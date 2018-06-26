@@ -30,6 +30,7 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.BoundExecutable;
 import io.micronaut.core.bind.DefaultExecutableBinder;
@@ -45,17 +46,19 @@ import io.micronaut.messaging.annotation.SendTo;
 import io.micronaut.messaging.exceptions.MessagingSystemException;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
+import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.Scheduler;
+import io.reactivex.functions.Function;
 import io.reactivex.schedulers.Schedulers;
 import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -307,9 +310,26 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                                                     consumerBean
                                             );
 
-                                            if (Publishers.isConvertibleToPublisher(result)) {
-                                                Flowable<?> resultFlowable = Publishers.convertPublisher(result, Flowable.class);
-                                                handleResultFlowable(consumerAnnotation, consumerBean, method, kafkaConsumer, consumerRecord, resultFlowable);
+                                            if (result != null) {
+                                                Flowable<?> resultFlowable;
+                                                boolean isBlocking;
+                                                if (Publishers.isConvertibleToPublisher(result)) {
+                                                    resultFlowable = Publishers.convertPublisher(result, Flowable.class);
+                                                    isBlocking = method.hasAnnotation(Blocking.class);
+                                                } else {
+                                                    resultFlowable = Flowable.just(result);
+                                                    isBlocking = true;
+                                                }
+
+                                                handleResultFlowable(
+                                                        consumerAnnotation,
+                                                        consumerBean,
+                                                        method,
+                                                        kafkaConsumer,
+                                                        consumerRecord,
+                                                        resultFlowable,
+                                                        isBlocking
+                                                );
                                             }
                                         } catch (Throwable e) {
                                             handleException(kafkaConsumer, consumerBean, consumerRecord, e);
@@ -390,130 +410,129 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
         }
     }
 
-    @SuppressWarnings("SubscriberImplementation")
+    @SuppressWarnings({"SubscriberImplementation", "unchecked"})
     private void handleResultFlowable(
             KafkaListener kafkaListener,
             Object consumerBean,
             ExecutableMethod<?, ?> method,
             KafkaConsumer kafkaConsumer,
             ConsumerRecord<?, ?> consumerRecord,
-            Flowable<?> resultFlowable) {
-        resultFlowable.subscribeOn(executorScheduler)
-                .subscribe(new Subscriber<Object>() {
-                    private Subscription subscription;
+            Flowable<?> resultFlowable,
+            boolean isBlocking) {
+        Flowable<RecordMetadata> recordMetadataProducer = resultFlowable.subscribeOn(executorScheduler)
+                .flatMap((Function<Object, Publisher<RecordMetadata>>) o -> {
+                    String[] destinationTopics = method.getValue(SendTo.class, String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
+                    if (ArrayUtils.isNotEmpty(destinationTopics)) {
+                        Object key = consumerRecord.key();
+                        Object value = o;
 
-                    @Override
-                    public void onSubscribe(Subscription s) {
-                        this.subscription = s;
-                        s.request(1);
-                    }
+                        if (key != null && value != null) {
+                            String groupId = kafkaListener.groupId();
+                            KafkaProducer kafkaProducer = producerRegistry.getProducer(
+                                    StringUtils.isNotEmpty(groupId) ? groupId : null,
+                                    Argument.of(key.getClass()),
+                                    Argument.of(value.getClass())
+                            );
 
-                    @SuppressWarnings("unchecked")
-                    @Override
-                    public void onNext(Object o) {
-
-                        String[] destinationTopics = method.getValue(SendTo.class, String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
-                        if (ArrayUtils.isNotEmpty(destinationTopics)) {
-                            try {
-                                Object key = consumerRecord.key();
-                                Object value = o;
-
-                                if (key != null && value != null) {
-                                    String groupId = kafkaListener.groupId();
-                                    KafkaProducer kafkaProducer = producerRegistry.getProducer(
-                                            StringUtils.isNotEmpty(groupId) ? groupId : null,
-                                            Argument.of(key.getClass()),
-                                            Argument.of(value.getClass())
+                            return Flowable.create(emitter -> {
+                                for (String destinationTopic : destinationTopics) {
+                                    ProducerRecord record = new ProducerRecord(
+                                            destinationTopic,
+                                            null,
+                                            key,
+                                            value,
+                                            consumerRecord.headers()
                                     );
 
-                                    for (String destinationTopic : destinationTopics) {
-                                        ProducerRecord record = new ProducerRecord(
-                                                destinationTopic,
-                                                null,
-                                                key,
-                                                value,
-                                                consumerRecord.headers()
-                                        );
+                                    kafkaProducer.send(record, (metadata, exception) -> {
+                                        if (exception != null) {
+                                            emitter.onError(exception);
+                                        } else {
+                                            emitter.onNext(metadata);
+                                        }
+                                    });
 
-                                        kafkaProducer.send(record, (metadata, exception) -> {
-                                            if (exception != null) {
-                                                onError(exception);
-                                            }
-                                        });
-
-                                    }
                                 }
-                            } catch (Exception e) {
-                                onError(e);
-                            }
+                                emitter.onComplete();
+                            }, BackpressureStrategy.ERROR);
 
 
                         }
-
-                        // ask for next
-                        subscription.request(1);
+                        return Flowable.empty();
                     }
+                    return Flowable.empty();
+                }).onErrorResumeNext((Function<Throwable, Publisher<RecordMetadata>>) throwable -> {
+                    handleException(consumerBean, new KafkaListenerException(
+                            "Error occurred processing record [" + consumerRecord + "] with Kafka reactive consumer [" + method + "]: " + throwable.getMessage(),
+                            throwable,
+                            consumerBean,
+                            kafkaConsumer,
+                            consumerRecord
+                    ));
 
-                    @SuppressWarnings("unchecked")
-                    @Override
-                    public void onError(Throwable t) {
-                        subscription.cancel();
+                    if (kafkaListener.redelivery()) {
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("Attempting redelivery of record [{}] following error", consumerRecord);
+                        }
 
-                        handleException(consumerBean, new KafkaListenerException(
-                                "Error occurred processing record [" + consumerRecord + "] with Kafka reactive consumer [" + method + "]: " + t.getMessage(),
-                                t,
-                                consumerBean,
-                                kafkaConsumer,
-                                consumerRecord
-                        ));
-
-                        if (kafkaListener.redelivery()) {
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("Attempting redelivery of record [{}] following error", consumerRecord);
-                            }
-
-                            Object key = consumerRecord.key();
-                            Object value = consumerRecord.value();
+                        Object key = consumerRecord.key();
+                        Object value = consumerRecord.value();
 
 
-                            if (key != null && value != null) {
-                                String groupId = kafkaListener.groupId();
-                                KafkaProducer kafkaProducer = producerRegistry.getProducer(
-                                        StringUtils.isNotEmpty(groupId) ? groupId : null,
-                                        Argument.of(key.getClass()),
-                                        Argument.of(value.getClass())
-                                );
+                        if (key != null && value != null) {
+                            String groupId = kafkaListener.groupId();
+                            KafkaProducer kafkaProducer = producerRegistry.getProducer(
+                                    StringUtils.isNotEmpty(groupId) ? groupId : null,
+                                    Argument.of(key.getClass()),
+                                    Argument.of(value.getClass())
+                            );
 
-                                ProducerRecord record = new ProducerRecord(
-                                        consumerRecord.topic(),
-                                        consumerRecord.partition(),
-                                        key,
-                                        value,
-                                        consumerRecord.headers()
-                                );
+                            ProducerRecord record = new ProducerRecord(
+                                    consumerRecord.topic(),
+                                    consumerRecord.partition(),
+                                    key,
+                                    value,
+                                    consumerRecord.headers()
+                            );
 
-                                kafkaProducer.send(record, (metadata, exception) -> {
-                                    if (exception != null) {
-                                        handleException(consumerBean, new KafkaListenerException(
-                                                "Redelivery failed for record [" + consumerRecord + "] with Kafka reactive consumer [" + method + "]: " + t.getMessage(),
-                                                t,
-                                                consumerBean,
-                                                kafkaConsumer,
-                                                consumerRecord
-                                        ));
-                                    }
-                                });
+                            return Flowable.create(emitter -> kafkaProducer.send(record, (metadata, exception) -> {
+                                if (exception != null) {
+                                    handleException(consumerBean, new KafkaListenerException(
+                                            "Redelivery failed for record [" + consumerRecord + "] with Kafka reactive consumer [" + method + "]: " + throwable.getMessage(),
+                                            throwable,
+                                            consumerBean,
+                                            kafkaConsumer,
+                                            consumerRecord
+                                    ));
 
-                            }
+                                    emitter.onComplete();
+                                } else {
+                                    emitter.onNext(metadata);
+                                    emitter.onComplete();
+                                }
+                            }), BackpressureStrategy.ERROR);
+
+
                         }
                     }
-
-                    @Override
-                    public void onComplete() {
-                        // no-op
-                    }
+                    return Flowable.empty();
                 });
 
+
+        if (isBlocking) {
+            recordMetadataProducer.blockingSubscribe(recordMetadata -> {
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("Method [{}] produced record metadata: {}", method, recordMetadata);
+                }
+            });
+        } else {
+            //noinspection ResultOfMethodCallIgnored
+            recordMetadataProducer.subscribe(recordMetadata -> {
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("Method [{}] produced record metadata: {}", method, recordMetadata);
+                }
+            });
+        }
     }
 
     private Argument findBodyArgument(ExecutableMethod<?, ?> method) {
