@@ -552,6 +552,20 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
         }
 
         @Override
+        public Optional<Object> get(CharSequence attr) {
+            Optional<Object> result = super.get(attr);
+            if (result.isPresent()) {
+                Object val = result.get();
+                if (val instanceof byte[]) {
+                    Optional<Object> deserialized = valueSerializer.deserialize((byte[]) val);
+                    deserialized.ifPresent(t -> attributeMap.put(attr, t));
+                    return deserialized;
+                }
+            }
+            return result;
+        }
+
+        @Override
         public Session setLastAccessedTime(Instant instant) {
             if (instant != null) {
                 if (!isNew()) {
