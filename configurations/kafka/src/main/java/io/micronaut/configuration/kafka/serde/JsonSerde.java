@@ -95,4 +95,9 @@ public class JsonSerde<T> implements Serializer<T>, Deserializer<T>, Serde<T> {
     public Deserializer<T> deserializer() {
         return this;
     }
+
+    @Override
+    public String toString() {
+        return "JsonSerde: " + type.getName();
+    }
 }
