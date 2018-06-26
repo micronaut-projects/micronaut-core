@@ -53,7 +53,8 @@ public class BatchConsumerRecordsBinderRegistry implements ArgumentBinderRegistr
     @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<ArgumentBinder<T, ConsumerRecords<?, ?>>> findArgumentBinder(Argument<T> argument, ConsumerRecords<?, ?> source) {
-        if (Iterable.class.isAssignableFrom(argument.getType())) {
+        Class<T> argType = argument.getType();
+        if (Iterable.class.isAssignableFrom(argType) || argType.isArray()) {
             Argument<?> batchType = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             List bound = new ArrayList();
 
