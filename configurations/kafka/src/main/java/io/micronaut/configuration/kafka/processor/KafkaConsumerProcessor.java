@@ -313,6 +313,61 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                                         Object result = boundExecutable.invoke(consumerBean);
 
                                         // handle batch result
+                                        if (result != null) {
+                                            if (result.getClass().isArray()) {
+                                                result = Arrays.asList((Object[]) result);
+                                            }
+
+                                            boolean isPublisher = Publishers.isConvertibleToPublisher(result);
+                                            Flowable<?> resultFlowable;
+                                            if (result instanceof Iterable) {
+                                                resultFlowable = Flowable.fromIterable((Iterable) result);
+                                            } else {
+                                                if (isPublisher) {
+                                                    resultFlowable = Publishers.convertPublisher(result, Flowable.class);
+                                                } else {
+                                                    resultFlowable = Flowable.just(result);
+                                                }
+                                            }
+
+                                            Iterator<? extends ConsumerRecord<?, ?>> iterator = consumerRecords.iterator();
+                                            boolean isBlocking = !isPublisher || method.hasAnnotation(Blocking.class);
+
+                                            if (isBlocking) {
+                                                resultFlowable.blockingSubscribe(o -> {
+                                                    if (iterator.hasNext()) {
+                                                        ConsumerRecord<?, ?> consumerRecord = iterator.next();
+
+                                                        handleResultFlowable(
+                                                                consumerAnnotation,
+                                                                consumerBean,
+                                                                method,
+                                                                kafkaConsumer,
+                                                                consumerRecord,
+                                                                Flowable.just(o),
+                                                                isBlocking
+                                                        );
+                                                    }
+                                                });
+                                            } else {
+                                                resultFlowable.forEach(o -> {
+                                                    if (iterator.hasNext()) {
+                                                        ConsumerRecord<?, ?> consumerRecord = iterator.next();
+
+                                                        handleResultFlowable(
+                                                                consumerAnnotation,
+                                                                consumerBean,
+                                                                method,
+                                                                kafkaConsumer,
+                                                                consumerRecord,
+                                                                Flowable.just(o),
+                                                                isBlocking
+                                                        );
+                                                    }
+                                                });
+                                            }
+
+                                        }
 
                                     } else {
                                         for (ConsumerRecord<?, ?> consumerRecord : consumerRecords) {
@@ -445,11 +500,11 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                         Object key = consumerRecord.key();
                         Object value = o;
 
-                        if (key != null && value != null) {
+                        if (value != null) {
                             String groupId = kafkaListener.groupId();
                             KafkaProducer kafkaProducer = producerRegistry.getProducer(
                                     StringUtils.isNotEmpty(groupId) ? groupId : null,
-                                    Argument.of(key.getClass()),
+                                    Argument.of((Class) (key != null ? key.getClass() : byte[].class)),
                                     Argument.of(value.getClass())
                             );
 
