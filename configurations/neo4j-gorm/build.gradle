@@ -16,4 +16,5 @@ dependencies {
     testRuntime(dependencyVersion("neo4j")) {
         exclude group: "io.netty", module: "netty-all"
     }
+    testRuntime 'io.netty:netty-transport-native-epoll:4.1.25.Final'
 }
