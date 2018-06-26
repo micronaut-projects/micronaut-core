@@ -53,7 +53,7 @@ $ mn create-function foo --features openfaas
 
 Beans can now be injected optionally using Kotlin nullable types without the need for the `@Nullable` annotation.
 
-=== New CLI flags
+=== CLI Improvements
 
 Two new flags have been added to the `create-app` command: `lang` and `test`. 
 
@@ -71,7 +71,7 @@ $ mn create-app bar --lang groovy
 $ mn create-app baz --lang kotlin
 ----
 
-The `test` flag accepts either `spock` or `junit`. This setting will determine the test framework used by any tests generated using CLI commands (currently only `create-controller`).  Each `lang` selection includes a default test framework selection: `java`/`junit`, `groovy`/`spock`, `kotlin`/`spek`. The `test` flag allows you to override the default test framework selection.
+The `test` flag accepts `spock`, `junit`, or `spek`. This setting will determine the test framework used by any tests generated using CLI commands (currently only `create-controller`).  Each `lang` selection includes a default test framework selection: `java`/`junit`, `groovy`/`spock`, `kotlin`/`spek`. The `test` flag allows you to override the default test framework selection.
 
 .Creating a Java application with Spock
 [source,bash]
@@ -85,6 +85,10 @@ $ mn create-app bar --test spock
 $ mn create-app baz --lang groovy --test junit
 ----
 
-=== Default Docker file  
+==== Default Docker file  
 
 Applications generated with `create-app` now include a default Docker file. 
+
+==== Java 9+ Improvements
+
+The CLI has been improved to provide a better experience for Java 9 and above.
