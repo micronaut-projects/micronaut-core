@@ -155,6 +155,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
      *
      * @param loadBalancer               The {@link LoadBalancer} to use for selecting servers
      * @param configuration              The {@link HttpClientConfiguration} object
+     * @param contextPath                The base URI to prepend to request uris
      * @param threadFactory              The thread factory to use for client threads
      * @param nettyClientSslBuilder      The SSL builder
      * @param codecRegistry              The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
@@ -251,7 +252,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
     /**
      * @param url           The URL
      * @param configuration The {@link HttpClientConfiguration} object
-     * @param contextPath   The context path
+     * @param contextPath   The base URI to prepend to request uris
      */
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration, String contextPath) {
         this(
@@ -275,6 +276,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
     /**
      * @param loadBalancer  The {@link LoadBalancer} to use for selecting servers
      * @param configuration The {@link HttpClientConfiguration} object
+     * @param contextPath   The base URI to prepend to request uris
      */
     public DefaultHttpClient(LoadBalancer loadBalancer, HttpClientConfiguration configuration, String contextPath) {
         this(loadBalancer,
@@ -1038,6 +1040,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
      * Resolve the filters for the request path.
      *
      * @param request The path
+     * @param requestURI The URI of the request
      * @return The filters
      */
     protected List<HttpClientFilter> resolveFilters(io.micronaut.http.HttpRequest<?> request, URI requestURI) {
@@ -1118,6 +1121,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
 
     /**
      * @param request           The request
+     * @param requestURI        The URI of the request
      * @param requestWrapper    The request wrapper
      * @param responsePublisher The response publisher
      * @param <I>               The input type
@@ -1145,6 +1149,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
 
     /**
      * @param request            The request
+     * @param requestURI         The URI of the request
      * @param requestContentType The request content type
      * @param permitsBody        Whether permits body
      * @return A {@link NettyRequestWriter}
