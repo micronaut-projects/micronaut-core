@@ -46,9 +46,9 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
     }
 
     Map<String, Object> getConfiguration() {
-        ['router.static.resources.paths':
+        ['micronaut.router.static.resources.paths':
                  ['classpath:', 'file:' + tempFile.parent],
-         'router.static.resources.enabled': true]
+         'micronaut.router.static.resources.enabled': true]
     }
 
     void cleanupSpec() {
@@ -132,9 +132,9 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
     void "test resources with configured mapping"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'router.static.resources.paths': ['classpath:', 'file:' + tempFile.parent],
-                'router.static.resources.enabled': true,
-                'router.static.resources.mapping': '/static/**'], 'test')
+                'micronaut.router.static.resources.paths': ['classpath:', 'file:' + tempFile.parent],
+                'micronaut.router.static.resources.enabled': true,
+                'micronaut.router.static.resources.mapping': '/static/**'], 'test')
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
 
@@ -161,9 +161,9 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
     void "test resources with configured mapping automatically resolves index.html"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'router.static.resources.paths': ['classpath:', 'file:' + tempFile.parent],
-                'router.static.resources.enabled': true,
-                'router.static.resources.mapping': '/static/**'], 'test')
+                'micronaut.router.static.resources.paths': ['classpath:', 'file:' + tempFile.parent],
+                'micronaut.router.static.resources.enabled': true,
+                'micronaut.router.static.resources.mapping': '/static/**'], 'test')
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
 
@@ -191,9 +191,9 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
     void "test resources with configured mapping automatically resolves index.html in subdirectory"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'router.static.resources.paths': ['classpath:', 'file:' + tempFile.parent],
-                'router.static.resources.enabled': true,
-                'router.static.resources.mapping': '/static/**'], 'test')
+                'micronaut.router.static.resources.paths': ['classpath:', 'file:' + tempFile.parent],
+                'micronaut.router.static.resources.enabled': true,
+                'micronaut.router.static.resources.mapping': '/static/**'], 'test')
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
 
@@ -220,9 +220,9 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
     void "test resources with configured mapping automatically resolves index.html in path"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'router.static.resources.paths': ['classpath:foo'],
-                'router.static.resources.enabled': true,
-                'router.static.resources.mapping': '/static/**'], 'test')
+                'micronaut.router.static.resources.paths': ['classpath:foo'],
+                'micronaut.router.static.resources.enabled': true,
+                'micronaut.router.static.resources.mapping': '/static/**'], 'test')
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
 
