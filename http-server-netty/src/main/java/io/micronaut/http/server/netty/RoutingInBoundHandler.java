@@ -92,6 +92,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -233,8 +234,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
 
         if (errorRoute != null) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
+            //handling connection reset by peer exceptions
+            if (cause instanceof IOException) {
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("IOException occurred (connection reset?): " + cause.getMessage(), cause);
+                }
+            } else {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
+                }
             }
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Found matching exception handler for exception [{}]: {}", cause.getMessage(), errorRoute);

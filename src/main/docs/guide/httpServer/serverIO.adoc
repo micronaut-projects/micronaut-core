@@ -1,6 +1,6 @@
 === Writing Data without Blocking
 
-Micronaut's HTTP server supports writing data with blocking simply by returning a rs:Publisher[] the emits objects that can be encoded to the HTTP response.
+Micronaut's HTTP server supports writing data without blocking simply by returning a rs:Publisher[] the emits objects that can be encoded to the HTTP response.
 
 The following table summarizes example return type signatures and the behaviour the server exhibits to handle each of them:
 
