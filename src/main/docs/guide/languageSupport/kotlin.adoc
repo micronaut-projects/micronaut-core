@@ -10,72 +10,39 @@ Support for Kotlin in Micronaut is built upon the https://kotlinlang.org/docs/re
 
 TIP: Learn more about kapt and its features from the https://kotlinlang.org/docs/reference/kapt.html[official documentation.]
 
-If you are using Gradle, you can use the https://docs.gradle.org/current/userguide/application_plugin.html[Application] plugin to run your application with the kapt compilation step in your build:
+The Micronaut annotation processors are declared in the `kapt` scope when using Gradle. For example:
 
 [source,groovy]
 .Example build.gradle
 ----
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-
-    dependencies {
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
-    }
-}
-
-apply plugin: "kotlin" //<1>
-apply plugin: 'kotlin-kapt'
-
-apply plugin: "application"
-mainClassName = "example.Application" //<2>
-
-repositories {
-    mavenCentral()
-    mavenLocal()
-}
-
 dependencies {
-    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion" //<3>
+    compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion" //<1>
     compile "org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion"
-    kapt "io.micronaut:inject-java" //<4>
+    kapt "io.micronaut:inject-java" //<2>
 
-    kaptTest "io.micronaut:inject-java" //<5>
-}
-
-test {
-    useJUnitPlatform()
-}
-
-compileKotlin {
-    kotlinOptions.jvmTarget = "1.8"
-}
-
-compileTestKotlin {
-    kotlinOptions.jvmTarget = "1.8"
+    kaptTest "io.micronaut:inject-java" //<3>
+    ...
 }
 ----
-<1> Apply the Kotlin and Kapt plugins
-<2> Set a `mainClassName` (required by the Application plugin)
-<3> Add the Kotlin standard libraries
-<4> Add the `inject-java` dependency under the `kapt` scope, so classes in `src/main` are processed
-<5> Add the `inject-java` dependency under the `kaptTest` scope, so classes in `src/test` are processed.
+
+
+<1> Add the Kotlin standard libraries
+<2> Add the `inject-java` dependency under the `kapt` scope, so classes in `src/main` are processed
+<3> Add the `inject-java` dependency under the `kaptTest` scope, so classes in `src/test` are processed.
 
 With a `build.gradle` file similar to the above, you can now run your Micronaut application using the `run` task (provided by the Application plugin):
 
 [source,bash]
 $ ./gradlew run
 
-You can now use Kotlin in your Micronaut project:
+An example controller written in Kotlin can be seen below:
 
 [source, kotlin]
 .src/main/kotlin/example/HelloController.kt
 ----
 package example
 
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.*
 
 @Controller("/")
 class HelloController {
@@ -87,4 +54,35 @@ class HelloController {
 }
 ----
 
-NOTE: The IntelliJ IDEA compiler does not support kapt! Classes must be compiled with the Gradle or Maven plugins.
+== Kotlin, Kapt and IntelliJ
+
+As of this writing IntelliJ's built-in compiler does not directly support Kapt and annotation processing. You must instead configure Intellij to run Gradle (or Maven) compilation as a build step before running your tests or application class.
+
+First edit the run configuration for tests or for the application and select "Run Gradle task" as a build step:
+
+image::kotlin-run-1.png[Intellij Settings,1024,768]
+
+Then add the `classes` task as task to execute for the application or for tests the `testClasses` task:
+
+image::kotlin-run-2.png[Intellij Settings,1024,768]
+
+Now whenever you run tests or the application Micronaut classes will be generated at compilation time.
+
+
+== Kotlin and Retaining Parameter Names
+
+Like with Java, the parameter name data for method parameters is not retained at compile time when using Kotlin. This can be a problem for Micronaut if you do not define parameter names explicitly and depend on an external JAR that is already compiled.
+
+To enable the retention of parameter name data with Kotlin you should set the `javaParameters` option to `true` in your `build.gradle`:
+
+.build.gradle
+[source,groovy]
+----
+compileTestKotlin {
+	kotlinOptions {
+	    jvmTarget = '1.8'
+	    javaParameters = true
+	}
+}
+----
+
