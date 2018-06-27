@@ -39,4 +39,4 @@ The following configuration properties are available to customize basic authenti
 
 See the javadoc for api:security.token.basicauth.BasicAuthTokenReaderConfigurationProperties[] for more information.
 
-//TIP: Read the http://guides.micronaut.io/micronaut-security-basicauth/guide/index.html[Basic Authentication Micronaut Guide] to learn more.
+TIP: Read the http://guides.micronaut.io/micronaut-security-basicauth/guide/index.html[Basic Authentication Micronaut Guide] to learn more.

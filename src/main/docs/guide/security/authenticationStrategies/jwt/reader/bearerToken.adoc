@@ -33,3 +33,5 @@ GET /protectedResource HTTP/1.1
 Host: micronaut.example
 Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjE0MjI5OTU5MjIsInN1YiI6ImppbWkiLCJyb2xlcyI6WyJST0xFX0FETUlOIiwiUk9MRV9VU0VSIl0sImlhdCI6MTQyMjk5MjMyMn0.rA7A2Gwt14LaYMpxNRtrCdO24RGrfHtZXY9fIjV8x8o
 ----
+
+TIP: Read the http://guides.micronaut.io/micronaut-security-jwt/guide/index.html[Micronaut JWT Authentication] to learn more.
