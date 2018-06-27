@@ -40,8 +40,8 @@ dependencies {
 apply from: "${rootProject.projectDir}/gradle/geb.gradle"
 
 webdriverBinaries {
-    chromedriver '2.38'
-    geckodriver '0.20.1'
+    chromedriver "${chromedriverVersion}"
+    geckodriver "${geckodriverVersion}"
 }
 
 test {
