@@ -292,7 +292,9 @@ public class RequiresCondition implements Condition {
             return true;
         } else {
             try {
-                boolean conditionResult = conditionClass.newInstance().matches(context);
+                Constructor<? extends Condition> constructor = conditionClass.getDeclaredConstructor();
+                constructor.setAccessible(true);
+                boolean conditionResult = constructor.newInstance().matches(context);
                 if (!conditionResult) {
                     context.fail("Custom condition [" + conditionClass + "] failed evaluation");
                 }

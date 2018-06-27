@@ -419,4 +419,26 @@ class MyBean {
         then:
         !beanDefinition.isEnabled(context)
     }
+
+    void "test requires non-public condition"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('io.micronaut.inject.requires.other_package.MyBean', '''
+package io.micronaut.inject.requires.other_package;
+
+import io.micronaut.context.annotation.*;
+import io.micronaut.inject.requires.other_package.NonPublicCondition;
+
+@Requires(condition = NonPublicCondition.class)
+@javax.inject.Singleton
+class MyBean {
+}
+''')
+
+        def context = ApplicationContext.build().build()
+
+        context.environment.start()
+
+        then:
+        beanDefinition.isEnabled(context)
+    }
 }
