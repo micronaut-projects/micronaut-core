@@ -19,6 +19,7 @@ package io.micronaut.http.context;
 import io.micronaut.http.HttpRequest;
 
 import java.util.Optional;
+import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 
 /**
@@ -58,6 +59,16 @@ public final class ServerRequestContext {
     }
 
     /**
+     * Return a new runnable by instrumenting the given runnable with request context handling.
+     *
+     * @param request  The request
+     * @param runnable The runnable
+     */
+    public static Runnable instrument(HttpRequest request, Runnable runnable) {
+        return () -> with(request, runnable);
+    }
+
+    /**
      * Wrap the execution of the given callable in request context processing.
      *
      * @param request  The request
@@ -69,6 +80,24 @@ public final class ServerRequestContext {
         try {
             REQUEST.set(request);
             return callable.get();
+        } finally {
+            REQUEST.remove();
+        }
+    }
+
+    /**
+     * Wrap the execution of the given callable in request context processing.
+     *
+     * @param request  The request
+     * @param callable The callable
+     * @param <T>      The return type of the callable
+     * @return The return value of the callable
+     * @throws Exception If the callable throws an exception
+     */
+    public static <T> T with(HttpRequest request, Callable<T> callable) throws Exception {
+        try {
+            REQUEST.set(request);
+            return callable.call();
         } finally {
             REQUEST.remove();
         }
