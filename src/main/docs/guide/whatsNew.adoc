@@ -85,9 +85,9 @@ $ mn create-app bar --test spock
 $ mn create-app baz --lang groovy --test junit
 ----
 
-==== Default Docker file  
+==== Default Dockerfile  
 
-Applications generated with `create-app` now include a default Docker file. 
+Applications generated with `create-app` now include a default `Dockerfile`. 
 
 ==== Java 9+ Improvements
 
