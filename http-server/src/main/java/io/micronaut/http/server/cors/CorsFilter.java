@@ -74,9 +74,10 @@ public class CorsFilter implements HttpServerFilter {
             if (response.isPresent()) {
                 return Publishers.just(response.get());
             } else {
-                return Publishers.then(chain.proceed(request), mutableHttpResponse ->
-                    handleResponse(request, mutableHttpResponse)
-                );
+                return Publishers.map(chain.proceed(request), mutableHttpResponse -> {
+                    handleResponse(request, mutableHttpResponse);
+                    return mutableHttpResponse;
+                });
             }
         } else {
             return chain.proceed(request);

@@ -27,9 +27,11 @@ import io.micronaut.http.client.docs.basics.Message
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
+import io.reactivex.functions.Consumer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 /**
  * @author Graeme Rocher
@@ -284,6 +286,48 @@ class HttpGetSpec extends Specification {
         helper.simpleSlash() == "success"
         helper.simplePreceedingSlash() == "success"
         helper.simpleDoubleSlash() == "success"
+    }
+
+    void "test body availability"() {
+        given:
+        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
+
+        when:
+        Flowable<HttpResponse> flowable = client.exchange(
+                HttpRequest.GET("/get/simple")
+        )
+        String body
+        flowable.firstOrError().subscribe((Consumer){ HttpResponse res ->
+            Thread.sleep(3000)
+            body = res.getBody(String).orElse(null)
+        })
+        def conditions = new PollingConditions(timeout: 4)
+
+        then:
+        conditions.eventually {
+            assert body == 'success'
+        }
+
+        cleanup:
+        client.stop()
+    }
+
+    void "test blocking body availability"() {
+        given:
+        HttpClient backing = HttpClient.create(embeddedServer.getURL())
+        BlockingHttpClient client = backing.toBlocking()
+
+        when:
+        HttpResponse res = client.exchange(
+                HttpRequest.GET("/get/simple")
+        )
+        String body = res.getBody(String).orElse(null)
+
+        then:
+        body == null
+
+        cleanup:
+        backing.stop()
     }
 
     @Controller("/get")

@@ -5,14 +5,16 @@ dependencies {
 
     compile dependencyVersion("groovy")
     compileOnly project(":inject-groovy")
-    compileOnly project(":http-server")
     compile project(":runtime-groovy")
     compile project(":inject")
     compile project(":spring")
-    testCompile project(":inject-groovy")
     compile "org.grails:grails-datastore-gorm-neo4j:6.1.5.RELEASE"
 
+    testCompile project(":inject-groovy")
     testCompile project(":http-server")
-    testCompile project(":http-client")
-    testRuntime dependencyVersion("neo4j")
+    testCompile(project(":http-client"))
+    testRuntime(dependencyVersion("neo4j")) {
+        exclude group: "io.netty", module: "netty-all"
+    }
+    testRuntime 'io.netty:netty-transport-native-epoll:4.1.25.Final'
 }
