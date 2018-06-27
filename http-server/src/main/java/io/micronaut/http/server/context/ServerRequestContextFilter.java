@@ -20,9 +20,12 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.context.ServerRequestContext;
+import io.micronaut.http.context.ServerRequestTracingPublisher;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import org.reactivestreams.Publisher;
+
+import java.util.function.Supplier;
 
 /**
  * A filter that instruments the request with the {@link io.micronaut.http.context.ServerRequestContext}.
@@ -34,6 +37,8 @@ import org.reactivestreams.Publisher;
 public final class ServerRequestContextFilter implements HttpServerFilter {
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-        return ServerRequestContext.with(request, () -> chain.proceed(request));
+        return ServerRequestContext.with(request, (Supplier<Publisher<MutableHttpResponse<?>>>) () ->
+                new ServerRequestTracingPublisher(request, chain.proceed(request))
+        );
     }
 }

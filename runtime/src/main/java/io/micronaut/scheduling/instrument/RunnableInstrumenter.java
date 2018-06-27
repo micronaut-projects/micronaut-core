@@ -16,28 +16,20 @@
 
 package io.micronaut.scheduling.instrument;
 
-import javax.annotation.Nonnull;
-import java.util.concurrent.Executor;
-
 /**
- * An {@link Executor} that has been instrumented to allow for propagation of thread state
- * and other instrumentation related tasks.
+ * Interface for classes that instrument {@link Runnable} instances.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface InstrumentedExecutor extends Executor, RunnableInstrumenter {
-
+public interface RunnableInstrumenter {
     /**
-     * Implementors can override to specify the target {@link Executor}.
+     * Implementors can override to instrument a Runnable.
      *
-     * @return The target {@link Executor}
+     * @param command The command to instrument
+     * @return The instrumented runnable
      */
-    Executor getTarget();
-
-    @Override
-    default void execute(@Nonnull Runnable command) {
-        getTarget().execute(instrument(command));
+    default Runnable instrument(Runnable command) {
+       return command;
     }
-
 }

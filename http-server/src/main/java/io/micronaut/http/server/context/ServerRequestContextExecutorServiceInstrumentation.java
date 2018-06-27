@@ -23,6 +23,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.scheduling.instrument.InstrumentedExecutorService;
 import io.micronaut.scheduling.instrument.InstrumentedScheduledExecutorService;
+import io.micronaut.scheduling.instrument.RunnableInstrumenter;
 
 import javax.inject.Singleton;
 import java.util.Optional;
@@ -38,7 +39,7 @@ import java.util.concurrent.ScheduledExecutorService;
  */
 @Singleton
 @Internal
-class ServerRequestContextExecutorServiceInstrumentation implements BeanCreatedEventListener<ExecutorService> {
+class ServerRequestContextExecutorServiceInstrumentation implements BeanCreatedEventListener<ExecutorService>, RunnableInstrumenter {
     @Override
     public final ExecutorService onCreated(BeanCreatedEvent<ExecutorService> event) {
         ExecutorService executorService = event.getBean();
@@ -77,6 +78,11 @@ class ServerRequestContextExecutorServiceInstrumentation implements BeanCreatedE
                 }
             };
         }
+    }
+
+    @Override
+    public Runnable instrument(Runnable command) {
+        return doInstrument(command);
     }
 
     private Runnable doInstrument(Runnable command) {
