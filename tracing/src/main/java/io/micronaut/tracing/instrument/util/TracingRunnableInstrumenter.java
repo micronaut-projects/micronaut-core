@@ -17,6 +17,7 @@
 package io.micronaut.tracing.instrument.util;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.scheduling.instrument.RunnableInstrumenter;
 import io.opentracing.Tracer;
 
 import javax.inject.Singleton;
@@ -30,7 +31,7 @@ import java.util.function.Function;
  */
 @Singleton
 @Requires(beans = Tracer.class)
-public class TracingRunnableInstrumenter implements Function<Runnable, Runnable> {
+public class TracingRunnableInstrumenter implements Function<Runnable, Runnable>, RunnableInstrumenter {
 
     private final Tracer tracer;
 
@@ -46,5 +47,10 @@ public class TracingRunnableInstrumenter implements Function<Runnable, Runnable>
     @Override
     public Runnable apply(Runnable runnable) {
         return new TracingRunnable(runnable, tracer);
+    }
+
+    @Override
+    public Runnable instrument(Runnable command) {
+        return apply(command);
     }
 }
