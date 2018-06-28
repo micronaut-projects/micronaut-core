@@ -40,7 +40,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.function.Supplier;
 
 /**
- * Instruments Reactor such that the thread factory used by Micronaut is used and instrumentations can be applied to the {@link java.util.concurrent.ScheduledExecutorService}
+ * Instruments Reactor such that the thread factory used by Micronaut is used and instrumentations can be applied to the {@link java.util.concurrent.ScheduledExecutorService}.
  *
  * @author Graeme Rocher
  * @since 1.0

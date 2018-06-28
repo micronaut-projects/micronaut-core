@@ -18,4 +18,4 @@ image::delegating_authentication_provider.svg[]
 `DelegatingAuthenticationProvider` is not enabled unless you provide implementations for link:{api}/io/micronaut/security/authentication/providers/UserFetcher.html[UserFetcher],
 link:{api}/io/micronaut/security/authentication/providers/PasswordEncoder.html[PasswordEncoder] and  link:{api}/io/micronaut/security/authentication/providers/AuthoritiesFetcher.html[AuthoritiesFetcher]
 
-//TIP: Read the http://guides.micronaut.io/micronaut-security-db-authprovider/guide/index.html[Database Authentication Provider Micronaut Guide] to learn more.
+TIP: Read the http://guides.micronaut.io/micronaut-database-authentication-provider-groovy/guide/index.html[LDAP and Database authentication providers] to learn more.

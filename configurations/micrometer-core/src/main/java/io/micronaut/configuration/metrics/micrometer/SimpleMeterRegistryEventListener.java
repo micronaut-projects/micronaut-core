@@ -44,7 +44,7 @@ import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory
 @Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
 public class SimpleMeterRegistryEventListener implements ApplicationEventListener<StartupEvent> {
 
-    private static Logger LOGGER = LoggerFactory.getLogger(SimpleMeterRegistryEventListener.class);
+    private static Logger logger = LoggerFactory.getLogger(SimpleMeterRegistryEventListener.class);
 
     /**
      * Application event method.
@@ -66,7 +66,9 @@ public class SimpleMeterRegistryEventListener implements ApplicationEventListene
                     .forEach(meterRegistryConfigurer -> {
                         if (meterRegistryConfigurer.supports(simpleMeterRegistry)) {
                             meterRegistryConfigurer.configure(simpleMeterRegistry);
-                            LOGGER.debug("Meter simpleMeterRegistry configured");
+                            if (logger.isDebugEnabled()) {
+                                logger.debug("Meter simpleMeterRegistry configured");
+                            }
                         }
                     });
             compositeMeterRegistry.add(simpleMeterRegistry);
