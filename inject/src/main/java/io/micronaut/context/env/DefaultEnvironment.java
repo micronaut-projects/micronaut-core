@@ -126,7 +126,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         Set<String> specifiedNames = new HashSet<>(3);
         specifiedNames.addAll(CollectionUtils.setOf(names));
 
-        if (!specifiedNames.contains(Environment.FUNCTION)) {
+        if (!specifiedNames.contains(Environment.FUNCTION) && shouldDeduceEnvironments()) {
             EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage();
             specifiedNames.addAll(environmentsAndPackage.enviroments);
             String aPackage = environmentsAndPackage.aPackage;
@@ -307,6 +307,15 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     public ResourceLoader forBase(String basePath) {
         return resourceLoader.forBase(basePath);
     }
+
+    /**
+     * @return Whether environment names and packages should be deduced
+     */
+    protected boolean shouldDeduceEnvironments() {
+        return true;
+    }
+
+
 
     /**
      * Creates the default annotation scanner.
