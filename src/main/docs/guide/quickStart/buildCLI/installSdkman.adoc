@@ -13,7 +13,7 @@ $ sdk install micronaut
 You can also specify the version to the `sdk install` command.
 
 ----
-$ sdk install micronaut 1.0.0.M1
+$ sdk install micronaut 1.0.0.M2
 ----
 
 You can find more information about SDKMAN usage on the http://sdkman.io/usage.html[SDKMAN Docs]
