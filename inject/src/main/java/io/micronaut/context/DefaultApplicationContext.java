@@ -389,6 +389,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             String bootstrapName = System.getProperty(BOOTSTRAP_NAME_PROPERTY);
             return StringUtils.isNotEmpty(bootstrapName) ? bootstrapName : BOOTSTRAP_NAME;
         }
+
+        @Override
+        protected boolean shouldDeduceEnvironments() {
+            return false;
+        }
     }
 
     /**
@@ -525,6 +530,10 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 bootstrapEnvironment.addPropertySource(source);
             }
             bootstrapEnvironment.start();
+            for (String pkg : bootstrapEnvironment.getPackages()) {
+                addPackage(pkg);
+            }
+
             return bootstrapEnvironment;
         }
     }
