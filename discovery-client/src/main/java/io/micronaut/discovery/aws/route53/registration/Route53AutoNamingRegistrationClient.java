@@ -18,37 +18,31 @@ package io.micronaut.discovery.aws.route53.registration;
 
 import com.amazonaws.SdkClientException;
 import com.amazonaws.services.servicediscovery.AWSServiceDiscovery;
+import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsync;
+import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsyncClientBuilder;
 import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryClient;
-import com.amazonaws.services.servicediscovery.model.CreatePublicDnsNamespaceRequest;
-import com.amazonaws.services.servicediscovery.model.CreatePublicDnsNamespaceResult;
-import com.amazonaws.services.servicediscovery.model.CreateServiceRequest;
-import com.amazonaws.services.servicediscovery.model.CreateServiceResult;
-import com.amazonaws.services.servicediscovery.model.CustomHealthStatus;
-import com.amazonaws.services.servicediscovery.model.DeleteNamespaceRequest;
-import com.amazonaws.services.servicediscovery.model.DeleteServiceRequest;
-import com.amazonaws.services.servicediscovery.model.DeregisterInstanceRequest;
-import com.amazonaws.services.servicediscovery.model.DnsConfig;
-import com.amazonaws.services.servicediscovery.model.DnsRecord;
-import com.amazonaws.services.servicediscovery.model.GetOperationRequest;
-import com.amazonaws.services.servicediscovery.model.GetOperationResult;
-import com.amazonaws.services.servicediscovery.model.RecordType;
-import com.amazonaws.services.servicediscovery.model.RegisterInstanceRequest;
-import com.amazonaws.services.servicediscovery.model.RegisterInstanceResult;
-import com.amazonaws.services.servicediscovery.model.RoutingPolicy;
-import com.amazonaws.services.servicediscovery.model.Service;
-import com.amazonaws.services.servicediscovery.model.UpdateInstanceCustomHealthStatusRequest;
+import com.amazonaws.services.servicediscovery.model.*;
 import io.micronaut.configurations.aws.AWSClientConfiguration;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceIdGenerator;
 import io.micronaut.discovery.aws.route53.Route53AutoRegistrationConfiguration;
 import io.micronaut.discovery.client.registration.DiscoveryServiceAutoRegistration;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
 import io.micronaut.discovery.cloud.aws.AmazonComputeInstanceMetadataResolver;
+import io.micronaut.discovery.registration.RegistrationConfiguration;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.health.HeartbeatConfiguration;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.micronaut.runtime.server.EmbeddedServerInstance;
+import io.reactivex.Flowable;
+import io.reactivex.schedulers.Schedulers;
+import org.reactivestreams.Publisher;
+import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,6 +50,8 @@ import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Future;
+
 
 /**
  * @author Rvanderwerf
@@ -99,8 +95,8 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     private final HeartbeatConfiguration heartbeatConfiguration;
     private final ServiceInstanceIdGenerator idGenerator;
     private final AWSClientConfiguration clientConfiguration;
-    private AWSServiceDiscovery discoveryClient;
-    private final AmazonComputeInstanceMetadataResolver amazonComputeInstanceMetadataResolver;
+    private AWSServiceDiscoveryAsync discoveryClient;
+    private AmazonComputeInstanceMetadataResolver amazonComputeInstanceMetadataResolver;
     private Service discoveryService;
 
 
@@ -128,7 +124,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         this.idGenerator = idGenerator;
         this.clientConfiguration = clientConfiguration;
         try {
-            this.discoveryClient = AWSServiceDiscoveryClient.builder().withClientConfiguration(clientConfiguration.getClientConfiguration()).build();
+            setDiscoveryClient(AWSServiceDiscoveryAsyncClientBuilder.standard().withClientConfiguration(clientConfiguration.getClientConfiguration()).build());
         } catch (SdkClientException ske) {
             LOG.warn("Warning: cannot find any AWS credentials. Please verify your configuration.", ske);
         }
@@ -145,16 +141,16 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     protected void pulsate(ServiceInstance instance, HealthStatus status) {
         // this only work if you create a health status check when you register it
         // we can't really pulsate anywhere because amazon health checks work inverse from this UNLESS you have a custom health check
-        if (discoveryService.getHealthCheckCustomConfig() != null) {
+        if (discoveryService!=null && discoveryService.getHealthCheckCustomConfig() != null) {
             CustomHealthStatus customHealthStatus = CustomHealthStatus.UNHEALTHY;
             if (status.getOperational().isPresent()) {
                 customHealthStatus = CustomHealthStatus.HEALTHY;
             }
-            discoveryClient.updateInstanceCustomHealthStatus(new UpdateInstanceCustomHealthStatusRequest().withInstanceId(instance.getInstanceId().get()).withServiceId(route53AutoRegistrationConfiguration.getAwsServiceId()).withStatus(customHealthStatus));
+            getDiscoveryClient().updateInstanceCustomHealthStatus(new UpdateInstanceCustomHealthStatusRequest().withInstanceId(instance.getInstanceId().get()).withServiceId(route53AutoRegistrationConfiguration.getAwsServiceId()).withStatus(customHealthStatus));
         }
 
         if (status.getOperational().isPresent() && !status.getOperational().get()) {
-            discoveryClient.deregisterInstance(new DeregisterInstanceRequest().withInstanceId(instance.getInstanceId().get()).withServiceId(route53AutoRegistrationConfiguration.getAwsServiceId()));
+            getDiscoveryClient().deregisterInstance(new DeregisterInstanceRequest().withInstanceId(instance.getInstanceId().get()).withServiceId(route53AutoRegistrationConfiguration.getAwsServiceId()));
             LOG.info("Health status is non operational, instance id " + instance.getInstanceId().get() + " was de-registered from the discovery service.");
         }
     }
@@ -168,7 +164,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         if (instance.getInstanceId().isPresent()) {
             DeregisterInstanceRequest deregisterInstanceRequest = new DeregisterInstanceRequest().withServiceId(route53AutoRegistrationConfiguration.getAwsServiceId())
                     .withInstanceId(instance.getInstanceId().get());
-            discoveryClient.deregisterInstance(deregisterInstanceRequest);
+            getDiscoveryClient().deregisterInstance(deregisterInstanceRequest);
         }
     }
 
@@ -217,14 +213,114 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
             }
         }
 
-        assert instance.getInstanceId().isPresent();
+
+        //assert ((EmbeddedServerInstance) instance).computeInstanceMetadataResolver.resolve(((EmbeddedServerInstance) instance).environment).isPresent();
+        //ComputeInstanceMetadata metadata =  ((EmbeddedServerInstance) instance).computeInstanceMetadataResolver.resolve(((NettyEmbeddedServerInstance) instance).environment).get().getInstanceId();
+        ConvertibleValues<String> metadata = instance.getMetadata();
+
+
+
         RegisterInstanceRequest instanceRequest = new RegisterInstanceRequest().withServiceId(route53AutoRegistrationConfiguration.getAwsServiceId())
-                .withInstanceId(instance.getInstanceId().get()).withCreatorRequestId(Long.toString(System.nanoTime())).withAttributes(instanceAttributes);
+                .withInstanceId(metadata.asMap().get("instanceId")).withCreatorRequestId(Long.toString(System.nanoTime())).withAttributes(instanceAttributes);
 
-        RegisterInstanceResult instanceResult = discoveryClient.registerInstance(instanceRequest);
-        GetOperationResult opResult = checkOperation(instanceResult.getOperationId());
+        Future<RegisterInstanceResult> instanceResult = getDiscoveryClient().registerInstanceAsync(instanceRequest);
+        Flowable<RegisterInstanceResult> flowableResult = Flowable.fromFuture(instanceResult);
 
-        assert opResult.getOperation().getStatus().equals("SUCCESS");
+
+
+
+        flowableResult.subscribe(new Subscriber<RegisterInstanceResult>() {
+
+            @Override
+            public void onNext(RegisterInstanceResult registerInstanceResult) {
+                if (LOG.isInfoEnabled()) {
+                    LOG.info("Called AWS to register service [{}] with {}", instance.getId(), route53AutoRegistrationConfiguration.getAwsServiceId());
+                }
+                if (registerInstanceResult.getOperationId() != null) {
+                    Flowable<GetOperationResult> operationResultFlowable = logRegisterResult(registerInstanceResult);
+                    operationResultFlowable.subscribe(new Subscriber<GetOperationResult>() {
+                        @Override
+                        public void onSubscribe(Subscription s) {
+                            s.request(1);
+                        }
+
+                        @Override
+                        public void onNext(GetOperationResult getOperationResult) {
+                            if (getOperationResult.getOperation().getStatus().equalsIgnoreCase("SUCCESS")) {
+                                if (LOG.isInfoEnabled()) {
+                                    LOG.info("Success register service [{}] with {}", instance.getId(), route53AutoRegistrationConfiguration.getAwsServiceId());
+                                }
+                            } else {
+                                if (getOperationResult.getOperation().getStatus().equals("FAIL")) {
+                                    LOG.error("Error calling aws service for operationId:" + getOperationResult + " error code:" + getOperationResult.getOperation().getErrorCode() + " error message:" + getOperationResult.getOperation().getErrorMessage());
+                                    if (route53AutoRegistrationConfiguration.isFailFast() && instance instanceof EmbeddedServerInstance) {
+                                        LOG.error("Error registering instance shutting down instance.");
+                                        ((EmbeddedServerInstance) instance).getEmbeddedServer().stop();
+                                    }
+                                } else {
+                                    LOG.error("Unknown status calling aws service for operationId:" + getOperationResult + " status code:" + getOperationResult.getOperation().getStatus());
+                                }
+                            }
+
+                        }
+
+                        @Override
+                        public void onError(Throwable t) {
+                            LOG.error("Error calling aws service for operationId:" + t.getMessage(),t);
+                            if (route53AutoRegistrationConfiguration.isFailFast() && instance instanceof EmbeddedServerInstance) {
+                                LOG.error("Error registering instance shutting down instance.");
+                                ((EmbeddedServerInstance) instance).getEmbeddedServer().stop();
+                            }
+                        }
+
+                        @Override
+                        public void onComplete() {
+                            if (LOG.isInfoEnabled()) {
+                                LOG.info("Success register service [{}] with {} is complete.", instance.getId(), route53AutoRegistrationConfiguration.getAwsServiceId());
+                            }
+                            // this is used later for custom health checks during pulsate
+                            discoveryService = getService(route53AutoRegistrationConfiguration.getAwsServiceId());
+
+                        }
+
+                    });
+                }
+
+            }
+            @Override
+            public void onSubscribe(Subscription s) {
+                s.request(1);
+            }
+
+            @Override
+            public void onError(Throwable t) {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Error registering instance with AWS:"+t.getMessage(),t);
+                }
+                if (route53AutoRegistrationConfiguration.isFailFast() && instance instanceof EmbeddedServerInstance) {
+                    LOG.error("Error registering instance with AWS and Failfast is set: stopping instance");
+                    ((EmbeddedServerInstance) instance).getEmbeddedServer().stop();
+                }
+            }
+
+            @Override
+            public void onComplete() {
+                if (LOG.isInfoEnabled()) {
+                    LOG.info("Success calling register service request [{}] with {} is complete.", instance.getId(),
+                            route53AutoRegistrationConfiguration.getAwsServiceId());
+                }
+            }
+        });
+
+
+    }
+
+
+    private Flowable<GetOperationResult> logRegisterResult(RegisterInstanceResult result) {
+        Future<GetOperationResult> operationResult = getDiscoveryClient().getOperationAsync(new GetOperationRequest().withOperationId(result.getOperationId()));
+        Flowable<GetOperationResult> flowableResult = Flowable.fromFuture(operationResult);
+        LOG.info("Registration for service operation ID:"+result.getOperationId()+" was ");
+        return flowableResult;
     }
 
     /**
@@ -235,7 +331,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     public void deleteService(String serviceId) {
 
         DeleteServiceRequest deleteServiceRequest = new DeleteServiceRequest().withId(serviceId);
-        discoveryClient.deleteService(deleteServiceRequest);
+        getDiscoveryClient().deleteService(deleteServiceRequest);
 
     }
 
@@ -247,7 +343,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     public void deleteNamespace(String namespaceId) {
 
         DeleteNamespaceRequest deleteNamespaceRequest = new DeleteNamespaceRequest().withId(namespaceId);
-        discoveryClient.deleteNamespace(deleteNamespaceRequest);
+        getDiscoveryClient().deleteNamespace(deleteNamespaceRequest);
 
     }
 
@@ -270,10 +366,11 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
                         .withName(name)
                         .withDescription("test");
         //TODO switch to async version
-        CreatePublicDnsNamespaceResult clientResult = discoveryClient.createPublicDnsNamespace(publicDnsNamespaceRequest);
+        CreatePublicDnsNamespaceResult clientResult = getDiscoveryClient().createPublicDnsNamespace(publicDnsNamespaceRequest);
         String operationId = clientResult.getOperationId();
 
 
+        //TODO move this operation ID to a file on disk, and check with a scheduled process every 5 seconds or so to see if success or not so it does not block.
         GetOperationResult opResult = checkOperation(operationId);
         return opResult.getOperation().getTargets().get("NAMESPACE");
     }
@@ -311,7 +408,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         GetOperationResult opResult = null;
         try {
             while (!result.equals("SUCCESS") && !result.equals("FAIL")) {
-                opResult = discoveryClient.getOperation(new GetOperationRequest().withOperationId(operationId));
+                opResult = getDiscoveryClient().getOperation(new GetOperationRequest().withOperationId(operationId));
                 result = opResult.getOperation().getStatus();
                 if (opResult.getOperation().getStatus().equals("SUCCESS")) {
                     LOG.info("Successfully get operation id " + operationId);
@@ -322,6 +419,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
                         return opResult;
                     }
                 }
+                //TODO make this configurable
                 Thread.currentThread().sleep(1000); // if you call this to much amazon will rate limit you
             }
         } catch (InterruptedException e) {
@@ -329,4 +427,34 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         }
         return opResult;
     }
+
+    public AWSServiceDiscoveryAsync getDiscoveryClient() {
+        return discoveryClient;
+    }
+
+    public void setDiscoveryClient(AWSServiceDiscoveryAsync discoveryClient) {
+        this.discoveryClient = discoveryClient;
+    }
+
+    public Service getDiscoveryService() {
+        return discoveryService;
+    }
+
+    public void setDiscoveryService(Service discoveryService) {
+        this.discoveryService = discoveryService;
+    }
+
+    /**
+     * The only reason we need this is to figure out if there is custom health checked enabled for pulsate.
+     * @param serviceId aws id of the service
+     * @return Service object with details of the discovery service
+     */
+    private Service getService(String serviceId) {
+        GetServiceRequest serviceRequest = new GetServiceRequest().withId(serviceId);
+        Future<GetServiceResult> serviceResultFuture = discoveryClient.getServiceAsync(serviceRequest);
+        GetServiceResult serviceResult = Flowable.fromFuture(serviceResultFuture).blockingSingle();
+        return serviceResult.getService();
+    }
+
+
 }
