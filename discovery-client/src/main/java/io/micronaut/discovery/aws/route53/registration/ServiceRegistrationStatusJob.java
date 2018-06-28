@@ -28,6 +28,9 @@ public class ServiceRegistrationStatusJob {
     @Inject
     Route53AutoRegistrationConfiguration route53AutoRegistrationConfiguration;
 
+    @Inject
+    EmbeddedServerInstance embeddedServerInstance;
+
     @Scheduled(fixedDelay = "10s")
     void executeEveryTen() throws IOException {
         // log for status file with an active operation id
@@ -45,8 +48,7 @@ public class ServiceRegistrationStatusJob {
                 if (result.getOperation().getStatus().equalsIgnoreCase("failure")) {
                     if (route53AutoRegistrationConfiguration.isFailFast()) {
                         LOG.error("Error registering instance shutting down instance.");
-                        //TODO how do I get the current instance?
-                        ((EmbeddedServerInstance) instance).getEmbeddedServer().stop();
+                        ((EmbeddedServerInstance) embeddedServerInstance).getEmbeddedServer().stop();
                     }
                 }
             }
