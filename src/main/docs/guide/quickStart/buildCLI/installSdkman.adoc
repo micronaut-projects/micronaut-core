@@ -21,7 +21,7 @@ You can find more information about SDKMAN usage on the http://sdkman.io/usage.h
 You should now be able to run the Micronaut CLI.
 
 ----
-> mn
+$ mn
 | Starting interactive mode...
 | Enter a command name to run. Use TAB for completion:
 mn>
