@@ -55,7 +55,7 @@ Beans can now be injected optionally using Kotlin nullable types without the nee
 
 === CLI Improvements
 
-Two new flags have been added to the `create-app` command: `lang` and `test`. 
+Aew flag has been added to the `create-app` command: `lang`. 
 
 The `lang` flag accepts any of the three supported languages: `java`, `groovy`, or `kotlin` (`java` is default when no flag is supplied). This selection will determine the language used for the `Application` class as well as other code artifacts generated using CLI commands (such as `create-controller`, `create-job`, etc).
 
@@ -69,20 +69,6 @@ $ mn create-app bar --lang groovy
 [source,bash]
 ----
 $ mn create-app baz --lang kotlin
-----
-
-The `test` flag accepts `spock`, `junit`, or `spek`. This setting will determine the test framework used by any tests generated using CLI commands (currently only `create-controller`).  Each `lang` selection includes a default test framework selection: `java`/`junit`, `groovy`/`spock`, `kotlin`/`spek`. The `test` flag allows you to override the default test framework selection.
-
-.Creating a Java application with Spock
-[source,bash]
-----
-$ mn create-app bar --test spock
-----
-
-.Creating a Groovy application with JUnit
-[source,bash]
-----
-$ mn create-app baz --lang groovy --test junit
 ----
 
 ==== Default Dockerfile  
