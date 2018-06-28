@@ -34,21 +34,21 @@ dependencies {
 [source,xml]
 ----
 <dependency>
-	<groupId>io.micronaut.configuration</groupId>
-	<artifactId>micrometer-core</artifactId>
-	<version>${micronaut.version}</version>
+  <groupId>io.micronaut.configuration</groupId>
+  <artifactId>micrometer-core</artifactId>
+  <version>${micronaut.version}</version>
 </dependency>
 <!-- micrometer-registry-statsd also pulls in micrometer-core so included above to verbose example -->
 <dependency>
-	<groupId>io.micronaut.configuration</groupId>
-	<artifactId>micrometer-registry-statsd</artifactId>
-	<version>${micronaut.version}</version>
+  <groupId>io.micronaut.configuration</groupId>
+  <artifactId>micrometer-registry-statsd</artifactId>
+  <version>${micronaut.version}</version>
 </dependency>
 <!-- Also required to enable endpoint -->
 <dependency>
-	<groupId>io.micronaut</groupId>
-	<artifactId>management</artifactId>
-	<version>${micronaut.version}</version>
+  <groupId>io.micronaut</groupId>
+  <artifactId>management</artifactId>
+  <version>${micronaut.version}</version>
 </dependency>
 ----
 
@@ -72,129 +72,43 @@ meters. A http://micrometer.io/docs/concepts#_meters[Meter] is something that pr
 
 A MeterRegistry can have some customizations automatically applied.
 
-=== MeterRegistryCustomizer
+=== Meter Registry Configurer
 
-* Any bean that implements MeterRegistryCustomizer gets applied to every _applicable_ MeterRegistry bean on creation
-* These beans should be declared with `@Context` to ensure they are available when the bean context is built
-* The implementation of the MeterRegistryCustomizer `supports()` method determines if the customizer is applied to a particular registry
+* Any bean that implements `MeterRegistryConfigurer` gets applied to every _applicable_ MeterRegistry bean on creation
+* The implementation of the MeterRegistryConfigurer `supports()` method determines if the configurer is applied to a particular registry
 ** If you want all registries to get the customization, simply return return `true`
-** Otherwize, you can evaluate the registry for its class type, its class hierarchy, or other criteria.
-** Rememebr you only get one shot for autoconfiguration; i.e. when the bean context is started.
+** Otherwise, you can evaluate the registry for its class type, its class hierarchy, or other criteria.
+** Remember you only get one shot for autoconfiguration; i.e. when the bean context is started.
 ** However, in code, you can apply additional customizations to the registry config
 
+.MeterRegistryConfigurer Interface
 [source,java]
 ----
-/*
-* Copyright 2017-2018 original authors
-*
-* Licensed under the Apache License, Version 2.0 (the "License");
-* you may not use this file except in compliance with the License.
-* You may obtain a copy of the License at
-*
-* http://www.apache.org/licenses/LICENSE-2.0
-*
-* Unless required by applicable law or agreed to in writing, software
-* distributed under the License is distributed on an "AS IS" BASIS,
-* WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-* See the License for the specific language governing permissions and
-* limitations under the License.
-*/
-
- package io.micronaut.configuration.metrics.aggregator;
-
- import io.micrometer.core.instrument.MeterRegistry;
-
- /**
-  * Class that will configure meter registries.  This is done on bean added event so that
-  * composite registry can be skipped and non-composite registries can be added to composite.
-  *
-  * @author Christian Oestreich
-  * @param <T> an instance of a meter registry that will be configured
-  * @since 1.0
-  */
- public interface MeterRegistryConfigurer<T extends MeterRegistry> {
-
-     /**
-      * Method to configure a meter registry with binders, filters, etc.
-      *
-      * @param meterRegistry Meter Registry
-      */
-     void configure(T meterRegistry);
-
-     /**
-      * Method to determine if this configurer supports the meter registry type.
-      *
-      * @param meterRegistry a meter registry
-      * @return boolean whether is supported
-      */
-     boolean supports(T meterRegistry);
-}
+include::{metricscore}/aggregator/MeterRegistryConfigurer.java[]
 ----
 
-=== MeterFilter
+.Example
+[source,java]
+----
+include::{testsmetricscore}/SimpleMeterRegistryConfigurer.java[]
+----
 
-* A MeterFilter can be used to determine if a Meter is to be added to the registry. See http://micrometer.io/docs/concepts#_meter_filters[Meter Filters]
+=== Meter Filter
+
+* A meter filter can be used to determine if a Meter is to be added to the registry. See http://micrometer.io/docs/concepts#_meter_filters[Meter Filters]
 * Any bean that implements MeterFilter will be applied to all registries when the registry is first created
 
 You can create custom filters similar to the following inside your application.  Micrometer's `MeterFilter` class provides several convenience methods to help with the creation of these filters.
 
+.Example
 [source,java]
 ----
-import io.micrometer.core.instrument.Tag;
-import io.micrometer.core.instrument.config.MeterFilter;
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Factory;
-
-import javax.inject.Singleton;
-import java.util.Arrays;
-
-@Factory
-public class MeterFilterFactory {
-
-    /**
-     * Exclude metrics starting with jvm
-     *
-     * @return meter filter
-     */
-    @Bean
-    @Singleton
-    MeterFilter jvmExclusionFilter() {
-        return MeterFilter.denyNameStartsWith("jvm");
-    }
-
-    /**
-     * Add global tags to all metrics
-     *
-     * @return meter filter
-     */
-    @Bean
-    @Singleton
-    MeterFilter addCommonTagFilter() {
-        return MeterFilter.commonTags(Arrays.asList(Tag.of("scope", "demo")));
-    }
-
-    /**
-     * Rename a tag key for every metric beginning with a given prefix.
-     * <p>
-     * This will rename the metric name http.server.requests tag value called `method` to `httpmethod`
-     * <p>
-     * OLD: http.server.requests ['method':'GET", ...]
-     * NEW: http.server.requests ['httpmethod':'GET", ...]
-     *
-     * @return meter filter
-     */
-    @Bean
-    @Singleton
-    MeterFilter renameFilter() {
-        return MeterFilter.renameTag("http.server.requests", "method", "httpmethod");
-    }
-}
+include::{testsmetricscore}/MeterFilterFactory.java[]
 ----
 
-=== MeterBinder
+=== Meter Binder
 
-Meter Binders get applied to Meter Registry to _mix in_ metrics producers. Micrometer.io defines
-several of these for cross-cutting meterics related to JVM metrics, caches, classloaders, etc.
+Meter Binders get applied to Meter Registry to _mix in_ metrics producers. Micrometer.io defines several of these for cross-cutting metrics related to JVM metrics, caches, classloaders, etc. These all extend a simple interface MeterBinder, but these are not auto wired as beans and manual wiring is required given how micrometer is currently implemented.
 
 ==== Provided Binders
 
@@ -309,36 +223,7 @@ See the Micrometer.io docs at https://micrometer.io/docs for more information.
 .Custom Metrics Example
 [source,java]
 ----
-import io.micrometer.core.instrument.Counter;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
-import io.micronaut.http.annotation.QueryValue;
-import io.micronaut.validation.Validated;
-import io.reactivex.Single;
-
-import javax.annotation.Nullable;
-import javax.validation.constraints.NotBlank;
-
-@Controller("/")
-@Validated
-public class IndexController {
-
-    private MeterRegistry meterRegistry;
-
-    public IndexController(MeterRegistry meterRegistry) {
-        this.meterRegistry = meterRegistry;
-    }
-
-    @Get("/hello/{name}")
-    public Single hello(@NotBlank String name) {
-        meterRegistry
-                .counter("web.access", "controller", "index", "action", "hello")
-                .increment();
-        return Single.just("Hello " + name);
-    }
-
-}
+include::{testsmetricscore}/IndexController.java[]
 ----
 
 == Metrics Registries & Reporters
@@ -353,9 +238,9 @@ You can include the statsd reporter via `io.micronaut.configuration:micrometer-r
 [source,xml]
 ----
 <dependency>
-	<groupId>io.micronaut.configuration</groupId>
-	<artifactId>micrometer-registry-statsd</artifactId>
-	<version>${micronaut.version}</version>
+  <groupId>io.micronaut.configuration</groupId>
+  <artifactId>micrometer-registry-statsd</artifactId>
+  <version>${micronaut.version}</version>
 </dependency>
 ----
 
@@ -393,9 +278,9 @@ You can include the graphite reporter via `io.micronaut.configuration:micrometer
 [source,xml]
 ----
 <dependency>
-	<groupId>io.micronaut.configuration</groupId>
-	<artifactId>micrometer-registry-graphite</artifactId>
-	<version>${micronaut.version}</version>
+  <groupId>io.micronaut.configuration</groupId>
+  <artifactId>micrometer-registry-graphite</artifactId>
+  <version>${micronaut.version}</version>
 </dependency>
 ----
 
@@ -431,9 +316,9 @@ You can include the atlas reporter via `io.micronaut.configuration:micrometer-re
 [source,xml]
 ----
 <dependency>
-	<groupId>io.micronaut.configuration</groupId>
-	<artifactId>micrometer-registry-atlas</artifactId>
-	<version>${micronaut.version}</version>
+  <groupId>io.micronaut.configuration</groupId>
+  <artifactId>micrometer-registry-atlas</artifactId>
+  <version>${micronaut.version}</version>
 </dependency>
 ----
 
@@ -467,9 +352,9 @@ You can include the prometheus reporter via `io.micronaut.configuration:micromet
 [source,xml]
 ----
 <dependency>
-	<groupId>io.micronaut.configuration</groupId>
-	<artifactId>micrometer-registry-prometheus</artifactId>
-	<version>${micronaut.version}</version>
+  <groupId>io.micronaut.configuration</groupId>
+  <artifactId>micrometer-registry-prometheus</artifactId>
+  <version>${micronaut.version}</version>
 </dependency>
 ----
 
