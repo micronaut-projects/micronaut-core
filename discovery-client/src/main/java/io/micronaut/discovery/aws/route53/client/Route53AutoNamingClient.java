@@ -16,18 +16,17 @@
 
 package io.micronaut.discovery.aws.route53.client;
 
+import com.amazonaws.SdkClientException;
 import com.amazonaws.services.servicediscovery.AWSServiceDiscovery;
+import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsync;
+import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsyncClientBuilder;
 import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryClient;
-import com.amazonaws.services.servicediscovery.model.InstanceSummary;
-import com.amazonaws.services.servicediscovery.model.ListInstancesRequest;
-import com.amazonaws.services.servicediscovery.model.ListInstancesResult;
-import com.amazonaws.services.servicediscovery.model.ListServicesRequest;
-import com.amazonaws.services.servicediscovery.model.ListServicesResult;
-import com.amazonaws.services.servicediscovery.model.ServiceFilter;
-import com.amazonaws.services.servicediscovery.model.ServiceSummary;
+import com.amazonaws.services.servicediscovery.model.*;
+import com.amazonaws.services.simplesystemsmanagement.model.GetParametersByPathResult;
 import io.micronaut.configurations.aws.AWSClientConfiguration;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
@@ -35,8 +34,13 @@ import io.micronaut.discovery.aws.route53.Route53ClientDiscoveryConfiguration;
 import io.micronaut.discovery.aws.route53.Route53DiscoveryConfiguration;
 import io.micronaut.discovery.aws.route53.registration.EC2ServiceInstance;
 import io.micronaut.http.client.Client;
+import io.reactivex.Flowable;
+import io.reactivex.Observable;
+import io.reactivex.schedulers.Schedulers;
+import javafx.collections.ObservableList;
 import org.reactivestreams.Publisher;
 
+import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.IOException;
@@ -44,6 +48,9 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 /**
  * @author Rvanderwerf
@@ -66,26 +73,50 @@ public class Route53AutoNamingClient implements DiscoveryClient {
     @Inject
     Route53DiscoveryConfiguration route53DiscoveryConfiguration;
 
-    AWSServiceDiscovery discoveryClient;
+    AWSServiceDiscoveryAsync discoveryClient;
+
+    public Route53ClientDiscoveryConfiguration getRoute53ClientDiscoveryConfiguration() {
+        return route53ClientDiscoveryConfiguration;
+    }
+
+    public void setRoute53ClientDiscoveryConfiguration(Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration) {
+        this.route53ClientDiscoveryConfiguration = route53ClientDiscoveryConfiguration;
+    }
+
+    public void setDiscoveryClient(AWSServiceDiscoveryAsync discoveryClient) {
+        this.discoveryClient = discoveryClient;
+    }
+
+    public AWSServiceDiscoveryAsync getDiscoveryClient() {
+        return discoveryClient;
+    }
 
     @Override
     public String getDescription() {
         return null;
     }
 
-    @Override
-    public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
-        if (discoveryClient == null) {
-            discoveryClient = AWSServiceDiscoveryClient.builder().withClientConfiguration(awsClientConfiguration.getClientConfiguration()).build();
-        }
-        if (serviceId == null) {
-            serviceId = route53ClientDiscoveryConfiguration.getAwsServiceId();  // we can default to the config file
-        }
+    @PostConstruct
+    private void init() {
+        discoveryClient = AWSServiceDiscoveryAsyncClientBuilder.standard().withClientConfiguration(awsClientConfiguration.getClientConfiguration()).build();
+    }
 
-        ListInstancesRequest instancesRequest = new ListInstancesRequest().withServiceId(serviceId);
-        ListInstancesResult instanceResult = discoveryClient.listInstances(instancesRequest);
+    /*@Override
+    public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
+        Publisher<ListInstancesResult> instancesResultPublisher = getAwsInstances(serviceId);
+        instancesResultPublisher.subscribe();
+
+    }*/
+
+
+    /**
+     * transforms an aws result into a list of service instances.
+     * @param instancesResult instance result list of a service from aws route 53
+     * @return serviceInstance list that micronaut wants
+     */
+    private Flowable<List<ServiceInstance>> convertInstancesResulttoServiceInstances(ListInstancesResult instancesResult) {
         List<ServiceInstance> serviceInstances = new ArrayList<ServiceInstance>();
-        for (InstanceSummary instanceSummary : instanceResult.getInstances()) {
+        for (InstanceSummary instanceSummary : instancesResult.getInstances()) {
             try {
                 String uri = "http://" + instanceSummary.getAttributes().get("URI");
                 ServiceInstance serviceInstance = new EC2ServiceInstance(instanceSummary.getId(), new URI(uri)).metadata(instanceSummary.getAttributes()).build();
@@ -94,33 +125,46 @@ public class Route53AutoNamingClient implements DiscoveryClient {
                 e.printStackTrace();
             }
         }
+        return Flowable.just(serviceInstances);
+    }
 
-        return Publishers.just(
-                serviceInstances
-        );
+    @Override
+    public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
+        if (serviceId == null) {
+            serviceId = getRoute53ClientDiscoveryConfiguration().getAwsServiceId();  // we can default to the config file
+        }
+        ListInstancesRequest instancesRequest = new ListInstancesRequest().withServiceId(serviceId);
+        Future<ListInstancesResult> instanceResult = getDiscoveryClient().listInstancesAsync(instancesRequest);
+        Flowable<ListInstancesResult> observableInstanceResult = Flowable.fromFuture(instanceResult);
+        Flowable<List<ServiceInstance>> observableInstances = observableInstanceResult.flatMap(result -> convertInstancesResulttoServiceInstances(result));
+        return observableInstances;
     }
 
     @Override
     public Publisher<List<String>> getServiceIds() {
-        if (discoveryClient == null) {
-            discoveryClient = AWSServiceDiscoveryClient.builder().withClientConfiguration(awsClientConfiguration.getClientConfiguration()).build();
-        }
-
-        ServiceFilter serviceFilter = new ServiceFilter().withName("NAMESPACE_ID").withValues(route53ClientDiscoveryConfiguration.getNamespaceId());
+        ServiceFilter serviceFilter = new ServiceFilter().withName("NAMESPACE_ID").withValues(getRoute53ClientDiscoveryConfiguration().getNamespaceId());
         ListServicesRequest listServicesRequest = new ListServicesRequest().withFilters(serviceFilter);
-        ListServicesResult response = discoveryClient.listServices(listServicesRequest);
-        List<ServiceSummary> services = response.getServices();
+        Future<ListServicesResult> response = getDiscoveryClient().listServicesAsync(listServicesRequest);
+        Flowable<ListServicesResult> flowableList = Flowable.fromFuture(response);
+        Flowable<List<String>> flowableInstanceIds = flowableList.flatMap(result -> convertServiceIds(result));
+        return flowableInstanceIds;
+    }
+
+    private Publisher<List<String>> convertServiceIds(ListServicesResult listServicesResult) {
+        List<ServiceSummary> services = listServicesResult.getServices();
         List<String> serviceIds = new ArrayList<String>();
+
         for (ServiceSummary service : services) {
             serviceIds.add(service.getId());
         }
         return Publishers.just(
                 serviceIds
         );
+
     }
 
     @Override
     public void close() throws IOException {
-        discoveryClient.shutdown();
+        getDiscoveryClient().shutdown();
     }
 }
