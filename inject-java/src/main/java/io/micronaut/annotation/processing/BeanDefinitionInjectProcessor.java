@@ -49,7 +49,6 @@ import io.micronaut.inject.configuration.ConfigurationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
 import io.micronaut.inject.configuration.PropertyMetadata;
 import io.micronaut.inject.processing.ProcessedTypes;
-import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
@@ -287,7 +286,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private ExecutableElementParamInfo constructorParamterInfo;
 
         /**
-         * @param concreteClass The {@link TypeElementVisitor}
+         * @param concreteClass The {@link TypeElement}
          */
         AnnBeanElementVisitor(TypeElement concreteClass) {
             this.concreteClass = concreteClass;

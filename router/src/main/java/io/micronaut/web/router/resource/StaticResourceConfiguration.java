@@ -39,7 +39,7 @@ public class StaticResourceConfiguration implements Toggleable {
     /**
      * The prefix for static resources configuration.
      */
-    public static final String PREFIX = "router.static.resources";
+    public static final String PREFIX = "micronaut.router.static.resources";
 
     protected boolean enabled = false;
     protected List<String> paths = Collections.emptyList();

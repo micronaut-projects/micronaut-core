@@ -63,6 +63,7 @@ public final class ServerRequestContext {
      *
      * @param request  The request
      * @param runnable The runnable
+     * @return The newly instrumented runnable
      */
     public static Runnable instrument(HttpRequest request, Runnable runnable) {
         return () -> with(request, runnable);
