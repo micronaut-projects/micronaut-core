@@ -10,7 +10,11 @@ echo "https://$GH_TOKEN:@github.com" > ~/.git-credentials
 ./gradlew --stop
 ./gradlew testClasses || EXIT_STATUS=$?
 if [[ $EXIT_STATUS -eq 0 ]]; then
-    ./gradlew check --no-daemon || EXIT_STATUS=$?
+    if [[ -n $TRAVIS_TAG ]] || [[ $TRAVIS_BRANCH =~ ^master$ && $TRAVIS_PULL_REQUEST == 'false' ]]; then
+        echo "Skipping Tests to Publish Release"
+    else
+        ./gradlew check --no-daemon || EXIT_STATUS=$?
+    fi
 fi
 
 if [[ $EXIT_STATUS -eq 0 ]]; then
