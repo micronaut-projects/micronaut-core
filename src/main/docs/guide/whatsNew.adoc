@@ -1,12 +1,12 @@
-This section covers what's new since the previous release of Micronaut.
+Apart from https://github.com/micronaut-projects/micronaut-core/milestone/2?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features.
 
 === Metrics Support
 
 The first version of support for Metrics via http://micrometer.io[Micrometer] is now available. Metrics are exposed via the <<metricsEndpoint,Metrics Endpoint>> and can be extensively customized.
 
-The first version of Metrics support includes support for Statsd, Atlas, Graphite and Prometheus with more Metrics backends coming in the future.
+Metrics support includes support for Statsd, Atlas, Graphite and Prometheus with more Metrics backends coming in the future.
 
-See the section on the <<metricsEndpoint,Metrics Endpoint>> for more information.
+See the section on the <<metricsEndpoint,Metrics Endpoint>> for more information. Special thanks to https://github.com/ctoestreich[Christian Oestreich] for significant contributions in this area.
 
 === Server Sent Event (SSE) Client
 
@@ -16,7 +16,7 @@ In additional the `@Client` annotation has been updated to add support for autom
 
 See the section on <<clientAnnotationStreaming, Client Streaming>> for more information.
 
-=== Blocking I/O Support
+=== Improved Blocking I/O Support
 
 It is now possible to return a api:core.io.Writable[] and have the operation offloaded to a the I/O thread pool, thus improving the ability to interface with APIs that do not yet support non-blocking I/O:
 

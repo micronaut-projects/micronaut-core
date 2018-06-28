@@ -5,6 +5,22 @@ The following section covers frequently asked questions that you may find yourse
 
 No. Your classes are your classes. Micronaut does not transform classes or modify the Java byte code you write. Micronaut at compile will produce an additional set of classes that sit next to your original untouched classes.
 
+==== Why Doesn't Micronaut use Spring?
+
+When asking why Micronaut doesn't use Spring, it is typically in reference to the Spring Dependency Injection container.
+
+NOTE: The Spring ecosystem is very broad and there are many Spring libraries you can use directly in Micronaut without requiring the Spring container.
+
+The reason Micronaut features its own native JSR-305 compliant dependency injection is that the cost of these features in Spring (and any reflection based DI/AOP container) is too great in terms of memory consumption and the impact on startup time. In order to support dependency injection at runtime Spring:
+
+* https://github.com/spring-projects/spring-framework/tree/master/spring-core/src/main/java/org/springframework/core/type/classreading[Reads the byte code] of every bean it finds at runtime.
+* https://github.com/spring-projects/spring-framework/blob/a691065d05741a4f1ca17925c8a5deec0f378c8b/spring-core/src/main/java/org/springframework/core/annotation/AnnotationUtils.java#L1465[Synthesizes new annotations] for each annotation on each bean method, constructor, field etc. to support Annotation metadata.
+* https://github.com/spring-projects/spring-framework/blob/master/spring-beans/src/main/java/org/springframework/beans/CachedIntrospectionResults.java[Builds Reflective Metadata] for each bean for every method, constructor, field etc.
+
+The result is a progressive degradation of startup time and memory consumption as your application incorporates more features.
+
+For Microservices and Serverless functions where it is critical that startup time and memory consumption remain low the above behaviour is an undesirable reality of using the Spring container, hence the designers of Micronaut chose not to use Spring.
+
 ==== Does Micronaut support Scala?
 
 Micronaut supports any JVM language that supports the Annotation Processor API. Scala currently does not support this API. However, Groovy also doesn't support this API and special support has been built that processes the Groovy AST. It may be technically possible to support Scala future if a similar module to `inject-groovy` is built, but as of this writing Scala is not supported.
@@ -35,3 +51,6 @@ Groovy by default imports the `groovy.lang` package which includes a class calle
 
 ==== Why is it taking much longer than it should to start the application
 
+Micronaut's startup time is typically very fast. At the application level, however, it is possible to block startup time so if you are seeing slow startup, review if you have any application startup listeners or `@Context` scope beans that are slowing startup.
+
+Some network issues can, also cause slow startup. On the Mac for example misconfiguration of your `/etc/hosts` file can cause issues. See the following link:https://stackoverflow.com/a/39698914/1264846[stackoverflow answer].
