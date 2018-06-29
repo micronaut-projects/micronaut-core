@@ -221,7 +221,6 @@ class KafkaBatchListenerSpec extends Specification {
         }
     }
 
-
     @io.micronaut.configuration.kafka.annotation.KafkaClient(batch = true)
     @Topic(KafkaBatchListenerSpec.BOOKS_TOPIC)
     static interface MyBatchClient {
@@ -268,7 +267,6 @@ class KafkaBatchListenerSpec extends Specification {
         @Topic(KafkaBatchListenerSpec.BOOKS_LIST_TOPIC)
         void receiveList(List<Book> books) {
             this.books.addAll books
-
         }
 
         @Topic(KafkaBatchListenerSpec.BOOKS_HEADERS_TOPIC)
@@ -288,7 +286,6 @@ class KafkaBatchListenerSpec extends Specification {
             this.books.addAll(books)
             return books*.title
         }
-
         @Topic(KafkaBatchListenerSpec.BOOKS_FORWARD_ARRAY_TOPIC)
         @SendTo(KafkaBatchListenerSpec.TITLES_TOPIC)
         String[] receiveAndSendArray(Book...books) {
