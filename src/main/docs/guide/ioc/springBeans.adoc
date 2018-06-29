@@ -35,17 +35,7 @@ beans = {
 In a non-Grails application something similar may be specified using
 any of Spring's bean definition styles:
 
-```java
-import io.micronaut.spring.beans.MicronautBeanProcessor;
-import io.micronaut.http.client.Client;
-import com.sample.Widget;
-import org.springframework.context.annotation.Configuration;
-
-@Configuration
-public class SomeBeanConfiguration {
-
-    @Bean
-    public MicronautBeanProcessor beanProcessor() {
-        return new MicronautBeanProcessor(Widget, Client)
-    }
-}
+[source, groovy]
+----
+include::spring/src/test/groovy/io/micronaut/spring/beans/MicronautBeanProcessorByAnnotationTypeSpec.groovy[tags=springconfig, indent=0]
+----

@@ -27,14 +27,16 @@ class MicronautBeanProcessorByAnnotationTypeSpec extends Specification {
     }
 }
 
+// tag::springconfig[]
 @Configuration
 class ByAnnotationTypeConfig {
 
     @Bean
-    MicronautBeanProcessor beanProcessors() {
+    MicronautBeanProcessor beanProcessor() {
         new MicronautBeanProcessor(Prototype, Singleton)
     }
 }
+// end::springconfig[]
 
 @Singleton
 class SomeSingleton {}
