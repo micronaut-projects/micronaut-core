@@ -33,11 +33,13 @@ import org.springframework.core.env.Environment;
 
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 /**
  * Adds Micronaut beans to a Spring application context.  This processor will
- * find all of the Micronaut beans of the specified type
+ * find all of the Micronaut beans of the specified types
  * and add them as beans to the Spring application context.
  *
  * @author jeffbrown
@@ -50,17 +52,17 @@ public class MicronautBeanProcessor implements BeanFactoryPostProcessor, Disposa
     private static final String MICRONAUT_SINGLETON_PROPERTY_NAME = "micronautSingleton";
 
     protected DefaultBeanContext micronautContext;
-    protected final Class<?> micronautBeanQualifierType;
+    protected final List<Class<?>> micronautBeanQualifierTypes;
     private Environment environment;
 
     /**
      *
-     * @param qualifierType The type associated with the
+     * @param qualifierTypes The types associated with the
      *                   Micronaut beans which should be added to the
      *                   Spring application context.
      */
-    public MicronautBeanProcessor(Class<?> qualifierType) {
-        this.micronautBeanQualifierType = qualifierType;
+    public MicronautBeanProcessor(Class<?>... qualifierTypes) {
+        this.micronautBeanQualifierTypes = Arrays.asList(qualifierTypes);
     }
 
     @Override
@@ -102,23 +104,26 @@ public class MicronautBeanProcessor implements BeanFactoryPostProcessor, Disposa
         }
         micronautContext.start();
 
-
-        Qualifier<Object> micronautBeanQualifier;
-        if(micronautBeanQualifierType.isAnnotation()) {
-            micronautBeanQualifier = Qualifiers.byStereotype((Class<? extends Annotation>) micronautBeanQualifierType);
-        } else {
-            micronautBeanQualifier = Qualifiers.byType(micronautBeanQualifierType);
-        }
-        micronautContext.getBeanDefinitions(micronautBeanQualifier)
+        micronautBeanQualifierTypes
                 .stream()
-                .forEach(definition -> {
-                    final BeanDefinitionBuilder beanDefinitionBuilder = BeanDefinitionBuilder
-                            .rootBeanDefinition(MicronautSpringBeanFactory.class.getName());
-                    beanDefinitionBuilder.addPropertyValue(MICRONAUT_BEAN_TYPE_PROPERTY_NAME, definition.getBeanType());
-                    beanDefinitionBuilder.addPropertyValue(MICRONAUT_CONTEXT_PROPERTY_NAME, micronautContext);
-                    beanDefinitionBuilder.addPropertyValue(MICRONAUT_SINGLETON_PROPERTY_NAME, definition.isSingleton());
-                    ((DefaultListableBeanFactory) beanFactory).registerBeanDefinition(definition.getName(), beanDefinitionBuilder.getBeanDefinition());
-                });
+                .forEach(micronautBeanQualifierType -> {
+            Qualifier<Object> micronautBeanQualifier;
+            if (micronautBeanQualifierType.isAnnotation()) {
+                micronautBeanQualifier = Qualifiers.byStereotype((Class<? extends Annotation>) micronautBeanQualifierType);
+            } else {
+                micronautBeanQualifier = Qualifiers.byType(micronautBeanQualifierType);
+            }
+            micronautContext.getBeanDefinitions(micronautBeanQualifier)
+                    .stream()
+                    .forEach(definition -> {
+                        final BeanDefinitionBuilder beanDefinitionBuilder = BeanDefinitionBuilder
+                                .rootBeanDefinition(MicronautSpringBeanFactory.class.getName());
+                        beanDefinitionBuilder.addPropertyValue(MICRONAUT_BEAN_TYPE_PROPERTY_NAME, definition.getBeanType());
+                        beanDefinitionBuilder.addPropertyValue(MICRONAUT_CONTEXT_PROPERTY_NAME, micronautContext);
+                        beanDefinitionBuilder.addPropertyValue(MICRONAUT_SINGLETON_PROPERTY_NAME, definition.isSingleton());
+                        ((DefaultListableBeanFactory) beanFactory).registerBeanDefinition(definition.getName(), beanDefinitionBuilder.getBeanDefinition());
+                    });
+        });
     }
 
     @Override
