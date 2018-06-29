@@ -287,7 +287,7 @@ class AWSServiceDiscoveryAsyncMock implements AWSServiceDiscoveryAsync {
                 @Override
                 public RegisterInstanceResult get() {
                     try {
-                        RegisterInstanceResult registerInstanceResult = mockFactory.Mock(RegisterInstanceResult)
+                        RegisterInstanceResult registerInstanceResult = new RegisterInstanceResult()
                         registerInstanceResult.operationId = "adslkdfaskljfdsaklj"
                         return registerInstanceResult
                     } catch (InterruptedException e) {
@@ -371,7 +371,17 @@ class AWSServiceDiscoveryAsyncMock implements AWSServiceDiscoveryAsync {
 
         @Override
         GetOperationResult getOperation(GetOperationRequest getOperationRequest) {
-            return null
+            try {
+                GetOperationResult operationResult = new GetOperationResult()
+                Operation operation = new Operation()
+                operation.id = "123456"
+                operation.status = "SUCCESS"
+                operationResult.operation = operation
+                return operationResult
+            } catch (InterruptedException e) {
+                throw new IllegalStateException(e)
+            }
+
         }
 
         @Override

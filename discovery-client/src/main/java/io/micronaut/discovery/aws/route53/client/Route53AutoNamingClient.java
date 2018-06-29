@@ -30,6 +30,8 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
+import io.micronaut.discovery.aws.route53.AWSServiceDiscoveryClientResolver;
+import io.micronaut.discovery.aws.route53.AWSServiceDiscoveryResolver;
 import io.micronaut.discovery.aws.route53.Route53ClientDiscoveryConfiguration;
 import io.micronaut.discovery.aws.route53.Route53DiscoveryConfiguration;
 import io.micronaut.discovery.aws.route53.registration.EC2ServiceInstance;
@@ -59,6 +61,7 @@ import java.util.concurrent.TimeUnit;
 @Singleton
 @Client(id = Route53ClientDiscoveryConfiguration.SERVICE_ID, path = "/", configuration = Route53ClientDiscoveryConfiguration.class)
 @Requires(env = Environment.AMAZON_EC2)
+//@Requires(notEnv = Environment.TEST)
 @Requires(beans = Route53DiscoveryConfiguration.class)
 @Requires(beans = AWSClientConfiguration.class)
 @Requires(property = "aws.route53.discovery.enabled", value = "true", defaultValue = "false")
@@ -73,7 +76,15 @@ public class Route53AutoNamingClient implements DiscoveryClient {
     @Inject
     Route53DiscoveryConfiguration route53DiscoveryConfiguration;
 
+    @Inject
+    AWSServiceDiscoveryResolver awsServiceDiscoveryResolver;
+
+    @Inject
+    Environment environment;
+
     AWSServiceDiscoveryAsync discoveryClient;
+
+
 
     public Route53ClientDiscoveryConfiguration getRoute53ClientDiscoveryConfiguration() {
         return route53ClientDiscoveryConfiguration;
@@ -88,7 +99,7 @@ public class Route53AutoNamingClient implements DiscoveryClient {
     }
 
     public AWSServiceDiscoveryAsync getDiscoveryClient() {
-        return discoveryClient;
+        return awsServiceDiscoveryResolver.resolve(environment);
     }
 
     @Override
@@ -98,7 +109,9 @@ public class Route53AutoNamingClient implements DiscoveryClient {
 
     @PostConstruct
     private void init() {
-        discoveryClient = AWSServiceDiscoveryAsyncClientBuilder.standard().withClientConfiguration(awsClientConfiguration.getClientConfiguration()).build();
+//        if (discoveryClient == null) {
+//            discoveryClient = AWSServiceDiscoveryAsyncClientBuilder.standard().withClientConfiguration(awsClientConfiguration.getClientConfiguration()).build();
+        //}
     }
 
     /*@Override

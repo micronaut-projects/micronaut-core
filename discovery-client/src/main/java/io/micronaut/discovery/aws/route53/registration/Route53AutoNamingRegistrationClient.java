@@ -28,28 +28,29 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceIdGenerator;
+import io.micronaut.discovery.aws.route53.AWSServiceDiscoveryClientResolver;
+import io.micronaut.discovery.aws.route53.AWSServiceDiscoveryResolver;
 import io.micronaut.discovery.aws.route53.Route53AutoRegistrationConfiguration;
 import io.micronaut.discovery.client.registration.DiscoveryServiceAutoRegistration;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
 import io.micronaut.discovery.cloud.aws.AmazonComputeInstanceMetadataResolver;
-import io.micronaut.discovery.registration.RegistrationConfiguration;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.health.HeartbeatConfiguration;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServerInstance;
+import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.Flowable;
-import io.reactivex.schedulers.Schedulers;
-import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Future;
 
 
@@ -98,6 +99,9 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     private AWSServiceDiscoveryAsync discoveryClient;
     private AmazonComputeInstanceMetadataResolver amazonComputeInstanceMetadataResolver;
     private Service discoveryService;
+    private AWSServiceDiscoveryResolver awsServiceDiscoveryResolver;
+    Executor executorService;
+
 
 
 
@@ -116,19 +120,26 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
             Route53AutoRegistrationConfiguration route53AutoRegistrationConfiguration,
             ServiceInstanceIdGenerator idGenerator,
             AWSClientConfiguration clientConfiguration,
-            AmazonComputeInstanceMetadataResolver amazonComputeInstanceMetadataResolver) {
+            AmazonComputeInstanceMetadataResolver amazonComputeInstanceMetadataResolver,
+            @Named(TaskExecutors.IO) Executor executorService,
+            AWSServiceDiscoveryResolver awsServiceDiscoveryResolver) {
         super(route53AutoRegistrationConfiguration);
         this.environment = environment;
         this.heartbeatConfiguration = heartbeatConfiguration;
         this.route53AutoRegistrationConfiguration = route53AutoRegistrationConfiguration;
         this.idGenerator = idGenerator;
         this.clientConfiguration = clientConfiguration;
+        this.awsServiceDiscoveryResolver = awsServiceDiscoveryResolver;
+/*
         try {
             setDiscoveryClient(AWSServiceDiscoveryAsyncClientBuilder.standard().withClientConfiguration(clientConfiguration.getClientConfiguration()).build());
         } catch (SdkClientException ske) {
             LOG.warn("Warning: cannot find any AWS credentials. Please verify your configuration.", ske);
         }
+*/
+        setDiscoveryClient(discoveryClient);
         this.amazonComputeInstanceMetadataResolver = amazonComputeInstanceMetadataResolver;
+        this.executorService = executorService;
     }
 
     /**
@@ -214,19 +225,13 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         }
 
 
-        //assert ((EmbeddedServerInstance) instance).computeInstanceMetadataResolver.resolve(((EmbeddedServerInstance) instance).environment).isPresent();
-        //ComputeInstanceMetadata metadata =  ((EmbeddedServerInstance) instance).computeInstanceMetadataResolver.resolve(((NettyEmbeddedServerInstance) instance).environment).get().getInstanceId();
         ConvertibleValues<String> metadata = instance.getMetadata();
-
-
 
         RegisterInstanceRequest instanceRequest = new RegisterInstanceRequest().withServiceId(route53AutoRegistrationConfiguration.getAwsServiceId())
                 .withInstanceId(metadata.asMap().get("instanceId")).withCreatorRequestId(Long.toString(System.nanoTime())).withAttributes(instanceAttributes);
 
         Future<RegisterInstanceResult> instanceResult = getDiscoveryClient().registerInstanceAsync(instanceRequest);
         Flowable<RegisterInstanceResult> flowableResult = Flowable.fromFuture(instanceResult);
-
-
 
 
         flowableResult.subscribe(new Subscriber<RegisterInstanceResult>() {
@@ -237,53 +242,11 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
                     LOG.info("Called AWS to register service [{}] with {}", instance.getId(), route53AutoRegistrationConfiguration.getAwsServiceId());
                 }
                 if (registerInstanceResult.getOperationId() != null) {
-                    Flowable<GetOperationResult> operationResultFlowable = logRegisterResult(registerInstanceResult);
-                    operationResultFlowable.subscribe(new Subscriber<GetOperationResult>() {
-                        @Override
-                        public void onSubscribe(Subscription s) {
-                            s.request(1);
-                        }
-
-                        @Override
-                        public void onNext(GetOperationResult getOperationResult) {
-                            if (getOperationResult.getOperation().getStatus().equalsIgnoreCase("SUCCESS")) {
-                                if (LOG.isInfoEnabled()) {
-                                    LOG.info("Success register service [{}] with {}", instance.getId(), route53AutoRegistrationConfiguration.getAwsServiceId());
-                                }
-                            } else {
-                                if (getOperationResult.getOperation().getStatus().equals("FAIL")) {
-                                    LOG.error("Error calling aws service for operationId:" + getOperationResult + " error code:" + getOperationResult.getOperation().getErrorCode() + " error message:" + getOperationResult.getOperation().getErrorMessage());
-                                    if (route53AutoRegistrationConfiguration.isFailFast() && instance instanceof EmbeddedServerInstance) {
-                                        LOG.error("Error registering instance shutting down instance.");
-                                        ((EmbeddedServerInstance) instance).getEmbeddedServer().stop();
-                                    }
-                                } else {
-                                    LOG.error("Unknown status calling aws service for operationId:" + getOperationResult + " status code:" + getOperationResult.getOperation().getStatus());
-                                }
-                            }
-
-                        }
-
-                        @Override
-                        public void onError(Throwable t) {
-                            LOG.error("Error calling aws service for operationId:" + t.getMessage(),t);
-                            if (route53AutoRegistrationConfiguration.isFailFast() && instance instanceof EmbeddedServerInstance) {
-                                LOG.error("Error registering instance shutting down instance.");
-                                ((EmbeddedServerInstance) instance).getEmbeddedServer().stop();
-                            }
-                        }
-
-                        @Override
-                        public void onComplete() {
-                            if (LOG.isInfoEnabled()) {
-                                LOG.info("Success register service [{}] with {} is complete.", instance.getId(), route53AutoRegistrationConfiguration.getAwsServiceId());
-                            }
-                            // this is used later for custom health checks during pulsate
-                            discoveryService = getService(route53AutoRegistrationConfiguration.getAwsServiceId());
-
-                        }
-
-                    });
+                    ServiceRegistrationStatusTask serviceRegistrationStatusTask = new ServiceRegistrationStatusTask(getDiscoveryClient(),
+                            route53AutoRegistrationConfiguration,
+                            instance,
+                            registerInstanceResult.getOperationId());
+                    executorService.execute(serviceRegistrationStatusTask);
                 }
 
             }
@@ -365,12 +328,8 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
                 new CreatePublicDnsNamespaceRequest().withCreatorRequestId(requestId)
                         .withName(name)
                         .withDescription("test");
-        //TODO switch to async version
         CreatePublicDnsNamespaceResult clientResult = getDiscoveryClient().createPublicDnsNamespace(publicDnsNamespaceRequest);
         String operationId = clientResult.getOperationId();
-
-
-        //TODO move this operation ID to a file on disk, and check with a scheduled process every 5 seconds or so to see if success or not so it does not block.
         GetOperationResult opResult = checkOperation(operationId);
         return opResult.getOperation().getTargets().get("NAMESPACE");
     }
@@ -399,7 +358,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     }
 
     /**
-     * loop for checking of the call to aws is complete or not. Need to replace with RxJava/future call.
+     * Loop for checking of the call to aws is complete or not. This is the non-async version used for testing
      * @param operationId operation ID we are polling for
      * @return result of the operation, can be success or failure or ongoing
      */
@@ -420,7 +379,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
                     }
                 }
                 //TODO make this configurable
-                Thread.currentThread().sleep(1000); // if you call this to much amazon will rate limit you
+                Thread.currentThread().sleep(5000); // if you call this to much amazon will rate limit you
             }
         } catch (InterruptedException e) {
             LOG.error("Error polling for aws response operation:", e);
@@ -429,7 +388,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     }
 
     public AWSServiceDiscoveryAsync getDiscoveryClient() {
-        return discoveryClient;
+        return awsServiceDiscoveryResolver.resolve(environment);
     }
 
     public void setDiscoveryClient(AWSServiceDiscoveryAsync discoveryClient) {
@@ -437,6 +396,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     }
 
     public Service getDiscoveryService() {
+
         return discoveryService;
     }
 
@@ -451,7 +411,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
      */
     private Service getService(String serviceId) {
         GetServiceRequest serviceRequest = new GetServiceRequest().withId(serviceId);
-        Future<GetServiceResult> serviceResultFuture = discoveryClient.getServiceAsync(serviceRequest);
+        Future<GetServiceResult> serviceResultFuture = getDiscoveryClient().getServiceAsync(serviceRequest);
         GetServiceResult serviceResult = Flowable.fromFuture(serviceResultFuture).blockingSingle();
         return serviceResult.getService();
     }
