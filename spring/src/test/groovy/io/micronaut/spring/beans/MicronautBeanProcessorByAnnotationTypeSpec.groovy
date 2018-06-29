@@ -31,13 +31,8 @@ class MicronautBeanProcessorByAnnotationTypeSpec extends Specification {
 class ByAnnotationTypeConfig {
 
     @Bean
-    MicronautBeanProcessor prototypeProcessor() {
-        new MicronautBeanProcessor(Prototype)
-    }
-
-    @Bean
-    MicronautBeanProcessor singletonProcessor() {
-        new MicronautBeanProcessor(Singleton)
+    MicronautBeanProcessor beanProcessors() {
+        new MicronautBeanProcessor(Prototype, Singleton)
     }
 }
 
