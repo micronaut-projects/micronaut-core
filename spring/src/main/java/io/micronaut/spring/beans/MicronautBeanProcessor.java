@@ -37,8 +37,8 @@ import java.util.Optional;
 
 /**
  * Adds Micronaut beans to a Spring application context.  This processor will
- * find all of the Micronaut beans marked with a specified stereotype
- * annotation and add them as beans to the Spring application context.
+ * find all of the Micronaut beans of the specified type
+ * and add them as beans to the Spring application context.
  *
  * @author jeffbrown
  * @since 1.0
@@ -50,17 +50,17 @@ public class MicronautBeanProcessor implements BeanFactoryPostProcessor, Disposa
     private static final String MICRONAUT_SINGLETON_PROPERTY_NAME = "micronautSingleton";
 
     protected DefaultBeanContext micronautContext;
-    protected final Class<? extends Annotation> micronautBeanStereotype;
+    protected final Class<?> micronautBeanQualifierType;
     private Environment environment;
 
     /**
      *
-     * @param stereotype The stereotype annotation associated with the
+     * @param qualifierType The type associated with the
      *                   Micronaut beans which should be added to the
      *                   Spring application context.
      */
-    public MicronautBeanProcessor(Class<? extends Annotation> stereotype) {
-        this.micronautBeanStereotype = stereotype;
+    public MicronautBeanProcessor(Class<?> qualifierType) {
+        this.micronautBeanQualifierType = qualifierType;
     }
 
     @Override
@@ -103,7 +103,12 @@ public class MicronautBeanProcessor implements BeanFactoryPostProcessor, Disposa
         micronautContext.start();
 
 
-        Qualifier<Object> micronautBeanQualifier = Qualifiers.byStereotype(micronautBeanStereotype);
+        Qualifier<Object> micronautBeanQualifier;
+        if(micronautBeanQualifierType.isAnnotation()) {
+            micronautBeanQualifier = Qualifiers.byStereotype((Class<? extends Annotation>) micronautBeanQualifierType);
+        } else {
+            micronautBeanQualifier = Qualifiers.byType(micronautBeanQualifierType);
+        }
         micronautContext.getBeanDefinitions(micronautBeanQualifier)
                 .stream()
                 .forEach(definition -> {

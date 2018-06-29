@@ -10,8 +10,8 @@ import spock.lang.Specification
 
 import javax.inject.Singleton
 
-@ContextConfiguration(classes = [Config])
-class MicronautBeanProcessorSpec extends Specification {
+@ContextConfiguration(classes = [ByAnnotationTypeConfig])
+class MicronautBeanProcessorByAnnotationTypeSpec extends Specification {
 
     @Autowired
     ApplicationContext applicationContext
@@ -28,7 +28,7 @@ class MicronautBeanProcessorSpec extends Specification {
 }
 
 @Configuration
-class Config {
+class ByAnnotationTypeConfig {
 
     @Bean
     MicronautBeanProcessor prototypeProcessor() {
