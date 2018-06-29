@@ -20,6 +20,8 @@ import io.micronaut.context.DefaultApplicationContext;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import org.springframework.beans.factory.FactoryBean;
 
+import javax.inject.Singleton;
+import java.lang.annotation.Annotation;
 import java.util.Optional;
 
 /**
@@ -65,6 +67,6 @@ class MicronautSpringBeanFactory implements FactoryBean {
 
     @Override
     public boolean isSingleton() {
-        return true;
+        return micronautBeanType.getAnnotation(Singleton.class) != null;
     }
 }

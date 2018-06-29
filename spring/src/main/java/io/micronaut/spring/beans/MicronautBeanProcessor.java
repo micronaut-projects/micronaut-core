@@ -21,7 +21,6 @@ import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.env.DefaultEnvironment;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.DisposableBean;
@@ -38,8 +37,8 @@ import java.util.Optional;
 
 /**
  * Adds Micronaut beans to a Spring application context.  This processor will
- * find all of the singleton Micronaut beans marked with a specified stereotype
- * annotation and add them as singleton beans to the Spring application context.
+ * find all of the Micronaut beans marked with a specified stereotype
+ * annotation and add them as beans to the Spring application context.
  *
  * @author jeffbrown
  * @since 1.0
@@ -106,7 +105,6 @@ public class MicronautBeanProcessor implements BeanFactoryPostProcessor, Disposa
         Qualifier<Object> micronautBeanQualifier = Qualifiers.byStereotype(micronautBeanStereotype);
         micronautContext.getBeanDefinitions(micronautBeanQualifier)
                 .stream()
-                .filter(BeanDefinition::isSingleton)
                 .forEach(definition -> {
                     final BeanDefinitionBuilder beanDefinitionBuilder = BeanDefinitionBuilder
                             .rootBeanDefinition(MicronautSpringBeanFactory.class.getName());
