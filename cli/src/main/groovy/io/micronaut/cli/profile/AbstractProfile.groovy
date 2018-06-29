@@ -55,6 +55,7 @@ abstract class AbstractProfile implements Profile {
     protected ProfileRepository profileRepository
     protected List<Dependency> dependencies = []
     protected List<String> repositories = []
+    protected List<String> jvmArgs = []
     protected List<String> parentNames = []
     protected List<String> buildRepositories = []
     protected List<String> buildPlugins = []
@@ -219,7 +220,7 @@ abstract class AbstractProfile implements Profile {
         }
 
         this.repositories = (List<String>) navigableConfig.get("repositories", [])
-
+        this.jvmArgs = (List<String>) navigableConfig.get("jvmArgs", [])
         this.buildRepositories = (List<String>) navigableConfig.get("build.repositories", [])
         this.buildPlugins = (List<String>) navigableConfig.get("build.plugins", [])
         this.buildExcludes = (List<String>) navigableConfig.get("build.excludes", [])
@@ -353,6 +354,12 @@ abstract class AbstractProfile implements Profile {
             calculatedRepositories.addAll(repositories)
         }
         return calculatedRepositories
+    }
+
+
+    @Override
+    List<String> getJvmArgs() {
+        jvmArgs
     }
 
     List<Dependency> getDependencies() {

@@ -93,6 +93,7 @@ class MavenBuildTokens extends BuildTokens {
 
         def dependenciesWriter = new StringWriter()
         MarkupBuilder dependenciesXml = new MarkupBuilder(dependenciesWriter)
+
         dependencies.each { Dependency dep ->
 
             def artifact = dep.artifact
@@ -117,6 +118,19 @@ class MavenBuildTokens extends BuildTokens {
             }
         }
 
+        def jvmArgsWriter = new StringWriter()
+        MarkupBuilder jvmArgsXml = new MarkupBuilder(jvmArgsWriter)
+
+        def arguments = profile.jvmArgs
+        for (Feature f in features) {
+            arguments.addAll(f.jvmArgs)
+        }
+
+        arguments.each { String arg ->
+            jvmArgsXml.argument("-${arg}")
+
+        }
+        tokens.put("arguments", prettyPrint(jvmArgsWriter.toString(), 12))
         tokens.put("dependencies", prettyPrint(dependenciesWriter.toString(), 8))
         tokens.put("repositories", prettyPrint(repositoriesWriter.toString(), 8))
         tokens.put("jdkversion", VersionInfo.getJdkVersion())
