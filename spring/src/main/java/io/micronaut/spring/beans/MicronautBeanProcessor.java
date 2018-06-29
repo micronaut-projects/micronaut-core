@@ -47,6 +47,7 @@ public class MicronautBeanProcessor implements BeanFactoryPostProcessor, Disposa
 
     private static final String MICRONAUT_BEAN_TYPE_PROPERTY_NAME = "micronautBeanType";
     private static final String MICRONAUT_CONTEXT_PROPERTY_NAME = "micronautContext";
+    private static final String MICRONAUT_SINGLETON_PROPERTY_NAME = "micronautSingleton";
 
     protected DefaultBeanContext micronautContext;
     protected final Class<? extends Annotation> micronautBeanStereotype;
@@ -110,6 +111,7 @@ public class MicronautBeanProcessor implements BeanFactoryPostProcessor, Disposa
                             .rootBeanDefinition(MicronautSpringBeanFactory.class.getName());
                     beanDefinitionBuilder.addPropertyValue(MICRONAUT_BEAN_TYPE_PROPERTY_NAME, definition.getBeanType());
                     beanDefinitionBuilder.addPropertyValue(MICRONAUT_CONTEXT_PROPERTY_NAME, micronautContext);
+                    beanDefinitionBuilder.addPropertyValue(MICRONAUT_SINGLETON_PROPERTY_NAME, definition.isSingleton());
                     ((DefaultListableBeanFactory) beanFactory).registerBeanDefinition(definition.getName(), beanDefinitionBuilder.getBeanDefinition());
                 });
     }
