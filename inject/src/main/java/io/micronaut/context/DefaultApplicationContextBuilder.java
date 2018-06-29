@@ -96,7 +96,8 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     public ApplicationContextBuilder mainClass(Class mainClass) {
         if (mainClass != null) {
-            this.classPathResourceLoader = ClassPathResourceLoader.defaultLoader(mainClass.getClassLoader());
+            ClassLoader classLoader = mainClass.getClassLoader();
+            this.classPathResourceLoader = ClassPathResourceLoader.defaultLoader(classLoader);
             String name = mainClass.getPackage().getName();
             if (StringUtils.isNotEmpty(name)) {
                 packages(name);
@@ -116,8 +117,9 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     @SuppressWarnings("MagicNumber")
     public ApplicationContext build() {
+        ClassLoader classLoader = ApplicationContext.class.getClassLoader();
         DefaultApplicationContext applicationContext = new DefaultApplicationContext(
-            classPathResourceLoader != null ? classPathResourceLoader : ClassPathResourceLoader.defaultLoader(ApplicationContext.class.getClassLoader()),
+            classPathResourceLoader != null ? classPathResourceLoader : ClassPathResourceLoader.defaultLoader(classLoader),
             environments.toArray(new String[0])
         );
 
