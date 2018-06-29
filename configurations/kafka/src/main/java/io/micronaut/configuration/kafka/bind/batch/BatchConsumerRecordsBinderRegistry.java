@@ -17,6 +17,7 @@
 package io.micronaut.configuration.kafka.bind.batch;
 
 import io.micronaut.configuration.kafka.bind.ConsumerRecordBinderRegistry;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.ArgumentBinderRegistry;
 import io.micronaut.core.convert.ConversionContext;
@@ -54,7 +55,7 @@ public class BatchConsumerRecordsBinderRegistry implements ArgumentBinderRegistr
     @Override
     public <T> Optional<ArgumentBinder<T, ConsumerRecords<?, ?>>> findArgumentBinder(Argument<T> argument, ConsumerRecords<?, ?> source) {
         Class<T> argType = argument.getType();
-        if (Iterable.class.isAssignableFrom(argType) || argType.isArray()) {
+        if (Iterable.class.isAssignableFrom(argType) || argType.isArray() || Publishers.isConvertibleToPublisher(argType)) {
             Argument<?> batchType = argument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             List bound = new ArrayList();
 
