@@ -16,6 +16,7 @@
 package io.micronaut.discovery.route53
 
 import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsync
+import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsyncClient
 import com.amazonaws.services.servicediscovery.model.Service
 import io.micronaut.configurations.aws.AWSClientConfiguration
 import io.micronaut.context.ApplicationContext
@@ -25,6 +26,8 @@ import io.micronaut.discovery.CompositeDiscoveryClient
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.ServiceInstanceIdGenerator
+import io.micronaut.discovery.aws.route53.AWSServiceDiscoveryClientResolver
+import io.micronaut.discovery.aws.route53.AWSServiceDiscoveryResolver
 import io.micronaut.discovery.aws.route53.Route53AutoRegistrationConfiguration
 import io.micronaut.discovery.aws.route53.Route53ClientDiscoveryConfiguration
 import io.micronaut.discovery.aws.route53.Route53DiscoveryConfiguration
@@ -143,6 +146,19 @@ class Route53AutoNamingClientUnitSpec extends Specification {
 
     }
 
+    @Replaces(AWSServiceDiscoveryClientResolver)
+    static class AWSServiceDiscoveryAsyncMock extends AWSServiceDiscoveryClientResolver implements AWSServiceDiscoveryResolver {
+
+        AWSServiceDiscoveryAsyncMock(AWSClientConfiguration clientConfiguration) {
+            super(clientConfiguration)
+        }
+
+        @Override
+        AWSServiceDiscoveryAsync resolve(Environment environment) {
+            new io.micronaut.discovery.route53.AWSServiceDiscoveryAsyncMock()
+        }
+
+    }
 
     @Replaces(AmazonComputeInstanceMetadataResolver)
     static class AmazonComputeInstanceMetadataResolverMock extends AmazonComputeInstanceMetadataResolver implements ComputeInstanceMetadataResolver {
