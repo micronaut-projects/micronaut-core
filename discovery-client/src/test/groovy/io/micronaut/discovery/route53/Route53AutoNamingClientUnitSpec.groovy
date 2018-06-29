@@ -38,6 +38,7 @@ import io.micronaut.discovery.cloud.aws.AmazonComputeInstanceMetadataResolver
 import io.micronaut.discovery.cloud.aws.AmazonEC2InstanceMetadata
 import io.micronaut.health.HeartbeatConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.scheduling.TaskExecutors
 import io.reactivex.Flowable
 import spock.lang.*
 import spock.mock.DetachedMockFactory
@@ -45,6 +46,8 @@ import spock.util.concurrent.PollingConditions
 
 import javax.annotation.PostConstruct
 import javax.inject.Inject
+import javax.inject.Named
+import java.util.concurrent.Executor
 
 /**
  * @author Rvanderwerf
@@ -71,7 +74,7 @@ class Route53AutoNamingClientUnitSpec extends Specification {
     @Shared
     DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient)
     @Shared
-    Route53AutoNamingClient route53AutoNamingClient = embeddedServer.applicationContext.getBean(Route53AutoNamingClientMock)
+    Route53AutoNamingClient route53AutoNamingClient = embeddedServer.applicationContext.getBean(Route53AutoNamingClient)
     @Shared
     String namespaceId
     @Shared
@@ -171,55 +174,4 @@ class Route53AutoNamingClientUnitSpec extends Specification {
         }
     }
 
-
-    @Replaces(Route53AutoNamingRegistrationClient)
-    static class Route53AutoNamingRegistrationClientMock extends Route53AutoNamingRegistrationClient {
-
-
-        /**
-         * Constructor for setup.
-         * @param environment current environemnts
-         * @param heartbeatConfiguration heartbeat config
-         * @param route53AutoRegistrationConfiguration config for auto registration
-         * @param idGenerator optional id generator (not used here)
-         * @param clientConfiguration general client configuraiton
-         * @param amazonComputeInstanceMetadataResolver resolver for aws compute metdata
-         */
-        protected Route53AutoNamingRegistrationClientMock(Environment environment, HeartbeatConfiguration heartbeatConfiguration, Route53AutoRegistrationConfiguration route53AutoRegistrationConfiguration, ServiceInstanceIdGenerator idGenerator, AWSClientConfiguration clientConfiguration, AmazonComputeInstanceMetadataResolver amazonComputeInstanceMetadataResolver) {
-            super(environment, heartbeatConfiguration, route53AutoRegistrationConfiguration, idGenerator, clientConfiguration, amazonComputeInstanceMetadataResolver)
-        }
-
-        AWSServiceDiscoveryAsync getDiscoveryClient() {
-            return new AWSServiceDiscoveryAsyncMock()
-        }
-
-    }
-
-
-    @Replaces(Route53AutoNamingClient)
-    static class Route53AutoNamingClientMock extends Route53AutoNamingClient {
-
-
-        String namespaceId = "asdb123"
-        String serviceId = "123abcdf"
-
-        Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration = new Route53ClientDiscoveryConfiguration()
-
-
-        Route53ClientDiscoveryConfiguration getRoute53ClientDiscoveryConfiguration() {
-            route53ClientDiscoveryConfiguration = new Route53ClientDiscoveryConfiguration()
-            route53ClientDiscoveryConfiguration.awsServiceId = serviceId
-            route53ClientDiscoveryConfiguration.namespaceId = namespaceId
-            return this.route53ClientDiscoveryConfiguration
-        }
-
-
-
-
-
-        AWSServiceDiscoveryAsync getDiscoveryClient() {
-            return new AWSServiceDiscoveryAsyncMock()
-        }
-
-    }
 }
