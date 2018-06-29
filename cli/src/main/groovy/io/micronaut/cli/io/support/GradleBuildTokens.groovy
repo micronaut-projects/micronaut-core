@@ -71,6 +71,13 @@ class GradleBuildTokens extends BuildTokens {
             "apply plugin:\"$name\""
         }
 
+        def jvmArgs = profile.jvmArgs
+        for (Feature f in features) {
+            jvmArgs.addAll(f.jvmArgs)
+        }
+
+        jvmArgs = jvmArgs.collect { String arg -> "'-${arg}'"}.join(',')
+
         for (Feature f in features) {
             buildPlugins.addAll f.buildPlugins.collect() { String name ->
                 "apply plugin:\"$name\""
@@ -79,6 +86,7 @@ class GradleBuildTokens extends BuildTokens {
 
         buildPlugins = buildPlugins.unique().join(ln)
 
+        tokens.put("jvmArgs", jvmArgs)
         tokens.put("buildPlugins", buildPlugins)
         tokens.put("dependencies", dependencies)
         tokens.put("buildDependencies", buildDependencies)
