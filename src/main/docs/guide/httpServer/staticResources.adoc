@@ -11,12 +11,13 @@ Here is what an example YAML configuration might look like (note that the `route
 
 [source,yaml]
 ----
-router:
-    static:
-        resources:
-            enabled: true
-            mapping: /static/**
-            paths: classpath:public
+micronaut:
+    router:
+        static:
+            resources:
+                enabled: true
+                mapping: /static/**
+                paths: classpath:public
 ----
 
 TIP: `index.html` will be resolved by default. In the above example a request to `/static` will attempt to retrieve `src/main/resources/public/index.html`.
