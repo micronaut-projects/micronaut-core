@@ -71,7 +71,7 @@ public interface AnnotationSource extends AnnotatedElement {
             annotationMetadata = (AnnotationMetadata) this;
         }
 
-        if (annotationMetadata != null) {
+        if (annotationMetadata != null && annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
             return Optional.ofNullable(annotationMetadata.getAnnotation(type));
         } else {
             AnnotatedElement[] elements = getAnnotatedElements();
@@ -92,11 +92,14 @@ public interface AnnotationSource extends AnnotatedElement {
      * @return The stereotype
      */
     default Optional<Annotation> findAnnotationWithStereoType(Class<? extends Annotation> stereotype) {
+        AnnotationMetadata annotationMetadata = null;
         if (this instanceof AnnotationMetadataProvider) {
-            Optional<Class<? extends Annotation>> type = ((AnnotationMetadataProvider) this).getAnnotationMetadata().getAnnotationTypeByStereotype(stereotype);
-            return type.map(this::getAnnotation);
+            annotationMetadata = ((AnnotationMetadataProvider) this).getAnnotationMetadata();
         } else if (this instanceof AnnotationMetadata) {
-            AnnotationMetadata annotationMetadata = (AnnotationMetadata) this;
+            annotationMetadata = (AnnotationMetadata) this;
+        }
+
+        if (annotationMetadata != null && annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
             Optional<Class<? extends Annotation>> type = annotationMetadata.getAnnotationTypeByStereotype(stereotype);
             return type.map(this::getAnnotation);
         } else {
@@ -119,12 +122,14 @@ public interface AnnotationSource extends AnnotatedElement {
      * @return The stereotype
      */
     default Collection<Annotation> findAnnotationsWithStereoType(Class<? extends Annotation> stereotype) {
+        AnnotationMetadata annotationMetadata = null;
         if (this instanceof AnnotationMetadataProvider) {
-            AnnotationMetadata annotationMetadata = ((AnnotationMetadataProvider) this).getAnnotationMetadata();
-            List<Class<? extends Annotation>> types = annotationMetadata.getAnnotationTypesByStereotype(stereotype);
-            return types.stream().map(this::getAnnotation).collect(Collectors.toList());
+            annotationMetadata = ((AnnotationMetadataProvider) this).getAnnotationMetadata();
         } else if (this instanceof AnnotationMetadata) {
-            AnnotationMetadata annotationMetadata = (AnnotationMetadata) this;
+            annotationMetadata = (AnnotationMetadata) this;
+        }
+
+        if (annotationMetadata != null && annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
             List<Class<? extends Annotation>> types = annotationMetadata.getAnnotationTypesByStereotype(stereotype);
             return types.stream().map(this::getAnnotation).collect(Collectors.toList());
         } else {
@@ -143,11 +148,14 @@ public interface AnnotationSource extends AnnotatedElement {
      */
     @Override
     default <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+        AnnotationMetadata annotationMetadata = null;
         if (this instanceof AnnotationMetadataProvider) {
-            AnnotationMetadata annotationMetadata = ((AnnotationMetadataProvider) this).getAnnotationMetadata();
-            return annotationMetadata.getAnnotation(annotationClass);
+            annotationMetadata = ((AnnotationMetadataProvider) this).getAnnotationMetadata();
         } else if (this instanceof AnnotationMetadata) {
-            AnnotationMetadata annotationMetadata = (AnnotationMetadata) this;
+            annotationMetadata = (AnnotationMetadata) this;
+        }
+
+        if (annotationMetadata != null && annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
             return annotationMetadata.getAnnotation(annotationClass);
         } else {
             // slow path
@@ -178,7 +186,7 @@ public interface AnnotationSource extends AnnotatedElement {
             annotationMetadata = (AnnotationMetadata) this;
         }
 
-        if (annotationMetadata != null) {
+        if (annotationMetadata != null && annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
             return annotationMetadata.getAnnotations();
         } else {
             AnnotatedElement[] elements = getAnnotatedElements();
@@ -200,7 +208,7 @@ public interface AnnotationSource extends AnnotatedElement {
             annotationMetadata = (AnnotationMetadata) this;
         }
 
-        if (annotationMetadata != null) {
+        if (annotationMetadata != null && annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
             return annotationMetadata.getDeclaredAnnotations();
         } else {
             AnnotatedElement[] elements = getAnnotatedElements();
@@ -224,7 +232,7 @@ public interface AnnotationSource extends AnnotatedElement {
             annotationMetadata = (AnnotationMetadata) this;
         }
 
-        if (annotationMetadata != null) {
+        if (annotationMetadata != null && annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
             for (String stereotype : stereotypes) {
                 if (annotationMetadata.hasStereotype(stereotype)) {
                     return true;
@@ -257,7 +265,7 @@ public interface AnnotationSource extends AnnotatedElement {
             annotationMetadata = (AnnotationMetadata) this;
         }
 
-        Annotation[] annotations = annotationMetadata != null ? annotationMetadata.getAnnotations() : getAnnotations();
+        Annotation[] annotations = annotationMetadata != null && annotationMetadata != AnnotationMetadata.EMPTY_METADATA ? annotationMetadata.getAnnotations() : getAnnotations();
         for (String annotationName : annotationNames) {
             if (Arrays.stream(annotations).anyMatch(ann -> ann.annotationType().getName().equals(annotationName))) {
                 return true;
