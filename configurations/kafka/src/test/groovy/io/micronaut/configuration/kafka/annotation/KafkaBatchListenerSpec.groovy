@@ -17,9 +17,12 @@ class KafkaBatchListenerSpec extends Specification {
 
     public static final String BOOKS_TOPIC = 'KafkaBatchListenerSpec-books'
     public static final String BOOKS_LIST_TOPIC = 'KafkaBatchListenerSpec-books-list'
+    public static final String BOOKS_FLUX_TOPIC = 'KafkaBatchListenerSpec-books-flux'
+    public static final String BOOKS_FLOWABLE_TOPIC = 'KafkaBatchListenerSpec-books-flowable'
     public static final String BOOKS_FORWARD_LIST_TOPIC = 'KafkaBatchListenerSpec-books-forward-list'
     public static final String BOOKS_FORWARD_ARRAY_TOPIC = 'KafkaBatchListenerSpec-books-forward-array'
     public static final String BOOKS_FORWARD_FLUX_TOPIC = 'KafkaBatchListenerSpec-books-forward-flux'
+    public static final String BOOKS_FORWARD_FLOWABLE_TOPIC = 'KafkaBatchListenerSpec-books-forward-flowable'
     public static final String BOOKS_ARRAY_TOPIC = 'KafkaBatchListenerSpec-books-array'
     public static final String TITLES_TOPIC = 'KafkaBatchListenerSpec-titles'
 
@@ -121,7 +124,7 @@ class KafkaBatchListenerSpec extends Specification {
         }
     }
 
-    void "test send batch flux"() {
+    void "test send and forward batch flux"() {
         given:
         MyBatchClient myBatchClient = context.getBean(MyBatchClient)
         BookListener bookListener = context.getBean(BookListener)
@@ -129,7 +132,7 @@ class KafkaBatchListenerSpec extends Specification {
         PollingConditions conditions = new PollingConditions(timeout: 30, delay: 0.5)
 
         when:
-        Flux<Book> results = myBatchClient.sendBooksFlux(Flux.fromIterable([new Book(title: "The Stand"), new Book(title: "The Shining")]))
+        Flux<Book> results = myBatchClient.sendAndForwardFlux(Flux.fromIterable([new Book(title: "The Stand"), new Book(title: "The Shining")]))
         results.collectList().block()
 
         then:
@@ -139,6 +142,63 @@ class KafkaBatchListenerSpec extends Specification {
             bookListener.books.contains(new Book(title: "The Shining"))
         }
     }
+
+    void "test send and forward batch flowable"() {
+        given:
+        MyBatchClient myBatchClient = context.getBean(MyBatchClient)
+        BookListener bookListener = context.getBean(BookListener)
+        bookListener.books?.clear()
+        PollingConditions conditions = new PollingConditions(timeout: 30, delay: 0.5)
+
+        when:
+        Flowable<Book> results = myBatchClient.sendAndForwardFlowable(Flowable.fromIterable([new Book(title: "The Flow"), new Book(title: "The Shining")]))
+        results.toList().blockingGet()
+
+        then:
+        conditions.eventually {
+            bookListener.books.size() == 2
+            bookListener.books.contains(new Book(title: "The Flow"))
+            bookListener.books.contains(new Book(title: "The Shining"))
+        }
+    }
+
+    void "test send batch flux"() {
+        given:
+        MyBatchClient myBatchClient = context.getBean(MyBatchClient)
+        BookListener bookListener = context.getBean(BookListener)
+        bookListener.books?.clear()
+        PollingConditions conditions = new PollingConditions(timeout: 30, delay: 0.5)
+
+        when:
+        myBatchClient.sendBooksFlux(Flux.fromIterable([new Book(title: "The Flux"), new Book(title: "The Shining")]))
+
+        then:
+        conditions.eventually {
+            bookListener.books.size() == 2
+            bookListener.books.contains(new Book(title: "The Flux"))
+            bookListener.books.contains(new Book(title: "The Shining"))
+        }
+    }
+
+
+    void "test send batch flowable"() {
+        given:
+        MyBatchClient myBatchClient = context.getBean(MyBatchClient)
+        BookListener bookListener = context.getBean(BookListener)
+        bookListener.books?.clear()
+        PollingConditions conditions = new PollingConditions(timeout: 30, delay: 0.5)
+
+        when:
+        myBatchClient.sendBooksFlowable(Flowable.fromIterable([new Book(title: "The Flowable"), new Book(title: "The Shining")]))
+
+        then:
+        conditions.eventually {
+            bookListener.books.size() == 2
+            bookListener.books.contains(new Book(title: "The Flowable"))
+            bookListener.books.contains(new Book(title: "The Shining"))
+        }
+    }
+
 
     @io.micronaut.configuration.kafka.annotation.KafkaClient(batch = true)
     @Topic(KafkaBatchListenerSpec.BOOKS_TOPIC)
@@ -157,9 +217,16 @@ class KafkaBatchListenerSpec extends Specification {
         void sendAndForward(Book...books)
 
         @Topic(KafkaBatchListenerSpec.BOOKS_FORWARD_FLUX_TOPIC)
-        Flux<Book> sendBooksFlux(Flux<Book> books)
+        Flux<Book> sendAndForwardFlux(Flux<Book> books)
 
-        Flowable<Book> sendBooksFlowable(Flowable<Book> books)
+        @Topic(KafkaBatchListenerSpec.BOOKS_FORWARD_FLOWABLE_TOPIC)
+        Flowable<Book> sendAndForwardFlowable(Flowable<Book> books)
+
+        @Topic(KafkaBatchListenerSpec.BOOKS_FLUX_TOPIC)
+        void sendBooksFlux(Flux<Book> books)
+
+        @Topic(KafkaBatchListenerSpec.BOOKS_FLOWABLE_TOPIC)
+        void sendBooksFlowable(Flowable<Book> books)
 
     }
 
@@ -203,10 +270,22 @@ class KafkaBatchListenerSpec extends Specification {
             return books.map { Book book -> book.title }
         }
 
+        @Topic(KafkaBatchListenerSpec.BOOKS_FORWARD_FLOWABLE_TOPIC)
         @SendTo(KafkaBatchListenerSpec.TITLES_TOPIC)
-        Flowable<String> receiveAndSendFlux(Flowable<Book> books) {
+        Flowable<String> receiveAndSendFlowable(Flowable<Book> books) {
             this.books.addAll books.toList().blockingGet()
             return books.map { Book book -> book.title }
+        }
+
+
+        @Topic(KafkaBatchListenerSpec.BOOKS_FLUX_TOPIC)
+        void recieveFlux(Flux<Book> books) {
+            this.books.addAll books.collectList().block()
+        }
+
+        @Topic(KafkaBatchListenerSpec.BOOKS_FLOWABLE_TOPIC)
+        void recieveFlowable(Flowable<Book> books) {
+            this.books.addAll books.toList().blockingGet()
         }
     }
 
