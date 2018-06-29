@@ -35,6 +35,7 @@ class MicronautSpringBeanFactory implements FactoryBean {
 
     private Class micronautBeanType;
     private DefaultApplicationContext micronautContext;
+    private boolean isMicronautSingleton;
 
     /**
      * @param micronautBeanType The type of bean this factory will create
@@ -48,6 +49,14 @@ class MicronautSpringBeanFactory implements FactoryBean {
      */
     public void setMicronautContext(DefaultApplicationContext micronautContext) {
         this.micronautContext = micronautContext;
+    }
+
+    /**
+     *
+     * @param isMicronautSingleton indicates if the Micronaut bean is a singleton
+     */
+    public void setMicronautSingleton(boolean isMicronautSingleton) {
+        this.isMicronautSingleton = isMicronautSingleton;
     }
 
     @Override
@@ -67,6 +76,6 @@ class MicronautSpringBeanFactory implements FactoryBean {
 
     @Override
     public boolean isSingleton() {
-        return micronautBeanType.getAnnotation(Singleton.class) != null;
+        return isMicronautSingleton;
     }
 }
