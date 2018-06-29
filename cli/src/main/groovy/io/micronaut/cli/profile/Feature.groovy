@@ -58,6 +58,12 @@ interface Feature {
      */
     List<String> getBuildPlugins()
 
+
+    /**
+     * @return The JVM args
+     */
+    List<String> getJvmArgs()
+
     /**
      * @return The configuration for the feature
      */

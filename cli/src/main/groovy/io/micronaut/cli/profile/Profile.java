@@ -104,6 +104,11 @@ public interface Profile {
     List<Dependency> getDependencies();
 
     /**
+     * @return The JVM args
+     */
+    List<String> getJvmArgs();
+
+    /**
      * @return The profiles configuration
      */
     NavigableMap getConfiguration();

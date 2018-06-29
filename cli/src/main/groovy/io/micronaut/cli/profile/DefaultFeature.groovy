@@ -44,6 +44,7 @@ class DefaultFeature implements Feature {
     final NavigableMap configuration = new NavigableMap()
     final List<Dependency> dependencies = []
     final List<String> buildPlugins
+    final List<String> jvmArgs
     final List<String> dependentFeatures = []
     private Boolean requested = false
     final Integer minJava
@@ -86,6 +87,7 @@ class DefaultFeature implements Feature {
             }
         }
         this.buildPlugins = (List<String>) configuration.get("build.plugins", [])
+        this.jvmArgs = (List<String>) configuration.get("jvmArgs", [])
 
         this.minJava = (Integer) configuration.get("java.min") ?: null
         this.maxJava = (Integer) configuration.get("java.max") ?: null
