@@ -20,6 +20,7 @@ import io.micronaut.configuration.kafka.bind.ConsumerRecordBinderRegistry;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.ArgumentBinderRegistry;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
@@ -63,8 +64,9 @@ public class BatchConsumerRecordsBinderRegistry implements ArgumentBinderRegistr
                 for (ConsumerRecord<?, ?> consumerRecord : consumerRecords) {
                     Optional<ArgumentBinder<?, ConsumerRecord<?, ?>>> binder = consumerRecordBinderRegistry.findArgumentBinder((Argument) argument, consumerRecord);
                     binder.ifPresent(b -> {
+                        ArgumentConversionContext conversionContext = ConversionContext.of((Argument) batchType).with(argument.getAnnotationMetadata());
                         ArgumentBinder.BindingResult<?> result = b.bind(
-                                ConversionContext.of((Argument) batchType),
+                                conversionContext,
                                 consumerRecord);
                         if (result.isPresentAndSatisfied()) {
                             bound.add(result.get());

@@ -5,6 +5,7 @@ import groovy.transform.ToString
 import io.micronaut.configuration.kafka.config.AbstractKafkaConfiguration
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.util.CollectionUtils
+import io.micronaut.messaging.annotation.Header
 import io.micronaut.messaging.annotation.SendTo
 import io.reactivex.Flowable
 import reactor.core.publisher.Flux
@@ -17,6 +18,7 @@ class KafkaBatchListenerSpec extends Specification {
 
     public static final String BOOKS_TOPIC = 'KafkaBatchListenerSpec-books'
     public static final String BOOKS_LIST_TOPIC = 'KafkaBatchListenerSpec-books-list'
+    public static final String BOOKS_HEADERS_TOPIC = 'KafkaBatchListenerSpec-books-headers'
     public static final String BOOKS_FLUX_TOPIC = 'KafkaBatchListenerSpec-books-flux'
     public static final String BOOKS_FLOWABLE_TOPIC = 'KafkaBatchListenerSpec-books-flowable'
     public static final String BOOKS_FORWARD_LIST_TOPIC = 'KafkaBatchListenerSpec-books-forward-list'
@@ -41,6 +43,27 @@ class KafkaBatchListenerSpec extends Specification {
     )
 
 
+    void "test send batch list with headers - blocking"() {
+        given:
+        MyBatchClient myBatchClient = context.getBean(MyBatchClient)
+        BookListener bookListener = context.getBean(BookListener)
+        bookListener.books?.clear()
+        PollingConditions conditions = new PollingConditions(timeout: 30, delay: 0.5)
+
+        when:
+        myBatchClient.sendBooksAndHeaders([new Book(title: "The Header"), new Book(title: "The Shining")])
+
+        then:
+        conditions.eventually {
+            bookListener.books.size() == 2
+            bookListener.headers.size() == 2
+            bookListener.headers.every() { it == "Bar" }
+            bookListener.books.contains(new Book(title: "The Header"))
+            bookListener.books.contains(new Book(title: "The Shining"))
+        }
+    }
+
+
     void "test send batch list - blocking"() {
         given:
         MyBatchClient myBatchClient = context.getBean(MyBatchClient)
@@ -58,7 +81,6 @@ class KafkaBatchListenerSpec extends Specification {
             bookListener.books.contains(new Book(title: "The Shining"))
         }
     }
-
 
 
     void "test send and forward batch list - blocking"() {
@@ -207,6 +229,10 @@ class KafkaBatchListenerSpec extends Specification {
         @Topic(KafkaBatchListenerSpec.BOOKS_LIST_TOPIC)
         void sendBooks(List<Book> books)
 
+        @Topic(KafkaBatchListenerSpec.BOOKS_HEADERS_TOPIC)
+        @Header(name = "X-Foo", value = "Bar")
+        void sendBooksAndHeaders(List<Book> books)
+
         @Topic(KafkaBatchListenerSpec.BOOKS_FORWARD_LIST_TOPIC)
         void sendAndForwardBooks(List<Book> books)
 
@@ -237,10 +263,18 @@ class KafkaBatchListenerSpec extends Specification {
     @Topic(KafkaBatchListenerSpec.BOOKS_TOPIC)
     static class BookListener {
         List<Book> books = []
+        List<String> headers = []
 
         @Topic(KafkaBatchListenerSpec.BOOKS_LIST_TOPIC)
         void receiveList(List<Book> books) {
             this.books.addAll books
+
+        }
+
+        @Topic(KafkaBatchListenerSpec.BOOKS_HEADERS_TOPIC)
+        void receiveList(List<Book> books, @Header("X-Foo") List<String> foos) {
+            this.books.addAll books
+            this.headers = foos
         }
 
         @Topic(KafkaBatchListenerSpec.BOOKS_ARRAY_TOPIC)
