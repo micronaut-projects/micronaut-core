@@ -1,5 +1,6 @@
 package io.micronaut.spring.beans
 
+import io.micronaut.context.annotation.Prototype
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
@@ -19,10 +20,20 @@ class MicronautBeanProcessorSpec extends Specification {
         expect:
         applicationContext.getBean(SomeSingleton).is applicationContext.getBean(SomeSingleton)
     }
+
+    void 'test prototype beans'() {
+        expect:
+        !applicationContext.getBean(SomePrototype).is(applicationContext.getBean(SomePrototype))
+    }
 }
 
 @Configuration
 class Config {
+
+    @Bean
+    MicronautBeanProcessor prototypeProcessor() {
+        new MicronautBeanProcessor(Prototype)
+    }
 
     @Bean
     MicronautBeanProcessor singletonProcessor() {
@@ -32,3 +43,6 @@ class Config {
 
 @Singleton
 class SomeSingleton {}
+
+@Prototype
+class SomePrototype {}
