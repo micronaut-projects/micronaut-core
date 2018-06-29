@@ -18,6 +18,8 @@ package io.micronaut.core.io.scan;
 
 import io.micronaut.core.io.ResourceLoader;
 
+import javax.annotation.Nullable;
+
 /**
  * Abstraction to load resources from the the classpath.
  *
@@ -46,7 +48,16 @@ public interface ClassPathResourceLoader extends ResourceLoader {
      * @param classLoader The classloader
      * @return The default loader
      */
-    static ClassPathResourceLoader defaultLoader(ClassLoader classLoader) {
+    static ClassPathResourceLoader defaultLoader(@Nullable ClassLoader classLoader) {
+        if (classLoader == null) {
+            classLoader = Thread.currentThread().getContextClassLoader();
+        }
+        if (classLoader == null) {
+            classLoader = ClassPathResourceLoader.class.getClassLoader();
+        }
+        if (classLoader == null) {
+            classLoader = ClassLoader.getSystemClassLoader();
+        }
         return new DefaultClassPathResourceLoader(classLoader);
     }
 }
