@@ -5,4 +5,9 @@ dependencies {
     compile project(":inject")
     compileOnly project(":inject-java")
     compile project(":aop")
+
+    testImplementation project(':inject-groovy')
+    testImplementation dependencyVersion('spock')
+    testImplementation dependencyModuleVersion('spock', 'spock-spring')
+    testImplementation dependencyModuleVersion('spring', 'spring-test')
 }
