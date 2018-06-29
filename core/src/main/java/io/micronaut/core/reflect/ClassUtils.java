@@ -18,6 +18,7 @@ package io.micronaut.core.reflect;
 
 import io.micronaut.core.util.ArrayUtils;
 
+import javax.annotation.Nullable;
 import java.util.*;
 
 /**
@@ -82,10 +83,10 @@ public class ClassUtils {
      * Check whether the given class is present in the given classloader.
      *
      * @param name        The name of the class
-     * @param classLoader The classloader
+     * @param classLoader The classloader. If null will fallback to attempt the thread context loader, otherwise the system loader
      * @return True if it is
      */
-    public static boolean isPresent(String name, ClassLoader classLoader) {
+    public static boolean isPresent(String name, @Nullable ClassLoader classLoader) {
         return forName(name, classLoader).isPresent();
     }
 
@@ -134,11 +135,18 @@ public class ClassUtils {
      * Attempt to load a class for the given name from the given class loader.
      *
      * @param name        The name of the class
-     * @param classLoader The classloader
+     * @param classLoader The classloader. If null will fallback to attempt the thread context loader, otherwise the system loader
      * @return An optional of the class
      */
-    public static Optional<Class> forName(String name, ClassLoader classLoader) {
+    public static Optional<Class> forName(String name, @Nullable ClassLoader classLoader) {
         try {
+            if (classLoader == null) {
+                classLoader = Thread.currentThread().getContextClassLoader();
+            }
+            if (classLoader == null) {
+                classLoader = ClassLoader.getSystemClassLoader();
+            }
+
             Optional<Class> commonType = Optional.ofNullable(COMMON_CLASS_MAP.get(name));
             if (commonType.isPresent()) {
                 return commonType;
@@ -147,18 +155,6 @@ public class ClassUtils {
             }
         } catch (ClassNotFoundException | NoClassDefFoundError e) {
             return Optional.empty();
-        }
-    }
-
-    private static void populateHierarchyInterfaces(Class<?> superclass, List<Class> hierarchy) {
-        if (!hierarchy.contains(superclass)) {
-            hierarchy.add(superclass);
-        }
-        for (Class<?> aClass : superclass.getInterfaces()) {
-            if (!hierarchy.contains(aClass)) {
-                hierarchy.add(aClass);
-            }
-            populateHierarchyInterfaces(aClass, hierarchy);
         }
     }
 
@@ -192,5 +188,17 @@ public class ClassUtils {
         }
 
         return hierarchy;
+    }
+
+    private static void populateHierarchyInterfaces(Class<?> superclass, List<Class> hierarchy) {
+        if (!hierarchy.contains(superclass)) {
+            hierarchy.add(superclass);
+        }
+        for (Class<?> aClass : superclass.getInterfaces()) {
+            if (!hierarchy.contains(aClass)) {
+                hierarchy.add(aClass);
+            }
+            populateHierarchyInterfaces(aClass, hierarchy);
+        }
     }
 }
