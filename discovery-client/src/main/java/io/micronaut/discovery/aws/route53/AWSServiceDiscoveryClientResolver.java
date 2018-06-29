@@ -13,7 +13,7 @@ import javax.inject.Singleton;
  * This gets a real amazon service discovery client. It is abstracted to allow for it to be replaced easier during testing.
  */
 //@Requires(notEnv = Environment.TEST)
-//@Requires(env = Environment.AMAZON_EC2)
+@Requires(env = Environment.AMAZON_EC2)
 @Singleton
 public class AWSServiceDiscoveryClientResolver implements AWSServiceDiscoveryResolver {
     AWSServiceDiscoveryAsync awsServiceDiscoveryAsync;
