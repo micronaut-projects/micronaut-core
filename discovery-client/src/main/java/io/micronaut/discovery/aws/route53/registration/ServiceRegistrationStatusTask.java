@@ -1,3 +1,19 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.micronaut.discovery.aws.route53.registration;
 
 import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsync;
@@ -8,8 +24,6 @@ import io.micronaut.discovery.aws.route53.Route53AutoRegistrationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServerInstance;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import java.util.concurrent.Executor;
-
 
 /**
  * This monitors and retries a given operationID when a service is registered. We have to do this in another thread because
@@ -18,8 +32,6 @@ import java.util.concurrent.Executor;
 public class ServiceRegistrationStatusTask implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(ServiceRegistrationStatusTask.class);
-
-
     String operationId;
     Route53AutoRegistrationConfiguration route53AutoRegistrationConfiguration;
     ServiceInstance embeddedServerInstance;
@@ -28,10 +40,10 @@ public class ServiceRegistrationStatusTask implements Runnable {
 
     /**
      * Constructor for the task.
-     * @param discoveryClient
-     * @param route53AutoRegistrationConfiguration
-     * @param embeddedServerInstance
-     * @param operationId
+     * @param discoveryClient aws connection imp for service discovery
+     * @param route53AutoRegistrationConfiguration configuration for auto registartion
+     * @param embeddedServerInstance server instance running to register
+     * @param operationId operation after first register call to monitor
      */
     public ServiceRegistrationStatusTask(AWSServiceDiscoveryAsync discoveryClient,
                                          Route53AutoRegistrationConfiguration route53AutoRegistrationConfiguration,
