@@ -51,19 +51,26 @@ import java.util.concurrent.Future;
 @Requires(property = "aws.route53.discovery.enabled", value = "true", defaultValue = "false")
 public class Route53AutoNamingClient implements DiscoveryClient {
 
-    @Inject
     AWSClientConfiguration awsClientConfiguration;
 
-    @Inject
     Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration;
 
-    @Inject
     AWSServiceDiscoveryResolver awsServiceDiscoveryResolver;
 
-    @Inject
     Environment environment;
 
     AWSServiceDiscoveryAsync discoveryClient;
+
+    public Route53AutoNamingClient(AWSClientConfiguration awsClientConfiguration,
+                                   Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration,
+                                   AWSServiceDiscoveryResolver awsServiceDiscoveryResolver,
+                                   Environment environment) {
+        this.awsClientConfiguration = awsClientConfiguration;
+        this.route53ClientDiscoveryConfiguration = route53ClientDiscoveryConfiguration;
+        this.awsServiceDiscoveryResolver = awsServiceDiscoveryResolver;
+        this.environment = environment;
+
+    }
 
     /**
      * Used to help with testing.
