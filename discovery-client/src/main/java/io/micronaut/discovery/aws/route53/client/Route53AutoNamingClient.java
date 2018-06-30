@@ -16,43 +16,28 @@
 
 package io.micronaut.discovery.aws.route53.client;
 
-import com.amazonaws.SdkClientException;
-import com.amazonaws.services.servicediscovery.AWSServiceDiscovery;
 import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsync;
-import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsyncClientBuilder;
-import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryClient;
 import com.amazonaws.services.servicediscovery.model.*;
-import com.amazonaws.services.simplesystemsmanagement.model.GetParametersByPathResult;
 import io.micronaut.configurations.aws.AWSClientConfiguration;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
-import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
-import io.micronaut.discovery.aws.route53.AWSServiceDiscoveryClientResolver;
 import io.micronaut.discovery.aws.route53.AWSServiceDiscoveryResolver;
 import io.micronaut.discovery.aws.route53.Route53ClientDiscoveryConfiguration;
 import io.micronaut.discovery.aws.route53.Route53DiscoveryConfiguration;
 import io.micronaut.discovery.aws.route53.registration.EC2ServiceInstance;
 import io.micronaut.http.client.Client;
 import io.reactivex.Flowable;
-import io.reactivex.Observable;
-import io.reactivex.schedulers.Schedulers;
-import javafx.collections.ObservableList;
 import org.reactivestreams.Publisher;
-
-import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 /**
  * @author Rvanderwerf
@@ -61,7 +46,6 @@ import java.util.concurrent.TimeUnit;
 @Singleton
 @Client(id = Route53ClientDiscoveryConfiguration.SERVICE_ID, path = "/", configuration = Route53ClientDiscoveryConfiguration.class)
 @Requires(env = Environment.AMAZON_EC2)
-//@Requires(notEnv = Environment.TEST)
 @Requires(beans = Route53DiscoveryConfiguration.class)
 @Requires(beans = AWSClientConfiguration.class)
 @Requires(property = "aws.route53.discovery.enabled", value = "true", defaultValue = "false")
@@ -74,9 +58,6 @@ public class Route53AutoNamingClient implements DiscoveryClient {
     Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration;
 
     @Inject
-    Route53DiscoveryConfiguration route53DiscoveryConfiguration;
-
-    @Inject
     AWSServiceDiscoveryResolver awsServiceDiscoveryResolver;
 
     @Inject
@@ -84,43 +65,46 @@ public class Route53AutoNamingClient implements DiscoveryClient {
 
     AWSServiceDiscoveryAsync discoveryClient;
 
-
-
+    /**
+     * Used to help with testing.
+     * @return Route53ClientDiscoveryConfiguration
+     */
     public Route53ClientDiscoveryConfiguration getRoute53ClientDiscoveryConfiguration() {
         return route53ClientDiscoveryConfiguration;
     }
 
+    /**
+     * Used to help with testing.
+     * @param route53ClientDiscoveryConfiguration config class
+     */
     public void setRoute53ClientDiscoveryConfiguration(Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration) {
         this.route53ClientDiscoveryConfiguration = route53ClientDiscoveryConfiguration;
     }
 
+    /**
+     * Used to help with testing.
+     * @param discoveryClient discovery client class
+     */
     public void setDiscoveryClient(AWSServiceDiscoveryAsync discoveryClient) {
         this.discoveryClient = discoveryClient;
     }
 
-    public AWSServiceDiscoveryAsync getDiscoveryClient() {
+    /**
+     * This is to make it easier to replace the client with a mock.
+     * @return AWSServiceDiscoveryAsync to communicate with AWS
+     */
+    private AWSServiceDiscoveryAsync getDiscoveryClient() {
         return awsServiceDiscoveryResolver.resolve(environment);
     }
 
+
+    /**
+     * Unused.
+     */
     @Override
     public String getDescription() {
-        return null;
+        return "Route 53 Auto Naming Client";
     }
-
-    @PostConstruct
-    private void init() {
-//        if (discoveryClient == null) {
-//            discoveryClient = AWSServiceDiscoveryAsyncClientBuilder.standard().withClientConfiguration(awsClientConfiguration.getClientConfiguration()).build();
-        //}
-    }
-
-    /*@Override
-    public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
-        Publisher<ListInstancesResult> instancesResultPublisher = getAwsInstances(serviceId);
-        instancesResultPublisher.subscribe();
-
-    }*/
-
 
     /**
      * transforms an aws result into a list of service instances.
@@ -141,6 +125,11 @@ public class Route53AutoNamingClient implements DiscoveryClient {
         return Flowable.just(serviceInstances);
     }
 
+    /**
+     * Gets a list of instances registered with Route53 given a service ID.
+     * @param serviceId The service id
+     * @return list of serviceInstances usable by MN.
+     */
     @Override
     public Publisher<List<ServiceInstance>> getInstances(String serviceId) {
         if (serviceId == null) {
@@ -153,6 +142,10 @@ public class Route53AutoNamingClient implements DiscoveryClient {
         return observableInstances;
     }
 
+    /**
+     * Gets a list of service IDs from AWS for a given namespace.
+     * @return rx java publisher list of the service IDs in string format
+     */
     @Override
     public Publisher<List<String>> getServiceIds() {
         ServiceFilter serviceFilter = new ServiceFilter().withName("NAMESPACE_ID").withValues(getRoute53ClientDiscoveryConfiguration().getNamespaceId());
@@ -163,6 +156,11 @@ public class Route53AutoNamingClient implements DiscoveryClient {
         return flowableInstanceIds;
     }
 
+    /**
+     * Converts the services IDs returned for usage in MN.
+     * @param listServicesResult service result returned from AWS
+     * @return RXJava publisher of the service list
+     */
     private Publisher<List<String>> convertServiceIds(ListServicesResult listServicesResult) {
         List<ServiceSummary> services = listServicesResult.getServices();
         List<String> serviceIds = new ArrayList<String>();
@@ -176,8 +174,11 @@ public class Route53AutoNamingClient implements DiscoveryClient {
 
     }
 
+    /**
+     * Close down AWS Client on shutdown.
+     */
     @Override
-    public void close() throws IOException {
+    public void close() {
         getDiscoveryClient().shutdown();
     }
 }

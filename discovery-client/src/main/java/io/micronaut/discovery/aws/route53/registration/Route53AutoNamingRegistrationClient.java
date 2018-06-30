@@ -16,10 +16,8 @@
 
 package io.micronaut.discovery.aws.route53.registration;
 
-import com.amazonaws.SdkClientException;
 import com.amazonaws.services.servicediscovery.AWSServiceDiscovery;
 import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsync;
-import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsyncClientBuilder;
 import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryClient;
 import com.amazonaws.services.servicediscovery.model.*;
 import io.micronaut.configurations.aws.AWSClientConfiguration;
@@ -28,7 +26,6 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceIdGenerator;
-import io.micronaut.discovery.aws.route53.AWSServiceDiscoveryClientResolver;
 import io.micronaut.discovery.aws.route53.AWSServiceDiscoveryResolver;
 import io.micronaut.discovery.aws.route53.Route53AutoRegistrationConfiguration;
 import io.micronaut.discovery.client.registration.DiscoveryServiceAutoRegistration;
@@ -44,7 +41,6 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import javax.inject.Named;
 import javax.inject.Singleton;
 import java.util.HashMap;
@@ -90,7 +86,6 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
      */
     public static final String AWS_ALIAS_DNS_NAME = "AWS_ALIAS_DNS_NAME";
     private static final Logger LOG = LoggerFactory.getLogger(Route53AutoNamingRegistrationClient.class);
-
     private final Route53AutoRegistrationConfiguration route53AutoRegistrationConfiguration;
     private final Environment environment;
     private final HeartbeatConfiguration heartbeatConfiguration;
@@ -99,8 +94,8 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     private AWSServiceDiscoveryAsync discoveryClient;
     private AmazonComputeInstanceMetadataResolver amazonComputeInstanceMetadataResolver;
     private Service discoveryService;
+    private Executor executorService;
     private AWSServiceDiscoveryResolver awsServiceDiscoveryResolver;
-    Executor executorService;
 
 
 
@@ -113,6 +108,8 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
      * @param idGenerator optional id generator (not used here)
      * @param clientConfiguration general client configuraiton
      * @param amazonComputeInstanceMetadataResolver resolver for aws compute metdata
+     * @param executorService this is for executing the thread to monitor the register operation for completion
+     * @param awsServiceDiscoveryResolver this allows is to swap out the bean for a mock version for unit testing
      */
     protected Route53AutoNamingRegistrationClient(
             Environment environment,
@@ -121,7 +118,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
             ServiceInstanceIdGenerator idGenerator,
             AWSClientConfiguration clientConfiguration,
             AmazonComputeInstanceMetadataResolver amazonComputeInstanceMetadataResolver,
-            @Named(TaskExecutors.IO) Executor executorService,
+            @Named(TaskExecutors.IO)Executor executorService,
             AWSServiceDiscoveryResolver awsServiceDiscoveryResolver) {
         super(route53AutoRegistrationConfiguration);
         this.environment = environment;
@@ -130,14 +127,6 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         this.idGenerator = idGenerator;
         this.clientConfiguration = clientConfiguration;
         this.awsServiceDiscoveryResolver = awsServiceDiscoveryResolver;
-/*
-        try {
-            setDiscoveryClient(AWSServiceDiscoveryAsyncClientBuilder.standard().withClientConfiguration(clientConfiguration.getClientConfiguration()).build());
-        } catch (SdkClientException ske) {
-            LOG.warn("Warning: cannot find any AWS credentials. Please verify your configuration.", ske);
-        }
-*/
-        setDiscoveryClient(discoveryClient);
         this.amazonComputeInstanceMetadataResolver = amazonComputeInstanceMetadataResolver;
         this.executorService = executorService;
     }
@@ -152,7 +141,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     protected void pulsate(ServiceInstance instance, HealthStatus status) {
         // this only work if you create a health status check when you register it
         // we can't really pulsate anywhere because amazon health checks work inverse from this UNLESS you have a custom health check
-        if (discoveryService!=null && discoveryService.getHealthCheckCustomConfig() != null) {
+        if (discoveryService != null && discoveryService.getHealthCheckCustomConfig() != null) {
             CustomHealthStatus customHealthStatus = CustomHealthStatus.UNHEALTHY;
             if (status.getOperational().isPresent()) {
                 customHealthStatus = CustomHealthStatus.HEALTHY;
@@ -166,10 +155,11 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         }
     }
 
-    @Override
+
     /**
      * shutdown instance if it fails health check can gracefully stop.
      */
+    @Override
     protected void deregister(ServiceInstance instance) {
 
         if (instance.getInstanceId().isPresent()) {
@@ -250,6 +240,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
                 }
 
             }
+
             @Override
             public void onSubscribe(Subscription s) {
                 s.request(1);
@@ -258,7 +249,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
             @Override
             public void onError(Throwable t) {
                 if (LOG.isErrorEnabled()) {
-                    LOG.error("Error registering instance with AWS:"+t.getMessage(),t);
+                    LOG.error("Error registering instance with AWS:" + t.getMessage(), t);
                 }
                 if (route53AutoRegistrationConfiguration.isFailFast() && instance instanceof EmbeddedServerInstance) {
                     LOG.error("Error registering instance with AWS and Failfast is set: stopping instance");
@@ -275,15 +266,6 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
             }
         });
 
-
-    }
-
-
-    private Flowable<GetOperationResult> logRegisterResult(RegisterInstanceResult result) {
-        Future<GetOperationResult> operationResult = getDiscoveryClient().getOperationAsync(new GetOperationRequest().withOperationId(result.getOperationId()));
-        Flowable<GetOperationResult> flowableResult = Flowable.fromFuture(operationResult);
-        LOG.info("Registration for service operation ID:"+result.getOperationId()+" was ");
-        return flowableResult;
     }
 
     /**
@@ -387,19 +369,27 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         return opResult;
     }
 
+    /**
+     * Gets the discovery client Impl for easier testing.
+     * @return interface to communicate with AWS (or fake it)
+     */
     public AWSServiceDiscoveryAsync getDiscoveryClient() {
         return awsServiceDiscoveryResolver.resolve(environment);
     }
 
-    public void setDiscoveryClient(AWSServiceDiscoveryAsync discoveryClient) {
-        this.discoveryClient = discoveryClient;
-    }
-
+    /**
+     * Gets the discovery service used on route53. This to check to see if it has custom health checks.
+     * @return service used to register instances to or get instances from
+     */
     public Service getDiscoveryService() {
 
         return discoveryService;
     }
 
+    /**
+     * Used for testing.
+     * @param discoveryService service reference on route53 on AWS
+     */
     public void setDiscoveryService(Service discoveryService) {
         this.discoveryService = discoveryService;
     }
@@ -415,6 +405,5 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         GetServiceResult serviceResult = Flowable.fromFuture(serviceResultFuture).blockingSingle();
         return serviceResult.getService();
     }
-
 
 }
