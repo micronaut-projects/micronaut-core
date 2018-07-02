@@ -548,8 +548,14 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
                     configuration
             );
 
+            Properties newProperties = newConfiguration.getConfig();
+
+            if (clientId != null) {
+                newProperties.putIfAbsent(ProducerConfig.CLIENT_ID_CONFIG, clientId);
+            }
+
             metadata.getValue(KafkaClient.class, "maxBlock", Duration.class).ifPresent(maxBlock ->
-                    newConfiguration.getConfig().put(
+                    newProperties.put(
                             ProducerConfig.MAX_BLOCK_MS_CONFIG,
                             String.valueOf(maxBlock.toMillis())
                     ));
@@ -558,7 +564,7 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
 
             if (ack != KafkaClient.Acknowledge.DEFAULT) {
                 String acksValue = ack == -1 ? "all" : String.valueOf(ack);
-                newConfiguration.getConfig().put(
+                newProperties.put(
                         ProducerConfig.ACKS_CONFIG,
                         acksValue
                 );
