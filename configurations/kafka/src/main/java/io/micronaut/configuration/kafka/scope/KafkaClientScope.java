@@ -34,6 +34,7 @@ import io.micronaut.inject.ParametrizedProvider;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.Producer;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.Serializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -138,7 +139,8 @@ public class KafkaClientScope implements CustomScope<KafkaClient>, LifeCycle<Kaf
 
             Supplier<AbstractKafkaProducerConfiguration> defaultResolver = () -> beanContext.getBean(DefaultKafkaProducerConfiguration.class);
             AbstractKafkaProducerConfiguration config;
-            if (StringUtils.isNotEmpty(id)) {
+            boolean hasId = StringUtils.isNotEmpty(id);
+            if (hasId) {
                 config = beanContext.findBean(
                         AbstractKafkaProducerConfiguration.class,
                         Qualifiers.byName(id)
@@ -150,6 +152,9 @@ public class KafkaClientScope implements CustomScope<KafkaClient>, LifeCycle<Kaf
             DefaultKafkaProducerConfiguration newConfig = new DefaultKafkaProducerConfiguration(config);
             newConfig.setKeySerializer(keySerializer);
             newConfig.setValueSerializer(valueSerializer);
+            if (hasId) {
+                newConfig.getConfig().putIfAbsent(ProducerConfig.CLIENT_ID_CONFIG, id);
+            }
             return beanContext.createBean(KafkaProducer.class, newConfig);
         });
     }
