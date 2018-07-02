@@ -298,32 +298,9 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                     try {
 
                         boolean trackPartitions = offsetStrategy == OffsetStrategy.SYNC_PER_RECORD || offsetStrategy == OffsetStrategy.ASYNC_PER_RECORD;
-                        ArgumentBinder<KafkaConsumer<?, ?>, ConsumerRecord<?, ?>> consumerBinder = (context, source) -> () -> Optional.of(kafkaConsumer);
-                        ArgumentBinder<KafkaConsumer<?, ?>, ConsumerRecords<?, ?>> batchConsumerBinder = (context, source) -> () -> Optional.of(kafkaConsumer);
-
-                        ArgumentBinderRegistry<ConsumerRecords<?, ?>> batchBinderRegistry = new ArgumentBinderRegistry<ConsumerRecords<?, ?>>() {
-                            @Override
-                            public <T> Optional<ArgumentBinder<T, ConsumerRecords<?, ?>>> findArgumentBinder(Argument<T> argument, ConsumerRecords<?, ?> source) {
-                                if (Consumer.class.isAssignableFrom(argument.getType())) {
-                                    //noinspection unchecked
-                                    return (Optional) Optional.of(batchConsumerBinder);
-                                } else {
-                                    return KafkaConsumerProcessor.this.batchBinderRegistry.findArgumentBinder(argument, source);
-                                }
-                            }
-                        };
-
-                        ArgumentBinderRegistry<ConsumerRecord<?, ?>> binderRegistry = new ArgumentBinderRegistry<ConsumerRecord<?, ?>>() {
-                            @Override
-                            public <T> Optional<ArgumentBinder<T, ConsumerRecord<?, ?>>> findArgumentBinder(Argument<T> argument, ConsumerRecord<?, ?> source) {
-                                if (Consumer.class.isAssignableFrom(argument.getType())) {
-                                    //noinspection unchecked
-                                    return (Optional) Optional.of(consumerBinder);
-                                } else {
-                                    return KafkaConsumerProcessor.this.binderRegistry.findArgumentBinder(argument, source);
-                                }
-                            }
-                        };
+                        Optional<Argument> consumerArg = Arrays.stream(method.getArguments()).filter(arg -> Consumer.class.isAssignableFrom(arg.getType())).findFirst();
+                        Map<Argument<?>, Object> boundArguments = new HashMap<>(2);
+                        consumerArg.ifPresent(argument -> boundArguments.put(argument, kafkaConsumer));
 
                         //noinspection InfiniteLoopStatement
                         while (true) {
@@ -335,7 +312,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
                                     if (isBatch) {
 
-                                        ExecutableBinder<ConsumerRecords<?, ?>> batchBinder = new DefaultExecutableBinder<>();
+                                        ExecutableBinder<ConsumerRecords<?, ?>> batchBinder = new DefaultExecutableBinder<>(boundArguments);
                                         BoundExecutable boundExecutable = batchBinder.bind(method, batchBinderRegistry, consumerRecords);
                                         Object result = boundExecutable.invoke(consumerBean);
 
@@ -397,7 +374,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                                         }
 
                                     } else {
-                                        ExecutableBinder<ConsumerRecord<?, ?>> executableBinder = new DefaultExecutableBinder<>();
+                                        ExecutableBinder<ConsumerRecord<?, ?>> executableBinder = new DefaultExecutableBinder<>(boundArguments);
                                         for (ConsumerRecord<?, ?> consumerRecord : consumerRecords) {
 
                                             if (LOG.isTraceEnabled()) {

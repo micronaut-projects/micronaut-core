@@ -16,8 +16,6 @@
 
 package io.micronaut.configuration.kafka.annotation;
 
-import org.apache.kafka.clients.consumer.KafkaConsumer;
-
 /**
  * <p>An enum representing different strategies for committing offsets to Kafka when using {@link KafkaListener}.</p>
  *
@@ -34,7 +32,7 @@ public enum OffsetStrategy {
      */
     AUTO,
     /**
-     * Do not commit offsets. In this case the consumer method should accept an argument that is the {@link org.apache.kafka.clients.consumer.KafkaConsumer} itself and call {@link KafkaConsumer#commitSync()}.
+     * Do not commit offsets. In this case the consumer method should accept an argument that is the {@link org.apache.kafka.clients.consumer.KafkaConsumer} itself and call {@link org.apache.kafka.clients.consumer.KafkaConsumer#commitSync()}.
      */
     DISABLED,
     /**
