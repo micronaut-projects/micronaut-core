@@ -35,7 +35,6 @@ import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.*;
 import io.micronaut.core.bind.annotation.Bindable;
-import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
@@ -299,15 +298,15 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                     try {
 
                         boolean trackPartitions = offsetStrategy == OffsetStrategy.SYNC_PER_RECORD || offsetStrategy == OffsetStrategy.ASYNC_PER_RECORD;
-                        ArgumentBinder<KafkaConsumer<?, ?>, ConsumerRecord<?, ?>> consumerBinder = (context, source) -> ()-> Optional.of(kafkaConsumer);
-                        ArgumentBinder<KafkaConsumer<?, ?>, ConsumerRecords<?, ?>> batchConsumerBinder = (context, source) -> ()-> Optional.of(kafkaConsumer);
+                        ArgumentBinder<KafkaConsumer<?, ?>, ConsumerRecord<?, ?>> consumerBinder = (context, source) -> () -> Optional.of(kafkaConsumer);
+                        ArgumentBinder<KafkaConsumer<?, ?>, ConsumerRecords<?, ?>> batchConsumerBinder = (context, source) -> () -> Optional.of(kafkaConsumer);
 
                         ArgumentBinderRegistry<ConsumerRecords<?, ?>> batchBinderRegistry = new ArgumentBinderRegistry<ConsumerRecords<?, ?>>() {
                             @Override
                             public <T> Optional<ArgumentBinder<T, ConsumerRecords<?, ?>>> findArgumentBinder(Argument<T> argument, ConsumerRecords<?, ?> source) {
                                 if (Consumer.class.isAssignableFrom(argument.getType())) {
                                     //noinspection unchecked
-                                    return (Optional)Optional.of(batchConsumerBinder);
+                                    return (Optional) Optional.of(batchConsumerBinder);
                                 } else {
                                     return KafkaConsumerProcessor.this.batchBinderRegistry.findArgumentBinder(argument, source);
                                 }
@@ -319,7 +318,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                             public <T> Optional<ArgumentBinder<T, ConsumerRecord<?, ?>>> findArgumentBinder(Argument<T> argument, ConsumerRecord<?, ?> source) {
                                 if (Consumer.class.isAssignableFrom(argument.getType())) {
                                     //noinspection unchecked
-                                    return (Optional)Optional.of(consumerBinder);
+                                    return (Optional) Optional.of(consumerBinder);
                                 } else {
                                     return KafkaConsumerProcessor.this.binderRegistry.findArgumentBinder(argument, source);
                                 }
@@ -406,10 +405,10 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                                             }
 
                                             if (trackPartitions) {
-                                                currentOffsets.put( new TopicPartition(
+                                                currentOffsets.put(new TopicPartition(
                                                                 consumerRecord.topic(),
                                                                 consumerRecord.partition()),
-                                                        new OffsetAndMetadata( consumerRecord.offset() + 1, null)
+                                                        new OffsetAndMetadata(consumerRecord.offset() + 1, null)
                                                 );
                                             }
 
