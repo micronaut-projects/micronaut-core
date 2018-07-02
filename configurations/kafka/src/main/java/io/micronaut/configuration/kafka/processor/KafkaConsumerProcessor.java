@@ -33,10 +33,9 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.bind.BoundExecutable;
-import io.micronaut.core.bind.DefaultExecutableBinder;
-import io.micronaut.core.bind.ExecutableBinder;
+import io.micronaut.core.bind.*;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
@@ -94,7 +93,6 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
     private final AbstractKafkaConsumerConfiguration defaultConsumerConfiguration;
     private final Queue<Consumer> consumers = new ConcurrentLinkedDeque<>();
     private final ConsumerRecordBinderRegistry binderRegistry;
-    private final DefaultExecutableBinder<ConsumerRecord<?, ?>> executableBinder;
     private final SerdeRegistry serdeRegistry;
     private final Scheduler executorScheduler;
     private final KafkaListenerExceptionHandler exceptionHandler;
@@ -130,7 +128,6 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
         this.defaultConsumerConfiguration = defaultConsumerConfiguration;
         this.binderRegistry = binderRegistry;
         this.batchBinderRegistry = batchBinderRegistry;
-        this.executableBinder = new DefaultExecutableBinder<>();
         this.serdeRegistry = serdeRegistry;
         this.executorScheduler = Schedulers.from(executorService);
         this.producerRegistry = producerRegistry;
@@ -300,9 +297,34 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                 }
                 executorService.submit(() -> {
                     try {
-                        ExecutableBinder<ConsumerRecords<?, ?>> batchBinder = new DefaultExecutableBinder<>();
-                        boolean trackPartitions = offsetStrategy == OffsetStrategy.SYNC_PER_RECORD || offsetStrategy == OffsetStrategy.ASYNC_PER_RECORD;
 
+                        boolean trackPartitions = offsetStrategy == OffsetStrategy.SYNC_PER_RECORD || offsetStrategy == OffsetStrategy.ASYNC_PER_RECORD;
+                        ArgumentBinder<KafkaConsumer<?, ?>, ConsumerRecord<?, ?>> consumerBinder = (context, source) -> ()-> Optional.of(kafkaConsumer);
+                        ArgumentBinder<KafkaConsumer<?, ?>, ConsumerRecords<?, ?>> batchConsumerBinder = (context, source) -> ()-> Optional.of(kafkaConsumer);
+
+                        ArgumentBinderRegistry<ConsumerRecords<?, ?>> batchBinderRegistry = new ArgumentBinderRegistry<ConsumerRecords<?, ?>>() {
+                            @Override
+                            public <T> Optional<ArgumentBinder<T, ConsumerRecords<?, ?>>> findArgumentBinder(Argument<T> argument, ConsumerRecords<?, ?> source) {
+                                if (Consumer.class.isAssignableFrom(argument.getType())) {
+                                    //noinspection unchecked
+                                    return (Optional)Optional.of(batchConsumerBinder);
+                                } else {
+                                    return KafkaConsumerProcessor.this.batchBinderRegistry.findArgumentBinder(argument, source);
+                                }
+                            }
+                        };
+
+                        ArgumentBinderRegistry<ConsumerRecord<?, ?>> binderRegistry = new ArgumentBinderRegistry<ConsumerRecord<?, ?>>() {
+                            @Override
+                            public <T> Optional<ArgumentBinder<T, ConsumerRecord<?, ?>>> findArgumentBinder(Argument<T> argument, ConsumerRecord<?, ?> source) {
+                                if (Consumer.class.isAssignableFrom(argument.getType())) {
+                                    //noinspection unchecked
+                                    return (Optional)Optional.of(consumerBinder);
+                                } else {
+                                    return KafkaConsumerProcessor.this.binderRegistry.findArgumentBinder(argument, source);
+                                }
+                            }
+                        };
 
                         //noinspection InfiniteLoopStatement
                         while (true) {
@@ -314,6 +336,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
                                     if (isBatch) {
 
+                                        ExecutableBinder<ConsumerRecords<?, ?>> batchBinder = new DefaultExecutableBinder<>();
                                         BoundExecutable boundExecutable = batchBinder.bind(method, batchBinderRegistry, consumerRecords);
                                         Object result = boundExecutable.invoke(consumerBean);
 
@@ -375,6 +398,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                                         }
 
                                     } else {
+                                        ExecutableBinder<ConsumerRecord<?, ?>> executableBinder = new DefaultExecutableBinder<>();
                                         for (ConsumerRecord<?, ?> consumerRecord : consumerRecords) {
 
                                             if (LOG.isTraceEnabled()) {
