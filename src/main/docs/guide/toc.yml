@@ -207,7 +207,9 @@ security:
 cli:
   title: Micronaut CLI
   createProject: Creating a Project
-  profiles: Profiles
+  profiles:
+    title: Profiles
+    comparingVersions: Comparing Versions
   features: Features
   commands: Commands
 faq: Frequently Asked Questions (FAQ)
