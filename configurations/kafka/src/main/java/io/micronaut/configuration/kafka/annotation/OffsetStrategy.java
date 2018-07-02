@@ -16,6 +16,8 @@
 
 package io.micronaut.configuration.kafka.annotation;
 
+import org.apache.kafka.clients.consumer.KafkaConsumer;
+
 /**
  * <p>An enum representing different strategies for committing offsets to Kafka when using {@link KafkaListener}.</p>
  *
@@ -31,6 +33,10 @@ public enum OffsetStrategy {
      * Automatically commit offsets with the {@link org.apache.kafka.clients.consumer.Consumer#poll(long)} loop.
      */
     AUTO,
+    /**
+     * Do not commit offsets. In this case the consumer method should accept an argument that is the {@link org.apache.kafka.clients.consumer.KafkaConsumer} itself and call {@link KafkaConsumer#commitSync()}.
+     */
+    DISABLED,
     /**
      * Synchronously commit offsets using {@link org.apache.kafka.clients.consumer.Consumer#commitSync()} after each batch of messages is processed.
      */
