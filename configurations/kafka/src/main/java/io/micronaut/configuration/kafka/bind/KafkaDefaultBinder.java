@@ -42,34 +42,66 @@ public class KafkaDefaultBinder<T> implements ConsumerRecordBinder<T> {
      */
     public KafkaDefaultBinder() {
         this.defaultResolver = new HashMap<>();
+        Function<ConsumerRecord<?, ?>, Object> topicFunc = ConsumerRecord::topic;
+        Function<ConsumerRecord<?, ?>, Object> offsetFunc = ConsumerRecord::offset;
+        Function<ConsumerRecord<?, ?>, Object> partitionFunc = ConsumerRecord::partition;
+        Function<ConsumerRecord<?, ?>, Object> timestampFunc = ConsumerRecord::timestamp;
         this.defaultResolver.put(
                 Argument.of(String.class, "topic"),
-                ConsumerRecord::topic
+                topicFunc
+        );
+        this.defaultResolver.put(
+                Argument.of(String.class, "topics"),
+                topicFunc
         );
         this.defaultResolver.put(
                 Argument.of(Long.class, "offset"),
-                ConsumerRecord::offset
+                offsetFunc
+        );
+        this.defaultResolver.put(
+                Argument.of(Long.class, "offsets"),
+                offsetFunc
         );
         this.defaultResolver.put(
                 Argument.of(Integer.class, "partition"),
-                ConsumerRecord::partition
+                partitionFunc
+        );
+        this.defaultResolver.put(
+                Argument.of(Integer.class, "partitions"),
+                partitionFunc
         );
         this.defaultResolver.put(
                 Argument.of(Long.class, "timestamp"),
-                ConsumerRecord::timestamp
+                timestampFunc
+        );
+        this.defaultResolver.put(
+                Argument.of(Long.class, "timestamps"),
+                timestampFunc
         );
 
         this.defaultResolver.put(
                 Argument.of(long.class, "offset"),
-                ConsumerRecord::offset
+                offsetFunc
+        );
+        this.defaultResolver.put(
+                Argument.of(long.class, "offsets"),
+                offsetFunc
         );
         this.defaultResolver.put(
                 Argument.of(int.class, "partition"),
-                ConsumerRecord::partition
+                partitionFunc
+        );
+        this.defaultResolver.put(
+                Argument.of(int.class, "partitions"),
+                partitionFunc
         );
         this.defaultResolver.put(
                 Argument.of(long.class, "timestamp"),
-                ConsumerRecord::timestamp
+                timestampFunc
+        );
+        this.defaultResolver.put(
+                Argument.of(long.class, "timestamps"),
+                timestampFunc
         );
     }
 
