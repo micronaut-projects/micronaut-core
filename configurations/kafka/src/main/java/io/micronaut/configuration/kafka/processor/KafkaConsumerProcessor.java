@@ -57,6 +57,7 @@ import org.apache.kafka.clients.consumer.*;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
+import org.apache.kafka.common.TopicPartition;
 import org.apache.kafka.common.errors.WakeupException;
 import org.apache.kafka.common.serialization.ByteArrayDeserializer;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -299,16 +300,20 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                 }
                 executorService.submit(() -> {
                     try {
+                        ExecutableBinder<ConsumerRecords<?, ?>> batchBinder = new DefaultExecutableBinder<>();
+                        boolean trackPartitions = offsetStrategy == OffsetStrategy.SYNC_PER_RECORD || offsetStrategy == OffsetStrategy.ASYNC_PER_RECORD;
+
+
                         //noinspection InfiniteLoopStatement
                         while (true) {
                             ConsumerRecords<?, ?> consumerRecords = kafkaConsumer.poll(pollTimeout.toMillis());
+                            Map<TopicPartition, OffsetAndMetadata> currentOffsets = trackPartitions ? new HashMap<>() : null;
 
                             try {
                                 if (consumerRecords != null && consumerRecords.count() > 0) {
 
                                     if (isBatch) {
 
-                                        ExecutableBinder<ConsumerRecords<?, ?>> batchBinder = new DefaultExecutableBinder<>();
                                         BoundExecutable boundExecutable = batchBinder.bind(method, batchBinderRegistry, consumerRecords);
                                         Object result = boundExecutable.invoke(consumerBean);
 
@@ -376,6 +381,14 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                                                 LOG.trace("Kafka consumer [{}] received record: {}", method, consumerRecord);
                                             }
 
+                                            if (trackPartitions) {
+                                                currentOffsets.put( new TopicPartition(
+                                                                consumerRecord.topic(),
+                                                                consumerRecord.partition()),
+                                                        new OffsetAndMetadata( consumerRecord.offset() + 1, null)
+                                                );
+                                            }
+
                                             try {
                                                 BoundExecutable boundExecutable = executableBinder.bind(method, binderRegistry, consumerRecord);
                                                 Object result = boundExecutable.invoke(
@@ -410,12 +423,14 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
                                             if (offsetStrategy == OffsetStrategy.SYNC_PER_RECORD) {
                                                 try {
-                                                    kafkaConsumer.commitSync();
+                                                    kafkaConsumer.commitSync(
+                                                            currentOffsets
+                                                    );
                                                 } catch (CommitFailedException e) {
                                                     handleException(kafkaConsumer, consumerBean, consumerRecord, e);
                                                 }
                                             } else if (offsetStrategy == OffsetStrategy.ASYNC_PER_RECORD) {
-                                                kafkaConsumer.commitAsync(resolveCommitCallback(consumerBean));
+                                                kafkaConsumer.commitAsync(currentOffsets, resolveCommitCallback(consumerBean));
                                             }
                                         }
                                     }
