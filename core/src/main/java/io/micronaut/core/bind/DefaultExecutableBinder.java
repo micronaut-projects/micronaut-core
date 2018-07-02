@@ -23,6 +23,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 
 import javax.annotation.Nullable;
+import java.util.Collections;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -31,6 +33,24 @@ import java.util.Optional;
  * @param <S> The source type
  */
 public class DefaultExecutableBinder<S> implements ExecutableBinder<S> {
+
+    private final Map<Argument<?>, Object> preBound;
+
+    /**
+     * Default constructor.
+     */
+    public DefaultExecutableBinder() {
+        this.preBound = Collections.emptyMap();
+    }
+
+    /**
+     * A map of pre-bound values for any arguments that don't need to be dynamically bound.
+     *
+     * @param preBound The pre bound values
+     */
+    public DefaultExecutableBinder(@Nullable Map<Argument<?>, Object> preBound) {
+        this.preBound = preBound == null ? Collections.emptyMap() : preBound;
+    }
 
     @Override
     public <T, R> BoundExecutable<T, R> bind(
@@ -43,29 +63,35 @@ public class DefaultExecutableBinder<S> implements ExecutableBinder<S> {
 
         for (int i = 0; i < arguments.length; i++) {
             Argument<?> argument = arguments[i];
-            Optional<? extends ArgumentBinder<?, S>> argumentBinder =
-                    registry.findArgumentBinder(argument, source);
 
-            if (argumentBinder.isPresent()) {
-                ArgumentBinder<?, S> binder = argumentBinder.get();
-                ArgumentConversionContext conversionContext = ConversionContext.of(argument);
-                ArgumentBinder.BindingResult<?> bindingResult = binder.bind(
-                        conversionContext,
-                        source
-                );
-
-                if (!bindingResult.isPresentAndSatisfied()) {
-                    if (argument.getAnnotationMetadata().hasAnnotation(Nullable.class)) {
-                        boundArguments[i] = null;
-                    } else {
-                        throw new UnsatisfiedArgumentException(argument);
-                    }
-                } else {
-                    boundArguments[i] = bindingResult.get();
-                }
+            if (preBound.containsKey(argument)) {
+                boundArguments[i] = preBound.get(argument);
 
             } else {
-                throw new UnsatisfiedArgumentException(argument);
+                Optional<? extends ArgumentBinder<?, S>> argumentBinder =
+                        registry.findArgumentBinder(argument, source);
+
+                if (argumentBinder.isPresent()) {
+                    ArgumentBinder<?, S> binder = argumentBinder.get();
+                    ArgumentConversionContext conversionContext = ConversionContext.of(argument);
+                    ArgumentBinder.BindingResult<?> bindingResult = binder.bind(
+                            conversionContext,
+                            source
+                    );
+
+                    if (!bindingResult.isPresentAndSatisfied()) {
+                        if (argument.getAnnotationMetadata().hasAnnotation(Nullable.class)) {
+                            boundArguments[i] = null;
+                        } else {
+                            throw new UnsatisfiedArgumentException(argument);
+                        }
+                    } else {
+                        boundArguments[i] = bindingResult.get();
+                    }
+
+                } else {
+                    throw new UnsatisfiedArgumentException(argument);
+                }
             }
         }
 
