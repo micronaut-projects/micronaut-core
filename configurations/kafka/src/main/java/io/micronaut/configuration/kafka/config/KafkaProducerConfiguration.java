@@ -61,8 +61,6 @@ public class KafkaProducerConfiguration<K, V> extends AbstractKafkaProducerConfi
         config.putAll(defaultConfiguration.getConfig());
         String propertyKey = PREFIX + '.' + NameUtils.hyphenate(producerName, true);
         config.putAll(environment.getProperty(propertyKey, Properties.class).orElseGet(Properties::new));
-        config.putIfAbsent(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, DEFAULT_KEY_SERIALIZER);
-        config.putIfAbsent(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, DEFAULT_VALUE_SERIALIZER);
 
     }
 

@@ -59,8 +59,6 @@ public class KafkaConsumerConfiguration<K, V> extends AbstractKafkaConsumerConfi
         config.putAll(defaultConfiguration.getConfig());
         String propertyKey = PREFIX + '.' + NameUtils.hyphenate(consumerName, true);
         config.putAll(environment.getProperty(propertyKey, Properties.class).orElseGet(Properties::new));
-        config.putIfAbsent(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, DEFAULT_KEY_DESERIALIZER);
-        config.putIfAbsent(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, DEFAULT_VALUE_DESERIALIZER);
     }
 
 }

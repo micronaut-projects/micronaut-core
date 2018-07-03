@@ -64,11 +64,5 @@ public class DefaultKafkaConsumerConfiguration<K, V> extends AbstractKafkaConsum
     private void init(AbstractKafkaConfiguration defaultConfiguration) {
         Properties config = getConfig();
         config.putAll(defaultConfiguration.getConfig());
-        config.putIfAbsent(
-                ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG,
-                AbstractKafkaConsumerConfiguration.DEFAULT_KEY_DESERIALIZER);
-        config.putIfAbsent(
-                ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG,
-                AbstractKafkaConsumerConfiguration.DEFAULT_VALUE_DESERIALIZER);
     }
 }
