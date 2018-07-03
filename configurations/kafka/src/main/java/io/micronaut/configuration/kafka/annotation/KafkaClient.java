@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.retry.annotation.Recoverable;
+import org.apache.kafka.common.serialization.Serializer;
 
 import javax.inject.Scope;
 import javax.inject.Singleton;

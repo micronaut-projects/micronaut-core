@@ -25,7 +25,7 @@ package io.micronaut.configuration.kafka;
  */
 public interface Acknowledgement {
     /**
-     * Acknowledge the last {@link org.apache.kafka.clients.consumer.ConsumerRecord} synchronously
+     * Acknowledge the last {@link org.apache.kafka.clients.consumer.ConsumerRecord} synchronously.
      */
     void ack();
 }
