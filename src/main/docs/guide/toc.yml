@@ -27,7 +27,7 @@ ioc:
   factories: Bean Factories
   conditionalBeans: Conditional Beans
   replaces: Bean Replacement
-  configurations: Bean Configurations
+  beanConfigurations: Bean Configurations
   lifecycle: Life-Cycle Methods
   events: Bean Events
   annotationMetadata: Bean Annotation Metadata
@@ -139,17 +139,28 @@ serverlessFunctions:
     functionCLI: Functions as CLI Applications
   lambdaFunctions: Deploying Functions to AWS Lambda 
   callingFunctions: Calling Functions with FunctionClient
-dataAccess:
-  title: Configurations for Data Access
-  sqlSupport: Configuring a SQL Data Source
-  hibernateSupport: Configuring Hibernate
-  mongoSupport: Configuring MongoDB
-  neo4jSupport: Configuring Neo4j
-  redisSupport: Configuring Redis
-  cassandraSupport: Configuring Cassandra
-otherConfigurations:
-  title: Other Configurations
-  rabbitmq: RabbitMQ
+messaging:
+  title: Message-Driven Microservices
+  kafka:
+    title: Kafka Support
+    kafkaQuickStart: Kafka Quick Start
+    kafkaListener:
+      title: Consumers Using @KafkaListener
+    kafkaClient:
+      title: Producers Using @KafkaClient
+configurations:
+  title: Configurations
+  dataAccess:
+    title: Configurations for Data Access
+    sqlSupport: Configuring a SQL Data Source
+    hibernateSupport: Configuring Hibernate
+    mongoSupport: Configuring MongoDB
+    neo4jSupport: Configuring Neo4j
+    redisSupport: Configuring Redis
+    cassandraSupport: Configuring Cassandra
+  otherConfigurations:
+    title: Other Configurations
+    rabbitmq: RabbitMQ
 languageSupport:
   title: Language Support
   java: Micronaut for Java
