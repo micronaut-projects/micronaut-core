@@ -32,8 +32,6 @@ import java.util.Properties;
  */
 public abstract class AbstractKafkaConsumerConfiguration<K, V> extends AbstractKafkaConfiguration<K, V> {
 
-    static final Class DEFAULT_KEY_DESERIALIZER = org.apache.kafka.common.serialization.ByteArrayDeserializer.class;
-    static final Class DEFAULT_VALUE_DESERIALIZER = org.apache.kafka.common.serialization.StringDeserializer.class;
     private Deserializer<K> keyDeserializer;
     private Deserializer<V> valueDeserializer;
 

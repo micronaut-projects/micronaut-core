@@ -86,6 +86,8 @@ class KafkaListenerSpec extends Specification {
     void "test receive ConsumerRecord"() {
         when:
         def config = context.getBean(AbstractKafkaProducerConfiguration)
+        config.setKeySerializer(new StringSerializer())
+        config.setValueSerializer(new StringSerializer())
         KafkaProducer producer = context.createBean(KafkaProducer, config)
         producer.send(new ProducerRecord("words-records", "key", "hello world")).get()
 

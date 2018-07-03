@@ -61,8 +61,6 @@ public class DefaultKafkaProducerConfiguration<K, V> extends AbstractKafkaProduc
     private void init(AbstractKafkaConfiguration defaultConfiguration) {
         Properties config = getConfig();
         config.putAll(defaultConfiguration.getConfig());
-        config.putIfAbsent(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, DEFAULT_KEY_SERIALIZER);
-        config.putIfAbsent(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, DEFAULT_VALUE_SERIALIZER);
 
         if (defaultConfiguration instanceof AbstractKafkaProducerConfiguration) {
             @SuppressWarnings("unchecked")

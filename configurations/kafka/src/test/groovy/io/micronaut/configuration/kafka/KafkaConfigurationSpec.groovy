@@ -6,6 +6,8 @@ import io.micronaut.configuration.kafka.config.KafkaConsumerConfiguration
 import io.micronaut.context.ApplicationContext
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.consumer.KafkaConsumer
+import org.apache.kafka.common.serialization.StringDeserializer
+import org.apache.kafka.common.serialization.StringSerializer
 import spock.lang.Specification
 
 class KafkaConfigurationSpec extends Specification {
@@ -14,7 +16,10 @@ class KafkaConfigurationSpec extends Specification {
 
     void "test default consumer configuration"() {
         given:
-        ApplicationContext applicationContext = ApplicationContext.run()
+        ApplicationContext applicationContext = ApplicationContext.run(
+                ("kafka." + ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG): StringDeserializer.name,
+                ("kafka." + ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG): StringDeserializer.name
+        )
 
         when:
         AbstractKafkaConsumerConfiguration config = applicationContext.getBean(AbstractKafkaConsumerConfiguration)
@@ -41,7 +46,10 @@ class KafkaConfigurationSpec extends Specification {
         ApplicationContext applicationContext = ApplicationContext.run(
                 ("kafka.${ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG}".toString()):"localhost:1111",
                 ("kafka.${ConsumerConfig.GROUP_ID_CONFIG}".toString()):"mygroup",
-                ("kafka.${ConsumerConfig.MAX_POLL_RECORDS_CONFIG}".toString()):"100"
+                ("kafka.${ConsumerConfig.MAX_POLL_RECORDS_CONFIG}".toString()):"100",
+                ("kafka." + ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG): StringDeserializer.name,
+                ("kafka." + ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG): StringDeserializer.name
+
         )
 
         when:
@@ -71,7 +79,10 @@ class KafkaConfigurationSpec extends Specification {
                 ("kafka.${ConsumerConfig.GROUP_ID_CONFIG}".toString()):"mygroup",
                 ("kafka.consumers.default.${ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG}".toString()):"localhost:2222",
                 ("kafka.${ConsumerConfig.GROUP_ID_CONFIG}".toString()):"mygroup",
-                ("kafka.consumers.default.${ConsumerConfig.MAX_POLL_RECORDS_CONFIG}".toString()):"100"
+                ("kafka.consumers.default.${ConsumerConfig.MAX_POLL_RECORDS_CONFIG}".toString()):"100",
+                ("kafka.consumers.default." + ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG): StringDeserializer.name,
+                ("kafka.consumers.default." + ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG): StringDeserializer.name
+
         )
 
         when:
