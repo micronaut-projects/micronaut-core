@@ -1,0 +1,8 @@
+Reloading (or "hot-loading") refers to the framework reinitializing classes (and parts of the application) when changes to the source files are detected. Micronaut does not include specific support for reloading of changed classes at runtime. Since Micronaut prioritizes startup time and most Micronaut apps can start up within a couple seconds, a productive workflow can often be had by restarting the application as changes are made; for example, by running a test class within an IDE.
+
+However, reloading support is available through the use of third-party JVM agents, along with automatic recompilation on file changes via a supporting build tool (such as Gradle) or IDE (such as Eclipse).
+
+The next sections document how to configure agent-reloading.
+
+
+
