@@ -227,17 +227,21 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                 }
             }
 
-            configureSerializers(method, consumerConfiguration);
+            configureDeserializers(method, consumerConfiguration);
 
             if (LOG.isDebugEnabled()) {
                 Optional kd = consumerConfiguration.getKeyDeserializer();
                 if (kd.isPresent()) {
                     LOG.debug("Using key deserializer [{}] for Kafka listener: {}", kd.get(), method);
+                } else {
+                    LOG.debug("Using key deserializer [{}] for Kafka listener: {}", properties.getProperty(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG), method);
                 }
                 Optional vd = consumerConfiguration.getValueDeserializer();
 
                 if (vd.isPresent()) {
                     LOG.debug("Using value deserializer [{}] for Kafka listener: {}", vd.get(), method);
+                } else {
+                    LOG.debug("Using value deserializer [{}] for Kafka listener: {}", properties.getProperty(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG), method);
                 }
             }
 
@@ -393,14 +397,9 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                                             }
 
                                             if (ackArg.isPresent()) {
-                                                boundArguments.put(ackArg.get(), new Acknowledgement() {
-                                                    @Override
-                                                    public void ack() {
-                                                        kafkaConsumer.commitSync(
-                                                                currentOffsets
-                                                        );
-                                                    }
-                                                });
+                                                boundArguments.put(ackArg.get(), (Acknowledgement) () -> kafkaConsumer.commitSync(
+                                                        currentOffsets
+                                                ));
                                             }
 
                                             try {
@@ -650,36 +649,40 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                 );
     }
 
-    private void configureSerializers(ExecutableMethod<?, ?> method, DefaultKafkaConsumerConfiguration consumerConfiguration) {
+    private void configureDeserializers(ExecutableMethod<?, ?> method, DefaultKafkaConsumerConfiguration consumerConfiguration) {
+        Properties properties = consumerConfiguration.getConfig();
         // figure out the Key deserializer
         Argument bodyArgument = findBodyArgument(method);
-        if (!consumerConfiguration.getKeyDeserializer().isPresent()) {
-            Optional<Argument> keyArgument = Arrays.stream(method.getArguments())
-                    .filter(arg -> arg.getAnnotation(KafkaKey.class) != null).findFirst();
 
-            if (keyArgument.isPresent()) {
-                consumerConfiguration.setKeyDeserializer(
-                        serdeRegistry.pickDeserializer(keyArgument.get())
-                );
-            } else {
-                //noinspection SingleStatementInBlock
-                if (bodyArgument != null && ConsumerRecord.class.isAssignableFrom(bodyArgument.getType())) {
-                    Optional<Argument<?>> keyType = bodyArgument.getTypeVariable("K");
-                    if (keyType.isPresent()) {
-                        consumerConfiguration.setKeyDeserializer(
-                                serdeRegistry.pickDeserializer(keyType.get())
-                        );
+        if (!properties.containsKey(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG)) {
+            if (!consumerConfiguration.getKeyDeserializer().isPresent()) {
+                Optional<Argument> keyArgument = Arrays.stream(method.getArguments())
+                        .filter(arg -> arg.getAnnotation(KafkaKey.class) != null).findFirst();
+
+                if (keyArgument.isPresent()) {
+                    consumerConfiguration.setKeyDeserializer(
+                            serdeRegistry.pickDeserializer(keyArgument.get())
+                    );
+                } else {
+                    //noinspection SingleStatementInBlock
+                    if (bodyArgument != null && ConsumerRecord.class.isAssignableFrom(bodyArgument.getType())) {
+                        Optional<Argument<?>> keyType = bodyArgument.getTypeVariable("K");
+                        if (keyType.isPresent()) {
+                            consumerConfiguration.setKeyDeserializer(
+                                    serdeRegistry.pickDeserializer(keyType.get())
+                            );
+                        } else {
+                            consumerConfiguration.setKeyDeserializer(new ByteArrayDeserializer());
+                        }
                     } else {
                         consumerConfiguration.setKeyDeserializer(new ByteArrayDeserializer());
                     }
-                } else {
-                    consumerConfiguration.setKeyDeserializer(new ByteArrayDeserializer());
                 }
             }
         }
 
         // figure out the Value deserializer
-        if (!consumerConfiguration.getValueDeserializer().isPresent()) {
+        if (!properties.containsKey(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG) && !consumerConfiguration.getValueDeserializer().isPresent()) {
 
             if (bodyArgument != null) {
 
