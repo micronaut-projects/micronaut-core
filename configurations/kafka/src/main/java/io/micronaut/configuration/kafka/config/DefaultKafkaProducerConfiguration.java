@@ -19,7 +19,6 @@ package io.micronaut.configuration.kafka.config;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.annotation.Requires;
-import org.apache.kafka.clients.producer.ProducerConfig;
 
 import javax.inject.Inject;
 import java.util.Properties;
