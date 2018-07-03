@@ -1,8 +1,11 @@
 package io.micronaut.configuration.kafka.annotation
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Property
 import io.micronaut.messaging.annotation.Header
 import io.micronaut.messaging.exceptions.MessagingClientException
+import org.apache.kafka.clients.producer.ProducerConfig
+import org.apache.kafka.common.serialization.ByteArraySerializer
 import reactor.core.publisher.Mono
 import spock.lang.Specification
 
@@ -65,6 +68,14 @@ class KafkaClientSpec extends Specification {
         CompletableFuture<String> sendSentence(@KafkaKey String key, String sentence)
 
         @Topic("words")
+        @KafkaClient(
+                properties = [
+                        @Property(name = ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
+                                  value = "org.apache.kafka.common.serialization.ByteArraySerializer"),
+                        @Property(name = ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
+                                value = "org.apache.kafka.common.serialization.ByteArraySerializer")
+                ]
+        )
         String sendSync(@KafkaKey String key, String sentence)
 
         @Topic("words")

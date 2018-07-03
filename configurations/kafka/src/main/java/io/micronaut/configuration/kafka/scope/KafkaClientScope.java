@@ -46,6 +46,7 @@ import javax.inject.Singleton;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 
@@ -134,9 +135,6 @@ public class KafkaClientScope implements CustomScope<KafkaClient>, LifeCycle<Kaf
         );
 
         return (T) clients.computeIfAbsent(key, clientKey -> {
-            Serializer<?> keySerializer = serdeRegistry.pickSerializer(keyType);
-            Serializer<?> valueSerializer = serdeRegistry.pickSerializer(valueType);
-
             Supplier<AbstractKafkaProducerConfiguration> defaultResolver = () -> beanContext.getBean(DefaultKafkaProducerConfiguration.class);
             AbstractKafkaProducerConfiguration config;
             boolean hasId = StringUtils.isNotEmpty(id);
@@ -150,10 +148,21 @@ public class KafkaClientScope implements CustomScope<KafkaClient>, LifeCycle<Kaf
             }
 
             DefaultKafkaProducerConfiguration newConfig = new DefaultKafkaProducerConfiguration(config);
-            newConfig.setKeySerializer(keySerializer);
-            newConfig.setValueSerializer(valueSerializer);
+
+            Properties properties = newConfig.getConfig();
+            if (!properties.containsKey(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG)) {
+                Serializer<?> keySerializer = serdeRegistry.pickSerializer(keyType);
+                newConfig.setKeySerializer(keySerializer);
+            }
+
+            if (!properties.containsKey(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG)) {
+                Serializer<?> valueSerializer = serdeRegistry.pickSerializer(valueType);
+                newConfig.setValueSerializer(valueSerializer);
+            }
+
+
             if (hasId) {
-                newConfig.getConfig().putIfAbsent(ProducerConfig.CLIENT_ID_CONFIG, id);
+                properties.putIfAbsent(ProducerConfig.CLIENT_ID_CONFIG, id);
             }
             return beanContext.createBean(KafkaProducer.class, newConfig);
         });

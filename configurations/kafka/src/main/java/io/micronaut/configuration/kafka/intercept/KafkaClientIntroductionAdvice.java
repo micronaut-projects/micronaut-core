@@ -27,6 +27,7 @@ import io.micronaut.configuration.kafka.config.DefaultKafkaProducerConfiguration
 import io.micronaut.configuration.kafka.config.KafkaProducerConfiguration;
 import io.micronaut.configuration.kafka.serde.SerdeRegistry;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.annotation.Bindable;
@@ -570,28 +571,49 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
                 );
             }
 
+            Property[] additionalProperties = metadata.getAnnotation(KafkaClient.class).properties();
 
-            Serializer<?> keySerializer = newConfiguration.getKeySerializer().orElse(null);
-            if (keySerializer == null) {
-                if (keyArgument != null) {
-                    keySerializer = serdeRegistry.pickSerializer(keyArgument);
-                } else {
-                    keySerializer = new ByteArraySerializer();
-                }
-                newConfiguration.setKeySerializer((Serializer) keySerializer);
-            }
-
-            Serializer<?> valueSerializer = newConfiguration.getValueSerializer().orElse(null);
-
-            if (valueSerializer == null) {
-                boolean batch = metadata.getValue(KafkaClient.class, "batch", Boolean.class).orElse(false);
-                valueSerializer = serdeRegistry.pickSerializer(batch ? bodyArgument.getFirstTypeVariable().orElse(bodyArgument) : bodyArgument);
-                newConfiguration.setValueSerializer((Serializer) valueSerializer);
+            for (Property additionalProperty : additionalProperties) {
+                newProperties.put(
+                        additionalProperty.name(),
+                        additionalProperty.value()
+                );
             }
 
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Creating new KafkaProducer. Key serializer: [{}]. Value serializer: [{}]", keySerializer, valueSerializer);
+                LOG.debug("Creating new KafkaProducer.");
             }
+
+            if (!newProperties.containsKey(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG)) {
+                Serializer<?> keySerializer = newConfiguration.getKeySerializer().orElse(null);
+                if (keySerializer == null) {
+                    if (keyArgument != null) {
+                        keySerializer = serdeRegistry.pickSerializer(keyArgument);
+                    } else {
+                        keySerializer = new ByteArraySerializer();
+                    }
+
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Using Kafka key serializer: {}", keySerializer);
+                    }
+                    newConfiguration.setKeySerializer((Serializer) keySerializer);
+                }
+            }
+
+            if (!newProperties.containsKey(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG)) {
+                Serializer<?> valueSerializer = newConfiguration.getValueSerializer().orElse(null);
+
+                if (valueSerializer == null) {
+                    boolean batch = metadata.getValue(KafkaClient.class, "batch", Boolean.class).orElse(false);
+                    valueSerializer = serdeRegistry.pickSerializer(batch ? bodyArgument.getFirstTypeVariable().orElse(bodyArgument) : bodyArgument);
+
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Using Kafka value serializer: {}", valueSerializer);
+                    }
+                    newConfiguration.setValueSerializer((Serializer) valueSerializer);
+                }
+            }
+
             return producerFactory.createProducer(newConfiguration);
         });
     }
