@@ -1,4 +1,4 @@
-By default Micronaut is a stateless HTTP server, however depending on your application requirements you may need to notion of HTTP sessions.
+By default Micronaut is a stateless HTTP server, however depending on your application requirements you may need the notion of HTTP sessions.
 
 Micronaut comes with a `session` module inspired by https://projects.spring.io/spring-session/[Spring Session] that enables this that currently features two implementations:
 
