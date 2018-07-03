@@ -16,6 +16,7 @@
 
 package io.micronaut.configuration.kafka.processor;
 
+import io.micronaut.configuration.kafka.Acknowledgement;
 import io.micronaut.configuration.kafka.KafkaConsumerAware;
 import io.micronaut.configuration.kafka.KafkaProducerRegistry;
 import io.micronaut.configuration.kafka.annotation.*;
@@ -157,6 +158,9 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
             boolean isBatch = method.getValue(KafkaListener.class, "batch", Boolean.class)
                     .orElse(false);
 
+            Optional<Argument> consumerArg = Arrays.stream(method.getArguments()).filter(arg -> Consumer.class.isAssignableFrom(arg.getType())).findFirst();
+            Optional<Argument> ackArg = Arrays.stream(method.getArguments()).filter(arg -> Acknowledgement.class.isAssignableFrom(arg.getType())).findFirst();
+
             String groupId = consumerAnnotation.groupId();
 
             if (StringUtils.isEmpty(groupId)) {
@@ -297,8 +301,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                 executorService.submit(() -> {
                     try {
 
-                        boolean trackPartitions = offsetStrategy == OffsetStrategy.SYNC_PER_RECORD || offsetStrategy == OffsetStrategy.ASYNC_PER_RECORD;
-                        Optional<Argument> consumerArg = Arrays.stream(method.getArguments()).filter(arg -> Consumer.class.isAssignableFrom(arg.getType())).findFirst();
+                        boolean trackPartitions = ackArg.isPresent() || offsetStrategy == OffsetStrategy.SYNC_PER_RECORD || offsetStrategy == OffsetStrategy.ASYNC_PER_RECORD;
                         Map<Argument<?>, Object> boundArguments = new HashMap<>(2);
                         consumerArg.ifPresent(argument -> boundArguments.put(argument, kafkaConsumer));
 
@@ -387,6 +390,17 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                                                                 consumerRecord.partition()),
                                                         new OffsetAndMetadata(consumerRecord.offset() + 1, null)
                                                 );
+                                            }
+
+                                            if (ackArg.isPresent()) {
+                                                boundArguments.put(ackArg.get(), new Acknowledgement() {
+                                                    @Override
+                                                    public void ack() {
+                                                        kafkaConsumer.commitSync(
+                                                                currentOffsets
+                                                        );
+                                                    }
+                                                });
                                             }
 
                                             try {
