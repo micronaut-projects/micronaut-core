@@ -21,7 +21,6 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.naming.NameUtils;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
 
 import java.util.Properties;
 
