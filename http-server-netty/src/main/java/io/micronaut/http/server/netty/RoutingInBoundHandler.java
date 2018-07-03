@@ -905,6 +905,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         Optional<MediaType> specifiedMediaType = response.getContentType();
                         MediaType responseMediaType = specifiedMediaType.orElse(defaultResponseMediaType);
 
+                        applyConfiguredHeaders(response.getHeaders());
+
                         streamHttpContentChunkByChunk(
                                 context,
                                 request,
@@ -984,15 +986,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             Optional<MediaType> specifiedMediaType = response.getContentType();
             MediaType responseMediaType = specifiedMediaType.orElse(defaultResponseMediaType);
 
-            MutableHttpHeaders headers = response.getHeaders();
-            if (serverConfiguration.isDateHeader() && !headers.contains(HttpHeaders.DATE)) {
-                headers.date(LocalDateTime.now());
-            }
-            serverConfiguration.getServerHeader().ifPresent((server) -> {
-                if (!headers.contains(HttpHeaders.SERVER)) {
-                    headers.add(HttpHeaders.SERVER, server);
-                }
-            });
+            applyConfiguredHeaders(response.getHeaders());
 
             Optional<?> responseBody = response.getBody();
             if (responseBody.isPresent()) {
@@ -1350,6 +1344,17 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 new AtomicReference<>(nettyHttpRequest),
                 Flowable.just(error)
         );
+    }
+
+    private void applyConfiguredHeaders(MutableHttpHeaders headers) {
+        if (serverConfiguration.isDateHeader() && !headers.contains("Date")) {
+            headers.date(LocalDateTime.now());
+        }
+        serverConfiguration.getServerHeader().ifPresent((server) -> {
+            if (!headers.contains("Server")) {
+                headers.add("Server", server);
+            }
+        });
     }
 
     /**

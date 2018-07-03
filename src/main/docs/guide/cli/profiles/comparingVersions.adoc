@@ -1,0 +1,8 @@
+The easiest way to see changes made to a fresh new app for a given profile between Micronaut versions is to use the next
+Github Repositories to generate a diff.
+
+|===
+|Application Profile
+|https://github.com/micronaut-profiles-versions/service-versions[service] Default profile used by `create-app` command.
+|https://github.com/micronaut-profiles-versions/function-versions[function] profile used by `create-function` command.
+|===
