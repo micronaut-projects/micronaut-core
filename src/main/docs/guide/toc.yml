@@ -210,6 +210,10 @@ cli:
   profiles: Profiles
   features: Features
   commands: Commands
+reloading:
+  title: Reloading
+  jrebel: JRebel
+  springloaded: Spring-Loaded
 faq: Frequently Asked Questions (FAQ)
 problems: Common Problems
 breaks: Breaking Changes
