@@ -4,6 +4,7 @@ package io.micronaut.configuration.kafka.docs.consumer.config;
 import io.micronaut.configuration.kafka.annotation.*;
 import io.micronaut.context.annotation.Property;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
+import org.apache.kafka.clients.consumer.ConsumerRecord;
 // end::imports[]
 
 // tag::clazz[]
@@ -16,9 +17,24 @@ public class ProductListener {
 // end::clazz[]
 
     // tag::method[]
-    @Topic("awesome-products") // <2>
-    public void receive(@KafkaKey String brand, String name) { // <3>
-        System.out.println("Got Product - " + name + " by " + brand);
+    @Topic("awesome-products")
+    public void receive(
+            @KafkaKey String brand, // <1>
+            Product product, // <2>
+            long offset, // <3>
+            int partition, // <4>
+            String topic, // <5>
+            long timestamp) { // <6>
+        System.out.println("Got Product - " + product.getName() + " by " + brand);
     }
     // end::method[]
+
+    // tag::consumeRecord[]
+    @Topic("awesome-products")
+    public void receive(ConsumerRecord<String, Product> record) { // <1>
+        Product product = record.value(); // <2>
+        String brand = record.key(); // <3>
+        System.out.println("Got Product - " + product.getName() + " by " + brand);
+    }
+    // end::consumeRecord[]
 }

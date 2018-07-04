@@ -1,1 +1,88 @@
-TODO
+The ann:configuration.kafka.annotation.KafkaListener[] annotation examples up until now have been relatively trivial, but Micronaut offers a lot of flexibility when it comes to the types of method signatures you can define.
+
+The following sections detail examples of supported use cases.
+
+=== Available Annotations
+
+There are a number of annotations available that allow you to specify how a method argument is bound.
+
+The following table summarizes the annotations and their purpose, with an example:
+
+.Kafka Messaging Annotations
+|===
+|Annotation |Description |Example
+
+|ann:messaging.annotation.Body[]
+| Allows explicitly indicating the body of the message
+|`@Body Product product`
+
+|ann:messaging.annotation.Header[]
+| Allows binding a parameter to a message header
+|`@Header("X-My-Header") String myHeader`
+
+|ann:configuration.kafka.annotation.KafkaKey[]
+| Allows specifying the parameter that is the key
+|`@KafkaKey String key`
+
+|===
+
+For example, you can use the ann:messaging.annotation.Header[] annotation to bind a parameter value from a header contained within a `ConsumerRecord`.
+
+
+=== Topics, Partitions and Offsets
+
+If you want a reference to the topic, partition or offset it is a simple matter of defining a parameter for each.
+
+The following table summarizes example parameters and how they related to the `ConsumerRecord` being processed:
+
+.@KafkaListener Method Parameters
+|===
+|Parameter |Description
+
+|`String topic`
+| The name of the topic
+
+|`long offset`
+| The offset of the `ConsumerRecord`
+
+|`int partition`
+| The partition of the `ConsumerRecord`
+
+|`long timestamp`
+| The timestamp of the `ConsumerRecord`
+
+|===
+
+As an example, following listener method will receive all of the above mentioned parameters:
+
+.Specifying Parameters for offset, topic etc.
+[source,java]
+----
+include::{testskafka}/consumer/config/ProductListener.java[tags=method, indent=0]
+----
+
+<1> The Kafka key
+<2> The message body
+<3> The offset of the `ConsumerRecord`
+<4> The partition of the `ConsumerRecord`
+<5> The topic. Note that the `@Topic` annotation supports multiple topics.
+<6> The timestamp of the `ConsumerRecord`
+
+=== Receiving a ConsumerRecord
+
+If you prefer you can also receive the entire `ConsumerRecord` object being listened for. In this case you should specify appropriate generic types for the key and value of the `ConsumerRecord` so that Micronaut can pick the correct deserializer for each.
+
+Consider the following example:
+
+.Specifying Parameters for offset, topic etc.
+[source,java]
+----
+include::{testskafka}/consumer/config/ProductListener.java[tags=consumeRecord, indent=0]
+----
+
+<1> The method signature accepts a `ConsumerRecord` that specifies a `String` for the key type and a POJO (`Product`) for the value type.
+<2> The `value()` method is used to retrieve the value
+<3> The `key()` method is used to retrieve the key
+
+=== Receiving and returning Reactive Types
+
