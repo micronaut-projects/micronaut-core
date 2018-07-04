@@ -909,7 +909,15 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
         if (StringUtils.isNotEmpty(contextPath)) {
             String rawPath = requestURI.getRawPath();
             try {
-                return new URI(StringUtils.prependUri(contextPath, rawPath));
+                return new URI(
+                        requestURI.getScheme(),
+                        requestURI.getUserInfo(),
+                        requestURI.getHost(),
+                        requestURI.getPort(),
+                        StringUtils.prependUri(contextPath, rawPath),
+                        requestURI.getRawQuery(),
+                        requestURI.getRawFragment()
+                );
             } catch (URISyntaxException e) {
                 //should never happen
             }
