@@ -145,9 +145,22 @@ messaging:
     title: Kafka Support
     kafkaQuickStart: Kafka Quick Start
     kafkaListener:
-      title: Consumers Using @KafkaListener
+      title: Kafka Consumers Using @KafkaListener
+      kafkaListenerConfiguration: Configuring @KafkaListener beans
+      kafkaListenerMethods: Defining @KafkaListener Methods
+      kafkaOffsets: Commiting Kafka Offsets
+      kafkaListenerBatch: Kafka Batch Processing
+      kafkaSendTo: Forwarding Messages with @SendTo
+      kafkaExceptions: Handling Consumer Exceptions
     kafkaClient:
-      title: Producers Using @KafkaClient
+      title: Kafka Producers Using @KafkaClient
+      kafkaClientConfiguration: Configuring @KafkaClient beans
+      kafkaClientMethods: Defining @KafkaClient Methods
+      kafkaClientBatch: Sending Records in Batch
+      kafkaClientScope: Injecting Kafka Producer Beans
+    kafkaApplications:
+      title: Running Kafka Applications
+      kafkaHealth: Kafka Health Checks
 configurations:
   title: Configurations
   dataAccess:
