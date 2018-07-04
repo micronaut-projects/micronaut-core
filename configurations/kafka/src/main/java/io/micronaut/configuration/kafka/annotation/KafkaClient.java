@@ -121,7 +121,7 @@ public @interface KafkaClient {
         public static final int ONE = 1;
 
         /**
-         * Wait for a full set of in-sync replicas to acknowlege.
+         * Wait for a full set of in-sync replicas to acknowledge.
          */
         public static final int ALL = -1;
     }
