@@ -21,7 +21,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.reactiverse.pgclient.PgPoolOptions;
 
 /**
- * PgPoolConfiguration for Reactive PG Client.
+ * The configuration class for Reactive Postgres Client.
  *
  * @author puneetbehl
  * @since 1.0
@@ -29,14 +29,19 @@ import io.reactiverse.pgclient.PgPoolOptions;
 @ConfigurationProperties(PgPoolClientSettings.PREFIX)
 public class PgPoolConfiguration {
 
+    /**
+     * The options for configuring a connection pool.
+     */
     @ConfigurationBuilder
     protected PgPoolOptions pgPoolOptions = new PgPoolOptions();
 
+    /**
+     * The Postgres connection URI.
+     */
     protected String uri;
 
     /**
-     *
-     * @return
+     * @return The Postgres connection URI.
      */
     public String getUri() {
         return uri;
@@ -44,7 +49,7 @@ public class PgPoolConfiguration {
 
     /**
      *
-     * @return
+     * @return The options for configuring a connection pool.
      */
     public PgPoolOptions getPgPoolOptions() {
         return pgPoolOptions;

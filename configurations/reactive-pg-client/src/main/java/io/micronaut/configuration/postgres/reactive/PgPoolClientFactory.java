@@ -27,6 +27,8 @@ import javax.annotation.Nullable;
 import javax.inject.Singleton;
 
 /**
+ * The Factory for creating Reactive Postgres client.
+ *
  * @author puneetbehl
  * @since 1.0
  */
@@ -34,11 +36,18 @@ import javax.inject.Singleton;
 public class PgPoolClientFactory {
 
     private final PgPoolConfiguration pgPoolConfiguration;
+
+    /**
+     * The Vertx instance if you are running with Vert.x.
+     */
     private final Vertx vertx;
 
     /**
-     * @param pgPoolConfiguration
-     * @param vertx
+     * Create the factory with given Posgres Pool configuration and
+     * Vertx instance(can be null) if you are running with Vert.x.
+     *
+     * @param pgPoolConfiguration The Reactive Postgres configurations
+     * @param vertx The Vertx instance
      */
     public PgPoolClientFactory(PgPoolConfiguration pgPoolConfiguration, @Nullable Vertx vertx) {
         this.pgPoolConfiguration = pgPoolConfiguration;
@@ -46,7 +55,7 @@ public class PgPoolClientFactory {
     }
 
     /**
-     * @return client
+     * @return client A pool of connections.
      */
     @Singleton
     @Bean(preDestroy = "close")
@@ -58,9 +67,10 @@ public class PgPoolClientFactory {
         }
     }
 
-
     /**
-     * @return
+     * Create a connection pool to the database configured with the {@link PgPoolConfiguration}.
+     *
+     * @return A pool of connections.
      */
     private PgPool createClient() {
         PgPoolConfiguration configuration = this.pgPoolConfiguration;
@@ -73,10 +83,11 @@ public class PgPoolClientFactory {
         }
     }
 
-
     /**
+     * Create a connection pool to the database configured with the {@link PgPoolConfiguration}.
+     *
      * @param vertx The Vertx instance.
-     * @return
+     * @return A pool of connections.
      */
     private PgPool createClient(Vertx vertx) {
         PgPoolConfiguration configuration = this.pgPoolConfiguration;
