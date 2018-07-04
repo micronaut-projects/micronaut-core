@@ -30,6 +30,8 @@ import org.reactivestreams.Publisher;
 import javax.inject.Singleton;
 
 /**
+ * A Health indicator for reactive Postgres client.
+ *
  * @author puneetbehl
  * @since 1.0
  */
@@ -41,7 +43,9 @@ public class PgPoolHealthIndicator implements HealthIndicator {
     private final PgPool client;
 
     /**
-     * @param client The Reactive Pg Client.
+     * Constructor.
+     *
+     * @param client A pool of connections.
      */
     public PgPoolHealthIndicator(PgPool client) {
         this.client = client;
