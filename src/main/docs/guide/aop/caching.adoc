@@ -46,7 +46,7 @@ If you wish to use Redis to cache results then you need to add the Lettuce confi
 ----
 dependencies {
     ...
-    compile "io.micronaut.configurations:redis-lettuce"
+    compile "io.micronaut.configuration:redis-lettuce"
     ...
 }
 ----
