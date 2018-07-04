@@ -86,3 +86,30 @@ include::{testskafka}/consumer/config/ProductListener.java[tags=consumeRecord, i
 
 === Receiving and returning Reactive Types
 
+In addition to common Java types and POJOs you can also define listener methods that receive a Reactive type such as a rx:Single[] or a Reactor `Mono`. For example:
+
+.Using Reactive Types
+[source,java]
+----
+include::{testskafka}/consumer/reactive/ProductListener.java[tags=method, indent=0]
+----
+
+<1> The `@KafkaKey` annotation is used to indicate the key
+<2> A rx:Single[] is used to receive the message body
+<3> The `doOnSuccess` method is used to process the result
+
+Note that in this case the method returns an `rx:Single[]` this indicates to Micronaut that the `poll` loop should continue and if `enable.auto.commit` is set to `true` (the default) the offsets will be committed potentially before the `doOnSuccess` is called.
+
+The idea here is that you are able to write consumers that don't block, however care must be taken in the case where an error occurs in the `doOnSuccess` method otherwise the message could be lost. You could for example re-deliver the message in case of an error.
+
+Alternatively, you can use the ann:core.annotation.Blocking[] annotation to tell Micronaut to subscribe to the returned reactive type in a blocking manner which will result in blocking the `poll` loop, preventing offsets from being committed automatically:
+
+.Blocking with Reactive Consumers
+[source,java]
+----
+@Blocking
+@Topic("reactive-products")
+public Single<Product> receive(
+    ...
+}
+----
