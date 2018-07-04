@@ -77,4 +77,3 @@ kafka:
 ----
 
 You may want to do this if for example you choose an alternative deserialization format such as Avro or Protobuf.
-
