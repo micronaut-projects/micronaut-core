@@ -30,6 +30,7 @@ import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.io.ResourceLoader;
@@ -211,9 +212,17 @@ public class DefaultBeanContext implements BeanContext {
                 }
             );
 
-            objects.forEach(beanRegistration -> {
+
+            Set<Integer> processed = new HashSet<>();
+            for (BeanRegistration beanRegistration : objects) {
                 BeanDefinition def = beanRegistration.beanDefinition;
                 Object bean = beanRegistration.bean;
+                int sysId = System.identityHashCode(bean);
+                if (processed.contains(sysId)) {
+                    continue;
+                }
+
+                processed.add(sysId);
                 if (def instanceof DisposableBeanDefinition) {
                     try {
                         //noinspection unchecked
@@ -236,7 +245,7 @@ public class DefaultBeanContext implements BeanContext {
                 if (bean instanceof LifeCycle) {
                     ((LifeCycle) bean).stop();
                 }
-            });
+            }
         }
         return this;
     }
@@ -1012,10 +1021,21 @@ public class DefaultBeanContext implements BeanContext {
                 Class<? extends Annotation> annotationType = entry.getKey();
                 streamOfType(ExecutableMethodProcessor.class, Qualifiers.byTypeArguments(annotationType))
                     .forEach(processor -> {
-                        for (BeanDefinitionMethodReference<?, ?> method : entry.getValue()) {
-                            //noinspection unchecked
-                            processor.process(method.getBeanDefinition(), method);
+                            for (BeanDefinitionMethodReference<?, ?> method : entry.getValue()) {
+                                BeanDefinition<?> beanDefinition = method.getBeanDefinition();
+
+                                // Only process the method if the the annotation is not declared at the class level
+                                // If declared at the class level it will already have been processed by ExecutableMethodProcessorListener
+                                if (!beanDefinition.hasStereotype(annotationType)) {
+                                    //noinspection unchecked
+                                    processor.process(beanDefinition, method);
+                                }
+                            }
+
+                        if (processor instanceof Completable) {
+                            ((Completable) processor).onComplete();
                         }
+
                     });
             }
         }

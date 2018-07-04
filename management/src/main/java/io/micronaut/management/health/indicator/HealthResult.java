@@ -73,8 +73,8 @@ public interface HealthResult {
     class Builder {
 
         private final String name;
-        private Optional<HealthStatus> status;
-        private Optional<Object> details;
+        private HealthStatus status;
+        private Object details;
 
         /**
          * @param name   The name of the health result
@@ -82,8 +82,7 @@ public interface HealthResult {
          */
         Builder(String name, HealthStatus status) {
             this.name = name;
-            this.status = Optional.ofNullable(status);
-            this.details = Optional.empty();
+            this.status = status;
         }
 
         /**
@@ -91,8 +90,6 @@ public interface HealthResult {
          */
         Builder(String name) {
             this.name = name;
-            this.status = Optional.empty();
-            this.details = Optional.empty();
         }
 
         /**
@@ -102,7 +99,7 @@ public interface HealthResult {
          * @return The builder
          */
         public Builder status(HealthStatus status) {
-            this.status = Optional.ofNullable(status);
+            this.status = status;
             return this;
         }
 
@@ -125,7 +122,7 @@ public interface HealthResult {
          * @return The builder
          */
         public Builder details(Object details) {
-            this.details = Optional.ofNullable(details);
+            this.details = details;
             return this;
         }
 
@@ -143,12 +140,12 @@ public interface HealthResult {
 
                 @Override
                 public HealthStatus getStatus() {
-                    return status.orElse(HealthStatus.UNKNOWN);
+                    return status != null ? status : HealthStatus.UNKNOWN;
                 }
 
                 @Override
                 public Object getDetails() {
-                    return details.orElse(null);
+                    return details;
                 }
             };
         }

@@ -23,7 +23,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * This lets you declare several headers for a client class and have them always included. hola
+ * This lets you declare several headers for a client class and have them always included.
  * Example usage:
  * <pre><code>
  *{@literal @}Headers({
@@ -31,7 +31,9 @@ import java.lang.annotation.Target;
  *     {@literal @}Header(name="Content-length",value="2048")
  * })
  * </code></pre>
+ *
  * @author rvanderwerf
+ * @author graemerocher Graeme Rocher
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)

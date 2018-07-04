@@ -1,5 +1,3 @@
-Micronaut features the ability to automatically configure access to common databases.
-
 The table summarizes the configuration modules and the dependencies you should add to your build to enable them.
 
 .Data Access Configuration Modules
