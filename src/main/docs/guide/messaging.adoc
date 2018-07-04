@@ -1,0 +1,8 @@
+In the past, with monolithic applications, message listeners that listened to messages from messaging systems would frequently be embedded in the same application unit.
+
+In Microservice architectures it is common to have individual Microservice applications that are driven by a message system such as RabbitMQ or Kafka.
+
+In fact a Message-driven Microservice may not even feature an HTTP endpoint or HTTP server (although this can be valuable from a health check and visibility perspective).
+
+
+

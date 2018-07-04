@@ -90,7 +90,7 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
         if (annotation == null) {
             throw new DependencyInjectionException(resolutionContext, argument, "ClientScope called for injection point that is not annotated with @Client");
         }
-        if (!HttpClient.class.isAssignableFrom(beanDefinition.getBeanType())) {
+        if (!HttpClient.class.isAssignableFrom(argument.getType())) {
             throw new DependencyInjectionException(resolutionContext, argument, "@Client used on type that is not an HttpClient");
         }
         if (!(provider instanceof ParametrizedProvider)) {

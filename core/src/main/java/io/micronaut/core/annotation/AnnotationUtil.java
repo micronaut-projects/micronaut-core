@@ -139,7 +139,7 @@ public class AnnotationUtil {
      */
     public static Optional<Annotation> findAnnotationWithStereoType(AnnotatedElement element, String stereotypeName) {
         if (element instanceof Class) {
-            return findAnnotationWithStereoType((Class) element, stereotypeName);
+            return findAnnotationWithStereoType(element, stereotypeName);
         } else {
             Annotation[] annotations = element.getAnnotations();
             return findAnnotationWithStereoType(stereotypeName, annotations);

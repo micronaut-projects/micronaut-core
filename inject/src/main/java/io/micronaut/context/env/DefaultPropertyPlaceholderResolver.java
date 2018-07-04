@@ -35,6 +35,11 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
      */
     public static final String PREFIX = "${";
 
+    /**
+     * Suffix for placeholder in properties.
+     */
+    public static final String SUFFIX = "}";
+
     private final PropertyResolver environment;
     private final String prefix;
 
@@ -44,6 +49,11 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     public DefaultPropertyPlaceholderResolver(PropertyResolver environment) {
         this.environment = environment;
         this.prefix = PREFIX;
+    }
+
+    @Override
+    public String getPrefix() {
+        return this.prefix;
     }
 
     @Override

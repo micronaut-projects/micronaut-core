@@ -38,4 +38,22 @@ public interface ArgumentConversionContext<T> extends ConversionContext, Annotat
     default AnnotationMetadata getAnnotationMetadata() {
         return getArgument().getAnnotationMetadata();
     }
+
+    /**
+     * Augment this context with annotation metadata.
+     *
+     * @param annotationMetadata The annotation metadata
+     * @return The conversion context
+     */
+    @SuppressWarnings("unchecked")
+    default ArgumentConversionContext<T> with(AnnotationMetadata annotationMetadata) {
+
+        ConversionContext thisContext = this;
+        return new DefaultArgumentConversionContext(getArgument(), thisContext.getLocale(), thisContext.getCharset()) {
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                return annotationMetadata;
+            }
+        };
+    }
 }
