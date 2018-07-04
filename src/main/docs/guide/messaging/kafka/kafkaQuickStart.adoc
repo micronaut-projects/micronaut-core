@@ -50,7 +50,7 @@ To create a Kafka `Producer` that sends messages you can simply define an interf
 For example the following is a trivial `@KafkaClient` interface:
 
 .ProductClient.java
-[source,groovy]
+[source,java]
 ----
 include::{testskafka}/quickstart/ProductClient.java[tags=imports, indent=0]
 
@@ -66,7 +66,7 @@ NOTE: You can omit the key, however this will result in a `null` key which means
 At compile time Micronaut will produce an implementation of the above interface. You can retrieve an instance of `ProductClient` either by looking up the bean from the api:context.ApplicationContext[] or by injecting the bean with `@Inject`:
 
 .Using ProductClient
-[source,groovy]
+[source,java]
 ----
 include::{testskafka}/DocTests.java[tags=quickstart, indent=0]
 ----
@@ -82,7 +82,7 @@ To listen to Kafka messages you can use the ann:configuration.kafka.annotation.K
 The following example will listen for messages published by the `ProductClient` in the previous section:
 
 .ProductListener.java
-[source,groovy]
+[source,java]
 ----
 include::{testskafka}/quickstart/ProductListener.java[tags=imports, indent=0]
 
