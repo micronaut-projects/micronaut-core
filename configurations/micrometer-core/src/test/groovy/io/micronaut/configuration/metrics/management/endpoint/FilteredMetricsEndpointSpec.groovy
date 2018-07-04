@@ -68,6 +68,9 @@ class FilteredMetricsEndpointSpec extends Specification {
     }
 
     void "test metrics endpoint with filtered metrics"() {
+        given:
+        RxHttpClient rxClient = RxHttpClient.create(embeddedServer.getURL())
+
         when:
         ApplicationContext context = embeddedServer.getApplicationContext()
 
@@ -81,18 +84,22 @@ class FilteredMetricsEndpointSpec extends Specification {
         context.containsBean(SimpleMeterRegistry)
 
         when:
-        def result = waitForResponse()
+
+        def result = waitForResponse(rxClient)
 
         then:
         result.names.size() == 1
         !result.names[0].toString().startsWith("system")
+
+        cleanup:
+        rxClient.close()
     }
 
-    Map waitForResponse(Integer loopCount = 1) {
+    Map waitForResponse(RxHttpClient rxClient, Integer loopCount = 1) {
         if (loopCount > 5) {
             throw new RuntimeException("Too many attempts to get metrics, failed!")
         }
-        RxHttpClient rxClient = RxHttpClient.create(embeddedServer.getURL())
+
         def response = rxClient.exchange("/metrics", Map).blockingFirst()
         Map result = response?.body()
         log.info("/metrics returned status=${response?.status()} data=${result}")
