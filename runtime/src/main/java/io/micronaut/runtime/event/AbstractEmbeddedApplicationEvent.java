@@ -18,7 +18,6 @@ package io.micronaut.runtime.event;
 
 import io.micronaut.context.event.ApplicationEvent;
 import io.micronaut.runtime.EmbeddedApplication;
-import io.micronaut.runtime.server.EmbeddedServer;
 
 /**
  * An abstract event for events specific to server applications.

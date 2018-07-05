@@ -42,6 +42,7 @@ public interface PropertyPlaceholderResolver {
     default String getPrefix() {
         return DefaultPropertyPlaceholderResolver.PREFIX;
     }
+
     /**
      * Resolve the placeholders and return an Optional String if it was possible to resolve them.
      *

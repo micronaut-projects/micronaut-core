@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+import io.micronaut.codec.CodecConfiguration;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
@@ -29,13 +30,13 @@ import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
 
+import javax.annotation.Nullable;
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * A {@link MediaTypeCodec} for JSON and Jackson.
@@ -46,16 +47,27 @@ import java.util.Map;
 @Singleton
 public class JsonMediaTypeCodec implements MediaTypeCodec {
 
+    public static final String CONFIGURATION_QUALIFIER = "json";
+
     private final ObjectMapper objectMapper;
     private final ApplicationConfiguration applicationConfiguration;
+    private final List<MediaType> additionalTypes;
 
     /**
      * @param objectMapper             To read/write JSON
      * @param applicationConfiguration The common application configurations
+     * @param codecConfiguration       The configuration for the codec
      */
-    public JsonMediaTypeCodec(ObjectMapper objectMapper, ApplicationConfiguration applicationConfiguration) {
+    public JsonMediaTypeCodec(ObjectMapper objectMapper,
+                              ApplicationConfiguration applicationConfiguration,
+                              @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         this.objectMapper = objectMapper;
         this.applicationConfiguration = applicationConfiguration;
+        if (codecConfiguration != null) {
+            this.additionalTypes = codecConfiguration.getAdditionalTypes();
+        } else {
+            this.additionalTypes = Collections.emptyList();
+        }
     }
 
     /**
@@ -71,8 +83,11 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
     }
 
     @Override
-    public MediaType getMediaType() {
-        return MediaType.APPLICATION_JSON_TYPE;
+    public Collection<MediaType> getMediaTypes() {
+        List<MediaType> mediaTypes = new ArrayList<>();
+        mediaTypes.add(MediaType.APPLICATION_JSON_TYPE);
+        mediaTypes.addAll(additionalTypes);
+        return mediaTypes;
     }
 
     @SuppressWarnings("Duplicates")

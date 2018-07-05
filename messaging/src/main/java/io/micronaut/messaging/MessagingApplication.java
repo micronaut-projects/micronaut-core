@@ -45,6 +45,7 @@ public class MessagingApplication implements EmbeddedApplication, Described {
 
     private final ApplicationContext applicationContext;
     private final ApplicationConfiguration configuration;
+
     /**
      * Constructs a new messaging application.
      *

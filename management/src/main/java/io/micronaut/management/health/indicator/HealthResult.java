@@ -21,7 +21,6 @@ import io.micronaut.health.HealthStatus;
 import javax.validation.constraints.NotNull;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * <p>Used to represent the output of a {@link HealthIndicator}.</p>
