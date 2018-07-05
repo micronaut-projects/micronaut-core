@@ -31,6 +31,9 @@ The table summarizes the configuration modules and the dependencies you should a
 |`io.micronaut.configuration:neo4j-gorm`
 |Configures http://gorm.grails.org/latest/neo4j/manual[GORM for Neo4j] for Groovy applications
 
+|`io.micronaut.configuration:postgres-reactive`
+|Configures the https://github.com/reactiverse/reactive-pg-client[Reactive Postgres Client]
+
 |`io.micronaut.configuration:redis-lettuce`
 |Configures the https://lettuce.io[Lettuce] driver for https://redis.io[Redis]
 
