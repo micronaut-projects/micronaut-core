@@ -23,7 +23,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.docs.basics.Message
+import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
@@ -286,6 +286,7 @@ class HttpGetSpec extends Specification {
         helper.simpleSlash() == "success"
         helper.simplePreceedingSlash() == "success"
         helper.simpleDoubleSlash() == "success"
+        helper.queryParam() == "a!b"
     }
 
     void "test body availability"() {
@@ -357,6 +358,11 @@ class HttpGetSpec extends Specification {
         HttpResponse jsonError() {
             return HttpResponse.serverError().body([foo: "bar"])
         }
+
+        @Get("/queryParam")
+        String queryParam(@QueryValue String foo) {
+            return foo
+        }
     }
 
     static class Book {
@@ -392,6 +398,10 @@ class HttpGetSpec extends Specification {
 
         String simpleDoubleSlash() {
             rxClientSlash.toBlocking().exchange(HttpRequest.GET("/simple"), String).body()
+        }
+
+        String queryParam() {
+            rxClient.toBlocking().exchange(HttpRequest.GET("/queryParam?foo=a!b"), String).body()
         }
     }
 }
