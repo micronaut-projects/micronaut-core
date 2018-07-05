@@ -103,6 +103,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         return false;
     }
 
+    /**
+     * The class to visit the type elements.
+     */
     private class ElementVisitor extends ElementScanner8<Object, Object> {
 
         private final TypeElement concreteClass;

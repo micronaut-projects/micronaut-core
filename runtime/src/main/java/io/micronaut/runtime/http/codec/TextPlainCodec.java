@@ -16,6 +16,7 @@
 
 package io.micronaut.runtime.http.codec;
 
+import io.micronaut.codec.CodecConfiguration;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.IOUtils;
@@ -27,7 +28,9 @@ import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.runtime.ApplicationConfiguration;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -36,7 +39,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * A codec that handles {@link MediaType#TEXT_PLAIN}.
@@ -47,14 +50,24 @@ import java.util.Optional;
 @Singleton
 public class TextPlainCodec implements MediaTypeCodec {
 
+    public static final String CONFIGURATION_QUALIFIER = "text";
+
     private final Charset defaultCharset;
+    private final List<MediaType> additionalTypes;
 
     /**
-     * @param defaultCharset The default charset used for serialization and deserialization
+     * @param defaultCharset      The default charset used for serialization and deserialization
+     * @param codecConfiguration  The configuration for the codec
      */
     @Inject
-    public TextPlainCodec(@Value("${" + ApplicationConfiguration.DEFAULT_CHARSET + "}") Optional<Charset> defaultCharset) {
+    public TextPlainCodec(@Value("${" + ApplicationConfiguration.DEFAULT_CHARSET + "}") Optional<Charset> defaultCharset,
+                          @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         this.defaultCharset = defaultCharset.orElse(StandardCharsets.UTF_8);
+        if (codecConfiguration != null) {
+            this.additionalTypes = codecConfiguration.getAdditionalTypes();
+        } else {
+            this.additionalTypes = Collections.emptyList();
+        }
     }
 
     /**
@@ -62,11 +75,15 @@ public class TextPlainCodec implements MediaTypeCodec {
      */
     public TextPlainCodec(Charset defaultCharset) {
         this.defaultCharset = defaultCharset != null ? defaultCharset : StandardCharsets.UTF_8;
+        this.additionalTypes = Collections.emptyList();
     }
 
     @Override
-    public MediaType getMediaType() {
-        return MediaType.TEXT_PLAIN_TYPE;
+    public Collection<MediaType> getMediaTypes() {
+        List<MediaType> mediaTypes = new ArrayList<>();
+        mediaTypes.add(MediaType.TEXT_PLAIN_TYPE);
+        mediaTypes.addAll(additionalTypes);
+        return mediaTypes;
     }
 
     @Override
