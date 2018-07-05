@@ -1,1 +1,37 @@
+=== Specifying the Key and the Value
+
 TODO
+
+=== Including Message Headers
+
+TODO
+
+=== Reactive and Non-Blocking Method Definitions
+
+TODO
+
+=== Available Annotations
+
+There are a number of annotations available that allow you to specify how a method argument is treated.
+
+The following table summarizes the annotations and their purpose, with an example:
+
+.Kafka Messaging Annotations
+|===
+|Annotation |Description |Example
+
+|ann:messaging.annotation.Body[]
+| Allows explicitly indicating the body of the message to sent
+|`@Body Product product`
+
+|ann:messaging.annotation.Header[]
+| Allows specifying a parameter that should be sent as a header
+|`@Header("X-My-Header") String myHeader`
+
+|ann:configuration.kafka.annotation.KafkaKey[]
+| Allows specifying the parameter that is the Kafka key
+|`@KafkaKey String key`
+
+|===
+
+For example, you can use the ann:messaging.annotation.Header[] annotation to bind a parameter value to a header in the `ProducerRecord`.
