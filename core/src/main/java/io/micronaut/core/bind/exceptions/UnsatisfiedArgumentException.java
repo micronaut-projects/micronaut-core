@@ -28,6 +28,7 @@ import io.micronaut.core.type.Argument;
 public class UnsatisfiedArgumentException extends RuntimeException {
 
     private final Argument<?> argument;
+
     /**
      * @param argument The {@link Argument}
      */

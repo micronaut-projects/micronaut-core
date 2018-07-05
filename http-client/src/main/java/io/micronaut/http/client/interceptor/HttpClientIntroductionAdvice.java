@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.codec.CodecConfiguration;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.async.publisher.Publishers;
@@ -538,7 +539,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         objectMapper.configure(feature, false);
                     }
 
-                    defaultClient.setMediaTypeCodecRegistry(MediaTypeCodecRegistry.of(new JsonMediaTypeCodec(objectMapper, beanContext.getBean(ApplicationConfiguration.class))));
+                    defaultClient.setMediaTypeCodecRegistry(
+                            MediaTypeCodecRegistry.of(
+                                    new JsonMediaTypeCodec(objectMapper,
+                                            beanContext.getBean(ApplicationConfiguration.class),
+                                            beanContext.findBean(CodecConfiguration.class, Qualifiers.byName(JsonMediaTypeCodec.CONFIGURATION_QUALIFIER)).orElse(null))));
                 }
             }
             return client;

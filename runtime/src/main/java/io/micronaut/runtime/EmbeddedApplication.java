@@ -19,20 +19,19 @@ package io.micronaut.runtime;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextLifeCyle;
 import io.micronaut.context.env.Environment;
-import io.micronaut.runtime.server.EmbeddedServer;
 
 /**
  * <p>An {@link EmbeddedApplication} is a runnable application that starts and manages the {@link ApplicationContext}.</p>
  *
- * <p>This interface is the parent interface of {@link EmbeddedServer} which formalizes the concept of a
+ * <p>This interface is the parent interface of {@link io.micronaut.runtime.server.EmbeddedServer} which formalizes the concept of a
  * server that exposes a port and address</p>
  *
  * <p>Applications that did not expose a port and address (messaging applications, CLI applications etc.
  * may wish to use this interface instead</p>
  *
  * @param <T>
- * @see EmbeddedServer
- * @author graemerocher
+ * @see io.micronaut.runtime.server.EmbeddedServer
+ * @author Graeme Rocher
  * @since 1.0
  */
 public interface EmbeddedApplication<T extends EmbeddedApplication> extends ApplicationContextLifeCyle<T> {
