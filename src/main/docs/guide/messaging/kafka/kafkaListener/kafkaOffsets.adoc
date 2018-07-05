@@ -40,14 +40,26 @@ The simplest way is to define an argument of type api:configuration.kafka.Acknow
 
 .Committing offsets with `ack()`
 [source,java]
+[source,java]
 ----
-TODO
+include::{testskafka}/consumer/offsets/ack/ProductListener.java[tags=method, indent=0]
 ----
 
-Alternatively you an supply a `KafkaConsumer` method argument and then call `commitSync` (or `commitAsync`) yourself when you are ready to commit offsets:
+<1> Committing offsets automatically is disabled
+<2> The listener method specifies a parameter of type api:configuration.kafka.Acknowledgement[]
+<3> The `ack()` method is called once the record has been processed
+
+Alternatively, you an supply a `KafkaConsumer` method argument and then call `commitSync` (or `commitAsync`) yourself when you are ready to commit offsets:
 
 .Committing offsets with the `KafkaConsumer` API
 [source,java]
 ----
-TODO
+include::{testskafka}/consumer/offsets/manual/ProductListener.java[tags=imports, indent=0]
+
+include::{testskafka}/consumer/offsets/manual/ProductListener.java[tags=method, indent=0]
 ----
+
+<1> Committing offsets automatically is disabled
+<2> The listener method specifies that it receives the offset data and a `KafkaConsumer`
+<3> The `commitSync()` method is called once the record has been processed
+
