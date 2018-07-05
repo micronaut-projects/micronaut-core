@@ -76,7 +76,7 @@ class GradleBuildTokens extends BuildTokens {
             jvmArgs.addAll(f.jvmArgs)
         }
 
-        jvmArgs = jvmArgs.collect { String arg -> "'-${arg}'"}.join(',')
+        jvmArgs = jvmArgs.collect { String arg -> "'${arg}'"}.join(',')
 
         for (Feature f in features) {
             buildPlugins.addAll f.buildPlugins.collect() { String name ->
