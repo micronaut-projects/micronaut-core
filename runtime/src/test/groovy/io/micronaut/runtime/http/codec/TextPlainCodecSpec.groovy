@@ -15,8 +15,10 @@
  */
 package io.micronaut.runtime.http.codec
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.core.io.buffer.ByteBufferFactory
+import io.micronaut.http.MediaType
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -36,5 +38,42 @@ class TextPlainCodecSpec extends Specification {
 
         then:
         1 * bufferFactory.buffer(2, 2) >> Stub(ByteBuffer)
+    }
+
+    void "test additional type configuration"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run([
+                'micronaut.codec.text.additionalTypes': ['text/html'],
+                'micronaut.codec.json.additionalTypes': ['foo/javascript']
+        ])
+
+        when:
+        TextPlainCodec codecBean = ctx.getBean(TextPlainCodec)
+
+        then:
+        codec.mediaTypes.size() == 1
+        codecBean.mediaTypes.size() == 2
+        codecBean.mediaTypes.contains(MediaType.of("text/html"))
+        codecBean.mediaTypes.contains(MediaType.TEXT_PLAIN_TYPE)
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "test additional type configuration 2"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run([
+                'micronaut.codec.json.additionalTypes': ['foo/javascript']
+        ])
+
+        when:
+        TextPlainCodec codecBean = ctx.getBean(TextPlainCodec)
+
+        then:
+        codecBean.mediaTypes.size() == 1
+        codecBean.mediaTypes.contains(MediaType.TEXT_PLAIN_TYPE)
+
+        cleanup:
+        ctx.close()
     }
 }
