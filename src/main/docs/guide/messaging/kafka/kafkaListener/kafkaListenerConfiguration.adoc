@@ -20,7 +20,7 @@ There are a number of ways to pass configuration properties to the `KafkaConsume
 [source,yaml]
 ----
 kafka:
-    consumer:
+    consumers:
         default:
             session:
                 timeout:
@@ -35,7 +35,7 @@ You can also provide configuration specific to a consumer group. For example con
 [source,yaml]
 ----
 kafka:
-    consumer:
+    consumers:
         myGroup:
             session:
                 timeout:
@@ -70,11 +70,10 @@ You can, however, explicitly override the `Deserializer` used by providing the a
 [source,yaml]
 ----
 kafka:
-    consumer:
+    consumers:
         myGroup:
             value:
                 deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
 ----
 
 You may want to do this if for example you choose an alternative deserialization format such as Avro or Protobuf.
-

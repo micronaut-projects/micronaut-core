@@ -1,1 +1,65 @@
-TODO
+=== Automatically Committing Offsets
+
+The way offsets are handled by a ann:configuration.kafka.annotation.KafkaListener[] bean is defined by the api:configuration.kafka.annotation.OffsetStrategy[] enum.
+
+The following table summarizes the enum values and behaviour:
+
+.Kafka Messaging Annotations
+|===
+|Value |Description
+
+|api:configuration.kafka.annotation.OffsetStrategy#AUTO[]
+|Automatically commit offsets. Sets `enable.auto.commit` to `true`
+
+|api:configuration.kafka.annotation.OffsetStrategy#DISABLED[]
+|Disables automatically committing offsets. Sets `enable.auto.commit` to `false`
+
+|api:configuration.kafka.annotation.OffsetStrategy#SYNC[]
+|Commits offsets manually at the end of each `poll()` loop if no exceptions occur. Sets `enable.auto.commit` to `false`
+
+|api:configuration.kafka.annotation.OffsetStrategy#ASYNC[]
+|Asynchronously commits offsets manually at the end of each `poll()` loop if no exceptions occur. Sets `enable.auto.commit` to `false`
+
+|api:configuration.kafka.annotation.OffsetStrategy#SYNC_PER_RECORD[]
+|Commits offsets manually after each `ConsumeRecord` is processed. Sets `enable.auto.commit` to `false`
+
+|api:configuration.kafka.annotation.OffsetStrategy#ASYNC_PER_RECORD[]
+|Commits offsets asynchronously after each `ConsumeRecord` is processed. Sets `enable.auto.commit` to `false`
+
+|===
+
+Depending on the your level of paranoia or durability requirements you can choose to tune how and when offsets are committed.
+
+=== Manually Committing Offsets
+
+If you set the `OffsetStrategy` to configuration.kafka.annotation.OffsetStrategy#DISABLED[] it becomes your responsibility to commit offsets.
+
+There is a couple of ways that can be achieved.
+
+The simplest way is to define an argument of type api:configuration.kafka.Acknowledgement[] and call the `ack()` method to commit offsets synchronously:
+
+.Committing offsets with `ack()`
+[source,java]
+[source,java]
+----
+include::{testskafka}/consumer/offsets/ack/ProductListener.java[tags=method, indent=0]
+----
+
+<1> Committing offsets automatically is disabled
+<2> The listener method specifies a parameter of type api:configuration.kafka.Acknowledgement[]
+<3> The `ack()` method is called once the record has been processed
+
+Alternatively, you an supply a `KafkaConsumer` method argument and then call `commitSync` (or `commitAsync`) yourself when you are ready to commit offsets:
+
+.Committing offsets with the `KafkaConsumer` API
+[source,java]
+----
+include::{testskafka}/consumer/offsets/manual/ProductListener.java[tags=imports, indent=0]
+
+include::{testskafka}/consumer/offsets/manual/ProductListener.java[tags=method, indent=0]
+----
+
+<1> Committing offsets automatically is disabled
+<2> The listener method specifies that it receives the offset data and a `KafkaConsumer`
+<3> The `commitSync()` method is called once the record has been processed
+

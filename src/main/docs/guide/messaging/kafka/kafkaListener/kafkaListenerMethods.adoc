@@ -2,6 +2,29 @@ The ann:configuration.kafka.annotation.KafkaListener[] annotation examples up un
 
 The following sections detail examples of supported use cases.
 
+=== Specifying Topics
+
+The ann:configuration.kafka.annotation.Topic[] annotation can be used at the method or the class level to specify which topics to be listened for.
+
+Care needs to be taken when using ann:configuration.kafka.annotation.Topic[] at the class level because every public method of the class annotated with ann:configuration.kafka.annotation.KafkaListener[] will become a Kafka consumer, which may be undesirable.
+
+You can specify multiple topics to listen for:
+
+.Specifying Multiple Topics
+[source,java]
+----
+@Topic("fun-products", "awesome-products")
+----
+
+You can also specify one or many regular expressions to listen for:
+
+.Using regular expressions to match Topics
+[source,java]
+----
+@Topic(patterns="products-\\w+")
+----
+
+
 === Available Annotations
 
 There are a number of annotations available that allow you to specify how a method argument is bound.
