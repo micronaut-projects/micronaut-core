@@ -474,12 +474,6 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
         }
     }
 
-    @Override
-    public void channelReadComplete(ChannelHandlerContext ctx) {
-        if (state == DEMANDING || state == DRAINING) {
-            requestDemand();
-        }
-    }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
