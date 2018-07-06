@@ -7,6 +7,7 @@ dependencies {
     compile project(":aop")
 
     testImplementation project(':inject-groovy')
+    testImplementation project(':inject-java')
     testImplementation dependencyVersion('spock')
     testImplementation dependencyModuleVersion('spock', 'spock-spring')
     testImplementation dependencyModuleVersion('spring', 'spring-test')
