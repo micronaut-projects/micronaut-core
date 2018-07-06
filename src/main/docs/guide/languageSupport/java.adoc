@@ -92,7 +92,7 @@ At compile time the parameter name `name` is lost and becomes simply `arg0` when
 ----
 interface HelloOperations {
     @Get("/hello/{name}")
-    String hello(@Parameter("name") String name);
+    String hello(@QueryValue("name") String name);
 }
 ----
 

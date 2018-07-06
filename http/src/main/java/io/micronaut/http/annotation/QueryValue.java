@@ -26,10 +26,11 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
 /**
- * Indicates that the parameter to a method should be bound from a value in the query string of the URI.
+ * Indicates that the parameter to a method should be bound from a value in the query string or path of the URI.
  *
  * @author Graeme Rocher
  * @see java.net.URI#getQuery()
+ * @see java.net.URI#getPath()
  * @since 1.0
  */
 @Documented
