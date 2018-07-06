@@ -38,6 +38,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 import java.nio.charset.StandardCharsets
+import java.time.Duration
 
 /**
  * @author graemerocher
@@ -136,8 +137,11 @@ class StreamRequestSpec extends Specification {
     }
 
     void "test stream post request with POJOs flowable"() {
+
         given:
-        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
+        def configuration = new DefaultHttpClientConfiguration()
+        configuration.setReadTimeout(Duration.ofMinutes(1))
+        RxHttpClient client = new DefaultHttpClient(embeddedServer.getURL(), configuration)
 
         when:
         int i = 0

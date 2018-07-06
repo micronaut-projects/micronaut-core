@@ -1,0 +1,5 @@
+https://kafka.apache.org[Apache Kafka] is a distributed stream processing platform that can be used for a range of messaging requirements in addition to stream processing and real-time data handling.
+
+Micronaut features dedicated support for defining both Kafka `Producer` and `Consumer` instances. Micronaut applications built with Kafka can be deployed with or without the presence of an HTTP server.
+
+With Micronaut's efficient compile-time AOP and cloud native features, writing efficient Kafka consumer applications that use very little resources is a breeze.

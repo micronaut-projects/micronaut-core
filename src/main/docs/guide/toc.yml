@@ -27,7 +27,7 @@ ioc:
   factories: Bean Factories
   conditionalBeans: Conditional Beans
   replaces: Bean Replacement
-  configurations: Bean Configurations
+  beanConfigurations: Bean Configurations
   lifecycle: Life-Cycle Methods
   events: Bean Events
   annotationMetadata: Bean Annotation Metadata
@@ -139,17 +139,42 @@ serverlessFunctions:
     functionCLI: Functions as CLI Applications
   lambdaFunctions: Deploying Functions to AWS Lambda 
   callingFunctions: Calling Functions with FunctionClient
-dataAccess:
-  title: Configurations for Data Access
-  sqlSupport: Configuring a SQL Data Source
-  hibernateSupport: Configuring Hibernate
-  mongoSupport: Configuring MongoDB
-  neo4jSupport: Configuring Neo4j
-  redisSupport: Configuring Redis
-  cassandraSupport: Configuring Cassandra
-otherConfigurations:
-  title: Other Configurations
-  rabbitmq: RabbitMQ
+messaging:
+  title: Message-Driven Microservices
+  kafka:
+    title: Kafka Support
+    kafkaQuickStart: Kafka Quick Start
+    kafkaClient:
+      title: Kafka Producers Using @KafkaClient
+      kafkaClientMethods: Defining @KafkaClient Methods
+      kafkaClientConfiguration: Configuring @KafkaClient beans
+      kafkaClientBatch: Sending Records in Batch
+      kafkaClientScope: Injecting Kafka Producer Beans
+      kafkaEmbedded: Embedding Kafka
+    kafkaListener:
+      title: Kafka Consumers Using @KafkaListener
+      kafkaListenerMethods: Defining @KafkaListener Methods
+      kafkaListenerConfiguration: Configuring @KafkaListener beans
+      kafkaOffsets: Commiting Kafka Offsets
+      kafkaListenerBatch: Kafka Batch Processing
+      kafkaSendTo: Forwarding Messages with @SendTo
+      kafkaExceptions: Handling Consumer Exceptions
+    kafkaApplications:
+      title: Running Kafka Applications
+      kafkaHealth: Kafka Health Checks
+configurations:
+  title: Configurations
+  dataAccess:
+    title: Configurations for Data Access
+    sqlSupport: Configuring a SQL Data Source
+    hibernateSupport: Configuring Hibernate
+    mongoSupport: Configuring MongoDB
+    neo4jSupport: Configuring Neo4j
+    redisSupport: Configuring Redis
+    cassandraSupport: Configuring Cassandra
+  otherConfigurations:
+    title: Other Configurations
+    rabbitmq: RabbitMQ
 languageSupport:
   title: Language Support
   java: Micronaut for Java
@@ -218,6 +243,8 @@ reloading:
   springloaded: Spring-Loaded
   gradleReload: Reloading with Gradle
   ideReload: Reloading with an IDE
-faq: Frequently Asked Questions (FAQ)
-problems: Common Problems
-breaks: Breaking Changes
+appendix:
+  title: Appendices
+  faq: Frequently Asked Questions (FAQ)
+  problems: Common Problems
+  breaks: Breaking Changes

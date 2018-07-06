@@ -16,6 +16,7 @@
 
 package io.micronaut.runtime.server.event;
 
+import io.micronaut.runtime.event.ApplicationStartupEvent;
 import io.micronaut.runtime.server.EmbeddedServer;
 
 /**
@@ -24,7 +25,7 @@ import io.micronaut.runtime.server.EmbeddedServer;
  * @author graemerocher
  * @since 1.0
  */
-public class ServerStartupEvent extends AbstractServerApplicationEvent {
+public class ServerStartupEvent extends ApplicationStartupEvent {
 
     /**
      * Constructs a prototypical Event.
@@ -34,5 +35,10 @@ public class ServerStartupEvent extends AbstractServerApplicationEvent {
      */
     public ServerStartupEvent(EmbeddedServer embeddedServer) {
         super(embeddedServer);
+    }
+
+    @Override
+    public EmbeddedServer getSource() {
+        return (EmbeddedServer) super.getSource();
     }
 }

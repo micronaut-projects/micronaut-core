@@ -37,6 +37,13 @@ public interface PropertyPlaceholderResolver {
     Optional<String> resolvePlaceholders(String str);
 
     /**
+     * @return The prefix used
+     */
+    default String getPrefix() {
+        return DefaultPropertyPlaceholderResolver.PREFIX;
+    }
+
+    /**
      * Resolve the placeholders and return an Optional String if it was possible to resolve them.
      *
      * @param str The placeholder to resolve

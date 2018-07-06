@@ -1,0 +1,71 @@
+=== @KafkaClient and Producer Properties
+
+There are a number of ways to pass configuration properties to the link:{kafkaapi}/org/apache/kafka/clients/producer/KafkaProducer.html[KafkaProducer]. You can set default producer properties using `kafka.producers.default` in `application.yml`:
+
+.Applying Default Configuration
+[source,yaml]
+----
+kafka:
+    producers:
+        default:
+            retries: 5
+----
+
+Any property in the link:{kafkaapi}/org/apache/kafka/clients/producer/ProducerConfig.html[ProducerConfig] class can be set. The above example will set the default number of times to retry sending a record.
+
+=== Per @KafkaClient Producer Properties
+
+To configure different properties for each client, you should set a `@KafkaClient` id using the annotation:
+
+.Using a Client ID
+[source,java]
+----
+@KafkaClient("product-client")
+----
+
+This serves 2 purposes. Firstly it sets the value of the `client.id` setting used to build the `KafkaProducer`. Secondly, it allows you to apply per producer configuration in `application.yml`:
+
+.Applying Default Configuration
+[source,yaml]
+----
+kafka:
+    producers:
+        product-client:
+            retries: 5
+----
+
+Finally, the ann:configuration.kafka.annotation.KafkaClient[] annotation itself provides a `properties` member that you can use to set producer specific properties:
+
+.Configuring Producer Properties with @KafkaClient
+[source,java]
+----
+include::{testskafka}/producer/config/ProductClient.java[tags=imports, indent=0]
+
+include::{testskafka}/producer/config/ProductClient.java[tags=clazz, indent=0]
+    ...
+}
+----
+
+=== @KafkaClient and Serializers
+
+When serializing keys and values Micronaut will by default attempt to automatically pick a link:{kafkaapi}/org/apache/kafka/common/serialization/Serializer.html[Serializer] to use. This is done via the api:configuration.kafka.serde.CompositeSerdeRegistry[] bean.
+
+TIP: You can replace the default api:configuration.kafka.serde.SerdeRegistry[] bean with your own implementation by defining a bean that uses `@Replaces(CompositeSerdeRegistry.class)`. See the section on <<replaces, Bean Replacement>>.
+
+All common `java.lang` types (`String`, `Integer`, primitives etc.) are supported and for POJOs by default a Jackson based JSON serializer is used.
+
+You can, however, explicitly override the `Serializer` used by providing the appropriate configuration in `application.yml`:
+
+.Applying Default Configuration
+[source,yaml]
+----
+kafka:
+    producers:
+        product-client:
+            value:
+                serializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+----
+
+You may want to do this if for example you choose an alternative serialization format such as Avro or Protobuf.
+
+

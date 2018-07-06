@@ -8,7 +8,7 @@ git config --global credential.helper "store --file=~/.git-credentials"
 echo "https://$GH_TOKEN:@github.com" > ~/.git-credentials
 
 if [[ $EXIT_STATUS -eq 0 ]]; then
-    if [[ -n $TRAVIS_TAG ]] || [[ $TRAVIS_BRANCH =~ ^master$ && $TRAVIS_PULL_REQUEST == 'false' ]]; then
+    if [[ -n $TRAVIS_TAG ]]; then
         echo "Skipping Tests to Publish Release"
         ./gradlew pTML || EXIT_STATUS=$?
     else

@@ -1,0 +1,10 @@
+You can run a Micronaut Kafka application with or without the presence of an HTTP server.
+
+If you run your application without the `http-server-netty` dependency you will see output like the following on startup:
+
+[source,bash]
+----
+11:06:22.638 [main] INFO  io.micronaut.runtime.Micronaut - Startup completed in 402ms. Server Running: 4 active message listeners.
+----
+
+No port is exposed, but the Kafka consumers are active and running. The process registers a shutdown hook such that the `KafkaConsumer` instances are closed correctly when the server is shutdown.

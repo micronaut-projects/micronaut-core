@@ -1,0 +1,30 @@
+If you need maximum flexibility and don't want to use the ann:configuration.kafka.annotation.KafkaClient[] support you can use the `@KafkaClient` annotation as qualifier for dependency injection of link:{kafkaapi}/org/apache/kafka/clients/producer/KafkaProducer.html[KafkaProducer] instances.
+
+Consider the following example:
+
+.Using a KafkaProducer directly
+[source,java]
+----
+include::{testskafka}/producer/inject/BookSender.java[tags=imports, indent=0]
+
+include::{testskafka}/producer/inject/BookSender.java[tags=clazz, indent=0]
+----
+
+<1> The `KafkaProducer` is dependency injected into the constructor. If not specified in configuration, the key and value serializer are inferred from the generic type arguments.
+<2> The `KafkaProducer` is used to send records
+
+Note that there is no need to call the `close()` method to shut down the `KafkaProducer`, it is fully managed by Micronaut and will be shutdown when the application shuts down.
+
+The previous example can be tested in JUnit with the following test:
+
+
+.Using a KafkaProducer directly
+[source,java]
+----
+include::{testskafka}/producer/inject/BookSenderTest.java[tags=test, indent=0]
+----
+
+<1> An embedded version of Kafka is used
+<2> The `BookSender` is retrieved from the api:context.ApplicationContext[] and a `ProducerRecord` sent
+
+By using the link:{kafkaapi}/org/apache/kafka/clients/producer/KafkaProducer.html[KafkaProducer] API directly you open up even more options if you require transactions (exactly-once delivery) or want control over when records are flushed etc.

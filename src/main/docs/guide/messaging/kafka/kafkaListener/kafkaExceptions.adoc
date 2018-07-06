@@ -1,0 +1,8 @@
+When an exception occurs in a ann:configuration.kafka.annotation.KafkaListener[] method by default the exception is simply logged. This is handled by api:configuration.kafka.exceptions.DefaultKafkaListenerExceptionHandler[].
+
+If you wish to replace this default exception handling with another implementation you can use the Micronaut's <<replaces, Bean Replacement>> feature to define a bean that replaces it: `@Replaces(DefaultKafkaListenerExceptionHandler.class)`.
+
+
+You can also define per bean exception handling logic by implementation the api:configuration.kafka.exceptions.KafkaListenerExceptionHandler[] interface in your ann:configuration.kafka.annotation.KafkaListener[] class.
+
+The api:configuration.kafka.exceptions.KafkaListenerExceptionHandler[] receives an exception of type api:configuration.kafka.exceptions.KafkaListenerException[] which allows access to the original `ConsumerRecord`, if available.

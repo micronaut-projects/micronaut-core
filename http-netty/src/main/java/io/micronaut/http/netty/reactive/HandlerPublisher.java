@@ -156,7 +156,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
      */
     protected void requestDemand() {
         if (LOG.isTraceEnabled()) {
-            LOG.trace("Demand received for next message. Calling context.read()");
+            LOG.trace("Demand received for next message (state = " + state + "). Calling context.read()");
         }
 
         ctx.read();
@@ -290,24 +290,33 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     }
 
     private void receivedDemand(long demand) {
-        if (LOG.isTraceEnabled()) {
-            LOG.trace("HandlerPublisher (state: {}) received demand: {}", state, demand);
-        }
         switch (state) {
             case BUFFERING:
             case DRAINING:
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("HandlerPublisher (state: {}) received demand: {}", state, demand);
+                }
+
                 if (addDemand(demand)) {
                     flushBuffer();
                 }
                 break;
 
             case DEMANDING:
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("HandlerPublisher (state: {}) received demand: {}", state, demand);
+                }
+
                 if (addDemand(demand)) {
                     flushBuffer();
                 }
                 break;
 
             case IDLE:
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("HandlerPublisher (state: {}) received demand: {}", state, demand);
+                }
+
                 if (addDemand(demand)) {
                     // Important to change state to demanding before doing a read, in case we get a synchronous
                     // read back.
@@ -345,6 +354,9 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
 
     private void flushBuffer() {
         while (!buffer.isEmpty() && (outstandingDemand > 0 || outstandingDemand == Long.MAX_VALUE)) {
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("HandlerPublisher (state: {}) release message from buffer to satisfy demand: ", state, outstandingDemand);
+            }
             publishMessage(buffer.remove());
         }
         if (buffer.isEmpty()) {
@@ -443,6 +455,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
             if (LOG.isTraceEnabled()) {
                 LOG.trace("HandlerPublisher (state: {}) emitting next message: {}", state, messageForTrace(next));
             }
+
             subscriber.onNext(next);
             if (outstandingDemand < Long.MAX_VALUE) {
                 outstandingDemand--;
@@ -452,22 +465,15 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
                     } else {
                         state = BUFFERING;
                     }
-                } else if (outstandingDemand > 0 && state == DEMANDING) {
+                } else if (outstandingDemand > 0 && (state == DEMANDING || state == BUFFERING || state == DRAINING)) {
                     requestDemand();
                 }
             } else {
-                // Long.MAX_VALUE to demand all items
                 requestDemand();
             }
         }
     }
 
-    @Override
-    public void channelReadComplete(ChannelHandlerContext ctx) {
-        if (state == DEMANDING) {
-            requestDemand();
-        }
-    }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
@@ -535,6 +541,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
      * A channel subscrition.
      */
     private class ChannelSubscription implements Subscription {
+
         @Override
         public void request(final long demand) {
             executor.execute(() -> receivedDemand(demand));
