@@ -18,7 +18,6 @@ package io.micronaut.http.netty.reactive;
 
 import static io.micronaut.http.netty.reactive.HandlerPublisher.State.*;
 
-import io.micronaut.core.async.processor.ProcessorSubscription;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;
@@ -92,7 +91,6 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     private ChannelHandlerContext ctx;
     private long outstandingDemand = 0;
     private Throwable noSubscriberError;
-    private Subscription downstreamSubscription;
 
     /**
      * Create a handler publisher.
@@ -162,13 +160,6 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
         }
 
         ctx.read();
-
-        if (downstreamSubscription != null) {
-            if (LOG.isTraceEnabled()) {
-                LOG.trace("Propagating demand to downstream subscription.");
-            }
-            downstreamSubscription.request(1);
-        }
     }
 
     /**
@@ -363,6 +354,9 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
 
     private void flushBuffer() {
         while (!buffer.isEmpty() && (outstandingDemand > 0 || outstandingDemand == Long.MAX_VALUE)) {
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("HandlerPublisher (state: {}) release message from buffer to satisfy demand: ", state, outstandingDemand);
+            }
             publishMessage(buffer.remove());
         }
         if (buffer.isEmpty()) {
@@ -482,7 +476,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
 
     @Override
     public void channelReadComplete(ChannelHandlerContext ctx) {
-        if (state == DEMANDING) {
+        if (state == DEMANDING || state == DRAINING) {
             requestDemand();
         }
     }
@@ -552,7 +546,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     /**
      * A channel subscrition.
      */
-    private class ChannelSubscription implements Subscription, ProcessorSubscription {
+    private class ChannelSubscription implements Subscription {
 
         @Override
         public void request(final long demand) {
@@ -562,11 +556,6 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
         @Override
         public void cancel() {
             executor.execute(HandlerPublisher.this::receivedCancel);
-        }
-
-        @Override
-        public void setDownStreamSubscription(Subscription subscription) {
-            downstreamSubscription = subscription;
         }
     }
 }
