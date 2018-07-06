@@ -33,19 +33,15 @@ import java.security.Principal;
 @Singleton
 public class HealthLevelOfDetailResolver {
 
-    /**
-     * True if the health endpoint is sensitive.
-     */
-    protected final boolean sensitive;
+    private final EndpointConfiguration configuration;
 
     /**
      * @param healthConfiguration Health endpoint configuration
      * @param defaultConfiguration Default endpoint configuration
      */
-    public HealthLevelOfDetailResolver(@Nullable @Named("health") EndpointConfiguration healthConfiguration,
+    public HealthLevelOfDetailResolver(@Nullable @Named(HealthEndpoint.NAME) EndpointConfiguration healthConfiguration,
                                        EndpointDefaultConfiguration defaultConfiguration) {
-        EndpointConfiguration configuration = healthConfiguration == null ? new EndpointConfiguration("health", defaultConfiguration) : healthConfiguration;
-        this.sensitive = configuration.isSensitive().orElse(HealthEndpoint.DEFAULT_SENSITIVE);
+        this.configuration = healthConfiguration == null ? new EndpointConfiguration(HealthEndpoint.NAME, defaultConfiguration) : healthConfiguration;
     }
 
     /**
@@ -55,9 +51,9 @@ public class HealthLevelOfDetailResolver {
      * @return The {@link HealthLevelOfDetail}
      */
     public HealthLevelOfDetail levelOfDetail(@Nullable Principal principal) {
-        if (principal == null) {
-            return HealthLevelOfDetail.STATUS;
+        if (principal != null || (configuration.isSensitive().isPresent() && !configuration.isSensitive().get())) {
+            return HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS;
         }
-        return HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS;
+        return HealthLevelOfDetail.STATUS;
     }
 }
