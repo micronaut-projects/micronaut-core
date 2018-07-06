@@ -18,6 +18,7 @@ package io.micronaut.http.netty.reactive;
 
 import static io.micronaut.http.netty.reactive.HandlerPublisher.State.*;
 
+import io.micronaut.core.async.processor.ProcessorSubscription;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;
@@ -91,6 +92,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     private ChannelHandlerContext ctx;
     private long outstandingDemand = 0;
     private Throwable noSubscriberError;
+    private Subscription downstreamSubscription;
 
     /**
      * Create a handler publisher.
@@ -156,10 +158,14 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
      */
     protected void requestDemand() {
         if (LOG.isTraceEnabled()) {
-            LOG.trace("Demand received for next message. Calling context.read()");
+            LOG.trace("Demand received for next message (state = " + state + "). Calling context.read()");
         }
 
         ctx.read();
+
+        if (downstreamSubscription != null) {
+            downstreamSubscription.request(1);
+        }
     }
 
     /**
@@ -290,24 +296,33 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     }
 
     private void receivedDemand(long demand) {
-        if (LOG.isTraceEnabled()) {
-            LOG.trace("HandlerPublisher (state: {}) received demand: {}", state, demand);
-        }
         switch (state) {
             case BUFFERING:
             case DRAINING:
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("HandlerPublisher (state: {}) received demand: {}", state, demand);
+                }
+
                 if (addDemand(demand)) {
                     flushBuffer();
                 }
                 break;
 
             case DEMANDING:
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("HandlerPublisher (state: {}) received demand: {}", state, demand);
+                }
+
                 if (addDemand(demand)) {
                     flushBuffer();
                 }
                 break;
 
             case IDLE:
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("HandlerPublisher (state: {}) received demand: {}", state, demand);
+                }
+
                 if (addDemand(demand)) {
                     // Important to change state to demanding before doing a read, in case we get a synchronous
                     // read back.
@@ -443,6 +458,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
             if (LOG.isTraceEnabled()) {
                 LOG.trace("HandlerPublisher (state: {}) emitting next message: {}", state, messageForTrace(next));
             }
+
             subscriber.onNext(next);
             if (outstandingDemand < Long.MAX_VALUE) {
                 outstandingDemand--;
@@ -534,15 +550,24 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     /**
      * A channel subscrition.
      */
-    private class ChannelSubscription implements Subscription {
+    private class ChannelSubscription implements Subscription, ProcessorSubscription {
+
         @Override
         public void request(final long demand) {
-            executor.execute(() -> receivedDemand(demand));
+
+            executor.execute(() -> {
+                receivedDemand(demand);
+            });
         }
 
         @Override
         public void cancel() {
             executor.execute(HandlerPublisher.this::receivedCancel);
+        }
+
+        @Override
+        public void setDownStreamSubscription(Subscription subscription) {
+            downstreamSubscription = subscription;
         }
     }
 }
