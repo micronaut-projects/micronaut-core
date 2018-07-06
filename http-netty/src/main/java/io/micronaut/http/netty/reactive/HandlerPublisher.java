@@ -164,6 +164,9 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
         ctx.read();
 
         if (downstreamSubscription != null) {
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Propagating demand to downstream subscription.");
+            }
             downstreamSubscription.request(1);
         }
     }
@@ -468,11 +471,10 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
                     } else {
                         state = BUFFERING;
                     }
-                } else if (outstandingDemand > 0 && state == DEMANDING) {
+                } else if (outstandingDemand > 0 && (state == DEMANDING || state == BUFFERING || state == DRAINING)) {
                     requestDemand();
                 }
             } else {
-                // Long.MAX_VALUE to demand all items
                 requestDemand();
             }
         }
