@@ -1,0 +1,4 @@
+The example in the quick start presented a trivial definition of an interface that be implemented automatically for you using the ann:configuration.kafka.annotation.KafkaClient[] annotation.
+
+The implementation that powers `@KafkaClient` (defined by the api:configuration.kafka.intercept.KafkaClientIntroductionAdvice[] class) is, however, very flexible and offers a range of options for defining Kafka clients.
+

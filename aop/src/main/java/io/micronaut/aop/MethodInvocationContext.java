@@ -18,6 +18,8 @@ package io.micronaut.aop;
 
 import io.micronaut.inject.ExecutableMethod;
 
+import javax.annotation.Nonnull;
+
 /**
  * Extended version of {@link InvocationContext} for {@link MethodInterceptor} instances.
  *
@@ -28,4 +30,11 @@ import io.micronaut.inject.ExecutableMethod;
  * @since 1.0
  */
 public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, ExecutableMethod<T, R> {
+
+    /**
+     * The underlying {@link ExecutableMethod} reference.
+     *
+     * @return The underlying method reference.
+     */
+    @Nonnull ExecutableMethod<T, R> getExecutableMethod();
 }

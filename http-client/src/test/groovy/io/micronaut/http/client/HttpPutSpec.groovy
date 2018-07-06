@@ -157,6 +157,20 @@ class HttpPutSpec extends Specification {
         book == toSend
     }
 
+    void "test binding multiple options to a json body"() {
+        when:
+        BlockingHttpClient blockingHttpClient = client.toBlocking()
+        String result = blockingHttpClient.retrieve(
+                HttpRequest.PUT("/put/optionalJson", [enable: true])
+                        .accept(MediaType.APPLICATION_JSON_TYPE),
+
+                String
+        )
+
+        then:
+        result == "enable=true"
+    }
+
 
     @Controller('/put')
     static class PostController {
@@ -187,6 +201,18 @@ class HttpPutSpec extends Specification {
             assert accept == MediaType.APPLICATION_JSON
             assert custom == 'Foo'
             return book
+        }
+
+        @Put(uri = '/optionalJson', produces = MediaType.TEXT_PLAIN)
+        String optionalJson(Optional<Boolean> enable, Optional<Integer> multiFactorCode) {
+            StringBuilder sb = new StringBuilder()
+            enable.ifPresent( { val ->
+                sb.append("enable=").append(val)
+            })
+            multiFactorCode.ifPresent({ code ->
+                sb.append("multiFactorCode=").append(code)
+            })
+            sb.toString()
         }
     }
     @EqualsAndHashCode

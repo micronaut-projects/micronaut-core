@@ -16,6 +16,7 @@
 
 package io.micronaut.http.server.codec;
 
+import io.micronaut.codec.CodecConfiguration;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;
@@ -26,6 +27,8 @@ import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.sse.Event;
 
+import javax.annotation.Nullable;
+import javax.inject.Named;
 import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.io.IOException;
@@ -33,6 +36,10 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * A {@link MediaTypeCodec} that will encode {@link Event} objects in order to support Server Sent Events.
@@ -42,6 +49,8 @@ import java.time.Duration;
  */
 @Singleton
 public class TextStreamCodec implements MediaTypeCodec {
+
+    public static final String CONFIGURATION_QUALIFIER = "text-stream";
 
     private static final byte[] DATA_PREFIX = "data: ".getBytes(StandardCharsets.UTF_8);
     private static final byte[] EVENT_PREFIX = "event: ".getBytes(StandardCharsets.UTF_8);
@@ -53,25 +62,36 @@ public class TextStreamCodec implements MediaTypeCodec {
     private final HttpServerConfiguration serverConfiguration;
     private final Provider<MediaTypeCodecRegistry> codecRegistryProvider;
     private final ByteBufferFactory byteBufferFactory;
+    private final List<MediaType> additionalTypes;
     private MediaTypeCodecRegistry codecRegistry;
 
     /**
      * @param serverConfiguration   The HTTP server configuration
      * @param byteBufferFactory     A byte buffer factory
      * @param codecRegistryProvider A media type codec registry
+     * @param codecConfiguration    The configuration for the codec
      */
     public TextStreamCodec(
         HttpServerConfiguration serverConfiguration,
         ByteBufferFactory byteBufferFactory,
-        Provider<MediaTypeCodecRegistry> codecRegistryProvider) {
+        Provider<MediaTypeCodecRegistry> codecRegistryProvider,
+        @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
         this.serverConfiguration = serverConfiguration;
         this.byteBufferFactory = byteBufferFactory;
         this.codecRegistryProvider = codecRegistryProvider;
+        if (codecConfiguration != null) {
+            this.additionalTypes = codecConfiguration.getAdditionalTypes();
+        } else {
+            this.additionalTypes = Collections.emptyList();
+        }
     }
 
     @Override
-    public MediaType getMediaType() {
-        return MediaType.TEXT_EVENT_STREAM_TYPE;
+    public Collection<MediaType> getMediaTypes() {
+        List<MediaType> mediaTypes = new ArrayList<>();
+        mediaTypes.add(MediaType.TEXT_EVENT_STREAM_TYPE);
+        mediaTypes.addAll(additionalTypes);
+        return mediaTypes;
     }
 
     @Override

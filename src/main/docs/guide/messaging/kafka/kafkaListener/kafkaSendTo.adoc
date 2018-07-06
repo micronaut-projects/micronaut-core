@@ -1,0 +1,29 @@
+On any `@KafkaListener` method that returns a value, you can use the ann:messaging.annotation.SendTo[] annotation to forward the return value to the topic or topics specified by the `@SendTo` annotation.
+
+The key of the original `ConsumerRecord` will be used as the key when forwarding the message.
+
+.Committing offsets with the `KafkaConsumer` API
+[source,java]
+----
+include::{testskafka}/consumer/sendto/ProductListener.java[tags=imports, indent=0]
+
+include::{testskafka}/consumer/sendto/ProductListener.java[tags=method, indent=0]
+----
+
+<1> The topic subscribed to is `awesome-products`
+<2> The topic to send the result to is `product-quantities`
+<3> The return value is used to indicate the value to forward
+
+You can also do the same using Reactive programming:
+
+.Committing offsets with the `KafkaConsumer` API
+[source,java]
+----
+include::{testskafka}/consumer/sendto/ProductListener.java[tags=reactive, indent=0]
+----
+
+<1> The topic subscribed to is `awesome-products`
+<2> The topic to send the result to is `product-quantities`
+<3> The return is mapped from the single to the value of the quantity
+
+In the reactive case the `poll` loop will continue and will not wait for the record to be sent unless you specifically annotate the method with ann:core.annotation.Blocking[].

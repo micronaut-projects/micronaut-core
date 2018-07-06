@@ -16,10 +16,7 @@
 
 package io.micronaut.runtime.server;
 
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.ApplicationContextLifeCyle;
-import io.micronaut.context.env.Environment;
-import io.micronaut.runtime.ApplicationConfiguration;
+import io.micronaut.runtime.EmbeddedApplication;
 
 import java.net.URI;
 import java.net.URL;
@@ -31,7 +28,7 @@ import java.net.URL;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface EmbeddedServer extends ApplicationContextLifeCyle<EmbeddedServer> {
+public interface EmbeddedServer extends EmbeddedApplication<EmbeddedServer> {
 
     /**
      * @return The port exposed by the server
@@ -58,21 +55,8 @@ public interface EmbeddedServer extends ApplicationContextLifeCyle<EmbeddedServe
      */
     URI getURI();
 
-    /**
-     * @return The {@link ApplicationContext} for the server
-     */
     @Override
-    ApplicationContext getApplicationContext();
-
-    /**
-     * @return The {@link ApplicationConfiguration} instance
-     */
-    ApplicationConfiguration getApplicationConfiguration();
-
-    /**
-     * @return The {@link Environment} for the server
-     */
-    default Environment getEnvironment() {
-        return getApplicationContext().getEnvironment();
+    default boolean isServer() {
+        return true;
     }
 }

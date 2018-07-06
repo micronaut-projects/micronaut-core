@@ -907,9 +907,8 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
      */
     protected URI resolveRequestURI(URI requestURI) {
         if (StringUtils.isNotEmpty(contextPath)) {
-            String rawPath = requestURI.getRawPath();
             try {
-                return new URI(StringUtils.prependUri(contextPath, rawPath));
+                return new URI(StringUtils.prependUri(contextPath, requestURI.toString()));
             } catch (URISyntaxException e) {
                 //should never happen
             }
@@ -1504,7 +1503,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
         ObjectMapper objectMapper = new ObjectMapperFactory().objectMapper(Optional.empty(), Optional.empty());
         ApplicationConfiguration applicationConfiguration = new ApplicationConfiguration();
         return MediaTypeCodecRegistry.of(
-            new JsonMediaTypeCodec(objectMapper, applicationConfiguration), new JsonStreamMediaTypeCodec(objectMapper, applicationConfiguration)
+            new JsonMediaTypeCodec(objectMapper, applicationConfiguration, null), new JsonStreamMediaTypeCodec(objectMapper, applicationConfiguration, null)
         );
     }
 
