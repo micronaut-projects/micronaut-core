@@ -23,7 +23,7 @@ public class ProductListener {
     }
     // end::method[]
 
-    // tag::method[]
+    // tag::reactive[]
     @Topic("awesome-products") // <1>
     @SendTo("product-quantities") // <2>
     public Single<Integer> receiveProduct(
@@ -35,5 +35,5 @@ public class ProductListener {
             return product.getQuantity(); // <3>
         });
     }
-    // end::method[]
+    // end::reactive[]
 }

@@ -1,8 +1,8 @@
 === Specifying the Key and the Value
 
-The Kafka key can be specified by providing a parameter annotated with `@KafkaKey`. If no such parameter is specified the record is ent with a `null` key.
+The Kafka key can be specified by providing a parameter annotated with `@KafkaKey`. If no such parameter is specified the record is sent with a `null` key.
 
-The value is send it resolved by selecting the argument annotated with nn:messaging.annotation.Body[], otherwise the first argument with no specific binding annotation is used. For example:
+The value to send is resolved by selecting the argument annotated with ann:messaging.annotation.Body[], otherwise the first argument with no specific binding annotation is used. For example:
 
 [source,java]
 ----

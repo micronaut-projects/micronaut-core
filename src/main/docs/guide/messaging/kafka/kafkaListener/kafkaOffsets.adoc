@@ -32,9 +32,9 @@ Depending on the your level of paranoia or durability requirements you can choos
 
 === Manually Committing Offsets
 
-If you set the `OffsetStrategy` to configuration.kafka.annotation.OffsetStrategy#DISABLED[] it becomes your responsibility to commit offsets.
+If you set the `OffsetStrategy` to api:configuration.kafka.annotation.OffsetStrategy#DISABLED[] it becomes your responsibility to commit offsets.
 
-There is a couple of ways that can be achieved.
+There are a couple of ways that can be achieved.
 
 The simplest way is to define an argument of type api:configuration.kafka.Acknowledgement[] and call the `ack()` method to commit offsets synchronously:
 
