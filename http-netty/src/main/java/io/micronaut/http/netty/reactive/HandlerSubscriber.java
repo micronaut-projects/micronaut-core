@@ -125,12 +125,6 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
         ctx.fireChannelRegistered();
     }
 
-    private void verifyRegisteredWithRightExecutor(ChannelHandlerContext ctx) {
-        if (ctx.channel().isRegistered() && !executor.inEventLoop()) {
-            throw new IllegalArgumentException("Channel handler MUST be registered with the same EventExecutor that it is created with.");
-        }
-    }
-
     @Override
     public void channelWritabilityChanged(ChannelHandlerContext ctx) {
         maybeRequestMore();
@@ -163,21 +157,6 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
         ctx.fireExceptionCaught(cause);
     }
 
-    private void cancel() {
-        switch (state) {
-            case NO_SUBSCRIPTION:
-                state = CANCELLED;
-                break;
-            case RUNNING:
-            case INACTIVE:
-                subscription.cancel();
-                state = CANCELLED;
-                break;
-            default:
-                // no-op
-        }
-    }
-
     @Override
     public void onSubscribe(final Subscription subscription) {
         if (subscription == null) {
@@ -187,31 +166,6 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
         } else {
             this.subscription = subscription;
             executor.execute(this::provideSubscription);
-        }
-    }
-
-    private void provideSubscription() {
-        switch (state) {
-            case NO_SUBSCRIPTION_OR_CONTEXT:
-                state = NO_CONTEXT;
-                break;
-            case NO_SUBSCRIPTION:
-                maybeStart();
-                break;
-            case CANCELLED:
-                subscription.cancel();
-                break;
-            default:
-                // no-op
-        }
-    }
-
-    private void maybeStart() {
-        if (ctx.channel().isActive()) {
-            state = RUNNING;
-            maybeRequestMore();
-        } else {
-            state = INACTIVE;
         }
     }
 
@@ -259,6 +213,52 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
     private void maybeRequestMore() {
         if (ctx.channel().isWritable()) {
             subscription.request(1);
+        }
+    }
+
+    private void verifyRegisteredWithRightExecutor(ChannelHandlerContext ctx) {
+        if (ctx.channel().isRegistered() && !executor.inEventLoop()) {
+            throw new IllegalArgumentException("Channel handler MUST be registered with the same EventExecutor that it is created with.");
+        }
+    }
+
+    private void cancel() {
+        switch (state) {
+            case NO_SUBSCRIPTION:
+                state = CANCELLED;
+                break;
+            case RUNNING:
+            case INACTIVE:
+                subscription.cancel();
+                state = CANCELLED;
+                break;
+            default:
+                // no-op
+        }
+    }
+
+    private void provideSubscription() {
+        switch (state) {
+            case NO_SUBSCRIPTION_OR_CONTEXT:
+                state = NO_CONTEXT;
+                break;
+            case NO_SUBSCRIPTION:
+                maybeStart();
+                break;
+            case CANCELLED:
+                subscription.cancel();
+                break;
+            default:
+                // no-op
+        }
+    }
+
+    private void maybeStart() {
+        if (ctx.channel().isActive()) {
+            state = RUNNING;
+            maybeRequestMore();
+        } else {
+            state = INACTIVE;
         }
     }
 }
