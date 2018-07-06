@@ -13,6 +13,8 @@ include::{testsjava}/requires/JdbcBookService.java[tags=requires, indent=0]
 
 The above bean defines two requirements. The first indicates that a `DataSource` bean must be present for the bean to load. The second requirement ensures that the `datasource.url` property is set before loading the `JdbcBookService` bean.
 
+NOTE: Kotlin currently does not support repeatable annotations. Use the `@Requirements` annotation when multiple requires are needed. For example, `@Requirements(Requires(...), Requires(...))`. See https://youtrack.jetbrains.com/issue/KT-12794 to track this feature.
+
 If you have multiple requirements that you find you may need to repeat on multiple beans then you can define a meta-annotation with the requirements:
 
 
