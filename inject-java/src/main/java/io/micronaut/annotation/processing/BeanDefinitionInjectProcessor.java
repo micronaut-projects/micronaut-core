@@ -125,6 +125,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     private JavaConfigurationMetadataBuilder metadataBuilder;
     private Map<String, AnnBeanElementVisitor> beanDefinitionWriters;
     private Set<String> processed = new HashSet<>();
+    private boolean executed = false;
 
     @Override
     public final synchronized void init(ProcessingEnvironment processingEnv) {
@@ -135,9 +136,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
     @Override
     public final boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-        if (annotations.isEmpty()) {
+        if (executed) {
             return false;
         }
+        executed = true;
 
         annotations = annotations
             .stream()
