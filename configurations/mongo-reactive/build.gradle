@@ -4,18 +4,19 @@ dependencies {
     compile project(":validation")
     compileOnly project(":inject-java")
     compileOnly project(":management")
-    compile "org.mongodb:mongodb-driver-reactivestreams:1.8.0", {
+    compile(dependencyVersion("mongo.reactive")) {
         exclude group:'org.mongodb', module:'mongodb-driver-async'
     }
-    compile "org.mongodb:mongodb-driver-async:$mongoVersion"
+    compile dependencyModuleVersion("mongo", "mongodb-driver-async")
 
-    compileOnly "org.mongodb:mongo-java-driver:$mongoVersion"
+    compileOnly dependencyModuleVersion("mongo", "mongo-java-driver")
     compileOnly "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.0.1"
 
     testCompile "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.0.1"
     testCompile dependencyVersion("rxjava2")
-    testCompile "org.mongodb:mongo-java-driver:$mongoVersion"
+    testCompile dependencyModuleVersion("mongo", "mongo-java-driver")
     testRuntime dependencyModuleVersion("netty", "netty-handler")
 }
+
 //compileJava.options.forkOptions.jvmArgs =['-verbose']
 //compileJava.options.fork=true
