@@ -13,16 +13,16 @@ dependencies {
     testRuntime 'com.h2database:h2:1.4.196'
     testRuntime "ch.qos.logback:logback-classic:1.2.3"
 }
-tasks.withType(Test) {
-    testLogging {
-        showStandardStreams = true
-    }
-    beforeTest {
-        System.out.println("STARTING: ${it.className}.$it.name")
-        System.out.flush()
-    }
-    afterTest {
-        System.out.println("FINISHED: ${it.className}.$it.name")
-        System.out.flush()
-    }
-}
+//tasks.withType(Test) {
+//    testLogging {
+//        showStandardStreams = true
+//    }
+//    beforeTest {
+//        System.out.println("STARTING: ${it.className}.$it.name")
+//        System.out.flush()
+//    }
+//    afterTest {
+//        System.out.println("FINISHED: ${it.className}.$it.name")
+//        System.out.flush()
+//    }
+//}
