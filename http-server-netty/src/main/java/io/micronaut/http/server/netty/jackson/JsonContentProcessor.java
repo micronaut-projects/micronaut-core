@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.jackson;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.JsonNode;
+import io.micronaut.core.async.processor.ProcessorSubscription;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.async.subscriber.TypedSubscriber;
@@ -85,6 +86,11 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
 
             @Override
             protected void doOnSubscribe(Subscription jsonSubscription) {
+
+                if (parentSubscription instanceof ProcessorSubscription) {
+                    ((ProcessorSubscription) parentSubscription).setDownStreamSubscription(jsonSubscription);
+                }
+
                 Subscription childSubscription = new Subscription() {
                     @Override
                     public synchronized void request(long n) {

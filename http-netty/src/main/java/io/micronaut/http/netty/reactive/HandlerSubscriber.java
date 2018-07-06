@@ -211,7 +211,7 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
     }
 
     private void maybeRequestMore() {
-        if (ctx.channel().isWritable()) {
+        if (ctx.channel().isWritable() && !(state == COMPLETE || state == CANCELLED)) {
             subscription.request(1);
         }
     }
