@@ -41,39 +41,17 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @author Graeme Rocher
  * @since 1.0
  */
+@SuppressWarnings("SubscriberImplementation")
 public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscriber<T> {
 
-    static final long DEFAULT_LOW_WATERMARK = 4;
-    static final long DEFAULT_HIGH_WATERMARK = 16;
-
     private final EventExecutor executor;
-    private final long demandLowWatermark;
-    private final long demandHighWatermark;
-
     private final AtomicBoolean hasSubscription = new AtomicBoolean();
 
     private volatile Subscription subscription;
     private volatile ChannelHandlerContext ctx;
 
     private State state = NO_SUBSCRIPTION_OR_CONTEXT;
-    private long outstandingDemand = 0;
     private ChannelFuture lastWriteFuture;
-
-    /**
-     * Create a new handler subscriber.
-     * <p>
-     * The supplied executor must be the same event loop as the event loop that this handler is eventually registered
-     * with, if not, an exception will be thrown when the handler is registered.
-     *
-     * @param executor            The executor to execute asynchronous events from the publisher on.
-     * @param demandLowWatermark  The low watermark for demand. When demand drops below this, more will be requested.
-     * @param demandHighWatermark The high watermark for demand. This is the maximum that will be requested.
-     */
-    public HandlerSubscriber(EventExecutor executor, long demandLowWatermark, long demandHighWatermark) {
-        this.executor = executor;
-        this.demandLowWatermark = demandLowWatermark;
-        this.demandHighWatermark = demandHighWatermark;
-    }
 
     /**
      * Create a new handler subscriber with the default low and high watermarks.
@@ -82,10 +60,9 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
      * with, if not, an exception will be thrown when the handler is registered.
      *
      * @param executor The executor to execute asynchronous events from the publisher on.
-     * @see #HandlerSubscriber(EventExecutor, long, long)
      */
     public HandlerSubscriber(EventExecutor executor) {
-        this(executor, DEFAULT_LOW_WATERMARK, DEFAULT_HIGH_WATERMARK);
+        this.executor = executor;
     }
 
     /**
@@ -118,7 +95,7 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
     }
 
     @Override
-    public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+    public void handlerAdded(ChannelHandlerContext ctx) {
         verifyRegisteredWithRightExecutor(ctx);
 
         switch (state) {
@@ -143,7 +120,7 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
     }
 
     @Override
-    public void channelRegistered(ChannelHandlerContext ctx) throws Exception {
+    public void channelRegistered(ChannelHandlerContext ctx) {
         verifyRegisteredWithRightExecutor(ctx);
         ctx.fireChannelRegistered();
     }
@@ -155,13 +132,13 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
     }
 
     @Override
-    public void channelWritabilityChanged(ChannelHandlerContext ctx) throws Exception {
+    public void channelWritabilityChanged(ChannelHandlerContext ctx) {
         maybeRequestMore();
         ctx.fireChannelWritabilityChanged();
     }
 
     @Override
-    public void channelActive(ChannelHandlerContext ctx) throws Exception {
+    public void channelActive(ChannelHandlerContext ctx) {
         if (state == INACTIVE) {
             state = RUNNING;
             maybeRequestMore();
@@ -170,18 +147,18 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
     }
 
     @Override
-    public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+    public void channelInactive(ChannelHandlerContext ctx) {
         cancel();
         ctx.fireChannelInactive();
     }
 
     @Override
-    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+    public void handlerRemoved(ChannelHandlerContext ctx) {
         cancel();
     }
 
     @Override
-    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         cancel();
         ctx.fireExceptionCaught(cause);
     }
@@ -240,16 +217,10 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
 
     @Override
     public void onNext(T t) {
-
         // Publish straight to the context.
         lastWriteFuture = ctx.writeAndFlush(t);
-        lastWriteFuture.addListener(new ChannelFutureListener() {
-            @Override
-            public void operationComplete(ChannelFuture future) throws Exception {
-
-                outstandingDemand--;
-                maybeRequestMore();
-            }
+        lastWriteFuture.addListener((ChannelFutureListener) future -> {
+            maybeRequestMore();
         });
     }
 
@@ -266,39 +237,28 @@ public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscr
         if (lastWriteFuture == null) {
             complete();
         } else {
-            lastWriteFuture.addListener(new ChannelFutureListener() {
-                @Override
-                public void operationComplete(ChannelFuture channelFuture) throws Exception {
-                    complete();
-                }
-            });
+            lastWriteFuture.addListener((ChannelFutureListener) channelFuture -> complete());
         }
     }
 
     private void doClose() {
-        executor.execute(new Runnable() {
-            @Override
-            public void run() {
-                switch (state) {
-                    case NO_SUBSCRIPTION:
-                    case INACTIVE:
-                    case RUNNING:
-                        ctx.close();
-                        state = COMPLETE;
-                        break;
-                    default:
-                        // no-op
-                }
+        executor.execute(() -> {
+            switch (state) {
+                case NO_SUBSCRIPTION:
+                case INACTIVE:
+                case RUNNING:
+                    ctx.close();
+                    state = COMPLETE;
+                    break;
+                default:
+                    // no-op
             }
         });
     }
 
     private void maybeRequestMore() {
-        if (outstandingDemand <= demandLowWatermark && ctx.channel().isWritable()) {
-            long toRequest = demandHighWatermark - outstandingDemand;
-
-            outstandingDemand = demandHighWatermark;
-            subscription.request(toRequest);
+        if (ctx.channel().isWritable()) {
+            subscription.request(1);
         }
     }
 }
