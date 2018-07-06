@@ -29,14 +29,13 @@ class PgPoolConfigurationSpec extends Specification {
     void "test reactive-pg-client configuration"() {
         when:
         ApplicationContext applicationContext = ApplicationContext.run(
-                'reactive.pg.client.port': '5432',
-                'reactive.pg.client.host': 'the-host',
-                'reactive.pg.client.database': 'the-db',
-                'reactive.pg.client.user': 'user',
-                'reactive.pg.client.password': 'secret',
-                'reactive.pg.client.maxSize': '5'
+                'postgres.reactive.client.port': '5432',
+                'postgres.reactive.client.host': 'the-host',
+                'postgres.reactive.client.database': 'the-db',
+                'postgres.reactive.client.user': 'user',
+                'postgres.reactive.client.password': 'secret',
+                'postgres.reactive.client.maxSize': '5'
         )
-        PgPoolHealthIndicator indicator = applicationContext.getBean(PgPoolHealthIndicator)
 
         then:
         applicationContext.containsBean(PgPoolConfiguration)

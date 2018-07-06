@@ -24,5 +24,5 @@ public interface PgPoolClientSettings {
     /**
      * The prefix to use for all Reactive Postgres Client settings.
      */
-    String PREFIX = "reactive.pg.client";
+    String PREFIX = "postgres.reactive.client";
 }
