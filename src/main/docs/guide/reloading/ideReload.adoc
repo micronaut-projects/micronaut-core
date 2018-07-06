@@ -1,0 +1,10 @@
+If you are using a build tool such as Maven, which does not support automatic recompilation on file changes, you may choose to use your IDE to recompile classes in combination with a reloading agent (as configured in the above sections).
+
+=== IntelliJ
+
+IntelliJ unfortunately does not have an automatic rebuild option that works for a running application. However, you can trigger a "rebuild" of the project with `CMD-F9` (Mac) or `CTRL-F9` (Windows).
+
+=== Eclipse
+
+Under the `Project` menu, check the `Build Automatically` option. This will trigger a recompilation of the project whenever file changes are saved to disk.
+

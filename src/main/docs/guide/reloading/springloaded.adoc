@@ -2,8 +2,7 @@
 
 WARNING: Spring-Loaded is not actively maintained and currently only supports Java versions < 9.
 
-
-=== CLI Feature
+== CLI Feature
 
 You can create a new application with Spring-Loaded preconfigured, using the CLI (for supported Java versions). To do this, use the `springloaded` feature.
 
@@ -16,7 +15,7 @@ This feature will include the Spring-Loaded agent JAR in your project, and provi
 You can start the application with `./gradlew run` (Gradle) or `./mvnw compile exec:exec` (Maven).
 
 
-=== Manual Configuration
+== Manual Configuration
 
 
 Configuring Spring-Loaded requires the agent JAR file to be downloaded on your system, and configured to be loaded as a `javaagent` by the build tool (or IDE).

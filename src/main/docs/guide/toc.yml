@@ -216,6 +216,8 @@ reloading:
   title: Reloading
   jrebel: JRebel
   springloaded: Spring-Loaded
+  gradleReload: Reloading with Gradle
+  ideReload: Reloading with an IDE
 faq: Frequently Asked Questions (FAQ)
 problems: Common Problems
 breaks: Breaking Changes
