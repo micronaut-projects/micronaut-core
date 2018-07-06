@@ -46,29 +46,6 @@ include::{testsuite}/configuration/postgres/reactive/PostgresReactiveSpec.groovy
 
 For more information on running queries on Postgres using the reactive client please read the "Running quries" section in the documentation of https://reactiverse.io/reactive-pg-client/guide/groovy/index.html[reactive-pg-client].
 
-== Using Testcontainers for testing
-
-We are using https://github.com/testcontainers/testcontainers-java[testcontainers-java] to use a containerized instance of a PostgresSQL database to test with our reactive Postgres client.
-
-To get started with Testcontainers add the following `testCompile` dependencies to your project `build.gradle`:
-
-[source,groovy]
-.build.gradle
-----
-include::test-suite/build.gradle[tags=testcontainers-dependencies,indent=0]
-----
-
-Now, in your Spec file create a Postgres testcontainer, start it and get the configurations for reactive Postgres client as following:
-
-[source,groovy]
-----
-include::{testsuite}/configuration/postgres/reactive/PostgresReactiveSpec.groovy[tags=appcontext-import,indent=0]
-include::{testsuite}/configuration/postgres/reactive/PostgresReactiveSpec.groovy[tags=pg-testcontainer-import,indent=0]
-include::{testsuite}/configuration/postgres/reactive/PostgresReactiveSpec.groovy[tags=pg-testcontainer,indent=0]
-include::{testsuite}/configuration/postgres/reactive/PostgresReactiveSpec.groovy[tags=pg-client-conf,indent=0]
-----
-For more information on Testcontainers, read the original docs https://www.testcontainers.org/[here].
-
 == Postgres Health Checks
 
 When the `postgres-reactive` module is activated a api:configuration.postgres.reactive.health.PgPoolHealthIndicator[] is activated resulting in the `/health` endpoint and api:health.CurrentHealthStatus[] interface resolving the health of the Postgres connection
