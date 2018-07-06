@@ -31,6 +31,7 @@ import io.micronaut.security.handlers.LogoutHandler
 import io.reactivex.Flowable
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
+import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -52,6 +53,7 @@ class LogoutControllerPathConfigurableSpec extends Specification {
     RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
 
+    @Ignore
     void "LogoutController is not accessible at /logout but at /salir"() {
         when:
         HttpRequest request = HttpRequest.POST("/logout", "").basicAuth("user", "password")
