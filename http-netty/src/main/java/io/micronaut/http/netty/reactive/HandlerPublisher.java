@@ -554,10 +554,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
 
         @Override
         public void request(final long demand) {
-
-            executor.execute(() -> {
-                receivedDemand(demand);
-            });
+            executor.execute(() -> receivedDemand(demand));
         }
 
         @Override
