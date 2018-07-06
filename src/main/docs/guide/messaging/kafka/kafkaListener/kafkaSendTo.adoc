@@ -14,7 +14,7 @@ include::{testskafka}/consumer/sendto/ProductListener.java[tags=method, indent=0
 <2> The topic to send the result to is `product-quantities`
 <3> The return value is used to indicate the value to forward
 
-You can also do the same reactively:
+You can also do the same using Reactive programming:
 
 .Committing offsets with the `KafkaConsumer` API
 [source,java]
