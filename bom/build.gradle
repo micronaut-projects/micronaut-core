@@ -59,10 +59,12 @@ publishing {
 
                                 def versionExpr = "\${${dep.key}.version}"
 
-                                mkp.dependency {
-                                    mkp.groupId info.group
-                                    mkp.artifactId info.name
-                                    mkp.version versionExpr
+                                if (info.name) {
+                                    mkp.dependency {
+                                        mkp.groupId info.group
+                                        mkp.artifactId info.name
+                                        mkp.version versionExpr
+                                    }
                                 }
                                 if(info.modules) {
                                    for(m in info.modules) {

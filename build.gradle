@@ -94,6 +94,16 @@ ext {
                     group  : 'io.micrometer',
                     name   : 'micrometer-registry-statsd'
             ],
+            'mongo' : [
+                    version: mongoVersion,
+                    group: 'org.mongodb',
+                    modules: ['mongodb-driver-async', 'mongo-java-driver']
+            ],
+            'mongo.reactive': [
+                    version: '1.8.0',
+                    group: 'org.mongodb',
+                    name: 'mongodb-driver-reactivestreams'
+            ],
             neo4j: [
                 version: neo4jVersion,
                 group:'org.neo4j.test',

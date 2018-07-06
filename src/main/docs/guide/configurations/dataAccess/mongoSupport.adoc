@@ -21,7 +21,16 @@ mongodb:
 
 TIP: The `mongodb.uri` follows the https://docs.mongodb.com/manual/reference/connection-string[MongoDB Connection String] format.
 
-Both a blocking http://mongodb.github.io/mongo-java-driver/3.7/javadoc/com/mongodb/async/client/MongoClient.html[MongoClient] and a non-blocking Reactive Streams http://mongodb.github.io/mongo-java-driver-reactivestreams/1.8/javadoc/com/mongodb/reactivestreams/client/MongoClient.html[MongoClient] are automatically then available for dependency injection.
+A non-blocking Reactive Streams http://mongodb.github.io/mongo-java-driver-reactivestreams/1.8/javadoc/com/mongodb/reactivestreams/client/MongoClient.html[MongoClient] is then available for dependency injection.
+
+To use the blocking driver, add a dependency to your application to the mongo-java-driver.
+
+[source,groovy]
+----
+compile "org.mongodb:mongo-java-driver"
+----
+
+Then the blocking http://mongodb.github.io/mongo-java-driver/3.7/javadoc/com/mongodb/MongoClient.html[MongoClient] will be available for injection.
 
 ==== Configuring the MongoDB Driver
 
