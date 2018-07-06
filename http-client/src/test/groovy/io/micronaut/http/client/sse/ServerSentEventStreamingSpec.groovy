@@ -120,7 +120,7 @@ class ServerSentEventStreamingSpec extends Specification {
         @Get(uri = '/pojo/delayed', produces = MediaType.TEXT_EVENT_STREAM)
         Flowable<Product> delayedStream() {
             return Flowable.fromIterable(dataSet().collect { it.data }).delay(
-                    15,
+                    5,
                     TimeUnit.SECONDS
             )
         }

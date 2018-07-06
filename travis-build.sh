@@ -13,9 +13,10 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
         ./gradlew pTML || EXIT_STATUS=$?
     else
         ./gradlew --stop
-        ./gradlew testClasses || EXIT_STATUS=$?
+#        ./gradlew testClasses || EXIT_STATUS=$?
 
-        ./gradlew check --no-daemon || EXIT_STATUS=$?
+#        ./gradlew check --no-daemon || EXIT_STATUS=$?
+        ./gradlew http-client:test --tests io.micronaut.http.client.StreamRequestSpec
     fi
 fi
 
