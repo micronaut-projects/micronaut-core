@@ -2,7 +2,7 @@ The examples in the previous section demonstrates how Micronaut allows you to bi
 
 == Binding Annotations
 
-You can customize the name of the variable bound with the link:{api}/io/micronaut/context/annotation/Parameter.html[@Parameter] annotation which accepts a value which is the name of the URI variable or request parameter to bind from.
+You can customize the name of the variable bound with the link:{api}/io/micronaut/http/annotation/QueryValue.html[@QueryValue] annotation which accepts a value which is the name of the URI variable or request parameter to bind from.
 
 In addition, there are other annotations within the link:{api}/io/micronaut/http/annotation/package-summary.html[io.micronaut.http.annotation] package to bind from different sources.
 
@@ -25,9 +25,9 @@ The following table summarizes the annotations, their purpose and provides an ex
 |Binds a parameter from an HTTP header
 |`@Header String contentType`
 
-|link:{api}/io/micronaut/context/annotation/Parameter.html[@Parameter]
+|link:{api}/io/micronaut/http/annotation/QueryValue.html[@QueryValue]
 |Bindings from a request URI variable or request parameter
-|`@Parameter String myParam`
+|`@QueryValue String myParam`
 |===
 
 When a value is not specified to any binding annotation then the parameter name is used. In other words the following two methods are equivalent and both bind from a cookie called `myCookie`:
