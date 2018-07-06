@@ -18,6 +18,8 @@ package io.micronaut.security.rules;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.management.endpoint.EndpointSensitivityProcessor;
+import io.micronaut.management.endpoint.health.HealthEndpoint;
+import io.micronaut.management.endpoint.processors.ReadEndpointRouteBuilder;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;
 
@@ -48,21 +50,30 @@ public class SensitiveEndpointRule implements SecurityRule {
      */
     protected final Map<Method, Boolean> endpointMethods;
 
+    protected final ReadEndpointRouteBuilder readEndpointRouteBuilder;
+
     /**
      * Constructs the rule with the existing and default endpoint
      * configurations used to determine if a given endpoint is
      * sensitive.
      *
+     * @param readEndpointRouteBuilder The routeBuilder which it is used to resolve if the request matches the {@link HealthEndpoint}
      * @param endpointSensitivityProcessor The endpoint configurations
      */
-    SensitiveEndpointRule(EndpointSensitivityProcessor endpointSensitivityProcessor) {
+    SensitiveEndpointRule(EndpointSensitivityProcessor endpointSensitivityProcessor,
+                          ReadEndpointRouteBuilder readEndpointRouteBuilder) {
         this.endpointMethods = endpointSensitivityProcessor.getEndpointMethods();
+        this.readEndpointRouteBuilder = readEndpointRouteBuilder;
     }
 
     @Override
     public SecurityRuleResult check(HttpRequest request, @Nullable RouteMatch routeMatch, @Nullable Map<String, Object> claims) {
+        if (readEndpointRouteBuilder.doesRequestMatchesEndpointRoute(request, HealthEndpoint.class)) {
+            return SecurityRuleResult.ALLOWED;
+        }
         if (routeMatch instanceof MethodBasedRouteMatch) {
             Method method = ((MethodBasedRouteMatch) routeMatch).getTargetMethod();
+
             if (endpointMethods.containsKey(method)) {
                 Boolean sensitive = endpointMethods.get(method);
                 if (claims == null && sensitive) {
