@@ -35,12 +35,12 @@ class PgPoolHealthIndicatorSpec extends Specification {
         PostgreSQLContainer postgres = new PostgreSQLContainer()
         postgres.start()
         ApplicationContext applicationContext = ApplicationContext.run(
-                'reactive.pg.client.port': postgres.getMappedPort(PostgreSQLContainer.POSTGRESQL_PORT),
-                'reactive.pg.client.host': postgres.getContainerIpAddress(),
-                'reactive.pg.client.database': postgres.databaseName,
-                'reactive.pg.client.user': postgres.username,
-                'reactive.pg.client.password': postgres.password,
-                'reactive.pg.client.maxSize': '5'
+                'postgres.reactive.client.port': postgres.getMappedPort(PostgreSQLContainer.POSTGRESQL_PORT),
+                'postgres.reactive.client.host': postgres.getContainerIpAddress(),
+                'postgres.reactive.client.database': postgres.databaseName,
+                'postgres.reactive.client.user': postgres.username,
+                'postgres.reactive.client.password': postgres.password,
+                'postgres.reactive.client.maxSize': '5'
         )
 
         when:
