@@ -21,11 +21,10 @@ import io.micronaut.health.HealthStatus;
 import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
+import io.reactiverse.pgclient.Row;
 import io.reactiverse.reactivex.pgclient.PgPool;
 import io.reactiverse.reactivex.pgclient.PgRowSet;
-import io.reactivex.Flowable;
 import io.reactivex.Single;
-import io.reactivex.schedulers.Schedulers;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
@@ -42,6 +41,7 @@ import javax.inject.Singleton;
 public class PgPoolHealthIndicator implements HealthIndicator {
 
     public static final String NAME = "pgPool";
+    public static final String QUERY = "select datname as db, pg_size_pretty(pg_database_size(datname)) as size from pg_database order by pg_database_size(datname) desc;";
     private final PgPool client;
 
     /**
@@ -55,28 +55,17 @@ public class PgPoolHealthIndicator implements HealthIndicator {
 
     @Override
     public Publisher<HealthResult> getResult() {
-        try {
-            Single<HealthResult> healthResultSingle = Single.create(emitter -> {
-                String query = "select datname as db, pg_size_pretty(pg_database_size(datname)) as size from pg_database order by pg_database_size(datname) desc;";
-                client.query(query, ar -> {
-                    if (ar.succeeded()) {
-                        HealthResult.Builder status = HealthResult.builder(NAME, HealthStatus.UP);
-                        PgRowSet result = ar.result();
-                        String details = String.join(", ", result.columnsNames());
-                        for (io.reactiverse.pgclient.Row row : result.getDelegate()) {
-                            details = details.concat("\n" + row.getString("db") + ", " + row.getString("size"));
-                        }
-                        status.details(details);
-                        emitter.onSuccess(status.build());
-                    } else {
-                        emitter.onSuccess(buildErrorResult(ar.cause()));
-                    }
-                });
-            });
-            return healthResultSingle.toFlowable().subscribeOn(Schedulers.io());
-        } catch (Throwable e) {
-            return Flowable.just(buildErrorResult(e));
-        }
+        Single<PgRowSet> single = client.rxQuery(QUERY);
+        Single<HealthResult> healthResultSingle = single.map(pgRowSet -> {
+            HealthResult.Builder status = HealthResult.builder(NAME, HealthStatus.UP);
+            String details = String.join(", ", pgRowSet.columnsNames());
+            for (Row row : pgRowSet.getDelegate()) {
+                details = details.concat("\n" + row.getString("db") + ", " + row.getString("size"));
+            }
+            status.details(details);
+            return status.build();
+        }).onErrorReturn(this::buildErrorResult);
+        return healthResultSingle.toFlowable();
     }
 
     private HealthResult buildErrorResult(Throwable throwable) {
