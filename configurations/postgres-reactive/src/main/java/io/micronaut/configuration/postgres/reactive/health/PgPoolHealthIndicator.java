@@ -18,6 +18,7 @@ package io.micronaut.configuration.postgres.reactive.health;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.health.HealthStatus;
+import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
 import io.reactiverse.reactivex.pgclient.PgPool;
@@ -30,12 +31,13 @@ import org.reactivestreams.Publisher;
 import javax.inject.Singleton;
 
 /**
- * A Health indicator for reactive Postgres client.
+ * A  {@link HealthIndicator} for reactive Postgres client.
  *
  * @author puneetbehl
  * @since 1.0
  */
 @Requires(classes = HealthIndicator.class)
+@Requires(property = HealthEndpoint.PREFIX + ".postgres.reactive.enabled", notEquals = "false")
 @Singleton
 public class PgPoolHealthIndicator implements HealthIndicator {
 
