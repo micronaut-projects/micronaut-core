@@ -48,6 +48,8 @@ For more information on running queries on Postgres using the reactive client pl
 
 == Postgres Health Checks
 
-When the `postgres-reactive` module is activated a api:configuration.postgres.reactive.health.PgPoolHealthIndicator[] is activated resulting in the `/health` endpoint and api:health.CurrentHealthStatus[] interface resolving the health of the Postgres connection
+When the `postgres-reactive` module is activated a api:configuration.postgres.reactive.health.PgPoolHealthIndicator[] is activated resulting in the `/health` endpoint and api:health.CurrentHealthStatus[] interface resolving the health of the Postgres connection.
+
+The only configuration option supported is to enable or disable the indicator by the `endpoints.health.postgres.reactive.enabled` key.
 
 See the section on the <<healthEndpoint, Health Endpoint>> for more information.
