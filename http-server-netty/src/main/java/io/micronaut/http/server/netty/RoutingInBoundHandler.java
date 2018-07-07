@@ -108,6 +108,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -130,6 +131,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private final RequestArgumentSatisfier requestArgumentSatisfier;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
+    private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
+            "^.*(?:connection.*(?:reset|closed|abort|broken)|broken.*pipe).*$", Pattern.CASE_INSENSITIVE);
 
     /**
      * @param beanLocator                             The bean locator
@@ -234,16 +237,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
 
         if (errorRoute != null) {
-            //handling connection reset by peer exceptions
-            if (cause instanceof IOException) {
-                if (LOG.isTraceEnabled()) {
-                    LOG.trace("IOException occurred (connection reset?): " + cause.getMessage(), cause);
-                }
-            } else {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
-                }
-            }
+            logException(cause);
+
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Found matching exception handler for exception [{}]: {}", cause.getMessage(), errorRoute);
             }
@@ -1332,9 +1327,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
     @SuppressWarnings("unchecked")
     private void writeDefaultErrorResponse(ChannelHandlerContext ctx, NettyHttpRequest nettyHttpRequest, Throwable cause) {
-        if (LOG.isErrorEnabled()) {
-            LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
-        }
+        logException(cause);
 
         MutableHttpResponse<?> error = io.micronaut.http.HttpResponse.serverError()
                 .body(new JsonError("Internal Server Error: " + cause.getMessage()));
@@ -1344,6 +1337,19 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 new AtomicReference<>(nettyHttpRequest),
                 Flowable.just(error)
         );
+    }
+
+    private void logException(Throwable cause) {
+        //handling connection reset by peer exceptions
+        if (cause instanceof IOException && IGNORABLE_ERROR_MESSAGE.matcher(cause.getMessage()).matches()) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Swallowed an IOException caused by client connectivity: " + cause.getMessage(), cause);
+            }
+        } else {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Unexpected error occurred: " + cause.getMessage(), cause);
+            }
+        }
     }
 
     private void applyConfiguredHeaders(MutableHttpHeaders headers) {
