@@ -7,8 +7,6 @@ git config --global user.email "$GIT_EMAIL"
 git config --global credential.helper "store --file=~/.git-credentials"
 echo "https://$GH_TOKEN:@github.com" > ~/.git-credentials
 
-brew update
-
 if [[ $EXIT_STATUS -eq 0 ]]; then
     if [[ -n $TRAVIS_TAG ]]; then
         echo "Skipping Tests to Publish Release"
