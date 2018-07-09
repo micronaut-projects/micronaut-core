@@ -16,7 +16,6 @@
 
 package io.micronaut.http.server.binding.binders;
 
-import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -67,14 +66,6 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
             String value = annotation.value();
             if (StringUtils.isNotEmpty(value)) {
                 parameterName = value;
-            }
-        } else {
-            Parameter p = argument.getAnnotation(Parameter.class);
-            if (p != null) {
-                String value = p.value();
-                if (StringUtils.isNotEmpty(value)) {
-                    parameterName = value;
-                }
             }
         }
 

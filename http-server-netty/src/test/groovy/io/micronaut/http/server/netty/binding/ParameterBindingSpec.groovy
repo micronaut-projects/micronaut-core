@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty.binding
 
-import io.micronaut.context.annotation.Parameter
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpParameters
 import io.micronaut.http.HttpRequest
@@ -115,17 +114,17 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         }
 
         @Get('/path/{max}')
-        String path(@Parameter("max") Integer maximum) {
+        String path(@QueryValue("max") Integer maximum) {
             "Parameter Value: $maximum"
         }
 
         @Get('/path/{id}/foo/{fooId}')
-        String path2(@Parameter("id") Long someId, Long fooId) {
+        String path2(@QueryValue("id") Long someId, Long fooId) {
             "Parameter Values: $someId $fooId"
         }
 
         @Get('/path/{id}/bar{/barId}')
-        String optionalPath(@Parameter("id") Long someId, @Nullable Long barId) {
+        String optionalPath(@QueryValue("id") Long someId, @Nullable Long barId) {
             "Parameter Values: $someId ${barId ?: ''}"
         }
 
