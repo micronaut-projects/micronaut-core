@@ -47,6 +47,13 @@ public class JsonSerdeRegistry implements SerdeRegistry {
     @SuppressWarnings("unchecked")
     @Override
     public <T> Serde<T> getSerde(Class<T> type) {
-        return serdes.computeIfAbsent(type, t -> beanContext.createBean(JsonSerde.class, t));
+        JsonSerde jsonSerde = serdes.get(type);
+        if (jsonSerde != null) {
+            return jsonSerde;
+        } else {
+            jsonSerde = beanContext.createBean(JsonSerde.class, type);
+            serdes.put(type, jsonSerde);
+            return jsonSerde;
+        }
     }
 }

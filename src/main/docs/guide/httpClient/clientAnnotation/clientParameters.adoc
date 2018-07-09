@@ -49,8 +49,8 @@ The following table summarizes the parameter annotations, their purpose and prov
 |Allows specifying parameters that should be sent as HTTP headers
 |`@Header String contentType`
 
-|ann:context.annotation.Parameter[]
+|ann:http.annotation.QueryValue[]
 |Allows customizing the name of the URI parameter to bind from
-|`@Parameter('userAge') Integer age`
+|`@QueryValue('userAge') Integer age`
 
 |===

@@ -16,7 +16,6 @@
 
 package io.micronaut.configurations.ribbon
 
-import io.micronaut.context.annotation.Parameter
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.discovery.consul.client.v1.CatalogEntry
 import io.micronaut.discovery.consul.client.v1.ConsulOperations
@@ -67,7 +66,7 @@ class MockConsulServer implements ConsulOperations {
 
     @Override
     Publisher<List<KeyValue>> readValues(String key,
-                                         @Nullable @Parameter("dc") String datacenter,
+                                         @Nullable @QueryValue("dc") String datacenter,
                                          @Nullable Boolean raw, @Nullable String seperator) {
         return Flowable.just(Collections.emptyList())
     }

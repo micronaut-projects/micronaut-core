@@ -57,19 +57,24 @@ public class CompositeSerdeRegistry implements SerdeRegistry {
     @Override
     @Nonnull
     public <T> Serde<T> getSerde(Class<T> type) {
-        return serdeMap.computeIfAbsent(type, aClass -> {
-            aClass = ReflectionUtils.getWrapperType(aClass);
+        Serde serde = serdeMap.get(type);
+
+        if (serde != null) {
+           return serde;
+        } else {
+            type = ReflectionUtils.getWrapperType(type);
             try {
-                return Serdes.serdeFrom(aClass);
+                return Serdes.serdeFrom(type);
             } catch (IllegalArgumentException e) {
                 for (SerdeRegistry registry : registries) {
-                    Serde<T> serde = registry.getSerde(type);
+                    serde = registry.getSerde(type);
                     if (serde != null) {
+                        serdeMap.put(type, serde);
                         return serde;
                     }
                 }
             }
             throw new SerializationException("No available serde for type: " + type);
-        });
+        }
     }
 }

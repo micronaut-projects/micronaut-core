@@ -16,6 +16,7 @@
 
 package io.micronaut.context;
 
+import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
@@ -24,9 +25,12 @@ import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
 import java.util.Optional;
+import java.util.concurrent.ForkJoinPool;
 
 /**
  * <p>A {@link BeanCreatedEventListener} that will monitor the creation of {@link ExecutableMethodProcessor} instances
@@ -37,6 +41,7 @@ import java.util.Optional;
  * @since 1.0
  */
 class ExecutableMethodProcessorListener implements BeanCreatedEventListener<ExecutableMethodProcessor> {
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
 
     @Override
     public ExecutableMethodProcessor onCreated(BeanCreatedEvent<ExecutableMethodProcessor> event) {
@@ -46,10 +51,37 @@ class ExecutableMethodProcessorListener implements BeanCreatedEventListener<Exec
         if (targetAnnotation.isPresent()) {
             Class annotationType = targetAnnotation.get();
             Collection<BeanDefinition<?>> beanDefinitions = beanContext.getBeanDefinitions(Qualifiers.byStereotype(annotationType));
-            for (BeanDefinition<?> beanDefinition : beanDefinitions) {
-                Collection<? extends ExecutableMethod<?, ?>> executableMethods = beanDefinition.getExecutableMethods();
-                for (ExecutableMethod<?, ?> executableMethod : executableMethods) {
-                    processor.process(beanDefinition, executableMethod);
+
+            boolean isParallel = annotationType.getAnnotation(Parallel.class) != null;
+
+            if (isParallel) {
+                for (BeanDefinition<?> beanDefinition : beanDefinitions) {
+                    Collection<? extends ExecutableMethod<?, ?>> executableMethods = beanDefinition.getExecutableMethods();
+                    for (ExecutableMethod<?, ?> executableMethod : executableMethods) {
+                        ForkJoinPool.commonPool().execute(() -> {
+                                try {
+                                    if (beanContext.isRunning()) {
+                                        processor.process(beanDefinition, executableMethod);
+                                    }
+                                } catch (Throwable e) {
+                                    if (LOG.isErrorEnabled()) {
+                                        LOG.error("Error processing bean method " + beanDefinition + "." + executableMethod + " with processor (" + processor + "): " + e.getMessage(), e);
+                                    }
+                                    Boolean shutdownOnError = executableMethod.getAnnotationMetadata().getValue(Parallel.class, "shutdownOnError", Boolean.class).orElse(true);
+                                    if (shutdownOnError) {
+                                        beanContext.stop();
+                                    }
+                                }
+                            }
+                        );
+                    }
+                }
+            } else {
+                for (BeanDefinition<?> beanDefinition : beanDefinitions) {
+                    Collection<? extends ExecutableMethod<?, ?>> executableMethods = beanDefinition.getExecutableMethods();
+                    for (ExecutableMethod<?, ?> executableMethod : executableMethods) {
+                        processor.process(beanDefinition, executableMethod);
+                    }
                 }
             }
         }

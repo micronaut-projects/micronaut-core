@@ -25,9 +25,6 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
-import io.micronaut.http.uri.UriTemplate;
-import io.micronaut.management.endpoint.health.HealthEndpoint;
-import io.micronaut.management.endpoint.processors.ReadEndpointRouteBuilder;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.RouteMatchUtils;
@@ -38,7 +35,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Returns 401 for {@link Endpoint} requests which have sensitive true (except /health). Disabled if micronaut.security is enabled.
+ * Returns 401 for {@link Endpoint} requests which have sensitive true. Disabled if micronaut.security is enabled.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -48,17 +45,13 @@ import java.util.Optional;
 public class EndpointsFilter extends OncePerRequestHttpServerFilter {
 
     protected final Map<Method, Boolean> endpointMethods;
-    protected final ReadEndpointRouteBuilder readEndpointRouteBuilder;
 
     /**
      * Constructor.
-     * @param readEndpointRouteBuilder The routeBuilder which it is used to resolve if the request matches the {@link HealthEndpoint}
      * @param endpointSensitivityProcessor The processor that resolves endpoint sensitivity
      */
-    public EndpointsFilter(EndpointSensitivityProcessor endpointSensitivityProcessor,
-                           ReadEndpointRouteBuilder readEndpointRouteBuilder) {
+    public EndpointsFilter(EndpointSensitivityProcessor endpointSensitivityProcessor) {
         this.endpointMethods = endpointSensitivityProcessor.getEndpointMethods();
-        this.readEndpointRouteBuilder = readEndpointRouteBuilder;
     }
 
     /**
@@ -70,9 +63,6 @@ public class EndpointsFilter extends OncePerRequestHttpServerFilter {
      */
     @Override
     protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
-        if (readEndpointRouteBuilder.doesRequestMatchesEndpointRoute(request, HealthEndpoint.class)) {
-            return chain.proceed(request);
-        }
         Optional<RouteMatch> routeMatch = RouteMatchUtils.findRouteMatchAtRequest(request);
         if (routeMatch.isPresent() && routeMatch.get() instanceof MethodBasedRouteMatch) {
             Method method = ((MethodBasedRouteMatch) routeMatch.get()).getTargetMethod();
