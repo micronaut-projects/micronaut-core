@@ -317,6 +317,24 @@ public class DefaultBeanContext implements BeanContext {
         return (Collection<BeanRegistration<T>>) result;
     }
 
+    @Override
+    public <T> Optional<BeanRegistration<T>> findBeanRegistration(T bean) {
+        for (BeanRegistration beanRegistration : singletonObjects.values()) {
+            if (bean == beanRegistration.getBean()) {
+               return Optional.of(beanRegistration);
+            }
+        }
+
+        Collection<CustomScope> scopes = getBeansOfType(CustomScope.class);
+        for (CustomScope<?> scope : scopes) {
+            Optional<BeanRegistration<T>> beanRegistration = scope.findBeanRegistration(bean);
+            if (beanRegistration.isPresent()) {
+                return beanRegistration;
+            }
+        }
+        return Optional.empty();
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public <R> Optional<MethodExecutionHandle<R>> findExecutionHandle(Class<?> beanType, String method, Class... arguments) {
@@ -326,7 +344,7 @@ public class DefaultBeanContext implements BeanContext {
     @SuppressWarnings("unchecked")
     @Override
     public <R> Optional<MethodExecutionHandle<R>> findExecutionHandle(Class<?> beanType, Qualifier<?> qualifier, String method, Class... arguments) {
-        Optional<? extends BeanDefinition<?>> foundBean = findBeanDefinition(beanType, (Qualifier) qualifier);
+        Optional<? extends BeanDefinition<?>> foundBean = findBeanRegistration(beanType, (Qualifier) qualifier);
         if (foundBean.isPresent()) {
             BeanDefinition<?> beanDefinition = foundBean.get();
             Optional<? extends ExecutableMethod<?, Object>> foundMethod = beanDefinition.findMethod(method, arguments);
@@ -377,7 +395,7 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     public <R> Optional<MethodExecutionHandle<R>> findExecutionHandle(Object bean, String method, Class[] arguments) {
         if (bean != null) {
-            Optional<? extends BeanDefinition<?>> foundBean = findBeanDefinition(bean.getClass());
+            Optional<? extends BeanDefinition<?>> foundBean = findBeanRegistration(bean.getClass());
             if (foundBean.isPresent()) {
                 BeanDefinition<?> beanDefinition = foundBean.get();
                 Optional<? extends ExecutableMethod<?, Object>> foundMethod = beanDefinition.findMethod(method, arguments);
@@ -431,7 +449,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
-    public <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType, Qualifier<T> qualifier) {
+    public <T> Optional<BeanDefinition<T>> findBeanRegistration(Class<T> beanType, Qualifier<T> qualifier) {
         if (Object.class == beanType) {
             // optimization for object resolve
             return Optional.empty();
