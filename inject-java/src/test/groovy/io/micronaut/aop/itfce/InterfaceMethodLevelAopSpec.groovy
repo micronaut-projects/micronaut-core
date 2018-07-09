@@ -72,7 +72,7 @@ class InterfaceMethodLevelAopSpec extends Specification {
         BeanContext beanContext = new DefaultBeanContext().start()
 
         when: "the bean definition is obtained"
-        BeanDefinition<InterfaceClass> beanDefinition = beanContext.findBeanRegistration(InterfaceClass).get()
+        BeanDefinition<InterfaceClass> beanDefinition = beanContext.findBeanDefinition(InterfaceClass).get()
 
         then:
         beanDefinition.findMethod("test", String).isPresent()

@@ -82,7 +82,7 @@ public interface BeanDefinitionRegistry {
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
      *                                                                for the given type
      */
-    <T> Optional<BeanDefinition<T>> findBeanRegistration(Class<T> beanType, Qualifier<T> qualifier);
+    <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType, Qualifier<T> qualifier);
 
 
     /**
@@ -207,7 +207,7 @@ public interface BeanDefinitionRegistry {
      * @throws NoSuchBeanException                                    If the bean cannot be found
      */
     default <T> BeanDefinition<T> getBeanDefinition(Class<T> beanType, Qualifier<T> qualifier) {
-        return findBeanRegistration(beanType, qualifier).orElseThrow(() -> new NoSuchBeanException(beanType, qualifier));
+        return findBeanDefinition(beanType, qualifier).orElseThrow(() -> new NoSuchBeanException(beanType, qualifier));
     }
 
     /**
@@ -236,7 +236,7 @@ public interface BeanDefinitionRegistry {
      * @throws NoSuchBeanException                                    If the bean cannot be found
      */
     default <T> BeanDefinition<T> getBeanDefinition(Class<T> beanType) {
-        return findBeanRegistration(beanType, null).orElseThrow(() -> new NoSuchBeanException(beanType));
+        return findBeanDefinition(beanType, null).orElseThrow(() -> new NoSuchBeanException(beanType));
     }
 
     /**
@@ -248,8 +248,8 @@ public interface BeanDefinitionRegistry {
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
      *                                                                for the given type
      */
-    default <T> Optional<BeanDefinition<T>> findBeanRegistration(Class<T> beanType) {
-        return findBeanRegistration(beanType, null);
+    default <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType) {
+        return findBeanDefinition(beanType, null);
     }
 
     /**
