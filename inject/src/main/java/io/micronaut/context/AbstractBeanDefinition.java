@@ -1634,9 +1634,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         path.pushFieldResolve(this, injectionPoint);
 
         try {
-            Field field = injectionPoint.getField();
-            Class<?> fieldType = field.getType();
-            Optional<Class> genericType = fieldType.isArray() ? Optional.of(fieldType.getComponentType()) : GenericTypeUtils.resolveGenericTypeArgument(field);
+            Optional<Class> genericType = injectionPoint.getType().isArray() ? Optional.of(injectionPoint.getType().getComponentType()) : injectionPoint.asArgument().getFirstTypeVariable().map(Argument::getType);
             if (!genericType.isPresent()) {
                 throw new DependencyInjectionException(resolutionContext, injectionPoint, "Expected exactly 1 generic type for field");
             }

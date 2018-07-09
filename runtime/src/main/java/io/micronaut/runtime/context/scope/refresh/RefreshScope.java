@@ -128,6 +128,16 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
 
     }
 
+    @Override
+    public <T> Optional<BeanRegistration<T>> findBeanRegistration(T bean) {
+        for (BeanRegistration beanRegistration : refreshableBeans.values()) {
+            if (beanRegistration.getBean() == bean) {
+                return Optional.of(beanRegistration);
+            }
+        }
+        return Optional.empty();
+    }
+
     /**
      * @param object The bean
      * @return The lock on the object

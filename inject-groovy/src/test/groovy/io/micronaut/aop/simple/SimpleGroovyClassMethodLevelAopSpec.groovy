@@ -70,7 +70,7 @@ class SimpleGroovyClassMethodLevelAopSpec extends Specification {
         BeanContext beanContext = new DefaultBeanContext().start()
 
         when: "the bean definition is obtained"
-        BeanDefinition<SimpleGroovyClass> beanDefinition = beanContext.findBeanDefinition(SimpleGroovyClass).get()
+        BeanDefinition<SimpleGroovyClass> beanDefinition = beanContext.findBeanRegistration(SimpleGroovyClass).get()
 
         then:
         beanDefinition.findMethod("test", String).isPresent()

@@ -16,14 +16,10 @@
 
 package io.micronaut.discovery.consul.client.v1;
 
-import io.micronaut.context.annotation.Parameter;
 import io.micronaut.discovery.consul.ConsulConfiguration;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Body;
-import io.micronaut.http.annotation.Get;
-import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.annotation.Put;
+import io.micronaut.http.annotation.*;
 import io.micronaut.retry.annotation.Retryable;
 import org.reactivestreams.Publisher;
 
@@ -79,7 +75,7 @@ public interface ConsulOperations {
     )
     Publisher<List<KeyValue>> readValues(
         String key,
-        @Nullable @Parameter("dc") String datacenter,
+        @Nullable @QueryValue("dc") String datacenter,
         @Nullable Boolean raw,
         @Nullable String seperator);
 
