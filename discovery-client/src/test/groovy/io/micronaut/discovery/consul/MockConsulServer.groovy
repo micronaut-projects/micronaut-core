@@ -15,7 +15,6 @@
  */
 package io.micronaut.discovery.consul
 
-import io.micronaut.context.annotation.Parameter
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.async.publisher.Publishers
 import io.micronaut.core.util.StringUtils
@@ -24,6 +23,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.QueryValue
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import org.reactivestreams.Publisher
@@ -102,8 +102,8 @@ class MockConsulServer implements ConsulOperations {
 
     @Override
     Mono<List<KeyValue>> readValues(String key,
-                                         @Nullable @Parameter("dc") String datacenter,
-                                         @Nullable Boolean raw, @Nullable String seperator) {
+                                    @Nullable @QueryValue("dc") String datacenter,
+                                    @Nullable Boolean raw, @Nullable String seperator) {
         return readValues(key)
     }
 
