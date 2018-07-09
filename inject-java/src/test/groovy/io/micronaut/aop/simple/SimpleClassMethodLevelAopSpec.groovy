@@ -72,7 +72,7 @@ class SimpleClassMethodLevelAopSpec extends Specification {
         BeanContext beanContext = new DefaultBeanContext().start()
 
         when: "the bean definition is obtained"
-        BeanDefinition<SimpleClass> beanDefinition = beanContext.findBeanRegistration(SimpleClass).get()
+        BeanDefinition<SimpleClass> beanDefinition = beanContext.findBeanDefinition(SimpleClass).get()
 
         then:
         beanDefinition.findMethod("test", String).isPresent()

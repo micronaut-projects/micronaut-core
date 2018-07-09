@@ -72,7 +72,7 @@ class ProxyingMethodLevelAopSpec extends Specification {
         BeanContext beanContext = new DefaultBeanContext().start()
 
         when: "the bean definition is obtained"
-        BeanDefinition<ProxyingClass> beanDefinition = beanContext.findBeanRegistration(ProxyingClass).get()
+        BeanDefinition<ProxyingClass> beanDefinition = beanContext.findBeanDefinition(ProxyingClass).get()
 
         then:
         beanDefinition.findMethod("test", String).isPresent()

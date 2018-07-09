@@ -34,11 +34,11 @@ class FindBeanDefinitionSpec extends Specification {
         BeanContext beanContext = BeanContext.run()
 
         expect:
-        beanContext.findBeanRegistration(A).get().beanType == B
-        beanContext.findBeanRegistration(B).get().beanType == B
-        beanContext.findBeanRegistration(IA).get().beanType == B
-        beanContext.findBeanRegistration(IB).get().beanType == B
-        beanContext.findBeanRegistration(Ab).get().beanType == B
+        beanContext.findBeanDefinition(A).get().beanType == B
+        beanContext.findBeanDefinition(B).get().beanType == B
+        beanContext.findBeanDefinition(IA).get().beanType == B
+        beanContext.findBeanDefinition(IB).get().beanType == B
+        beanContext.findBeanDefinition(Ab).get().beanType == B
         beanContext.getBean(A, Qualifiers.byName("A")) instanceof A
         !(beanContext.getBean(A, Qualifiers.byName("A")) instanceof B)
         beanContext.getBean(A) instanceof B

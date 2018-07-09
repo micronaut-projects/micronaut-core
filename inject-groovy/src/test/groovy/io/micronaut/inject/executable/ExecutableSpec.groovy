@@ -38,7 +38,7 @@ class ExecutableSpec extends Specification {
 
         when:
         Optional<MethodExecutionHandle> method = applicationContext.findExecutionHandle(BookController, "show", Long)
-        ExecutableMethod executableMethod = applicationContext.findBeanRegistration(BookController).get().findMethod("show", Long).get()
+        ExecutableMethod executableMethod = applicationContext.findBeanDefinition(BookController).get().findMethod("show", Long).get()
 
         then:
         method.isPresent()
