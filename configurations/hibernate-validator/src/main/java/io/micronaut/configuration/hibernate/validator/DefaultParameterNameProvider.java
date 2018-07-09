@@ -64,7 +64,7 @@ public class DefaultParameterNameProvider implements ParameterNameProvider {
         if (INTERNAL_CLASS_NAMES.contains(declaringClass.getName())) {
             return doGetParameterNames(constructor);
         }
-        Optional<? extends BeanDefinition<?>> definition = beanContext.findBeanDefinition(declaringClass);
+        Optional<? extends BeanDefinition<?>> definition = beanContext.findBeanRegistration(declaringClass);
         return definition.map(def ->
             Arrays.stream(def.getConstructor().getArguments()).map(Argument::getName).collect(Collectors.toList())
         ).orElse(defaultParameterTypes(parameterTypes));
