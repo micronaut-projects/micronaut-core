@@ -16,11 +16,9 @@
 
 package io.micronaut.management.endpoint.health;
 
-import io.micronaut.management.endpoint.EndpointConfiguration;
-import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
+import io.micronaut.context.annotation.Value;
 
 import javax.annotation.Nullable;
-import javax.inject.Named;
 import javax.inject.Singleton;
 import java.security.Principal;
 
@@ -33,15 +31,13 @@ import java.security.Principal;
 @Singleton
 public class HealthLevelOfDetailResolver {
 
-    private final EndpointConfiguration configuration;
+    private final DetailsVisibility detailsVisibility;
 
     /**
-     * @param healthConfiguration Health endpoint configuration
-     * @param defaultConfiguration Default endpoint configuration
+     * @param detailsVisibility Controls whether health details should be visible
      */
-    public HealthLevelOfDetailResolver(@Nullable @Named(HealthEndpoint.NAME) EndpointConfiguration healthConfiguration,
-                                       EndpointDefaultConfiguration defaultConfiguration) {
-        this.configuration = healthConfiguration == null ? new EndpointConfiguration(HealthEndpoint.NAME, defaultConfiguration) : healthConfiguration;
+    public HealthLevelOfDetailResolver(@Value("${" + HealthEndpoint.PREFIX + ".details-visible:AUTHENTICATED}") DetailsVisibility detailsVisibility) {
+        this.detailsVisibility = detailsVisibility;
     }
 
     /**
@@ -51,9 +47,20 @@ public class HealthLevelOfDetailResolver {
      * @return The {@link HealthLevelOfDetail}
      */
     public HealthLevelOfDetail levelOfDetail(@Nullable Principal principal) {
-        if (principal != null || (configuration.isSensitive().isPresent() && !configuration.isSensitive().get())) {
-            return HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS;
+        boolean showDetails = false;
+        switch (detailsVisibility) {
+            case AUTHENTICATED:
+                showDetails = principal != null;
+                break;
+            case ANONYMOUS:
+                showDetails = true;
+            default:
+                // no-op
         }
-        return HealthLevelOfDetail.STATUS;
+        if (showDetails) {
+            return HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS;
+        } else {
+            return HealthLevelOfDetail.STATUS;
+        }
     }
 }

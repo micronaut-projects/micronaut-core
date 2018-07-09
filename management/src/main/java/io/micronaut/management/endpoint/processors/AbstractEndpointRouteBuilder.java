@@ -22,7 +22,6 @@ import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.BeanDefinition;
@@ -134,48 +133,13 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
      * @return An {@link UriTemplate}
      */
     protected UriTemplate buildUriTemplate(ExecutableMethod<?, ?> method, String id) {
-        UriTemplate template = buildUriTemplateById(id);
+        UriTemplate template = new UriTemplate(uriNamingStrategy.resolveUri(id));
         for (Argument argument : method.getArguments()) {
             if (isPathParameter(argument)) {
                 template = template.nest("/{" + argument.getName() + "}");
             }
         }
         return template;
-    }
-
-    /**
-     * @param request The {@link HttpRequest} instance
-     * @param endpointClazz The Endpoint class
-     * @return A boolean value indicating if the request path matches the endpoint path
-     */
-    public boolean doesRequestMatchesEndpointRoute(HttpRequest<?> request, Class<?> endpointClazz) {
-        if ( request != null && request.getPath() != null) {
-            Optional<UriTemplate> uriTemplate = buildUriTemplateByEndpointType(endpointClazz);
-            if ( uriTemplate.isPresent() ) {
-                if(uriTemplate.get().compareTo(UriTemplate.of(request.getPath())) == 0) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    /**
-     *
-     * @param declaringType The Type
-     * @return An {@link UriTemplate}
-     */
-    protected Optional<UriTemplate> buildUriTemplateByEndpointType(Class<?> declaringType) {
-        Optional<String> endPointId = resolveActiveEndPointId(declaringType);
-        return endPointId.isPresent() ? Optional.ofNullable(buildUriTemplateById(endPointId.get())) : Optional.empty();
-    }
-
-    /**
-     * @param id     The route id
-     * @return An {@link UriTemplate}
-     */
-    protected UriTemplate buildUriTemplateById(String id) {
-        return new UriTemplate(uriNamingStrategy.resolveUri(id));
     }
 
     /**

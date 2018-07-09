@@ -19,6 +19,7 @@ package io.micronaut.scheduling.annotation;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import io.micronaut.context.annotation.Executable;
+import io.micronaut.context.annotation.Parallel;
 import io.micronaut.scheduling.TaskExecutors;
 
 import java.lang.annotation.Documented;
@@ -38,6 +39,7 @@ import java.lang.annotation.Target;
 @Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE})
 @Executable(processOnStartup = true)
 @Repeatable(Schedules.class)
+@Parallel
 public @interface Scheduled {
 
     /**

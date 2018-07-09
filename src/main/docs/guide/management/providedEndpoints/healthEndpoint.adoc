@@ -14,7 +14,10 @@ endpoints:
         enabled: Boolean
         sensitive: Boolean
         id: String
+        detailsVisible: String <1>
 ----
+
+<1> One of api:management.endpoint.health.DetailsVisibility[]
 
 == Customization
 
@@ -55,3 +58,7 @@ The threshold can be provided as a string like "10MB" or "200KB", or the number 
 === JDBC
 
 The JDBC health indicator determines the health of your application based on the ability to successfully create connections to datasources in the application context. The only configuration option supported is to enable or disable the indicator by the `endpoints.health.jdbc.enabled` key.
+
+=== Discovery Client
+
+If your application is using service discovery, a health indicator will be included to monitor the health of the discovery client. The data returned can include a list of the services available.
