@@ -23,8 +23,8 @@ You should then configure the URI or https://reactiverse.io/reactive-pg-client/a
 [source,yaml]
 .application.yml
 ----
-reactive:
-	pg.client:
+postgres:
+	reactive:
 		port: 5432
 		host: the-host
 		database: the-db
