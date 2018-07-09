@@ -39,7 +39,7 @@ import javax.inject.Singleton
 class HealthSensitivitySpec extends Specification {
 
     @Unroll
-    void "If endpoints.health.sensitive=true #description => 200 OK/NOT OK"(boolean security, String description) {
+    void "If endpoints.health.sensitive=true #description => 401"(boolean security, String description) {
         given:
         Map m = [
                 'spec.name'                            : 'healthsensitivity',
@@ -57,16 +57,11 @@ class HealthSensitivitySpec extends Specification {
 
         when:
         HttpRequest httpRequest = HttpRequest.GET("/health")
-        HttpResponse response = rxClient.exchange(httpRequest, Map).blockingFirst()
+        rxClient.exchange(httpRequest, Map).blockingFirst()
 
         then:
-        noExceptionThrown()
-
-        when:
-        Map result = response.body()
-
-        then:
-        !result.containsKey('details')
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.UNAUTHORIZED
 
         cleanup:
         embeddedServer.close()
@@ -121,13 +116,101 @@ class HealthSensitivitySpec extends Specification {
         where:
         sensitive | security | authenticated | expected
         true      | true     | true          | HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
-        false     | true     | false         | HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
+        false     | true     | false         | HealthLevelOfDetail.STATUS
         false     | true     | true          | HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
-        false     | false    | false         | HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
-        true      | true     | false         | HealthLevelOfDetail.STATUS
-        true      | false    | false         | HealthLevelOfDetail.STATUS
+        false     | false    | false         | HealthLevelOfDetail.STATUS
 
         description = "endpoints.health.sensitive=${sensitive} " + (security ? 'micronaut.security.enabled=true ' + (authenticated ? 'authenticated' : 'not authenticated') : '')
+    }
+
+    void "test details visible AUTHENTICATED"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+            'spec.name'                            : 'healthsensitivity',
+            'endpoints.health.enabled'             : true,
+            'endpoints.health.sensitive'           : false,
+            'endpoints.health.detailsVisible'      : 'AUTHENTICATED',
+            'micronaut.security.enabled'           : true])
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        when:
+        HttpRequest httpRequest = HttpRequest.GET("/health")
+        HttpResponse response = rxClient.exchange(httpRequest, Map).blockingFirst()
+        Map result = response.body()
+
+        then: // The details are not included because the user is not authenticated
+        response.code() == HttpStatus.OK.code
+        result.containsKey('status')
+        !result.containsKey('details')
+
+
+        when:
+        httpRequest = HttpRequest.GET("/health").basicAuth("user", "password")
+        response = rxClient.exchange(httpRequest, Map).blockingFirst()
+        result = response.body()
+
+        then: // The details are included because the user is authenticated
+        response.code() == HttpStatus.OK.code
+        result.containsKey('status')
+        result.containsKey('details')
+
+        cleanup:
+        embeddedServer.close()
+        rxClient.close()
+    }
+
+    void "test details visible ANONYMOUS"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name'                            : 'healthsensitivity',
+                'endpoints.health.enabled'             : true,
+                'endpoints.health.sensitive'           : false,
+                'endpoints.health.detailsVisible'      : 'ANONYMOUS',
+                'micronaut.security.enabled'           : true])
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        when:
+        HttpRequest httpRequest = HttpRequest.GET("/health")
+        HttpResponse response = rxClient.exchange(httpRequest, Map).blockingFirst()
+        Map result = response.body()
+
+        then: // The details are included because detailsVisible is ANONYMOUS
+        response.code() == HttpStatus.OK.code
+        result.containsKey('status')
+        result.containsKey('details')
+
+        cleanup:
+        embeddedServer.close()
+        rxClient.close()
+    }
+
+
+    void "test details visible NEVER"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name'                            : 'healthsensitivity',
+                'endpoints.health.enabled'             : true,
+                'endpoints.health.sensitive'           : false,
+                'endpoints.health.detailsVisible'      : 'NEVER',
+                'micronaut.security.enabled'           : true])
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        when:
+        HttpRequest httpRequest = HttpRequest.GET("/health").basicAuth("user", "password")
+        HttpResponse response = rxClient.exchange(httpRequest, Map).blockingFirst()
+        Map result = response.body()
+
+        then: // The details are not included because detailsVisible is NEVER
+        response.code() == HttpStatus.OK.code
+        result.containsKey('status')
+        !result.containsKey('details')
+
+        cleanup:
+        embeddedServer.close()
+        rxClient.close()
     }
 
     @Singleton
