@@ -25,12 +25,12 @@ package io.micronaut.management.endpoint.health;
 public enum DetailsVisibility {
 
     /**
-     * Never show health details
+     * Never show health details.
      */
     NEVER,
 
     /**
-     * Only show health details to authenticated users
+     * Only show health details to authenticated users.
      */
     AUTHENTICATED,
 

@@ -17,11 +17,8 @@
 package io.micronaut.management.endpoint.health;
 
 import io.micronaut.context.annotation.Value;
-import io.micronaut.management.endpoint.EndpointConfiguration;
-import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 
 import javax.annotation.Nullable;
-import javax.inject.Named;
 import javax.inject.Singleton;
 import java.security.Principal;
 
@@ -57,6 +54,8 @@ public class HealthLevelOfDetailResolver {
                 break;
             case ANONYMOUS:
                 showDetails = true;
+            default:
+                // no-op
         }
         if (showDetails) {
             return HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS;
