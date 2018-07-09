@@ -16,6 +16,7 @@
 
 package io.micronaut.context.scope;
 
+import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
@@ -64,4 +65,15 @@ public interface CustomScope<A extends Annotation> {
      * @return An {@link Optional} of the instance if it exists
      */
     <T> Optional<T> remove(BeanIdentifier identifier);
+
+    /**
+     * Get the {@link BeanDefinition} for the given bean.
+     *
+     * @param bean The bean
+     * @param <T> The bean generic type
+     * @return The bean definition if it can be resolved
+     */
+    default <T> Optional<BeanRegistration<T>> findBeanRegistration(T bean) {
+        return Optional.empty();
+    }
 }

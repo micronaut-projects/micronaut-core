@@ -111,7 +111,7 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
      */
     protected Optional<String> resolveActiveEndPointId(Class<?> declaringType) {
         return endpointIds.computeIfAbsent(declaringType, aClass -> {
-            Optional<? extends BeanDefinition<?>> opt = beanContext.findBeanDefinition(declaringType);
+            Optional<? extends BeanDefinition<?>> opt = beanContext.findBeanRegistration(declaringType);
             if (opt.isPresent()) {
                 BeanDefinition<?> beanDefinition = opt.get();
                 if (beanDefinition.hasStereotype(Endpoint.class)) {
