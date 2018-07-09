@@ -49,11 +49,7 @@ class PgPoolHealthIndicatorSpec extends Specification {
 
         then:
         result.status == HealthStatus.UP
-        result.details == "db, size\n" +
-                "test, 7063 kB\n" +
-                "postgres, 6953 kB\n" +
-                "template1, 6953 kB\n" +
-                "template0, 6953 kB"
+        result.details
 
         when:
         postgres.stop()

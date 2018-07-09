@@ -41,7 +41,7 @@ import javax.inject.Singleton;
 public class PgPoolHealthIndicator implements HealthIndicator {
 
     public static final String NAME = "pgPool";
-    public static final String QUERY = "select datname as db, pg_size_pretty(pg_database_size(datname)) as size from pg_database order by pg_database_size(datname) desc;";
+    public static final String QUERY = "SELECT version();";
     private final PgPool client;
 
     /**
