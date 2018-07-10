@@ -27,3 +27,5 @@ endpoints:
 ----
 
 If the endpoint `id` is set through configuration, the URL where the endpoint is accessible also changes to reflect the value. For example if the `foo` endpoint id was changed to `bar`, the foo endpoint would be executed through `http://localhost:<port>/bar`.
+
+By deafult, the endpoints' base path is set to `/`. You can change it. If you set `endpoints.all.path=/admin` the foo endpoint would be executed through `http://localhost:<port>/admin/bar`.

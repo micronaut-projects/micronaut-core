@@ -71,6 +71,7 @@ httpServer:
     bodyAnnotation: Using the @Body Annotation
     reactiveResponses: Reactive Responses
   jsonBinding: JSON Binding with Jackson
+  datavalidation: Data Validation
   staticResources: Serving Static Resources
 #  contentNegotiation: Content Negotiation
   errorHandling: Error Handling
@@ -170,6 +171,7 @@ configurations:
     hibernateSupport: Configuring Hibernate
     mongoSupport: Configuring MongoDB
     neo4jSupport: Configuring Neo4j
+    postgresSupport: Configuring Postgres
     redisSupport: Configuring Redis
     cassandraSupport: Configuring Cassandra
   otherConfigurations:
@@ -179,7 +181,11 @@ languageSupport:
   title: Language Support
   java: Micronaut for Java
   groovy: Micronaut for Groovy
-  kotlin: Micronaut for Kotlin
+  kotlin:
+    title: Micronaut for Kotlin
+    kaptintellij: Kotlin, Kapt and IntelliJ
+    openandaop: Kotlin and AOP Advice
+    kotlinretainparamnames: Kotlin and Retaining Parameter Names
 management:
   title: Management & Monitoring
   buildingEndpoints:
@@ -237,6 +243,12 @@ cli:
     comparingVersions: Comparing Versions
   features: Features
   commands: Commands
+  reloading:
+    title: Reloading
+    jrebel: JRebel
+    springloaded: Spring-Loaded
+    gradleReload: Reloading with Gradle
+    ideReload: Reloading with an IDE
 appendix:
   title: Appendices
   faq: Frequently Asked Questions (FAQ)

@@ -109,7 +109,7 @@ a:hover,
 }
 
 @media screen and (min-width: 961px) {
-    #main > div:nth-child(-n+54) {
+    #main > div:nth-child(-n+58) {
         max-width: 62%;
     }
 }

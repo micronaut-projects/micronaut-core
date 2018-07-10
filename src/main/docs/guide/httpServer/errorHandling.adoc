@@ -1,6 +1,6 @@
 Sometimes with distributing applications, bad things happen. Thus having a good way to handle errors is important.
 
-=== Status Handlers
+== Status Handlers
 
 The api:http.annotation.Error[] annotation supports defining either an exception class or an HTTP status. Methods decorated with the annotation will be invoked as the result of other controller methods. The annotation also supports the notion of global and local, local being the default.
 
@@ -8,7 +8,7 @@ Local error handlers will only respond to methods defined in the same controller
 
 TIP: When defining an error handler for an exception, you can specify the exception instance as an argument to the method and omit the exception property of the annotation.
 
-=== Local Error Handling
+== Local Error Handling
 
 For example the following method will handling JSON parse exceptions from Jackson for the scope of the declaring controller:
 
@@ -33,7 +33,7 @@ include::{testsuite}/server/json/PersonController.java[tags=statusError, indent=
 <2> A api:http.hateos.JsonError[] instance is returned for all 404 responses
 <3> An api:http.HttpStatus#NOT_FOUND[] response is returned
 
-=== Global Error Handling
+== Global Error Handling
 
 .Global error handler
 [source,java]

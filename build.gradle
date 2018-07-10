@@ -153,6 +153,11 @@ ext {
                 group:'org.reactivestreams',
                 name:'reactive-streams'
             ],
+            'reactive.pg.client': [
+                    version: reactivePgClientVersion,
+                    group:'io.reactiverse',
+                    name:'reactive-pg-client'
+            ],
             rxjava1: [
                 version: rxJava1Version,
                 group:'io.reactivex',
