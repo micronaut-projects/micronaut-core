@@ -3,10 +3,10 @@ dependencies {
     compile dependencyVersion("reactive.pg.client")
     compileOnly project(":management")
     compileOnly project(":inject-java")
-    compileOnly "io.vertx:vertx-rx-java2:3.5.1", {
+    compile "io.vertx:vertx-rx-java2:3.5.1", {
         exclude module: "vertx-core"
     }
-    compileOnly "io.vertx:vertx-codegen:3.5.1", {
+    compile "io.vertx:vertx-codegen:3.5.1", {
         exclude module: "vertx-core"
     }
 

@@ -10,14 +10,6 @@ To configure the Reactive Postgres you should first add `postgres-reactive` modu
 include::test-suite/build.gradle[tags=postgres-reactive-dependencies,indent=0]
 ----
 
-In addition, you might also need to add following Vert.x dependencies:
-
-[source,groovy]
-.build.gradle
-----
-include::test-suite/build.gradle[tags=vertx-dependencies,indent=0]
-----
-
 You should then configure the URI or https://reactiverse.io/reactive-pg-client/apidocs/index.html[`PoolOptions`] of the Postgres server you wish to communicate with in `application.yml`:
 
 [source,yaml]
