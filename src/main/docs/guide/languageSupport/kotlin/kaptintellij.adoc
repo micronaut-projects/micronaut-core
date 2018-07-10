@@ -1,0 +1,11 @@
+As of this writing IntelliJ's built-in compiler does not directly support Kapt and annotation processing. You must instead configure Intellij to run Gradle (or Maven) compilation as a build step before running your tests or application class.
+
+First edit the run configuration for tests or for the application and select "Run Gradle task" as a build step:
+
+image::kotlin-run-1.png[Intellij Settings,1024,768]
+
+Then add the `classes` task as task to execute for the application or for tests the `testClasses` task:
+
+image::kotlin-run-2.png[Intellij Settings,1024,768]
+
+Now whenever you run tests or the application Micronaut classes will be generated at compilation time.

@@ -1,0 +1,25 @@
+Micronaut provides a compile-time AOP API that does not use reflection. When you use any Micronaut's <<aop, AOP Advice>>,
+it creates a subclass at compile-time to provide the AOP behaviour. Kotlin classes are final by default. Thus, you need to annotate them as `open`
+so that the generated subclasses can extend them.
+
+[source, java]
+----
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.HttpStatus
+import io.micronaut.validation.Validated
+import javax.validation.constraints.NotBlank
+
+@Validated
+@Controller("/email")
+open class EmailController { // <1>
+
+    @Get("/send")
+    open fun index(@NotBlank recipient: String, // <1>
+                   @NotBlank subject: String): HttpStatus {
+        return HttpStatus.OK
+    }
+}
+----
+
+<1> if you use `@Validated` AOP Advice, you need to use `open` at class and method level.
