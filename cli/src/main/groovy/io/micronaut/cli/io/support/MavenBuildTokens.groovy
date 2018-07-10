@@ -127,7 +127,7 @@ class MavenBuildTokens extends BuildTokens {
         }
 
         arguments.each { String arg ->
-            jvmArgsXml.argument("-${arg}")
+            jvmArgsXml.argument("${arg}")
 
         }
         tokens.put("arguments", prettyPrint(jvmArgsWriter.toString(), 12))

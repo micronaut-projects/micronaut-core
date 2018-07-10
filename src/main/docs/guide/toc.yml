@@ -243,6 +243,12 @@ cli:
     comparingVersions: Comparing Versions
   features: Features
   commands: Commands
+  reloading:
+    title: Reloading
+    jrebel: JRebel
+    springloaded: Spring-Loaded
+    gradleReload: Reloading with Gradle
+    ideReload: Reloading with an IDE
 appendix:
   title: Appendices
   faq: Frequently Asked Questions (FAQ)
