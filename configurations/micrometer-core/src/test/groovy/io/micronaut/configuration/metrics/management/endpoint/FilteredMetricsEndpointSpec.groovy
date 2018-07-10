@@ -20,6 +20,7 @@ import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Single
 import spock.lang.AutoCleanup
+import spock.lang.IgnoreIf
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Stepwise
@@ -67,6 +68,7 @@ class FilteredMetricsEndpointSpec extends Specification {
         context.containsBean(SimpleMeterRegistry)
     }
 
+    @IgnoreIf({System.getenv("TRAVIS")})
     void "test metrics endpoint with filtered metrics"() {
         given:
         RxHttpClient rxClient = RxHttpClient.create(embeddedServer.getURL())
