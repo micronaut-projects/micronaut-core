@@ -8,7 +8,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.validation.Validated;
 import javax.validation.constraints.NotBlank;
-import java.util.HashMap;
+import java.util.Collections;
 //end::imports[]
 
 @Requires(property = "spec.name", value = "datavalidationparams")
@@ -20,9 +20,7 @@ public class EmailController {
     @Get("/send")
     public HttpResponse send(@NotBlank String recipient, // <2>
                              @NotBlank String subject) { // <2>
-        return HttpResponse.ok(new HashMap<String, String>() {{
-                put("msg", "OK");
-            }});
+        return HttpResponse.ok(Collections.singletonMap("msg", "OK"));
     }
 }
 //end::clazz[]

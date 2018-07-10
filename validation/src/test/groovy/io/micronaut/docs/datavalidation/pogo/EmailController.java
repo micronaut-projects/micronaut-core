@@ -9,7 +9,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.validation.Validated;
 import javax.validation.Valid;
-import java.util.HashMap;
+import java.util.Collections;
 //end::imports[]
 
 @Requires(property = "spec.name", value = "datavalidationpogo")
@@ -20,8 +20,6 @@ public class EmailController {
 
     @Post("/send")
     public HttpResponse send(@Body @Valid Email email) { // <2>
-        return HttpResponse.ok(new HashMap<String, String>() {{
-            put("msg", "OK");
-        }});    }
+        return HttpResponse.ok(Collections.singletonMap("msg", "OK"));    }
 }
 //end::clazz[]
