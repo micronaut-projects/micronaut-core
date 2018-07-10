@@ -17,15 +17,6 @@ dependencies {
     testCompile "org.testcontainers:postgresql:1.8.0"
     // end::testcontainers-dependencies[]
 
-    // tag::vertx-dependencies[]
-    testCompile "io.vertx:vertx-rx-java2:3.5.1", {
-        exclude module: "vertx-core"
-    }
-    testCompile "io.vertx:vertx-codegen:3.5.1", {
-        exclude module: "vertx-core"
-    }
-    // end::vertx-dependencies[]
-
     testRuntime 'org.apache.tomcat:tomcat-jdbc:8.0.44'
     testRuntime 'com.h2database:h2:1.4.196'
     testRuntime "ch.qos.logback:logback-classic:1.2.3"
