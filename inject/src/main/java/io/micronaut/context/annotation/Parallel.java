@@ -27,11 +27,10 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * <p>A hint annotation that can be added to {@link Bean} definitions or {@link Executable} methods to indicate that they can be initialized in
  * parallel with the application context.</p>
  *
- * <p>This allows optimized startup time by allowing beans that have slow initialization paths to startup and startup time without impacting the overall startup time of the application.</p>
+ * <p>This allows optimized startup time by allowing beans that have slow initialization paths to startup and without impacting the overall startup time of the application.</p>
  *
- * <p>Note that beans and methods that are processed in parallel (unlike {@link Context scoped beans} will not fail the startup of the {@link io.micronaut.context.ApplicationContext}
- * as they may be initialized after the {@link io.micronaut.context.ApplicationContext} has started. If this behaviour is required the bean can inject the {@link io.micronaut.context.ApplicationContext}
- *  can call {@link io.micronaut.context.ApplicationContext#stop()} to abort the application.</p>
+ * <p>Note that beans and methods that are processed in parallel (unlike {@link Context} scoped beans) will not initially fail the startup of the {@link io.micronaut.context.ApplicationContext}
+ * as they may be initialized after the {@link io.micronaut.context.ApplicationContext} has started and cannot participate in {@link io.micronaut.context.event.StartupEvent} processing. If a parallel bean fails to startup it will by default stop the {@link io.micronaut.context.ApplicationContext} with an error unless {@link #shutdownOnError()} set to to {@code false}.</p>
  *
  * <p>Adding {@link Parallel} to methods is most useful when used in conjunction with a {@link io.micronaut.context.processor.ExecutableMethodProcessor}. Be aware however, that the processor in this case should be thread safe as could be executed in parallel for different methods.</p>
  *
