@@ -81,7 +81,7 @@ class MicronautCli {
     private static final int KEYPRESS_CTRL_C = 3
     private static final int KEYPRESS_ESC = 27
     private static final String USAGE_MESSAGE = "create-app [NAME]"
-    private static final String FEDERATION_USAGE_MESSAGE = "create-federation [NAME] --services [SERVICE_NAME],[SERVICE_NAME],..."
+    private static final String FEDERATION_USAGE_MESSAGE = "create-federation [NAME] --services SERVICE_NAME[,SERVICE_NAME]..."
     private static final String FUNCTION_USAGE_MESSAGE = "create-function [NAME]"
 
     // store original System.in, System.out and System.err
@@ -211,71 +211,42 @@ class MicronautCli {
      * @return The exit status code
      */
     public int execute(String... args) {
-        long start = 0
         if (!parser) {
-            start = System.nanoTime()
             parser = createParser()
         }
         def parseResult = parser.parseArgs(args)
-        MicronautConsole.instance.ansiEnabled = commonOptions.ansiEnabled
 
-        if (start && commonOptions.verbose) {
-            println("Loaded commands in " + java.time.Duration.ofNanos(System.nanoTime() - start))
-        }
+        def console = MicronautConsole.getInstance()
+        console.ansiEnabled = commonOptions.ansiEnabled
 
-        def p = parseResult
-        while (p) { // check if this command or any subcommand requested help or version info
-            if (p.isVersionHelpRequested()) {
-                def console = MicronautConsole.instance
-                p.commandSpec().version().each { console.addStatus(it) }
-                exit(0)
-            }
-            if (p.isUsageHelpRequested()) {
-                def console = MicronautConsole.instance
-                Ansi ansi = console.ansiEnabled ? Ansi.ON : Ansi.OFF
-                console.append(p.commandSpec().commandLine().getUsageMessage(ansi))
-                exit(0)
-            }
-            p = p.subcommand()
-        }
+        if (printHelpIfRequested(parseResult)) { exit(0) }
 
-
-        File micronautCli = new File("micronaut-cli.yml")
-        File profileYml = new File("profile.yml")
-        if (!micronautCli.exists() && !profileYml.exists()) {
+        if (!isRunningInProject()) {
             //Execution path for CLI outside of a project
-            if (!parseResult.hasSubcommand()) {
-                integrateGradle = false
-                def console = MicronautConsole.getInstance()
-                // force resolve of all profiles
-                profileRepository.getAllProfiles()
-                console.reader.addCompleter(new PicocliCompleter(parser.commandSpec))
-                profile = [handleCommand: { ExecutionContext context ->
 
-                    def cl = context.parseResult
-                    while (cl.hasSubcommand()) { cl = cl.subcommand() } // most specific subcommand
-                    def name = cl.commandSpec().name()
-                    def cmd = CommandRegistry.getCommand(name, profileRepository)
-                    if (cmd != null) {
-                        return executeCommandWithArgumentValidation(cmd, cl)
-                    } else if (cl != context.parseResult) {
-                        return executeCommandWithArgumentValidation(cl.commandSpec().userObject() as Command, cl)
-                    }
+            if (parseResult.hasSubcommand()) {
+                def pr = parseResult
+                while (pr.hasSubcommand()) { pr = pr.subcommand() } // most specific subcommand
+                return executeCommand(pr.commandSpec().userObject() as Command, pr) ? 0 : 1
+            } else if (parseResult.unmatched()) {
+                return getBaseUsage()
+            } else {
+                integrateGradle = false
+                console.reader.addCompleter(new PicocliCompleter(parser.commandSpec))
+
+                profile = [handleCommand: { ExecutionContext context ->
+                    def pr = context.parseResult
+                    assertNoUnmatchedArguments(pr)
+                    while (pr.hasSubcommand()) { pr = pr.subcommand() } // most specific subcommand
+                    return executeCommand(pr.commandSpec().userObject() as Command, pr)
                 }] as Profile
 
                 startInteractiveMode(console)
                 return 0
             }
-            if (parseResult.hasSubcommand()) {
-                def cmd = CommandRegistry.getCommand(parseResult.subcommand().commandSpec().name(), profileRepository)
-                return executeCommandWithArgumentValidation(cmd, parseResult.subcommand()) ? 0 : 1
-            } else {
-                return getBaseUsage()
-            }
-
         } else {
             //Execution path for CLI within a project
-            initializeApplication(parseResult)
+            // we already called initializeApplication() when creating the parser
             if (parseResult.hasSubcommand()) {
                 return handleCommand(parseResult) ? 0 : 1
             } else {
@@ -285,35 +256,81 @@ class MicronautCli {
         return 0
     }
 
+    private static boolean isRunningInProject() {
+        new File("micronaut-cli.yml").exists() || new File("profile.yml").exists()
+    }
+
     private CommandLine createParser() {
         CommandLine result = new CommandLine(this)
 
         // allow unmatched args to support !<cmd> (see #handleBuiltInCommands)
         result.commandSpec.parser().unmatchedArgumentsAllowed(true) // TBD only for top-level (mn) command?
 
-        // Temporarily switch on verbosity in case there's a problem loading commands.
-        // Values will be reset when parsing new input.
-        System.setProperty("micronaut.verbose", "true")
-        System.setProperty("micronaut.full.stacktrace", "true")
-        System.setProperty("micronaut.show.stacktrace", "true")
-
         // register all subcommands up front so we can provide completion for the full command hierarchy
-        MicronautConsole.instance.log("Loading commands...")
-        profileRepository = createMavenProfileRepository()
-        CommandRegistry.findCommands(profileRepository).each { Command cmd ->
-            result.addSubcommand(cmd.name, new CommandLine(cmd))
+
+        if (isRunningInProject()) {
+            initializeApplication()
+            profile.getCommands(projectContext).each { Command cmd ->
+                result.addSubcommand(cmd.name, new CommandLine(cmd))
+            }
+        } else {
+            profileRepository = createMavenProfileRepository()
+
+            // force resolution of all profiles
+            profileRepository.getAllProfiles()
+
+            CommandRegistry.findCommands(profileRepository).each { Command cmd ->
+                if (!result.subcommands.containsKey(cmd.name)) { // picocli won't allow duplicates
+                    result.addSubcommand(cmd.name, new CommandLine(cmd))
+                }
+            }
         }
+
         result.addSubcommand('!', new CommandLine(new BangCommand(this)))
         result.addSubcommand('exit', new CommandLine(new ExitCommand(this)), 'quit')
         result.setUsageHelpWidth(100) // do this last so it applies to all subcommands
         result
     }
 
-    protected boolean executeCommandWithArgumentValidation(Command cmd, ParseResult parseResult) {
+    /**
+     * Prints usage or version help to the console if requested and returns {@code true};
+     * otherwise returns {@code false}.
+     */
+    private boolean printHelpIfRequested(ParseResult parseResult) {
+        def p = parseResult
+        while (p) { //
+            if (p.isVersionHelpRequested()) {
+                p.commandSpec().version().each { MicronautConsole.instance.addStatus(it) }
+                return true
+            }
+            if (p.isUsageHelpRequested()) {
+                def console = MicronautConsole.instance
+                Ansi ansi = console.ansiEnabled ? Ansi.ON : Ansi.OFF
+                console.append(p.commandSpec().commandLine().getUsageMessage(ansi))
+                return true
+            }
+            p = p.subcommand()
+        }
+        false
+    }
+
+    /**
+     * Throws an UnmatchedArgumentException if there are unmatched args
+     * EXCEPT when the user requested to repeat a previous command with {@code !<cmd>}.
+     * Also, no exception is thrown if a subcommand was recognized:
+     * in that case the subcommand should be processed and the unknown option is ignored.
+     */
+    private void assertNoUnmatchedArguments(ParseResult parseResult) {
+        if (!parseResult.hasSubcommand() && parseResult.unmatched() && !parseResult.unmatched()[0].startsWith('!')) {
+            throw new CommandLine.UnmatchedArgumentException(parseResult.commandSpec().commandLine(), parseResult.unmatched());
+        }
+    }
+
+    protected boolean executeCommand(Command cmd, ParseResult parseResult) {
         return cmd.handle(createExecutionContext(parseResult))
     }
 
-    protected void initializeApplication(ParseResult parseResult) {
+    protected void initializeApplication() {
         applicationConfig = loadApplicationConfig()
         File profileYml = new File("profile.yml")
         if (profileYml.exists()) {
@@ -369,20 +386,18 @@ class MicronautCli {
         synchronized (MicronautCli) {
             try {
                 currentExecutionContext = context
-                if (handleBuiltInCommands(context)) {
-                    return true
-                }
-
-                def mainCommandLine = context.getParseResult()
-                while (mainCommandLine.hasSubcommand()) { mainCommandLine = mainCommandLine.subcommand() }
-
                 console.setStacktrace(commonOptions.showStacktrace)
+
+                def parseResult = context.getParseResult()
+                if (handleBuiltInCommands(context))    { return true }
+                if (printHelpIfRequested(parseResult)) { return true }
+                assertNoUnmatchedArguments(parseResult)
 
                 if (profile.handleCommand(context)) {
                     if (tiggerAppLoad) {
                         console.updateStatus("Initializing application. Please wait...")
                         try {
-                            initializeApplication(mainCommandLine)
+                            parser = createParser() // initializes application
                             setupCompleters()
                         } finally {
                             tiggerAppLoad = false
@@ -391,8 +406,11 @@ class MicronautCli {
                     return true;
                 }
                 return false
-            }
-            catch (Throwable e) {
+            } catch (ParameterException e) {
+                console.error(e.message)
+                console.append(e.commandLine.getUsageMessage(console.ansiEnabled ? Ansi.ON : Ansi.OFF))
+                return false
+            } catch (Throwable e) {
                 console.error("Command [${context.parseResult.commandSpec().name()}] error: ${e.message}", e)
                 return false
             } finally {
@@ -420,7 +438,8 @@ class MicronautCli {
             new RegexCompletor("!\\w+"), new EscapingFileNameCompletor())
         )
 
-        completers.addAll((profile.getCompleters(projectContext) ?: []) as Collection)
+        completers.add(new PicocliCompleter(parser.commandSpec))
+
         consoleReader.addCompleter(aggregateCompleter)
         return console
     }

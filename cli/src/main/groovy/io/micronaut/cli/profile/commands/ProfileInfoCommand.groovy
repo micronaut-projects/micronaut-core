@@ -116,7 +116,7 @@ class ProfileInfoCommand extends ArgumentCompletingCommand implements ProfileRep
         return true
     }
 
-    protected Iterable<Command> findCommands(Profile profile, MicronautConsole console) {
+    public Iterable<Command> findCommands(Profile profile, MicronautConsole console) {
         def commands = profile.getCommands(new ProjectContext() {
             @Override
             MicronautConsole getConsole() {

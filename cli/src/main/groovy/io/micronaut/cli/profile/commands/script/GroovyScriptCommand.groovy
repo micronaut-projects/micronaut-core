@@ -102,7 +102,7 @@ abstract class GroovyScriptCommand extends PicocliBaseScript implements ProfileC
     boolean handle(ExecutionContext executionContext) {
         setExecutionContext(executionContext)
         notify("${name}Start", executionContext)
-        def result = run()
+        def result = runScriptBody() // PicocliBaseScript.run() would try to parse the input again
         notify("${name}End", executionContext)
         if (result instanceof Boolean) {
             return ((Boolean) result)

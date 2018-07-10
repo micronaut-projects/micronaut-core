@@ -481,32 +481,10 @@ abstract class AbstractProfile implements Profile {
 
     @Override
     boolean handleCommand(io.micronaut.cli.profile.ExecutionContext context) {
-        getCommands(context) // ensure initialization
-
         def parseResult = context.parseResult
         while (parseResult.hasSubcommand()) { parseResult = parseResult.subcommand() }
-        def commandName = parseResult.commandSpec().name()
-        def cmd = commandsByName[commandName]
-        if (cmd) {
-            return cmd.handle(context)
-        } else {
-            // Apply command name expansion (rA for run-app, tA for test-app etc.)
-            cmd = commandsByName.values().find() { Command c ->
-                ScriptNameResolver.resolvesTo(commandName, c.name)
-            }
-            if (cmd) {
-                return cmd.handle(context)
-            } else {
-                context.console.error("Command not found ${commandName}")
-                def mostSimilar = CosineSimilarity.mostSimilar(commandName, commandsByName.keySet())
-                List<String> topMatches = mostSimilar.subList(0, Math.min(3, mostSimilar.size()));
-                if (topMatches) {
-                    context.console.log("Did you mean: ${topMatches.join(' or ')}?")
-                }
-                return false
-            }
-
-        }
+        Command cmd = parseResult.commandSpec().userObject() as Command
+        return cmd.handle(context)
     }
 
     @Override
