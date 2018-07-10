@@ -9,7 +9,7 @@ First, add the Hibernate Validator configuration to your application:
 compile "io.micronaut.configuration:hibernate-validator"
 ----
 
-We can validate parameters using `javax.validation` annotations and the api:validation.Validated[] annotation at class level.
+We can validate parameters using `javax.validation` annotations and the api:validation.Validated[] annotation at the class level.
 
 [source,java]
 ----
