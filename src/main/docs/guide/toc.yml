@@ -170,6 +170,7 @@ configurations:
     hibernateSupport: Configuring Hibernate
     mongoSupport: Configuring MongoDB
     neo4jSupport: Configuring Neo4j
+    postgresSupport: Configuring Postgres
     redisSupport: Configuring Redis
     cassandraSupport: Configuring Cassandra
   otherConfigurations:
