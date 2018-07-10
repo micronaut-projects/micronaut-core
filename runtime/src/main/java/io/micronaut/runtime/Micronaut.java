@@ -32,7 +32,6 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import java.net.URL;
 import java.util.*;
-import java.util.concurrent.CountDownLatch;
 import java.util.function.Function;
 
 /**
@@ -101,17 +100,29 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                         }
                     }
 
-                    CountDownLatch latch = new CountDownLatch(1);
+                    Thread mainThread = Thread.currentThread();
                     boolean finalKeepAlive = keepAlive;
                     Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                        if (LOG.isInfoEnabled()) {
+                            LOG.info("Embedded Application shutting down");
+                        }
                         embeddedApplication.stop();
                         if (finalKeepAlive) {
-                            latch.countDown();
+                            mainThread.interrupt();
                         }
                     }));
 
                     if (keepAlive) {
-                        latch.await();
+                        try {
+                            while (embeddedApplication.isRunning()) {
+                                Thread.sleep(1000);
+                            }
+                            if (LOG.isInfoEnabled()) {
+                                LOG.info("Embedded Application shutting down");
+                            }
+                        } catch (InterruptedException e) {
+                            // ignore
+                        }
                     }
 
                 } catch (Throwable e) {

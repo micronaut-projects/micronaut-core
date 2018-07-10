@@ -75,7 +75,7 @@ public class KafkaDefaultConfiguration extends AbstractKafkaConfiguration {
         Properties properties = new Properties();
         values.entrySet().stream().filter(entry -> {
             String key = entry.getKey().toString();
-            return !Stream.of("embedded", "consumers", "producers").anyMatch(key::startsWith);
+            return !Stream.of("embedded", "consumers", "producers", "streams").anyMatch(key::startsWith);
         }).forEach(entry -> properties.put(entry.getKey(), entry.getValue()));
         return properties;
     }
