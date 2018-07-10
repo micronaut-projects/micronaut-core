@@ -182,6 +182,7 @@ languageSupport:
   kotlin:
     title: Micronaut for Kotlin
     kaptintellij: Kotlin, Kapt and IntelliJ
+    openandaop: Kotlin and AOP Advice
     kotlinretainparamnames: Kotlin and Retaining Parameter Names
 management:
   title: Management & Monitoring
