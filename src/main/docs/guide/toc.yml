@@ -71,6 +71,7 @@ httpServer:
     bodyAnnotation: Using the @Body Annotation
     reactiveResponses: Reactive Responses
   jsonBinding: JSON Binding with Jackson
+  datavalidation: Data Validation
   staticResources: Serving Static Resources
 #  contentNegotiation: Content Negotiation
   errorHandling: Error Handling
