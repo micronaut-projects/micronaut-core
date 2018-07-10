@@ -1,0 +1,59 @@
+It is easy to validate incoming data with Micronaut's controllers with the
+<<validation, Validation Advice>>.
+
+First, add the Hibernate Validator configuration to your application:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut.configuration:hibernate-validator"
+----
+
+We can validate parameters using `javax.validation` annotations and the api:validation.Validated[] annotation at the class level.
+
+[source,java]
+----
+include::{testsvalidation}/datavalidation/params/EmailController.java[tag=imports]
+
+include::{testsvalidation}/datavalidation/params/EmailController.java[tag=clazz]
+----
+
+<1> Annotate controller with api:validation.Validated[]
+<2> `subject` and `recipient` cannot be blank.
+
+The validation behaviour is shown in the following test:
+
+[source,groovy]
+----
+include::{testsvalidation}/datavalidation/params/EmailControllerSpec.groovy[tag=paramsvalidated,indent=0]
+----
+
+
+Often, you may want to use POJOs as controller method parameters.
+
+[source,java]
+----
+include::{testsvalidation}/datavalidation/pogo/Email.java[]
+----
+
+<1> You can use `javax.validation` annotations in your POJOs.
+
+You need to annotate your controller with api:validation.Validated[]. Also, you need to annotate the binding POJO with `@Valid`.
+
+.Example
+[source,java]
+----
+include::{testsvalidation}/datavalidation/pogo/EmailController.java[tag=imports]
+
+include::{testsvalidation}/datavalidation/pogo/EmailController.java[tag=clazz]
+----
+<1> Annotate controller with api:validation.Validated[]
+<2> Annotate the POJO which you wish to validate with `@Valid`
+
+
+The validation of POJOs is shown in the following test:
+
+[source,groovy]
+----
+include::{testsvalidation}/datavalidation/pogo/EmailControllerSpec.groovy[tag=pojovalidated,indent=0]
+----
