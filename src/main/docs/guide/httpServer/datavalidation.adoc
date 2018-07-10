@@ -1,4 +1,4 @@
-It is easy to validate incoming data into Micronaut' controllers with the
+It is easy to validate incoming data with Micronaut's controllers with the
 <<validation, Validation Advice>>.
 
 First, add the Hibernate Validator configuration to your application:
