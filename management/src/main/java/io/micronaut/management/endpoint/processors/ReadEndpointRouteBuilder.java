@@ -20,6 +20,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 import io.micronaut.management.endpoint.Read;
 
 import javax.inject.Singleton;
@@ -41,12 +42,14 @@ public class ReadEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
      * @param uriNamingStrategy The URI naming strategy
      * @param conversionService The conversion service
      * @param nonPathTypesProviders A list of providers which defines types not to be used as Path parameters
+     * @param endpointDefaultConfiguration Endpoints default Configuration
      */
     public ReadEndpointRouteBuilder(ApplicationContext beanContext,
                                     UriNamingStrategy uriNamingStrategy,
                                     ConversionService<?> conversionService,
-                                    Collection<NonPathTypesProvider> nonPathTypesProviders) {
-        super(beanContext, uriNamingStrategy, conversionService, nonPathTypesProviders);
+                                    Collection<NonPathTypesProvider> nonPathTypesProviders,
+                                    EndpointDefaultConfiguration endpointDefaultConfiguration) {
+        super(beanContext, uriNamingStrategy, conversionService, nonPathTypesProviders, endpointDefaultConfiguration);
     }
 
     @Override
