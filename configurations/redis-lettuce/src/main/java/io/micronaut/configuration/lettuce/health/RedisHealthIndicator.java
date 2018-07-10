@@ -42,9 +42,14 @@ import java.util.Collections;
 @Singleton
 @Requires(classes = HealthIndicator.class)
 public class RedisHealthIndicator implements HealthIndicator {
+    /**
+     * Default name to use for health indication for Redis.
+     */
     public static final String NAME = "redis";
+
     private static final int TIMEOUT_SECONDS = 3;
     private static final int RETRY = 3;
+
     private final BeanContext beanContext;
     private final HealthAggregator<?> healthAggregator;
     private final StatefulRedisConnection[] connections;

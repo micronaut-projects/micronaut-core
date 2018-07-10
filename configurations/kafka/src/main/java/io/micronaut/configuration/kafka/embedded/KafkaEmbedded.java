@@ -45,6 +45,7 @@ import java.nio.file.Files;
 import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 /**
@@ -68,6 +69,7 @@ public class KafkaEmbedded implements BeanCreatedEventListener<AbstractKafkaConf
     private KafkaServer kafkaServer;
 
     private final KafkaEmbeddedConfiguration embeddedConfiguration;
+    private final AtomicBoolean init = new AtomicBoolean(false);
 
     /**
      * Construct a new instance.
@@ -79,7 +81,7 @@ public class KafkaEmbedded implements BeanCreatedEventListener<AbstractKafkaConf
     }
 
     @Override
-    public AbstractKafkaConfiguration onCreated(BeanCreatedEvent<AbstractKafkaConfiguration> event) {
+    public synchronized AbstractKafkaConfiguration onCreated(BeanCreatedEvent<AbstractKafkaConfiguration> event) {
 
         AbstractKafkaConfiguration config = event.getBean();
         if (kafkaServer != null) {
@@ -104,7 +106,8 @@ public class KafkaEmbedded implements BeanCreatedEventListener<AbstractKafkaConf
         if (embeddedConfiguration.isEnabled() &&
                 kafkaServer == null &&
                 kafkaPort > -1 &&
-                SocketUtils.isTcpPortAvailable(kafkaPort)) {
+                SocketUtils.isTcpPortAvailable(kafkaPort) &&
+                init.compareAndSet(false, true)) {
             try {
                 if (zkServer == null) {
                     initZooKeeper();
@@ -153,33 +156,36 @@ public class KafkaEmbedded implements BeanCreatedEventListener<AbstractKafkaConf
     @Override
     @PreDestroy
     public void close() {
-        if (kafkaServer != null) {
-            try {
-                kafkaServer.shutdown();
-            } catch (Exception e) {
-                if (LOG.isWarnEnabled()) {
-                    LOG.warn("Error shutting down embedded Kafka Server: " + e.getMessage(), e);
+        new Thread(() -> {
+            if (kafkaServer != null) {
+                try {
+                    kafkaServer.shutdown();
+                } catch (Exception e) {
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn("Error shutting down embedded Kafka Server: " + e.getMessage(), e);
+                    }
                 }
             }
-        }
-        if (zkClient != null) {
-            try {
-                zkClient.close();
-            } catch (Exception e) {
-                if (LOG.isWarnEnabled()) {
-                    LOG.warn("Error shutting down embedded ZooKeeper Client: " + e.getMessage(), e);
+            if (zkClient != null) {
+                try {
+                    zkClient.close();
+                } catch (Exception e) {
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn("Error shutting down embedded ZooKeeper Client: " + e.getMessage(), e);
+                    }
                 }
             }
-        }
-        if (zkServer != null) {
-            try {
-                zkServer.shutdown();
-            } catch (Exception e) {
-                if (LOG.isWarnEnabled()) {
-                    LOG.warn("Error shutting down embedded ZooKeeper: " + e.getMessage(), e);
+            if (zkServer != null) {
+                try {
+                    zkServer.shutdown();
+                } catch (Exception e) {
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn("Error shutting down embedded ZooKeeper: " + e.getMessage(), e);
+                    }
                 }
             }
-        }
+        }, "embedded-kafka-shutdown-thread").start();
+
     }
 
 
