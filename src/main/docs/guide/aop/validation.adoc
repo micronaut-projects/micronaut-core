@@ -1,8 +1,14 @@
 Validation advice is one of the most common advice types you are likely to want to incorporate into your application.
 
-Validation advice is built on `javax.validation` and the http://hibernate.org/validator[Hibernate Validator] project.
+Validation advice is built on https://jcp.org/en/jsr/detail?id=380[JSR 380], also known as Bean Validation 2.0.
 
-To get started first add the Hibernate Validator configuration to your application:
+JSR 380 is a specification of the Java API for bean validation which ensures that the
+properties of a bean meet specific criteria, using `javax.validation` annotations such as `@NotNull`, `@Min`, and `@Max`.
+
+http://hibernate.org/validator[Hibernate Validator] project is a reference implementation for JSR 380. Micronaut ships
+with a built-in configuration to use Hibernate Validator.
+
+To get started, first add the Hibernate Validator configuration to your application:
 
 .build.gradle
 [source,groovy]
