@@ -5,7 +5,7 @@ Validation advice is built on https://jcp.org/en/jsr/detail?id=380[JSR 380], als
 JSR 380 is a specification of the Java API for bean validation which ensures that the
 properties of a bean meet specific criteria, using `javax.validation` annotations such as `@NotNull`, `@Min`, and `@Max`.
 
-http://hibernate.org/validator[Hibernate Validator] project is a reference specification for JSR 380. Micronaut ships
+http://hibernate.org/validator[Hibernate Validator] project is a reference implmentation for JSR 380. Micronaut ships
 with a built-in configuration to use Hibernate Validator.
 
 To get started, first add the Hibernate Validator configuration to your application:
