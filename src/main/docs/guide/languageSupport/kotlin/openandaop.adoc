@@ -1,4 +1,6 @@
-When you use Micronaut's <<aop, AOP Advice>> in your Kotlin classes, you need to annotate them as `open`.
+Micronaut provides a compile-time AOP API that does not use reflection. When you use any Micronaut's <<aop, AOP Advice>>,
+it creates a subclass at compile-time to provide the AOP behaviour. Kotlin classes are final by default. Thus, you need to annotate them as `open`
+so that the generated subclasses can extend them.
 
 [source, java]
 ----
