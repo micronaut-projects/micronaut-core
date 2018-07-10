@@ -23,6 +23,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 import io.micronaut.management.endpoint.Write;
 
 import javax.inject.Singleton;
@@ -44,12 +45,14 @@ public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
      * @param uriNamingStrategy The URI naming strategy
      * @param conversionService The conversion service
      * @param nonPathTypesProviders A list of providers which defines types not to be used as Path parameters
+     * @param endpointDefaultConfiguration Endpoints default Configuration
      */
     public WriteEndpointRouteBuilder(ApplicationContext beanContext,
                                      UriNamingStrategy uriNamingStrategy,
                                      ConversionService<?> conversionService,
-                                     Collection<NonPathTypesProvider> nonPathTypesProviders) {
-        super(beanContext, uriNamingStrategy, conversionService, nonPathTypesProviders);
+                                     Collection<NonPathTypesProvider> nonPathTypesProviders,
+                                     EndpointDefaultConfiguration endpointDefaultConfiguration) {
+        super(beanContext, uriNamingStrategy, conversionService, nonPathTypesProviders, endpointDefaultConfiguration);
     }
 
     @Override
