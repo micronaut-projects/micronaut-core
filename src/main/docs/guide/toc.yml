@@ -181,7 +181,11 @@ languageSupport:
   title: Language Support
   java: Micronaut for Java
   groovy: Micronaut for Groovy
-  kotlin: Micronaut for Kotlin
+  kotlin:
+    title: Micronaut for Kotlin
+    kaptintellij: Kotlin, Kapt and IntelliJ
+    openandaop: Kotlin and AOP Advice
+    kotlinretainparamnames: Kotlin and Retaining Parameter Names
 management:
   title: Management & Monitoring
   buildingEndpoints:
