@@ -28,7 +28,9 @@ import io.micronaut.discovery.eureka.client.v2.InstanceInfo;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.health.HeartbeatConfiguration;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.reactivex.Single;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -81,30 +83,29 @@ public class EurekaAutoRegistration extends DiscoveryServiceAutoRegistration {
         if (heartbeatConfiguration.isEnabled() && registration != null) {
             InstanceInfo instanceInfo = registration.getInstanceInfo();
             if (status.equals(HealthStatus.UP)) {
-                eurekaClient.heartbeat(instanceInfo.getApp(), instanceInfo.getId()).subscribe(new Subscriber<HttpStatus>() {
-                    @Override
-                    public void onSubscribe(Subscription s) {
-                        s.request(1);
-                    }
-
-                    @Override
-                    public void onNext(HttpStatus httpStatus) {
+                Single<HttpStatus> heartbeatPublisher = Single.fromPublisher(eurekaClient.heartbeat(instanceInfo.getApp(), instanceInfo.getId()));
+                //noinspection ResultOfMethodCallIgnored
+                heartbeatPublisher.subscribe((httpStatus, throwable) -> {
+                    if (throwable == null) {
                         if (LOG.isDebugEnabled()) {
                             LOG.debug("Successfully reported passing state to Eureka");
                         }
-                    }
-
-                    @Override
-                    public void onError(Throwable t) {
-                        String errorMessage = getErrorMessage(t, "Error reporting passing state to Eureka: ");
-                        if (LOG.isErrorEnabled()) {
-                            LOG.error(errorMessage, t);
+                    } else {
+                        if (throwable instanceof HttpClientResponseException) {
+                            HttpClientResponseException hcre = (HttpClientResponseException) throwable;
+                            httpStatus = hcre.getStatus();
+                            if (httpStatus == HttpStatus.NOT_FOUND) {
+                                if (LOG.isInfoEnabled()) {
+                                    LOG.info("Instance [{}] no longer registered with Eureka. Attempting re-registration.", instance.getId());
+                                }
+                                register(instance);
+                                return;
+                            }
                         }
-                    }
-
-                    @Override
-                    public void onComplete() {
-                        // no-op
+                        String errorMessage = getErrorMessage(throwable, "Error reporting passing state to Eureka: ");
+                        if (LOG.isErrorEnabled()) {
+                            LOG.error(errorMessage, throwable);
+                        }
                     }
                 });
             } else {
