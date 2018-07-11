@@ -37,7 +37,6 @@ import java.util.concurrent.TimeUnit;
 public class KafkaStreamsFactory implements Closeable {
 
     private final Collection<KafkaStreams> streams = new ConcurrentLinkedDeque<>();
-
     /**
      * Exposes the {@link ConfiguredStreamBuilder} as a bean.
      *
@@ -53,15 +52,15 @@ public class KafkaStreamsFactory implements Closeable {
      * Builds the default {@link KafkaStreams} bean from the configuration and the supplied {@link ConfiguredStreamBuilder}.
      *
      * @param builder The builder
-     * @param kStreams The built {@link KStream} instances
+     * @param kStreams The KStream definitions
      * @return The {@link KafkaStreams} bean
      */
     @EachBean(AbtractKafkaStreamsConfiguration.class)
     @Context
     KafkaStreams kafkaStreams(
             ConfiguredStreamBuilder builder,
-            // not used directly, but required so beans are constructed. DO NOT remove
-            KStream...kStreams) {
+            // required for initialization. DO NOT DELETE
+            KStream... kStreams) {
         KafkaStreams kafkaStreams = new KafkaStreams(
                 builder.build(),
                 builder.getConfiguration()

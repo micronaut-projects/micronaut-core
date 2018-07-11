@@ -8,9 +8,9 @@
         </encoder>
     </appender>
 
-    <root level="info">
+    <root level="warn">
         <appender-ref ref="STDOUT" />
     </root>
     <logger name="io.micronaut.configuration.kafka" level="TRACE"/>
-    <!--<logger name="io.micronaut.http" level="TRACE"/>-->
+    <logger name="io.micronaut.context" level="TRACE"/>
 </configuration>

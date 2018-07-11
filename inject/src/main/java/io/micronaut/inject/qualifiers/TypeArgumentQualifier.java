@@ -18,7 +18,10 @@ package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.reflect.GenericTypeUtils;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.BeanType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -33,6 +36,7 @@ import java.util.stream.Stream;
  */
 public class TypeArgumentQualifier<T> implements Qualifier<T> {
 
+    private static final Logger LOG = LoggerFactory.getLogger(TypeArgumentQualifier.class);
     private final Class[] typeArguments;
 
     /**
@@ -47,12 +51,28 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
         return candidates.filter(candidate -> {
             if (beanType.isInterface()) {
                 Class[] classes = GenericTypeUtils.resolveInterfaceTypeArguments(candidate.getBeanType(), beanType);
-                return areTypesCompatible(classes);
+
+                boolean result = areTypesCompatible(classes);
+                if (LOG.isTraceEnabled() && !result) {
+                    LOG.trace("Bean type {} is not compatible with candidate generic types [{}] of candidate {}", beanType, ArrayUtils.toString(classes), candidate);
+                }
+                return result;
             } else {
                 Class[] classes = GenericTypeUtils.resolveSuperTypeGenericArguments(candidate.getBeanType(), beanType);
-                return areTypesCompatible(classes);
+                boolean result = areTypesCompatible(classes);
+                if (LOG.isTraceEnabled() && !result) {
+                    LOG.trace("Bean type {} is not compatible with candidate generic types [{}] of candidate {}", beanType, ArrayUtils.toString(classes), candidate);
+                }
+                return result;
             }
         });
+    }
+
+    /**
+     * @return The type arguments
+     */
+    public Class[] getTypeArguments() {
+        return typeArguments;
     }
 
     /**
