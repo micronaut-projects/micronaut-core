@@ -33,7 +33,7 @@ public interface HttpRequestFactory {
      * The default {@link io.micronaut.http.cookie.CookieFactory} instance.
      */
     Optional<HttpRequestFactory> INSTANCE = SoftServiceLoader.load(HttpRequestFactory.class)
-        .firstOr("io.micronaut.http.client.NettyClientHttpRequestFactory", HttpRequestFactory.class.getClassLoader())
+        .firstOr("io.micronaut.http.simple.SimpleHttpRequestFactory", HttpRequestFactory.class.getClassLoader())
         .map(ServiceDefinition::load);
 
     /**

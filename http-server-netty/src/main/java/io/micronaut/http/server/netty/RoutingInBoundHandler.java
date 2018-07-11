@@ -44,10 +44,10 @@ import io.micronaut.http.hateos.Link;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.netty.buffer.NettyByteBufferFactory;
+import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
-import io.micronaut.http.server.binding.RequestBinderRegistry;
+import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.InternalServerException;
 import io.micronaut.http.server.netty.async.ContextCompletionAwareSubscriber;
@@ -141,7 +141,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
      * @param customizableResponseTypeHandlerRegistry The customizable response type handler registry
      * @param staticResourceResolver                  The static resource resolver
      * @param serverConfiguration                     The Netty HTTP server configuration
-     * @param binderRegistry                          The Request binder registry
+     * @param requestArgumentSatisfier                The Request argument satisfier
      * @param executorSelector                        The executor selector
      * @param ioExecutor                              The IO executor
      */
@@ -152,7 +152,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
         StaticResourceResolver staticResourceResolver,
         NettyHttpServerConfiguration serverConfiguration,
-        RequestBinderRegistry binderRegistry,
+        RequestArgumentSatisfier requestArgumentSatisfier,
         ExecutorSelector executorSelector,
         ExecutorService ioExecutor) {
 
@@ -163,7 +163,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         this.ioExecutor = ioExecutor;
         this.executorSelector = executorSelector;
         this.router = router;
-        this.requestArgumentSatisfier = new RequestArgumentSatisfier(binderRegistry);
+        this.requestArgumentSatisfier = requestArgumentSatisfier;
         this.serverConfiguration = serverConfiguration;
     }
 

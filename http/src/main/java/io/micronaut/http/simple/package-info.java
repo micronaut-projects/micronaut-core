@@ -15,10 +15,9 @@
  */
 
 /**
- * Netty HTTP Byte buffer.
+ * Simple HTTP request and response classes.
  *
- * @author Sergio del Amo
+ * @author Vladimir Orany
  * @since 1.0
  */
-package io.micronaut.http.netty.buffer;
-
+package io.micronaut.http.simple;

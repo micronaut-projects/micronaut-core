@@ -51,7 +51,7 @@ import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.multipart.MultipartException;
-import io.micronaut.http.netty.buffer.NettyByteBufferFactory;
+import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
