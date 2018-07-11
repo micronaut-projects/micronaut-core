@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.server.netty;
+package io.micronaut.http.server.binding;
 
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -24,13 +23,13 @@ import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.server.binding.RequestBinderRegistry;
 import io.micronaut.http.server.binding.binders.BodyArgumentBinder;
 import io.micronaut.http.server.binding.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UnresolvedArgument;
 
 import javax.annotation.Nullable;
+import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -43,15 +42,15 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Internal
-class RequestArgumentSatisfier {
+@Singleton
+public class RequestArgumentSatisfier {
 
     private final RequestBinderRegistry binderRegistry;
 
     /**
      * @param requestBinderRegistry The Request binder registry
      */
-    RequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry) {
+    public RequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry) {
         this.binderRegistry = requestBinderRegistry;
     }
 
@@ -63,7 +62,7 @@ class RequestArgumentSatisfier {
      * @param satisfyOptionals Whether to satisfy optionals
      * @return The route
      */
-    RouteMatch<?> fulfillArgumentRequirements(RouteMatch<?> route, HttpRequest<?> request, boolean satisfyOptionals) {
+    public RouteMatch<?> fulfillArgumentRequirements(RouteMatch<?> route, HttpRequest<?> request, boolean satisfyOptionals) {
         Collection<Argument> requiredArguments = route.getRequiredArguments();
         Map<String, Object> argumentValues;
 
@@ -111,9 +110,7 @@ class RequestArgumentSatisfier {
                     }
 
                 } else {
-                    ((NettyHttpRequest) request).setBodyRequired(true);
-
-                    value = (UnresolvedArgument) () -> argumentBinder.bind(conversionContext, request);
+                    value = getValueForBlockingBodyArgumentBinder(request, argumentBinder, conversionContext);
                 }
             } else {
 
@@ -143,5 +140,9 @@ class RequestArgumentSatisfier {
             }
         }
         return Optional.ofNullable(value);
+    }
+
+    protected Object getValueForBlockingBodyArgumentBinder(HttpRequest<?> request, ArgumentBinder argumentBinder, ArgumentConversionContext conversionContext) {
+        return (UnresolvedArgument) () -> argumentBinder.bind(conversionContext, request);
     }
 }

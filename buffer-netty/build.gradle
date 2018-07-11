@@ -1,0 +1,5 @@
+dependencies {
+    compile project(":core")
+    compileOnly project(":inject-java")
+    compile dependencyModuleVersion("netty", "netty-buffer")
+}

@@ -1,4 +1,5 @@
 dependencies {
+    compile project(":buffer-netty")
     compile project(":http")
     compileOnly project(":inject-java")
     compile dependencyVersion("netty")
