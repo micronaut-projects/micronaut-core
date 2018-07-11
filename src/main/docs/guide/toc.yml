@@ -163,6 +163,7 @@ messaging:
     kafkaApplications:
       title: Running Kafka Applications
       kafkaHealth: Kafka Health Checks
+    kafkaStream: Building Kafka Stream Applications
 configurations:
   title: Configurations
   dataAccess:

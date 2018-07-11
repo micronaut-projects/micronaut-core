@@ -1,0 +1,103 @@
+https://kafka.apache.org/documentation/streams/[Kafka Streams] is a platform for building real time streaming applications.
+
+When using Micronaut with Kafka Stream, your application gains all of the features from Micronaut (configuration management, AOP, DI, health checks etc.), simplifying the construction of Kafka Stream applications.
+
+Since Micronaut's DI and AOP is compile time, you can build low overhead stream applications with ease.
+
+=== Defining Kafka Streams
+
+To define Kafka Streams you should first add the `kafka-streams` configuration to your build.
+
+For example in Gradle:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut.configuration:kafka-streams"
+----
+
+Or with Maven:
+
+.Maven
+[source,xml]
+----
+<dependency>
+  <groupId>io.micronaut.configuration</groupId>
+  <artifactId>kafka-streams</artifactId>
+</dependency>
+----
+
+The minimum configuration required is to set the Kafka bootstrap servers:
+
+.Configuring Kafka
+[source,yaml]
+----
+kafka:
+    bootstrap:
+        servers: localhost:9092
+----
+
+
+You should then define a ann:context.annotation.Factory[] for your streams that defines beans that return a `KStream`. For example to implement the Word Count example from the Kafka Streams documentation:
+
+
+.Kafka Streams Word Count
+[source,java]
+----
+include::{testskafkastreams}/WordCountStream.java[tags=imports, indent=0]
+
+include::{testskafkastreams}/WordCountStream.java[tags=clazz, indent=0]
+
+include::{testskafkastreams}/WordCountStream.java[tags=wordCountStream, indent=4]
+
+}
+----
+
+<1> The input topic
+<2> The output topic
+<3> An instance of api:configuration.kafka.streams.ConfiguredStreamBuilder[] is injected that allows mutating the configuration
+
+NOTE: With Kafka streams the key and value `Serdes` (serializer/deserializer) must be classes with a zero argument constructor. If you wish to use JSON (de)serialization you can subclass api:configuration.kafka.serde.JsonSerde[] to define your `Serdes`
+
+You can use the ann:configuration.kafka.annotation.KafkaClient[] annotation to send a sentence to be processed by the above stream:
+
+.Defining a Kafka Client
+[source,java]
+----
+include::{testskafkastreams}/WordCountClient.java[]
+----
+
+You can also define a ann:configuration.kafka.annotation.KafkaListener[] to listen for the result of the word count stream:
+
+.Defining a Kafka Listener
+[source,java]
+----
+include::{testskafkastreams}/WordCountListener.java[]
+----
+
+
+=== Configuring Kafka Streams
+
+You can define multiple Kafka streams each with their own unique configuration. To do this you should define the configuration with `kafka.streams.[STREAM-NAME]`. For example in `application.yml`:
+
+.Defining Per Stream Configuration
+[source,yaml]
+----
+kafka:
+    streams:
+        my-stream:
+            num:
+                stream:
+                    threads: 10
+----
+
+The above configuration sets the `num.stream.threads` setting of the Kafka `StreamsConfig` to `10` for a stream named `my-stream`.
+
+You can then inject a api:configuration.kafka.streams.ConfiguredStreamBuilder[] specfically for the above configuration using `javax.inject.Named`:
+
+.Kafka Streams Word Count
+[source,java]
+----
+include::{testskafkastreams}/WordCountStream.java[tags=namedStream, indent=0]
+}
+----
