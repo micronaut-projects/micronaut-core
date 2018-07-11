@@ -446,6 +446,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         }
 
         @Override
+        protected void processParallelBeans() {
+            // no-op
+        }
+
+        @Override
         public void publishEvent(Object event) {
             // no-op .. the bootstrap context shouldn't publish events
         }

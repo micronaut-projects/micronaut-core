@@ -16,6 +16,8 @@
 
 package io.micronaut.context.annotation;
 
+import io.micronaut.core.annotation.Experimental;
+
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -45,6 +47,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.METHOD, ElementType.TYPE, ElementType.ANNOTATION_TYPE})
+@Experimental
 public @interface Parallel {
     /**
      * The default behaviour is to shutdown the context if an error occurs on initialization. Can be set false if shutdown is not required.
