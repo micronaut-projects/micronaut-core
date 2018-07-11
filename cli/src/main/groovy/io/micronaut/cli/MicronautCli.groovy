@@ -556,10 +556,7 @@ class MicronautCli {
     private boolean handleBuiltInCommands(ExecutionContext context) {
         def parseResult = context.parseResult
         if (!parseResult.unmatched().empty && parseResult.unmatched()[0].startsWith('!')) {
-            def args = []
-            args.addAll(parseResult.unmatched())
-            args[0] = args[0].substring(1) // strip off leading '!'
-            return executeProcess(context, args as String[])
+            return executeProcess(context, parseResult.unmatched() as String[])
         }
         return false
     }
@@ -567,7 +564,7 @@ class MicronautCli {
     protected boolean executeProcess(ExecutionContext context, String[] args) {
         def console = context.console
         try {
-            args[0] = args[0].substring(1)
+            args[0] = args[0].substring(1)  // strip off leading '!'
             def process = new ProcessBuilder(args).redirectErrorStream(true).start()
             console.log process.inputStream.getText('UTF-8')
             return true
