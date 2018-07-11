@@ -20,5 +20,5 @@
  * @author Sergio del Amo
  * @since 1.0
  */
-package io.micronaut.http.netty.buffer;
+package io.micronaut.buffer.netty;
 
