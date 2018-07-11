@@ -26,7 +26,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -76,11 +75,23 @@ public class SimpleHttpParameters implements HttpParameters {
         return values.get(name, conversionContext);
     }
 
+    /**
+     * Put new http parameter.
+     * @param name      the name of the parameter
+     * @param value     the value of the parameter
+     * @return the previous value of the parameter
+     */
     public List<String> put(String name, String value) {
         return valuesMap.put(name, Collections.singletonList(value));
     }
 
-    public List<String> put(String name, List<String> value) {
-        return valuesMap.put(name, value);
+    /**
+     * Put new http parameter.
+     * @param name      the name of the parameter
+     * @param values    the values of the parameter
+     * @return the previous value of the parameter
+     */
+    public List<String> put(String name, List<String> values) {
+        return valuesMap.put(name, values);
     }
 }

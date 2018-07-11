@@ -19,7 +19,6 @@ package io.micronaut.http.simple;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequestFactory;
 import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.http.cookie.CookieFactory;
 
 /**
  * Simple {@link HttpRequestFactory} implementation.
@@ -32,41 +31,41 @@ import io.micronaut.http.cookie.CookieFactory;
 public class SimpleHttpRequestFactory implements HttpRequestFactory {
     @Override
     public <T> MutableHttpRequest<T> get(String uri) {
-        return new SimpleHttpRequest<T>(HttpMethod.GET, uri, null);
+        return new SimpleHttpRequest<>(HttpMethod.GET, uri, null);
     }
 
     @Override
     public <T> MutableHttpRequest<T> post(String uri, T body) {
-        return new SimpleHttpRequest<T>(HttpMethod.POST, uri, body);
+        return new SimpleHttpRequest<>(HttpMethod.POST, uri, body);
     }
 
     @Override
     public <T> MutableHttpRequest<T> put(String uri, T body) {
-        return new SimpleHttpRequest<T>(HttpMethod.PUT, uri, body);
+        return new SimpleHttpRequest<>(HttpMethod.PUT, uri, body);
     }
 
     @Override
     public <T> MutableHttpRequest<T> patch(String uri, T body) {
-        return new SimpleHttpRequest<T>(HttpMethod.PATCH, uri, body);
+        return new SimpleHttpRequest<>(HttpMethod.PATCH, uri, body);
     }
 
     @Override
     public <T> MutableHttpRequest<T> head(String uri) {
-        return new SimpleHttpRequest<T>(HttpMethod.HEAD, uri, null);
+        return new SimpleHttpRequest<>(HttpMethod.HEAD, uri, null);
     }
 
     @Override
     public <T> MutableHttpRequest<T> options(String uri) {
-        return new SimpleHttpRequest<T>(HttpMethod.OPTIONS, uri, null);
+        return new SimpleHttpRequest<>(HttpMethod.OPTIONS, uri, null);
     }
 
     @Override
     public <T> MutableHttpRequest<T> delete(String uri, T body) {
-        return new SimpleHttpRequest<T>(HttpMethod.DELETE, uri, body);
+        return new SimpleHttpRequest<>(HttpMethod.DELETE, uri, body);
     }
 
     @Override
     public <T> MutableHttpRequest<T> create(HttpMethod httpMethod, String uri) {
-        return new SimpleHttpRequest<T>(httpMethod, uri, null);
+        return new SimpleHttpRequest<>(httpMethod, uri, null);
     }
 }

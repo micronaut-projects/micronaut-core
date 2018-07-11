@@ -80,6 +80,12 @@ public class SimpleCookies implements Cookies {
         return Collections.unmodifiableCollection(cookies.values());
     }
 
+    /**
+     * Put a new cookie.
+     * @param name      the name of the cookie
+     * @param cookie    the cookie itself
+     * @return previous value for given name
+     */
     public Cookie put(CharSequence name, Cookie cookie) {
         return cookies.put(name, cookie);
     }

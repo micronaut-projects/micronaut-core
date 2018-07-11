@@ -32,6 +32,8 @@ import java.util.Optional;
 /**
  * Simple {@link MutableHttpResponse} implementation.
  *
+ * @param <B> the type of the body
+ *
  * @author Vladimir Orany
  * @since 1.0
  */
