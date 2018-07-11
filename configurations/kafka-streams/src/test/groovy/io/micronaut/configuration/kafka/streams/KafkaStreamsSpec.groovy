@@ -20,18 +20,22 @@ class KafkaStreamsSpec extends Specification {
 
     void "test kafka stream application"() {
         given:
-        WordCountClient wordCountClient = context.getBean(WordCountClient)
-        WordCountListener countListener = context.getBean(WordCountListener)
+
         PollingConditions conditions = new PollingConditions(timeout: 30, delay: 1)
 
         when:
-        wordCountClient.publishSentence("test","The quick brown fox jumps over the lazy dog. THE QUICK BROWN FOX JUMPED OVER THE LAZY DOG'S BACK")
+        WordCountClient wordCountClient = context.getBean(WordCountClient);
+        wordCountClient.publishSentence("The quick brown fox jumps over the lazy dog. THE QUICK BROWN FOX JUMPED OVER THE LAZY DOG'S BACK");
+
+        WordCountListener countListener = context.getBean(WordCountListener)
 
         then:
         conditions.eventually {
             countListener.getCount("fox") > 0
             countListener.getCount("jumps") > 0
+            println countListener.wordCounts
         }
+
     }
 
 
