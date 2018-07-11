@@ -44,7 +44,7 @@ import io.micronaut.http.hateos.Link;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.netty.buffer.NettyByteBufferFactory;
+import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.http.server.binding.RequestBinderRegistry;
