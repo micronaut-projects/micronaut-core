@@ -18,6 +18,8 @@ package io.micronaut.http.simple.cookies;
 
 import io.micronaut.http.cookie.Cookie;
 
+import java.util.Objects;
+
 /**
  * Simple {@link Cookie} implementation.
  *
@@ -178,6 +180,11 @@ public class SimpleCookie implements Cookie {
         }
 
         return 0;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(name, domain, path);
     }
 
     @Override

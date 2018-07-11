@@ -34,6 +34,8 @@ import java.util.Optional;
 /**
  * Simple {@link MutableHttpRequest} implementation.
  *
+ * @param <B> the type of the body
+ *
  * @author Vladimir Orany
  * @since 1.0
  */
@@ -48,6 +50,12 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
     private URI uri;
     private B body;
 
+    /**
+     * Simple {@link MutableHttpRequest} implementation.
+     * @param method    the HTTP method
+     * @param uri       the URI of the request
+     * @param body      the optional body of the request
+     */
     public SimpleHttpRequest(HttpMethod method, String uri, B body) {
         this.method = method;
         try {

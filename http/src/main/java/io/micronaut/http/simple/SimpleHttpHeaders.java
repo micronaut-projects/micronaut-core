@@ -33,6 +33,10 @@ public class SimpleHttpHeaders implements MutableHttpHeaders {
     private final Map<String, String> headers;
     private final ConversionService conversionService;
 
+    /**
+     * Map-based implementation of {@link MutableHttpHeaders}.
+     * @param conversionService The conversion service
+     */
     SimpleHttpHeaders(ConversionService conversionService) {
         this.headers = new LinkedHashMap<>();
         this.conversionService = conversionService;
