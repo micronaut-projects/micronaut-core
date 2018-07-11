@@ -60,27 +60,40 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     /**
      * @return Get the path without any parameters
      */
-    String getPath();
+    default String getPath() {
+        return getUri().getPath();
+    }
 
     /**
      * @return Obtain the remote address
      */
-    InetSocketAddress getRemoteAddress();
+    default InetSocketAddress getRemoteAddress() {
+        return getServerAddress();
+    }
 
     /**
      * @return Obtain the server address
      */
-    InetSocketAddress getServerAddress();
+    default InetSocketAddress getServerAddress() {
+        String host = getUri().getHost();
+        int port = getUri().getPort();
+        return new InetSocketAddress(host != null ? host : "localhost", port > -1 ? port : 80);
+    }
 
     /**
      * @return The server host name
      */
-    String getServerName();
+    default String getServerName() {
+        return getUri().getHost();
+    }
 
     /**
      * @return Is the request an HTTPS request
      */
-    boolean isSecure();
+    default boolean isSecure() {
+        String scheme = getUri().getScheme();
+        return scheme != null && scheme.equals("https");
+    }
 
     @Override
     default HttpRequest<B> setAttribute(CharSequence name, Object value) {

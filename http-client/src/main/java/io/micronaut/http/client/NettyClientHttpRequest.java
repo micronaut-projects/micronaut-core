@@ -58,8 +58,6 @@ import java.util.Optional;
 @Internal
 class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
 
-    private static final int DEFAULT_HTTP_PORT = 80;
-
     private final NettyHttpHeaders headers = new NettyHttpHeaders();
     private final MutableConvertibleValues<Object> attributes = new MutableConvertibleValuesMap<>();
     private final io.micronaut.http.HttpMethod httpMethod;
@@ -162,34 +160,6 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
     @Override
     public URI getUri() {
         return uri;
-    }
-
-    @Override
-    public String getPath() {
-        return uri.getPath();
-    }
-
-    @Override
-    public InetSocketAddress getRemoteAddress() {
-        return getServerAddress();
-    }
-
-    @Override
-    public InetSocketAddress getServerAddress() {
-        String host = uri.getHost();
-        int port = uri.getPort();
-        return new InetSocketAddress(host != null ? host : "localhost", port > -1 ? port : DEFAULT_HTTP_PORT);
-    }
-
-    @Override
-    public String getServerName() {
-        return uri.getHost();
-    }
-
-    @Override
-    public boolean isSecure() {
-        String scheme = getUri().getScheme();
-        return scheme != null && scheme.equals("https");
     }
 
     private NettyHttpParameters decodeParameters(String uri) {
