@@ -3,6 +3,7 @@ package io.micronaut.configuration.kafka.streams
 import io.micronaut.configuration.kafka.config.AbstractKafkaConfiguration
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.util.CollectionUtils
+import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -14,9 +15,15 @@ class KafkaStreamsSpec extends Specification {
             CollectionUtils.mapOf(
                     "kafka.bootstrap.servers", 'localhost:${random.port}',
                     AbstractKafkaConfiguration.EMBEDDED, true,
-                    AbstractKafkaConfiguration.EMBEDDED_TOPICS, [WordCountStream.INPUT, WordCountStream.OUTPUT]
+                    AbstractKafkaConfiguration.EMBEDDED_TOPICS, [WordCountStream.INPUT, WordCountStream.OUTPUT],
+                    'kafka.streams.my-stream.num.stream.threads',10
             )
     )
+
+    void "test config"() {
+        expect:
+        context.getBean(ConfiguredStreamBuilder, Qualifiers.byName('my-stream')).configuration['num.stream.threads'] == "10"
+    }
 
     void "test kafka stream application"() {
         given:
