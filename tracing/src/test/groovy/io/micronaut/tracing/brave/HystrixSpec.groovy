@@ -16,7 +16,7 @@
 package io.micronaut.tracing.brave
 
 import brave.SpanCustomizer
-import io.micronaut.configurations.hystrix.annotation.HystrixCommand
+import io.micronaut.configuration.hystrix.annotation.HystrixCommand
 import io.micronaut.context.ApplicationContext
 import io.micronaut.tracing.annotation.NewSpan
 import io.reactivex.Single
