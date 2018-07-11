@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.netty.buffer;
+package io.micronaut.buffer.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
