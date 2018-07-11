@@ -64,6 +64,17 @@ public class JsonSerde<T> implements Serializer<T>, Deserializer<T>, Serde<T> {
         this.type = type;
     }
 
+    /**
+     * Constructs a new instance for the given arguments. Using a default {@link ObjectMapper}
+     *
+     * @param objectMapper The object mapper to use
+     * @param type The target type
+     */
+    public JsonSerde(ObjectMapper objectMapper, Class<T> type) {
+        this.objectSerializer = new JacksonObjectSerializer(objectMapper);
+        this.type = type;
+    }
+
     @Override
     public T deserialize(String topic, byte[] data) {
         return objectSerializer.deserialize(data, type)

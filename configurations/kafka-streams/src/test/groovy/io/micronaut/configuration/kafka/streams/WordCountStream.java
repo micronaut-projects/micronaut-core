@@ -7,6 +7,7 @@ import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsConfig;
 import org.apache.kafka.streams.kstream.*;
 
+import javax.inject.Singleton;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Properties;
@@ -17,7 +18,7 @@ public class WordCountStream {
     public static final String INPUT = "streams-plaintext-input";
     public static final String OUTPUT = "streams-wordcount-output";
 
-    @Bean
+    @Singleton
     KStream<String, String> wordCountStream(ConfiguredStreamBuilder builder) {
         // set default serdes
         Properties props = builder.getConfiguration();
