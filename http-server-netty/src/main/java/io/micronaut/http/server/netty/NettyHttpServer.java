@@ -30,6 +30,7 @@ import io.micronaut.discovery.event.ServiceShutdownEvent;
 import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
+import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.binding.RequestBinderRegistry;
 import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
@@ -110,7 +111,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final StaticResourceResolver staticResourceResolver;
     private final Environment environment;
     private final Router router;
-    private final RequestBinderRegistry binderRegistry;
+    private final RequestArgumentSatisfier requestArgumentSatisfier;
     private final BeanLocator beanLocator;
     private final ThreadFactory threadFactory;
     private volatile int serverPort;
@@ -125,7 +126,7 @@ public class NettyHttpServer implements EmbeddedServer {
      * @param serverConfiguration                     The Netty HTTP server configuration
      * @param applicationContext                      The application context
      * @param router                                  The router
-     * @param binderRegistry                          The request binder registry
+     * @param requestArgumentSatisfier                The request argument satisfier
      * @param mediaTypeCodecRegistry                  The Media type codec registry
      * @param customizableResponseTypeHandlerRegistry The Netty customizable response type handler registry
      * @param resourceResolver                        The static resource resolver
@@ -141,7 +142,7 @@ public class NettyHttpServer implements EmbeddedServer {
         NettyHttpServerConfiguration serverConfiguration,
         ApplicationContext applicationContext,
         Router router,
-        RequestBinderRegistry binderRegistry,
+        RequestArgumentSatisfier requestArgumentSatisfier,
         MediaTypeCodecRegistry mediaTypeCodecRegistry,
         NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry,
         StaticResourceResolver resourceResolver,
@@ -167,7 +168,7 @@ public class NettyHttpServer implements EmbeddedServer {
         this.executorSelector = executorSelector;
         OrderUtil.sort(outboundHandlers);
         this.outboundHandlers = outboundHandlers;
-        this.binderRegistry = binderRegistry;
+        this.requestArgumentSatisfier = requestArgumentSatisfier;
         this.staticResourceResolver = resourceResolver;
         this.sslContext = nettyServerSslBuilder.build();
         this.threadFactory = threadFactory;
@@ -202,8 +203,6 @@ public class NettyHttpServer implements EmbeddedServer {
                     protected void initChannel(Channel ch) throws Exception {
                         ChannelPipeline pipeline = ch.pipeline();
 
-                        RequestBinderRegistry binderRegistry = NettyHttpServer.this.binderRegistry;
-
                         sslContext.ifPresent(ctx -> pipeline.addLast(ctx.newHandler(ch.alloc())));
 
                         serverConfiguration.getLogLevel().ifPresent(logLevel -> pipeline.addLast(new LoggingHandler(logLevel)));
@@ -231,7 +230,7 @@ public class NettyHttpServer implements EmbeddedServer {
                             customizableResponseTypeHandlerRegistry,
                             staticResourceResolver,
                             serverConfiguration,
-                            binderRegistry,
+                            requestArgumentSatisfier,
                             executorSelector,
                             ioExecutor
                         ));

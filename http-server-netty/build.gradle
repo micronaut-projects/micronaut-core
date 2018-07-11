@@ -1,7 +1,6 @@
 dependencies {
     compile project(":http-server")
     compile project(":http-netty")
-    compile project(":router")
 
     compileOnly project(":inject-java")
 
