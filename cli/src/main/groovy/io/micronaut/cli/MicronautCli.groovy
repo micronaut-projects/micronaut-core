@@ -556,9 +556,9 @@ class MicronautCli {
     private boolean handleBuiltInCommands(ExecutionContext context) {
         def parseResult = context.parseResult
         if (!parseResult.unmatched().empty && parseResult.unmatched()[0].startsWith('!')) {
-            def args = [ 'mn' ]
+            def args = []
             args.addAll(parseResult.unmatched())
-            args[1] = args[1].substring(1) // strip off leading '!'
+            args[0] = args[0].substring(1) // strip off leading '!'
             return executeProcess(context, args as String[])
         }
         return false
