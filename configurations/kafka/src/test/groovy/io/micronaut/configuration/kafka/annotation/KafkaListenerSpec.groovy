@@ -3,6 +3,8 @@ package io.micronaut.configuration.kafka.annotation
 import groovy.transform.EqualsAndHashCode
 import io.micronaut.configuration.kafka.config.AbstractKafkaConfiguration
 import io.micronaut.configuration.kafka.config.AbstractKafkaProducerConfiguration
+import io.micronaut.configuration.kafka.metrics.KafkaConsumerMetrics
+import io.micronaut.configuration.kafka.metrics.KafkaProducerMetrics
 import io.micronaut.configuration.kafka.serde.JsonSerde
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.util.CollectionUtils
@@ -42,6 +44,8 @@ class KafkaListenerSpec extends Specification {
         MyConsumer myConsumer = context.getBean(MyConsumer)
 
         then:
+        context.containsBean(KafkaConsumerMetrics)
+        context.containsBean(KafkaProducerMetrics)
         conditions.eventually {
             myConsumer.wordCount == 2
             myConsumer.lastTopic == 'words'
