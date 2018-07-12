@@ -426,7 +426,7 @@ class MicronautCli {
     }
 
     protected MicronautConsole setupCompleters() {
-        MicronautConsole console = projectContext.console
+        MicronautConsole console = projectContext ? projectContext.console : MicronautConsole.instance
 
         def consoleReader = console.reader
         consoleReader.setHandleUserInterrupt(true)
