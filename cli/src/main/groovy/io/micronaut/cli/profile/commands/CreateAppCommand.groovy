@@ -41,11 +41,11 @@ class CreateAppCommand extends AbstractCreateCommand {
     String appname = ""
 
     // note: description contains a variable that will be replaced by picocli, not by Groovy
-    @Option(names = '-lang', paramLabel = 'LANG', description = 'Which language to use. Possible values: ${COMPLETION-CANDIDATES}.')
+    @Option(names = ['-l', '--lang'], paramLabel = 'LANG', description = 'Which language to use. Possible values: ${COMPLETION-CANDIDATES}.')
     SupportedLanguage lang = SupportedLanguage.java
 
     // note: description contains a variable that will be replaced by picocli, not by Groovy
-    @Option(names = '-build', paramLabel = 'BUILD-TOOL', description = 'Which build tool to configure. Possible values: ${COMPLETION-CANDIDATES}.')
+    @Option(names = ['-b', '--build'], paramLabel = 'BUILD-TOOL', description = 'Which build tool to configure. Possible values: ${COMPLETION-CANDIDATES}.')
     SupportedBuildTool build = SupportedBuildTool.gradle
 
     @Override

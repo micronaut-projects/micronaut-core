@@ -69,13 +69,13 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
     ProfileRepository profileRepository
     Map<String, String> variables = [:]
 
-    @Option(names = "-inplace", description = "Create a service using the current directory")
+    @Option(names = ['-i', '--inplace'], description = 'Create a service using the current directory')
     boolean inplace
 
-    @Option(names = "-profile", paramLabel = "PROFILE", description = "The profile to use", completionCandidates = ProfileCompletionCandidates)
+    @Option(names = ['-p', '--profile'], paramLabel = 'PROFILE', description = 'The profile to use', completionCandidates = ProfileCompletionCandidates)
     String profile
 
-    @Option(names = "-features", paramLabel = "FEATURE", description = "The features to use", completionCandidates = FeatureCompletionCandidates)
+    @Option(names = ['-f', '--features'], paramLabel = 'FEATURE', description = 'The features to use', completionCandidates = FeatureCompletionCandidates)
     List<String> features = []
 
     @Mixin

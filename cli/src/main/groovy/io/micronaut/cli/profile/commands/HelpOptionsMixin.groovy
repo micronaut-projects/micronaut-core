@@ -39,9 +39,9 @@ import picocli.CommandLine.Option
 @Command(versionProvider = MicronautCliVersionProvider) // individual commands can set a different versionProvider
 class HelpOptionsMixin {
 
-    @Option(names = ['-h', '-help', '--help'], usageHelp = true, description = ['Show this help message and exit.'])
+    @Option(names = ['-h', '--help'], usageHelp = true, description = ['Show this help message and exit.'])
     boolean helpRequested
 
-    @Option(names = ['-V', '-version', '--version'], versionHelp = true, description = ['Print version information and exit.'])
+    @Option(names = ['-V', '--version'], versionHelp = true, description = ['Print version information and exit.'])
     boolean versionRequested
 }

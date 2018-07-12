@@ -46,12 +46,12 @@ class CreateFederationCommand extends AbstractCreateCommand {
     @Parameters(arity = '0..1', paramLabel = 'NAME', description = 'The name of the federation to create.')
     String federationName = ''
 
-    @Option(names = '--services', arity = "1..*", paramLabel = 'SERVICE', split = ',',
+    @Option(names = ['-s', '--services'], arity = "1..*", paramLabel = 'SERVICE', split = ',',
             required = true, description = 'The names of the services to create.')
     List<String> services = []
 
     // note: description contains a variable that will be replaced by picocli, not by Groovy
-    @Option(names = '-build', paramLabel = 'BUILD-TOOL', description = 'Which build tool to configure. Possible values: ${COMPLETION-CANDIDATES}.')
+    @Option(names = ['-b', '--build'], paramLabel = 'BUILD-TOOL', description = 'Which build tool to configure. Possible values: ${COMPLETION-CANDIDATES}.')
     SupportedBuildTool build = SupportedBuildTool.gradle
 
     CreateFederationCommand() {

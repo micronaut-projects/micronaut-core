@@ -32,19 +32,19 @@ import java.nio.file.Paths
 class CreateFunctionCommand extends AbstractCreateCommand {
     public static final String NAME = "create-function"
 
-    @Parameters(arity = "0..1", paramLabel = "NAME", description = "The name of the function to create.")
+    @Parameters(arity = '0..1', paramLabel = 'NAME', description = 'The name of the function to create.')
     String functionName
 
-    @Option(names = "-provider", paramLabel = "PROVIDER", description = "Which cloud provider to use. Possible values: \"aws\".")
-    protected String provider = "aws"
+    @Option(names = ['-r', '--provider'], paramLabel = 'PROVIDER', description = 'Which cloud provider to use. Possible values: ${DEFAULT-VALUE}.')
+    protected String provider = 'aws'
 
-    @Option(names = "-lang", paramLabel = "LANG", description = "Which language to use. Possible values: \"java\", \"groovy\", \"kotlin\".")
+    @Option(names = ['-l', '--lang'], paramLabel = 'LANG', description = 'Which language to use. Possible values: ${COMPLETION-CANDIDATES}.')
     SupportedLanguage lang = SupportedLanguage.java
 
-    @Option(names = "-test", paramLabel = "TEST", description = "Which test framework to use. Possible values: \"junit\", \"spock\", \"spek\".")
+    @Option(names = ['-t', '--test'], paramLabel = 'TEST', description = 'Which test framework to use. Possible values: ${COMPLETION-CANDIDATES}.')
     SupportedTestFramework testFramework
 
-    @Option(names = "-build", paramLabel = "BUILD-TOOL", description = "Which build tool to configure. Possible values: \"gradle\", \"maven\".")
+    @Option(names = ['-b', '--build'], paramLabel = 'BUILD-TOOL', description = 'Which build tool to configure. Possible values: ${COMPLETION-CANDIDATES}.')
     SupportedBuildTool build = SupportedBuildTool.gradle
 
     CreateFunctionCommand() {

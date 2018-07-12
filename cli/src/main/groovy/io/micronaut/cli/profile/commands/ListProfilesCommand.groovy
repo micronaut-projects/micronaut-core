@@ -41,7 +41,7 @@ class ListProfilesCommand implements Command, ProfileRepositoryAware {
     CommandSpec commandSpec
 
     @CommandLine.Mixin
-    HelpOptionsMixin helpOptions
+    private CommonOptionsMixin autoHelp // adds help, version and other common options to the command
 
     ProfileRepository profileRepository
 
