@@ -23,7 +23,6 @@ import io.micronaut.cli.codegen.model.ModelBuilder
 import io.micronaut.cli.console.logging.ConsoleAntBuilder
 import io.micronaut.cli.console.logging.ConsoleLogger
 import io.micronaut.cli.console.logging.MicronautConsole
-import io.micronaut.cli.profile.CommandDescription
 import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.ProfileCommand
@@ -37,6 +36,10 @@ import io.micronaut.cli.profile.commands.templates.TemplateRenderer
 import io.micronaut.cli.profile.commands.templates.TemplateRendererImpl
 import io.micronaut.cli.util.NameUtils
 import io.micronaut.cli.util.VersionInfo
+import picocli.CommandLine
+import picocli.CommandLine.Spec
+import picocli.CommandLine.Model.CommandSpec
+import picocli.groovy.PicocliBaseScript
 
 /**
  * A base class for Groovy scripts that implement commands
@@ -45,12 +48,12 @@ import io.micronaut.cli.util.VersionInfo
  * @since 1.0
  */
 @CompileStatic
-abstract class GroovyScriptCommand extends Script implements ProfileCommand, ProfileRepositoryAware, ConsoleLogger, ModelBuilder, FileSystemInteraction, TemplateRenderer, CommandEvents, ServerInteraction {
+abstract class GroovyScriptCommand extends PicocliBaseScript implements ProfileCommand, ProfileRepositoryAware, ConsoleLogger, ModelBuilder, FileSystemInteraction, TemplateRenderer, CommandEvents, ServerInteraction {
 
     Profile profile
     ProfileRepository profileRepository
     String name = getClass().name.contains('-') ? getClass().name : NameUtils.getScriptName(getClass().name)
-    CommandDescription description = new CommandDescription(name)
+
     @Delegate
     ExecutionContext executionContext
     @Delegate
@@ -80,53 +83,8 @@ abstract class GroovyScriptCommand extends Script implements ProfileCommand, Pro
      */
     String micronautVersion = VersionInfo.getVersion(getClass())
 
-    /**
-     * Provides a description for the command
-     *
-     * @param desc The description
-     * @param usage The usage information
-     */
-    void description(String desc, String usage) {
-        // ignore, just a stub for documentation purposes, populated by CommandScriptTransform
-    }
-
-    /**
-     * Provides a description for the command
-     *
-     * @param desc The description
-     * @param usage The usage information
-     */
-    void description(String desc, Closure detail) {
-        // ignore, just a stub for documentation purposes, populated by CommandScriptTransform
-    }
-
-    /**
-     * Obtains details of the given flag if it has been set by the user
-     *
-     * @param name The name of the flag
-     * @return The flag information, or null if it isn't set by the user
-     */
-    def flag(String name) {
-        if (commandLine.hasOption(name)) {
-            return commandLine.optionValue(name)
-        } else {
-            def value = commandLine?.undeclaredOptions?.get(name)
-            return value ?: null
-        }
-    }
-
-    /**
-     * @return The undeclared command line arguments
-     */
-    Map<String, Object> getArgsMap() {
-        executionContext.commandLine.undeclaredOptions
-    }
-
-    /**
-     * @return The arguments as a list of strings
-     */
-    List<String> getArgs() {
-        executionContext.commandLine.remainingArgs
+    CommandSpec getCommandSpec() {
+        getOrCreateCommandLine().commandSpec
     }
 
     /**
@@ -144,7 +102,7 @@ abstract class GroovyScriptCommand extends Script implements ProfileCommand, Pro
     boolean handle(ExecutionContext executionContext) {
         setExecutionContext(executionContext)
         notify("${name}Start", executionContext)
-        def result = run()
+        def result = runScriptBody() // PicocliBaseScript.run() would try to parse the input again
         notify("${name}End", executionContext)
         if (result instanceof Boolean) {
             return ((Boolean) result)
@@ -163,10 +121,10 @@ abstract class GroovyScriptCommand extends Script implements ProfileCommand, Pro
         def commandName = NameUtils.getScriptName(name)
         def context = executionContext
         if (profile?.hasCommand(context, commandName)) {
-            def commandLine = context.commandLine
+            def parseResult = context.parseResult
             def newArgs = [commandName]
             newArgs.addAll argsArray.collect() { it.toString() }
-            def newContext = new MicronautCli.ExecutionContextImpl(commandLine.parseNew(newArgs as String[]), context)
+            def newContext = new MicronautCli.ExecutionContextImpl(new CommandLine(parseResult.commandSpec()).parseArgs(newArgs as String[]), context)
             return profile.handleCommand(newContext)
         } else {
             throw new MissingMethodException(name, getClass(), argsArray)
