@@ -386,9 +386,10 @@ class MicronautCli {
         synchronized (MicronautCli) {
             try {
                 currentExecutionContext = context
-                console.setStacktrace(commonOptions.showStacktrace)
-
                 def parseResult = context.getParseResult()
+                boolean showStack = commonOptions.showStacktrace || parseResult.subcommand()?.matchedOptionValue("stacktrace", false)
+                console.setStacktrace(showStack)
+
                 if (handleBuiltInCommands(context))    { return true }
                 if (printHelpIfRequested(parseResult)) { return true }
                 assertNoUnmatchedArguments(parseResult)
