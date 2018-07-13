@@ -4,6 +4,7 @@ import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -33,14 +34,25 @@ class MetricsEndpointSpec extends Specification {
     void "test metrics endpoint disabled"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.http.client.read-timeout':'5m',
                 'endpoints.metrics.sensitive': false,
                 (MICRONAUT_METRICS_ENABLED)  : false
         ])
+
+        when:
+        def context = embeddedServer.getApplicationContext()
+
+        then:
+        !context.containsBean(MeterRegistry)
+        !context.containsBean(CompositeMeterRegistry)
+        !context.containsBean(SimpleMeterRegistry)
+
+
         URL server = embeddedServer.getURL()
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
 
         when:
-        rxClient.exchange("/metrics", Map).blockingFirst()
+        rxClient.retrieve(HttpRequest.GET("/metrics"), Map).blockingFirst()
 
         then:
         thrown(HttpClientResponseException)

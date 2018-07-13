@@ -31,7 +31,6 @@ import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
-import io.micronaut.http.server.binding.RequestBinderRegistry;
 import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;

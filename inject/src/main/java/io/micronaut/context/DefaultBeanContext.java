@@ -1333,7 +1333,7 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     /**
-     * Processes parallel bean definitions
+     * Processes parallel bean definitions.
      */
     protected void processParallelBeans() {
         new Thread(() -> beanDefinitionsClasses.stream()

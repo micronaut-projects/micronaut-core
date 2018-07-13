@@ -8,6 +8,7 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS
+import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED
 
 class SystemMeterRegistryBinderSpec extends Specification {
@@ -56,8 +57,8 @@ class SystemMeterRegistryBinderSpec extends Specification {
         cfg                                             | setting | binderPresent | uptimePresent | processorPresent | filePresent
         MICRONAUT_METRICS_ENABLED                       | true    | true          | true          | true             | true
         MICRONAUT_METRICS_ENABLED                       | false   | false         | false         | false            | false
-        MICRONAUT_METRICS + "binders.uptime.enabled"    | false   | true          | false         | true             | true
-        MICRONAUT_METRICS + "binders.processor.enabled" | false   | true          | true          | false            | true
-        MICRONAUT_METRICS + "binders.files.enabled"     | false   | true          | true          | true             | false
+        MICRONAUT_METRICS_BINDERS + ".uptime.enabled"    | false   | true          | false         | true             | true
+        MICRONAUT_METRICS_BINDERS + ".processor.enabled" | false   | true          | true          | false            | true
+        MICRONAUT_METRICS_BINDERS + ".files.enabled"     | false   | true          | true          | true             | false
     }
 }

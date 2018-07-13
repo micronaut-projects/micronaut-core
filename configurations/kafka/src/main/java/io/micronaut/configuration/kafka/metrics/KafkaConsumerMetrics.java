@@ -21,6 +21,7 @@ import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.binder.MeterBinder;
 import io.micronaut.configuration.kafka.config.AbstractKafkaConfiguration;
 import io.micronaut.configuration.kafka.config.AbstractKafkaConsumerConfiguration;
+import io.micronaut.configuration.metrics.annotation.RequiresMetrics;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
@@ -40,7 +41,7 @@ import java.util.Properties;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.stream.Collectors;
 
-import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED;
+import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS;
 
 /**
  * Binds Kafka Metrics to Micrometer.
@@ -48,9 +49,9 @@ import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory
  * @author graemerocher
  * @since 1.0
  */
-@Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
-@Requires(beans = MeterRegistry.class)
+@RequiresMetrics
 @Context
+@Requires(property = MICRONAUT_METRICS_BINDERS + ".kafka.enabled", value = "true", defaultValue = "true")
 public class KafkaConsumerMetrics implements BeanCreatedEventListener<AbstractKafkaConsumerConfiguration>, MeterBinder, Closeable {
 
     private static final Collection<MeterRegistry> METER_REGISTRIES = new ConcurrentLinkedQueue<>();
