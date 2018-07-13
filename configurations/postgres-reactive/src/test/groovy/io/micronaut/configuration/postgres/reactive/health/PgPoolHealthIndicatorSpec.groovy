@@ -30,7 +30,7 @@ import spock.lang.Specification
  */
 class PgPoolHealthIndicatorSpec extends Specification {
 
-    void "test pgPool health indicator"() {
+    void "test postgres-reactive health indicator"() {
         given:
         PostgreSQLContainer postgres = new PostgreSQLContainer()
         postgres.start()
@@ -49,7 +49,7 @@ class PgPoolHealthIndicatorSpec extends Specification {
 
         then:
         result.status == HealthStatus.UP
-        result.details
+        result.details.version.startsWith("PostgreSQL ${postgres.DEFAULT_TAG}".toString())
 
         when:
         postgres.stop()
