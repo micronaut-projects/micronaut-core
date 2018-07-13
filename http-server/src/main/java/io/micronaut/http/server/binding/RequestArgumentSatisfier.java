@@ -142,7 +142,14 @@ public class RequestArgumentSatisfier {
         return Optional.ofNullable(value);
     }
 
-    protected Object getValueForBlockingBodyArgumentBinder(HttpRequest<?> request, ArgumentBinder argumentBinder, ArgumentConversionContext conversionContext) {
+    /**
+     *
+     * @param request The request
+     * @param argumentBinder The argument binder
+     * @param conversionContext The conversion context
+     * @return The body argument
+     */
+    private Object getValueForBlockingBodyArgumentBinder(HttpRequest<?> request, ArgumentBinder argumentBinder, ArgumentConversionContext conversionContext) {
         return (UnresolvedArgument) () -> argumentBinder.bind(conversionContext, request);
     }
 }

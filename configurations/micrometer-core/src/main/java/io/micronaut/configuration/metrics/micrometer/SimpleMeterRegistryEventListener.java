@@ -20,8 +20,8 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.micronaut.configuration.metrics.aggregator.MeterRegistryConfigurer;
+import io.micronaut.configuration.metrics.annotation.RequiresMetrics;
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.StartupEvent;
 import org.slf4j.Logger;
@@ -29,8 +29,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.util.stream.Stream;
-
-import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED;
 
 
 /**
@@ -41,7 +39,7 @@ import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory
  * @since 1.0
  */
 @Singleton
-@Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
+@RequiresMetrics
 public class SimpleMeterRegistryEventListener implements ApplicationEventListener<StartupEvent> {
 
     private static Logger logger = LoggerFactory.getLogger(SimpleMeterRegistryEventListener.class);

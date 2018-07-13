@@ -19,6 +19,7 @@ package io.micronaut.configuration.metrics.binder.system;
 import io.micrometer.core.instrument.binder.system.FileDescriptorMetrics;
 import io.micrometer.core.instrument.binder.system.ProcessorMetrics;
 import io.micrometer.core.instrument.binder.system.UptimeMetrics;
+import io.micronaut.configuration.metrics.annotation.RequiresMetrics;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
@@ -26,8 +27,7 @@ import io.micronaut.context.annotation.Requires;
 
 import javax.inject.Singleton;
 
-import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS;
-import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED;
+import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS;
 
 /**
  * Binder factory that will create the system metrics beans.
@@ -36,7 +36,7 @@ import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory
  * @since 1.0
  */
 @Factory
-@Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
+@RequiresMetrics
 public class SystemMeterRegistryBinder {
 
     /**
@@ -47,7 +47,7 @@ public class SystemMeterRegistryBinder {
     @Bean
     @Singleton
     @Primary
-    @Requires(property = MICRONAUT_METRICS + "binders.uptime.enabled", value = "true", defaultValue = "true")
+    @Requires(property = MICRONAUT_METRICS_BINDERS + ".uptime.enabled", value = "true", defaultValue = "true")
     public UptimeMetrics uptimeMetrics() {
         return new UptimeMetrics();
     }
@@ -60,7 +60,7 @@ public class SystemMeterRegistryBinder {
     @Bean
     @Singleton
     @Primary
-    @Requires(property = MICRONAUT_METRICS + "binders.processor.enabled", value = "true", defaultValue = "true")
+    @Requires(property = MICRONAUT_METRICS_BINDERS + ".processor.enabled", value = "true", defaultValue = "true")
     public ProcessorMetrics processorMetrics() {
         return new ProcessorMetrics();
     }
@@ -73,7 +73,7 @@ public class SystemMeterRegistryBinder {
     @Bean
     @Singleton
     @Primary
-    @Requires(property = MICRONAUT_METRICS + "binders.files.enabled", value = "true", defaultValue = "true")
+    @Requires(property = MICRONAUT_METRICS_BINDERS + ".files.enabled", value = "true", defaultValue = "true")
     public FileDescriptorMetrics fileDescriptorMetrics() {
         return new FileDescriptorMetrics();
     }

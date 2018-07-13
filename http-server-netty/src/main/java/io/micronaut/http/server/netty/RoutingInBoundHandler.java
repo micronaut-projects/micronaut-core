@@ -121,6 +121,8 @@ import java.util.stream.Collectors;
 class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.http.HttpRequest<?>> {
 
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundHandler.class);
+    private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
+            "^.*(?:connection.*(?:reset|closed|abort|broken)|broken.*pipe).*$", Pattern.CASE_INSENSITIVE);
 
     private final Router router;
     private final ExecutorSelector executorSelector;
@@ -131,8 +133,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private final RequestArgumentSatisfier requestArgumentSatisfier;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
-    private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
-            "^.*(?:connection.*(?:reset|closed|abort|broken)|broken.*pipe).*$", Pattern.CASE_INSENSITIVE);
 
     /**
      * @param beanLocator                             The bean locator

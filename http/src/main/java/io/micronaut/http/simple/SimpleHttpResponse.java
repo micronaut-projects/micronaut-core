@@ -84,6 +84,11 @@ class SimpleHttpResponse<B> implements MutableHttpResponse<B> {
         return this.status;
     }
 
+    /**
+     * The cookies for this response.
+     *
+     * @return The cookies.
+     */
     public Cookies getCookies() {
         return cookies;
     }

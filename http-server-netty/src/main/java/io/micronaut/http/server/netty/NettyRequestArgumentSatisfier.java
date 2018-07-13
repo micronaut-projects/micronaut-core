@@ -22,6 +22,11 @@ import java.util.Optional;
 @Singleton
 public class NettyRequestArgumentSatisfier extends RequestArgumentSatisfier {
 
+    /**
+     * Constructor.
+     *
+     * @param requestBinderRegistry The request argument binder
+     */
     public NettyRequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry) {
         super(requestBinderRegistry);
     }
