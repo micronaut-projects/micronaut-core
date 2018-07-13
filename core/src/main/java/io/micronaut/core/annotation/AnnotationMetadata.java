@@ -178,7 +178,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @return A list of values
      */
     List<ConvertibleValues<Object>> getDeclaredAnnotationValuesByType(Class<? extends Annotation> annotationType);
-    
+
     /**
      * Return the default value for the given annotation member.
      *

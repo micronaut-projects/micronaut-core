@@ -9,6 +9,8 @@ import io.micronaut.inject.BeanDefinition
 
 class RepeatableAnnotationSpec extends AbstractTypeElementSpec {
 
+
+
     void "test repeatable annotation properties with alias"() {
         given:
         BeanDefinition definition = buildBeanDefinition('test.Test','''\
@@ -70,6 +72,94 @@ class Test {
         requires.size() == 2
     }
 
+    void "test repeatable annotation resolve all values with single @Requires - reverse"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import io.micronaut.inject.annotation.repeatable.*;
+import io.micronaut.context.annotation.*;
+
+@Requires(property="bar")
+@OneRequires
+@javax.inject.Singleton
+class Test {
+
+}
+''')
+        when:
+        List<ConvertibleValues> requirements = definition.getAnnotationValuesByType(Requires.class)
+        Requires[] requires = definition.getAnnotationsByType(Requires)
+
+        then:
+        definition.getAnnotationMetadata().hasAnnotation(Requires.class)
+        definition.getAnnotationMetadata().hasAnnotation(Requirements.class)
+
+        requirements != null
+        requirements.size() == 2
+        requires.size() == 2
+    }
+
+    void "test repeatable annotation resolve inherited from meta annotations"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import io.micronaut.inject.annotation.repeatable.*;
+import io.micronaut.context.annotation.*;
+
+@OneRequires
+@TwoRequires
+@javax.inject.Singleton
+class Test {
+
+}
+''')
+        when:
+        List<ConvertibleValues> requirements = definition.getAnnotationValuesByType(Requires.class)
+        Requires[] requires = definition.getAnnotationsByType(Requires)
+
+        then:
+        definition.getAnnotationMetadata().hasStereotype(Requires.class)
+        definition.getAnnotationMetadata().hasStereotype(Requirements.class)
+        !definition.getAnnotationMetadata().hasAnnotation(Requires.class)
+        !definition.getAnnotationMetadata().hasAnnotation(Requirements.class)
+
+        requirements != null
+        requirements.size() == 3
+        requires.size() == 3
+    }
+
+    void "test repeatable annotation resolve inherited from meta annotations - reverse"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import io.micronaut.inject.annotation.repeatable.*;
+import io.micronaut.context.annotation.*;
+
+@TwoRequires
+@OneRequires
+@javax.inject.Singleton
+class Test {
+
+}
+''')
+        when:
+        List<ConvertibleValues> requirements = definition.getAnnotationValuesByType(Requires.class)
+        Requires[] requires = definition.getAnnotationsByType(Requires)
+
+        then:
+        definition.getAnnotationMetadata().hasStereotype(Requires.class)
+        definition.getAnnotationMetadata().hasStereotype(Requirements.class)
+        !definition.getAnnotationMetadata().hasAnnotation(Requires.class)
+        !definition.getAnnotationMetadata().hasAnnotation(Requirements.class)
+
+        requirements != null
+        requirements.size() == 3
+        requires.size() == 3
+    }
+
 
     void "test repeatable annotation resolve all values with multiple @Requires"() {
         given:
@@ -82,6 +172,34 @@ import io.micronaut.context.annotation.*;
 @OneRequires
 @Requires(property="bar")
 @Requires(property="another")
+@javax.inject.Singleton
+class Test {
+
+}
+''')
+        when:
+        List<ConvertibleValues> requirements = definition.getAnnotationValuesByType(Requires.class)
+        Requires[] requires = definition.getAnnotationsByType(Requires)
+
+        then:
+        definition.getAnnotationMetadata().hasAnnotation(Requires.class)
+        definition.getAnnotationMetadata().hasAnnotation(Requirements.class)
+        requirements != null
+        requirements.size() == 3
+        requires.size() == 3
+    }
+
+    void "test repeatable annotation resolve all values with multiple @Requires - reverse"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import io.micronaut.inject.annotation.repeatable.*;
+import io.micronaut.context.annotation.*;
+
+@Requires(property="bar")
+@Requires(property="another")
+@OneRequires
 @javax.inject.Singleton
 class Test {
 
@@ -137,6 +255,31 @@ import io.micronaut.context.annotation.*;
 
 @TwoRequires
 @Requires(property="bar")
+@javax.inject.Singleton
+class Test {
+
+}
+''')
+        when:
+        List<ConvertibleValues> requirements = definition.getAnnotationValuesByType(Requires.class)
+        Requires[] requires = definition.getAnnotationsByType(Requires)
+
+        then:
+        requirements != null
+        requirements.size() == 3
+        requires.size() == 3
+    }
+
+    void "test repeatable annotation resolve all values with multiple inherited @Requires - reverse"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import io.micronaut.inject.annotation.repeatable.*;
+import io.micronaut.context.annotation.*;
+
+@Requires(property="bar")
+@TwoRequires
 @javax.inject.Singleton
 class Test {
 
