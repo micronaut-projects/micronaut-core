@@ -24,6 +24,7 @@ import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.context.exceptions.BeanContextException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.TaskExecutors;
 import org.slf4j.Logger;
@@ -71,7 +72,7 @@ class ReactorInstrumentation {
                         public ScheduledExecutorService decorateExecutorService(String schedulerType, Supplier<? extends ScheduledExecutorService> actual) {
                             ScheduledExecutorService scheduledExecutorService = actual.get();
                             for (BeanCreatedEventListener schedulerCreateListener : schedulerCreateListeners) {
-                                Object newBean = schedulerCreateListener.onCreated(new BeanCreatedEvent(beanContext, beanDefinition, scheduledExecutorService));
+                                Object newBean = schedulerCreateListener.onCreated(new BeanCreatedEvent(beanContext, beanDefinition, BeanIdentifier.of("reactor-" + schedulerType), scheduledExecutorService));
                                 if (!(newBean instanceof ScheduledExecutorService)) {
                                     throw new BeanContextException("Bean creation listener [" + schedulerCreateListener + "] should return ScheduledExecutorService, but returned " + newBean);
                                 }
