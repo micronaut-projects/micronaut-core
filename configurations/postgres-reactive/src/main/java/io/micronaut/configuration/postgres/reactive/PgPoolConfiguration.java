@@ -29,15 +29,8 @@ import io.reactiverse.pgclient.PgPoolOptions;
 @ConfigurationProperties(PgPoolClientSettings.PREFIX)
 public class PgPoolConfiguration {
 
-    /**
-     * The options for configuring a connection pool.
-     */
     @ConfigurationBuilder
     protected PgPoolOptions pgPoolOptions = new PgPoolOptions();
-
-    /**
-     * The Postgres connection URI.
-     */
     protected String uri;
 
     /**
