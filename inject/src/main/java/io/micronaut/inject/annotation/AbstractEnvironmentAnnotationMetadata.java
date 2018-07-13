@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -145,8 +144,6 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     public List<String> getDeclaredAnnotationNamesTypeByStereotype(String stereotype) {
         return annotationMetadata.getAnnotationNamesByStereotype(stereotype);
     }
-
-
 
     @Override
     public ConvertibleValues<Object> getValues(String annotation) {

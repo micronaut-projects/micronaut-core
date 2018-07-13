@@ -474,7 +474,6 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
         }
     }
 
-
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
         complete();

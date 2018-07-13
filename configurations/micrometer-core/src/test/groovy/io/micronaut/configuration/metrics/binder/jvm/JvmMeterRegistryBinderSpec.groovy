@@ -9,6 +9,7 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS
+import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED
 
 class JvmMeterRegistryBinderSpec extends Specification {
@@ -58,7 +59,7 @@ class JvmMeterRegistryBinderSpec extends Specification {
         cfg                                       | setting
         MICRONAUT_METRICS_ENABLED                 | true
         MICRONAUT_METRICS_ENABLED                 | false
-        MICRONAUT_METRICS + "binders.jvm.enabled" | true
-        MICRONAUT_METRICS + "binders.jvm.enabled" | false
+        MICRONAUT_METRICS_BINDERS + ".jvm.enabled" | true
+        MICRONAUT_METRICS_BINDERS + ".jvm.enabled" | false
     }
 }

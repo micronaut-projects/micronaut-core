@@ -20,6 +20,7 @@ import io.micrometer.core.instrument.binder.jvm.ClassLoaderMetrics;
 import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics;
 import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics;
 import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics;
+import io.micronaut.configuration.metrics.annotation.RequiresMetrics;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
@@ -27,8 +28,7 @@ import io.micronaut.context.annotation.Requires;
 
 import javax.inject.Singleton;
 
-import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS;
-import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED;
+import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS;
 
 /**
  * Binder factory that will create the jvm metrics beans.
@@ -37,8 +37,8 @@ import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory
  * @since 1.0
  */
 @Factory
-@Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
-@Requires(property = MICRONAUT_METRICS + "binders.jvm.enabled", value = "true", defaultValue = "true")
+@RequiresMetrics
+@Requires(property = MICRONAUT_METRICS_BINDERS + ".jvm.enabled", value = "true", defaultValue = "true")
 public class JvmMeterRegistryBinder {
 
     /**

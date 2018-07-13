@@ -6,6 +6,7 @@ import spock.lang.Specification
 import spock.lang.Unroll
 
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS
+import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED
 
 class LogbackMeterRegistryBinderSpec extends Specification {
@@ -46,8 +47,8 @@ class LogbackMeterRegistryBinderSpec extends Specification {
         cfg                                           | setting
         MICRONAUT_METRICS_ENABLED                     | true
         MICRONAUT_METRICS_ENABLED                     | false
-        MICRONAUT_METRICS + "binders.logback.enabled" | true
-        MICRONAUT_METRICS + "binders.logback.enabled" | false
+        MICRONAUT_METRICS_BINDERS + ".logback.enabled" | true
+        MICRONAUT_METRICS_BINDERS + ".logback.enabled" | false
     }
 
 }

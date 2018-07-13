@@ -36,6 +36,12 @@ public class SimpleCookie implements Cookie {
     private boolean secure;
     private long maxAge;
 
+    /**
+     * Constructor.
+     *
+     * @param name The name
+     * @param value The value
+     */
     public SimpleCookie(String name, String value) {
         this.name = name;
         this.value = value;
