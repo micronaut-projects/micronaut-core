@@ -1221,7 +1221,8 @@ public class DefaultBeanContext implements BeanContext {
                                  Qualifier<T> qualifier,
                                  boolean isSingleton,
                                  Map<String, Object> argumentValues) {
-        BeanRegistration<T> beanRegistration = isSingleton && !beanDefinition.isIterable() ? singletonObjects.get(new BeanKey(beanDefinition.getBeanType(), qualifier)) : null;
+        BeanKey beanKey = new BeanKey(beanDefinition.getBeanType(), qualifier);
+        BeanRegistration<T> beanRegistration = isSingleton && !beanDefinition.isIterable() ? singletonObjects.get(beanKey) : null;
         T bean;
         if (beanRegistration != null) {
             return beanRegistration.bean;
@@ -1304,7 +1305,7 @@ public class DefaultBeanContext implements BeanContext {
 
             Collection<BeanCreatedEventListener> beanCreatedEventListeners = getBeansOfType(resolutionContext, BeanCreatedEventListener.class, Qualifiers.byTypeArguments(beanDefinition.getBeanType()));
             for (BeanCreatedEventListener listener : beanCreatedEventListeners) {
-                bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, bean));
+                bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, bean));
                 if (bean == null) {
                     throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
                 }

@@ -18,6 +18,7 @@ package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.BeanIdentifier;
 
 /**
  * <p>An event fired when a bean is created and fully initialized.</p>
@@ -29,12 +30,23 @@ import io.micronaut.inject.BeanDefinition;
  */
 public class BeanCreatedEvent<T> extends BeanEvent<T> {
 
+    private final BeanIdentifier beanIdentifier;
+
     /**
      * @param beanContext    The bean context
      * @param beanDefinition The bean definition
+     * @param beanIdentifier The bean identifier
      * @param bean           The bean
      */
-    public BeanCreatedEvent(BeanContext beanContext, BeanDefinition<T> beanDefinition, T bean) {
+    public BeanCreatedEvent(BeanContext beanContext, BeanDefinition<T> beanDefinition, BeanIdentifier beanIdentifier, T bean) {
         super(beanContext, beanDefinition, bean);
+        this.beanIdentifier = beanIdentifier;
+    }
+
+    /**
+     * @return The bean identifier used to create the bean
+     */
+    public BeanIdentifier getBeanIdentifier() {
+        return beanIdentifier;
     }
 }
