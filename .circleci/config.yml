@@ -1,0 +1,15 @@
+version: 2
+jobs:
+  build:
+    working_directory: ~/repo
+    docker:
+      - image: circleci/openjdk:8-jdk-browsers
+    environment:
+      JVM_OPTS: -Xmx3200m
+      TERM: dumb
+    steps:
+      - checkout
+      - run: ./gradlew --console=plain --stop
+      - run: ./gradlew --console=plain testClasses
+      - run: ./gradlew --console=plain check -x test-suite:test --no-daemon
+      - run: ./gradlew --console=plain test-suite:test --no-daemon
