@@ -28,8 +28,6 @@ import io.micronaut.cache.annotation.CacheConfig;
 import io.micronaut.cache.annotation.CacheInvalidate;
 import io.micronaut.cache.annotation.CachePut;
 import io.micronaut.cache.annotation.Cacheable;
-import io.micronaut.cache.annotation.InvalidateOperations;
-import io.micronaut.cache.annotation.PutOperations;
 import io.micronaut.cache.exceptions.CacheSystemException;
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.async.publisher.Publishers;
@@ -314,13 +312,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
      * @return The operations to cause the return value to be cached within the given cache name.
      */
     protected CachePut[] putOperations(MethodInvocationContext context) {
-        if (context.hasStereotype(CachePut.class)) {
-            return new CachePut[]{context.getAnnotation(CachePut.class)};
-        } else if (context.hasStereotype(PutOperations.class)) {
-            return context.getAnnotation(PutOperations.class).value();
-        } else {
-            return null;
-        }
+        return context.getAnnotationsByType(CachePut.class);
     }
 
     /**
@@ -330,13 +322,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
      * @return The operations to cause the eviction of the given caches
      */
     protected CacheInvalidate[] invalidateOperations(MethodInvocationContext context) {
-        if (context.hasStereotype(CacheInvalidate.class)) {
-            return new CacheInvalidate[]{context.getAnnotation(CacheInvalidate.class)};
-        } else if (context.hasStereotype(InvalidateOperations.class)) {
-            return context.getAnnotation(InvalidateOperations.class).value();
-        } else {
-            return null;
-        }
+        return context.getAnnotationsByType(CacheInvalidate.class);
     }
 
     private Object interceptPublisher(MethodInvocationContext<Object, Object> context, ReturnType returnTypeObject, Class returnType) {

@@ -1,16 +1,47 @@
 package io.micronaut.inject.annotation.repeatable
 
-import groovy.transform.NotYetImplemented
 import io.micronaut.context.annotation.Requirements
+import io.micronaut.context.annotation.Requires
+import io.micronaut.core.convert.value.ConvertibleValues
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.annotation.AnnotationValue
-import io.micronaut.inject.annotation.TestCachePuts
 
 
 class RepeatableAnnotationSpec extends AbstractTypeElementSpec {
 
-    @NotYetImplemented
+    void "test repeatable annotation properties with alias"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import io.micronaut.inject.annotation.repeatable.*;
+import io.micronaut.context.annotation.*;
+
+@OneRequires(properties = @Property(name="prop1", value="value1"))
+@SomeOther(properties = @Property(name="prop2", value="value2"))
+@javax.inject.Singleton
+class Test {
+
+    @OneRequires(properties = @Property(name="prop2", value="value2"))    
+    void someMethod() {}
+}
+''')
+
+        when:
+        SomeOther someOther= definition.getAnnotation(SomeOther)
+        OneRequires oneRequires = definition.getAnnotation(OneRequires)
+
+        then:
+        oneRequires.properties().size() == 1
+        oneRequires.properties()[0].name() == 'prop1'
+        oneRequires.properties()[0].value() == 'value1'
+        someOther.properties().size() == 1
+        someOther.properties()[0].name() == 'prop2'
+        someOther.properties()[0].value() == 'value2'
+    }
+
+
+
     void "test repeatable annotation resolve all values with single @Requires"() {
         given:
         BeanDefinition definition = buildBeanDefinition('test.Test','''\
@@ -19,7 +50,7 @@ package test;
 import io.micronaut.inject.annotation.repeatable.*;
 import io.micronaut.context.annotation.*;
 
-@SomeRequires
+@OneRequires
 @Requires(property="bar")
 @javax.inject.Singleton
 class Test {
@@ -27,15 +58,19 @@ class Test {
 }
 ''')
         when:
-        AnnotationValue[] requirements = definition.getValue(Requirements, AnnotationValue[].class).orElse(null)
+        List<ConvertibleValues> requirements = definition.getAnnotationValuesByType(Requires.class)
+        Requires[] requires = definition.getAnnotationsByType(Requires)
 
         then:
+        definition.getAnnotationMetadata().hasAnnotation(Requires.class)
+        definition.getAnnotationMetadata().hasAnnotation(Requirements.class)
+
         requirements != null
         requirements.size() == 2
+        requires.size() == 2
     }
 
 
-    @NotYetImplemented
     void "test repeatable annotation resolve all values with multiple @Requires"() {
         given:
         BeanDefinition definition = buildBeanDefinition('test.Test','''\
@@ -44,7 +79,7 @@ package test;
 import io.micronaut.inject.annotation.repeatable.*;
 import io.micronaut.context.annotation.*;
 
-@SomeRequires
+@OneRequires
 @Requires(property="bar")
 @Requires(property="another")
 @javax.inject.Singleton
@@ -53,10 +88,67 @@ class Test {
 }
 ''')
         when:
-        AnnotationValue[] requirements = definition.getValue(Requirements, AnnotationValue[].class).orElse(null)
+        List<ConvertibleValues> requirements = definition.getAnnotationValuesByType(Requires.class)
+        Requires[] requires = definition.getAnnotationsByType(Requires)
+
+        then:
+        definition.getAnnotationMetadata().hasAnnotation(Requires.class)
+        definition.getAnnotationMetadata().hasAnnotation(Requirements.class)
+        requirements != null
+        requirements.size() == 3
+        requires.size() == 3
+    }
+
+    void "test repeatable annotation resolve all values with multiple declared and inherited @Requires"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import io.micronaut.inject.annotation.repeatable.*;
+import io.micronaut.context.annotation.*;
+
+@TwoRequires
+@Requires(property="bar")
+@Requires(property="another")
+@javax.inject.Singleton
+class Test {
+
+}
+''')
+        when:
+        List<ConvertibleValues> requirements = definition.getAnnotationValuesByType(Requires.class)
+        Requires[] requires = definition.getAnnotationsByType(Requires)
+
+        then:
+        requirements != null
+        requirements.size() == 4
+        requires.size() == 4
+    }
+
+
+
+    void "test repeatable annotation resolve all values with multiple inherited @Requires"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test','''\
+package test;
+
+import io.micronaut.inject.annotation.repeatable.*;
+import io.micronaut.context.annotation.*;
+
+@TwoRequires
+@Requires(property="bar")
+@javax.inject.Singleton
+class Test {
+
+}
+''')
+        when:
+        List<ConvertibleValues> requirements = definition.getAnnotationValuesByType(Requires.class)
+        Requires[] requires = definition.getAnnotationsByType(Requires)
 
         then:
         requirements != null
         requirements.size() == 3
+        requires.size() == 3
     }
 }

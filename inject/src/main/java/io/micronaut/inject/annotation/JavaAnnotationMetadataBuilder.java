@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.processing.JavaModelUtils;
 
+import javax.annotation.Nullable;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -31,6 +32,7 @@ import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.AbstractAnnotationValueVisitor8;
 import javax.lang.model.util.Elements;
 import java.lang.annotation.Annotation;
+import java.lang.annotation.Repeatable;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -61,6 +63,29 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected String getAnnotationMemberName(Element member) {
         return member.getSimpleName().toString();
+    }
+
+    @Nullable
+    @Override
+    protected String getRepeatableName(AnnotationMirror annotationMirror) {
+        List<? extends AnnotationMirror> mirrors = annotationMirror.getAnnotationType().asElement().getAnnotationMirrors();
+        for (AnnotationMirror mirror : mirrors) {
+            String name = mirror.getAnnotationType().toString();
+            if (Repeatable.class.getName().equals(name)) {
+                Map<? extends ExecutableElement, ? extends javax.lang.model.element.AnnotationValue> elementValues = mirror.getElementValues();
+                for (ExecutableElement executableElement : elementValues.keySet()) {
+                    if (executableElement.getSimpleName().toString().equals("value")) {
+                        javax.lang.model.element.AnnotationValue av = elementValues.get(executableElement);
+                        Object value = av.getValue();
+                        if (value instanceof DeclaredType) {
+                            Element element = ((DeclaredType) value).asElement();
+                            return JavaModelUtils.getClassName((TypeElement) element);
+                        }
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     @Override
@@ -153,7 +178,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected String getAnnotationTypeName(AnnotationMirror annotationMirror) {
-        return annotationMirror.getAnnotationType().toString();
+        return JavaModelUtils.getClassName((TypeElement) annotationMirror.getAnnotationType().asElement());
     }
 
     private void populateTypeHierarchy(Element element, List<Element> hierarchy) {

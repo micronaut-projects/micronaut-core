@@ -257,7 +257,7 @@ class AnnotationMetadataSupport {
         }
 
         @Override
-        public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        public Object invoke(Object proxy, Method method, Object[] args) {
             String name = method.getName();
             if ((args == null || args.length == 0) && "hashCode".equals(name)) {
                 return hashCode;

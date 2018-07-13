@@ -17,6 +17,7 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
@@ -29,16 +30,10 @@ import io.micronaut.core.value.OptionalValues;
 
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
+import java.lang.annotation.Repeatable;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Default implementation of {@link AnnotationMetadata}.
@@ -125,6 +120,61 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             return ConversionService.SHARED.convert(defaultValues.get(member), requiredType);
         }
         return Optional.empty();
+    }
+
+    @Override
+    public List<ConvertibleValues<Object>> getDeclaredAnnotationValuesByType(Class<? extends Annotation> annotationType) {
+        if (annotationType != null) {
+            Map<String, Map<CharSequence, Object>> sourceAnnotations = this.declaredAnnotations;
+            Map<String, Map<CharSequence, Object>> sourceStereotypes = this.declaredStereotypes;
+
+            List<ConvertibleValues<Object>> results = resolveAnnotationValuesByType(annotationType, sourceAnnotations, sourceStereotypes);
+            if (results != null) {
+                return results;
+            }
+        }
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<ConvertibleValues<Object>> getAnnotationValuesByType(Class<? extends Annotation> annotationType) {
+        if (annotationType != null) {
+            List<ConvertibleValues<Object>> results = resolveAnnotationValuesByType(annotationType, allAnnotations, allStereotypes);
+            if (results != null) {
+                return results;
+            }
+        }
+        return Collections.emptyList();
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public <T extends Annotation> T[] getAnnotationsByType(Class<T> annotationClass) {
+
+        if (annotationClass != null) {
+            List<ConvertibleValues<Object>> values = getAnnotationValuesByType(annotationClass);
+
+            return values.stream()
+                        .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries))
+                        .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
+        }
+
+        //noinspection unchecked
+        return (T[]) AnnotationUtil.ZERO_ANNOTATIONS;
+    }
+
+    @Override
+    public <T extends Annotation> T[] getDeclaredAnnotationsByType(Class<T> annotationClass) {
+        if (annotationClass != null) {
+            List<ConvertibleValues<Object>> values = getAnnotationValuesByType(annotationClass);
+
+            return values.stream()
+                    .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries))
+                    .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
+        }
+
+        //noinspection unchecked
+        return (T[]) AnnotationUtil.ZERO_ANNOTATIONS;
     }
 
     @Override
@@ -286,6 +336,76 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     /**
+     * Adds a repeatable annotation value. If a value already exists will be added
+     *
+     * @param annotationName The annotation name
+     * @param annotationValue The annotation value
+     */
+    protected final void addRepeatable(String annotationName, AnnotationValue annotationValue) {
+        if (StringUtils.isNotEmpty(annotationName) && annotationValue != null) {
+            Map<String, Map<CharSequence, Object>> allAnnotations = getAllAnnotations();
+
+            addRepeatableInternal(annotationName, annotationValue, allAnnotations);
+        }
+    }
+
+    /**
+     * Adds a repeatable stereotype value. If a value already exists will be added
+     *
+     * @param parents The parent annotations
+     * @param stereotype The annotation name
+     * @param annotationValue The annotation value
+     */
+    protected void addRepeatableStereotype(List<String> parents, String stereotype, AnnotationValue annotationValue) {
+        Map<String, Map<CharSequence, Object>> allStereotypes = getAllStereotypes();
+        List<String> annotationList = getAnnotationsByStereotypeInternal(stereotype);
+        for (String parentAnnotation : parents) {
+            if (!annotationList.contains(parentAnnotation)) {
+                annotationList.add(parentAnnotation);
+            }
+        }
+
+        addRepeatableInternal(stereotype, annotationValue, allStereotypes);
+    }
+
+    /**
+     * Adds a repeatable declared stereotype value. If a value already exists will be added
+     *
+     * @param parents The parent annotations
+     * @param stereotype The annotation name
+     * @param annotationValue The annotation value
+     */
+    protected void addDeclaredRepeatableStereotype(List<String> parents, String stereotype, AnnotationValue annotationValue) {
+        Map<String, Map<CharSequence, Object>> declaredStereotypes = getDeclaredStereotypesInternal();
+        List<String> annotationList = getAnnotationsByStereotypeInternal(stereotype);
+        for (String parentAnnotation : parents) {
+            if (!annotationList.contains(parentAnnotation)) {
+                annotationList.add(parentAnnotation);
+            }
+        }
+
+        addRepeatableInternal(stereotype, annotationValue, declaredStereotypes);
+        addRepeatableInternal(stereotype, annotationValue, getAllStereotypes());
+    }
+
+    /**
+     * Adds a repeatable annotation value. If a value already exists will be added
+     *
+     * @param annotationName The annotation name
+     * @param annotationValue The annotation value
+     */
+    protected final void addDeclaredRepeatable(String annotationName, AnnotationValue annotationValue) {
+        if (StringUtils.isNotEmpty(annotationName) && annotationValue != null) {
+            Map<String, Map<CharSequence, Object>> allAnnotations = getDeclaredAnnotationsInternal();
+
+            addRepeatableInternal(annotationName, annotationValue, allAnnotations);
+
+            addRepeatable(annotationName, annotationValue);
+        }
+    }
+
+
+    /**
      * Adds a stereotype and its member values, if the annotation already exists the data will be merged with existing
      * values replaced.
      *
@@ -303,7 +423,16 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                     annotationList.add(parentAnnotation);
                 }
             }
-            addAnnotation(stereotype, values, null, allStereotypes, false);
+
+            // add to stereotypes
+            addAnnotation(
+                    stereotype,
+                    values,
+                    null,
+                    allStereotypes,
+                    false
+            );
+
         }
     }
 
@@ -326,7 +455,15 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                     annotationList.add(parentAnnotation);
                 }
             }
-            addAnnotation(stereotype, values, declaredStereotypes, allStereotypes, true);
+
+            addAnnotation(
+                    stereotype,
+                    values,
+                    declaredStereotypes,
+                    allStereotypes,
+                    true
+            );
+
         }
     }
 
@@ -356,6 +493,28 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         System.out.println("allAnnotations = " + allAnnotations);
         System.out.println("allStereotypes = " + allStereotypes);
         System.out.println("annotationsByStereotype = " + annotationsByStereotype);
+    }
+
+    private List<ConvertibleValues<Object>> resolveAnnotationValuesByType(Class<? extends Annotation> annotationType, Map<String, Map<CharSequence, Object>> sourceAnnotations, Map<String, Map<CharSequence, Object>> sourceStereotypes) {
+        Repeatable repeatable = annotationType.getAnnotation(Repeatable.class);
+        if (repeatable != null) {
+            Class<? extends Annotation> repeatableType = repeatable.value();
+            if (hasStereotype(repeatableType)) {
+                List<ConvertibleValues<Object>> results = new ArrayList<>();
+                if (sourceAnnotations != null) {
+                    Map<CharSequence, Object> values = sourceAnnotations.get(repeatableType.getName());
+                    addAnnotationValuesFromData(results, values);
+                }
+
+                if (sourceStereotypes != null) {
+                    Map<CharSequence, Object> values = sourceStereotypes.get(repeatableType.getName());
+                    addAnnotationValuesFromData(results, values);
+                }
+
+                return results;
+            }
+        }
+        return null;
     }
 
     private void addAnnotation(String annotation,
@@ -449,6 +608,30 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             this.annotationsByStereotype = annotations;
         }
         return annotations;
+    }
+
+    private void addRepeatableInternal(String annotationName, AnnotationValue annotationValue, Map<String, Map<CharSequence, Object>> allAnnotations) {
+        addRepeatableInternal(annotationName, AnnotationMetadata.VALUE_MEMBER, annotationValue, allAnnotations);
+    }
+
+    private void addRepeatableInternal(String annotationName, String member, AnnotationValue annotationValue, Map<String, Map<CharSequence, Object>> allAnnotations) {
+        Map<CharSequence, Object> values = allAnnotations.computeIfAbsent(annotationName, s -> new HashMap<>());
+        Object v = values.get(member);
+        if (v != null) {
+            if (v.getClass().isArray()) {
+                Object[] array = (Object[]) v;
+                List newValues = new ArrayList(array.length + 1);
+                newValues.addAll(Arrays.asList(array));
+                newValues.add(annotationValue);
+                values.put(member, newValues);
+            } else if (v instanceof Collection) {
+                ((Collection) v).add(annotationValue);
+            }
+        } else {
+            ArrayList<Object> newValues = new ArrayList<>(2);
+            newValues.add(annotationValue);
+            values.put(member, newValues);
+        }
     }
 
     /**

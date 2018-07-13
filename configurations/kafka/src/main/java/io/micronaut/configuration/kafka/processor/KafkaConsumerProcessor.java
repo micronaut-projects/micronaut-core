@@ -137,7 +137,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
 
-        Topic[] topicAnnotations = method.getAnnotationsByType(Topic.class);
+        Topic[] topicAnnotations = method.getDeclaredAnnotationsByType(Topic.class);
         KafkaListener consumerAnnotation = method.getAnnotation(KafkaListener.class);
 
         if (ArrayUtils.isEmpty(topicAnnotations)) {

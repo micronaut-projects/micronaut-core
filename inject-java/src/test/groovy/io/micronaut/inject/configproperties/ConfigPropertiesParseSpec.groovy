@@ -27,7 +27,7 @@ import io.micronaut.inject.BeanFactory
  * @author Graeme Rocher
  * @since 1.0
  */
-class ConfigPropertiesParseSpec extends AbstractTypeElementSpec {
+class   ConfigPropertiesParseSpec extends AbstractTypeElementSpec {
 
     void "test inner class paths - pojo inheritance"() {
         when:

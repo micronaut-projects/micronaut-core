@@ -107,4 +107,24 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     default Annotation[] getDeclaredAnnotations() {
         return getAnnotationMetadata().getDeclaredAnnotations();
     }
+
+    @Override
+    default List<ConvertibleValues<Object>> getAnnotationValuesByType(Class<? extends Annotation> annotationType) {
+        return getAnnotationMetadata().getAnnotationValuesByType(annotationType);
+    }
+
+    @Override
+    default List<ConvertibleValues<Object>> getDeclaredAnnotationValuesByType(Class<? extends Annotation> annotationType) {
+        return getAnnotationMetadata().getDeclaredAnnotationValuesByType(annotationType);
+    }
+
+    @Override
+    default <T extends Annotation> T[] getAnnotationsByType(Class<T> annotationClass) {
+        return getAnnotationMetadata().getAnnotationsByType(annotationClass);
+    }
+
+    @Override
+    default <T extends Annotation> T[] getDeclaredAnnotationsByType(Class<T> annotationClass) {
+        return getAnnotationMetadata().getDeclaredAnnotationsByType(annotationClass);
+    }
 }

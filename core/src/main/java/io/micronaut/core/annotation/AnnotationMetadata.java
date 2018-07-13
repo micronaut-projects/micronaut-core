@@ -22,6 +22,7 @@ import io.micronaut.core.value.OptionalValues;
 
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
+import java.lang.annotation.Repeatable;
 import java.lang.reflect.AnnotatedElement;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -163,6 +164,21 @@ public interface AnnotationMetadata extends AnnotatedElement {
     <T> Optional<T> getDefaultValue(String annotation, String member, Class<T> requiredType);
 
     /**
+     * Gets all the annotation values by the given repeatable type.
+     *
+     * @param annotationType The annotation type
+     * @return A list of values
+     */
+    List<ConvertibleValues<Object>> getAnnotationValuesByType(Class<? extends Annotation> annotationType);
+
+    /**
+     * Gets only declared annotation values by the given repeatable type.
+     *
+     * @param annotationType The annotation type
+     * @return A list of values
+     */
+    List<ConvertibleValues<Object>> getDeclaredAnnotationValuesByType(Class<? extends Annotation> annotationType);
+    /**
      * Return the default value for the given annotation member.
      *
      * @param annotation   The annotation
@@ -185,13 +201,24 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @return An {@link Optional} of the value
      */
     default <T> Optional<T> getValue(Class<? extends Annotation> annotation, String member, Class<T> requiredType) {
-        Optional<T> value = getValues(annotation).get(member, requiredType);
-        if (!value.isPresent()) {
-            if (hasStereotype(annotation)) {
-                return getDefaultValue(annotation, member, requiredType);
+        Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
+        if (repeatable != null) {
+            List<ConvertibleValues<Object>> values = getAnnotationValuesByType(annotation);
+            if (!values.isEmpty()) {
+                return values.iterator().next().get(member, requiredType);
+            } else {
+                return Optional.empty();
             }
+        } else {
+
+            Optional<T> value = getValues(annotation).get(member, requiredType);
+            if (!value.isPresent()) {
+                if (hasStereotype(annotation)) {
+                    return getDefaultValue(annotation, member, requiredType);
+                }
+            }
+            return value;
         }
-        return value;
     }
 
     /**
@@ -316,7 +343,18 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @return The {@link ConvertibleValues}
      */
     default ConvertibleValues<Object> getValues(Class<? extends Annotation> annotation) {
-        return getValues(annotation.getName());
+        Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
+        if (repeatable != null) {
+            List<ConvertibleValues<Object>> values = getAnnotationValuesByType(annotation);
+            if (!values.isEmpty()) {
+                return values.iterator().next();
+            } else {
+                //noinspection unchecked
+                return ConvertibleValues.EMPTY;
+            }
+        } else {
+            return getValues(annotation.getName());
+        }
     }
 
     /**
@@ -533,7 +571,17 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @return An {@link Optional} of the value
      */
     default Optional<Object> getValue(Class<? extends Annotation> annotation) {
-        return getValue(annotation.getName(), Object.class);
+        Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
+        if (repeatable != null) {
+            List<ConvertibleValues<Object>> values = getAnnotationValuesByType(annotation);
+            if (!values.isEmpty()) {
+                return values.iterator().next().get("value", Object.class);
+            } else {
+                return Optional.empty();
+            }
+        } else {
+            return getValue(annotation.getName(), Object.class);
+        }
     }
 
     /**
@@ -545,6 +593,16 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @return An {@link Optional} of the value
      */
     default <T> Optional<T> getValue(Class<? extends Annotation> annotation, Class<T> requiredType) {
+        Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
+        if (repeatable != null) {
+            List<ConvertibleValues<Object>> values = getAnnotationValuesByType(annotation);
+            if (!values.isEmpty()) {
+                return values.iterator().next().get("value", requiredType);
+            } else {
+                return Optional.empty();
+            }
+
+        }
         return getValue(annotation.getName(), requiredType);
     }
 
@@ -555,7 +613,15 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @return True if the annotation is present
      */
     default boolean hasAnnotation(@Nullable Class<? extends Annotation> annotation) {
-        return annotation != null && hasAnnotation(annotation.getName());
+        if (annotation != null) {
+            Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
+            if (repeatable != null) {
+                return hasAnnotation(repeatable.value());
+            } else {
+                return hasAnnotation(annotation.getName());
+            }
+        }
+        return false;
     }
 
     /**
@@ -567,7 +633,15 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @return True if the annotation is present
      */
     default boolean hasStereotype(@Nullable Class<? extends Annotation> annotation) {
-        return annotation != null && hasStereotype(annotation.getName());
+        if (annotation != null) {
+            Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
+            if (repeatable != null) {
+                return hasStereotype(repeatable.value());
+            } else {
+                return hasStereotype(annotation.getName());
+            }
+        }
+        return false;
     }
 
     /**
@@ -609,7 +683,15 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @return True if the annotation is present
      */
     default boolean hasDeclaredAnnotation(@Nullable Class<? extends Annotation> annotation) {
-        return annotation != null && hasDeclaredAnnotation(annotation.getName());
+        if (annotation != null) {
+            Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
+            if (repeatable != null) {
+                return hasDeclaredAnnotation(repeatable.value());
+            } else {
+                return hasDeclaredAnnotation(annotation.getName());
+            }
+        }
+        return false;
     }
 
     /**
@@ -619,7 +701,15 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @return True if the annotation is present
      */
     default boolean hasDeclaredStereotype(@Nullable Class<? extends Annotation> stereotype) {
-        return stereotype != null && hasDeclaredStereotype(stereotype.getName());
+        if (stereotype != null) {
+            Repeatable repeatable = stereotype.getAnnotation(Repeatable.class);
+            if (repeatable != null) {
+                return hasDeclaredStereotype(repeatable.value());
+            } else {
+                return hasDeclaredStereotype(stereotype.getName());
+            }
+        }
+        return false;
     }
 
     /**
