@@ -93,6 +93,16 @@ class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
+    public List<ConvertibleValues<Object>> getAnnotationValuesByType(Class<? extends Annotation> annotationType) {
+        return Collections.emptyList();
+    }
+
+    @Override
+    public List<ConvertibleValues<Object>> getDeclaredAnnotationValuesByType(Class<? extends Annotation> annotationType) {
+        return Collections.emptyList();
+    }
+
+    @Override
     public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
         return null;
     }

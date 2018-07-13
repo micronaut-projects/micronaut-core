@@ -16,6 +16,8 @@
 package io.micronaut.ast.groovy
 
 import io.micronaut.context.annotation.Property
+import io.micronaut.context.annotation.PropertySource
+import io.micronaut.inject.annotation.AnnotationValue
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata
 import io.micronaut.inject.configuration.ConfigurationMetadata
 import io.micronaut.inject.configuration.PropertyMetadata
@@ -740,9 +742,17 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                         methodAnnotationMetadata = DefaultAnnotationMetadata.mutateMember(
                                 methodAnnotationMetadata,
-                                Property.name,
-                                "name",
-                                propertyMetadata.path
+                                PropertySource.class.getName(),
+                                AnnotationMetadata.VALUE_MEMBER,
+                                Collections.singletonList(
+                                        new AnnotationValue(
+                                                Property.class.getName(),
+                                                Collections.singletonMap(
+                                                        (CharSequence)"name",
+                                                        (Object)propertyMetadata.getPath()
+                                                )
+                                        )
+                                )
                         )
 
                         getBeanWriter().visitSetterValue(
@@ -875,9 +885,17 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 )
                                 fieldAnnotationMetadata = DefaultAnnotationMetadata.mutateMember(
                                         fieldAnnotationMetadata,
-                                        Property.name,
-                                        "name",
-                                        propertyMetadata.path
+                                        PropertySource.class.getName(),
+                                        AnnotationMetadata.VALUE_MEMBER,
+                                        Collections.singletonList(
+                                                new AnnotationValue(
+                                                        Property.class.getName(),
+                                                        Collections.singletonMap(
+                                                                (CharSequence)"name",
+                                                                (Object)propertyMetadata.getPath()
+                                                        )
+                                                )
+                                        )
                                 )
                             }
                             getBeanWriter().visitFieldValue(
@@ -994,9 +1012,17 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             )
                             fieldAnnotationMetadata = DefaultAnnotationMetadata.mutateMember(
                                     fieldAnnotationMetadata,
-                                    Property.name,
-                                    "name",
-                                    propertyMetadata.path
+                                    PropertySource.class.getName(),
+                                    AnnotationMetadata.VALUE_MEMBER,
+                                    Collections.singletonList(
+                                            new AnnotationValue(
+                                                    Property.class.getName(),
+                                                    Collections.singletonMap(
+                                                            (CharSequence)"name",
+                                                            (Object)propertyMetadata.getPath()
+                                                    )
+                                            )
+                                    )
                             )
                         }
                         getBeanWriter().visitSetterValue(

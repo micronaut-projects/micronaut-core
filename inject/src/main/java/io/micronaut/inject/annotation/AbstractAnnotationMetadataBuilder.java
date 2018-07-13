@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.OptionalValues;
 
+import javax.annotation.Nullable;
 import javax.inject.Scope;
 import java.util.*;
 
@@ -150,6 +151,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The name
      */
     protected abstract String getAnnotationMemberName(T member);
+
+    /**
+     * Obtain the name of the repeatable annotation if the annotation is is one.
+     *
+     * @param annotationMirror The annotation mirror
+     * @return Return the name or null
+     */
+    protected abstract @Nullable String getRepeatableName(A annotationMirror);
 
     /**
      * @param annotationMirror The annotation
@@ -300,10 +309,21 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
                 Map<CharSequence, Object> annotationValues = populateAnnotationData(annotationMirror, annotationMetadata, isDeclared);
 
-                if (isDeclared) {
-                    annotationMetadata.addDeclaredAnnotation(annotationName, annotationValues);
+                String repeatableName = getRepeatableName(annotationMirror);
+
+                if (repeatableName != null) {
+                    AnnotationValue av = new AnnotationValue(annotationName, annotationValues);
+                    if (isDeclared) {
+                        annotationMetadata.addDeclaredRepeatable(repeatableName, av);
+                    } else {
+                        annotationMetadata.addRepeatable(repeatableName, av);
+                    }
                 } else {
-                    annotationMetadata.addAnnotation(annotationName, annotationValues);
+                    if (isDeclared) {
+                        annotationMetadata.addDeclaredAnnotation(annotationName, annotationValues);
+                    } else {
+                        annotationMetadata.addAnnotation(annotationName, annotationValues);
+                    }
                 }
             }
             for (A annotationMirror : annotationHierarchy) {
@@ -327,6 +347,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return annotationMetadata;
     }
 
+
+
     private void buildStereotypeHierarchy(List<String> parents, T element, DefaultAnnotationMetadata metadata, boolean isDeclared) {
         List<? extends A> annotationMirrors = getAnnotationsForType(element);
         if (!annotationMirrors.isEmpty()) {
@@ -344,10 +366,22 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     topLevel.add(annotationMirror);
 
                     Map<CharSequence, Object> data = populateAnnotationData(annotationMirror, metadata, isDeclared);
-                    if (isDeclared) {
-                        metadata.addDeclaredStereotype(parents, annotationName, data);
+
+                    String repeatableName = getRepeatableName(annotationMirror);
+
+                    if (repeatableName != null) {
+                        AnnotationValue av = new AnnotationValue(annotationName, data);
+                        if (isDeclared) {
+                            metadata.addDeclaredRepeatableStereotype(parents, repeatableName, av);
+                        } else {
+                            metadata.addRepeatableStereotype(parents, repeatableName, av);
+                        }
                     } else {
-                        metadata.addStereotype(parents, annotationName, data);
+                        if (isDeclared) {
+                            metadata.addDeclaredStereotype(parents, annotationName, data);
+                        } else {
+                            metadata.addStereotype(parents, annotationName, data);
+                        }
                     }
                 }
             }

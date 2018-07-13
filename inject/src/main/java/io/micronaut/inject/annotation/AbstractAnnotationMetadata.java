@@ -68,8 +68,8 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
         if (annotationClass == null || annotationMap == null) {
             return null;
         }
-        String annotationName = annotationClass.getName().intern();
-        if (hasAnnotation(annotationName) || hasStereotype(annotationName)) {
+        if (hasAnnotation(annotationClass) || hasStereotype(annotationClass)) {
+            String annotationName = annotationClass.getName().intern();
             return (T) annotationMap.computeIfAbsent(annotationName, s -> {
                 ConvertibleValues<Object> annotationValues = getValues(annotationClass);
                 return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValues);
@@ -148,5 +148,40 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
         }
 
         return AnnotationUtil.ZERO_ANNOTATIONS;
+    }
+
+    /**
+     * Adds any annotation values found in the values map to the results.
+     *
+     * @param results The results
+     * @param values The values
+     */
+    protected final void addAnnotationValuesFromData(List<ConvertibleValues<Object>> results, Map<CharSequence, Object> values) {
+        if (values != null) {
+            Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
+            if (v instanceof AnnotationValue[]) {
+                AnnotationValue[] avs = (AnnotationValue[]) v;
+                for (AnnotationValue av : avs) {
+                    addValuesToResults(results, av.getConvertibleValues());
+                }
+            } else if (v instanceof Collection) {
+                Collection c = (Collection) v;
+                for (Object o : c) {
+                    if (o instanceof AnnotationValue) {
+                        addValuesToResults(results, ((AnnotationValue) o).getConvertibleValues());
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Adds a values instance to the results.
+     *
+     * @param results The results
+     * @param values The values
+     */
+    protected void addValuesToResults(List<ConvertibleValues<Object>> results, ConvertibleValues<Object> values) {
+        results.add(values);
     }
 }

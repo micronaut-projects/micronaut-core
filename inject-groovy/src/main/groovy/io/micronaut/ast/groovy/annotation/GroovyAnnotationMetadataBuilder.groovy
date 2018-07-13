@@ -33,6 +33,7 @@ import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.expr.ListExpression
 import org.codehaus.groovy.ast.expr.PropertyExpression
 
+import java.lang.annotation.Repeatable
 import java.lang.reflect.Array
 
 /**
@@ -49,6 +50,18 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     @Override
     protected AnnotatedNode getTypeForAnnotation(AnnotationNode annotationMirror) {
         return annotationMirror.classNode
+    }
+
+    @Override
+    protected String getRepeatableName(AnnotationNode annotationMirror) {
+        List<AnnotationNode> annotationNodes = annotationMirror.classNode.getAnnotations(ClassHelper.makeCached(Repeatable))
+        if (annotationNodes) {
+            Expression expression = annotationNodes.get(0).getMember("value")
+            if (expression instanceof ClassExpression) {
+                return ((ClassExpression)expression).type.name
+            }
+        }
+        return null
     }
 
     @Override
