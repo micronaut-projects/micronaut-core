@@ -22,7 +22,6 @@ import io.micrometer.core.instrument.Statistic;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry;
 import io.micronaut.configuration.metrics.annotation.RequiresMetrics;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.Read;
@@ -32,8 +31,6 @@ import java.util.*;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
-import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED;
-
 /**
  * Provides a metrics endpoint to visualize metrics.
  *
@@ -41,8 +38,7 @@ import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory
  * @since 1.0
  */
 @Endpoint(value = MetricsEndpoint.NAME, defaultSensitive = MetricsEndpoint.DEFAULT_SENSITIVE)
-@Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
-@Requires(beans = MeterRegistry.class)
+@RequiresMetrics
 public class MetricsEndpoint {
 
     /**
