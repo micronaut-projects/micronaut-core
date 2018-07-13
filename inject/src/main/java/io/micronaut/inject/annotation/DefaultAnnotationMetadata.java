@@ -82,6 +82,10 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     Map<String, Map<CharSequence, Object>> allStereotypes;
     Map<String, List<String>> annotationsByStereotype;
 
+    // The following fields are used only at compile time, and
+    // should not be used in any of the read methods
+    private Map<String, String> repeated = null;
+
     /**
      * Constructs empty annotation metadata.
      */
@@ -330,8 +334,26 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @SuppressWarnings("WeakerAccess")
     protected final void addAnnotation(String annotation, Map<CharSequence, Object> values) {
         if (annotation != null) {
-            Map<String, Map<CharSequence, Object>> allAnnotations = getAllAnnotations();
-            addAnnotation(annotation, values, null, allAnnotations, false);
+            String repeatedName = getRepeatedName(annotation);
+            if (repeatedName != null) {
+                Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
+                if (v instanceof AnnotationValue[]) {
+                    AnnotationValue[] avs = (AnnotationValue[]) v;
+                    for (AnnotationValue av : avs) {
+                        addRepeatable(annotation, av);
+                    }
+                } else if (v instanceof Iterable) {
+                    Iterable i = (Iterable) v;
+                    for (Object o : i) {
+                        if (o instanceof AnnotationValue) {
+                            addRepeatable(annotation, ((AnnotationValue) o));
+                        }
+                    }
+                }
+            } else {
+                Map<String, Map<CharSequence, Object>> allAnnotations = getAllAnnotations();
+                addAnnotation(annotation, values, null, allAnnotations, false);
+            }
         }
     }
 
@@ -416,22 +438,40 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @SuppressWarnings("WeakerAccess")
     protected final void addStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
         if (stereotype != null) {
-            Map<String, Map<CharSequence, Object>> allStereotypes = getAllStereotypes();
-            List<String> annotationList = getAnnotationsByStereotypeInternal(stereotype);
-            for (String parentAnnotation : parentAnnotations) {
-                if (!annotationList.contains(parentAnnotation)) {
-                    annotationList.add(parentAnnotation);
+            String repeatedName = getRepeatedName(stereotype);
+            if (repeatedName != null) {
+                Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
+                if (v instanceof AnnotationValue[]) {
+                    AnnotationValue[] avs = (AnnotationValue[]) v;
+                    for (AnnotationValue av : avs) {
+                        addRepeatableStereotype(parentAnnotations, stereotype, av);
+                    }
+                } else if (v instanceof Iterable) {
+                    Iterable i = (Iterable) v;
+                    for (Object o : i) {
+                        if (o instanceof AnnotationValue) {
+                            addRepeatableStereotype(parentAnnotations, stereotype, (AnnotationValue) o);
+                        }
+                    }
                 }
-            }
+            } else {
+                Map<String, Map<CharSequence, Object>> allStereotypes = getAllStereotypes();
+                List<String> annotationList = getAnnotationsByStereotypeInternal(stereotype);
+                for (String parentAnnotation : parentAnnotations) {
+                    if (!annotationList.contains(parentAnnotation)) {
+                        annotationList.add(parentAnnotation);
+                    }
+                }
 
-            // add to stereotypes
-            addAnnotation(
-                    stereotype,
-                    values,
-                    null,
-                    allStereotypes,
-                    false
-            );
+                // add to stereotypes
+                addAnnotation(
+                        stereotype,
+                        values,
+                        null,
+                        allStereotypes,
+                        false
+                );
+            }
 
         }
     }
@@ -447,22 +487,40 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @SuppressWarnings("WeakerAccess")
     protected final void addDeclaredStereotype(List<String> parentAnnotations, String stereotype, Map<CharSequence, Object> values) {
         if (stereotype != null) {
-            Map<String, Map<CharSequence, Object>> declaredStereotypes = getDeclaredStereotypesInternal();
-            Map<String, Map<CharSequence, Object>> allStereotypes = getAllStereotypes();
-            List<String> annotationList = getAnnotationsByStereotypeInternal(stereotype);
-            for (String parentAnnotation : parentAnnotations) {
-                if (!annotationList.contains(parentAnnotation)) {
-                    annotationList.add(parentAnnotation);
+            String repeatedName = getRepeatedName(stereotype);
+            if (repeatedName != null) {
+                Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
+                if (v instanceof AnnotationValue[]) {
+                    AnnotationValue[] avs = (AnnotationValue[]) v;
+                    for (AnnotationValue av : avs) {
+                        addDeclaredRepeatableStereotype(parentAnnotations, stereotype, av);
+                    }
+                } else if (v instanceof Iterable) {
+                    Iterable i = (Iterable) v;
+                    for (Object o : i) {
+                        if (o instanceof AnnotationValue) {
+                            addDeclaredRepeatableStereotype(parentAnnotations, stereotype, (AnnotationValue) o);
+                        }
+                    }
                 }
-            }
+            } else {
+                Map<String, Map<CharSequence, Object>> declaredStereotypes = getDeclaredStereotypesInternal();
+                Map<String, Map<CharSequence, Object>> allStereotypes = getAllStereotypes();
+                List<String> annotationList = getAnnotationsByStereotypeInternal(stereotype);
+                for (String parentAnnotation : parentAnnotations) {
+                    if (!annotationList.contains(parentAnnotation)) {
+                        annotationList.add(parentAnnotation);
+                    }
+                }
 
-            addAnnotation(
-                    stereotype,
-                    values,
-                    declaredStereotypes,
-                    allStereotypes,
-                    true
-            );
+                addAnnotation(
+                        stereotype,
+                        values,
+                        declaredStereotypes,
+                        allStereotypes,
+                        true
+                );
+            }
 
         }
     }
@@ -476,9 +534,27 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     protected void addDeclaredAnnotation(String annotation, Map<CharSequence, Object> values) {
         if (annotation != null) {
-            Map<String, Map<CharSequence, Object>> declaredAnnotations = getDeclaredAnnotationsInternal();
-            Map<String, Map<CharSequence, Object>> allAnnotations = getAllAnnotations();
-            addAnnotation(annotation, values, declaredAnnotations, allAnnotations, true);
+            String repeatedName = getRepeatedName(annotation);
+            if (repeatedName != null) {
+                Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
+                if (v instanceof AnnotationValue[]) {
+                    AnnotationValue[] avs = (AnnotationValue[]) v;
+                    for (AnnotationValue av : avs) {
+                        addDeclaredRepeatable(annotation, av);
+                    }
+                } else if (v instanceof Iterable) {
+                    Iterable i = (Iterable) v;
+                    for (Object o : i) {
+                        if (o instanceof AnnotationValue) {
+                            addDeclaredRepeatable(annotation, ((AnnotationValue) o));
+                        }
+                    }
+                }
+            } else {
+                Map<String, Map<CharSequence, Object>> declaredAnnotations = getDeclaredAnnotationsInternal();
+                Map<String, Map<CharSequence, Object>> allAnnotations = getAllAnnotations();
+                addAnnotation(annotation, values, declaredAnnotations, allAnnotations, true);
+            }
         }
     }
 
@@ -600,6 +676,13 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return getAnnotationsByStereotypeInternal().computeIfAbsent(stereotype, s -> new ArrayList<>());
     }
 
+    private String getRepeatedName(String annotation) {
+        if (repeated != null) {
+            return repeated.get(annotation);
+        }
+        return null;
+    }
+
     @SuppressWarnings("MagicNumber")
     private Map<String, List<String>> getAnnotationsByStereotypeInternal() {
         Map<String, List<String>> annotations = this.annotationsByStereotype;
@@ -615,6 +698,12 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     private void addRepeatableInternal(String annotationName, String member, AnnotationValue annotationValue, Map<String, Map<CharSequence, Object>> allAnnotations) {
+        if (repeated == null) {
+            repeated = new HashMap<>(2);
+        }
+
+        repeated.put(annotationName, annotationValue.getAnnotationName());
+
         Map<CharSequence, Object> values = allAnnotations.computeIfAbsent(annotationName, s -> new HashMap<>());
         Object v = values.get(member);
         if (v != null) {
