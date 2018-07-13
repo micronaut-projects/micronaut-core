@@ -21,13 +21,12 @@ import io.micronaut.health.HealthStatus;
 import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
-import io.reactiverse.pgclient.Row;
 import io.reactiverse.reactivex.pgclient.PgPool;
-import io.reactiverse.reactivex.pgclient.PgRowSet;
-import io.reactivex.Single;
+import io.reactiverse.reactivex.pgclient.Row;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
+import java.util.Collections;
 
 /**
  * A  {@link HealthIndicator} for reactive Postgres client.
@@ -35,12 +34,12 @@ import javax.inject.Singleton;
  * @author puneetbehl
  * @since 1.0
  */
-@Requires(classes = HealthIndicator.class)
+@Requires(beans = HealthEndpoint.class)
 @Requires(property = HealthEndpoint.PREFIX + ".postgres.reactive.enabled", notEquals = "false")
 @Singleton
 public class PgPoolHealthIndicator implements HealthIndicator {
 
-    public static final String NAME = "pgPool";
+    public static final String NAME = "postgres-reactive";
     public static final String QUERY = "SELECT version();";
     private final PgPool client;
 
@@ -55,17 +54,14 @@ public class PgPoolHealthIndicator implements HealthIndicator {
 
     @Override
     public Publisher<HealthResult> getResult() {
-        Single<PgRowSet> single = client.rxQuery(QUERY);
-        Single<HealthResult> healthResultSingle = single.map(pgRowSet -> {
-            HealthResult.Builder status = HealthResult.builder(NAME, HealthStatus.UP);
-            String details = String.join(", ", pgRowSet.columnsNames());
-            for (Row row : pgRowSet.getDelegate()) {
-                details = details.concat("\n" + row.getString("db") + ", " + row.getString("size"));
-            }
-            status.details(details);
-            return status.build();
-        }).onErrorReturn(this::buildErrorResult);
-        return healthResultSingle.toFlowable();
+        return client.rxQuery(QUERY)
+                .map(pgRowSet -> {
+                    HealthResult.Builder status = HealthResult.builder(NAME, HealthStatus.UP);
+                    Row row = pgRowSet.iterator().next();
+                    status.details(Collections.singletonMap("version", row.getString(0)));
+                    return status.build();
+                })
+                .onErrorReturn(this::buildErrorResult).toFlowable();
     }
 
     private HealthResult buildErrorResult(Throwable throwable) {
