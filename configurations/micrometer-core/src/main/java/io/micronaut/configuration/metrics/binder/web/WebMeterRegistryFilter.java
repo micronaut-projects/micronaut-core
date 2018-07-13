@@ -17,6 +17,7 @@
 package io.micronaut.configuration.metrics.binder.web;
 
 import io.micrometer.core.instrument.MeterRegistry;
+import io.micronaut.configuration.metrics.annotation.RequiresMetrics;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
@@ -25,8 +26,7 @@ import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import org.reactivestreams.Publisher;
 
-import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS;
-import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED;
+import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS;
 
 /**
  * Once per request web filter that will register the timers
@@ -39,9 +39,8 @@ import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory
  * @since 1.0
  */
 @Filter("${micronaut.metrics.http.path:/**}")
-@Requires(beans = MeterRegistry.class)
-@Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
-@Requires(property = MICRONAUT_METRICS + "binders.web.enabled", value = "true", defaultValue = "true")
+@RequiresMetrics
+@Requires(property = MICRONAUT_METRICS_BINDERS + ".web.enabled", value = "true", defaultValue = "true")
 public class WebMeterRegistryFilter extends OncePerRequestHttpServerFilter {
 
     private final MeterRegistry meterRegistry;

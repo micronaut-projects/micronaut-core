@@ -19,16 +19,14 @@ package io.micronaut.configuration.metrics.micrometer;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry;
 import io.micronaut.configuration.metrics.aggregator.MeterRegistryConfigurer;
+import io.micronaut.configuration.metrics.annotation.RequiresMetrics;
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
-
-import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED;
 
 /**
  * Bean used to configure meter registries.  This bean is required to compose any sub type
@@ -38,7 +36,7 @@ import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory
  * @since 1.0
  */
 @Singleton
-@Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
+@RequiresMetrics
 public class MeterRegistryCreationListener implements BeanCreatedEventListener<MeterRegistry> {
 
     private static Logger logger = LoggerFactory.getLogger(MeterRegistryCreationListener.class);
