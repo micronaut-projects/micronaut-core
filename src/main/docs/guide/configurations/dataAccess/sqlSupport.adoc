@@ -99,3 +99,20 @@ When injecting link:{javase}javax/sql/DataSource.html[DataSource] beans, the one
 Once you have configured a JDBC `DataSource` the api:management.health.indicator.jdbc.JdbcIndicator[] is activated resulting in the `/health` endpoint and api:health.CurrentHealthStatus[] interface resolving the health of the JDBC connection.
 
 See the section on the <<healthEndpoint, Health Endpoint>> for more information.
+
+== Using Spring Transaction Management
+
+If you wish to use Spring-based transaction management you can add the following dependencies to your application:
+
+.build.gradle
+[source,groovy]
+----
+dependencies {
+    compile "io.micronaut:spring"
+    runtime "org.springframework:spring-jdbc"
+}
+----
+
+Micronaut will automatically configure a `DataSourceTransactionManager` and wrap the `DataSource` in a `TransactionAwareDataSourceProxy` for each configured `DataSource`.
+
+You should then use Micronaut's ann:spring.tx.annotation.Transactional[] annotation to ensure low-overhead, compile-time transaction management is applied to your classes.

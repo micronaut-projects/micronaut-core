@@ -4,6 +4,7 @@ dependencies {
     compile dependencyModuleVersion("spring", "spring-context")
     compile project(":inject")
     compileOnly project(":inject-java")
+    compileOnly dependencyModuleVersion("spring", "spring-jdbc")
     compile project(":aop")
 
     testImplementation project(':inject-groovy')

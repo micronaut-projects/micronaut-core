@@ -130,7 +130,7 @@ ext {
                 version: springVersion,
                 group:'org.springframework',
                 name: 'spring-core',
-                modules:['spring-context', 'spring-tx', 'spring-orm']
+                modules:['spring-context', 'spring-tx', 'spring-orm', 'spring-jdbc']
             ],
             snakeyaml: [
                 version: yamlVersion,
