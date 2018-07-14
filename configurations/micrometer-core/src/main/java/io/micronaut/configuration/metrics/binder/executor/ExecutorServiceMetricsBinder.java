@@ -18,19 +18,23 @@ package io.micronaut.configuration.metrics.binder.executor;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tag;
+import io.micrometer.core.instrument.Tags;
+import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.binder.jvm.ExecutorServiceMetrics;
-import io.micrometer.core.instrument.internal.TimedExecutorService;
 import io.micronaut.configuration.metrics.annotation.RequiresMetrics;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.scheduling.instrument.InstrumentedExecutorService;
+import io.micronaut.scheduling.instrument.InstrumentedScheduledExecutorService;
 
 import javax.inject.Singleton;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
 
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS;
 
@@ -48,9 +52,9 @@ public class ExecutorServiceMetricsBinder implements BeanCreatedEventListener<Ex
     private final MeterRegistry meterRegistry;
 
     /**
-     * Constructs the default instance
+     * Constructs the default instance.
      *
-     * @param meterRegistry The meter registry.
+     * @param meterRegistry The meter registry
      */
     public ExecutorServiceMetricsBinder(MeterRegistry meterRegistry) {
         this.meterRegistry = meterRegistry;
@@ -74,6 +78,43 @@ public class ExecutorServiceMetricsBinder implements BeanCreatedEventListener<Ex
         new ExecutorServiceMetrics(unwrapped, beanIdentifier.getName(), tags).bindTo(meterRegistry);
 
         // allow timing
-        return new TimedExecutorService(meterRegistry, executorService, beanIdentifier.getName(), tags);
+        final Timer timer = meterRegistry.timer("executor", Tags.concat(tags , "name", beanIdentifier.getName()));
+        if (executorService instanceof ScheduledExecutorService) {
+            return new InstrumentedScheduledExecutorService() {
+
+                @Override
+                public ScheduledExecutorService getTarget() {
+                    return (ScheduledExecutorService) executorService;
+                }
+
+                @Override
+                public <T> Callable<T> instrument(Callable<T> task) {
+                    return timer.wrap(task);
+                }
+
+                @Override
+                public Runnable instrument(Runnable command) {
+                    return timer.wrap(command);
+                }
+            };
+        } else {
+            return new InstrumentedExecutorService() {
+                @Override
+                public ExecutorService getTarget() {
+                    return executorService;
+                }
+
+                @Override
+                public <T> Callable<T> instrument(Callable<T> task) {
+                    return timer.wrap(task);
+                }
+
+                @Override
+                public Runnable instrument(Runnable command) {
+                    return timer.wrap(command);
+                }
+            };
+        }
+
     }
 }
