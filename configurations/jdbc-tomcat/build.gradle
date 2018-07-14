@@ -5,4 +5,8 @@ dependencies {
     compile "org.apache.tomcat:tomcat-jdbc:9.0.1"
 
     testCompile "com.h2database:h2:1.4.196"
+
+    testCompile project(":spring")
+    testCompile project(":inject-java")
+    testCompile dependencyModuleVersion("spring", "spring-jdbc")
 }
