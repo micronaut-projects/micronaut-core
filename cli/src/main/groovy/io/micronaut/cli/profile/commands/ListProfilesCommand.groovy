@@ -18,11 +18,12 @@ package io.micronaut.cli.profile.commands
 
 import groovy.transform.CompileStatic
 import io.micronaut.cli.profile.Command
-import io.micronaut.cli.profile.CommandDescription
 import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.ProfileRepository
 import io.micronaut.cli.profile.ProfileRepositoryAware
+import picocli.CommandLine
+import picocli.CommandLine.Model.CommandSpec
 
 /**
  * Lists the available {@link io.micronaut.cli.profile.Profile} instances 
@@ -31,23 +32,32 @@ import io.micronaut.cli.profile.ProfileRepositoryAware
  * @since 1.0
  */
 @CompileStatic
+@CommandLine.Command(name = 'list-profiles', description = 'Lists the available profiles')
 class ListProfilesCommand implements Command, ProfileRepositoryAware {
 
     final String name = "list-profiles"
-    final CommandDescription description = new CommandDescription(name, "Lists the available profiles", "mn list-profiles")
+
+    @CommandLine.Spec
+    CommandSpec commandSpec
+
+    @CommandLine.Mixin
+    private CommonOptionsMixin autoHelp // adds help, version and other common options to the command
 
     ProfileRepository profileRepository
 
     @Override
     boolean handle(ExecutionContext executionContext) {
-        def allProfiles = profileRepository.allProfiles
+        def allProfiles = profileRepository.allProfiles.sort { it.name }
         def console = executionContext.console
         console.addStatus("Available Profiles")
         console.log('--------------------')
-        for (Profile p in allProfiles) {
-            console.log("* $p.name - ${p.description}")
-        }
 
+        if (!allProfiles.empty) {
+            int width = Math.min(20, allProfiles.collect { it.name }.sort { it.length() }.last().length())
+            for (Profile p in allProfiles) {
+                console.log("  ${p.name.padRight(width)}  ${p.description}")
+            }
+        }
         return true
     }
 }

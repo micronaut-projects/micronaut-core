@@ -4,6 +4,7 @@ repositories {
 }
 
 dependencies {
+    compile "info.picocli:picocli:$picocliVersion"
     compile "org.apache.ant:ant:1.9.7"
     compile dependencyModuleVersion("groovy", "groovy-ant")
     compile dependencyModuleVersion("groovy", "groovy-json")
@@ -49,6 +50,13 @@ class MicronautCreateStartScripts extends org.gradle.api.tasks.application.Creat
         generator.scriptRelPath = "bin/${getUnixScript().name}"
         generator.generateUnixScript(getUnixScript())
         generator.generateWindowsScript(getWindowsScript())
+    }
+}
+
+configurations.all {
+    resolutionStrategy {
+        // prevent fatJar result containing multiple versions of picocli
+        force("info.picocli:picocli:$picocliVersion")
     }
 }
 

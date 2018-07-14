@@ -14,29 +14,26 @@
  * limitations under the License.
  */
 
-package io.micronaut.cli.console.parsing;
+package io.micronaut.cli.profile.commands
 
-/**
- * Exception that is thrown in command line parsing fails.
- *
- * @author Graeme Rocher
- * @since 1.0
- */
-public class ParseException extends RuntimeException {
+import groovy.transform.CompileStatic
 
-    private static final long serialVersionUID = 1;
+@CompileStatic
+enum SupportedLanguage {
+    java("java"),
+    groovy("groovy"),
+    kotlin("kt")
 
-    /**
-     * @param message The message
-     */
-    public ParseException(String message) {
-        super(message);
+    final String extension
+    private SupportedLanguage(String extension) {
+        this.extension = extension
     }
 
-    /**
-     * @param cause The throwable
-     */
-    public ParseException(Throwable cause) {
-        super(cause);
+    static boolean isValidValue(String value) {
+        values().collect { it.name() }.contains(value)
+    }
+
+    static Optional<SupportedLanguage> findValue(String value) {
+        isValidValue(value) ? Optional.of(valueOf(value)) : Optional.<SupportedLanguage>empty()
     }
 }
