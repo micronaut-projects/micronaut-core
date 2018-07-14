@@ -66,7 +66,12 @@ public class DataSourceTransactionManagerFactory {
     private static class TransactionAwareDataSourceListener implements BeanCreatedEventListener<DataSource> {
         @Override
         public DataSource onCreated(BeanCreatedEvent<DataSource> event) {
-            return new TransactionAwareDataSourceProxy(event.getBean());
+            DataSource dataSource = event.getBean();
+            if (dataSource instanceof TransactionAwareDataSourceProxy) {
+                return dataSource;
+            } else {
+                return new TransactionAwareDataSourceProxy(dataSource);
+            }
         }
     }
 }
