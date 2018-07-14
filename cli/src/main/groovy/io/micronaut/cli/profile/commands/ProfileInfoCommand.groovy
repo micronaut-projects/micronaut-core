@@ -20,14 +20,17 @@ import groovy.transform.CompileStatic
 import io.micronaut.cli.config.CodeGenConfig
 import io.micronaut.cli.config.ConfigMap
 import io.micronaut.cli.console.logging.MicronautConsole
-import io.micronaut.cli.console.parsing.CommandLine
 import io.micronaut.cli.profile.Command
-import io.micronaut.cli.profile.CommandDescription
 import io.micronaut.cli.profile.ExecutionContext
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.ProfileRepository
 import io.micronaut.cli.profile.ProfileRepositoryAware
 import io.micronaut.cli.profile.ProjectContext
+import picocli.CommandLine
+import picocli.CommandLine.Mixin
+import picocli.CommandLine.Parameters
+import picocli.CommandLine.Spec
+import picocli.CommandLine.Model.CommandSpec
 
 /**
  * A command to find out information about the given profile
@@ -36,17 +39,34 @@ import io.micronaut.cli.profile.ProjectContext
  * @since 1.0
  */
 @CompileStatic
+@CommandLine.Command(name = 'profile-info', description = 'Display information about a given profile')
 class ProfileInfoCommand extends ArgumentCompletingCommand implements ProfileRepositoryAware {
 
     public static final String NAME = 'profile-info'
 
     final String name = NAME
-    final CommandDescription description = new CommandDescription(name, "Display information about a given profile")
+
+    @Parameters(arity = "1", paramLabel = "PROFILE-NAME", description = "The name or coordinates of the profile",
+                completionCandidates = ProfileCompletionCandidates)
+    String profileName
+
+    @Mixin
+    CommonOptionsMixin commonOptionsMixin
 
     ProfileRepository profileRepository
 
-    ProfileInfoCommand() {
-        description.argument(name: "Profile Name", description: "The name or coordinates of the profile", required: true)
+    ProfileInfoCommand() { }
+
+    // Implementation note: this Command is first created and registered in the CommandRegistry.
+    // At that point, the `setProfileRepository` method is called, but we cannot initialize
+    // the completion candidates for this command yet, because the commandSpec is still null.
+    //
+    // When `setCommandSpec` is called by picocli, we can read from the profileRepository
+    // to initialize the profile and feature completion candidates for this command.
+    @Spec
+    void setCommandSpec(CommandSpec commandSpec) {
+        super.setCommandSpec(commandSpec)
+        ProfileCompletionCandidates.updateCommandArguments(commandSpec, profileRepository)
     }
 
     void setProfileRepository(ProfileRepository profileRepository) {
@@ -61,54 +81,42 @@ class ProfileInfoCommand extends ArgumentCompletingCommand implements ProfileRep
             return false
         } else {
 
-            def profileName = executionContext.commandLine.remainingArgs[0]
-
             def profile = profileRepository.getProfile(profileName)
             if (profile == null) {
                 console.error("Profile not found for name [$profileName]")
             } else {
-                console.log("Profile: ${profile.name}")
+                console.addStatus("Profile: ${profile.name}")
                 console.log('--------------------')
                 console.log(profile.description)
                 console.log('')
-                console.log('Provided Commands:')
+                console.addStatus('Provided Commands:')
                 console.log('--------------------')
                 Iterable<Command> commands = findCommands(profile, console).toUnique { Command c -> c.name }.sort { it.name }
-
-                for (cmd in commands) {
-                    def description = cmd.description
-                    console.log("* ${description.name} - ${description.description}")
+                if (!commands.empty) {
+                    int width = Math.min(20, commands.collect { it.name }.sort { it.length() }.last().length())
+                    String separator = String.format('%n').padRight(width) // in case of multi-line command description
+                    for (cmd in commands) {
+                        def spec = cmd.commandSpec
+                        console.log("  ${spec.name().padRight(width)}  ${spec.usageMessage().description()?.join(separator)}")
+                    }
                 }
                 console.log('')
-                console.log('Provided Features:')
+                console.addStatus('Provided Features:')
                 console.log('--------------------')
                 def features = profile.features.sort { it.name }
+                if (!features.empty) {
+                    int width = Math.min(20, features.collect { it.name }.sort { it.length() }.last().length())
 
-                for (feature in features) {
-                    console.log("* ${feature.name} - ${feature.description}")
+                    for (feature in features) {
+                        console.log("  ${feature.name.padRight(width)}  ${feature.description}")
+                    }
                 }
             }
         }
         return true
     }
 
-    @Override
-    protected int complete(CommandLine commandLine, CommandDescription desc, List<CharSequence> candidates, int cursor) {
-        List<String> lastOption = commandLine.remainingArgs
-        def profileNames = profileRepository.allProfiles.collect() { Profile p -> p.name }
-        if (!lastOption.empty) {
-            String name = lastOption.get(0)
-            profileNames = profileNames.findAll { String pn ->
-                pn.startsWith(name)
-            }.collect {
-                "${it.substring(name.size())} ".toString()
-            }
-        }
-        candidates.addAll profileNames
-        return cursor
-    }
-
-    protected Iterable<Command> findCommands(Profile profile, MicronautConsole console) {
+    public Iterable<Command> findCommands(Profile profile, MicronautConsole console) {
         def commands = profile.getCommands(new ProjectContext() {
             @Override
             MicronautConsole getConsole() {
