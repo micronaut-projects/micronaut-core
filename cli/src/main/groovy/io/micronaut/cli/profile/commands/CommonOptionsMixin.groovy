@@ -48,21 +48,11 @@ class CommonOptionsMixin extends HelpOptionsMixin {
     @Option(names = ['-n', '--plain-output'], description = ['Use plain text instead of ANSI colors and styles.'])
     boolean ansiEnabled = true // toggled to false if option is specified
 
-    boolean showStacktrace
-    boolean verbose
-
     @Option(names = ['-x', '--stacktrace'], defaultValue = "false", description = ['Show full stack trace when exceptions occur.'])
-    void setShowStackTrace(boolean newValue) {
-        showStacktrace = newValue
-        System.setProperty("micronaut.show.stacktrace", "${newValue}")
-    }
+    boolean showStacktrace
 
     @Option(names = ['-v', '--verbose'], defaultValue = "false", description = ['Create verbose output.'])
-    void setVerbose(boolean newValue) {
-        verbose = newValue
-        System.setProperty("micronaut.verbose", "${newValue}")
-        System.setProperty("micronaut.full.stacktrace", "${newValue}")
-    }
+    boolean verbose
 
 //    @Option(names = ['-debug-fork'], hidden = true)
 //    boolean debugFork

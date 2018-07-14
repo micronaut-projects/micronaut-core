@@ -48,6 +48,7 @@ import picocli.CommandLine
 import picocli.CommandLine.Help.Ansi
 import picocli.CommandLine.ParameterException
 import picocli.CommandLine.ParseResult
+import picocli.CommandLine.UnmatchedArgumentException
 
 import java.util.concurrent.Callable
 import java.util.concurrent.ExecutionException
@@ -173,7 +174,9 @@ class MicronautCli {
         } catch (ParameterException e) {
             MicronautConsole console = MicronautConsole.instance
             console.error("Error occurred running Micronaut CLI: $e.message")
-            console.append(e.commandLine.getUsageMessage(console.ansiEnabled ? Ansi.ON : Ansi.OFF))
+            if (!UnmatchedArgumentException.printSuggestions(e, console.out)) {
+                console.append(e.commandLine.getUsageMessage(console.ansiEnabled ? Ansi.ON : Ansi.OFF))
+            }
             exit(1)
         } catch (Throwable e) {
             while (e.cause && e != e.cause) {
@@ -215,9 +218,7 @@ class MicronautCli {
             parser = createParser()
         }
         def parseResult = parser.parseArgs(args)
-
-        def console = MicronautConsole.getInstance()
-        console.ansiEnabled = commonOptions.ansiEnabled
+        def console = initConsole(parseResult)
 
         if (printHelpIfRequested(parseResult)) { exit(0) }
 
@@ -314,6 +315,23 @@ class MicronautCli {
         false
     }
 
+    private MicronautConsole initConsole(ParseResult parseResult) {
+        boolean showStack = commonOptions.showStacktrace || parseResult.subcommand()?.matchedOptionValue("stacktrace", false)
+        boolean verbose = commonOptions.verbose || parseResult.subcommand()?.matchedOptionValue("verbose", false)
+        boolean ansiEnabled = commonOptions.ansiEnabled && !parseResult.subcommand()?.matchedOptionValue("plain-output", false)
+
+        System.setProperty("micronaut.show.stacktrace", "${showStack}")
+        System.setProperty("micronaut.verbose",         "${verbose}")
+        System.setProperty("micronaut.full.stacktrace", "${verbose}")
+
+        def console = MicronautConsole.getInstance()
+        console.verbose = verbose
+        console.stacktrace = showStack
+        console.ansiEnabled = ansiEnabled
+
+        console
+    }
+
     /**
      * Throws an UnmatchedArgumentException if there are unmatched args
      * EXCEPT when the user requested to repeat a previous command with {@code !<cmd>}.
@@ -387,8 +405,6 @@ class MicronautCli {
             try {
                 currentExecutionContext = context
                 def parseResult = context.getParseResult()
-                boolean showStack = commonOptions.showStacktrace || parseResult.subcommand()?.matchedOptionValue("stacktrace", false)
-                console.setStacktrace(showStack)
 
                 if (handleBuiltInCommands(context))    { return true }
                 if (printHelpIfRequested(parseResult)) { return true }
@@ -409,7 +425,9 @@ class MicronautCli {
                 return false
             } catch (ParameterException e) {
                 console.error(e.message)
-                console.append(e.commandLine.getUsageMessage(console.ansiEnabled ? Ansi.ON : Ansi.OFF))
+                if (!UnmatchedArgumentException.printSuggestions(e, console.out)) {
+                    console.append(e.commandLine.getUsageMessage(console.ansiEnabled ? Ansi.ON : Ansi.OFF))
+                }
                 return false
             } catch (Throwable e) {
                 console.error("Command [${context.parseResult.commandSpec().name()}] error: ${e.message}", e)
@@ -472,6 +490,8 @@ class MicronautCli {
                 } else if (commandLine.trim()) {
                     try {
                         ParseResult parseResult = parser.parseArgs(splitCommandLine(commandLine))
+                        initConsole(parseResult)
+
                         if (!CommandLine.printHelpIfRequested(parseResult.asCommandLineList(), System.out, System.err, console.ansiEnabled ? Ansi.ON : Ansi.OFF)) {
                             if (nonBlockingInput.isNonBlockingEnabled()) {
                                 handleCommandWithCancellationSupport(console, parseResult, commandExecutor, nonBlockingInput)
@@ -482,8 +502,10 @@ class MicronautCli {
                     } catch (ParameterException invalidInput) {
                         // if user input was invalid, print the error message and the help message for the relevant subcommand
                         console.error(invalidInput.getMessage())
-                        Ansi ansi = console.ansiEnabled ? Ansi.ON : Ansi.OFF
-                        console.append(invalidInput.commandLine.getUsageMessage(ansi))
+                        if (!UnmatchedArgumentException.printSuggestions(invalidInput, console.out)) {
+                            Ansi ansi = console.ansiEnabled ? Ansi.ON : Ansi.OFF
+                            console.append(invalidInput.commandLine.getUsageMessage(ansi))
+                        }
                     }
                 }
             } catch (UserInterruptException e) {
@@ -605,7 +627,9 @@ class MicronautCli {
             if (historicalCommand.startsWith("!")) {
                 console.error "Can not repeat command: $historicalCommand"
             } else {
-                return micronautCli.handleCommand(micronautCli.parser.parseArgs(splitCommandLine(historicalCommand)))
+                def parseResult = micronautCli.parser.parseArgs(splitCommandLine(historicalCommand))
+                micronautCli.initConsole(parseResult)
+                return micronautCli.handleCommand(parseResult)
             }
             return false
         }
