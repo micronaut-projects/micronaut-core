@@ -22,6 +22,7 @@ import io.micronaut.context.env.MapPropertySource
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
+import javax.sql.DataSource
 import java.sql.ResultSet
 
 class DatasourceConfigurationSpec extends Specification {
@@ -49,11 +50,11 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.start()
 
         expect:
-        applicationContext.containsBean(HikariDataSource)
+        applicationContext.containsBean(DataSource)
         applicationContext.containsBean(DatasourceConfiguration)
 
         when:
-        HikariDataSource dataSource = applicationContext.getBean(HikariDataSource)
+        HikariUrlDataSource dataSource = applicationContext.getBean(DataSource)
 
         then: //The default configuration is supplied because H2 is on the classpath
         dataSource.jdbcUrl == 'jdbc:h2:mem:default;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
@@ -75,11 +76,11 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.start()
 
         expect:
-        applicationContext.containsBean(HikariDataSource)
+        applicationContext.containsBean(DataSource)
         applicationContext.containsBean(DatasourceConfiguration)
 
         when:
-        HikariDataSource dataSource = applicationContext.getBean(HikariDataSource)
+        HikariDataSource dataSource = applicationContext.getBean(DataSource)
         ResultSet resultSet = dataSource.getConnection().prepareStatement("SELECT H2VERSION() FROM DUAL").executeQuery()
         resultSet.next()
         String version = resultSet.getString(1)
@@ -108,11 +109,11 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.start()
 
         expect:
-        applicationContext.containsBean(HikariDataSource)
+        applicationContext.containsBean(DataSource)
         applicationContext.containsBean(DatasourceConfiguration)
 
         when:
-        HikariDataSource dataSource = applicationContext.getBean(HikariDataSource)
+        HikariDataSource dataSource = applicationContext.getBean(DataSource)
 
         then:
         dataSource.connectionTimeout == 500
@@ -139,11 +140,11 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.start()
 
         expect:
-        applicationContext.containsBean(HikariDataSource)
+        applicationContext.containsBean(DataSource)
         applicationContext.containsBean(DatasourceConfiguration)
 
         when:
-        HikariDataSource dataSource = applicationContext.getBean(HikariDataSource)
+        HikariDataSource dataSource = applicationContext.getBean(DataSource)
 
         then: //The default configuration is supplied because H2 is on the classpath
         dataSource.jdbcUrl == 'jdbc:h2:mem:default;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
@@ -152,7 +153,7 @@ class DatasourceConfigurationSpec extends Specification {
         dataSource.driverClassName == 'org.h2.Driver'
 
         when:
-        dataSource = applicationContext.getBean(HikariDataSource, Qualifiers.byName("foo"))
+        dataSource = applicationContext.getBean(DataSource, Qualifiers.byName("foo"))
 
         then: //The default configuration is supplied because H2 is on the classpath
         dataSource.jdbcUrl == 'jdbc:h2:mem:foo;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'

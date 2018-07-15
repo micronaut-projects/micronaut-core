@@ -38,6 +38,7 @@ import java.util.stream.Stream;
  * @author Christian Oestreich
  * @since 1.0
  */
+@SuppressWarnings("PublisherImplementation")
 public class MetricsPublisher implements Publisher<MutableHttpResponse<?>> {
 
     private static final String WEB_METRIC_NAME = "http.server.requests";
