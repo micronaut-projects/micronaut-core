@@ -35,6 +35,7 @@ import javax.sql.DataSource;
  */
 @Factory
 @Requires(classes = DataSourceTransactionManager.class)
+@Requires(condition = HibernatePresenceCondition.class)
 public class DataSourceTransactionManagerFactory {
 
     /**
