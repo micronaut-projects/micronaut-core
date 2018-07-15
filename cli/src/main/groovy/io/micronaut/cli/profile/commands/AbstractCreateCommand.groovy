@@ -75,7 +75,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
     @Option(names = ['-p', '--profile'], paramLabel = 'PROFILE', description = 'The profile to use', completionCandidates = ProfileCompletionCandidates)
     String profile
 
-    @Option(names = ['-f', '--features'], paramLabel = 'FEATURE', description = 'The features to use', completionCandidates = FeatureCompletionCandidates)
+    @Option(names = ['-f', '--features'], paramLabel = 'FEATURE', split = ",", description = 'The features to use', completionCandidates = FeatureCompletionCandidates)
     List<String> features = []
 
     @Mixin
