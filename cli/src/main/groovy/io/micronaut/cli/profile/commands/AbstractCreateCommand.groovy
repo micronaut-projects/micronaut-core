@@ -405,24 +405,27 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         if (tokens) {
             List<String> requestedFeatureNames = features.findAll { it.requested }*.name
             List<String> allFeatureNames = features*.name
-            String testFramework = null
-            String sourceLanguage = null
 
-            if (requestedFeatureNames) {
-                testFramework = evaluateTestFramework(requestedFeatureNames)
-                sourceLanguage = evaluateSourceLanguage(requestedFeatureNames)
+            if (profile.name != "profile") {
+                String testFramework = null
+                String sourceLanguage = null
+
+                if (requestedFeatureNames) {
+                    testFramework = evaluateTestFramework(requestedFeatureNames)
+                    sourceLanguage = evaluateSourceLanguage(requestedFeatureNames)
+                }
+
+                if (!testFramework) {
+                    testFramework = evaluateTestFramework(allFeatureNames)
+                }
+
+                if (!sourceLanguage) {
+                    sourceLanguage = evaluateSourceLanguage(allFeatureNames)
+                }
+
+                tokens.put("testFramework", testFramework)
+                tokens.put("sourceLanguage", sourceLanguage)
             }
-
-            if (!testFramework) {
-                testFramework = evaluateTestFramework(allFeatureNames)
-            }
-
-            if (!sourceLanguage) {
-                sourceLanguage = evaluateSourceLanguage(allFeatureNames)
-            }
-
-            tokens.put("testFramework", testFramework)
-            tokens.put("sourceLanguage", sourceLanguage)
         }
 
         ant.replace(dir: targetDirectory) {
