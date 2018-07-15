@@ -34,48 +34,15 @@ import picocli.CommandLine.Parameters
  */
 @CompileStatic
 @Command(name = 'create-app', description = 'Creates an application')
-class CreateAppCommand extends AbstractCreateCommand {
+class CreateAppCommand extends AbstractCreateAppCommand {
     public static final String NAME = 'create-app'
 
     @Parameters(arity = '0..1', paramLabel = 'NAME', description = 'The name of the application to create.')
     String appname = ""
 
-    // note: description contains a variable that will be replaced by picocli, not by Groovy
-    @Option(names = ['-l', '--lang'], paramLabel = 'LANG', description = 'Which language to use. Possible values: ${COMPLETION-CANDIDATES}.')
-    SupportedLanguage lang = SupportedLanguage.java
-
-    // note: description contains a variable that will be replaced by picocli, not by Groovy
-    @Option(names = ['-b', '--build'], paramLabel = 'BUILD-TOOL', description = 'Which build tool to configure. Possible values: ${COMPLETION-CANDIDATES}.')
-    SupportedBuildTool build = SupportedBuildTool.gradle
-
     @Override
     String getName() { NAME }
 
-
     @Override
-    boolean handle(ExecutionContext executionContext) {
-        String profileName = evaluateProfileName()
-
-        Set<String> selectedFeatures = new HashSet<>()
-        selectedFeatures.addAll(features)
-        selectedFeatures.add(resolveLang())
-
-        CreateServiceCommandObject cmd = new CreateServiceCommandObject(
-                appName: this.appname,
-                baseDir: executionContext.baseDir,
-                profileName: profileName,
-                micronautVersion: VersionInfo.getVersion(MicronautCli),
-                features: selectedFeatures,
-                inplace: this.inplace,
-                build: this.build.name(),
-                console: executionContext.console
-        )
-
-        return this.handle(cmd)
-    }
-
-    protected String resolveLang() {
-        lang
-    }
-
+    protected String getNameOfAppToCreate() { appname }
 }
