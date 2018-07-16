@@ -1,0 +1,27 @@
+To use the https://www.thymeleaf.org[Thymeleaf] Java template engine as described in this section, in addition to the `templates` dependency, add the following dependency on your classpath. For example, in `build.gradle`
+
+[source, groovy]
+----
+runtime "org.thymeleaf:thymeleaf:3.0.9.RELEASE"
+----
+
+Thymeleaf integration instantiates a `ClassLoaderTemplateResolver`.
+The properties used can be customized by overriding the values of api:io.micronaut.templates.ThymeleafConfigurationProperties[].
+
+The example shown in the <<templates, Templates>> section, could be rendered with the following Thymeleaf template:
+
+[source,html]
+.src/main/resources/templates/home.html
+----
+include::{teststemplates}/../../../../resources/templates/home.html[]
+}
+----
+
+and layout:
+
+[source,html]
+.src/main/resources/templates/layoutFile.html
+----
+include::{teststemplates}/../../../../resources/templates/layoutFile.html[]
+}
+----

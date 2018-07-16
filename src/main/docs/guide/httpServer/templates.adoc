@@ -1,0 +1,43 @@
+To use the Templating features described in this section, add the dependency on your classpath. For example, in `build.gradle`
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut:templates"
+----
+
+Place your templates at `src/main/resource/templates`.
+
+If you wish to use a different folder instead of `templates`, set the property `micronaut.templates.folder`.
+
+Your controller's method can render the response with a template with the the api:templates.Template[] annotation.
+
+The following is an example of a controller which renders a template.
+
+[source,java]
+.src/main/java/myapp/ThymeleafController.java
+----
+include::{teststemplates}/TemplateController.groovy[tags=clazz]
+
+include::{teststemplates}/TemplateController.groovy[tags=map]
+
+}
+----
+
+<1> Use `@Template` annotation to indicate the template name which should be used to render a view for the route.
+
+Moreover, you can render a POJO with a template to:
+
+[source,java]
+.src/main/java/myapp/TemplateController.java
+----
+include::{teststemplates}/TemplateController.groovy[tags=clazz]
+
+include::{teststemplates}/TemplateController.groovy[tags=pogo]
+
+}
+----
+
+<1> Use `@Template` annotation to indicate the template name which should be used to render the POJO responded by the controller.
+
+The next sections show different template engines integrations.

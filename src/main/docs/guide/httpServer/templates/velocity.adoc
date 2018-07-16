@@ -1,0 +1,15 @@
+To use the http://velocity.apache.org[Apache Velocity] Java-based template engine as described in this section, in addition to the `templates` dependency, add the following dependency on your classpath. For example, in `build.gradle`
+
+[source, groovy]
+----
+runtime "org.apache.velocity:velocity-engine-core:2.0"
+----
+
+The example shown in the <<templates, Templates>> section, could be rendered with the following Velocity template:
+
+[source,html]
+.src/main/resources/templates/home.vm
+----
+include::{teststemplates}/../../../../resources/templates/home.vm[]
+}
+----
