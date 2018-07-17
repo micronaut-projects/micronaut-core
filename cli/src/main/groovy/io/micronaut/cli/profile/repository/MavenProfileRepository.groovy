@@ -20,11 +20,13 @@ import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import io.micronaut.cli.MicronautCli
 import io.micronaut.cli.boot.DependencyVersions
+import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.util.VersionInfo
 import org.eclipse.aether.artifact.Artifact
 import org.eclipse.aether.artifact.DefaultArtifact
 import org.eclipse.aether.graph.Dependency
+import org.eclipse.aether.transfer.ArtifactNotFoundException
 import org.springframework.boot.cli.compiler.grape.AetherGrapeEngine
 import org.springframework.boot.cli.compiler.grape.DependencyResolutionContext
 import org.springframework.boot.cli.compiler.grape.DependencyResolutionFailedException
@@ -108,7 +110,7 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
             grapeEngine.grab(group: art.groupId,
                              module: art.artifactId,
                              version: art.version ?: null)
-        } catch (DependencyResolutionFailedException e) {
+        } catch (ArtifactNotFoundException | DependencyResolutionFailedException e) {
 
             def localData = new File(mavenLocal, "/${art.groupId.replace('.', '/')}/$art.artifactId/maven-metadata-local.xml")
             if (localData.exists()) {
@@ -117,9 +119,11 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
                 if (profileFile.exists()) {
                     classLoader.addURL(profileFile.toURI().toURL())
                 } else {
+                    MicronautConsole.instance.error("${profileFile} not found in ${localData}")
                     throw e
                 }
             } else {
+                MicronautConsole.instance.error("Also: ${localData} not found")
                 throw e
             }
         }
@@ -171,8 +175,14 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
             }
             profiles.sort { it.module }
 
-            for (Map profile in profiles) {
-                grapeEngine.grab(profile)
+            try {
+                for (Map profile in profiles) {
+                    grapeEngine.grab(profile)
+                }
+            } catch (ArtifactNotFoundException | DependencyResolutionFailedException e) {
+                if (Boolean.getBoolean("micronaut.verbose")) {
+                    MicronautConsole.instance.warn("Ignoring error: " + e)
+                }
             }
 
             def localData = new File(mavenLocal, "/io/micronaut/profiles")
