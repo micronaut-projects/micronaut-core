@@ -71,6 +71,8 @@ public interface Writable extends Streamable {
      * @throws IOException if an error occurred while outputting data to the writer
      */
     default void writeTo(OutputStream outputStream, @Nullable Charset charset) throws IOException {
-        writeTo(new OutputStreamWriter(outputStream, charset == null ? StandardCharsets.UTF_8 : charset));
+        OutputStreamWriter writer = new OutputStreamWriter(outputStream, charset == null ? StandardCharsets.UTF_8 : charset);
+        writeTo(writer);
+        writer.flush();
     }
 }
