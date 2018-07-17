@@ -6,6 +6,7 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.templates.Template
+import io.reactivex.Single
 
 @Requires(property = "spec.name", value = "velocity")
 @Controller("/velocity")
@@ -26,6 +27,12 @@ class VelocityController {
     @Get("/home")
     HttpResponse<Person> home() {
         HttpResponse.ok(new Person(loggedIn: true, username: 'sdelamo'))
+    }
+
+    @Template("home")
+    @Get("/reactive")
+    Single<Person> reactive() {
+        return Single.just(new Person(loggedIn: true, username: 'sdelamo'))
     }
 
     @Template("bogus")

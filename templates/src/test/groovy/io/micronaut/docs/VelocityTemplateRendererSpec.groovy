@@ -89,6 +89,22 @@ class VelocityTemplateRendererSpec extends Specification {
         rsp.body().contains("<h1>username: <span>sdelamo</span></h1>")
     }
 
+    def "invoking /velocity/reactive renders velocity template from a controller returning a reactive type"() {
+        when:
+        HttpResponse<String> rsp = client.toBlocking().exchange('/velocity/reactive', String)
+
+        then:
+        noExceptionThrown()
+        rsp.status() == HttpStatus.OK
+
+        when:
+        String body = rsp.body()
+
+        then:
+        body
+        rsp.body().contains("<h1>username: <span>sdelamo</span></h1>")
+    }
+
     def "invoking /velocity/bogus returns 404 if you attempt to render a template which does not exist"() {
         when:
         client.toBlocking().exchange('/velocity/bogus', String)
