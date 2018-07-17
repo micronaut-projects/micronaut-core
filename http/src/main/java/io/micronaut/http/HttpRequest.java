@@ -147,11 +147,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @see HttpRequestFactory
      */
     static <T> MutableHttpRequest<T> GET(String uri) {
-        HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No HTTP client implementation found on classpath")
-        );
-
-        return factory.get(uri);
+        return HttpRequestFactory.INSTANCE.get(uri);
     }
 
     /**
@@ -175,11 +171,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @see HttpRequestFactory
      */
     static <T> MutableHttpRequest<T> OPTIONS(String uri) {
-        HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No HTTP client implementation found on classpath")
-        );
-
-        return factory.options(uri);
+        return HttpRequestFactory.INSTANCE.options(uri);
     }
 
     /**
@@ -201,11 +193,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      * @see HttpRequestFactory
      */
     static MutableHttpRequest<?> HEAD(String uri) {
-        HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No HTTP client implementation found on classpath")
-        );
-
-        return factory.head(uri);
+        return HttpRequestFactory.INSTANCE.head(uri);
     }
 
     /**
@@ -233,11 +221,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     static <T> MutableHttpRequest<T> POST(String uri, T body) {
         Objects.requireNonNull(uri, "Argument [uri] is required");
         Objects.requireNonNull(body, "Argument [body] cannot be null");
-        HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No HTTP client implementation found on classpath")
-        );
-
-        return factory.post(uri, body);
+        return HttpRequestFactory.INSTANCE.post(uri, body);
     }
 
     /**
@@ -265,11 +249,8 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     static <T> MutableHttpRequest<T> PUT(String uri, T body) {
         Objects.requireNonNull(uri, "Argument [uri] is required");
         Objects.requireNonNull(body, "Argument [body] cannot be null");
-        HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No HTTP client implementation found on classpath")
-        );
 
-        return factory.put(uri, body);
+        return HttpRequestFactory.INSTANCE.put(uri, body);
     }
 
     /**
@@ -297,11 +278,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     static <T> MutableHttpRequest<T> PATCH(String uri, T body) {
         Objects.requireNonNull(uri, "Argument [uri] is required");
         Objects.requireNonNull(body, "Argument [body] cannot be null");
-        HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No HTTP client implementation found on classpath")
-        );
-
-        return factory.patch(uri, body);
+        return HttpRequestFactory.INSTANCE.patch(uri, body);
     }
 
     /**
@@ -328,11 +305,7 @@ public interface HttpRequest<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpRequest<T> DELETE(String uri, T body) {
         Objects.requireNonNull(uri, "Argument [uri] is required");
-        HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No HTTP client implementation found on classpath")
-        );
-
-        return factory.delete(uri, body);
+        return HttpRequestFactory.INSTANCE.delete(uri, body);
     }
 
     /**
@@ -358,10 +331,6 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     static <T> MutableHttpRequest<T> create(HttpMethod httpMethod, String uri) {
         Objects.requireNonNull(httpMethod, "Argument [httpMethod] is required");
         Objects.requireNonNull(uri, "Argument [uri] is required");
-        HttpRequestFactory factory = HttpRequestFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No HTTP client implementation found on classpath")
-        );
-
-        return factory.create(httpMethod, uri);
+        return HttpRequestFactory.INSTANCE.create(httpMethod, uri);
     }
 }
