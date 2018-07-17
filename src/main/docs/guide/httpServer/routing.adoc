@@ -31,7 +31,22 @@ The value of the `@Controller` annotation is a https://tools.ietf.org/html/rfc65
 
 NOTE: Many other frameworks, including Spring, implement the URI template specification
 
-== URI Variables
+The actual implementation is handled by the api:http.uri.UriMatchTemplate[] class, which extends api:http.uri.UriTemplate[].
+
+You can use this class explicitly within your application to build URIs. For example:
+
+.Using a UriTemplate
+[source,java]
+----
+include::{testsuite}/server/uris/UriTemplateTest.java[tags=match, indent=0]
+----
+
+<1> The `match` method can be used to match a path
+<2> The `expand` method can be used to expand a template into a URI.
+
+If you have a requirement to build paths to include in your responses you can use api:http.uri.UriTemplate[] to do so.
+
+== URI Path Variables
 
 URI variables can be referenced via method arguments. For example:
 
@@ -108,6 +123,14 @@ The following table provides some examples of URI templates and what they match:
 | `/books/foo/bar.xml`
 
 |===
+
+== URI Reserved Character Matching
+
+By default URI variables as defined by the https://tools.ietf.org/html/rfc6570[RFC-6570 URI template] spec cannot include reserved characters such as `/`, `?` etc.
+
+If you wish to match or expand entire paths then this can be problematic. As per https://tools.ietf.org/html/rfc6570#section-3.2.3[section 3.2.3 of the specification], you can use reserved expansion or matching using the `+` operator.
+
+For example the URI `/books/{+path}` will match both `/books/foo` and `/books/foo/bar` since the `+` indicates that the variable `path` should include reserved characters (in this case `/`).
 
 == Routing Annotations
 
