@@ -230,7 +230,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     public Environment start() {
         if (running.compareAndSet(false, true)) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Starting environment {} for active names {}", this, getActiveNames() );
+                LOG.debug("Starting environment {} for active names {}", this, getActiveNames());
             }
             if (reading.compareAndSet(false, true)) {
 
@@ -342,6 +342,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     protected void readPropertySources(String name) {
         List<PropertySource> propertySources = readPropertySourceList(name);
+        propertySources.addAll(this.propertySources.values());
         propertySources.addAll(readPropertySourceListFromFiles(System.getProperty(PROPERTY_SOURCES_KEY)));
         propertySources.addAll(readPropertySourceListFromFiles(
             readPropertySourceListKeyFromEnvironment())
@@ -371,7 +372,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @return The list of property sources for each file
      */
     protected List<PropertySource> readPropertySourceListFromFiles(String files) {
-        List<PropertySource> propertySources = new ArrayList<>(this.propertySources.values());
+        List<PropertySource> propertySources = new ArrayList<>();
         Collection<PropertySourceLoader> propertySourceLoaders = getPropertySourceLoaders();
         Optional<Collection<String>> filePathList = Optional.ofNullable(files)
             .filter(value -> !value.isEmpty())
@@ -406,7 +407,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @return The list of property sources
      */
     protected List<PropertySource> readPropertySourceList(String name) {
-        List<PropertySource> propertySources = new ArrayList<>(this.propertySources.values());
+        List<PropertySource> propertySources = new ArrayList<>();
         Collection<PropertySourceLoader> propertySourceLoaders = getPropertySourceLoaders();
         if (propertySourceLoaders.isEmpty()) {
             loadPropertySourceFromLoader(name, new PropertiesPropertySourceLoader(), propertySources);
