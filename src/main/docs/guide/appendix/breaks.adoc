@@ -6,12 +6,11 @@ This section will document breaking changes that may happen during milestone or 
 * To reduce confusion around `@Parameter`, it can no longer be used to denote an argument should be bound from the request url. Its sole purpose is defining arguments for parameterized beans. Use `@QueryValue` instead.
 * The health endpoint will now only report details when the user is authenticated. To revert to the previous behavior, set `endpoints.health.detailsVisible: ANONYMOUS`.
 * The CLI options have been standardized to use two leading dashes for long options (like `--stacktrace`) and one for shortcuts (like `-h`). That means that some options no longer work. For example, this command used to work with M2: `create-app -lang groovy myapp`. From M3, you will see this error: `Could not convert 'ang' to SupportedLanguage for option '--lang'`. Specifying either `-l LANG` or `--lang LANG` works as expected.
-
-The following packages have also been renamed for consistency:
-
-* `io.micronaut.configurations.ribbon` -> `io.micronaut.configuration.ribbon`
-* `io.micronaut.configurations.hystrix` -> `io.micronaut.configuration.hystrix`
-* `io.micronaut.configurations.aws` -> `io.micronaut.configuration.aws`
+* The following packages have been renamed for consistency:
+ - `io.micronaut.configurations.ribbon` -> `io.micronaut.configuration.ribbon`
+ - `io.micronaut.configurations.hystrix` -> `io.micronaut.configuration.hystrix`
+ - `io.micronaut.configurations.aws` -> `io.micronaut.configuration.aws`
+* The default Consul configuration prefix has been changed to reflect changes in the latest version of Consul. Previously a leading slash was expected and the default value was `/config/`. The new default value is `config/`. To restore the previous behavior, set `consul.client.config.path = /config/`
 
 
 ==== 1.0.0.M2
