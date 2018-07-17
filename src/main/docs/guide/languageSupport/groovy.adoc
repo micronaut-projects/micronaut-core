@@ -28,7 +28,7 @@ The <<cli, Command Line Interface>> for Micronaut includes special support for G
 [source,bash]
 .Create a Micronaut Groovy application
 ----
-$ mn create-app hello-world -lang groovy
+$ mn create-app hello-world --lang groovy
 ----
 
 The above will generate a Groovy project, built with Gradle. You can use the `-build maven` flag to generate a project built with Maven instead.

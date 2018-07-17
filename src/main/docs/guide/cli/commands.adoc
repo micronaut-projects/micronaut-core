@@ -84,7 +84,7 @@ The `create-job` command generates a simple api:scheduling.annotation.Scheduled[
 
 [source,bash]
 ----
-$ mn create-job UpdateFeeds -lang groovy
+$ mn create-job UpdateFeeds --lang groovy
 | Rendered template Job.groovy to destination src/main/groovy/example/UpdateFeedsJob.groovy
 ----
 
