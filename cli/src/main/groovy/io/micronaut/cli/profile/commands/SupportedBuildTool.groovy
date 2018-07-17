@@ -14,27 +14,24 @@
  * limitations under the License.
  */
 
-package io.micronaut.cli.profile.steps
+package io.micronaut.cli.profile.commands
 
-import io.micronaut.cli.profile.Command
-import io.micronaut.cli.profile.Step
+import groovy.transform.CompileStatic
 
-/**
- * Creates steps
- *
- * @author Graeme Rocher
- * @since 1.0
- */
-interface StepFactory {
+@CompileStatic
+enum SupportedBuildTool {
+    gradle,
+    maven;
 
-    /**
-     * Creates a step for the given name, command and parameters
-     *
-     * @param name The name of the step
-     * @param command The command
-     * @param parameters The parameters
-     *
-     * @return The step instance
-     */
-    Step createStep(String name, Command command, Map parameters)
+    static boolean isValidValue(String value) {
+        names().contains(value)
+    }
+
+    static List<String> names() {
+        values().collect { it.name() }
+    }
+
+    static List<String> quoted() {
+        values().collect{ "\"${it}\"".toString() }
+    }
 }

@@ -17,6 +17,7 @@
 package io.micronaut.cli.profile
 
 import io.micronaut.cli.util.Named
+import picocli.CommandLine.Model.CommandSpec
 
 /**
  * An interface that represents a command to be executed by the Micronaut command line. Commands are by default global,
@@ -30,7 +31,7 @@ interface Command extends Named {
     /**
      * @return The description of the command
      */
-    CommandDescription getDescription()
+    CommandSpec getCommandSpec()
 
     /**
      * run the command
