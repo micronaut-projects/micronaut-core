@@ -235,6 +235,7 @@ security:
     login: Login Controller
     logout: Logout Controller
     refresh: Refresh Controller
+  retrievingAuthenticatedUser: Retrieve the authenticated user
   securityEvents: Security Events
 cli:
   title: Micronaut CLI
