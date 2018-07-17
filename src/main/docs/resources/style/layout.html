@@ -116,6 +116,24 @@
         }
         prevScrollpos = currentScrollPos;
     }
+
+    function wrapElementsInLinks(x) {
+        var i;
+        for (i = 0; i < x.length; i++) {
+            if (x[i].id !== '') {
+                var link = document.createElement('a');
+                link.innerHTML = x[i].outerHTML;
+                link.setAttribute('href', 'index.html#'+x[i].id);
+                x[i].parentNode.insertBefore(link, x[i]);
+                x[i].remove();
+                console.log("Id: " + x[i].id);
+            }
+        }
+    }
+    wrapElementsInLinks(document.querySelectorAll("h1"));
+    wrapElementsInLinks(document.querySelectorAll("h2"));
+    wrapElementsInLinks(document.querySelectorAll("h3"));
+
 </script>
 </body>
 </html>
