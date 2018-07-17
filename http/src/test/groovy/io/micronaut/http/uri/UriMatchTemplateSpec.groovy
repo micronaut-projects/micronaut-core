@@ -76,6 +76,11 @@ class UriMatchTemplateSpec extends Specification {
 
         where:
         template                         | uri                        | matches | variables
+        // raw unencoded paths
+        "/books/{+path}"                 | '/books/1.xml'             | true    | [path: '1.xml']
+        "/books/{+path}"                 | '/books/foo/1.xml'         | true    | [path: 'foo/1.xml']
+        "/books/{+path}"                 | '/books/foo/bar/baz'       | true    | [path: 'foo/bar/baz']
+        "/books/{+path}/test"            | '/books/foo/bar/test'      | true    | [path: 'foo/bar']
         "/books{/id}{.ext:?}"            | '/books/1.xml'             | true    | [id: '1', ext: 'xml']
         "/books{/id}{.ext:?}"            | '/books/1'                 | true    | [id: '1', ext: null]
         "/books{/path:.*?}{.ext:?}"      | '/books/foo/bar.xml'       | true    | [path: 'foo/bar', ext: 'xml']

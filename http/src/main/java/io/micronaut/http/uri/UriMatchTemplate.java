@@ -344,7 +344,12 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
          * @return The variable match pattern
          */
         protected String getVariablePattern(String variable, char operator) {
-            return VARIABLE_MATCH_PATTERN;
+            if (operator == '+') {
+                // Allow reserved characters. See https://tools.ietf.org/html/rfc6570#section-3.2.3
+                return "([\\S]";
+            } else {
+                return VARIABLE_MATCH_PATTERN;
+            }
         }
     }
 }
