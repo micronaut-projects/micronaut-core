@@ -349,21 +349,34 @@ public class GenericUtils {
     }
 
     private void resolveGenericTypeParameter(Map<String, Object> resolvedParameters, String parameterName, TypeMirror mirror, Map<String, Object> boundTypes) {
-        DeclaredType declaredType = (DeclaredType) mirror;
-        List<? extends TypeMirror> nestedArguments = declaredType.getTypeArguments();
-        if (nestedArguments.isEmpty()) {
-            resolvedParameters.put(
-                parameterName,
-                resolveTypeReference(typeUtils.erasure(mirror), resolvedParameters)
-            );
-        } else {
-            resolvedParameters.put(
-                parameterName,
-                Collections.singletonMap(
-                    resolveTypeReference(typeUtils.erasure(mirror), resolvedParameters),
-                    resolveGenericTypes(declaredType, boundTypes)
-                )
-            );
+        if (mirror instanceof DeclaredType) {
+            DeclaredType declaredType = (DeclaredType) mirror;
+            List<? extends TypeMirror> nestedArguments = declaredType.getTypeArguments();
+            if (nestedArguments.isEmpty()) {
+                resolvedParameters.put(
+                        parameterName,
+                        resolveTypeReference(typeUtils.erasure(mirror), resolvedParameters)
+                );
+            } else {
+                resolvedParameters.put(
+                        parameterName,
+                        Collections.singletonMap(
+                                resolveTypeReference(typeUtils.erasure(mirror), resolvedParameters),
+                                resolveGenericTypes(declaredType, boundTypes)
+                        )
+                );
+            }
+        } else if (mirror instanceof TypeVariable) {
+            TypeVariable tv = (TypeVariable) mirror;
+            TypeMirror upperBound = tv.getUpperBound();
+            if (upperBound instanceof DeclaredType) {
+                resolveGenericTypeParameter(
+                        resolvedParameters,
+                        parameterName,
+                        upperBound,
+                        boundTypes
+                );
+            }
         }
     }
 
