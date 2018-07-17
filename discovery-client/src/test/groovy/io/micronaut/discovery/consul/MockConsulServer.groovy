@@ -72,13 +72,13 @@ class MockConsulServer implements ConsulOperations {
                 folder = key.substring(0, i)
             }
             List<KeyValue> list = keyvalues.computeIfAbsent(folder, { String k -> []})
-            list.add(new KeyValue(key.substring(1), Base64.getEncoder().encodeToString(value.bytes)))
+            list.add(new KeyValue(key, Base64.getEncoder().encodeToString(value.bytes)))
         }
         return Flowable.just(true)
     }
 
     @Override
-    @Get("/kv/{key}")
+    @Get("/kv/{+key}")
     Mono<List<KeyValue>> readValues(String key) {
         key = URLDecoder.decode(key, "UTF-8")
         Map<String, List<KeyValue>> found = keyvalues.findAll { entry -> entry.key.startsWith(key)}
@@ -93,7 +93,7 @@ class MockConsulServer implements ConsulOperations {
 
                 List<KeyValue> values = keyvalues.get(prefix)
                 if(values) {
-                    return Mono.just(values.findAll({it.key.startsWith(key.substring(1))}))
+                    return Mono.just(values.findAll({it.key.startsWith(key)}))
                 }
             }
         }

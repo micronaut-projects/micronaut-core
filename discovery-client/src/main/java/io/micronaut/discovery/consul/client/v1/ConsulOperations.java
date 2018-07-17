@@ -44,7 +44,7 @@ public interface ConsulOperations {
      * @param value The value as a String
      * @return A {@link Publisher} that emits a boolean if the operation succeeded
      */
-    @Put(uri = "/kv/{key}", consumes = MediaType.TEXT_PLAIN)
+    @Put(uri = "/kv/{+key}", consumes = MediaType.TEXT_PLAIN)
     @Produces(value = MediaType.TEXT_PLAIN, single = true)
     Publisher<Boolean> putValue(String key, @Body String value);
 
@@ -54,7 +54,7 @@ public interface ConsulOperations {
      * @param key The key to read
      * @return A {@link Publisher} that emits a list of {@link KeyValue}
      */
-    @Get("/kv/{key}?recurse")
+    @Get("/kv/{+key}?recurse")
     @Produces(single = true)
     Publisher<List<KeyValue>> readValues(String key);
 
@@ -67,7 +67,7 @@ public interface ConsulOperations {
      * @param seperator  The separator to use
      * @return A {@link Publisher} that emits a list of {@link KeyValue}
      */
-    @Get("/kv/{key}?recurse=true{&dc}{&raw}{&seperator}")
+    @Get("/kv/{+key}?recurse=true{&dc}{&raw}{&seperator}")
     @Produces(single = true)
     @Retryable(
         attempts = "${" + ConsulConfiguration.ConsulConfigDiscoveryConfiguration.PREFIX + ".retryCount:3}",

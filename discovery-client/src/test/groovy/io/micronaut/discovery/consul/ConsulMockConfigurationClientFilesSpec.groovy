@@ -91,7 +91,7 @@ not:
         ApplicationContext applicationContext = ApplicationContext.run(
                 [
                         (ConfigurationClient.ENABLED): true,
-                        'consul.client.config.path':'/some-path/config',
+                        'consul.client.config.path':'some-path/config',
                         'consul.client.config.format': 'file',
                         'micronaut.application.name':'test-app',
                         'consul.client.host': 'localhost',
@@ -121,6 +121,6 @@ not:
 
 
     private void writeValue(String name, String value) {
-        Flowable.fromPublisher(client.putValue("/some-path/config/$name", value)).blockingFirst()
+        Flowable.fromPublisher(client.putValue("some-path/config/$name", value)).blockingFirst()
     }
 }

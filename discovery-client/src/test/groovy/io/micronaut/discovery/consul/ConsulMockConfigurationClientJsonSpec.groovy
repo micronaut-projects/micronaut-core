@@ -112,6 +112,6 @@ class ConsulMockConfigurationClientJsonSpec extends Specification {
 
 
     private void writeValue(String name, String value) {
-        Flowable.fromPublisher(client.putValue("/config/$name", value)).blockingFirst()
+        Flowable.fromPublisher(client.putValue("config/$name", value)).blockingFirst()
     }
 }

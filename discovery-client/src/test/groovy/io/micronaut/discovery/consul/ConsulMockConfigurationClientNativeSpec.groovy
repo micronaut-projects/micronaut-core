@@ -59,15 +59,15 @@ class ConsulMockConfigurationClientNativeSpec extends Specification {
 
     void "test read and write key values with ConsulClient"() {
         when:"A property is written"
-        def result = Flowable.fromPublisher(client.putValue("/config/application/datasource.url", "mysql://blah")).blockingFirst()
+        def result = Flowable.fromPublisher(client.putValue("config/application/datasource.url", "mysql://blah")).blockingFirst()
 
         then:"The operation was successful"
         result
 
         when:"Properties are read"
-        Flowable.fromPublisher(client.putValue("/config/application/datasource.driver", "java.SomeDriver")).blockingFirst()
+        Flowable.fromPublisher(client.putValue("config/application/datasource.driver", "java.SomeDriver")).blockingFirst()
 
-        List<KeyValue> keyValues = Flowable.fromPublisher(client.readValues("/config")).blockingFirst()
+        List<KeyValue> keyValues = Flowable.fromPublisher(client.readValues("config")).blockingFirst()
 
         then:
         keyValues.size() == 2
@@ -98,6 +98,6 @@ class ConsulMockConfigurationClientNativeSpec extends Specification {
     }
 
     private void writeValue(String env, String name, String value) {
-        Flowable.fromPublisher(client.putValue("/config/$env/$name", value)).blockingFirst()
+        Flowable.fromPublisher(client.putValue("config/$env/$name", value)).blockingFirst()
     }
 }
