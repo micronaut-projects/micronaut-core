@@ -229,6 +229,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @Override
     public Environment start() {
         if (running.compareAndSet(false, true)) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Starting environment {} for active names {}", this, getActiveNames() );
+            }
             if (reading.compareAndSet(false, true)) {
 
                 readPropertySources(getPropertySourceRootName());

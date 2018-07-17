@@ -349,6 +349,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         this.propertySources.put(properties.getName(), properties);
         synchronized (catalog) {
             for (String property : properties) {
+
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("Processing property key {}", property);
+                }
+
                 Object value = properties.get(property);
 
                 if (value instanceof String) {
