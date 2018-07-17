@@ -115,12 +115,10 @@ public class ConsulConfigurationClient implements ConfigurationClient {
             path += "/";
         }
 
-        String pathPrefix = path.substring(1);
+        String pathPrefix = path;
         String commonConfigPath = path + Environment.DEFAULT_NAME;
-        String commonPrefix = commonConfigPath.substring(1);
         final boolean hasApplicationSpecificConfig = serviceId.isPresent();
         String applicationSpecificPath = hasApplicationSpecificConfig ? path + serviceId.get() : null;
-        String applicationPrefix = hasApplicationSpecificConfig ? applicationSpecificPath.substring(1) : null;
 
         String dc = configDiscoveryConfiguration.getDatacenter().orElse(null);
         Function<Throwable, Publisher<? extends List<KeyValue>>> errorHandler = throwable -> {
@@ -153,8 +151,8 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                     String key = keyValue.getKey();
                     String value = keyValue.getValue();
                     boolean isFolder = key.endsWith("/") && value == null;
-                    boolean isCommonConfigKey = key.startsWith(commonPrefix);
-                    boolean isApplicationSpecificConfigKey = hasApplicationSpecificConfig && key.startsWith(applicationPrefix);
+                    boolean isCommonConfigKey = key.startsWith(commonConfigPath);
+                    boolean isApplicationSpecificConfigKey = hasApplicationSpecificConfig && key.startsWith(applicationSpecificPath);
                     boolean validKey = isCommonConfigKey || isApplicationSpecificConfigKey;
                     if (!isFolder && validKey) {
 
@@ -185,11 +183,11 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                                 String property = null;
                                 Set<String> propertySourceNames = null;
                                 if (isCommonConfigKey) {
-                                    property = resolvePropertyName(commonPrefix, key);
+                                    property = resolvePropertyName(commonConfigPath, key);
                                     propertySourceNames = resolvePropertySourceNames(pathPrefix, key, activeNames);
 
                                 } else if (isApplicationSpecificConfigKey) {
-                                    property = resolvePropertyName(applicationPrefix, key);
+                                    property = resolvePropertyName(applicationSpecificPath, key);
                                     propertySourceNames = resolvePropertySourceNames(pathPrefix, key, activeNames);
                                 }
                                 if (property != null && propertySourceNames != null) {
