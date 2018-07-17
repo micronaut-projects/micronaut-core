@@ -120,3 +120,14 @@ body {
 #main {
     margin-left: 4%;
 }
+
+#main a {
+    text-decoration: none;
+}
+#main a:hover {
+    text-decoration: underline;
+}
+
+#main .paragraph a {
+    text-decoration: underline;
+}
