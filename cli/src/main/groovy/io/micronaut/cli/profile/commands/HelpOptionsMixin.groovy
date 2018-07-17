@@ -17,32 +17,31 @@
 package io.micronaut.cli.profile.commands
 
 import groovy.transform.CompileStatic
-import io.micronaut.cli.MicronautCli
-import io.micronaut.cli.profile.ExecutionContext
-import io.micronaut.cli.util.VersionInfo
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
-import picocli.CommandLine.Parameters
 
 /**
- * Command for creating Micronaut applications
+ * Mixin that adds help and version options to a command. Example usage:
+ * <pre>
+ * &#064;Command(name = 'command')
+ * class App {
+ *     &#064;Mixin
+ *     HelpOptionsMixin helpOptions // adds help and version options to the command
  *
- * @author Graeme Rocher
- * @author Lari Hotari
+ *     // ...
+ * }
+ * </pre>
+ *
  * @author Remko Popma
- * @since 1.0
+ * @version 1.0
  */
 @CompileStatic
-@Command(name = 'create-app', description = 'Creates an application')
-class CreateAppCommand extends AbstractCreateAppCommand {
-    public static final String NAME = 'create-app'
+@Command(versionProvider = MicronautCliVersionProvider) // individual commands can set a different versionProvider
+class HelpOptionsMixin {
 
-    @Parameters(arity = '0..1', paramLabel = 'NAME', description = 'The name of the application to create.')
-    String appname = ""
+    @Option(names = ['-h', '--help'], usageHelp = true, description = ['Show this help message and exit.'])
+    boolean helpRequested
 
-    @Override
-    String getName() { NAME }
-
-    @Override
-    protected String getNameOfAppToCreate() { appname }
+    @Option(names = ['-V', '--version'], versionHelp = true, description = ['Print version information and exit.'])
+    boolean versionRequested
 }

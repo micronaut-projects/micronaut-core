@@ -4,29 +4,68 @@ In addition, there are specialty commands for creating a "federation" of multipl
 
 
 .Micronaut CLI Project Creation Commands
+[cols="1,2,2,4"]
 |===
-|Command|Description|Arguments|Example
+|Command|Description|Options|Example
 
 |`create-app`
 |Creates a basic Micronaut application, using the `service` profile by default.
-| `profile`, `features`, `build`, `inplace`
-|`mn create-app my-project -features mongo-reactive,security-jwt  -build maven`
+a|
+* `-p`, `--profile`
+* `-f`, `--features`
+* `-b`, `--build`
+* `-i`, `--inplace`
+a|
+[source,bash]
+----
+mn create-app my-project --features
+ mongo-reactive,security-jwt --build maven
+----
 
 
 |`create-function`
 |Creates a Micronaut serverless function, using the `function-aws` profile by default.
-| `provider`, `lang`, `test`, `features`, `build`, `inplace`
-|`mn create-function my-lambda-function -lang groovy -test spock`
+a|
+* `-p`, `--provider`
+* `-l`, `--lang`
+* `-t`, `--test`
+* `-f`, `--features`
+* `-b`, `--build`
+* `-i`, `--inplace`
+a|
+[source,bash]
+----
+mn create-function my-lambda-function
+ --lang groovy --test spock
+----
 
 |`create-federation`
 |Creates a federation of Micronaut services with shared profile/features.
-| `services`, `profile`, `features`, `build`, `inplace`
-|`mn create-federation my-federation -services users,inventory,billing`
+a|
+* `-s`, `--services`
+* `-p`, `--profile`
+* `-f`, `--features`
+* `-b`, `--build`
+* `-i`, `--inplace`
+a|
+[source,bash]
+----
+mn create-federation my-federation
+ --services users,inventory,billing
+----
 
 |`create-profile`
 |Creates a Micronaut profile
-| `profile`, `features`, `inplace`
-|`mn create-profile security-service -profile service -features security-jwt`
+a|
+* `-p`, `--profile`
+* `-f`, `--features`
+* `-i`, `--inplace`
+a|
+[source,bash]
+----
+mn create-profile security-service
+ --profile service --features security-jwt
+----
 
 |===
 
@@ -37,24 +76,34 @@ The `create-app` command will generate a basic Micronaut project, with optional 
 
 
 .Create-App Flags
+[cols="2,3,3"]
 |===
 |Flag|Description|Example
 
-|`build`
+|`-b`, `--build`
 |Build tool (one of `gradle`, `maven` - default is `gradle`)
-|`-build maven`
+|`--build maven`
 
-|`profile`
+|`-p`, `--profile`
 |Profile to use for the project (default is `service`)
-|`-profile function-aws`
+|`--profile function-aws`
 
-|`features`
+|`-f`, `--features`
 |Features to use for the project, comma-separated
-|`-features security-jwt,mongo-gorm`
+a|
+[source,bash]
+----
+--features security-jwt,mongo-gorm
+----
+or
+[source,bash]
+----
+-f security-jwt -f mongo-gorm
+----
 
-|`inplace`
+|`-i`, `--inplace`
 |If present, generates the project in the current directory (project name is optional if this flag is set)
-|`-inplace`
+|`--inplace`
 
 |===
 
@@ -95,7 +144,7 @@ To create an app with Groovy & Spock support, supply the appropriate features vi
 
 [source,bash]
 ----
-mn> create-app my-groovy-app -features groovy, spock
+mn> create-app my-groovy-app --features groovy,spock
 ----
 
 This will include the Groovy & Spock dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.
@@ -106,7 +155,7 @@ To create an app with Kotlin & Spek support, supply the appropriate features via
 
 [source,bash]
 ----
-mn> create-app my-kotlin-app -features kotlin, spek
+mn> create-app my-kotlin-app --features kotlin,spek
 ----
 
 This will include the Kotlin & Spek dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.
@@ -118,7 +167,7 @@ By default `create-app` will create a Gradle project, with a `build.gradle` file
 
 [source,bash]
 ----
-mn> create-app my-maven-app -build maven
+mn> create-app my-maven-app --build maven
 ----
 
 == Create-Function
@@ -128,32 +177,42 @@ The `create-function` command will generate a <<serverlessFunctions,Micronaut fu
 TIP: Currently AWS Lambda is the only supported cloud provider for Micronaut functions, so some of the information below will be specific to that platform. Other cloud providers will be added soon and this section will be updated accordingly.
 
 .Create-Function Flags
+[cols="1,2,2"]
 |===
 |Flag|Description|Example
 
-|`lang`
+|`-l`, `--lang`
 |Language to use for the function (one of `java`, `groovy`, `kotlin` - default is `java`)
-|`-lang groovy`
+|`--lang groovy`
 
-|`test`
+|`-t`, `--test`
 |Test framework to use for the function (one of `junit`, `spock` - default is `junit`)
-|`-test spock`
+|`--test spock`
 
-|`build`
+|`-b`, `--build`
 |Build tool (one of `gradle`, `maven` - default is `gradle`)
-|`-build maven`
+|`--build maven`
 
-|`features`
+|`-f`, `--features`
 |Features to use for the function, comma-separated
-|`-features security-jwt,mongo-gorm`
+a|
+[source,bash]
+----
+--features security-jwt,mongo-gorm
+----
+or
+[source,bash]
+----
+-f security-jwt -f mongo-gorm
+----
 
-|`provider`
+|`-p`, `--provider`
 |Provider to use for the function (currently the only supported provider is `aws` for AWS Lambda - this is the default)
-|`-provider aws`
+|`--provider aws`
 
-|`inplace`
+|`-i`, `--inplace`
 |If present, generates the function in the current directory (function name is optional if this flag is set)
-|`-inplace`
+|`--inplace`
 
 |===
 
@@ -166,7 +225,7 @@ Depending on language choice, an appropriate test will also be generated. By def
 
 [source,bash]
 ----
-$ mn create-function hello-world -lang java -test spock
+$ mn create-function hello-world --lang java --test spock
 ----
 
 === Build Tool
@@ -198,28 +257,38 @@ For further details, consult the https://docs.aws.amazon.com/lambda/latest/dg/ja
 The `create-federation` command accepts the same flags as the `create-app` command, and follows mostly the same behavior. The key difference is that this command accepts multiple project names following the `services` flag, and will generate a project (with the specified profile and features) for each name supplied. The `[NAME]` argument will be used to create the top-level multi-project build for the federation.
 
 .Create-Federation Flags
+[cols="1,2,2"]
 |===
 |Flag|Description|Example
 
-|`services`
+|`-s`, `--services`
 |Comma-separated list of services (applications) to create
-|`-services users,inventory,billing`
+|`--services users,inventory,billing`
 
-|`build`
+|`-b`, `--build`
 |Build tool (one of `gradle`, `maven` - default is `gradle`)
-|`-build maven`
+|`--build maven`
 
-|`profile`
+|`-p`, `--profile`
 |Profile to use for all projects in the federation (default is `service`)
-|`-profile function-aws`
+|`--profile function-aws`
 
-|`features`
+|`-f`, `--features`
 |Features to use for all projects in the federation, comma-separated
-|`-features security-jwt,mongo-gorm`
+a|
+[source,bash]
+----
+--features security-jwt,mongo-gorm
+----
+or
+[source,bash]
+----
+-f security-jwt -f mongo-gorm
+----
 
-|`inplace`
+|`-i`, `--inplace`
 |If present, generates the project in the current directory (project name is optional if this flag is set)
-|`-inplace`
+|`--inplace`
 
 |===
 
@@ -228,4 +297,33 @@ When creating a federation, a top-level project file will be generated (using th
 == Create-Profile
 
 The `create-profile` command is used to generate new profiles for the Micronaut CLI.
-//TODO
+
+//TODO should "profile to use" be "profile to extend"?
+
+
+.Create-Profile Flags
+[cols="1,2,2"]
+|===
+|Flag|Description|Example
+
+|`-l`, `--lang`
+|Language to use for the profile (one of `java`, `groovy`, `kotlin` - default is `java`)
+|`--lang groovy`
+
+|`-b`, `--build`
+|Build tool (one of `gradle`, `maven` - default is `gradle`)
+|`--build maven`
+
+|`-p`, `--profile`
+|Profile to extend
+|`--profile function-aws`
+
+|`-f`, `--features`
+|Features to use, comma-separated
+|`--features security-jwt,mongo-gorm`
+
+|`-i`, `--inplace`
+|If present, generates the profile in the current directory (profile name is optional if this flag is set)
+|`--inplace`
+
+|===
