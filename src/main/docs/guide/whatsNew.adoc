@@ -1,80 +1,28 @@
-Apart from https://github.com/micronaut-projects/micronaut-core/milestone/2?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features.
+Apart from https://github.com/micronaut-projects/micronaut-core/milestone/3?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features.
 
-=== Metrics Support
+=== Improved Metrics Support
 
-The first version of support for Metrics via http://micrometer.io[Micrometer] is now available. Metrics are exposed via the <<metricsEndpoint,Metrics Endpoint>> and can be extensively customized.
+Metrics support has been improved with support for metrics for:
 
-Metrics support includes support for Statsd, Atlas, Graphite and Prometheus with more Metrics backends coming in the future.
+* Micronaut Thread Pools
+* Kafka Metrics
 
-See the section on the <<metricsEndpoint,Metrics Endpoint>> for more information. Special thanks to https://github.com/ctoestreich[Christian Oestreich] for significant contributions in this area.
+=== Apache Kafka Support
 
-=== Server Sent Event (SSE) Client
+Micronaut can now be used to build Message-Driven Microservices with Apache Kafka. See the <<kafka, Kafka>> section of the documentation for more information.
 
-A new api:http.client.sse.SseClient[] interface has been introduced that provides a client for streaming Server Sent Events (SSE) on the server. The client can also be used for testing SSE controllers.
+=== Annotation Metadata Processing Support Improved
 
-In additional the `@Client` annotation has been updated to add support for automatically implementing streaming interfaces for both JSON and SSE streaming.
+All annotation metadata in Micronaut is produced as compile time, resulting in significant improvements to startup time and memory consumption over traditional frameworks.
 
-See the section on <<clientAnnotationStreaming, Client Streaming>> for more information.
+This support has been enhanced to better support repeated annotations such that repeated annotations are normalized at compile time, avoiding the need to process them and compensate for the difference between a single annotation definition and multiple.
 
-=== Improved Blocking I/O Support
+The api:core.annotation.AnnotationMetadata[] interface now includes methods such as `getAnnotationValuesByType` and `getDeclaredAnnotationValuesByType` that allow the retrieval of the repeated annotation values that are computed at compile time.
 
-It is now possible to return a api:core.io.Writable[] and have the operation offloaded to a the I/O thread pool, thus improving the ability to interface with APIs that do not yet support non-blocking I/O:
+=== Reactive Postgres Driver Support
 
-[source,java]
-----
-@Get(uri = "/welcome", produces = MediaType.TEXT_PLAIN)
-Writable render() { // <2>
-    return writer -> template.make( // <3>
-        CollectionUtils.mapOf(
-                "firstName", "Fred",
-                "lastName", "Flintstone"
-        )
-    ).writeTo(writer);
-}
-----
-
-See the section on <<serverIO, Writing Response Data>> for more information.
-
-=== Support for OpenFaaS
-
-Micronaut functions can now be executed from the CLI and will read from `System.in` the data required to execute a function.
-
-This means it is possible to deploy functions developed with Micronaut to Serverless platforms that package functions within containers such as OpenFaaS, Fn etc.
-
-The command line has also been updated with a `openfaas` feature which will create the necessary `Dockerfile` ready for deployment to OpenFaaS:
-
-.Creating an OpenFaaS Function
-[source,bash]
-----
-$ mn create-function foo --features openfaas
-----
-
-=== Kotlin Optional Type Support
-
-Beans can now be injected optionally using Kotlin nullable types without the need for the `@Nullable` annotation.
+Support has been added for the https://github.com/reactiverse/reactive-pg-client[Postgres Reactive Client] project allowing building non-blocking, reactive applications with Postgres SQL and Micronaut. See the documentation on <<postgresSupport, Postgres Reactive Client Support>> for more information.
 
 === CLI Improvements
 
-A new flag has been added to the `create-app` command: `lang`. 
-
-The `lang` flag accepts any of the three supported languages: `java`, `groovy`, or `kotlin` (`java` is default when no flag is supplied). This selection will determine the language used for the `Application` class as well as other code artifacts generated using CLI commands (such as `create-controller`, `create-job`, etc).
-
-.Creating a Groovy application
-[source,bash]
-----
-$ mn create-app bar --lang groovy
-----
-
-.Creating a Kotlin application
-[source,bash]
-----
-$ mn create-app baz --lang kotlin
-----
-
-==== Default Dockerfile  
-
-Applications generated with `create-app` now include a default `Dockerfile`. 
-
-==== Java 9+ Improvements
-
-The CLI has been improved to provide a better experience for Java 9 and above.
+Thanks to a contribution from https://github.com/remkop[Remko Popma] the CLI has been re-written on top of https://github.com/remkop/picocli[PicoCLI] resulting in improvements to documentation, TAB completion and code maintainability.
