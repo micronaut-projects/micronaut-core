@@ -16,6 +16,7 @@
 
 package io.micronaut.inject.processing;
 
+import javax.lang.model.element.Element;
 import javax.lang.model.element.Name;
 import javax.lang.model.element.NestingKind;
 import javax.lang.model.element.TypeElement;
@@ -42,8 +43,14 @@ public class JavaModelUtils {
             StringBuilder builder = new StringBuilder();
             while (nestingKind == NestingKind.MEMBER) {
                 builder.insert(0, '$').insert(1, enclosingElement.getSimpleName());
-                enclosingElement = (TypeElement) enclosingElement.getEnclosingElement();
-                nestingKind = enclosingElement.getNestingKind();
+                Element enclosing = enclosingElement.getEnclosingElement();
+
+                if (enclosing instanceof TypeElement) {
+                    enclosingElement = (TypeElement) enclosing;
+                    nestingKind = enclosingElement.getNestingKind();
+                } else {
+                    break;
+                }
             }
             Name enclosingName = enclosingElement.getQualifiedName();
             return enclosingName.toString() + builder;
