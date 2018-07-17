@@ -14,34 +14,13 @@
  * limitations under the License.
  */
 
-package io.micronaut.cli.profile
+package io.micronaut.cli.profile.commands
 
 import groovy.transform.CompileStatic
 
-/**
- * Represents argument to a command
- *
- * @author Graeme Rocher
- * @since 1.0
- */
 @CompileStatic
-class CommandArgument {
-    /**
-     * The name of the argument
-     */
-    String name
-    /**
-     * The description of the argument
-     */
-    String description
-
-    /**
-     * Whether the argument is required or not
-     */
-    boolean required = true
-
-    /**
-     * The string argument this argument translates into
-     */
-    String target
+enum SupportedTestFramework {
+    junit,
+    spock,
+    spek
 }

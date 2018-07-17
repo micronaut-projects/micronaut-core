@@ -1,3 +1,2 @@
-io.micronaut.cli.profile.commands.factory.YamlCommandFactory
 io.micronaut.cli.profile.commands.factory.GroovyScriptCommandFactory
 io.micronaut.cli.profile.commands.factory.ServiceCommandFactory

@@ -4,19 +4,19 @@ Profiles can include commands for generating common code artifacts. Not all comm
 ----
 mn> profile-info service
 Profile: service
---------------------
+------------------
 The service profile
 
 Provided Commands:
---------------------
-* help - Prints help information for a specific command
-* create-job - Creates a job with scheduled method
-* create-bean - Creates a singleton bean
-* create-controller - Creates a controller and associated test
-* create-client - Creates a client interface
+------------------
+  create-bean        Creates a singleton bean
+  create-client      Creates a client interface
+  create-controller  Creates a controller and associated test
+  create-job         Creates a job with scheduled method
+  help               Prints help information for a specific command
 
 Provided Features:
---------------------
+------------------
 ...
 ----
 
@@ -44,13 +44,13 @@ Commands in the base profile are inherited by all other profiles and are always 
 |===
 |Flag|Description|Example
 
-|`lang`
+|`-l`, `--lang`
 |The language used for the bean class
-|`-lang groovy`
+|`--lang groovy`
 
-|`force`
+|`-f`, `--force`
 |Whether to overwrite existing files
-|`-force`
+|`--force`
 
 |
 |===
@@ -69,13 +69,13 @@ $ mn create-bean EmailService
 |===
 |Flag|Description|Example
 
-|`lang`
+|`-l`, `--lang`
 |The language used for the job class
-|`-lang groovy`
+|`--lang groovy`
 
-|`force`
+|`-f`, `--force`
 |Whether to overwrite existing files
-|`-force`
+|`--force`
 
 |
 |===
@@ -98,13 +98,13 @@ The service profile includes commands that are dependent upon the HTTP server an
 |===
 |Flag|Description|Example
 
-|`lang`
+|`-l`, `--lang`
 |The language used for the controller
-|`-lang groovy`
+|`--lang groovy`
 
-|`force`
+|`-f`, `--force`
 |Whether to overwrite existing files
-|`-force`
+|`--force`
 
 |
 |===
@@ -124,13 +124,13 @@ $ mn create-controller Book
 |===
 |Flag|Description|Example
 
-|`lang`
+|`-l`, `--lang`
 |The language used for the client
-|`-lang groovy`
+|`--lang groovy`
 
-|`force`
+|`-f`, `--force`
 |Whether to overwrite existing files
-|`-force`
+|`--force`
 
 |
 |===
