@@ -26,7 +26,6 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.Ignore
 import spock.lang.Specification
 
 import java.util.function.Consumer
@@ -103,24 +102,6 @@ class WebFunctionSpec extends Specification {
         embeddedServer.stop()
     }
 
-    // TODO
-    @Ignore
-    void 'test camel cased function bean'() {
-        given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
-
-        when:
-        HttpResponse<String> response = client.toBlocking().exchange('/hello-world', String)
-
-        then:
-        response.code() == HttpStatus.OK.code
-        response.body() == 'hello there world'
-
-        cleanup:
-        embeddedServer.stop()
-
-    }
     void "test string consumer with text plain"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
@@ -163,17 +144,6 @@ class WebFunctionSpec extends Specification {
     static class StringSupplier implements Supplier<String> {
         String getValue() {
             return "value"
-        }
-        @Override
-        String get() {
-            return getValue()
-        }
-    }
-
-    @FunctionBean("helloWorld")
-    static class CamelCaseSupplier implements Supplier<String> {
-        String getValue() {
-            return "hello there world"
         }
         @Override
         String get() {
