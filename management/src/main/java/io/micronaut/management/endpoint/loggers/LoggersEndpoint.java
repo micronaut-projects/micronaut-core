@@ -17,6 +17,7 @@
 package io.micronaut.management.endpoint.loggers;
 
 import io.micronaut.management.endpoint.Endpoint;
+import io.micronaut.management.endpoint.EndpointConfiguration;
 
 /**
  * <p>Exposes an {@link Endpoint} to manage loggers.</p>
@@ -24,12 +25,35 @@ import io.micronaut.management.endpoint.Endpoint;
  * @author Matthew Moss
  * @since 1.0
  */
-@Endpoint(id = LoggersEndpoint.NAME)
+@Endpoint(id = LoggersEndpoint.NAME,
+        defaultEnabled = LoggersEndpoint.DEFAULT_ENABLED,
+        defaultSensitive = LoggersEndpoint.DEFAULT_SENSITIVE)
 public class LoggersEndpoint {
 
     /**
-     * Endpoint name.
+     * Endpoint name
      */
     public static final String NAME = "loggers";
 
+    /**
+     * Endpoint configuration prefix
+     */
+    public static final String PREFIX = EndpointConfiguration.PREFIX + "." + NAME;
+
+    /**
+     * Endpoint default enabled
+     */
+    public static final boolean DEFAULT_ENABLED = true;
+
+    /**
+     * Endpoint default sensitivity
+     */
+    public static final boolean DEFAULT_SENSITIVE = false;
+
+    /**
+     * Endpoint constructor
+     */
+    public LoggersEndpoint() {
+
+    }
 }
