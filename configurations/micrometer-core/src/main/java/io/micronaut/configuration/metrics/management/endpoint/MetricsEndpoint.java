@@ -22,10 +22,8 @@ import io.micrometer.core.instrument.Statistic;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry;
 import io.micronaut.configuration.metrics.annotation.RequiresMetrics;
-import io.micronaut.http.HttpResponse;
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.Read;
-import io.reactivex.Single;
 
 import java.util.*;
 import java.util.function.BiFunction;
@@ -69,8 +67,8 @@ public class MetricsEndpoint {
      * @return single of http response with list of metric names
      */
     @Read
-    Single<HttpResponse<ListNamesResponse>> listNames() {
-        return Single.just(getListNamesResponse());
+    MetricNames listNames() {
+        return getListNamesResponse();
     }
 
     /**
@@ -86,8 +84,8 @@ public class MetricsEndpoint {
      * @return single with metric details response
      */
     @Read
-    Single<HttpResponse<MetricDetailsResponse>> getMetricDetails(String name) {
-        return Single.just(getMetricDetailsResponse(name));
+    MetricDetails getMetricDetails(String name) {
+        return getMetricDetailsResponse(name);
     }
 
     /**
@@ -96,10 +94,10 @@ public class MetricsEndpoint {
      *
      * @return http response with list of metric names
      */
-    private HttpResponse<ListNamesResponse> getListNamesResponse() {
+    private MetricNames getListNamesResponse() {
         Set<String> names = new LinkedHashSet<>();
         collectNames(names, this.meterRegistries);
-        return HttpResponse.ok(new ListNamesResponse(names));
+        return new MetricNames(names);
     }
 
     /**
@@ -114,19 +112,19 @@ public class MetricsEndpoint {
      * @param name the name of the meter to get the details for.
      * @return single with metric details response
      */
-    private HttpResponse<MetricDetailsResponse> getMetricDetailsResponse(String name) {
+    private MetricDetails getMetricDetailsResponse(String name) {
         List<Tag> tags = Collections.emptyList();
         List<Meter> meters = new ArrayList<>();
         collectMeters(meters, this.meterRegistries, name, tags, new HashSet<>());
         if (meters.isEmpty()) {
-            return HttpResponse.notFound();
+            return null;
         }
         Map<Statistic, Double> samples = getSamples(meters);
         Map<String, Set<String>> availableTags = getAvailableTags(meters);
         tags.forEach((t) -> availableTags.remove(t.getKey()));
-        return HttpResponse.ok(new MetricDetailsResponse(name,
+        return new MetricDetails(name,
                 asList(samples, Sample::new),
-                asList(availableTags, AvailableTag::new)));
+                asList(availableTags, AvailableTag::new));
     }
 
     private void collectMeters(List<Meter> meters, Collection<MeterRegistry> meterRegistries, String name,
@@ -242,7 +240,7 @@ public class MetricsEndpoint {
     /**
      * Response payload for a metric name listing.
      */
-    public static final class ListNamesResponse {
+    public static final class MetricNames {
 
         private final Set<String> names;
 
@@ -251,7 +249,7 @@ public class MetricsEndpoint {
          *
          * @param names list of names
          */
-        ListNamesResponse(Set<String> names) {
+        MetricNames(Set<String> names) {
             this.names = names;
         }
 
@@ -268,7 +266,7 @@ public class MetricsEndpoint {
     /**
      * Response payload for a metric name selector.
      */
-    public static final class MetricDetailsResponse {
+    public static final class MetricDetails {
 
         private final String name;
 
@@ -283,8 +281,8 @@ public class MetricsEndpoint {
          * @param measurements  numerical values
          * @param availableTags tags
          */
-        MetricDetailsResponse(String name, List<Sample> measurements,
-                              List<AvailableTag> availableTags) {
+        MetricDetails(String name, List<Sample> measurements,
+                      List<AvailableTag> availableTags) {
             this.name = name;
             this.measurements = measurements;
             this.availableTags = availableTags;
