@@ -67,7 +67,7 @@ public class MetricsEndpoint {
      * @return single of http response with list of metric names
      */
     @Read
-    MetricNames listNames() {
+    public MetricNames listNames() {
         return getListNamesResponse();
     }
 
@@ -84,7 +84,7 @@ public class MetricsEndpoint {
      * @return single with metric details response
      */
     @Read
-    MetricDetails getMetricDetails(String name) {
+    public MetricDetails getMetricDetails(String name) {
         return getMetricDetailsResponse(name);
     }
 
