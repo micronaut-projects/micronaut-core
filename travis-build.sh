@@ -10,7 +10,7 @@ echo "https://$GH_TOKEN:@github.com" > ~/.git-credentials
 if [[ $EXIT_STATUS -eq 0 ]]; then
     if [[ -n $TRAVIS_TAG ]]; then
         echo "Skipping Tests to Publish Release"
-        ./gradlew pTML || EXIT_STATUS=$?
+        ./gradlew pTML assemble || EXIT_STATUS=$?
     else
         ./gradlew --stop
         ./gradlew testClasses || EXIT_STATUS=$?
