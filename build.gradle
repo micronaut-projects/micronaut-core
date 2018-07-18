@@ -120,6 +120,11 @@ ext {
                 name:'netty-codec-http',
                 modules:['netty-handler','netty-handler-proxy']
             ],
+            picocli: [
+                    version: picocliVersion,
+                    group:'info.picocli',
+                    name:'picocli'
+            ],
             lettuce: [
                 version: lettuceVersion,
                 group:'io.lettuce',
