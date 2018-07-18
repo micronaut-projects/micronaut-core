@@ -28,7 +28,7 @@ import org.reactivestreams.Publisher;
  * @author James Kleeh
  * @since 1.0
  */
-public interface HealthAggregator<T> {
+public interface HealthAggregator<T extends HealthResult> {
 
     /**
      * @param indicators The health indicators to aggregate.
