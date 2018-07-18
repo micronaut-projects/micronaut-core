@@ -18,9 +18,11 @@ package io.micronaut.management.endpoint.loggers;
 
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.EndpointConfiguration;
+import io.micronaut.management.endpoint.Read;
+import io.reactivex.Single;
 
 /**
- * <p>Exposes an {@link Endpoint} to manage loggers.</p>
+ * Exposes an {@link Endpoint} to manage loggers
  *
  * @author Matthew Moss
  * @since 1.0
@@ -50,10 +52,26 @@ public class LoggersEndpoint {
      */
     public static final boolean DEFAULT_SENSITIVE = false;
 
-    /**
-     * Endpoint constructor
-     */
-    public LoggersEndpoint() {
+    private final LoggingSystem loggingSystem;
+    private final LoggersDataCollector loggersDataCollector;
 
+    /**
+     * @param loggingSystem the {@link LoggingSystem}
+     * @param loggersDataCollector the {@link LoggersDataCollector}
+     */
+    public LoggersEndpoint(LoggingSystem loggingSystem,
+                           LoggersDataCollector loggersDataCollector) {
+        this.loggingSystem = loggingSystem;
+        this.loggersDataCollector = loggersDataCollector;
+    }
+
+    /**
+     * @return the loggers as a {@link Single}
+     */
+    @Read
+    public Single getLoggers() {
+        return Single.fromPublisher(
+                loggersDataCollector.getData(loggingSystem.getLoggers())
+        );
     }
 }
