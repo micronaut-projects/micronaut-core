@@ -83,6 +83,7 @@ import io.netty.handler.timeout.IdleStateEvent;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.handler.timeout.ReadTimeoutHandler;
 import io.netty.util.CharsetUtil;
+import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.Future;
 import io.reactivex.*;
@@ -113,6 +114,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 /**
  * Default implementation of the {@link HttpClient} interface based on Netty.
@@ -369,7 +371,14 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
             @Override
             public <I, O> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request, io.micronaut.core.type.Argument<O> bodyType) {
                 Flowable<io.micronaut.http.HttpResponse<O>> publisher = DefaultHttpClient.this.exchange(request, bodyType);
-                return publisher.doOnNext((res) -> res.getBody(ByteBuf.class).ifPresent(ByteBuf::release)).blockingFirst();
+                return publisher.doOnNext((res) -> {
+                    Optional<ByteBuf> byteBuf = res.getBody(ByteBuf.class);
+                    byteBuf.ifPresent(bb -> {
+                        if (bb.refCnt() > 0) {
+                            ReferenceCountUtil.safeRelease(bb);
+                        }
+                    });
+                }).blockingFirst();
             }
         };
     }
