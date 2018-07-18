@@ -29,7 +29,7 @@ consul:
     defaultZone: "${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"
 ----
 
-TIP: Using the Micronaut CLI you can quickly create a new service setup with Consul using: `mn create-app my-app -features discovery-consul`
+TIP: Using the Micronaut CLI you can quickly create a new service setup with Consul using: `mn create-app my-app --features discovery-consul`
 
 The `consul.client.defaultZone` settings accepts a list of Consul servers to be used by default.
 
