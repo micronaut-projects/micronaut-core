@@ -29,6 +29,8 @@ import javax.inject.Singleton;
 import java.io.IOException;
 import java.net.URI;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * A {@link DiscoveryClient} implementation for Kubernetes. Kubernetes uses environment variables so no API calls is
@@ -59,43 +61,13 @@ public class KubernetesDiscoveryClient implements DiscoveryClient {
      * Default constructor.
      */
     public KubernetesDiscoveryClient() {
-        Map<String, String> env = resolveEnvironment();
-        Map<String, ServiceInstance> serviceInstanceMap = new HashMap<>();
-        for (Map.Entry<String, String> entry : env.entrySet()) {
-            String key = entry.getKey();
-            for (String suffix : SUFFIXES) {
-                if (key.endsWith(suffix)) {
-                    String serviceId = key.substring(0, key.length() - HOST_SUFFIX.length());
-                    String host = entry.getValue();
-                    String port;
-                    boolean isSecure = false;
-
-                    port = env.get(serviceId + HTTPS_PORT_SUFFIX);
-                    if (StringUtils.isEmpty(port)) {
-                        port = env.get(serviceId + PORT_SUFFIX);
-                    } else {
-                        isSecure = true;
-                    }
-
-                    if (port != null) {
-                        if (serviceId.endsWith(PUBLISHED_SUFFIX)) {
-                            serviceId = serviceId.substring(0, serviceId.length() - PUBLISHED_SUFFIX.length());
-                        } else if (serviceId.endsWith(RANDOM_PORTS_SUFFIX)) {
-                            serviceId = serviceId.substring(0, serviceId.length() - RANDOM_PORTS_SUFFIX.length());
-                        }
-
-                        serviceId = serviceId.toLowerCase(Locale.ENGLISH).replace('_', '-');
-                        serviceInstanceMap.put(
-                                serviceId,
-                                ServiceInstance.builder(
-                                        serviceId,
-                                        URI.create((isSecure ? "https://" : "http://") + host + ":" + port)
-                                ).build()
-                        );
-                    }
-                }
-            }
-        }
+        Map<String, ServiceInstance> serviceInstanceMap = resolveEnvironment().entrySet()
+                .stream()
+                .filter(this::keyEndsWithSuffix)
+                .map(this::entryToServiceInstance)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toMap(ServiceInstance::getId, Function.identity(), (x, y) -> x));
+        
         if (LOG.isDebugEnabled()) {
             LOG.debug("Discovered Services from Kubernetes environment:");
             for (ServiceInstance serviceInstance : serviceInstanceMap.values()) {
@@ -103,6 +75,48 @@ public class KubernetesDiscoveryClient implements DiscoveryClient {
             }
         }
         this.serviceIds = serviceInstanceMap;
+    }
+    
+    private boolean keyEndsWithSuffix(Map.Entry<String, String> entry) {
+        String key = entry.getKey();
+        for (String suffix : SUFFIXES) {
+            if (key.endsWith(suffix)) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    private ServiceInstance entryToServiceInstance(Map.Entry<String, String> entry) {
+        Map<String, String> env = resolveEnvironment();
+        ServiceInstance si = null;
+        String key = entry.getKey();
+        String serviceId = key.substring(0, key.length() - HOST_SUFFIX.length());
+        String host = entry.getValue();
+        String port;
+        boolean isSecure = false;
+    
+        port = env.get(serviceId + HTTPS_PORT_SUFFIX);
+        if (StringUtils.isEmpty(port)) {
+            port = env.get(serviceId + PORT_SUFFIX);
+        } else {
+            isSecure = true;
+        }
+    
+        if (port != null) {
+            if (serviceId.endsWith(PUBLISHED_SUFFIX)) {
+                serviceId = serviceId.substring(0, serviceId.length() - PUBLISHED_SUFFIX.length());
+            } else if (serviceId.endsWith(RANDOM_PORTS_SUFFIX)) {
+                serviceId = serviceId.substring(0, serviceId.length() - RANDOM_PORTS_SUFFIX.length());
+            }
+        
+            serviceId = serviceId.toLowerCase(Locale.ENGLISH).replace('_', '-');
+        
+            si = ServiceInstance.builder(serviceId, URI.create((isSecure ? "https://" : "http://") + host + ":" + port)).build();
+        }
+    
+        return si;
     }
 
     @Override

@@ -7,3 +7,19 @@ include::{testshttpservernetty}/consumes/TestController.groovy[tags=clazz, inden
 
 <1> `@Consumes` annotation takes a `String[]` of supported media types for an incoming request.
 <2> By default, a controller's action consumes request with `Content-Type` of type `application-json`.
+
+=== Customizing Processed Content Types
+
+Normally the JSON parsing only happens if the content type is `application-json`. The other api:io.micronaut.http.codec.MediaTypeCodec[] classes behave in a similar manner that they have pre-defined content types they can process. To extend the list of media types that a given codec should process, you can provide configuration that will be stored in api:io.micronaut.codec.CodecConfiguration[]:
+
+[source,yaml]
+----
+micronaut:
+    codec:
+        json:
+            additionalTypes:
+              - text/javascript
+              - ...
+----
+
+Currently supported configuration prefixes are `json`, `json-stream`, `text`, and `text-stream`.
