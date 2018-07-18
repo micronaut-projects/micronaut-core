@@ -387,6 +387,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 constructorParamterInfo.getGenericTypes());
 
                         if (isAopProxyType) {
+
+                            if (modelUtils.isFinal(classElement)) {
+                                error(classElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + classElement);
+                                return null;
+                            }
                             Object[] interceptorTypes = annotationUtils.getAnnotationMetadata(concreteClass)
                                     .getAnnotationNamesByStereotype(AROUND_TYPE)
                                     .toArray();
@@ -776,16 +781,21 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         aroundMethodMetadata = methodAnnotationMetadata;
                     }
 
-                    aopProxyWriter.visitAroundMethod(
-                            typeRef,
-                            resolvedReturnType,
-                            resolvedReturnType,
-                            returnTypeGenerics,
-                            method.getSimpleName().toString(),
-                            params.getParameters(),
-                            params.getParameterMetadata(),
-                            params.getGenericTypes(),
-                            aroundMethodMetadata);
+                    if (modelUtils.isFinal(method)) {
+                        error(method, "Public method defines AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on class.");
+                    } else {
+                        aopProxyWriter.visitAroundMethod(
+                                typeRef,
+                                resolvedReturnType,
+                                resolvedReturnType,
+                                returnTypeGenerics,
+                                method.getSimpleName().toString(),
+                                params.getParameters(),
+                                params.getParameterMetadata(),
+                                params.getGenericTypes(),
+                                aroundMethodMetadata);
+                    }
+
                 }
             }
         }
