@@ -36,6 +36,7 @@ The URI mapped to is defined by the either the value of the ann:function.Functio
 |Annotation|URI
 
 |`@FunctionBean("hello")` | `/hello`
+|`@FunctionBean("helloWorld")` | `/helloWorld`
 |`@FunctionBean("hello-world")` | `/hello-world`
 
 |===
