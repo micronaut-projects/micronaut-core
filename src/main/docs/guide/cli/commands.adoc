@@ -172,7 +172,7 @@ It creates an associated test that will run the application and verify that a co
 
 [source,bash]
 ----
-$ mn create-command my-command
-| Rendered template Command.java to destination src/main/java/java/app/MyCommand.java
-| Rendered template CommandTest.java to destination src/test/java/java/app/MyCommandTest.java
+$ mn create-command print
+| Rendered template Command.java to destination src/main/java/example/PrintCommand.java
+| Rendered template CommandTest.java to destination src/test/java/example/PrintCommandTest.java
 ----
