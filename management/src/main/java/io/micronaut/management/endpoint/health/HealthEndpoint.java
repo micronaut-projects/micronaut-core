@@ -21,6 +21,7 @@ import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.management.endpoint.Read;
 import io.micronaut.management.health.aggregator.HealthAggregator;
 import io.micronaut.management.health.indicator.HealthIndicator;
+import io.micronaut.management.health.indicator.HealthResult;
 import io.reactivex.Single;
 
 import javax.annotation.Nullable;
@@ -50,7 +51,7 @@ public class HealthEndpoint {
      */
     public static final String PREFIX = EndpointConfiguration.PREFIX + "." + NAME;
 
-    private HealthAggregator healthAggregator;
+    private HealthAggregator<HealthResult> healthAggregator;
     private HealthIndicator[] healthIndicators;
     private HealthLevelOfDetailResolver healthLevelOfDetailResolver;
 
@@ -59,7 +60,7 @@ public class HealthEndpoint {
      * @param healthIndicators            The {@link HealthIndicator}
      * @param healthLevelOfDetailResolver The {@link HealthLevelOfDetailResolver}
      */
-    public HealthEndpoint(HealthAggregator healthAggregator,
+    public HealthEndpoint(HealthAggregator<HealthResult> healthAggregator,
                           HealthIndicator[] healthIndicators,
                           HealthLevelOfDetailResolver healthLevelOfDetailResolver) {
         this.healthAggregator = healthAggregator;
@@ -72,8 +73,10 @@ public class HealthEndpoint {
      * @return The health information as a {@link Single}
      */
     @Read
-    Single getHealth(@Nullable Principal principal) {
+    public Single<HealthResult> getHealth(@Nullable Principal principal) {
         HealthLevelOfDetail detail = healthLevelOfDetailResolver.levelOfDetail(principal);
-        return Single.fromPublisher(healthAggregator.aggregate(healthIndicators, detail));
+        return Single.fromPublisher(
+                healthAggregator.aggregate(healthIndicators, detail)
+        );
     }
 }
