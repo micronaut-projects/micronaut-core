@@ -1,13 +1,16 @@
 package io.micronaut.management.endpoint.loggers.impl;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.management.endpoint.loggers.LogLevel;
 import io.micronaut.management.endpoint.loggers.LoggerConfiguration;
+import io.micronaut.management.endpoint.loggers.LoggersEndpoint;
 import io.micronaut.management.endpoint.loggers.LoggingSystem;
 
 import javax.inject.Singleton;
 import java.util.stream.Stream;
 
 @Singleton
+@Requires(beans = LoggersEndpoint.class)
 public class LogbackLoggingSystem implements LoggingSystem {
 
     public Stream<LoggerConfiguration> getLoggers() {
