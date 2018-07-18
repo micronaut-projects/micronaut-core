@@ -33,7 +33,6 @@ import org.junit.Test;
 import static org.junit.Assert.*;
 
 public class MicronautFactoryTest {
-    @Ignore("Why does this test fail?")
     @Test
     public void createDelegatesToApplicationContext() throws Exception {
         System.setProperty("a.name", "testValue");
@@ -46,7 +45,7 @@ public class MicronautFactoryTest {
         A a = factory.create(A.class);
         A another = applicationContext.getBean(A.class);
 
-        assertSame("injected value is available", another, a);
+        assertSame("can get singleton A from factory and context", another, a);
         assertEquals("injected value is available", "testValue", a.injectedValue);
 
         applicationContext.close();
