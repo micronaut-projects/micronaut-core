@@ -142,3 +142,37 @@ The `create-client` command generates a simple api:http.client.Client[] interfac
 $ mn create-client Book
 | Rendered template Client.java to destination src/main/java/example/BookClient.java
 ----
+
+
+== CLI Profile Commands
+
+The cli profile lets you generate CLI commands to control your application.
+
+=== Create-Command
+
+.Create-Command Flags
+|===
+|Flag|Description|Example
+
+|`-l`, `--lang`
+|The language used for the command
+|`--lang groovy`
+
+|`-f`, `--force`
+|Whether to overwrite existing files
+|`--force`
+
+|
+|===
+
+The `create-command` command generates a standalone application that can be executed as a
+http://picocli.info[picocli] link:http://picocli.info/apidocs/picocli/CommandLine.Command.html[Command].
+It follows a `*Command` convention for generating the class name.
+It creates an associated test that will run the application and verify that a command line option was set.
+
+[source,bash]
+----
+$ mn create-command print
+| Rendered template Command.java to destination src/main/java/example/PrintCommand.java
+| Rendered template CommandTest.java to destination src/test/java/example/PrintCommandTest.java
+----
