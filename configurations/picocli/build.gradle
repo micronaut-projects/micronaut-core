@@ -1,0 +1,7 @@
+dependencies {
+    compile project(":inject")
+    compile project(":runtime")
+    compileOnly project(":inject-java")
+    compile "info.picocli:picocli:$picocliVersion"
+    testCompile project(":inject-java")
+}
