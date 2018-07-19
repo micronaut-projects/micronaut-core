@@ -42,11 +42,14 @@ class LoggersEndpointSpec extends Specification {
 
     // Loggers configured in logback-test.xml
     static final configuredLoggers = [
-            ROOT: [configuredLevel: INFO, effectiveLevel: INFO],
-            errors: [configuredLevel: INFO, effectiveLevel: INFO],
-            'no-appenders': [configuredLevel: INFO, effectiveLevel: INFO],
-            'no-level': [configuredLevel: INFO, effectiveLevel: INFO],
-            'no-config': [configuredLevel: INFO, effectiveLevel: INFO],
+//            ROOT: [configuredLevel: INFO, effectiveLevel: INFO],
+//            errors: [configuredLevel: INFO, effectiveLevel: INFO],
+//            'no-appenders': [configuredLevel: INFO, effectiveLevel: INFO],
+//            'no-level': [configuredLevel: INFO, effectiveLevel: INFO],
+//            'no-config': [configuredLevel: INFO, effectiveLevel: INFO],
+
+            // Currently stubbed in implementation
+            foo: [configuredLevel: NOT_SPECIFIED, effectiveLevel: NOT_SPECIFIED]
     ]
 
     void setup() {
@@ -87,11 +90,27 @@ class LoggersEndpointSpec extends Specification {
         then:
         result.containsKey 'loggers'
 
-//        and: 'we have all the loggers expected from configuration'
-//        configuredLoggers.every { log, levels ->
-//            result.loggers.containsKey log
-//            result.loggers."${log}" == levels
-//        }
+        and: 'we have all the loggers expected from configuration'
+        configuredLoggers.every { log, levels ->
+            result.loggers.containsKey log
+            result.loggers."${log}" == levels
+        }
+    }
+
+    void 'test that a configured logger can be retrieved by name from the endpoint'() {
+        when:
+        def name = 'foo'
+        def response = client.exchange(GET("/loggers/${name}"), Map).blockingFirst()
+
+        then:
+        response.status == HttpStatus.OK
+
+        when:
+        def result = response.body()
+
+        then:
+        result.configuredLevel == configuredLoggers.foo.configuredLevel
+        result.effectiveLevel == configuredLoggers.foo.effectiveLevel
     }
 
 }
