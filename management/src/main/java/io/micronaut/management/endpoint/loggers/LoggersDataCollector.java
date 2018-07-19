@@ -18,7 +18,7 @@ package io.micronaut.management.endpoint.loggers;
 
 import org.reactivestreams.Publisher;
 
-import java.util.stream.Stream;
+import java.util.Collection;
 
 /**
  * Used to respond with logger information for the {@link LoggersEndpoint}.
@@ -29,6 +29,6 @@ import java.util.stream.Stream;
  */
 public interface LoggersDataCollector<T> {
 
-    Publisher<T> getData(Stream<LoggerConfiguration> loggerConfigurations);
+    Publisher<T> getData(Collection<LoggerConfiguration> configurations);
 
 }

@@ -7,15 +7,19 @@ import io.micronaut.management.endpoint.loggers.LoggersEndpoint;
 import io.micronaut.management.endpoint.loggers.LoggingSystem;
 
 import javax.inject.Singleton;
-import java.util.stream.Stream;
+import java.util.Collection;
+import java.util.Collections;
 
 @Singleton
 @Requires(beans = LoggersEndpoint.class)
 public class LogbackLoggingSystem implements LoggingSystem {
 
     @Override
-    public Stream<LoggerConfiguration> getLoggers() {
-        return Stream.empty();
+    public Collection<LoggerConfiguration> getLoggers() {
+        return Collections.singletonList(
+                new LoggerConfiguration("foo", LogLevel.NOT_SPECIFIED,
+                        LogLevel.NOT_SPECIFIED)
+        );
     }
 
     @Override

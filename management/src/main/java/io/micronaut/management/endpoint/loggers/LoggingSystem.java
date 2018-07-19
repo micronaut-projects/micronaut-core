@@ -18,7 +18,7 @@ package io.micronaut.management.endpoint.loggers;
 
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
-import java.util.stream.Stream;
+import java.util.Collection;
 
 /**
  * Abstraction for a logging system
@@ -31,9 +31,9 @@ public interface LoggingSystem {
     /**
      * Returns all existing loggers
      *
-     * @return A {@link Stream} of {@link LoggerConfiguration} instances for all existing loggers
+     * @return A {@link Collection} of {@link LoggerConfiguration} instances for all existing loggers
      */
-    Stream<LoggerConfiguration> getLoggers();
+    Collection<LoggerConfiguration> getLoggers();
 
     /**
      * Returns a {@link LoggerConfiguration} for the logger found by name (or created if not found)
