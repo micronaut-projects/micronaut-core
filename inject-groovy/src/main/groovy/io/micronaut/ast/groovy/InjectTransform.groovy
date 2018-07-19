@@ -1093,6 +1093,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 ClassNode providerGenericType = AstGenericUtils.resolveInterfaceGenericType(classNode, Provider)
                 boolean isProvider = providerGenericType != null
                 AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(classNode)
+
+                if(annotationMetadata.hasStereotype(groovy.lang.Singleton)) {
+                    addError("Class annotated with groovy.lang.Singleton instead of javax.inject.Singleton. Import javax.inject.Singleton to use Micronaut Dependency Injection.", classNode)
+                }
                 if(configurationMetadata != null) {
                     annotationMetadata = DefaultAnnotationMetadata.mutateMember(
                             annotationMetadata,
