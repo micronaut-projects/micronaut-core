@@ -14,10 +14,59 @@ endpoints:
         enabled: Boolean
         sensitive: Boolean
         id: String
-        detailsVisible: String <1>
+        details-visible: String <1>
+        status:
+            http-mapping: Map<String, HttpStatus>
 ----
 
 <1> One of api:management.endpoint.health.DetailsVisibility[]
+
+The `details-visible` setting is used to control whether health detail should be exposed to users who are not authenticated.
+
+For example setting:
+
+.Using `details-visible`
+[source,yaml]
+----
+endpoints:
+    health:
+        details-visible: ANONYMOUS
+----
+
+Will expose detailed information read from the various health indicators about the health status of the application to anonymous unauthenticated users.
+
+The `endpoints.health.status.http-mapping` setting can be used to control what status codes are returned for each health status. The defaults are described in the table below:
+
+
+|===
+|Status | HTTP Code
+
+|api:health.HealthStatus#UP[]
+|api:http.HttpStatus#OK[] (200)
+
+|api:health.HealthStatus#UNKNOWN[]
+|api:http.HttpStatus#OK[] (200)
+
+|api:health.HealthStatus#DOWN[]
+|api:http.HttpStatus#SERVICE_UNAVAILABLE[] (503)
+
+|===
+
+You can provide custom mappings in `application.yml`:
+
+
+.Custom Health Status Codes
+[source,yaml]
+----
+endpoints:
+    health:
+        status:
+            http-mapping:
+                DOWN: 200
+----
+
+The above will return api:http.HttpStatus#OK[] (200) even when the api:health.HealthStatus[] is api:health.HealthStatus#DOWN[].
+
 
 == Customization
 

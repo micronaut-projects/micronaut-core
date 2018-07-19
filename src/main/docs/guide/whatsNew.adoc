@@ -28,3 +28,16 @@ Support has been added for the https://github.com/reactiverse/reactive-pg-client
 === CLI Improvements
 
 Thanks to a contribution from https://github.com/remkop[Remko Popma] the CLI has been re-written on top of https://github.com/remkop/picocli[PicoCLI] resulting in improvements to documentation, TAB completion and code maintainability.
+
+=== Spring Transaction Management for SQL
+
+Regular JDBC support now optionally supports transaction management via Spring's transaction manager with the addition of the following dependencies to your classpath:
+
+.build.gradle
+[source,groovy]
+----
+dependencies {
+    compile "io.micronaut:spring"
+    runtime "org.springframework:spring-jdbc"
+}
+----
