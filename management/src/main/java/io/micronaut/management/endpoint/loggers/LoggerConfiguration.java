@@ -16,6 +16,9 @@
 
 package io.micronaut.management.endpoint.loggers;
 
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Represents the configuration of a {@link LoggingSystem} logger
  *
@@ -59,6 +62,16 @@ public class LoggerConfiguration {
      */
     public LogLevel getEffectiveLevel() {
         return effectiveLevel;
+    }
+
+    /**
+     * @return a Map of data to emit (less the name)
+     */
+    public Map<String, Object> getData() {
+        Map<String, Object> data = new HashMap<>(2);
+        data.put("configuredLevel", getConfiguredLevel());
+        data.put("effectiveLevel", getEffectiveLevel());
+        return data;
     }
 
 }
