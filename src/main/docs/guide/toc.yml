@@ -144,6 +144,7 @@ messaging:
   title: Message-Driven Microservices
   kafka:
     title: Kafka Support
+    kafkaCli: Using the Micronaut CLI
     kafkaQuickStart: Kafka Quick Start
     kafkaClient:
       title: Kafka Producers Using @KafkaClient

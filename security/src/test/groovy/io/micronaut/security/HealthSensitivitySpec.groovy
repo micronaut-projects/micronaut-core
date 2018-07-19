@@ -23,6 +23,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.management.endpoint.health.HealthLevelOfDetail
+import io.micronaut.management.health.indicator.HealthResult
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.security.authentication.AuthenticationFailed
 import io.micronaut.security.authentication.AuthenticationProvider
@@ -30,6 +31,8 @@ import io.micronaut.security.authentication.AuthenticationRequest
 import io.micronaut.security.authentication.AuthenticationResponse
 import io.micronaut.security.authentication.UserDetails
 import io.reactivex.Flowable
+import io.reactivex.annotations.NonNull
+import io.reactivex.functions.Function
 import org.reactivestreams.Publisher
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -95,11 +98,19 @@ class HealthSensitivitySpec extends Specification {
             httpRequest = httpRequest.basicAuth("user", "password")
         }
         def response = rxClient.exchange(httpRequest, Map)
-                .blockingFirst()
-        Map result = response.body()
+        .onErrorResumeNext(new Function<Throwable, Publisher<? extends HttpResponse<HealthResult>>>() {
+            @Override
+            Publisher<? extends HttpResponse<HealthResult>> apply(@NonNull Throwable throwable) throws Exception {
+
+                def response = ((HttpClientResponseException) throwable).response
+                response.getBody(Map)
+                return Flowable.just(response)
+            }
+        }).blockingFirst()
+        Map result = response.getBody(Map).get()
 
         then:
-        response.code() == HttpStatus.OK.code
+        response.code() == HttpStatus.SERVICE_UNAVAILABLE.code
         result.status == "DOWN"
         if (expected == HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS) {
             assert result.containsKey('details')
