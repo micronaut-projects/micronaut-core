@@ -16,6 +16,14 @@
             document.body.className = classes.join(" ");
         }
     </script>
+    <style type="text/css">
+        @media screen and (min-width: 961px) {
+            #main > div:nth-child(-n+${(toc.children.size() + toc.children.sum { it.children.size() } + toc.children*.children.sum { it.children.size() })/2}) {
+                max-width: 62%;
+            }
+        }
+    </style>
+
 </head>
 
 <body class="body" onload="addJsClass();">
