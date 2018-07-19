@@ -19,7 +19,6 @@ import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
-import spock.lang.Specification
 
 class SetterWithQualifierSpec extends AbstractTypeElementSpec {
 

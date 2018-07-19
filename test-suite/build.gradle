@@ -2,23 +2,35 @@ dependencies {
     testCompile project(":http-server-netty")
     testCompile project(":http-client")
     testCompile project(":configurations:hibernate-validator")
+    // tag::postgres-reactive-dependencies[]
+    testCompile project(":configurations:postgres-reactive")
+    // end::postgres-reactive-dependencies[]
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
     testCompile project(":tracing")
     testCompile project(":management")
 
     testCompile 'io.jaegertracing:jaeger-core:0.27.0'
-    testCompile 'com.squareup.okhttp3:okhttp:3.8.1'
-    testCompile 'com.launchdarkly:okhttp-eventsource:1.5.2'
     testCompile dependencyModuleVersion("groovy", "groovy-json")
+    // tag::testcontainers-dependencies[]
+    testCompile "org.testcontainers:spock:1.8.0"
+    testCompile "org.testcontainers:postgresql:1.8.0"
+    // end::testcontainers-dependencies[]
+
     testRuntime 'org.apache.tomcat:tomcat-jdbc:8.0.44'
     testRuntime 'com.h2database:h2:1.4.196'
     testRuntime "ch.qos.logback:logback-classic:1.2.3"
 }
-tasks.withType(Test) {
-    maxParallelForks = 1
-    forkEvery = 5
-    testLogging {
-        showStandardStreams = true
-    }
-}
+//tasks.withType(Test) {
+//    testLogging {
+//        showStandardStreams = true
+//    }
+//    beforeTest {
+//        System.out.println("STARTING: ${it.className}.$it.name")
+//        System.out.flush()
+//    }
+//    afterTest {
+//        System.out.println("FINISHED: ${it.className}.$it.name")
+//        System.out.flush()
+//    }
+//}

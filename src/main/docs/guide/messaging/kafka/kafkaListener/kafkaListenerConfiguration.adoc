@@ -1,0 +1,79 @@
+=== @KafkaListener and Consumer Groups
+
+Kafka consumers created with `@KafkaListener` will by default run within a consumer group that is the value of `micronaut.application.name` unless you explicitly specify a value to the `@KafkaListener` annotation. For example:
+
+.Specifying a Consumer Group
+[source,java]
+----
+@KafkaListener("myGroup")
+----
+
+The above example will run the consumer within a consumer group called `myGroup`.
+
+TIP: You can make the consumer group configurable using a placeholder: `@KafkaListener("${my.consumer.group:myGroup}")`
+
+=== @KafkaListener and Consumer Properties
+
+There are a number of ways to pass configuration properties to the `KafkaConsumer`. You can set default consumer properties using `kafka.consumers.default` in `application.yml`:
+
+.Applying Default Configuration
+[source,yaml]
+----
+kafka:
+    consumers:
+        default:
+            session:
+                timeout:
+                    ms: 5000
+----
+
+The above example will set the default `session.timeout.ms` that Kafka uses to decide whether a consumer is alive or not and applies it to all created `KafkaConsumer` instances.
+
+You can also provide configuration specific to a consumer group. For example consider the following configuration:
+
+.Applying Consumer Group Specific config
+[source,yaml]
+----
+kafka:
+    consumers:
+        myGroup:
+            session:
+                timeout:
+                    ms: 5000
+----
+
+The above configuration will pass properties to only the `@KafkaListener` beans that apply to the consumer group `myGroup`.
+
+Finally, the ann:configuration.kafka.annotation.KafkaListener[] annotation itself provides a `properties` member that you can use to set consumer specific properties:
+
+.Configuring Consumer Properties with @KafkaListener
+[source,java]
+----
+include::{testskafka}/consumer/config/ProductListener.java[tags=imports, indent=0]
+
+include::{testskafka}/consumer/config/ProductListener.java[tags=clazz, indent=0]
+    ...
+}
+----
+
+=== @KafkaListener and Deserializers
+
+As mentioned previously when defining `@KafkaListener` methods, Micronaut will attempt to pick an appropriate deserializer for the method signature. This is done via the api:configuration.kafka.serde.CompositeSerdeRegistry[] bean.
+
+TIP: You can replace the default api:configuration.kafka.serde.SerdeRegistry[] bean with your own implementation by defining a bean that uses `@Replaces(CompositeSerdeRegistry.class)`. See the section on <<replaces, Bean Replacement>>.
+
+All common `java.lang` types (`String`, `Integer`, primitives etc.) are supported and for POJOs by default a Jackson based JSON deserializer is used.
+
+You can, however, explicitly override the `Deserializer` used by providing the appropriate configuration in `application.yml`:
+
+.Applying Default Configuration
+[source,yaml]
+----
+kafka:
+    consumers:
+        myGroup:
+            value:
+                deserializer: org.apache.kafka.common.serialization.ByteArrayDeserializer
+----
+
+You may want to do this if for example you choose an alternative deserialization format such as Avro or Protobuf.

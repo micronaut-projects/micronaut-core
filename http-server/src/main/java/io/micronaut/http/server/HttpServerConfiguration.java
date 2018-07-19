@@ -47,11 +47,6 @@ public class HttpServerConfiguration {
 
     public static final String PREFIX = "micronaut.server";
 
-    /**
-     * Constant for localhost.
-     */
-    public static final String LOCALHOST = "localhost";
-
     protected int port = -1; // default to random port
     protected Optional<String> host = Optional.empty();
     protected Optional<Integer> readTimeout;
@@ -62,6 +57,8 @@ public class HttpServerConfiguration {
     protected Duration idleTime = Duration.of(60, ChronoUnit.SECONDS);
     protected MultipartConfiguration multipart = new MultipartConfiguration();
     protected CorsConfiguration cors = new CorsConfiguration();
+    protected Optional<String> serverHeader = Optional.empty();
+    protected boolean dateHeader = true;
 
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
@@ -167,6 +164,20 @@ public class HttpServerConfiguration {
      */
     public Duration getIdleTime() {
         return idleTime;
+    }
+
+    /**
+     * @return The optional server header value
+     */
+    public Optional<String> getServerHeader() {
+        return serverHeader;
+    }
+
+    /**
+     * @return True if the date header should be set
+     */
+    public boolean isDateHeader() {
+        return dateHeader;
     }
 
     /**

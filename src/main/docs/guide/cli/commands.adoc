@@ -4,19 +4,19 @@ Profiles can include commands for generating common code artifacts. Not all comm
 ----
 mn> profile-info service
 Profile: service
---------------------
+------------------
 The service profile
 
 Provided Commands:
---------------------
-* help - Prints help information for a specific command
-* create-job - Creates a job with scheduled method
-* create-bean - Creates a singleton bean
-* create-controller - Creates a controller and associated test
-* create-client - Creates a client interface
+------------------
+  create-bean        Creates a singleton bean
+  create-client      Creates a client interface
+  create-controller  Creates a controller and associated test
+  create-job         Creates a job with scheduled method
+  help               Prints help information for a specific command
 
 Provided Features:
---------------------
+------------------
 ...
 ----
 
@@ -28,8 +28,8 @@ All of the code-generation commands will honor the values written in `micronaut-
 profile: service
 defaultPackage: example
 ---
-testFramework: java
-sourceLanguage: spock
+testFramework: spock
+sourceLanguage: java
 ----
 
 With the above settings, the `create-controller` command will (by default) generate Java controllers with an associated Spock test, under the `example` package. Commands accept arguments and these defaults can be overriden on a per-command basis.
@@ -44,13 +44,13 @@ Commands in the base profile are inherited by all other profiles and are always 
 |===
 |Flag|Description|Example
 
-|`lang`
+|`-l`, `--lang`
 |The language used for the bean class
-|`-lang groovy`
+|`--lang groovy`
 
-|`force`
+|`-f`, `--force`
 |Whether to overwrite existing files
-|`-force`
+|`--force`
 
 |
 |===
@@ -69,13 +69,13 @@ $ mn create-bean EmailService
 |===
 |Flag|Description|Example
 
-|`lang`
+|`-l`, `--lang`
 |The language used for the job class
-|`-lang groovy`
+|`--lang groovy`
 
-|`force`
+|`-f`, `--force`
 |Whether to overwrite existing files
-|`-force`
+|`--force`
 
 |
 |===
@@ -84,7 +84,7 @@ The `create-job` command generates a simple api:scheduling.annotation.Scheduled[
 
 [source,bash]
 ----
-$ mn create-job UpdateFeeds -lang groovy
+$ mn create-job UpdateFeeds --lang groovy
 | Rendered template Job.groovy to destination src/main/groovy/example/UpdateFeedsJob.groovy
 ----
 
@@ -98,13 +98,13 @@ The service profile includes commands that are dependent upon the HTTP server an
 |===
 |Flag|Description|Example
 
-|`lang`
+|`-l`, `--lang`
 |The language used for the controller
-|`-lang groovy`
+|`--lang groovy`
 
-|`force`
+|`-f`, `--force`
 |Whether to overwrite existing files
-|`-force`
+|`--force`
 
 |
 |===
@@ -124,13 +124,13 @@ $ mn create-controller Book
 |===
 |Flag|Description|Example
 
-|`lang`
+|`-l`, `--lang`
 |The language used for the client
-|`-lang groovy`
+|`--lang groovy`
 
-|`force`
+|`-f`, `--force`
 |Whether to overwrite existing files
-|`-force`
+|`--force`
 
 |
 |===
@@ -141,4 +141,38 @@ The `create-client` command generates a simple api:http.client.Client[] interfac
 ----
 $ mn create-client Book
 | Rendered template Client.java to destination src/main/java/example/BookClient.java
+----
+
+
+== CLI Profile Commands
+
+The cli profile lets you generate CLI commands to control your application.
+
+=== Create-Command
+
+.Create-Command Flags
+|===
+|Flag|Description|Example
+
+|`-l`, `--lang`
+|The language used for the command
+|`--lang groovy`
+
+|`-f`, `--force`
+|Whether to overwrite existing files
+|`--force`
+
+|
+|===
+
+The `create-command` command generates a standalone application that can be executed as a
+http://picocli.info[picocli] link:http://picocli.info/apidocs/picocli/CommandLine.Command.html[Command].
+It follows a `*Command` convention for generating the class name.
+It creates an associated test that will run the application and verify that a command line option was set.
+
+[source,bash]
+----
+$ mn create-command print
+| Rendered template Command.java to destination src/main/java/example/PrintCommand.java
+| Rendered template CommandTest.java to destination src/test/java/example/PrintCommandTest.java
 ----

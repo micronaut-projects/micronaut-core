@@ -33,4 +33,11 @@ public interface TaskExecutors {
      * The name of the {@link java.util.concurrent.ScheduledExecutorService} used to schedule background tasks.
      */
     String SCHEDULED = "scheduled";
+
+    /**
+     * The name of the {@link java.util.concurrent.ScheduledExecutorService} used to run message consumers such as a Kafka or RabbitMQ listeners.
+     */
+    String MESSAGE_CONSUMER = "consumer";
+
+
 }

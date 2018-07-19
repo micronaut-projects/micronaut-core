@@ -21,13 +21,6 @@ import io.micronaut.context.annotation.Type
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
-import io.micronaut.context.ApplicationContext
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.inject.AbstractTypeElementSpec
-import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
-import io.micronaut.inject.writer.BeanDefinitionVisitor
-import spock.lang.Specification
 
 /**
  * @author graemerocher

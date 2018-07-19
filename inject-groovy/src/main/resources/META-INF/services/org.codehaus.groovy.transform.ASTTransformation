@@ -1,1 +1,2 @@
 io.micronaut.ast.groovy.InjectTransform
+io.micronaut.ast.groovy.TypeElementVisitorTransform

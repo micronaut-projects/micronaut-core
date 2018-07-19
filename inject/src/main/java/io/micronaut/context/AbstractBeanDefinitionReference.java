@@ -41,6 +41,7 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
     private final String beanDefinitionTypeName;
     private Class beanDefinition;
     private Boolean present;
+    private Class beanType;
 
     /**
      * @param beanTypeName           The bean type name
@@ -67,9 +68,19 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
     @Override
     public Class getBeanType() {
         if (isPresent()) {
-            return GenericTypeUtils
-                .resolveInterfaceTypeArgument(beanDefinition, BeanFactory.class)
-                .orElse(null);
+            Class beanType = this.beanType;
+            if (beanType == null) {
+                synchronized (this) { // double check
+                    beanType = this.beanType;
+                    if (beanType == null) {
+                        beanType = GenericTypeUtils
+                                .resolveInterfaceTypeArgument(beanDefinition, BeanFactory.class)
+                                .orElse(null);
+                        this.beanType = beanType;
+                    }
+                }
+            }
+            return beanType;
         }
         return null;
     }
@@ -84,7 +95,7 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
      */
     @Override
     public BeanDefinition load() {
-        if (isPresent()) {
+        if ((present != null && present) || isPresent()) {
             try {
                 return (BeanDefinition) beanDefinition.newInstance();
             } catch (Throwable e) {
@@ -98,7 +109,9 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
     @Override
     public BeanDefinition load(BeanContext context) {
         BeanDefinition definition = load();
-        ((AbstractBeanDefinition) definition).configure(context);
+        if (context instanceof ApplicationContext && definition instanceof EnvironmentConfigurable) {
+            ((EnvironmentConfigurable) definition).configure(((ApplicationContext) context).getEnvironment());
+        }
         return definition;
     }
 

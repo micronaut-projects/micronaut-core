@@ -18,7 +18,7 @@ package io.micronaut.http.server.netty.types;
 
 import io.micronaut.core.order.Ordered;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.netty.NettyHttpResponse;
+import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.netty.channel.ChannelHandlerContext;
 
 /**
@@ -38,7 +38,7 @@ public interface NettyCustomizableResponseTypeHandler<T> extends Ordered {
      * @param response The mutable Micronaut response
      * @param context  The channel context
      */
-    void handle(T object, HttpRequest<?> request, NettyHttpResponse<?> response, ChannelHandlerContext context);
+    void handle(T object, HttpRequest<?> request, NettyMutableHttpResponse<?> response, ChannelHandlerContext context);
 
     /**
      * @param type The type to check

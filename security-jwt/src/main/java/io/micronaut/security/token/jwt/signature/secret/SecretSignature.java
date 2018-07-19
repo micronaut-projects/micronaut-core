@@ -27,6 +27,8 @@ import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
 import io.micronaut.security.token.jwt.signature.AbstractSignatureConfiguration;
 
+import java.util.Base64;
+
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
@@ -44,7 +46,7 @@ public class SecretSignature extends AbstractSignatureConfiguration {
      */
     public SecretSignature(SecretSignatureConfiguration config) {
         if (config.getSecret() != null) {
-            this.secret = config.getSecret().getBytes(UTF_8);
+            this.secret = config.isBase64() ? Base64.getDecoder().decode(config.getSecret()) : config.getSecret().getBytes(UTF_8);
         }
         this.algorithm = config.getJwsAlgorithm();
     }

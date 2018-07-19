@@ -15,7 +15,6 @@
  */
 package io.micronaut.inject.beans
 
-import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 

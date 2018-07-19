@@ -16,7 +16,6 @@
 package io.micronaut.aop.simple
 
 import io.micronaut.context.annotation.Prototype
-import io.micronaut.context.annotation.Prototype
 
 /**
  * @author Graeme Rocher

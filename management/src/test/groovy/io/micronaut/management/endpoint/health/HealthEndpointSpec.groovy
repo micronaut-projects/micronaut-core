@@ -19,11 +19,13 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.type.Argument
+import io.micronaut.health.HealthStatus
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.server.binding.binders.TypedRequestArgumentBinder
 import io.micronaut.management.health.aggregator.RxJavaHealthAggregator
+import io.micronaut.management.health.indicator.HealthResult
 import io.micronaut.management.health.indicator.diskspace.DiskSpaceIndicator
 import io.micronaut.management.health.indicator.jdbc.JdbcIndicator
 import io.micronaut.runtime.server.EmbeddedServer
@@ -169,12 +171,12 @@ class HealthEndpointSpec extends Specification {
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
 
         when:
-        def response = rxClient.exchange("/health", Map).blockingFirst()
-        Map result = response.body()
+        def response = rxClient.exchange("/health", HealthResult).blockingFirst()
+        HealthResult result = response.body()
 
         then:
         response.code() == HttpStatus.OK.code
-        result.status == "DOWN"
+        result.status == HealthStatus.DOWN
         result.details
         result.details.diskSpace.status == "DOWN"
         result.details.diskSpace.details.error.startsWith("Free disk space below threshold.")

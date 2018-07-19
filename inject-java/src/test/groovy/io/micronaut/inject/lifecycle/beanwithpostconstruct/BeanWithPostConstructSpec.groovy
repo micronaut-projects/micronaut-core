@@ -17,12 +17,8 @@ package io.micronaut.inject.lifecycle.beanwithpostconstruct
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
-import io.micronaut.context.BeanContext
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
-import spock.lang.Specification
 
 class BeanWithPostConstructSpec extends AbstractTypeElementSpec {
 

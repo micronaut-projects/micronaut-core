@@ -235,11 +235,20 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
 
         @Override
         public String toString() {
-            StringBuilder baseString = new StringBuilder("new ");
-            BeanDefinition declaringType = getDeclaringType();
-            baseString.append(declaringType.getBeanType().getSimpleName());
-            outputArguments(declaringType, baseString);
-            return baseString.toString();
+            ConstructorInjectionPoint constructorInjectionPoint = getDeclaringType().getConstructor();
+            if (constructorInjectionPoint instanceof MethodInjectionPoint) {
+                MethodInjectionPoint methodInjectionPoint = (MethodInjectionPoint) constructorInjectionPoint;
+                StringBuilder baseString = new StringBuilder(methodInjectionPoint.getMethod().getDeclaringClass().getSimpleName()).append('.');
+                baseString.append(methodInjectionPoint.getName());
+                outputArguments(baseString, methodInjectionPoint.getArguments());
+                return baseString.toString();
+            } else {
+                StringBuilder baseString = new StringBuilder("new ");
+                BeanDefinition declaringType = getDeclaringType();
+                baseString.append(declaringType.getBeanType().getSimpleName());
+                outputArguments(declaringType, baseString);
+                return baseString.toString();
+            }
         }
     }
 
@@ -281,7 +290,7 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
         FieldSegment(BeanDefinition declaringClass, FieldInjectionPoint fieldInjectionPoint) {
             super(declaringClass,
                 fieldInjectionPoint.getName(),
-                Argument.of(fieldInjectionPoint.getField()));
+                fieldInjectionPoint.asArgument());
         }
 
         @Override

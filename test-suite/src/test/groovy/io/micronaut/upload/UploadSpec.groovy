@@ -30,7 +30,6 @@ import spock.lang.IgnoreIf
  * @author Graeme Rocher
  * @since 1.0
  */
-@IgnoreIf({System.getenv("TRAVIS")})
 class UploadSpec extends AbstractMicronautSpec {
 
     @Override
@@ -260,6 +259,7 @@ class UploadSpec extends AbstractMicronautSpec {
         response.getBody().get() == 'bar: 9'
     }
 
+    @IgnoreIf({ System.getenv("TRAVIS")})
     void "test simple in-memory file upload exceeds size"() {
         given:
         MultipartBody requestBody = MultipartBody.builder()

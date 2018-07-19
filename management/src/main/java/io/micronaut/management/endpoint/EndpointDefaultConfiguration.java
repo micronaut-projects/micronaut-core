@@ -34,8 +34,19 @@ public class EndpointDefaultConfiguration {
      */
     public static final String PREFIX = "endpoints.all";
 
+    private static final String DEFAULT_ENDPOINT_BASE_PATH = "/";
+
     protected Optional<Boolean> enabled = Optional.empty();
     protected Optional<Boolean> sensitive = Optional.empty();
+    protected String path = DEFAULT_ENDPOINT_BASE_PATH;
+
+    /**
+     *
+     * @return endpoints Base Path (defaults to: {@value #DEFAULT_ENDPOINT_BASE_PATH})
+     */
+    public String getPath() {
+        return path;
+    }
 
     /**
      * @return Whether the endpoint is enabled

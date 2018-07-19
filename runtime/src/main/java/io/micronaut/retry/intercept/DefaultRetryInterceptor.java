@@ -179,7 +179,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                         delay,
                         (exception).getMessage());
                 }
-                return retryObservable.delay(delay, TimeUnit.MILLISECONDS);
+                return retryObservable.delaySubscription(delay, TimeUnit.MILLISECONDS);
             } else {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Cannot retry anymore. Rethrowing original exception for method: {}", context);

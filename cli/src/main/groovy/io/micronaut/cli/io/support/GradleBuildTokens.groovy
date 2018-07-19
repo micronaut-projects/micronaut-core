@@ -18,13 +18,14 @@ package io.micronaut.cli.io.support
 import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.repository.MavenProfileRepository
+import io.micronaut.cli.util.VersionInfo
 import org.eclipse.aether.graph.Dependency
 
 /**
  * @author James Kleeh
  * @sicen 1.0
  */
-class GradleBuildTokens {
+class GradleBuildTokens extends BuildTokens {
 
     Map getTokens(Profile profile, List<Feature> features) {
         Map tokens = [:]
@@ -70,6 +71,13 @@ class GradleBuildTokens {
             "apply plugin:\"$name\""
         }
 
+        def jvmArgs = profile.jvmArgs
+        for (Feature f in features) {
+            jvmArgs.addAll(f.jvmArgs)
+        }
+
+        jvmArgs = jvmArgs.collect { String arg -> "'${arg}'"}.join(',')
+
         for (Feature f in features) {
             buildPlugins.addAll f.buildPlugins.collect() { String name ->
                 "apply plugin:\"$name\""
@@ -78,11 +86,13 @@ class GradleBuildTokens {
 
         buildPlugins = buildPlugins.unique().join(ln)
 
+        tokens.put("jvmArgs", jvmArgs)
         tokens.put("buildPlugins", buildPlugins)
         tokens.put("dependencies", dependencies)
         tokens.put("buildDependencies", buildDependencies)
         tokens.put("buildRepositories", buildRepositories)
         tokens.put("repositories", repositories)
+        tokens.put("jdkversion", VersionInfo.getJdkVersion())
 
         tokens
     }

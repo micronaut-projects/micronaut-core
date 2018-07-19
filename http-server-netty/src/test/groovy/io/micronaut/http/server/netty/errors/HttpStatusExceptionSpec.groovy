@@ -26,8 +26,6 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.exceptions.HttpStatusException
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 
-import javax.inject.Singleton
-
 /**
  * @author Iván López
  * @since 1.0

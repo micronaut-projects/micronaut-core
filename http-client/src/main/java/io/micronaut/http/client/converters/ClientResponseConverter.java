@@ -20,7 +20,7 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.http.client.FullNettyClientHttpResponse;
-import io.micronaut.http.netty.NettyHttpResponse;
+import io.micronaut.http.netty.NettyMutableHttpResponse;
 
 import javax.inject.Singleton;
 import java.util.Optional;
@@ -32,7 +32,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
-public class ClientResponseConverter implements TypeConverter<FullNettyClientHttpResponse, NettyHttpResponse> {
+public class ClientResponseConverter implements TypeConverter<FullNettyClientHttpResponse, NettyMutableHttpResponse> {
 
     private final ConversionService conversionService;
 
@@ -44,7 +44,7 @@ public class ClientResponseConverter implements TypeConverter<FullNettyClientHtt
     }
 
     @Override
-    public Optional<NettyHttpResponse> convert(FullNettyClientHttpResponse object, Class<NettyHttpResponse> targetType, ConversionContext context) {
-        return Optional.of(new NettyHttpResponse(object.getNativeResponse(), conversionService).body(object.getBody()));
+    public Optional<NettyMutableHttpResponse> convert(FullNettyClientHttpResponse object, Class<NettyMutableHttpResponse> targetType, ConversionContext context) {
+        return Optional.of(new NettyMutableHttpResponse(object.getNativeResponse(), conversionService).body(object.getBody()));
     }
 }

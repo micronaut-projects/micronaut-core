@@ -19,6 +19,7 @@ import groovy.xml.MarkupBuilder
 import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.repository.MavenProfileRepository
+import io.micronaut.cli.util.VersionInfo
 import org.eclipse.aether.graph.Dependency
 import org.eclipse.aether.graph.Exclusion
 
@@ -26,7 +27,7 @@ import org.eclipse.aether.graph.Exclusion
  * @author James Kleeh
  * @since 1.0
  */
-class MavenBuildTokens {
+class MavenBuildTokens extends BuildTokens {
 
     public static Map<String, String> scopeConversions = [:]
 
@@ -50,9 +51,16 @@ class MavenBuildTokens {
 
         (profile.repositories + defaultRepo).each { String repo ->
             if (repo.startsWith('http')) {
-                repositoriesXml.repository {
-                    id(repo.replaceAll("^http(|s)://(.*?)/.*", '$2'))
-                    url(repo)
+                try {
+                    URI uri = URI.create(repo)
+                    if (uri != null) {
+                        repositoriesXml.repository {
+                            id(uri.host)
+                            url(repo)
+                        }
+                    }
+                } catch (Exception e) {
+                    //no-op
                 }
             } else if (repo == 'jcenter()') {
                 repositoriesXml.repository {
@@ -85,6 +93,7 @@ class MavenBuildTokens {
 
         def dependenciesWriter = new StringWriter()
         MarkupBuilder dependenciesXml = new MarkupBuilder(dependenciesWriter)
+
         dependencies.each { Dependency dep ->
 
             def artifact = dep.artifact
@@ -109,8 +118,22 @@ class MavenBuildTokens {
             }
         }
 
+        def jvmArgsWriter = new StringWriter()
+        MarkupBuilder jvmArgsXml = new MarkupBuilder(jvmArgsWriter)
+
+        def arguments = profile.jvmArgs
+        for (Feature f in features) {
+            arguments.addAll(f.jvmArgs)
+        }
+
+        arguments.each { String arg ->
+            jvmArgsXml.argument("${arg}")
+
+        }
+        tokens.put("arguments", prettyPrint(jvmArgsWriter.toString(), 12))
         tokens.put("dependencies", prettyPrint(dependenciesWriter.toString(), 8))
         tokens.put("repositories", prettyPrint(repositoriesWriter.toString(), 8))
+        tokens.put("jdkversion", VersionInfo.getJdkVersion())
 
         tokens
     }

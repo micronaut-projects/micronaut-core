@@ -40,9 +40,7 @@ import io.micronaut.inject.ExecutableMethod;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.BiConsumer;
 
 /**
@@ -197,23 +195,29 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
                             status(declaringType, httpStatus, declaringType, method.getMethodName(), method.getArgumentTypes());
                         }
                     });
-                } else if (method.isPresent(Error.class, "value")) {
-                    Optional<Class> aClass = method.classValue(Error.class);
-                    aClass.ifPresent(exceptionType -> {
-                        if (Throwable.class.isAssignableFrom(exceptionType)) {
-                            if (isGlobal) {
-                                //noinspection unchecked
-                                error(exceptionType, declaringType, method.getMethodName(), method.getArgumentTypes());
-                            } else {
-                                error(declaringType, exceptionType, declaringType, method.getMethodName(), method.getArgumentTypes());
+                } else {
+                    Class exceptionType = null;
+                    if (method.isPresent(Error.class, "value")) {
+                        Optional<Class> annotationValue = method.classValue(Error.class);
+                        if (annotationValue.isPresent()) {
+                            if (Throwable.class.isAssignableFrom(annotationValue.get())) {
+                                exceptionType = annotationValue.get();
                             }
                         }
-                    });
-                } else {
+                    }
+                    if (exceptionType == null) {
+                        exceptionType = Arrays.stream(method.getArgumentTypes())
+                                .filter(Throwable.class::isAssignableFrom)
+                                .findFirst()
+                                .orElse(Throwable.class);
+                    }
+
                     if (isGlobal) {
-                        error(Throwable.class, declaringType, method.getMethodName(), method.getArgumentTypes());
+                        //noinspection unchecked
+                        error(exceptionType, declaringType, method.getMethodName(), method.getArgumentTypes());
                     } else {
-                        error(declaringType, Throwable.class, declaringType, method.getMethodName(), method.getArgumentTypes());
+                        //noinspection unchecked
+                        error(declaringType, exceptionType, declaringType, method.getMethodName(), method.getArgumentTypes());
                     }
                 }
             }
@@ -238,7 +242,11 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             if (value.length() == 1 && value.charAt(0) == '/') {
                 return rootUri;
             } else {
-                return rootUri + value;
+                if (value.charAt(0) != '/' && !value.startsWith("{/")) {
+                    return rootUri + "/" + value;
+                } else {
+                    return rootUri + value;
+                }
             }
         } else {
             return rootUri + uriNamingStrategy.resolveUri(method.getMethodName());

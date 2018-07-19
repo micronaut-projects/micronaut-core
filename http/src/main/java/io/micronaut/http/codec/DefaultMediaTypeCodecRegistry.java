@@ -52,10 +52,12 @@ public class DefaultMediaTypeCodecRegistry implements MediaTypeCodecRegistry {
         if (codecs != null) {
             this.codecs = Collections.unmodifiableCollection(codecs);
             for (MediaTypeCodec decoder : codecs) {
-                MediaType mediaType = decoder.getMediaType();
-                if (mediaType != null) {
-                    decodersByExtension.put(mediaType.getExtension(), decoder);
-                    decodersByType.put(mediaType, decoder);
+                Collection<MediaType> mediaTypes = decoder.getMediaTypes();
+                for (MediaType mediaType : mediaTypes) {
+                    if (mediaType != null) {
+                        decodersByExtension.put(mediaType.getExtension(), decoder);
+                        decodersByType.put(mediaType, decoder);
+                    }
                 }
             }
         } else {

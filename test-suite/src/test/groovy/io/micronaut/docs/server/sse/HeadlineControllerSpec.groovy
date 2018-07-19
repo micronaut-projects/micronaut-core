@@ -15,10 +15,9 @@
  */
 package io.micronaut.docs.server.sse
 
-import com.launchdarkly.eventsource.EventHandler
-import com.launchdarkly.eventsource.EventSource
-import com.launchdarkly.eventsource.MessageEvent
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.client.sse.RxSseClient
 import io.micronaut.http.sse.Event
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
@@ -37,55 +36,21 @@ class HeadlineControllerSpec extends Specification {
 
     void "test consume event stream object"() {
         given:
-        MyEventHandler eventHandler = new MyEventHandler()
-        EventSource eventSource = new EventSource.Builder(
-                eventHandler, new URI( "${embeddedServer.URL}/headlines")
-        ).reconnectTimeMs(1000 * 100).build()
+        RxSseClient client = embeddedServer.applicationContext.createBean(RxSseClient, embeddedServer.getURL())
 
-        eventSource.start()
+        List<Event<Headline>> events = []
+
+        client.eventStream(HttpRequest.GET("/headlines"), Headline).subscribe { event ->
+            events.add(event)
+        }
 
         PollingConditions conditions = new PollingConditions(timeout: 3)
         expect:
         conditions.eventually {
-            eventHandler.events.size() == 2
-            eventHandler.events.first().data.data == '{"title":"Micronaut 1.0 Released","description":"Come and get it"}'
+            events.size() == 2
+            events[0].data.title == "Micronaut 1.0 Released"
+            events[0].data.description == "Come and get it"
         }
-
-        cleanup:
-        eventSource.close()
     }
 
-}
-
-class MyEventHandler implements EventHandler {
-    boolean opened = false
-    boolean closed = false
-    List<String> comments = []
-    List<Event<MessageEvent>> events = []
-    List<Throwable> errors = []
-
-    @Override
-    void onOpen() throws Exception {
-        opened = true
-    }
-
-    @Override
-    void onClosed() throws Exception {
-        closed = true
-    }
-
-    @Override
-    void onMessage(String event, MessageEvent messageEvent) throws Exception {
-        events.add(Event.of(messageEvent).name(event))
-    }
-
-    @Override
-    void onComment(String comment) throws Exception {
-        comments.add(comment)
-    }
-
-    @Override
-    void onError(Throwable t) {
-        errors.add(t)
-    }
 }

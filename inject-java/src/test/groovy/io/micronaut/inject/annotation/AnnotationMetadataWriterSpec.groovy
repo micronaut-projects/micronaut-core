@@ -24,15 +24,6 @@ import io.micronaut.context.annotation.Type
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.retry.annotation.Recoverable
-import io.micronaut.aop.Around
-import io.micronaut.aop.introduction.StubIntroducer
-import io.micronaut.context.annotation.Primary
-import io.micronaut.context.annotation.Requirements
-import io.micronaut.context.annotation.Requires
-import io.micronaut.context.annotation.Type
-import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.inject.AbstractTypeElementSpec
-import io.micronaut.retry.annotation.Recoverable
 
 import javax.inject.Qualifier
 import javax.inject.Scope
@@ -339,7 +330,7 @@ interface ITest {
         metadata.getValue(Around, 'lazy').isPresent()
         metadata.isTrue(Around, 'proxyTarget')
         metadata.isFalse(Around, 'lazy')
-        metadata.getAnnotationNamesByStereotype(Around.name) == [Trace.name, SomeOther.name] as Set
+        metadata.getAnnotationNamesByStereotype(Around.name) == [Trace.name, SomeOther.name]
     }
 
 }

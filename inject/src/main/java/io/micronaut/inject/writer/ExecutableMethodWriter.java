@@ -31,6 +31,7 @@ import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collection;
@@ -299,5 +300,11 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         try (OutputStream outputStream = classWriterOutputVisitor.visitClass(className)) {
             outputStream.write(classWriter.toByteArray());
         }
+    }
+
+    @Nonnull
+    @Override
+    protected final GeneratorAdapter beginAnnotationMetadataMethod(ClassWriter classWriter) {
+        return startProtectedMethod(classWriter, "resolveAnnotationMetadata", AnnotationMetadata.class.getName());
     }
 }

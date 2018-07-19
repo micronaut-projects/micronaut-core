@@ -94,7 +94,7 @@ public abstract class AbstractParametrizedBeanDefinition<T> extends AbstractBean
                     throw new BeanInstantiationException(resolutionContext, "Missing argument value: " + argumentName);
                 }
                 Object value = requiredArgumentValues.get(argumentName);
-                boolean requiresConversion = !requiredArgument.getType().isInstance(value);
+                boolean requiresConversion = value != null && !requiredArgument.getType().isInstance(value);
                 if (requiresConversion) {
                     Optional<?> converted = ConversionService.SHARED.convert(value, requiredArgument.getType(), ConversionContext.of(requiredArgument));
                     Object finalValue = value;

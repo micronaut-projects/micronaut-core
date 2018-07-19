@@ -12,7 +12,7 @@ dependencies {
     compile project(":spring")
     testCompile project(":inject-groovy")
     compile "org.grails:grails-datastore-gorm-mongodb:6.1.4.RELEASE"
-    compile dependencyVersion("mongodb")
+    compile "org.mongodb:mongo-java-driver:$mongoVersion"
 
     testCompile project(":http-server")
     testCompile project(":http-client")

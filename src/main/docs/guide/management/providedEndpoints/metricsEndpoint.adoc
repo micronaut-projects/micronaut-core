@@ -1,0 +1,381 @@
+The metrics endpoint returns information about the "metrics" of the application.
+
+To execute the metrics endpoint, send a GET request to /metrics.  This will return a list of the metrics registered with the `MeterRegistry` bean.
+
+== Configuration
+
+Currently the metrics endpoint will only be enabled if you include the `micrometer-core` (or one of the typed registries such as `micrometer-registry-statsd` or `micrometer-registry-graphite`) AND the `management` dependencies.  You will also need to have the global metrics flag enabled (true by default).
+
+.Property
+
+[source,yaml]
+----
+micronaut:
+  metrics:
+    enabled: true
+----
+
+.Gradle
+
+[source,groovy]
+----
+dependencies {
+    ...
+    compile "io.micronaut.configuration:micrometer-core"
+    // micrometer-registry-statsd also pulls in micrometer-core so included above to verbose example
+    compile "io.micronaut.configuration:micrometer-registry-statsd"
+    // Also required to enable endpoint
+    compile "io.micronaut:management"
+    ...
+}
+----
+
+.Maven
+[source,xml]
+----
+<dependency>
+  <groupId>io.micronaut.configuration</groupId>
+  <artifactId>micrometer-core</artifactId>
+  <version>${micronaut.version}</version>
+</dependency>
+<!-- micrometer-registry-statsd also pulls in micrometer-core so included above to verbose example -->
+<dependency>
+  <groupId>io.micronaut.configuration</groupId>
+  <artifactId>micrometer-registry-statsd</artifactId>
+  <version>${micronaut.version}</version>
+</dependency>
+<!-- Also required to enable endpoint -->
+<dependency>
+  <groupId>io.micronaut</groupId>
+  <artifactId>management</artifactId>
+  <version>${micronaut.version}</version>
+</dependency>
+----
+
+To configure the metrics endpoint, supply configuration through `endpoints.metrics`.
+
+.Metrics Endpoint Configuration Example
+[source,yaml]
+----
+endpoints:
+  metrics:
+    enabled: Boolean
+    sensitive: Boolean
+    id: String
+----
+
+== Metric Concepts
+
+Key `Micrometer.io` http://micrometer.io/docs/concepts[concepts] include
+a http://micrometer.io/docs/concepts#_registry[MeterRegistry] to register and use
+meters. A http://micrometer.io/docs/concepts#_meters[Meter] is something that produces metrics.
+
+A MeterRegistry can have some customizations automatically applied.
+
+=== Meter Registry Configurer
+
+* Any bean that implements `MeterRegistryConfigurer` gets applied to every _applicable_ MeterRegistry bean on creation
+* The implementation of the MeterRegistryConfigurer `supports()` method determines if the configurer is applied to a particular registry
+** If you want all registries to get the customization, simply return return `true`
+** Otherwise, you can evaluate the registry for its class type, its class hierarchy, or other criteria.
+** Remember you only get one shot for autoconfiguration; i.e. when the bean context is started.
+** However, in code, you can apply additional customizations to the registry config
+
+.MeterRegistryConfigurer Interface
+[source,java]
+----
+include::{metricscore}/aggregator/MeterRegistryConfigurer.java[]
+----
+
+.Example
+[source,java]
+----
+include::{testsmetricscore}/SimpleMeterRegistryConfigurer.java[]
+----
+
+=== Meter Filter
+
+* A meter filter can be used to determine if a Meter is to be added to the registry. See http://micrometer.io/docs/concepts#_meter_filters[Meter Filters]
+* Any bean that implements MeterFilter will be applied to all registries when the registry is first created
+
+You can create custom filters similar to the following inside your application.  Micrometer's `MeterFilter` class provides several convenience methods to help with the creation of these filters.
+
+.Example
+[source,java]
+----
+include::{testsmetricscore}/MeterFilterFactory.java[]
+----
+
+=== Meter Binder
+
+Meter Binders get applied to Meter Registry to _mix in_ metrics producers. Micrometer.io defines several of these for cross-cutting metrics related to JVM metrics, caches, classloaders, etc. These all extend a simple interface MeterBinder, but these are not auto wired as beans and manual wiring is required given how micrometer is currently implemented.
+
+==== Provided Binders
+
+The following metrics currently have binders and are enabled by default.  The settings listed below can disable the specific metric binders if you do not with to collect or report the specific metrics.
+
+===== Jvm Metrics
+
+The JVM metrics bindings will provide several jvm metrics.
+
+*Control Property*: `micronaut.metrics.binders.jvm.enabled`
+
+.Metrics provided
+|=======
+|*Name* 
+| jvm.buffer.count 
+| jvm.buffer.memory.used
+| jvm.buffer.total.capacity
+| jvm.classes.loaded
+| jvm.classes.unloaded
+| jvm.gc.live.data.size
+| jvm.gc.max.data.size
+| jvm.gc.memory.allocated
+| jvm.gc.memory.promoted
+| jvm.memory.committed
+| jvm.memory.max
+| jvm.memory.used
+| jvm.threads.daemon
+| jvm.threads.live
+| jvm.threads.peak
+|=======
+
+===== Web Metrics
+
+There is a default web filter provided for web metrics.  All routes, status codes, methods and exceptions will be timed and counted.
+
+*Control Property*: `micronaut.metrics.binders.web.enabled`
+
+.Filter Path
+If enabled, be default the path `/**` will be intercepted.  If you wish to change which paths are run through the filter set the following property.
+
+*Control Property*: `micronaut.metrics.http.path`
+
+.Metrics provided
+|=======
+|*Name*
+| http.server.requests
+|=======
+
+===== System Metrics
+
+There are multiple metrics that can be separately toggled.
+
+====== Uptime Metrics
+
+The uptime metrics bindings will provide system uptime metrics.
+
+*Control Property*: `micronaut.metrics.binders.uptime.enabled`
+
+.Metrics provided
+|=======
+|*Name*
+| process.uptime
+| process.start.time
+|=======
+
+===== Processor Metrics
+
+The processor metrics bindings will provide system processor metrics.
+
+*Control Property*: `micronaut.metrics.binders.processor.enabled`
+
+.Metrics provided
+|=======
+|*Name*
+| system.load.average.1m
+| system.cpu.usage
+| system.cpu.count
+| process.cpu.usage
+|=======
+
+===== File Descriptor Metrics
+
+The file descriptor metrics bindings will provide system file descriptor metrics.
+
+*Control Property*: `micronaut.metrics.binders.files.enabled`
+
+.Metrics provided
+|=======
+|*Name*
+| process.files.open
+| process.files.max
+|=======
+
+===== Logback Metrics
+
+The logging metrics bindings will provide logging metrics if using Logback.
+
+*Control Property*: `micronaut.metrics.binders.logback.enabled`
+
+.Metrics provided
+|=======
+|*Name*
+| logback.events
+|=======
+
+== Adding Custom Metrics
+
+To add metrics to your application you can inject a MeterRegistry bean to your class and use the provided methods to access counters, timers, etc.
+
+See the Micrometer.io docs at https://micrometer.io/docs for more information.
+
+.Custom Metrics Example
+[source,java]
+----
+include::{testsmetricscore}/IndexController.java[]
+----
+
+== Metrics Registries & Reporters
+
+By default there a metrics endpoint wired up and metrics are provided to it for viewing or retrieving via http.  If you want to register a specific type of reporter you will need to include a typed registry configuration.  The following are the currently supported libraries for reporting metrics.
+
+=== Statsd Registry
+
+You can include the statsd reporter via `io.micronaut.configuration:micrometer-registry-statsd:${micronaut.version}`
+
+.Maven
+[source,xml]
+----
+<dependency>
+  <groupId>io.micronaut.configuration</groupId>
+  <artifactId>micrometer-registry-statsd</artifactId>
+  <version>${micronaut.version}</version>
+</dependency>
+----
+
+You can configure this reporter using `micronaut.metrics.export.statsd`.  The most commonly changed configuration properties are listed below, but see https://github.com/micrometer-metrics/micrometer/blob/master/implementations/micrometer-registry-statsd/src/main/java/io/micrometer/statsd/StatsdConfig.java[StatdsConfig] for more options
+
+|=======
+|*Name* |*Description*
+|enabled |Whether to enable the reporter. Could disable to local dev for example. Default: `true`
+|flavor |The type of metric to use (datadog, etsy or telegraf). Default: `datadog`
+|step |How frequently to report metrics. Default: `PT1M` (1 min).  See `java.time.Duration#parse(CharSequence)`
+|host |The host to communicate to statsd on. Default: `localhost`
+|port |The port to communicate to statsd on. Default: `8125`
+|=======
+
+.Example Statsd Config
+[source,yml]
+----
+micronaut:
+  metrics:
+    enabled: true
+    export:
+      statsd:
+        enabled: true
+        flavor: datadog
+        step: PT1M
+        host: localhost
+        port: 8125
+----
+
+=== Graphite Registry
+
+You can include the graphite reporter via `io.micronaut.configuration:micrometer-registry-graphite:${micronaut.version}`
+
+.Maven
+[source,xml]
+----
+<dependency>
+  <groupId>io.micronaut.configuration</groupId>
+  <artifactId>micrometer-registry-graphite</artifactId>
+  <version>${micronaut.version}</version>
+</dependency>
+----
+
+You can configure this reporter using `micronaut.metrics.export.graphite`.  The most commonly changed configuration properties are listed below, but see https://github.com/micrometer-metrics/micrometer/blob/master/implementations/micrometer-registry-graphite/src/main/java/io/micrometer/graphite/GraphiteConfig.java[GraphiteConfig] for more options
+
+|=======
+|*Name* |*Description*
+|enabled |Whether to enable the reporter. Could disable to local dev for example. Default: `true`
+|step |How frequently to report metrics. Default: `PT1M` (1 min).  See `java.time.Duration#parse(CharSequence)`
+|host |The host to communicate with graphite. Default: `localhost`
+|port |The port to communicate with graphite. Default: `2004`
+|=======
+
+.Example Graphite Config
+[source,yml]
+----
+micronaut:
+  metrics:
+    enabled: true
+    export:
+      graphite:
+        enabled: true
+        step: PT1M
+        host: localhost
+        port: 2004
+----
+
+=== Atlas Registry
+
+You can include the atlas reporter via `io.micronaut.configuration:micrometer-registry-atlas:${micronaut.version}`
+
+.Maven
+[source,xml]
+----
+<dependency>
+  <groupId>io.micronaut.configuration</groupId>
+  <artifactId>micrometer-registry-atlas</artifactId>
+  <version>${micronaut.version}</version>
+</dependency>
+----
+
+You can configure this reporter using `micronaut.metrics.export.atlas`.  The most commonly changed configuration properties are listed below, but see https://github.com/Netflix/spectator/blob/master/spectator-reg-atlas/src/main/java/com/netflix/spectator/atlas/AtlasConfig.java[AtlasConfig] for more options
+
+|=======
+|*Name* |*Description*
+|enabled |Whether to enable the reporter. Could disable to local dev for example. Default: `true`
+|step |How frequently to report metrics. Default: `PT1M` (1 min).  See `java.time.Duration#parse(CharSequence)`
+|uri |The uri for the atlas backend. Default: `http://localhost:7101/api/v1/publish`
+|=======
+
+.Example Atlas Config
+[source,yml]
+----
+micronaut:
+  metrics:
+    enabled: true
+    export:
+      atlas:
+        enabled: true
+        uri: http://localhost:7101/api/v1/publish
+        step: PT1M
+----
+
+=== Prometheus Registry
+
+You can include the prometheus reporter via `io.micronaut.configuration:micrometer-registry-prometheus:${micronaut.version}`
+
+.Maven
+[source,xml]
+----
+<dependency>
+  <groupId>io.micronaut.configuration</groupId>
+  <artifactId>micrometer-registry-prometheus</artifactId>
+  <version>${micronaut.version}</version>
+</dependency>
+----
+
+You can configure this reporter using `micronaut.metrics.export.prometheus`.  The most commonly changed configuration properties are listed below, but see https://github.com/micrometer-metrics/micrometer/blob/master/implementations/micrometer-registry-prometheus/src/main/java/io/micrometer/prometheus/PrometheusConfig.java[PrometheusConfig] for more options
+
+|=======
+|*Name* |*Description*
+|enabled |Whether to enable the reporter. Could disable to local dev for example. Default: `true`
+|step |How frequently to report metrics. Default: `PT1M` (1 min).  See `java.time.Duration#parse(CharSequence)`
+|descriptions | Boolean if meter descriptions should be sent to Prometheus. Turn this off to minimize the amount of data sent on each scrape. Default: `true`
+|=======
+
+.Example Prometheus Config
+[source,yml]
+----
+micronaut:
+  metrics:
+    enabled: true
+    export:
+      prometheus:
+        enabled: true
+        step: PT1M
+        descriptions: true
+----

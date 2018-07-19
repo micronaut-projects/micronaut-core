@@ -18,7 +18,6 @@ package io.micronaut.security.authorization
 import io.micronaut.context.annotation.Requires
 import io.micronaut.management.endpoint.Endpoint
 import io.micronaut.management.endpoint.Read
-import io.micronaut.security.authentication.Authentication
 
 import java.security.Principal
 

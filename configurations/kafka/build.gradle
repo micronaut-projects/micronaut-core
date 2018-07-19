@@ -1,0 +1,34 @@
+dependencies {
+    compile project(":messaging")
+    compile 'org.apache.kafka:kafka-clients:1.1.0'
+
+    compileOnly project(":management")
+    compileOnly project(":configurations:micrometer-core")
+    compileOnly 'org.apache.kafka:kafka_2.12:1.1.0'
+    compileOnly 'org.apache.kafka:kafka-clients:1.1.0:test'
+    compileOnly 'org.apache.kafka:kafka_2.12:1.1.0:test'
+
+    compileOnly project(":inject-java")
+
+    testCompile dependencyVersion("reactor")
+    testCompile project(":management")
+    testCompile project(":inject-groovy")
+    testCompile project(":inject-java")
+    testCompile project(":configurations:micrometer-core")
+    testCompile 'org.apache.kafka:kafka-clients:1.1.0:test'
+    testCompile 'org.apache.kafka:kafka_2.12:1.1.0'
+    testCompile 'org.apache.kafka:kafka_2.12:1.1.0:test'
+}
+//tasks.withType(Test) {
+//    testLogging {
+//        showStandardStreams = true
+//    }
+//    beforeTest {
+//        System.out.println("STARTING: ${it.className}.$it.name")
+//        System.out.flush()
+//    }
+//    afterTest {
+//        System.out.println("FINISHED: ${it.className}.$it.name")
+//        System.out.flush()
+//    }
+//}

@@ -18,6 +18,8 @@ package io.micronaut.security.rules;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.management.endpoint.EndpointSensitivityProcessor;
+import io.micronaut.management.endpoint.health.HealthEndpoint;
+import io.micronaut.management.endpoint.processors.ReadEndpointRouteBuilder;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;
 
@@ -63,6 +65,7 @@ public class SensitiveEndpointRule implements SecurityRule {
     public SecurityRuleResult check(HttpRequest request, @Nullable RouteMatch routeMatch, @Nullable Map<String, Object> claims) {
         if (routeMatch instanceof MethodBasedRouteMatch) {
             Method method = ((MethodBasedRouteMatch) routeMatch).getTargetMethod();
+
             if (endpointMethods.containsKey(method)) {
                 Boolean sensitive = endpointMethods.get(method);
                 if (claims == null && sensitive) {

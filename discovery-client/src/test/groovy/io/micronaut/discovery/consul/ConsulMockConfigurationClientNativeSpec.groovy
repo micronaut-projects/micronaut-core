@@ -19,7 +19,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.context.env.EnvironmentPropertySource
 import io.micronaut.context.env.PropertySource
-import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.discovery.config.ConfigurationClient
 import io.micronaut.discovery.consul.client.v1.ConsulClient
 import io.micronaut.discovery.consul.config.ConsulConfigurationClient
@@ -37,13 +36,9 @@ import spock.lang.Stepwise
  */
 @Stepwise
 class ConsulMockConfigurationClientNativeSpec extends Specification {
-    @Shared
-    int serverPort = SocketUtils.findAvailableTcpPort()
-
     @AutoCleanup
     @Shared
     EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer, [
-            'micronaut.server.port'                   : serverPort,
             (MockConsulServer.ENABLED):true
     ])
 
@@ -53,7 +48,7 @@ class ConsulMockConfigurationClientNativeSpec extends Specification {
             [
                     (ConfigurationClient.ENABLED): true,
                     'consul.client.host': 'localhost',
-                    'consul.client.port': serverPort]
+                    'consul.client.port': consulServer.getPort()]
     )
 
     @Shared
@@ -64,15 +59,15 @@ class ConsulMockConfigurationClientNativeSpec extends Specification {
 
     void "test read and write key values with ConsulClient"() {
         when:"A property is written"
-        def result = Flowable.fromPublisher(client.putValue("/config/application/datasource.url", "mysql://blah")).blockingFirst()
+        def result = Flowable.fromPublisher(client.putValue("config/application/datasource.url", "mysql://blah")).blockingFirst()
 
         then:"The operation was successful"
         result
 
         when:"Properties are read"
-        Flowable.fromPublisher(client.putValue("/config/application/datasource.driver", "java.SomeDriver")).blockingFirst()
+        Flowable.fromPublisher(client.putValue("config/application/datasource.driver", "java.SomeDriver")).blockingFirst()
 
-        List<KeyValue> keyValues = Flowable.fromPublisher(client.readValues("/config")).blockingFirst()
+        List<KeyValue> keyValues = Flowable.fromPublisher(client.readValues("config")).blockingFirst()
 
         then:
         keyValues.size() == 2
@@ -103,6 +98,6 @@ class ConsulMockConfigurationClientNativeSpec extends Specification {
     }
 
     private void writeValue(String env, String name, String value) {
-        Flowable.fromPublisher(client.putValue("/config/$env/$name", value)).blockingFirst()
+        Flowable.fromPublisher(client.putValue("config/$env/$name", value)).blockingFirst()
     }
 }

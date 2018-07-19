@@ -17,8 +17,6 @@ package io.micronaut.inject.lifecycle.beancreationeventlistener;
 
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
-import io.micronaut.context.event.BeanCreatedEvent;
-import io.micronaut.context.event.BeanCreatedEventListener;
 
 import javax.inject.Singleton;
 

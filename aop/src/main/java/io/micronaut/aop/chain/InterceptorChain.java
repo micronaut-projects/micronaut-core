@@ -24,6 +24,7 @@ import io.micronaut.aop.InvocationContext;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.EnvironmentConfigurable;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -33,16 +34,11 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.annotation.Annotation;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -203,14 +199,14 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
     }
 
     private static void instrumentAnnotationMetadata(BeanContext beanContext, ExecutableMethod<?, ?> method) {
-        if (beanContext instanceof ApplicationContext && method.getAnnotationMetadata() instanceof DefaultAnnotationMetadata) {
+        if (beanContext instanceof ApplicationContext && method instanceof EnvironmentConfigurable) {
             // ensure metadata is environment aware
-            ((DefaultAnnotationMetadata) method.getAnnotationMetadata()).configure(beanContext);
+            ((EnvironmentConfigurable) method).configure(((ApplicationContext) beanContext).getEnvironment());
         }
     }
 
     private static Interceptor[] resolveInterceptorsInternal(ExecutableMethod<?, ?> method, Class<? extends Annotation> annotationType, Interceptor[] interceptors) {
-        Set<Class<? extends Annotation>> annotations = method.getAnnotationTypesByStereotype(annotationType);
+        List<Class<? extends Annotation>> annotations = method.getAnnotationTypesByStereotype(annotationType);
 
         Set<Class> applicableClasses = annotations.stream()
             .filter(aClass -> {

@@ -20,7 +20,6 @@ import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.micronaut.http.*;
 import io.micronaut.http.annotation.*;
-import javax.inject.Singleton;
 import javax.validation.constraints.Size;
 // end::imports[]
 

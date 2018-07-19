@@ -18,6 +18,46 @@ The `javax.annotation`, which includes `@PostConstruct`, `@PreDestroy` etc. is n
 compile 'javax.annotation:javax.annotation-api:1.3.2'
 ----
 
+== Using Project Lombok
+
+https://projectlombok.org[Project Lombok] is a popular java library that adds a number of useful AST transformations to the Java language via annotation processors.
+
+Since both Micronaut and Lombok use annotation processors, special care needs to be taken when configuring Lombok to ensure that the Lombok processor runs *before* Micronaut's processor.
+
+For example in Gradle adding the following dependencies to the `dependencies` block:
+
+.Configuring Lombok in Gradle
+[source,groovy]
+----
+compileOnly 'org.projectlombok:lombok:1.16.20'
+annotationProcessor "org.projectlombok:lombok:1.16.20"
+...
+// Micronaut processor define after Lombok
+annotationProcessor "io.micronaut:inject-java"
+----
+
+Or when using Maven:
+
+.Configuring Lombok in Maven
+[source,xml]
+----
+<annotationProcessorPaths>
+  <path>
+    <groupId>org.projectlombok</groupId>
+    <artifactId>lombok</artifactId>
+    <version>1.18.0</version>
+  </path>
+  <path>
+    <groupId>io.micronaut</groupId>
+    <artifactId>inject-java</artifactId>
+    <version>${micronaut.version}</version>
+  </path>
+</annotationProcessorPaths>
+----
+
+NOTE: In both cases (Gradle and Maven) the Micronaut processor should be configured after the Lombok processor, reversing the order of the declared dependencies will not work.
+
+
 == IDE Considerations
 
 You can use any IDE to develop Micronaut, if you depend on your configured build tool (Gradle or Maven) to build the application.
@@ -52,7 +92,7 @@ At compile time the parameter name `name` is lost and becomes simply `arg0` when
 ----
 interface HelloOperations {
     @Get("/hello/{name}")
-    String hello(@Parameter("name") String name);
+    String hello(@QueryValue("name") String name);
 }
 ----
 

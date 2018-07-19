@@ -20,7 +20,6 @@ import io.micronaut.context.env.Environment
 import io.micronaut.context.env.EnvironmentPropertySource
 import io.micronaut.context.env.PropertySource
 import io.micronaut.context.exceptions.ConfigurationException
-import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.discovery.config.ConfigurationClient
 import io.micronaut.discovery.consul.client.v1.ConsulClient
 import io.micronaut.discovery.consul.config.ConsulConfigurationClient
@@ -35,13 +34,10 @@ import spock.lang.Specification
  * @since 1.0
  */
 class ConsulMockConfigurationClientJsonSpec extends Specification {
-    @Shared
-    int serverPort = SocketUtils.findAvailableTcpPort()
 
     @AutoCleanup
     @Shared
     EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer, [
-            'micronaut.server.port'   : serverPort,
             (MockConsulServer.ENABLED): true
     ])
 
@@ -53,7 +49,7 @@ class ConsulMockConfigurationClientJsonSpec extends Specification {
                     (ConfigurationClient.ENABLED): true,
                     'consul.client.config.format': 'json',
                     'consul.client.host'         : 'localhost',
-                    'consul.client.port'         : serverPort]
+                    'consul.client.port'         : consulServer.getPort()]
     )
 
     @Shared
@@ -116,6 +112,6 @@ class ConsulMockConfigurationClientJsonSpec extends Specification {
 
 
     private void writeValue(String name, String value) {
-        Flowable.fromPublisher(client.putValue("/config/$name", value)).blockingFirst()
+        Flowable.fromPublisher(client.putValue("config/$name", value)).blockingFirst()
     }
 }

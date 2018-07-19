@@ -18,6 +18,7 @@ package io.micronaut.cli.profile
 
 import groovy.transform.CompileStatic
 import groovy.transform.EqualsAndHashCode
+import groovy.transform.InheritConstructors
 import groovy.transform.ToString
 import io.micronaut.cli.config.NavigableMap
 import io.micronaut.cli.io.support.Resource
@@ -32,6 +33,7 @@ import org.yaml.snakeyaml.Yaml
  * @author Graeme Rocher
  * @since 1.0
  */
+@InheritConstructors
 @EqualsAndHashCode(includes = ['name'])
 @ToString(includes = ['profile', 'name'])
 @CompileStatic
@@ -42,8 +44,11 @@ class DefaultFeature implements Feature {
     final NavigableMap configuration = new NavigableMap()
     final List<Dependency> dependencies = []
     final List<String> buildPlugins
+    final List<String> jvmArgs
     final List<String> dependentFeatures = []
     private Boolean requested = false
+    final Integer minJava
+    final Integer maxJava
 
     DefaultFeature(Profile profile, String name, Resource location) {
         this.profile = profile
@@ -82,6 +87,10 @@ class DefaultFeature implements Feature {
             }
         }
         this.buildPlugins = (List<String>) configuration.get("build.plugins", [])
+        this.jvmArgs = (List<String>) configuration.get("jvmArgs", [])
+
+        this.minJava = (Integer) configuration.get("java.min") ?: null
+        this.maxJava = (Integer) configuration.get("java.max") ?: null
     }
 
     @Override
@@ -95,6 +104,16 @@ class DefaultFeature implements Feature {
     }
 
     @Override
+    Integer getMinJavaVersion() {
+        minJava
+    }
+
+    @Override
+    Integer getMaxJavaVersion() {
+        maxJava
+    }
+
+    @Override
     void setRequested(Boolean r) {
         requested = r
     }
@@ -102,5 +121,21 @@ class DefaultFeature implements Feature {
     @Override
     Boolean getRequested() {
         requested
+    }
+
+    @Override
+    boolean isSupported(Integer javaVersion) {
+        if (minJavaVersion != null) {
+            if (maxJavaVersion != null) {
+                return javaVersion >= minJavaVersion && javaVersion <= maxJavaVersion
+            } else {
+                return javaVersion >= minJavaVersion
+            }
+        }
+        if (maxJavaVersion != null) {
+            return javaVersion <= maxJavaVersion
+        }
+
+        true
     }
 }

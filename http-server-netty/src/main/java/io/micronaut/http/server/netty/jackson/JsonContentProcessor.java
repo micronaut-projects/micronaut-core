@@ -85,11 +85,21 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
 
             @Override
             protected void doOnSubscribe(Subscription jsonSubscription) {
+
                 Subscription childSubscription = new Subscription() {
+                    boolean first = true;
                     @Override
                     public synchronized void request(long n) {
-                        jsonSubscription.request(n);
-                        parentSubscription.request(n);
+                        // this is a hack. The first item emitted for arrays is already in the buffer
+                        // and not part of the demand, so we have to demand 1 extra
+                        // find a better way in the future
+                        if (first) {
+                            jsonSubscription.request(n < Long.MAX_VALUE ? n + 1 : n);
+                            parentSubscription.request(n < Long.MAX_VALUE ? n + 1 : n);
+                        } else {
+                            jsonSubscription.request(n);
+                            parentSubscription.request(n);
+                        }
                     }
 
                     @Override

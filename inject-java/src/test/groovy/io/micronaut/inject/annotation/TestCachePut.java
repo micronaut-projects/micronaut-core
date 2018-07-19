@@ -16,8 +16,6 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.context.annotation.Type;
 
 import java.lang.annotation.*;
 

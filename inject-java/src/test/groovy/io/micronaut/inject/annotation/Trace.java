@@ -17,8 +17,6 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.aop.Around;
 import io.micronaut.context.annotation.AliasFor;
-import io.micronaut.aop.Around;
-import io.micronaut.context.annotation.AliasFor;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;

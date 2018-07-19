@@ -19,6 +19,7 @@ package io.micronaut.function.executor;
 import io.micronaut.core.cli.CommandLine;
 
 import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.function.BiConsumer;
 
@@ -58,8 +59,7 @@ public class FunctionApplication extends StreamFunctionExecutor {
      */
     public static void run(StreamFunctionExecutor functionExecutor, String... args) {
         parseData(args, (data, isDebug) -> {
-            ByteArrayInputStream input = new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8));
-            try {
+            try (InputStream input = data != null ? new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8)) : System.in) {
                 functionExecutor.execute(input, System.out);
             } catch (Exception e) {
                 exitWithError(isDebug, e);
@@ -96,7 +96,7 @@ public class FunctionApplication extends StreamFunctionExecutor {
         if (value != null) {
             data.accept(value.toString(), commandLine.hasOption("x"));
         } else {
-            exitWithNoData();
+            data.accept(null, commandLine.hasOption("x"));
         }
     }
 

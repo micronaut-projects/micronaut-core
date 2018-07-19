@@ -36,7 +36,7 @@ public abstract class ConfigDiscoveryConfiguration implements Toggleable {
     /**
      * The default path.
      */
-    public static final String DEFAULT_PATH = "/" + PREFIX + "/";
+    public static final String DEFAULT_PATH = PREFIX + "/";
 
     private boolean enabled = true;
     private String path;

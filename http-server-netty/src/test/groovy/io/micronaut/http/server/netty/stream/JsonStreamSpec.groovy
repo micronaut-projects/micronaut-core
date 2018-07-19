@@ -34,7 +34,7 @@ import spock.lang.Specification
  */
 class JsonStreamSpec extends Specification {
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['micronaut.server.serverHeader': 'JsonStreamSpec'])
 
     void "test json stream response content type"() {
         given:
@@ -45,7 +45,8 @@ class JsonStreamSpec extends Specification {
         expect:
         response.contentType.isPresent()
         response.contentType.get() == MediaType.APPLICATION_JSON_STREAM_TYPE
-
+        response.header("Server") == "JsonStreamSpec"
+        response.header("Date")
     }
 
     @Controller("/json/stream")

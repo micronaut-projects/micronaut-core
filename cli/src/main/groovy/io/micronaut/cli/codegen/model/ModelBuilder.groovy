@@ -41,7 +41,7 @@ trait ModelBuilder {
      * @return The {@link Model} instance
      */
     Model model(Class cls) {
-        return new ModelImpl(cls.getName())
+        return model(cls.getName())
     }
     /**
      * A model for the given class name
@@ -50,6 +50,9 @@ trait ModelBuilder {
      * @return The {@link Model} instance
      */
     Model model(String className) {
+        if (className.contains('-')) {
+            className = NameUtils.getNameFromScript(className)
+        }
         if (defaultPackage && !className.contains('.')) {
             return new ModelImpl("${defaultPackage}.$className")
         } else {

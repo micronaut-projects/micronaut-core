@@ -1,6 +1,6 @@
 The routes endpoint returns information about URIs available to be called for your application. By default the data returned includes the URI, allowed method, content types produced, and information about the method that would be executed.
 
-To execute the beans endpoint, send a GET request to /routes.
+To execute the routes endpoint, send a GET request to /routes.
 
 == Configuration
 

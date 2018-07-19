@@ -19,10 +19,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.junit.Test;
-import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.inject.qualifiers.Qualifiers;
 
 import static org.junit.Assert.assertNotNull;
 import static io.micronaut.docs.env.DataSourceFactory.*;

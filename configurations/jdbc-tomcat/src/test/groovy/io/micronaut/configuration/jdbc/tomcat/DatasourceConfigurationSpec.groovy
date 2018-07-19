@@ -15,13 +15,13 @@
  */
 package io.micronaut.configuration.jdbc.tomcat
 
-import org.apache.tomcat.jdbc.pool.DataSource
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
+import javax.sql.DataSource
 import java.sql.ResultSet
 
 class DatasourceConfigurationSpec extends Specification {
@@ -53,7 +53,7 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.containsBean(DatasourceConfiguration)
 
         when:
-        DataSource dataSource = applicationContext.getBean(DataSource)
+        DataSource dataSource = applicationContext.getBean(DataSource).targetDataSource
 
         then: //The default configuration is supplied because H2 is on the classpath
         dataSource.url == 'jdbc:h2:mem:default;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
@@ -118,7 +118,7 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.containsBean(DatasourceConfiguration)
 
         when:
-        DataSource dataSource = applicationContext.getBean(DataSource)
+        DataSource dataSource = applicationContext.getBean(DataSource).targetDataSource
 
         then:
         dataSource.abandonWhenPercentageFull == 99
@@ -151,7 +151,7 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.containsBean(DatasourceConfiguration)
 
         when:
-        DataSource dataSource = applicationContext.getBean(DataSource)
+        DataSource dataSource = applicationContext.getBean(DataSource).targetDataSource
 
         then: //The default configuration is supplied because H2 is on the classpath
         dataSource.url == 'jdbc:h2:mem:default;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
@@ -161,7 +161,7 @@ class DatasourceConfigurationSpec extends Specification {
         dataSource.driverClassName == 'org.h2.Driver'
 
         when:
-        dataSource = applicationContext.getBean(DataSource, Qualifiers.byName("foo"))
+        dataSource = applicationContext.getBean(DataSource, Qualifiers.byName("foo")).targetDataSource
 
         then: //The default configuration is supplied because H2 is on the classpath
         dataSource.url == 'jdbc:h2:mem:foo;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'

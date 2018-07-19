@@ -77,6 +77,11 @@ public interface Profile {
     Iterable<Feature> getDefaultFeatures();
 
     /**
+     * @return The oneOf features for this profile
+     */
+    Iterable<OneOfFeature> getOneOfFeatures();
+
+    /**
      * @return The required features for this profile
      */
     Iterable<Feature> getRequiredFeatures();
@@ -97,6 +102,11 @@ public interface Profile {
      * @return The dependency definitions for this profile
      */
     List<Dependency> getDependencies();
+
+    /**
+     * @return The JVM args
+     */
+    List<String> getJvmArgs();
 
     /**
      * @return The profiles configuration

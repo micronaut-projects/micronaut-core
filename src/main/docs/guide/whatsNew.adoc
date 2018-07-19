@@ -1,0 +1,28 @@
+Apart from https://github.com/micronaut-projects/micronaut-core/milestone/3?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features.
+
+=== Improved Metrics Support
+
+Metrics support has been improved with support for metrics for:
+
+* Micronaut Thread Pools
+* Kafka Metrics
+
+=== Apache Kafka Support
+
+Micronaut can now be used to build Message-Driven Microservices with Apache Kafka. See the <<kafka, Kafka>> section of the documentation for more information.
+
+=== Annotation Metadata Processing Support Improved
+
+All annotation metadata in Micronaut is produced as compile time, resulting in significant improvements to startup time and memory consumption over traditional frameworks.
+
+This support has been enhanced to better support repeated annotations such that repeated annotations are normalized at compile time, avoiding the need to process them and compensate for the difference between a single annotation definition and multiple.
+
+The api:core.annotation.AnnotationMetadata[] interface now includes methods such as `getAnnotationValuesByType` and `getDeclaredAnnotationValuesByType` that allow the retrieval of the repeated annotation values that are computed at compile time.
+
+=== Reactive Postgres Driver Support
+
+Support has been added for the https://github.com/reactiverse/reactive-pg-client[Postgres Reactive Client] project allowing building non-blocking, reactive applications with Postgres SQL and Micronaut. See the documentation on <<postgresSupport, Postgres Reactive Client Support>> for more information.
+
+=== CLI Improvements
+
+Thanks to a contribution from https://github.com/remkop[Remko Popma] the CLI has been re-written on top of https://github.com/remkop/picocli[PicoCLI] resulting in improvements to documentation, TAB completion and code maintainability.

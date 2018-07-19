@@ -19,8 +19,8 @@ package io.micronaut.inject.visitor;
 /**
  * Provides a hook into the compilation process to allow user defined functionality to be created at compile time.
  *
- * @param <C> The annotation required on the class.
- * @param <E> The annotation required on the element.
+ * @param <C> The annotation required on the class. Use {@link Object} for all classes.
+ * @param <E> The annotation required on the element. Use {@link Object} for all elements.
  * @author James Kleeh
  * @since 1.0
  */

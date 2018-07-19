@@ -77,6 +77,7 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
         this.httpClient = new DefaultHttpClient(
             LoadBalancer.empty(),
             configuration,
+            null,
             threadFactory,
             nettyClientSslBuilder,
             codecRegistry,

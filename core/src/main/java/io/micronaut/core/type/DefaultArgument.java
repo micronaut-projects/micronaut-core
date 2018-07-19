@@ -131,7 +131,11 @@ class DefaultArgument<T> implements Argument<T> {
         if (this.qualifier != null) {
             return this.qualifier;
         } else {
-            this.qualifier = AnnotationUtil.findAnnotationWithStereoType("javax.inject.Qualifier", getAnnotations()).orElse(null);
+
+            AnnotationMetadata annotationMetadata = getAnnotationMetadata();
+            this.qualifier = annotationMetadata.getAnnotationTypeByStereotype("javax.inject.Qualifier")
+                                               .map(annotationMetadata::getAnnotation)
+                                               .orElse(null);
             return qualifier;
         }
     }

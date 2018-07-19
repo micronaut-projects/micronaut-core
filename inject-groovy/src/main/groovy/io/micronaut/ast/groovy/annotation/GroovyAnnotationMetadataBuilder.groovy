@@ -33,6 +33,7 @@ import org.codehaus.groovy.ast.expr.Expression
 import org.codehaus.groovy.ast.expr.ListExpression
 import org.codehaus.groovy.ast.expr.PropertyExpression
 
+import java.lang.annotation.Repeatable
 import java.lang.reflect.Array
 
 /**
@@ -49,6 +50,18 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     @Override
     protected AnnotatedNode getTypeForAnnotation(AnnotationNode annotationMirror) {
         return annotationMirror.classNode
+    }
+
+    @Override
+    protected String getRepeatableName(AnnotationNode annotationMirror) {
+        List<AnnotationNode> annotationNodes = annotationMirror.classNode.getAnnotations(ClassHelper.makeCached(Repeatable))
+        if (annotationNodes) {
+            Expression expression = annotationNodes.get(0).getMember("value")
+            if (expression instanceof ClassExpression) {
+                return ((ClassExpression)expression).type.name
+            }
+        }
+        return null
     }
 
     @Override
@@ -170,14 +183,16 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
 
     @Override
     protected OptionalValues<?> getAnnotationValues(AnnotatedNode member, Class<?> annotationType) {
-        def anns = member.getAnnotations(ClassHelper.make(annotationType))
-        if (!anns.isEmpty()) {
-            AnnotationNode ann = anns[0]
-            Map<CharSequence, Object> converted = new LinkedHashMap<>();
-            for (annMember in ann.members) {
-                readAnnotationRawValues(annMember.key, annMember.value, converted)
+        if (member != null) {
+            def anns = member.getAnnotations(ClassHelper.make(annotationType))
+            if (!anns.isEmpty()) {
+                AnnotationNode ann = anns[0]
+                Map<CharSequence, Object> converted = new LinkedHashMap<>();
+                for (annMember in ann.members) {
+                    readAnnotationRawValues(annMember.key, annMember.value, converted)
+                }
+                return OptionalValues.of(Object.class, converted)
             }
-            return OptionalValues.of(Object.class, converted)
         }
         return OptionalValues.empty()
     }

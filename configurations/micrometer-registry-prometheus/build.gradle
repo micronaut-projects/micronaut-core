@@ -1,0 +1,11 @@
+dependencies {
+    compileOnly project(":inject-java")
+
+    compile project(":configurations:micrometer-core")
+
+    compile "io.micrometer:micrometer-registry-prometheus:$micrometerVersion"
+
+    testCompile project(":inject-groovy")
+    testCompile project(":inject-java")
+    testCompile project(":http-server-netty")
+}

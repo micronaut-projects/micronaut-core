@@ -57,7 +57,7 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
     private static final String TAG_HYSTRIX_COMMAND = "hystrix.command";
     private static final String TAG_HYSTRIX_GROUP = "hystrix.group";
     private static final String TAG_HYSTRIX_THREAD_POOL = "hystrix.threadPool";
-    private static final String HYSTRIX_ANNOTATION = "io.micronaut.configurations.hystrix.annotation.HystrixCommand";
+    private static final String HYSTRIX_ANNOTATION = "io.micronaut.configuration.hystrix.annotation.HystrixCommand";
 
     private final Tracer tracer;
     private final ConversionService<?> conversionService;

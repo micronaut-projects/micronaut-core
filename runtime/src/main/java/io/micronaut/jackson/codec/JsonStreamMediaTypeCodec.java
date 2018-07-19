@@ -17,10 +17,17 @@
 package io.micronaut.jackson.codec;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micronaut.codec.CodecConfiguration;
 import io.micronaut.http.MediaType;
 import io.micronaut.runtime.ApplicationConfiguration;
 
+import javax.annotation.Nullable;
+import javax.inject.Named;
 import javax.inject.Singleton;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * A codec for {@link MediaType#APPLICATION_JSON_STREAM}.
@@ -31,16 +38,31 @@ import javax.inject.Singleton;
 @Singleton
 public class JsonStreamMediaTypeCodec extends JsonMediaTypeCodec {
 
+    public static final String CONFIGURATION_QUALIFIER = "json-stream";
+
+    private final List<MediaType> additionalTypes;
+
     /**
      * @param objectMapper             To read/write JSON
      * @param applicationConfiguration The common application configurations
+     * @param codecConfiguration       The configuration for the codec
      */
-    public JsonStreamMediaTypeCodec(ObjectMapper objectMapper, ApplicationConfiguration applicationConfiguration) {
-        super(objectMapper, applicationConfiguration);
+    public JsonStreamMediaTypeCodec(ObjectMapper objectMapper,
+                                    ApplicationConfiguration applicationConfiguration,
+                                    @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
+        super(objectMapper, applicationConfiguration, null);
+        if (codecConfiguration != null) {
+            this.additionalTypes = codecConfiguration.getAdditionalTypes();
+        } else {
+            this.additionalTypes = Collections.emptyList();
+        }
     }
 
     @Override
-    public MediaType getMediaType() {
-        return MediaType.APPLICATION_JSON_STREAM_TYPE;
+    public Collection<MediaType> getMediaTypes() {
+        List<MediaType> mediaTypes = new ArrayList<>();
+        mediaTypes.add(MediaType.APPLICATION_JSON_STREAM_TYPE);
+        mediaTypes.addAll(additionalTypes);
+        return mediaTypes;
     }
 }

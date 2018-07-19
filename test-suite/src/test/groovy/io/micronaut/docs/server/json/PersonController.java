@@ -28,7 +28,6 @@ import io.micronaut.http.hateos.JsonError;
 import io.micronaut.http.hateos.Link;
 import io.reactivex.*;
 
-import javax.inject.Singleton;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 
@@ -96,6 +95,7 @@ public class PersonController {
     // end::regular[]
 
     // tag::localError[]
+    @Error
     public HttpResponse<JsonError> jsonError(HttpRequest request, JsonParseException jsonParseException) { // <1>
         JsonError error = new JsonError("Invalid JSON: " + jsonParseException.getMessage()) // <2>
                 .link(Link.SELF, Link.of(request.getUri()));
@@ -110,7 +110,6 @@ public class PersonController {
     public String throwError() {
         throw new RuntimeException("Something went wrong");
     }
-
 
     @Error // <1>
     // tag::globalError[]

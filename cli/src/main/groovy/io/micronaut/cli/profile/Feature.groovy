@@ -58,6 +58,12 @@ interface Feature {
      */
     List<String> getBuildPlugins()
 
+
+    /**
+     * @return The JVM args
+     */
+    List<String> getJvmArgs()
+
     /**
      * @return The configuration for the feature
      */
@@ -77,4 +83,16 @@ interface Feature {
      * @return Whether the feature was requested on the command line
      */
     Boolean getRequested()
+
+    /**
+     * @return The minimum required Java version
+     */
+    Integer getMinJavaVersion()
+
+    /**
+     * @return The maximum supported Java version
+     */
+    Integer getMaxJavaVersion()
+
+    boolean isSupported(Integer javaVersion)
 }

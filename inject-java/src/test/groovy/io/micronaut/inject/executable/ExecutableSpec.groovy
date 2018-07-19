@@ -23,10 +23,8 @@ import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.ExecutableMethod
 import io.micronaut.inject.ExecutionHandle
 import io.micronaut.inject.MethodExecutionHandle
-import spock.lang.Specification
 
 import javax.inject.Named
-import javax.inject.Singleton
 
 class ExecutableSpec extends AbstractTypeElementSpec {
 

@@ -45,9 +45,9 @@ class ClientScopeSpec extends Specification implements MockConsulSpec  {
         ])
         waitForService(consulServer, 'messageService')
 
-        MessageService messageClient = ApplicationContext.run(MessageService, [
+        MessageService messageClient = ApplicationContext.build([
                 'consul.client.port': consulServer.port
-        ])
+        ]).start().getBean(MessageService)
 
         expect:
         messageClient.getMessage() == "Server ${messageServer.port}"
@@ -73,9 +73,9 @@ class ClientScopeSpec extends Specification implements MockConsulSpec  {
                 'micronaut.application.name': 'messageService'
         ])
 
-        MessageService messageClient = ApplicationContext.run(MessageService, [
+        MessageService messageClient = ApplicationContext.build([
                 'consul.client.port': consulServer.port
-        ])
+        ]).start().getBean(MessageService)
 
 
         expect: "Different servers are called for each invocation of getMessage()"

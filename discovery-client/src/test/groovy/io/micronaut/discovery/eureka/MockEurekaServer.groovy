@@ -25,7 +25,6 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Produces
 import org.reactivestreams.Publisher
 
-import javax.inject.Singleton
 import javax.validation.Valid
 import javax.validation.constraints.NotBlank
 import javax.validation.constraints.NotNull

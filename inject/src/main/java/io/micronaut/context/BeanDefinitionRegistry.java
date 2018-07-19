@@ -84,6 +84,18 @@ public interface BeanDefinitionRegistry {
      */
     <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType, Qualifier<T> qualifier);
 
+
+    /**
+     * Obtain a {@link BeanDefinition} for the given bean.
+     *
+     * @param bean The bean
+     * @param <T>       The concrete type
+     * @return An {@link Optional} of the bean definition
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
+     *                                                                for the given type
+     */
+    <T> Optional<BeanRegistration<T>> findBeanRegistration(T bean);
+
     /**
      * Obtain a {@link BeanDefinition} for the given type.
      *

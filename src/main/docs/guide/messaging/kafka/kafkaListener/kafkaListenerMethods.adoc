@@ -1,0 +1,138 @@
+The ann:configuration.kafka.annotation.KafkaListener[] annotation examples up until now have been relatively trivial, but Micronaut offers a lot of flexibility when it comes to the types of method signatures you can define.
+
+The following sections detail examples of supported use cases.
+
+=== Specifying Topics
+
+The ann:configuration.kafka.annotation.Topic[] annotation can be used at the method or the class level to specify which topics to be listened for.
+
+Care needs to be taken when using ann:configuration.kafka.annotation.Topic[] at the class level because every public method of the class annotated with ann:configuration.kafka.annotation.KafkaListener[] will become a Kafka consumer, which may be undesirable.
+
+You can specify multiple topics to listen for:
+
+.Specifying Multiple Topics
+[source,java]
+----
+@Topic("fun-products", "awesome-products")
+----
+
+You can also specify one or many regular expressions to listen for:
+
+.Using regular expressions to match Topics
+[source,java]
+----
+@Topic(patterns="products-\\w+")
+----
+
+
+=== Available Annotations
+
+There are a number of annotations available that allow you to specify how a method argument is bound.
+
+The following table summarizes the annotations and their purpose, with an example:
+
+.Kafka Messaging Annotations
+|===
+|Annotation |Description |Example
+
+|ann:messaging.annotation.Body[]
+| Allows explicitly indicating the body of the message
+|`@Body Product product`
+
+|ann:messaging.annotation.Header[]
+| Allows binding a parameter to a message header
+|`@Header("X-My-Header") String myHeader`
+
+|ann:configuration.kafka.annotation.KafkaKey[]
+| Allows specifying the parameter that is the key
+|`@KafkaKey String key`
+
+|===
+
+For example, you can use the ann:messaging.annotation.Header[] annotation to bind a parameter value from a header contained within a `ConsumerRecord`.
+
+
+=== Topics, Partitions and Offsets
+
+If you want a reference to the topic, partition or offset it is a simple matter of defining a parameter for each.
+
+The following table summarizes example parameters and how they related to the `ConsumerRecord` being processed:
+
+.@KafkaListener Method Parameters
+|===
+|Parameter |Description
+
+|`String topic`
+| The name of the topic
+
+|`long offset`
+| The offset of the `ConsumerRecord`
+
+|`int partition`
+| The partition of the `ConsumerRecord`
+
+|`long timestamp`
+| The timestamp of the `ConsumerRecord`
+
+|===
+
+As an example, following listener method will receive all of the above mentioned parameters:
+
+.Specifying Parameters for offset, topic etc.
+[source,java]
+----
+include::{testskafka}/consumer/config/ProductListener.java[tags=method, indent=0]
+----
+
+<1> The Kafka key
+<2> The message body
+<3> The offset of the `ConsumerRecord`
+<4> The partition of the `ConsumerRecord`
+<5> The topic. Note that the `@Topic` annotation supports multiple topics.
+<6> The timestamp of the `ConsumerRecord`
+
+=== Receiving a ConsumerRecord
+
+If you prefer you can also receive the entire `ConsumerRecord` object being listened for. In this case you should specify appropriate generic types for the key and value of the `ConsumerRecord` so that Micronaut can pick the correct deserializer for each.
+
+Consider the following example:
+
+.Specifying Parameters for offset, topic etc.
+[source,java]
+----
+include::{testskafka}/consumer/config/ProductListener.java[tags=consumeRecord, indent=0]
+----
+
+<1> The method signature accepts a `ConsumerRecord` that specifies a `String` for the key type and a POJO (`Product`) for the value type.
+<2> The `value()` method is used to retrieve the value
+<3> The `key()` method is used to retrieve the key
+
+=== Receiving and returning Reactive Types
+
+In addition to common Java types and POJOs you can also define listener methods that receive a Reactive type such as a rx:Single[] or a Reactor `Mono`. For example:
+
+.Using Reactive Types
+[source,java]
+----
+include::{testskafka}/consumer/reactive/ProductListener.java[tags=method, indent=0]
+----
+
+<1> The `@KafkaKey` annotation is used to indicate the key
+<2> A rx:Single[] is used to receive the message body
+<3> The `doOnSuccess` method is used to process the result
+
+Note that in this case the method returns an `rx:Single[]` this indicates to Micronaut that the `poll` loop should continue and if `enable.auto.commit` is set to `true` (the default) the offsets will be committed potentially before the `doOnSuccess` is called.
+
+The idea here is that you are able to write consumers that don't block, however care must be taken in the case where an error occurs in the `doOnSuccess` method otherwise the message could be lost. You could for example re-deliver the message in case of an error.
+
+Alternatively, you can use the ann:core.annotation.Blocking[] annotation to tell Micronaut to subscribe to the returned reactive type in a blocking manner which will result in blocking the `poll` loop, preventing offsets from being committed automatically:
+
+.Blocking with Reactive Consumers
+[source,java]
+----
+@Blocking
+@Topic("reactive-products")
+public Single<Product> receive(
+    ...
+}
+----

@@ -2,14 +2,14 @@ Micronaut is a modern, JVM-based, full stack microservices framework designed fo
 
 Micronaut is developed by the creators of the Grails framework and takes inspiration from lessons learnt over the years building real-world applications from monoliths to microservices using Spring, Spring Boot and Grails.
 
-Micronaut aims to provide all the tools necessary to build microservice applications including:
+Micronaut aims to provide all the tools necessary to build full-featured microservice applications, including:
 
 * Dependency Injection and Inversion of Control (IoC)
 * Sensible Defaults and Auto-Configuration
 * Configuration and Configuration Sharing
 * Service Discovery
 * HTTP Routing
-* HTTP Client with Client-Side Load Balancing
+* HTTP Client with client-side load-balancing
 
 At the same time Micronaut aims to avoid the downsides of frameworks like Spring, Spring Boot and Grails by providing:
 
@@ -17,12 +17,10 @@ At the same time Micronaut aims to avoid the downsides of frameworks like Spring
 * Reduced memory footprint
 * Minimal use of reflection
 * Minimal use of proxies
-* Easy Unit Testing
+* Easy unit testing
 
-Whilst frameworks like Spring and Grails were never designed to run in scenarios such as as functions on a Server-less platform, or on Android or as a low memory footprint microservice; Micronaut on the other hand is designed to be suitable for all of these scenarios.
+Historically, frameworks such as Spring and Grails were not designed to run in scenarios such as server-less functions, Android apps, or low memory-footprint microservices. In contrast, Micronaut is designed to be suitable for all of these scenarios.
 
-The way this is achieved is through a series of Java annotation processors, that are usable on any JVM language that supports them, and an HTTP Server and Client built on Netty.
-
-The purpose of the annotation processors is to provide a similar programming model to Spring and Grails, but by pre-compiling all the information necessary to perform DI, define AOP proxies and configure your application to run in a microservices environment.
+This goal is achieved through the use of Java's https://docs.oracle.com/javase/8/docs/api/javax/annotation/processing/Processor.html[annotation processors], which are usable on any JVM language that supports them, as well as an HTTP Server and Client built on https://netty.io/[Netty]. In order to provide a similar programming model to Spring and Grails, these annotation processors precompile the necessary metadata in order to perform DI, define AOP proxies and configure your application to run in a microservices environment.
 
 Many of the APIs within Micronaut are heavily inspired by Spring and Grails. This is by design, and aids in bringing developers up to speed quickly.

@@ -16,11 +16,6 @@
 
 package io.micronaut.http;
 
-import io.micronaut.core.io.service.ServiceDefinition;
-import io.micronaut.core.io.service.SoftServiceLoader;
-
-import java.util.Optional;
-
 /**
  * A factory interface for creating {@link MutableHttpResponse} instances.
  *
@@ -32,9 +27,7 @@ public interface HttpResponseFactory {
     /**
      * The default {@link io.micronaut.http.cookie.CookieFactory} instance.
      */
-    Optional<HttpResponseFactory> INSTANCE = SoftServiceLoader.load(HttpResponseFactory.class)
-        .firstOr("io.micronaut.http.server.netty.NettyHttpResponseFactory", HttpResponseFactory.class.getClassLoader())
-        .map(ServiceDefinition::load);
+    HttpResponseFactory INSTANCE = DefaultHttpFactories.resolveDefaultResponseFactory();
 
     /**
      * Creates an {@link HttpStatus#OK} response with a body.

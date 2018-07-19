@@ -19,6 +19,8 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Error
 import io.micronaut.web.router.GroovyRouteBuilder
 import io.micronaut.web.router.RouteMatch
 import io.micronaut.web.router.Router
@@ -37,15 +39,18 @@ class GroovyRouteBuilderSpec extends Specification {
     @Unroll
     void "Test uri #method #uri matches route for routes #routeBean.name"() {
 
-        given:
+        when:
         def context = new DefaultApplicationContext("test").start()
         Router router = context.getBean(Router)
 
         Optional<RouteMatch> route = router."${method}"(uri)
 
-        expect:
+        then:
         route.isPresent() == isPresent
         route.isPresent() ? route.get().invoke() : null == result
+
+        cleanup:
+        context.stop()
 
         where:
         uri                 | method            | isPresent | routeBean      | result
@@ -62,6 +67,22 @@ class GroovyRouteBuilderSpec extends Specification {
         '/book/1'           | HttpMethod.DELETE | true      | ResourceRoutes | "deleted 1"
         '/book/1'           | HttpMethod.PATCH  | true      | ResourceRoutes | "updated 1"
         '/book/1/author'    | HttpMethod.GET    | true      | ResourceRoutes | ['author']
+    }
+
+    void "test the correct local error route is returned"() {
+        given:
+        def context = new DefaultApplicationContext("test").start()
+        Router router = context.getBean(Router)
+
+        expect:
+        router.route(ErrorHandlingController, new A()).get().execute() == "c"
+        router.route(ErrorHandlingController, new B()).get().execute() == "c"
+        router.route(ErrorHandlingController, new C()).get().execute() == "c"
+        router.route(ErrorHandlingController, new D()).get().execute() == "e"
+        router.route(ErrorHandlingController, new E()).get().execute() == "e"
+
+        cleanup:
+        context.stop()
     }
 
     // tag::routes[]
@@ -144,4 +165,35 @@ class GroovyRouteBuilderSpec extends Specification {
         }
 
     }
+
+    @Controller
+    static class ErrorHandlingController {
+
+        @Get
+        String throwsA() { throw new A() }
+        @Get
+        String throwsB() { throw new B() }
+        @Get
+        String throwsC() { throw new C() }
+        @Get
+        String throwsD() { throw new D() }
+        @Get
+        String throwsE() { throw new E() }
+
+        @Error
+        String handleC(C c) {
+            "c"
+        }
+
+        @Error
+        String handleE(E e) {
+            "e"
+        }
+    }
+
+    class A extends B {}
+    class B extends C {}
+    class C extends D {}
+    class D extends E {}
+    class E extends RuntimeException {}
 }

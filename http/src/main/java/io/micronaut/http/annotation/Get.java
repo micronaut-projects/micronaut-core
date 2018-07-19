@@ -62,4 +62,15 @@ public @interface Get {
      */
     @AliasFor(annotation = Consumes.class, member = "value")
     String[] consumes() default {};
+
+
+    /**
+     * Shortcut that allows setting both the {@link #consumes()} and {@link #produces()} settings to the same media type.
+     *
+     * @return The media type this method processes
+     */
+    @AliasFor(annotation = Produces.class, member = "value")
+    @AliasFor(annotation = Consumes.class, member = "value")
+    String[] processes() default {};
+
 }

@@ -54,7 +54,7 @@ class RedisSessionSpec extends Specification {
         session.put("username", "fred")
         session.put("foo", new Foo(name: "Fred", age: 10))
 
-        Session  saved = sessionStore.save(session).get()
+        Session saved = sessionStore.save(session).get()
 
         then:"The session created event is fired and the session is valid"
         conditions.eventually {
@@ -67,6 +67,7 @@ class RedisSessionSpec extends Specification {
         saved.creationTime
         saved.id
         saved.get("username").get() == "fred"
+        saved.get("foo").get() instanceof Foo
         saved.get("foo", Foo).get().name == "Fred"
         saved.get("foo", Foo).get().age == 10
 
@@ -80,6 +81,7 @@ class RedisSessionSpec extends Specification {
         retrieved.maxInactiveInterval
         retrieved.creationTime
         retrieved.id
+        retrieved.get("foo", Foo).get() instanceof Foo
         retrieved.get("username", String).get() == "fred"
         retrieved.get("foo", Foo).get().name == "Fred"
         retrieved.get("foo", Foo).get().age == 10

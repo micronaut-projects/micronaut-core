@@ -13,7 +13,7 @@ include::{testsjava}/env/DataSourceFactory.java[tags=eachBean, indent=0]
 
 Note that `@EachBean` requires that the parent bean has a `@Named` qualifier, since the qualifier is inherited by each bean created by `@EachBean`.
 
-In other words try retrieve the `DataSource` created by `test.datasource.one` you can do:
+In other words, to retrieve the `DataSource` created by `test.datasource.one` you can do:
 
 .Using a Qualifier
 [source,java]

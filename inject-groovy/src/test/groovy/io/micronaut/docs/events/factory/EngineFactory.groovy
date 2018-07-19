@@ -17,8 +17,6 @@ package io.micronaut.docs.events.factory
 
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
-import io.micronaut.context.annotation.Bean
-import io.micronaut.context.annotation.Factory
 
 import javax.annotation.PostConstruct
 import javax.inject.Singleton

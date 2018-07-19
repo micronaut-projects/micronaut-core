@@ -22,6 +22,7 @@ import brave.Tracing;
 import brave.http.HttpClientHandler;
 import brave.http.HttpTracing;
 import brave.propagation.TraceContext;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.*;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.tracing.instrument.http.AbstractOpenTracingFilter;
@@ -126,7 +127,15 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
     private void configureSpan(Span span) {
         span.kind(Span.Kind.CLIENT);
         span.tag(AbstractOpenTracingFilter.TAG_METHOD, request.getMethod().name());
-        span.tag(AbstractOpenTracingFilter.TAG_PATH, request.getPath());
+        String path = request.getPath();
+        Optional<Object> serviceIdOptional = request.getAttribute(HttpAttributes.SERVICE_ID);
+        if (serviceIdOptional.isPresent()) {
+            String serviceId = serviceIdOptional.get().toString();
+            if (StringUtils.isNotEmpty(serviceId) && serviceId.startsWith("/")) {
+                path = StringUtils.prependUri(serviceId, path);
+            }
+        }
+        span.tag(AbstractOpenTracingFilter.TAG_PATH, path);
     }
 
     private void configureAttributes(HttpResponse<?> response) {

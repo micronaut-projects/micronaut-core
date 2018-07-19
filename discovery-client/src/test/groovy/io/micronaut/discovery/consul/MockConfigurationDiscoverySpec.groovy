@@ -16,7 +16,6 @@
 package io.micronaut.discovery.consul
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.discovery.config.ConfigurationClient
 import io.micronaut.discovery.consul.client.v1.ConsulClient
 import io.micronaut.runtime.server.EmbeddedServer
@@ -27,13 +26,9 @@ import spock.lang.Specification
 
 class MockConfigurationDiscoverySpec extends Specification {
 
-    @Shared
-    int serverPort = SocketUtils.findAvailableTcpPort()
-
     @AutoCleanup
     @Shared
     EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer, [
-            'micronaut.server.port'   : serverPort,
             (MockConsulServer.ENABLED): true
     ])
 
@@ -42,7 +37,7 @@ class MockConfigurationDiscoverySpec extends Specification {
     ApplicationContext someContext = ApplicationContext.run(
             [
                     'consul.client.host': 'localhost',
-                    'consul.client.port': serverPort]
+                    'consul.client.port': consulServer.getPort()]
     )
 
     @Shared
@@ -65,7 +60,7 @@ class MockConfigurationDiscoverySpec extends Specification {
                         (ConfigurationClient.ENABLED): true,
                         'micronaut.application.name' :'test-app',
                         'consul.client.host'         : 'localhost',
-                        'consul.client.port'         : serverPort]
+                        'consul.client.port'         : consulServer.port]
         )
 
         when:"A configuration value is read"
@@ -98,7 +93,7 @@ class MockConfigurationDiscoverySpec extends Specification {
                 [
                         'consul.client.config.enabled': false,
                         'consul.client.host'          : 'localhost',
-                        'consul.client.port'          : serverPort]
+                        'consul.client.port'          : consulServer.port]
         )
 
         def result = applicationContext.environment.getProperty("some.consul.value2", String)

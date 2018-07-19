@@ -16,6 +16,7 @@
 
 package io.micronaut.context;
 
+import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
@@ -23,6 +24,8 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.MethodInjectionPoint;
+import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 
 import javax.annotation.Nullable;
 import javax.annotation.PostConstruct;
@@ -39,7 +42,7 @@ import java.util.Objects;
  * @since 1.0
  */
 @Internal
-class DefaultMethodInjectionPoint implements MethodInjectionPoint {
+class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentConfigurable {
 
     private final BeanDefinition declaringBean;
     private final AnnotationMetadata annotationMetadata;
@@ -48,6 +51,7 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
     private final String methodName;
     private final Class[] argTypes;
     private final Argument[] arguments;
+    private Environment environment;
 
     /**
      * Constructs a new {@link DefaultMethodInjectionPoint}.
@@ -86,7 +90,7 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
         this.arguments = arguments == null ? Argument.ZERO_ARGUMENTS : arguments;
         this.argTypes = Argument.toClassArray(arguments);
         this.declaringBean = declaringBean;
-        this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
+        this.annotationMetadata = initAnnotationMetadata(annotationMetadata);
         if (this.annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
             this.annotatedElements = AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
         } else {
@@ -94,6 +98,11 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
                 annotationMetadata
             };
         }
+    }
+
+    @Override
+    public void configure(Environment environment) {
+        this.environment = environment;
     }
 
     @Override
@@ -170,5 +179,27 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint {
         int result = Objects.hash(declaringType, methodName);
         result = 31 * result + Arrays.hashCode(argTypes);
         return result;
+    }
+
+    private AnnotationMetadata initAnnotationMetadata(@Nullable AnnotationMetadata annotationMetadata) {
+        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+            return new MethodAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
+        }
+        return AnnotationMetadata.EMPTY_METADATA;
+    }
+
+    /**
+     * Internal environment aware annotation metadata delegate.
+     */
+    private final class MethodAnnotationMetadata extends AbstractEnvironmentAnnotationMetadata {
+        MethodAnnotationMetadata(DefaultAnnotationMetadata targetMetadata) {
+            super(targetMetadata);
+        }
+
+        @Nullable
+        @Override
+        protected Environment getEnvironment() {
+            return environment;
+        }
     }
 }

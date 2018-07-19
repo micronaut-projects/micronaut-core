@@ -17,7 +17,6 @@ package io.micronaut.aop.introduction
 
 import io.micronaut.aop.MethodInterceptor
 import io.micronaut.aop.MethodInvocationContext
-import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.type.MutableArgumentValue
 
 import javax.inject.Singleton

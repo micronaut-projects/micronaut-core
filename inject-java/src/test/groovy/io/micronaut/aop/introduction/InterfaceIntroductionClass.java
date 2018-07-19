@@ -18,7 +18,6 @@ package io.micronaut.aop.introduction;
 import io.micronaut.aop.simple.Mutating;
 
 import javax.inject.Singleton;
-import java.util.List;
 
 /**
  * @author Graeme Rocher

@@ -18,7 +18,6 @@ package io.micronaut.health
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.IgnoreIf
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -30,7 +29,6 @@ import javax.inject.Singleton
  */
 class HeartbeatTaskSpec extends Specification {
 
-    @IgnoreIf({System.getenv('TRAVIS')})
     void "test that by default a heartbeat is sent"() {
         when:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
@@ -53,10 +51,16 @@ class HeartbeatTaskSpec extends Specification {
 
     @Singleton
     static class HeartbeatListener implements ApplicationEventListener<HeartbeatEvent> {
-        HeartbeatEvent event
+        private HeartbeatEvent event
         @Override
-        void onApplicationEvent(HeartbeatEvent event) {
+        synchronized void onApplicationEvent(HeartbeatEvent event) {
+            println "Test Heartbeat listener $this received event $event"
             this.event = event
+        }
+
+        synchronized HeartbeatEvent getEvent() {
+            println "Test Heartbeat listener $this return event $event"
+            return event
         }
     }
 }

@@ -17,7 +17,6 @@ package io.micronaut.inject.configproperties;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import org.hibernate.validator.constraints.NotBlank;
-import io.micronaut.context.annotation.ConfigurationProperties;
 
 import javax.validation.constraints.NotNull;
 import java.net.URL;

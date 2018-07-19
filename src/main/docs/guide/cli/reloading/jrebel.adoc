@@ -1,0 +1,98 @@
+https://zeroturnaround.com/software/jrebel/[JRebel] is a proprietary reloading solution that involves an agent library, as well as sophisticated IDE support. The JRebel documentation includes detailed steps for IDE integration and usage of the tool. In this section, we will simply show how to install and configure the agent for Maven and Gradle projects.
+
+== CLI Feature
+
+You can create a new application with JRebel preconfigured, using the CLI. To do this, use the `jrebel` feature. Please note that you will still need to install JRebel and configure the path to the agent.
+
+----
+> mn create-app my-reloading-app --features jrebel
+----
+
+This feature will include the appropriate build tool config for Gradle or Maven to load the agent, however you will need to supply the correct path to the agent in the `gradle.properties` file (for Gradle) or `pom.xml` (for Maven). The steps necessary are described below.
+
+== Install/configure JRebel Agent
+
+The simplest way to install JRebel is to download the "standalone" installation package from the https://zeroturnaround.com/software/jrebel/download[JRebel download page]. Unzip the downloaded file to a convenient location within your user's directory - for example, `~/bin/jrebel`
+
+The installation directory will contain a `lib` directory containing the agent files. The appropriate agent based on your operating system, following the table below:
+
+.JRebel Agent
+|===
+|OS|Agent
+
+|Windows 64-bit JDK
+| `[jrebel directory]\lib\jrebel64.dll`
+|Windows 32-bit JDK
+| `[jrebel directory]\lib\jrebel32.dll`
+|Mac OS X 64-bit JDK
+| `[jrebel directory]/lib/libjrebel64.dylib`
+|Mac OS X 32-bit JDK
+| `[jrebel directory]/lib/libjrebel32.dylib`
+|Linux 64-bit JDK
+| `[jrebel directory]/lib/libjrebel64.so`
+|Linux 32-bit JDK
+| `[jrebel directory]/lib/libjrebel32.so`
+|===
+
+Note the path to the appropriate agent, and add the value to your project build.
+
+=== Gradle
+
+Add the path to `gradle.properties` (create the file if necessary), as the `rebelAgent` property.
+
+.gradle.properties
+[source,properties]
+----
+#Assuming installation path of ~/bin/jrebel/
+rebelAgent= -agentpath:~/bin/jrebel/lib/libjrebel64.dylib
+----
+
+Add the appropriate JVM arg to `build.gradle` (not necessary if using the CLI feature)
+
+[source,groovy]
+----
+run.dependsOn(generateRebel)
+if (project.hasProperty('rebelAgent')) {
+    run.jvmArgs += rebelAgent
+}
+----
+
+You can start the application with `./gradlew run`, and it will include the agent. See the section on <<gradleReload, Gradle Reloading>> or <<ideReload, IDE Reloading>> to set up the recompilation.
+
+=== Maven
+
+
+Add the path to `pom.xml` as a build profile (if using the CLI feature, the profile `jrebel` is already provided - simply update the path to the agent JAR).
+
+[source,xml]
+----
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<!-- ... -->
+    <profiles>
+        <profile>
+            <id>jrebel</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>1.6.0</version>
+                        <configuration>
+                            <executable>java</executable>
+                            <arguments>
+                                <argument>-noverify</argument>
+                                <argument>-XX:TieredStopAtLevel=1</argument>
+                                <argument>-agentpath:~/bin/jrebel/lib/jrebel6/lib/libjrebel64.dylib</argument>
+                                <argument>-classpath</argument>
+                                <classpath/>
+                                <argument>${exec.mainClass}</argument>
+                            </arguments>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>
+----

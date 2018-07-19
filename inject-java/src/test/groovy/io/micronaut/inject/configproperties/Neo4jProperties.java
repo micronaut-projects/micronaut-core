@@ -18,8 +18,6 @@ package io.micronaut.inject.configproperties;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import org.neo4j.driver.v1.*;
-import io.micronaut.context.annotation.ConfigurationBuilder;
-import io.micronaut.context.annotation.ConfigurationProperties;
 
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {

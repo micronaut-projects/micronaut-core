@@ -21,7 +21,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.function.Predicate.isEqual;
 import static javax.tools.Diagnostic.Kind.ERROR;
 
-import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.collect.ImmutableSet;
@@ -38,7 +37,7 @@ import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.util.Context;
 import io.micronaut.annotation.processing.PackageConfigurationInjectProcessor;
 import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor;
-import io.micronaut.annotation.processing.PackageConfigurationInjectProcessor;
+import io.micronaut.annotation.processing.TypeElementVisitorProcessor;
 
 import java.io.File;
 import java.io.IOException;
@@ -127,6 +126,7 @@ public final class Parser {
         try {
 
             List<Processor> processors = new ArrayList<>();
+            processors.add(new TypeElementVisitorProcessor());
             processors.add(new PackageConfigurationInjectProcessor());
             processors.add(new BeanDefinitionInjectProcessor());
             task.setProcessors(processors);

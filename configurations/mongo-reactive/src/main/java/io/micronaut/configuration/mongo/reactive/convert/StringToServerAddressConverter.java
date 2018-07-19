@@ -31,6 +31,17 @@ import java.util.Optional;
 public class StringToServerAddressConverter implements TypeConverter<CharSequence, ServerAddress> {
     @Override
     public Optional<ServerAddress> convert(CharSequence object, Class<ServerAddress> targetType, ConversionContext context) {
-        return Optional.of(new ServerAddress(object.toString()));
+        String address = object.toString();
+        if (address.contains(":")) {
+            String[] hostAndPort = address.split(":");
+            try {
+                return Optional.of(new ServerAddress(hostAndPort[0], Integer.valueOf(hostAndPort[1])));
+            } catch (NumberFormatException e) {
+                context.reject(address, e);
+                return Optional.empty();
+            }
+        } else {
+            return Optional.of(new ServerAddress(address));
+        }
     }
 }

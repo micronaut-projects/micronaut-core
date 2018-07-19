@@ -90,11 +90,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The ok response
      */
     static <T> MutableHttpResponse<T> ok() {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-
-        return factory.ok();
+        return HttpResponseFactory.INSTANCE.ok();
     }
 
     /**
@@ -104,11 +100,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> notFound() {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-
-        return factory.status(HttpStatus.NOT_FOUND);
+        return HttpResponseFactory.INSTANCE.status(HttpStatus.NOT_FOUND);
     }
 
     /**
@@ -118,11 +110,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> unauthorized() {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-
-        return factory.status(HttpStatus.UNAUTHORIZED);
+        return HttpResponseFactory.INSTANCE.status(HttpStatus.UNAUTHORIZED);
     }
 
     /**
@@ -133,11 +121,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> notFound(T body) {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-
-        return factory.<T>status(HttpStatus.NOT_FOUND)
+        return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.NOT_FOUND)
             .body(body);
     }
 
@@ -148,11 +132,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> badRequest() {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-
-        return factory.status(HttpStatus.BAD_REQUEST);
+        return HttpResponseFactory.INSTANCE.status(HttpStatus.BAD_REQUEST);
     }
 
     /**
@@ -163,11 +143,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> badRequest(T body) {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-
-        return factory.status(HttpStatus.BAD_REQUEST, body);
+        return HttpResponseFactory.INSTANCE.status(HttpStatus.BAD_REQUEST, body);
     }
 
     /**
@@ -177,11 +153,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> unprocessableEntity() {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-
-        return factory.status(HttpStatus.UNPROCESSABLE_ENTITY);
+        return HttpResponseFactory.INSTANCE.status(HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
     /**
@@ -192,10 +164,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> notAllowed(HttpMethod... allowed) {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-        return factory.<T>status(HttpStatus.METHOD_NOT_ALLOWED)
+        return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.METHOD_NOT_ALLOWED)
             .headers((headers) -> headers.allow(allowed));
     }
 
@@ -207,10 +176,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> notAllowed(Set<HttpMethod> allowed) {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-        return factory.<T>status(HttpStatus.METHOD_NOT_ALLOWED)
+        return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.METHOD_NOT_ALLOWED)
             .headers((headers) -> headers.allow(allowed));
     }
 
@@ -221,11 +187,8 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> serverError() {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
 
-        return factory.status(HttpStatus.INTERNAL_SERVER_ERROR);
+        return HttpResponseFactory.INSTANCE.status(HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
     /**
@@ -235,11 +198,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> accepted() {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-
-        return factory.status(HttpStatus.ACCEPTED);
+        return HttpResponseFactory.INSTANCE.status(HttpStatus.ACCEPTED);
     }
 
     /**
@@ -249,11 +208,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> noContent() {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-
-        return factory.status(HttpStatus.NO_CONTENT);
+        return HttpResponseFactory.INSTANCE.status(HttpStatus.NO_CONTENT);
     }
 
     /**
@@ -263,11 +218,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> notModified() {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-
-        return factory.status(HttpStatus.NOT_MODIFIED);
+        return HttpResponseFactory.INSTANCE.status(HttpStatus.NOT_MODIFIED);
     }
 
     /**
@@ -278,10 +229,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The ok response
      */
     static <T> MutableHttpResponse<T> ok(T body) {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-        return factory.ok(body);
+        return HttpResponseFactory.INSTANCE.ok(body);
     }
 
     /**
@@ -292,11 +240,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The created response
      */
     static <T> MutableHttpResponse<T> created(T body) {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-
-        return factory.<T>status(HttpStatus.CREATED)
+        return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.CREATED)
             .body(body);
     }
 
@@ -308,11 +252,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The created response
      */
     static <T> MutableHttpResponse<T> created(URI location) {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-
-        return factory.<T>status(HttpStatus.CREATED)
+        return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.CREATED)
             .headers((headers) ->
                 headers.location(location)
             );
@@ -326,11 +266,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> seeOther(URI location) {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-
-        return factory.<T>status(HttpStatus.SEE_OTHER)
+        return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.SEE_OTHER)
             .headers((headers) ->
                 headers.location(location)
             );
@@ -344,11 +280,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> temporaryRedirect(URI location) {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-
-        return factory.<T>status(HttpStatus.TEMPORARY_REDIRECT)
+        return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.TEMPORARY_REDIRECT)
             .headers((headers) ->
                 headers.location(location)
             );
@@ -362,11 +294,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> permanentRedirect(URI location) {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-
-        return factory.<T>status(HttpStatus.PERMANENT_REDIRECT)
+        return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.PERMANENT_REDIRECT)
             .headers((headers) ->
                 headers.location(location)
             );
@@ -380,11 +308,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> redirect(URI location) {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-
-        return factory.<T>status(HttpStatus.MOVED_PERMANENTLY)
+        return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.MOVED_PERMANENTLY)
             .headers((headers) ->
                 headers.location(location)
             );
@@ -398,11 +322,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> status(HttpStatus status) {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-
-        return factory.status(status);
+        return HttpResponseFactory.INSTANCE.status(status);
     }
 
     /**
@@ -414,11 +334,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> status(HttpStatus status, String reason) {
-        HttpResponseFactory factory = HttpResponseFactory.INSTANCE.orElseThrow(() ->
-            new IllegalStateException("No Server implementation found on classpath")
-        );
-
-        return factory.status(status, reason);
+        return HttpResponseFactory.INSTANCE.status(status, reason);
     }
 
     /**

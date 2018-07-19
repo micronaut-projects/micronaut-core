@@ -32,8 +32,6 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-import javax.inject.Singleton
-
 /**
  * @author graemerocher
  * @since 1.0

@@ -17,10 +17,13 @@
 package io.micronaut.cache;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Weigher;
+import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -40,16 +43,19 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
 
     private final CacheConfiguration cacheConfiguration;
     private final com.github.benmanes.caffeine.cache.Cache cache;
+    private final ApplicationContext applicationContext;
     private final ConversionService<?> conversionService;
 
     /**
      * Construct a sync cache implementation with given configurations.
      *
      * @param cacheConfiguration The cache configurations
+     * @param applicationContext The application context
      * @param conversionService To convert the value from the cache into given required type
      */
-    public DefaultSyncCache(CacheConfiguration cacheConfiguration, ConversionService<?> conversionService) {
+    public DefaultSyncCache(CacheConfiguration cacheConfiguration, ApplicationContext applicationContext, ConversionService<?> conversionService) {
         this.cacheConfiguration = cacheConfiguration;
+        this.applicationContext = applicationContext;
         this.conversionService = conversionService;
         this.cache = buildCache(cacheConfiguration);
     }
@@ -108,13 +114,8 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
     @SuppressWarnings("unchecked")
     @Override
     public <T> Optional<T> putIfAbsent(Object key, T value) {
-        Class<T> aClass = (Class<T>) value.getClass();
-        Optional<T> existing = get(key, aClass);
-        if (!existing.isPresent()) {
-            put(key, value);
-            return Optional.empty();
-        }
-        return existing;
+        Object previous = cache.asMap().putIfAbsent(key, value);
+        return Optional.ofNullable((T) previous);
     }
 
     /**
@@ -129,8 +130,22 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
         cacheConfiguration.getExpireAfterWrite().ifPresent(duration -> builder.expireAfterWrite(duration.toMillis(), TimeUnit.MILLISECONDS));
         cacheConfiguration.getInitialCapacity().ifPresent(builder::initialCapacity);
         cacheConfiguration.getMaximumSize().ifPresent(builder::maximumSize);
-        cacheConfiguration.getMaximumWeight().ifPresent(builder::maximumWeight);
+        cacheConfiguration.getMaximumWeight().ifPresent((long weight) -> {
+            builder.maximumWeight(weight);
+            builder.weigher(findWeigher());
+        });
 
+        if (cacheConfiguration.isTestMode()) {
+            // run commands on same thread
+            builder.executor(Runnable::run);
+        }
         return builder.build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private Weigher<Object, Object> findWeigher() {
+        return applicationContext.findBean(Weigher.class, Qualifiers.byName(cacheConfiguration.getCacheName()))
+                .orElseGet(() -> applicationContext.findBean(Weigher.class)
+                        .orElse(Weigher.singletonWeigher()));
     }
 }

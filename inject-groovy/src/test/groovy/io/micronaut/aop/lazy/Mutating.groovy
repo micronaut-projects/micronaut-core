@@ -15,7 +15,6 @@
  */
 package io.micronaut.aop.lazy
 
-import io.micronaut.context.annotation.Type
 import io.micronaut.aop.Around
 import io.micronaut.context.annotation.Type
 

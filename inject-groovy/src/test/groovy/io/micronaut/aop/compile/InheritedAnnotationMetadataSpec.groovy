@@ -18,9 +18,6 @@ package io.micronaut.aop.compile
 import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.core.annotation.Blocking
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.AbstractBeanDefinitionSpec
-import io.micronaut.core.annotation.Blocking
-import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 
 /**

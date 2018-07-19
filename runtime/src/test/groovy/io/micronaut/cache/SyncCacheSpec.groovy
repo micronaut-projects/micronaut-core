@@ -41,9 +41,11 @@ class SyncCacheSpec extends Specification {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
                 'micronaut.caches.counter.initialCapacity':10,
+                'micronaut.caches.counter.testMode':true,
                 'micronaut.caches.counter.maximumSize':20,
                 'micronaut.caches.counter2.initialCapacity':10,
-                'micronaut.caches.counter2.maximumSize':20
+                'micronaut.caches.counter2.maximumSize':20,
+                'micronaut.caches.counter2.testMode':true
         )
 
         when:
@@ -140,7 +142,8 @@ class SyncCacheSpec extends Specification {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
                 'micronaut.caches.test.initialCapacity':1,
-                'micronaut.caches.test.maximumSize':3
+                'micronaut.caches.test.maximumSize':3,
+                'micronaut.caches.test.testMode':true,
         )
 
         when:

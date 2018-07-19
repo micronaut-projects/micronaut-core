@@ -28,4 +28,14 @@ import java.io.Serializable;
  * @since 1.0
  */
 public interface BeanIdentifier extends CharSequence, Serializable, Named {
+
+    /**
+     * Create a new {@link BeanIdentifier} for the given id.
+     *
+     * @param id The id
+     * @return The identifier
+     */
+    static BeanIdentifier of(String id) {
+        return new DefaultBeanIdentifier(id);
+    }
 }

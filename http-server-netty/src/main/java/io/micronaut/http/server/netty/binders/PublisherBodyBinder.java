@@ -29,15 +29,14 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.binding.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.server.binding.binders.NonBlockingBodyArgumentBinder;
-import io.micronaut.http.server.netty.DefaultHttpContentProcessor;
-import io.micronaut.http.server.netty.HttpContentProcessor;
-import io.micronaut.http.server.netty.HttpContentSubscriberFactory;
-import io.micronaut.http.server.netty.NettyHttpRequest;
+import io.micronaut.http.server.netty.*;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 import io.netty.buffer.ByteBufHolder;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscription;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.util.Optional;
@@ -50,6 +49,8 @@ import java.util.Optional;
  */
 @Singleton
 public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> implements NonBlockingBodyArgumentBinder<Publisher> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
 
     private final BeanLocator beanLocator;
     private final HttpServerConfiguration httpServerConfiguration;
@@ -96,6 +97,9 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
 
                     @Override
                     protected void doOnNext(Object message) {
+                        if (LOG.isTraceEnabled()) {
+                            LOG.trace("Server received streaming message for argument [{}]: {}", context.getArgument(), message);
+                        }
                         ArgumentConversionContext<?> conversionContext = context.with(targetType);
                         if (message instanceof ByteBufHolder) {
                             message = ((ByteBufHolder) message).content();
@@ -104,6 +108,9 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                         if (converted.isPresent()) {
                             subscriber.onNext(converted.get());
                         } else {
+                            if (LOG.isTraceEnabled()) {
+                                LOG.trace("Cannot convert message for argument [{}] and value: {}", context.getArgument(), message);
+                            }
                             try {
                                 Optional<ConversionError> lastError = conversionContext.getLastError();
                                 if (lastError.isPresent()) {
@@ -119,6 +126,9 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
 
                     @Override
                     protected void doOnError(Throwable t) {
+                        if (LOG.isTraceEnabled()) {
+                            LOG.trace("Server received error for argument [" + context.getArgument() + "]: " + t.getMessage(), t);
+                        }
                         try {
                             subscriber.onError(t);
                         } finally {
@@ -128,6 +138,9 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
 
                     @Override
                     protected void doOnComplete() {
+                        if (LOG.isTraceEnabled()) {
+                            LOG.trace("Done receiving messages for argument: {}", context.getArgument());
+                        }
                         subscriber.onComplete();
                     }
 

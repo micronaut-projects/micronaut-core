@@ -18,6 +18,7 @@ package io.micronaut.security
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -41,10 +42,10 @@ class HealthSensitivitySpec extends Specification {
     void "If endpoints.health.sensitive=true #description => 401"(boolean security, String description) {
         given:
         Map m = [
-                'spec.name': 'healthsensitivity',
-                'endpoints.health.enabled': true,
+                'spec.name'                            : 'healthsensitivity',
+                'endpoints.health.enabled'             : true,
                 'endpoints.health.disk-space.threshold': '9999GB',
-                'endpoints.health.sensitive': true,
+                'endpoints.health.sensitive'           : true,
         ]
         if (security) {
             m['micronaut.security.enabled'] = security
@@ -75,9 +76,9 @@ class HealthSensitivitySpec extends Specification {
     void "#description => #expected"(boolean sensitive, boolean security, boolean authenticated, HealthLevelOfDetail expected, String description) {
         given:
         Map m = [
-                'spec.name': 'healthsensitivity',
-                'endpoints.health.enabled': true,
-                'endpoints.health.sensitive': sensitive,
+                'spec.name'                            : 'healthsensitivity',
+                'endpoints.health.enabled'             : true,
+                'endpoints.health.sensitive'           : sensitive,
                 'endpoints.health.disk-space.threshold': '9999GB',
         ]
         if (security) {
@@ -93,13 +94,14 @@ class HealthSensitivitySpec extends Specification {
         if (authenticated) {
             httpRequest = httpRequest.basicAuth("user", "password")
         }
-        def response = rxClient.exchange(httpRequest, Map).blockingFirst()
+        def response = rxClient.exchange(httpRequest, Map)
+                .blockingFirst()
         Map result = response.body()
 
         then:
         response.code() == HttpStatus.OK.code
         result.status == "DOWN"
-        if (expected == HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS ) {
+        if (expected == HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS) {
             assert result.containsKey('details')
             assert result.details.diskSpace.status == "DOWN"
             assert result.details.diskSpace.details.error.startsWith("Free disk space below threshold.")
@@ -114,10 +116,101 @@ class HealthSensitivitySpec extends Specification {
         where:
         sensitive | security | authenticated | expected
         true      | true     | true          | HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
-//        false     | true     | false         | HealthLevelOfDetail.STATUS
-//        false     | true     | true          | HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
-//        false     | false    | false         | HealthLevelOfDetail.STATUS
-        description = "endpoints.health.sensitive=${sensitive} " + (security ? 'micronaut.security.enabled=true ' + (authenticated ? 'authenticated': 'not authenticated') : '')
+        false     | true     | false         | HealthLevelOfDetail.STATUS
+        false     | true     | true          | HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS
+        false     | false    | false         | HealthLevelOfDetail.STATUS
+
+        description = "endpoints.health.sensitive=${sensitive} " + (security ? 'micronaut.security.enabled=true ' + (authenticated ? 'authenticated' : 'not authenticated') : '')
+    }
+
+    void "test details visible AUTHENTICATED"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+            'spec.name'                            : 'healthsensitivity',
+            'endpoints.health.enabled'             : true,
+            'endpoints.health.sensitive'           : false,
+            'endpoints.health.detailsVisible'      : 'AUTHENTICATED',
+            'micronaut.security.enabled'           : true])
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        when:
+        HttpRequest httpRequest = HttpRequest.GET("/health")
+        HttpResponse response = rxClient.exchange(httpRequest, Map).blockingFirst()
+        Map result = response.body()
+
+        then: // The details are not included because the user is not authenticated
+        response.code() == HttpStatus.OK.code
+        result.containsKey('status')
+        !result.containsKey('details')
+
+
+        when:
+        httpRequest = HttpRequest.GET("/health").basicAuth("user", "password")
+        response = rxClient.exchange(httpRequest, Map).blockingFirst()
+        result = response.body()
+
+        then: // The details are included because the user is authenticated
+        response.code() == HttpStatus.OK.code
+        result.containsKey('status')
+        result.containsKey('details')
+
+        cleanup:
+        embeddedServer.close()
+        rxClient.close()
+    }
+
+    void "test details visible ANONYMOUS"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name'                            : 'healthsensitivity',
+                'endpoints.health.enabled'             : true,
+                'endpoints.health.sensitive'           : false,
+                'endpoints.health.detailsVisible'      : 'ANONYMOUS',
+                'micronaut.security.enabled'           : true])
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        when:
+        HttpRequest httpRequest = HttpRequest.GET("/health")
+        HttpResponse response = rxClient.exchange(httpRequest, Map).blockingFirst()
+        Map result = response.body()
+
+        then: // The details are included because detailsVisible is ANONYMOUS
+        response.code() == HttpStatus.OK.code
+        result.containsKey('status')
+        result.containsKey('details')
+
+        cleanup:
+        embeddedServer.close()
+        rxClient.close()
+    }
+
+
+    void "test details visible NEVER"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name'                            : 'healthsensitivity',
+                'endpoints.health.enabled'             : true,
+                'endpoints.health.sensitive'           : false,
+                'endpoints.health.detailsVisible'      : 'NEVER',
+                'micronaut.security.enabled'           : true])
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        when:
+        HttpRequest httpRequest = HttpRequest.GET("/health").basicAuth("user", "password")
+        HttpResponse response = rxClient.exchange(httpRequest, Map).blockingFirst()
+        Map result = response.body()
+
+        then: // The details are not included because detailsVisible is NEVER
+        response.code() == HttpStatus.OK.code
+        result.containsKey('status')
+        !result.containsKey('details')
+
+        cleanup:
+        embeddedServer.close()
+        rxClient.close()
     }
 
     @Singleton
@@ -126,7 +219,7 @@ class HealthSensitivitySpec extends Specification {
 
         @Override
         Publisher<AuthenticationResponse> authenticate(AuthenticationRequest authenticationRequest) {
-            if ( authenticationRequest.identity == 'user' && authenticationRequest.secret == 'password' ) {
+            if (authenticationRequest.identity == 'user' && authenticationRequest.secret == 'password') {
                 return Flowable.just(new UserDetails('user', []))
             }
             return Flowable.just(new AuthenticationFailed())

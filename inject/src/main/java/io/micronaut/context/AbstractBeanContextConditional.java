@@ -16,7 +16,6 @@
 
 package io.micronaut.context;
 
-import io.micronaut.context.annotation.Requirements;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.Failure;
@@ -44,11 +43,11 @@ abstract class AbstractBeanContextConditional implements BeanContextConditional,
 
     @Override
     public boolean isEnabled(BeanContext context) {
-        int contextId = context.hashCode();
+        int contextId = System.identityHashCode(context);
         Boolean enabled = this.enabled.get(contextId);
         if (enabled == null) {
             AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-            Condition condition = annotationMetadata.hasStereotype(Requirements.class) || annotationMetadata.hasStereotype(Requires.class) ? new RequiresCondition(annotationMetadata) : null;
+            Condition condition = annotationMetadata.hasStereotype(Requires.class) ? new RequiresCondition(annotationMetadata) : null;
             DefaultConditionContext<AbstractBeanContextConditional> conditionContext = new DefaultConditionContext<>(context, this);
             enabled = condition == null || condition.matches(conditionContext);
             if (LOG.isDebugEnabled() && !enabled) {

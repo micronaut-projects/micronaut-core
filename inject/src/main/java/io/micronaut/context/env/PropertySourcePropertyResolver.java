@@ -16,9 +16,11 @@
 
 package io.micronaut.context.env;
 
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.format.MapFormat;
+import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.util.CollectionUtils;
@@ -29,19 +31,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Properties;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * <p>A {@link PropertyResolver} that resolves from one or many {@link PropertySource} instances.</p>
@@ -52,6 +45,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class PropertySourcePropertyResolver implements PropertyResolver {
 
     private static final Logger LOG = LoggerFactory.getLogger(PropertySourcePropertyResolver.class);
+    private static final Pattern RANDOM_PATTERN = Pattern.compile("\\$\\{\\s?random\\.(\\S+?)\\}");
 
     protected final ConversionService<?> conversionService;
     protected final PropertyPlaceholderResolver propertyPlaceholderResolver;
@@ -60,6 +54,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     // this allows optimization of searches by prefix
     @SuppressWarnings("MagicNumber")
     protected final Map<String, Object>[] catalog = new Map[57];
+    private final Random random = new Random();
 
     /**
      * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
@@ -150,7 +145,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     return true;
                 } else {
                     String finalName = name + ".";
-                    return entries.keySet().stream().anyMatch(key -> key.startsWith(finalName));
+                    return entries.keySet().stream().anyMatch(key ->
+                            key.startsWith(finalName)
+                    );
                 }
             }
         }
@@ -225,6 +222,13 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         }
         if (LOG.isTraceEnabled()) {
                 LOG.trace("No value found for property: {}", name);
+        }
+
+        Class<T> requiredType = conversionContext.getArgument().getType();
+        if (Properties.class.isAssignableFrom(requiredType)) {
+            return Optional.of((T) new Properties());
+        } else if (Map.class.isAssignableFrom(requiredType)) {
+            return Optional.of((T) Collections.emptyMap());
         }
         return Optional.empty();
     }
@@ -345,7 +349,52 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         this.propertySources.put(properties.getName(), properties);
         synchronized (catalog) {
             for (String property : properties) {
+
+                if (LOG.isTraceEnabled()) {
+                    LOG.trace("Processing property key {}", property);
+                }
+
                 Object value = properties.get(property);
+
+                if (value instanceof String) {
+                    String str = (String) value;
+                    if (convention != PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE && str.contains(propertyPlaceholderResolver.getPrefix())) {
+                        StringBuffer newValue = new StringBuffer();
+                        Matcher matcher = RANDOM_PATTERN.matcher(str);
+                        boolean hasRandoms = false;
+                        while (matcher.find()) {
+                            hasRandoms = true;
+                            String type = matcher.group(1).trim().toLowerCase();
+                            String randomValue;
+                            switch (type) {
+                                case "port":
+                                    randomValue = String.valueOf(SocketUtils.findAvailableTcpPort());
+                                break;
+                                case "int":
+                                case "integer":
+                                    randomValue = String.valueOf(random.nextInt());
+                                break;
+                                case "long":
+                                    randomValue = String.valueOf(random.nextLong());
+                                break;
+                                case "float":
+                                    randomValue = String.valueOf(random.nextFloat());
+                                break;
+                                default:
+                                    throw new ConfigurationException("Invalid random expression " + matcher.group(0) + " for property: " + property);
+                            }
+                            matcher.appendReplacement(newValue, randomValue);
+                        }
+
+                        if (hasRandoms) {
+                            matcher.appendTail(newValue);
+                            value = newValue.toString();
+                        }
+
+                    }
+
+
+                }
 
                 List<String> resolvedProperties = resolvePropertiesForConvention(property, convention);
                 for (String resolvedProperty : resolvedProperties) {

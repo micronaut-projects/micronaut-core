@@ -15,10 +15,8 @@
  */
 package io.micronaut.aop.hotswap;
 
-import io.micronaut.aop.proxytarget.Mutating;
 import io.micronaut.aop.Around;
 import io.micronaut.aop.proxytarget.Mutating;
-import io.micronaut.aop.simple.Bar;
 
 import javax.inject.Singleton;
 

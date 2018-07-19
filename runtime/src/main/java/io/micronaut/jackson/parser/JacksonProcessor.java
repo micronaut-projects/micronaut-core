@@ -25,6 +25,8 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.micronaut.core.async.processor.SingleThreadedBufferingProcessor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -38,6 +40,8 @@ import java.util.concurrent.ConcurrentLinkedDeque;
  * @since 1.0
  */
 public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], JsonNode> {
+
+    private static final Logger LOG = LoggerFactory.getLogger(JacksonProcessor.class);
 
     private NonBlockingJsonParser currentNonBlockingJsonParser;
     private final ConcurrentLinkedDeque<JsonNode> nodeStack = new ConcurrentLinkedDeque<>();
@@ -97,6 +101,10 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
     @Override
     protected void onUpstreamMessage(byte[] message) {
         try {
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Received upstream bytes of length: " + message.length);
+            }
+
             ByteArrayFeeder byteFeeder = currentNonBlockingJsonParser.getNonBlockingInputFeeder();
             boolean consumed = false;
             boolean needMoreInput = byteFeeder.needMoreInput();
@@ -114,6 +122,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                 while ((event = currentNonBlockingJsonParser.nextToken()) != JsonToken.NOT_AVAILABLE) {
                     JsonNode root = asJsonNode(event);
                     if (root != null) {
+
                         boolean isLast = nodeStack.isEmpty();
                         if (isLast) {
                             byteFeeder.endOfInput();
@@ -123,8 +132,12 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                             break;
                         } else {
                             currentDownstreamSubscriber()
-                                    .ifPresent(subscriber ->
-                                            subscriber.onNext(root)
+                                    .ifPresent(subscriber -> {
+                                            if (LOG.isTraceEnabled()) {
+                                                LOG.trace("Materialized new JsonNode call onNext...");
+                                            }
+                                            subscriber.onNext(root);
+                                        }
                                     );
                         }
                         if (isLast) {
@@ -133,7 +146,11 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                     }
                 }
                 if (needMoreInput()) {
+                    if (LOG.isTraceEnabled()) {
+                        LOG.trace("More input required to parse JSON. Demanding more.");
+                    }
                     upstreamSubscription.request(1);
+                    upstreamDemand++;
                 }
             }
         } catch (IOException e) {

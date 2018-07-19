@@ -7,14 +7,16 @@ git config --global user.email "$GIT_EMAIL"
 git config --global credential.helper "store --file=~/.git-credentials"
 echo "https://$GH_TOKEN:@github.com" > ~/.git-credentials
 
-git clone https://${GH_TOKEN}@github.com/${TRAVIS_REPO_SLUG}.git -b gh-pages gh-pages --single-branch > /dev/null
-
-./gradlew --stop
-./gradlew testClasses || EXIT_STATUS=$?
-./gradlew -Dgeb.env=chromeHeadless check -x test-suite:test --no-daemon || EXIT_STATUS=$?
-
 if [[ $EXIT_STATUS -eq 0 ]]; then
-    ./gradlew test-suite:test --no-daemon || EXIT_STATUS=$?
+    if [[ -n $TRAVIS_TAG ]]; then
+        echo "Skipping Tests to Publish Release"
+        ./gradlew pTML assemble || EXIT_STATUS=$?
+    else
+        ./gradlew --stop
+        ./gradlew testClasses || EXIT_STATUS=$?
+
+        ./gradlew check --no-daemon || EXIT_STATUS=$?
+    fi
 fi
 
 if [[ $EXIT_STATUS -eq 0 ]]; then
@@ -31,6 +33,8 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
 
       ./gradlew --stop
       ./gradlew --no-daemon docs || EXIT_STATUS=$?
+
+      git clone https://${GH_TOKEN}@github.com/micronaut-projects/micronaut-docs.git -b gh-pages gh-pages --single-branch > /dev/null
 
       cd gh-pages
 
@@ -67,27 +71,24 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
         git push origin HEAD || true
       }
       cd ..
+
+      rm -rf gh-pages
+
+      if [[ -n $TRAVIS_TAG ]]; then
+        echo "set released version in static website"
+        git clone https://${GH_TOKEN}@github.com/micronaut-projects/micronaut-projects/static-website.git -b master static-website-master --single-branch > /dev/null
+        cd static-website-master
+        version="$TRAVIS_TAG"
+        version=${version:1}
+        ./release.sh $version
+        git commit -a -m "Updating micronaut version at static website for Travis build: https://travis-ci.org/$TRAVIS_REPO_SLUG/builds/$TRAVIS_BUILD_ID" && {
+          git push origin HEAD || true
+        }
+        cd ..
+        rm -r static-website-master
+      fi
+
     fi
 fi
 
-
-if [[ $EXIT_STATUS -ne 0 ]]; then
-
-  ./gradlew aggregateReports
-
-  cd gh-pages
-
-  mkdir -p reports
-
-  cp -r ../build/reports/. ./reports/
-
-  git add reports/*
-
-  git commit -a -m "Updating reports for Travis build: https://travis-ci.org/$TRAVIS_REPO_SLUG/builds/$TRAVIS_BUILD_ID" && {
-    git push origin HEAD || true
-  }
-  cd ..
-  rm -rf gh-pages
-  
-fi
 exit $EXIT_STATUS

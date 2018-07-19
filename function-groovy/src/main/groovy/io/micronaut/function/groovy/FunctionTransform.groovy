@@ -32,7 +32,6 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.varX
 import groovy.transform.CompileStatic
 import groovy.transform.Field
 import io.micronaut.ast.groovy.InjectTransform
-import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.utils.AstUtils
 import io.micronaut.context.ApplicationContext
@@ -96,7 +95,14 @@ class FunctionTransform implements ASTTransformation {
         for (node in source.getAST().classes) {
             if (node.isScript()) {
                 node.setSuperClass(ClassHelper.makeCached(FunctionScript))
-                MethodNode functionMethod = node.methods.find() { method -> !method.isAbstract() && !method.isStatic() && method.isPublic() && method.name != 'run' }
+                List<MethodNode> methods = node.methods.findAll() { method ->
+                    !method.isAbstract() && !method.isStatic() && method.isPublic() && method.name != 'run' && !(NameUtils.isSetterName(method.name) && node.getField(NameUtils.getPropertyNameForSetter(method.name))) && method.declaringClass.name != FunctionScript.name
+                }
+                if(methods.size() > 1) {
+                    AstMessageUtils.error(source, node, "Function ["+node.name+"] must have exactly one public method that represents the function")
+                    return
+                }
+                MethodNode functionMethod = methods[0]
                 if (functionMethod == null) {
                     AstMessageUtils.error(source, node, "Function must have at least one public method")
                 } else {
@@ -205,6 +211,7 @@ class FunctionTransform implements ASTTransformation {
                     functionName -= '-function'
 
                     functionBean.setMember("value", constX(functionName))
+                    functionBean.setMember("method", constX(functionMethod.name))
                     node.addAnnotation(functionBean)
                     node.addConstructor(
                         applicationContextConstructor
@@ -218,16 +225,7 @@ class FunctionTransform implements ASTTransformation {
                         }
                     } else {
                         if (argLength == 0) {
-                            def returnType = ClassHelper.getWrapper(functionMethod.returnType.plainNodeReference)
-                            node.addInterface(GenericsUtils.makeClassSafeWithGenerics(
-                                ClassHelper.make(Supplier).plainNodeReference,
-                                new GenericsType(returnType)
-                            ))
-                            def mn = new MethodNode("get", Modifier.PUBLIC, functionMethod.returnType.plainNodeReference, AstUtils.ZERO_PARAMETERS, null, stmt(
-                                callX(varX("this"), functionMethod.getName())
-                            ))
-                            mn.addAnnotation(new AnnotationNode(AstUtils.INTERNAL_ANNOTATION))
-                            node.addMethod(mn)
+                            implementSupplier(functionMethod, node)
                         } else {
                             if (argLength == 1) {
                                 implementFunction(functionMethod, node)
@@ -242,6 +240,22 @@ class FunctionTransform implements ASTTransformation {
 
             }
         }
+    }
+
+    protected void implementSupplier(MethodNode functionMethod, ClassNode node) {
+        def returnType = ClassHelper.getWrapper(functionMethod.returnType.plainNodeReference)
+        if (functionMethod.returnType.usingGenerics) {
+            returnType = GenericsUtils.makeClassSafeWithGenerics(returnType, functionMethod.returnType.genericsTypes)
+        }
+        node.addInterface(GenericsUtils.makeClassSafeWithGenerics(
+                ClassHelper.make(Supplier).plainNodeReference,
+                new GenericsType(returnType)
+        ))
+        def mn = new MethodNode("get", Modifier.PUBLIC, returnType, AstUtils.ZERO_PARAMETERS, null, stmt(
+                callX(varX("this"), functionMethod.getName())
+        ))
+        mn.addAnnotation(new AnnotationNode(AstUtils.INTERNAL_ANNOTATION))
+        node.addMethod(mn)
     }
 
     protected void implementConsumer(MethodNode functionMethod, ClassNode classNode) {

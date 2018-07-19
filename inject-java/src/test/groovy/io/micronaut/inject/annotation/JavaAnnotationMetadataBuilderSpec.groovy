@@ -17,18 +17,6 @@ package io.micronaut.inject.annotation
 
 import io.micronaut.aop.Around
 import io.micronaut.context.annotation.ConfigurationReader
-import io.micronaut.context.annotation.Context
-import io.micronaut.context.annotation.Infrastructure
-import io.micronaut.context.annotation.Primary
-import io.micronaut.context.annotation.Requirements
-import io.micronaut.context.annotation.Requires
-import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.inject.AbstractTypeElementSpec
-import io.micronaut.runtime.context.scope.Refreshable
-import io.micronaut.runtime.context.scope.ScopedProxy
-import io.micronaut.aop.Around
-import io.micronaut.context.annotation.ConfigurationReader
-import io.micronaut.context.annotation.Infrastructure
 import io.micronaut.context.annotation.Primary
 import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
@@ -46,6 +34,22 @@ import javax.inject.Singleton
  * @since 1.0
  */
 class JavaAnnotationMetadataBuilderSpec extends AbstractTypeElementSpec {
+
+    void "test find closest stereotype"() {
+        given:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+@ScopeTwo
+class Test {
+}
+''')
+
+        expect:
+        metadata != null
+        metadata.getAnnotationNameByStereotype(Scope).get() == ScopeTwo.name
+    }
 
     void "test annotation names by stereotype"() {
         given:
@@ -409,7 +413,7 @@ interface ITest {
         metadata.getValue(Around, 'lazy').isPresent()
         metadata.isTrue(Around, 'proxyTarget')
         metadata.isFalse(Around, 'lazy')
-        metadata.getAnnotationNamesByStereotype(Around.name) == [Trace.name, SomeOther.name] as Set
+        metadata.getAnnotationNamesByStereotype(Around.name) == [Trace.name, SomeOther.name]
     }
 
 
@@ -485,5 +489,22 @@ interface ITest {
         !metadata.hasStereotype(Singleton)
     }
 
+    void "test a circular annotation is read correctly"() {
+        given:
+        AnnotationMetadata metadata = buildMethodAnnotationMetadata('''\
+package test;
+
+class Test {
+
+    @io.micronaut.inject.annotation.Circular
+    void testMethod() {}
+}
+''', 'testMethod')
+
+
+        expect:
+        metadata != null
+        metadata.hasAnnotation(Circular)
+    }
 
 }

@@ -1,0 +1,47 @@
+By default if you define a method that takes a container type such as a jdk:java.util.List[] the list will be serialized using the specified `value.serializer` (the default will result in a JSON array).
+
+For example the following two methods will both send serialized arrays:
+
+.Sending Arrays and Lists
+[source,java]
+----
+@Topic("books")
+void sendList(List<Book> books);
+
+@Topic("books")
+void sendBooks(Book...books);
+----
+
+Instead of a sending a serialized array you may wish to instead send batches of link:{kafkaapi}/org/apache/kafka/clients/producer/ProducerRecord.html[ProducerRecord] either synchronously or asynchronously.
+
+To do this you can specify a value of `true` to the `batch` member of the ann:configuration.kafka.annotation.KafkaClient[] annotation:
+
+.Sending `ProducerRecord` batches
+[source,java]
+----
+@KafkaClient(batch=true)
+@Topic("books")
+void send(List<Book> books);
+----
+
+In the above case instead of sending a serialized array the client implementation will iterate over each item in the list and send a `ProducerRecord` for each. The previous example is blocking, however you can return a reactive type if desired:
+
+.Sending `ProducerRecord` batches Reactively
+[source,java]
+----
+@KafkaClient(batch=true)
+@Topic("books")
+Flowable<RecordMetadata> send(List<Book> books);
+----
+
+You can also use an unbound reactive type such as rx:Flowable[] as the source of your batch data:
+
+.Sending `ProducerRecord` batches from a Flowable
+[source,java]
+----
+@KafkaClient(batch=true)
+@Topic("books")
+Flowable<RecordMetadata> send(Flowable<Book> books);
+----
+
+

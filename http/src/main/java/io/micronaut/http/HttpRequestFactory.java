@@ -16,11 +16,6 @@
 
 package io.micronaut.http;
 
-import io.micronaut.core.io.service.ServiceDefinition;
-import io.micronaut.core.io.service.SoftServiceLoader;
-
-import java.util.Optional;
-
 /**
  * A factory interface for {@link MutableHttpRequest} objects.
  *
@@ -32,9 +27,7 @@ public interface HttpRequestFactory {
     /**
      * The default {@link io.micronaut.http.cookie.CookieFactory} instance.
      */
-    Optional<HttpRequestFactory> INSTANCE = SoftServiceLoader.load(HttpRequestFactory.class)
-        .firstOr("io.micronaut.http.client.NettyClientHttpRequestFactory", HttpRequestFactory.class.getClassLoader())
-        .map(ServiceDefinition::load);
+    HttpRequestFactory INSTANCE = DefaultHttpFactories.resolveDefaultRequestFactory();
 
     /**
      * Return a {@link MutableHttpRequest} that executes an {@link HttpMethod#GET} request for the given URI.

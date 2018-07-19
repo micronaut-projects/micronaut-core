@@ -32,6 +32,7 @@ import java.util.Optional;
  */
 public class HttpClientResponseException extends HttpClientException {
     private final HttpResponse<?> response;
+    private boolean jsonType = true;
 
     /**
      * @param message  The message
@@ -56,11 +57,10 @@ public class HttpClientResponseException extends HttpClientException {
 
     @Override
     public String getMessage() {
-        Optional<JsonError> body = getResponse().getBody(JsonError.class);
-        if (body.isPresent()) {
-            return body.get().getMessage();
+        if (jsonType) {
+            return getResponse().getBody(JsonError.class).map(JsonError::getMessage).orElse(super.getMessage());
         } else {
-            return super.getMessage();
+            return getResponse().getBody(String.class).orElse(super.getMessage());
         }
     }
 
@@ -86,6 +86,9 @@ public class HttpClientResponseException extends HttpClientException {
                 response.getBody(JsonError.class);
             } else if (contentType.get().equals(MediaType.APPLICATION_VND_ERROR_TYPE)) {
                 response.getBody(VndError.class);
+            } else {
+                jsonType = false;
+                response.getBody(String.class);
             }
         }
     }

@@ -23,7 +23,6 @@ import io.micronaut.context.ApplicationContext
 import org.grails.datastore.mapping.mongo.MongoDatastore
 import org.grails.datastore.mapping.validation.ValidationException
 import spock.lang.AutoCleanup
-import spock.lang.IgnoreIf
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -33,7 +32,6 @@ import javax.validation.constraints.NotBlank
  * @author graemerocher
  * @since 1.0
  */
-@IgnoreIf({ System.getenv("JENKINS_URL") })
 class MongoDatastoreFactorySpec extends Specification {
     @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.build('mongodb.uri': MongoSettings.DEFAULT_URI)
                                                                                    .mainClass(MongoDatastoreFactorySpec)

@@ -1,0 +1,84 @@
+=== Automatically Committing Offsets
+
+The way offsets are handled by a ann:configuration.kafka.annotation.KafkaListener[] bean is defined by the api:configuration.kafka.annotation.OffsetStrategy[] enum.
+
+The following table summarizes the enum values and behaviour:
+
+.Kafka Messaging Annotations
+|===
+|Value |Description
+
+|api:configuration.kafka.annotation.OffsetStrategy#AUTO[]
+|Automatically commit offsets. Sets `enable.auto.commit` to `true`
+
+|api:configuration.kafka.annotation.OffsetStrategy#DISABLED[]
+|Disables automatically committing offsets. Sets `enable.auto.commit` to `false`
+
+|api:configuration.kafka.annotation.OffsetStrategy#SYNC[]
+|Commits offsets manually at the end of each `poll()` loop if no exceptions occur. Sets `enable.auto.commit` to `false`
+
+|api:configuration.kafka.annotation.OffsetStrategy#ASYNC[]
+|Asynchronously commits offsets manually at the end of each `poll()` loop if no exceptions occur. Sets `enable.auto.commit` to `false`
+
+|api:configuration.kafka.annotation.OffsetStrategy#SYNC_PER_RECORD[]
+|Commits offsets manually after each `ConsumeRecord` is processed. Sets `enable.auto.commit` to `false`
+
+|api:configuration.kafka.annotation.OffsetStrategy#ASYNC_PER_RECORD[]
+|Commits offsets asynchronously after each `ConsumeRecord` is processed. Sets `enable.auto.commit` to `false`
+
+|===
+
+Depending on the your level of paranoia or durability requirements you can choose to tune how and when offsets are committed.
+
+=== Manually Committing Offsets
+
+If you set the `OffsetStrategy` to api:configuration.kafka.annotation.OffsetStrategy#DISABLED[] it becomes your responsibility to commit offsets.
+
+There are a couple of ways that can be achieved.
+
+The simplest way is to define an argument of type api:configuration.kafka.Acknowledgement[] and call the `ack()` method to commit offsets synchronously:
+
+.Committing offsets with `ack()`
+[source,java]
+[source,java]
+----
+include::{testskafka}/consumer/offsets/ack/ProductListener.java[tags=method, indent=0]
+----
+
+<1> Committing offsets automatically is disabled
+<2> The listener method specifies a parameter of type api:configuration.kafka.Acknowledgement[]
+<3> The `ack()` method is called once the record has been processed
+
+Alternatively, you an supply a `KafkaConsumer` method argument and then call `commitSync` (or `commitAsync`) yourself when you are ready to commit offsets:
+
+.Committing offsets with the `KafkaConsumer` API
+[source,java]
+----
+include::{testskafka}/consumer/offsets/manual/ProductListener.java[tags=imports, indent=0]
+
+include::{testskafka}/consumer/offsets/manual/ProductListener.java[tags=method, indent=0]
+----
+
+<1> Committing offsets automatically is disabled
+<2> The listener method specifies that it receives the offset data and a `KafkaConsumer`
+<3> The `commitSync()` method is called once the record has been processed
+
+=== Manually Assigning Offsets to a Consumer Bean
+
+Sometimes you may wish to control exactly the position you wish to resume consuming messages from.
+
+For example if you store offsets in a database you may wish to read the offsets from the database when the consumer starts and start reading from the position stored in the database.
+
+To support this use case your consumer bean can implement the link:{kafkaapi}/org/apache/kafka/clients/consumer/ConsumerRebalanceListener.html[ConsumerRebalanceListener] and api:configuration.kafka.KafkaConsumerAware[] interfaces:
+
+.Manually seeking offsets with the `KafkaConsumer` API
+[source,java]
+----
+include::{testskafka}/consumer/offsets/rebalance/ProductListener.java[tags=imports, indent=0]
+
+include::{testskafka}/consumer/offsets/rebalance/ProductListener.java[tags=clazz, indent=0]
+----
+
+<1> The `setKafkaConsumer` of the api:configuration.kafka.KafkaConsumerAware[] allows access to the underlying producer
+<2> The `onPartitionsRevoked` can be used to save offsets
+<3> The `onPartitionsAssigned` can use used to read offsets and seek to a specific position. In this trivial example we just seek to the offset 1 (skipping the first record).

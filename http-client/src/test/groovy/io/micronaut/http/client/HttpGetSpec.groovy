@@ -23,12 +23,15 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
+import io.reactivex.functions.Consumer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 /**
  * @author Graeme Rocher
@@ -75,6 +78,49 @@ class HttpGetSpec extends Specification {
         def e = thrown(HttpClientResponseException)
         e.message == "Page Not Found"
         e.status == HttpStatus.NOT_FOUND
+
+        cleanup:
+        client.stop()
+        client.close()
+    }
+
+    void "test 500 request with body"() {
+        given:
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
+
+        when:
+        def flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/get/error")
+        ))
+
+        flowable.blockingFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.message == "Server error"
+        e.status == HttpStatus.INTERNAL_SERVER_ERROR
+
+        cleanup:
+        client.stop()
+        client.close()
+    }
+
+
+    void "test 500 request with json body"() {
+        given:
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
+
+        when:
+        def flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/get/jsonError")
+        ))
+
+        flowable.blockingFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.message == "Internal Server Error"
+        e.status == HttpStatus.INTERNAL_SERVER_ERROR
 
         cleanup:
         client.stop()
@@ -229,7 +275,60 @@ class HttpGetSpec extends Specification {
 
         cleanup:
         client.stop()
+    }
 
+    void "test get with @Client"() {
+        given:
+        MyGetHelper helper = embeddedServer.applicationContext.getBean(MyGetHelper)
+
+        expect:
+        helper.simple() == "success"
+        helper.simpleSlash() == "success"
+        helper.simplePreceedingSlash() == "success"
+        helper.simpleDoubleSlash() == "success"
+        helper.queryParam() == "a!b"
+    }
+
+    void "test body availability"() {
+        given:
+        RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
+
+        when:
+        Flowable<HttpResponse> flowable = client.exchange(
+                HttpRequest.GET("/get/simple")
+        )
+        String body
+        flowable.firstOrError().subscribe((Consumer){ HttpResponse res ->
+            Thread.sleep(3000)
+            body = res.getBody(String).orElse(null)
+        })
+        def conditions = new PollingConditions(timeout: 4)
+
+        then:
+        conditions.eventually {
+            assert body == 'success'
+        }
+
+        cleanup:
+        client.stop()
+    }
+
+    void "test blocking body availability"() {
+        given:
+        HttpClient backing = HttpClient.create(embeddedServer.getURL())
+        BlockingHttpClient client = backing.toBlocking()
+
+        when:
+        HttpResponse res = client.exchange(
+                HttpRequest.GET("/get/simple")
+        )
+        String body = res.getBody(String).orElse(null)
+
+        then:
+        body == null
+
+        cleanup:
+        backing.stop()
     }
 
     @Controller("/get")
@@ -249,9 +348,60 @@ class HttpGetSpec extends Specification {
         List<Book> pojoList() {
             return [ new Book(title: "The Stand") ]
         }
+
+        @Get(uri = "/error", produces = MediaType.TEXT_PLAIN)
+        HttpResponse error() {
+            return HttpResponse.serverError().body("Server error")
+        }
+
+        @Get("/jsonError")
+        HttpResponse jsonError() {
+            return HttpResponse.serverError().body([foo: "bar"])
+        }
+
+        @Get("/queryParam")
+        String queryParam(@QueryValue String foo) {
+            return foo
+        }
     }
 
     static class Book {
         String title
+    }
+
+    static class Error {
+        String message
+    }
+
+    @javax.inject.Singleton
+    static class MyGetHelper {
+        private final RxStreamingHttpClient rxClientSlash
+        private final RxStreamingHttpClient rxClient
+
+        MyGetHelper(@Client("/get/") RxStreamingHttpClient rxClientSlash,
+                    @Client("/get") RxStreamingHttpClient rxClient) {
+            this.rxClient = rxClient
+            this.rxClientSlash = rxClientSlash
+        }
+
+        String simple() {
+            rxClient.toBlocking().exchange(HttpRequest.GET("simple"), String).body()
+        }
+
+        String simplePreceedingSlash() {
+            rxClient.toBlocking().exchange(HttpRequest.GET("/simple"), String).body()
+        }
+
+        String simpleSlash() {
+            rxClientSlash.toBlocking().exchange(HttpRequest.GET("simple"), String).body()
+        }
+
+        String simpleDoubleSlash() {
+            rxClientSlash.toBlocking().exchange(HttpRequest.GET("/simple"), String).body()
+        }
+
+        String queryParam() {
+            rxClient.toBlocking().exchange(HttpRequest.GET("/queryParam?foo=a!b"), String).body()
+        }
     }
 }

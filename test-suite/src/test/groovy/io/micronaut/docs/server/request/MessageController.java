@@ -18,7 +18,6 @@ package io.micronaut.docs.server.request;
 // tag::imports[]
 import io.micronaut.http.*;
 import io.micronaut.http.annotation.*;
-import javax.inject.Singleton;
 
 import static io.micronaut.http.HttpResponse.*; // <1>
 // end::imports[]

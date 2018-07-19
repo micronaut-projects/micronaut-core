@@ -1,0 +1,26 @@
+This section will document breaking changes that may happen during milestone or release candidate releases, as well as major releases eg (1.x.x -> 2.x.x).
+
+==== 1.0.0.M3
+
+* The contract for `io.micronaut.http.codec.MediaTypeCodec` has changed to support multiple media types.
+* To reduce confusion around `@Parameter`, it can no longer be used to denote an argument should be bound from the request url. Its sole purpose is defining arguments for parameterized beans. Use `@QueryValue` instead.
+* The health endpoint will now only report details when the user is authenticated. To revert to the previous behavior, set `endpoints.health.detailsVisible: ANONYMOUS`.
+* The CLI options have been standardized to use two leading dashes for long options (like `--stacktrace`) and one for shortcuts (like `-h`). That means that some options no longer work. For example, this command used to work with M2: `create-app -lang groovy myapp`. From M3, you will see this error: `Could not convert 'ang' to SupportedLanguage for option '--lang'`. Specifying either `-l LANG` or `--lang LANG` works as expected.
+* The following packages have been renamed:
+ - `io.micronaut.configurations.ribbon` -> `io.micronaut.configuration.ribbon`
+ - `io.micronaut.configurations.hystrix` -> `io.micronaut.configuration.hystrix`
+ - `io.micronaut.configurations.aws` -> `io.micronaut.configuration.aws`
+ - `io.micronaut.http.netty.buffer` -> `io.micronaut.buffer.netty`
+* The default Consul configuration prefix has been changed to reflect changes in the latest version of Consul. Previously a leading slash was expected and the default value was `/config/`. The new default value is `config/`. To restore the previous behavior, set `consul.client.config.path = /config/`
+* The `session` module will now serialize POJOs to JSON using Jackson by default instead of Java Serialization. This change is because Java serialization will be removed and deprecated in a future version of the JDK.
+
+
+==== 1.0.0.M2
+
+* The constructor signature for DefaultHttpClient has changed to include an extra argument. This change should not impact existing uses.
+* Libraries compiled against M1 are not binary compatible with M2.
+* For Java 9+ automatic module name has been set to `<groupId>.<name>`. Previously if you have been using the "inject-java" module, the module is now named "io.micronaut.inject-java".
+* When an HttpClientResponseException is thrown, the body of the response will be set to the exception message for responses with a text media type. Previously the status description was returned.
+* Mongo configurations were updated to a new version of the driver (3.6.1 -> 3.7.1), which may break existing uses. See their link:http://mongodb.github.io/mongo-java-driver/3.7/upgrading/[upgrading] page for more information.
+* The `router` configuration key was changed to be `micronaut.router`. Static resource configuration is affected by this change. Please update your configuration: `router.static.resources` -> `micronaut.router.static.resources`.
+
