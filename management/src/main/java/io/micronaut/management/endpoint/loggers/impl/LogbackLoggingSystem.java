@@ -10,6 +10,8 @@ import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.Collections;
 
+// TODO Implement methods of this class against logback.
+
 @Singleton
 @Requires(beans = LoggersEndpoint.class)
 public class LogbackLoggingSystem implements LoggingSystem {
