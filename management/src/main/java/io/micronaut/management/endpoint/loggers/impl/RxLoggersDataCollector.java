@@ -16,6 +16,7 @@ import java.util.stream.Stream;
 @Requires(beans = LoggersEndpoint.class)
 public class RxLoggersDataCollector implements LoggersDataCollector<Map<String, Object>> {
 
+    @Override
     public Publisher<Map<String, Object>> getData(Stream<LoggerConfiguration> loggerConfigurations) {
         return Single.just(Collections.<String, Object>emptyMap()).toFlowable();
     }
