@@ -39,8 +39,7 @@ import java.lang.annotation.Target;
 @Retention(RUNTIME)
 @Target(ElementType.TYPE)
 @Singleton
-@ConfigurationReader
-@Executable
+@ConfigurationReader(prefix = EndpointConfiguration.PREFIX)
 @Requires(condition = EndpointEnabledCondition.class)
 public @interface Endpoint {
 

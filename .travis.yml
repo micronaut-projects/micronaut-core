@@ -35,6 +35,7 @@ deploy:
   api_key:
     secure: DGa/P6NIzjUrlBCwy7K6/Sr42lvwxkOGcDhMj5IU476ZCP38cbf8ibhNPuMUZ+CluEPJtbOouVZZL2C3kGYJSXsToFOw94up01izRys26Ej/l3A7r4Am6FToZmBqrK07nbGI92UXdV+KuQP97iKWDhE406y5DjoBUBlTMNsg2zHhHbUjF8jcCa2Sj2WA1xMPh9QS/Llh7dC0lG9JLzzJnvSlhRJXf6fa7fST+jeAc2nxIxtuNn6+YnXIGfLr8jt4MBHka5aIkg0htjeVZyNrfRl54BX5npVo7dx3W/H5XP9ZEA89tXxe5ZZEt3wgmAZLlcFnoPpebwYEXT0q/oLSXpUv9lbhKX4HaSwIdSoiRByPN8LnjPXZA5UmsYeiqPCqBPeS7pMEu3bsibSnpunPSJbwDF+egVX5pPCFUyZXva7vOCr4uQRZQMQNRo5u3bh7TTaFhjpEAtnPpVvwUYEOzKqoU/umOmJMyHG53Ut3R79OP9U0A18VTtZJ5Usi2fPqo8nTdn+Sli7rOnyDfjnPLUriW+5jFfMINcbzSPhTJAjsazdvWnox06K0vNYldrCkkkQ+BjOm+YmY6ANg4q3Ap3+65osEeL0G34bstiEBcQCw0wbwKMLgYSHMpBf5XZQL7MsppZLJQv5HRinKJQeYSTtSM3pKWdQVo5cGtBxQiPY=
   file: cli/build/distributions/micronaut-${TRAVIS_TAG:1}.zip
+  skip_cleanup: true
   on:
     repo: micronaut-projects/micronaut-core
     tags: true

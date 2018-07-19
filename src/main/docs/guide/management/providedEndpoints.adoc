@@ -16,6 +16,10 @@ When the `management` dependency is added to your project, the following built-i
 | `/health`
 |Returns information about the "health" of the application (see <<healthEndpoint, HealthEndpoint>>)
 
+|api:configuration.metrics.management.endpoint.MetricsEndpoint[]
+| `/metrics`
+|Return the <<metricsEndpoint,application metrics>>. Requires the `micrometer-core` configuration on the classpath.
+
 |api:management.endpoint.refresh.RefreshEndpoint[]
 | `/refresh`
 |Refreshes the application state (see <<refreshEndpoint, RefreshEndpoint>>)
