@@ -1,10 +1,12 @@
 package io.micronaut.management.endpoint.loggers.impl;
 
+import ch.qos.logback.classic.LoggerContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.management.endpoint.loggers.LogLevel;
 import io.micronaut.management.endpoint.loggers.LoggerConfiguration;
 import io.micronaut.management.endpoint.loggers.LoggersEndpoint;
 import io.micronaut.management.endpoint.loggers.LoggingSystem;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.util.Collection;
@@ -37,4 +39,10 @@ public class LogbackLoggingSystem implements LoggingSystem {
     public void setLogLevel(String name, LogLevel level) {
     }
 
+    /**
+     * @return The logback {@link LoggerContext}
+     */
+    protected LoggerContext getLoggerContext() {
+        return (LoggerContext) LoggerFactory.getILoggerFactory();
+    }
 }
