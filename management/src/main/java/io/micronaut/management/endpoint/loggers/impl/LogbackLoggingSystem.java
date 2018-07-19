@@ -12,6 +12,9 @@ import java.util.Collections;
 
 // TODO Implement methods of this class against logback.
 
+/**
+ * An implementation of {@link LoggingSystem} that works with logback.
+ */
 @Singleton
 @Requires(beans = LoggersEndpoint.class)
 public class LogbackLoggingSystem implements LoggingSystem {
