@@ -85,7 +85,7 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
           git push origin HEAD || true
         }
         cd ..
-        rm -r static-website-master
+        rm -rf static-website-master
       fi
 
     fi
