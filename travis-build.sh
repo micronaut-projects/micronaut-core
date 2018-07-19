@@ -17,6 +17,20 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
 
         ./gradlew check --no-daemon || EXIT_STATUS=$?
     fi
+
+      if [[ -n $TRAVIS_TAG ]]; then
+        echo "set released version in static website"
+        git clone https://${GH_TOKEN}@github.com/micronaut-projects/static-website.git -b master static-website-master --single-branch > /dev/null
+        cd static-website-master
+        version="$TRAVIS_TAG"
+        version=${version:1}
+        ./release.sh $version
+        git commit -a -m "Updating micronaut version at static website for Travis build: https://travis-ci.org/$TRAVIS_REPO_SLUG/builds/$TRAVIS_BUILD_ID" && {
+          git push origin HEAD || true
+        }
+        cd ..
+        rm -r static-website-master
+      fi
 fi
 
 exit $EXIT_STATUS
