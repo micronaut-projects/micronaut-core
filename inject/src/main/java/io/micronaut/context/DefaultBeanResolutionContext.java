@@ -290,7 +290,7 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
         FieldSegment(BeanDefinition declaringClass, FieldInjectionPoint fieldInjectionPoint) {
             super(declaringClass,
                 fieldInjectionPoint.getName(),
-                Argument.of(fieldInjectionPoint.getField()));
+                fieldInjectionPoint.asArgument());
         }
 
         @Override

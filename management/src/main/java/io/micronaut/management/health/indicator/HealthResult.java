@@ -16,6 +16,7 @@
 
 package io.micronaut.management.health.indicator;
 
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import io.micronaut.health.HealthStatus;
 
 import javax.validation.constraints.NotNull;
@@ -28,6 +29,7 @@ import java.util.Map;
  * @author James Kleeh
  * @since 1.0
  */
+@JsonDeserialize(as = DefaultHealthResult.class)
 public interface HealthResult {
 
     /**
@@ -131,22 +133,11 @@ public interface HealthResult {
          * @return The {@link HealthResult}
          */
         public HealthResult build() {
-            return new HealthResult() {
-                @Override
-                public String getName() {
-                    return name;
-                }
-
-                @Override
-                public HealthStatus getStatus() {
-                    return status != null ? status : HealthStatus.UNKNOWN;
-                }
-
-                @Override
-                public Object getDetails() {
-                    return details;
-                }
-            };
+            return new DefaultHealthResult(
+                    name,
+                    status != null ? status : HealthStatus.UNKNOWN,
+                    details
+            );
         }
     }
 }

@@ -16,6 +16,7 @@
 package io.micronaut.inject.configproperties;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.convert.format.ReadableBytes;
 
 import java.net.URL;
 import java.util.List;
@@ -38,6 +39,22 @@ public class MyConfig {
     Inner inner;
     protected int defaultPort = 9999;
     protected Integer anotherPort;
+
+    private int maxSize;
+    @ReadableBytes
+    int anotherSize;
+
+    public int getMaxSize() {
+        return maxSize;
+    }
+
+    public void setMaxSize(@ReadableBytes int maxSize) {
+        this.maxSize = maxSize;
+    }
+
+    public int getAnotherSize() {
+        return anotherSize;
+    }
 
     public Integer getAnotherPort() {
         return anotherPort;

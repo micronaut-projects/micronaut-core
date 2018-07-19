@@ -16,6 +16,8 @@
 
 package io.micronaut.health;
 
+import com.fasterxml.jackson.annotation.JsonValue;
+
 import javax.annotation.concurrent.Immutable;
 import javax.validation.constraints.NotNull;
 import java.util.Optional;
@@ -66,7 +68,11 @@ public class HealthStatus implements Comparable<HealthStatus> {
      * @param operational If it's operational
      * @param severity    The severity, the higher the value, the more sever is situation.
      */
-    public HealthStatus(@NotNull String name, String description, Boolean operational, Integer severity) {
+    public HealthStatus(
+            String name,
+            String description,
+            Boolean operational,
+            Integer severity) {
         if (name == null) {
             throw new IllegalArgumentException("Name cannot be null when creating a health status");
         }
@@ -175,12 +181,8 @@ public class HealthStatus implements Comparable<HealthStatus> {
     }
 
     @Override
+    @JsonValue
     public String toString() {
-        return "HealthStatus{" +
-            "name='" + name + '\'' +
-            ", description=" + description +
-            ", operational=" + operational +
-            ", severity=" + severity +
-            '}';
+        return name;
     }
 }
