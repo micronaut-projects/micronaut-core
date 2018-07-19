@@ -27,8 +27,7 @@ public class RxLoggersDataCollector implements LoggersDataCollector<Map<String, 
 
     @Override
     public Publisher<Map<String, Object>> getOne(LoggingSystem loggingSystem, String name) {
-        return Single.just(loggingSystem.getLogger(name).getData())
-                .toFlowable();
+        return getLogger(loggingSystem.getLogger(name)).toFlowable();
     }
 
     /**
@@ -43,6 +42,14 @@ public class RxLoggersDataCollector implements LoggersDataCollector<Map<String, 
                 .collectInto(loggers, (map, configuration) ->
                     map.put(configuration.getName(), configuration.getData())
                 );
+    }
+
+    /**
+     * @param configuration The logger configuration
+     * @return A {@link Single} that wraps the configuration data
+     */
+    protected Single<Map<String, Object>> getLogger(LoggerConfiguration configuration) {
+        return Single.just(configuration.getData());
     }
 
     /**
