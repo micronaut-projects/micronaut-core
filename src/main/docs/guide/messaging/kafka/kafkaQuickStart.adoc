@@ -1,7 +1,7 @@
 To add support for Kafka to an existing project, you should first add the Micronaut Kafka configuration to your build configuration. For example in Gradle:
 
 .build.gradle
-[source,groovy]dd
+[source,groovy]
 ----
 compile "io.micronaut.configuration:kafka"
 ----
