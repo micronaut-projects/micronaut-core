@@ -216,6 +216,7 @@ class MicronautCli {
     public int execute(String... args) {
         if (!parser) {
             parser = createParser()
+            // picocli.AutoComplete.bash('mn', new File('mn_completion'), null, parser) // uncomment to regenerate completion script
         }
         def parseResult = parser.parseArgs(args)
         def console = initConsole(parseResult)
