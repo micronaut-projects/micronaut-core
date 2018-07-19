@@ -18,7 +18,7 @@ package io.micronaut.management.endpoint.loggers;
 
 import org.reactivestreams.Publisher;
 
-import java.util.Collection;
+import javax.validation.constraints.NotBlank;
 
 /**
  * Used to respond with logger information for the {@link LoggersEndpoint}.
@@ -29,6 +29,8 @@ import java.util.Collection;
  */
 public interface LoggersDataCollector<T> {
 
-    Publisher<T> getData(Collection<LoggerConfiguration> configurations);
+    Publisher<T> getData(LoggingSystem loggingSystem);
+
+    Publisher<T> getOne(LoggingSystem loggingSystem, @NotBlank String name);
 
 }

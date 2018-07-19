@@ -16,10 +16,13 @@
 
 package io.micronaut.management.endpoint.loggers;
 
+import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.management.endpoint.Read;
 import io.reactivex.Single;
+
+import javax.validation.constraints.NotBlank;
 
 /**
  * Exposes an {@link Endpoint} to manage loggers
@@ -69,9 +72,12 @@ public class LoggersEndpoint {
      * @return the loggers as a {@link Single}
      */
     @Read
-    public Single getLoggers() {
-        return Single.fromPublisher(
-                loggersDataCollector.getData(loggingSystem.getLoggers())
-        );
+    public Single loggers() {
+        return Single.fromPublisher(loggersDataCollector.getData(loggingSystem));
+    }
+
+    @Read
+    public Single getLogger(@QueryValue @NotBlank String name) {
+        return Single.fromPublisher(loggersDataCollector.getOne(loggingSystem, name));
     }
 }
