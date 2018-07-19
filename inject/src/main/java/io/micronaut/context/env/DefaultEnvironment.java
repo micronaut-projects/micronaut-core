@@ -249,6 +249,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @Override
     public Environment stop() {
         running.set(false);
+        reading.set(false);
         synchronized (catalog) {
             for (int i = 0; i < catalog.length; i++) {
                 catalog[i] = null;
