@@ -10,7 +10,7 @@ echo "https://$GH_TOKEN:@github.com" > ~/.git-credentials
 if [[ $EXIT_STATUS -eq 0 ]]; then
     if [[ -n $TRAVIS_TAG ]]; then
         echo "Skipping Tests to Publish Release"
-        ./gradlew pTML || EXIT_STATUS=$?
+        ./gradlew pTML assemble || EXIT_STATUS=$?
     else
         ./gradlew --stop
         ./gradlew testClasses || EXIT_STATUS=$?
@@ -76,7 +76,7 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
 
       if [[ -n $TRAVIS_TAG ]]; then
         echo "set released version in static website"
-        git clone https://${GH_TOKEN}@github.com/micronaut-projects/micronaut-projects/static-website.git -b master static-website-master --single-branch > /dev/null
+        git clone https://${GH_TOKEN}@github.com/micronaut-projects/static-website.git -b master static-website-master --single-branch > /dev/null
         cd static-website-master
         version="$TRAVIS_TAG"
         version=${version:1}
@@ -85,7 +85,7 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
           git push origin HEAD || true
         }
         cd ..
-        rm -r static-website-master
+        rm -rf static-website-master
       fi
 
     fi

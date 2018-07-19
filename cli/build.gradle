@@ -31,6 +31,10 @@ task createStartScripts(type: MicronautCreateStartScripts) {
     classpath = configurations.runtime
     doLast {
         ant.chmod(file: new File(outDir, 'mn'), perm: 'ugo+rx')
+        copy {
+            from 'src/main/resources/mn_completion'
+            into outDir
+        }
     }
 }
 

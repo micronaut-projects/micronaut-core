@@ -1461,7 +1461,8 @@ public class DefaultBeanContext implements BeanContext {
         Optional<BeanResolutionContext.Segment> currentSegment = resolutionContext.getPath().currentSegment();
         Optional<Class<? extends Annotation>> scope = Optional.empty();
         if (currentSegment.isPresent()) {
-            scope = AnnotationUtil.findAnnotationWithStereoType(Scope.class, currentSegment.get().getArgument().getAnnotations()).map(Annotation::annotationType);
+            Argument argument = currentSegment.get().getArgument();
+            scope = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Scope.class);
         }
         if (!scope.isPresent()) {
             scope = isProxy ? Optional.empty() : definition.getScope();

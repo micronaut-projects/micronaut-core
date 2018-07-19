@@ -81,7 +81,7 @@ class RedisSessionSpec extends Specification {
         retrieved.maxInactiveInterval
         retrieved.creationTime
         retrieved.id
-        retrieved.get("foo").get() instanceof Foo
+        retrieved.get("foo", Foo).get() instanceof Foo
         retrieved.get("username", String).get() == "fred"
         retrieved.get("foo", Foo).get().name == "Fred"
         retrieved.get("foo", Foo).get().age == 10
