@@ -29,14 +29,14 @@ import java.util.Collection;
 public interface LoggingSystem {
 
     /**
-     * Returns all existing loggers
+     * Returns all existing loggers.
      *
      * @return A {@link Collection} of {@link LoggerConfiguration} instances for all existing loggers
      */
     Collection<LoggerConfiguration> getLoggers();
 
     /**
-     * Returns a {@link LoggerConfiguration} for the logger found by name (or created if not found)
+     * Returns a {@link LoggerConfiguration} for the logger found by name (or created if not found).
      *
      * @param name the logger name
      * @return the logger configuration
@@ -44,7 +44,7 @@ public interface LoggingSystem {
     LoggerConfiguration getLogger(@NotBlank String name);
 
     /**
-     * Set the log level for the logger found by name (or created if not found)
+     * Set the log level for the logger found by name (or created if not found).
      *
      * @param name the logger name
      * @param level the log level to set on the named logger

@@ -29,8 +29,21 @@ import javax.validation.constraints.NotBlank;
  */
 public interface LoggersDataCollector<T> {
 
+    /**
+     * Collect all existing loggers in the system.
+     *
+     * @param loggingSystem The {@link LoggingSystem} in use
+     * @return A {@link Publisher} of <code>T</code>
+     */
     Publisher<T> getData(LoggingSystem loggingSystem);
 
+    /**
+     * Find (or create if not found) the named logger in the system.
+     *
+     * @param loggingSystem The {@link LoggingSystem} in use
+     * @param name The name of the logger to find or create
+     * @return A {@link Publisher} of <code>T</code>
+     */
     Publisher<T> getOne(LoggingSystem loggingSystem, @NotBlank String name);
 
 }

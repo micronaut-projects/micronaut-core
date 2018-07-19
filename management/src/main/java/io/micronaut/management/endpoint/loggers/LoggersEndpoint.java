@@ -25,7 +25,7 @@ import io.reactivex.Single;
 import javax.validation.constraints.NotBlank;
 
 /**
- * Exposes an {@link Endpoint} to manage loggers
+ * Exposes an {@link Endpoint} to manage loggers.
  *
  * @author Matthew Moss
  * @since 1.0
@@ -36,22 +36,22 @@ import javax.validation.constraints.NotBlank;
 public class LoggersEndpoint {
 
     /**
-     * Endpoint name
+     * Endpoint name.
      */
     public static final String NAME = "loggers";
 
     /**
-     * Endpoint configuration prefix
+     * Endpoint configuration prefix.
      */
     public static final String PREFIX = EndpointConfiguration.PREFIX + "." + NAME;
 
     /**
-     * Endpoint default enabled
+     * Endpoint default enabled.
      */
     public static final boolean DEFAULT_ENABLED = true;
 
     /**
-     * Endpoint default sensitivity
+     * Endpoint default sensitivity.
      */
     public static final boolean DEFAULT_SENSITIVE = false;
 
@@ -76,6 +76,10 @@ public class LoggersEndpoint {
         return Single.fromPublisher(loggersDataCollector.getData(loggingSystem));
     }
 
+    /**
+     * @param name The name of the logger to find
+     * @return the {@link LogLevel} (both configured and effective) of the named logger
+     */
     @Read
     public Single getLogger(@QueryValue @NotBlank String name) {
         return Single.fromPublisher(loggersDataCollector.getOne(loggingSystem, name));

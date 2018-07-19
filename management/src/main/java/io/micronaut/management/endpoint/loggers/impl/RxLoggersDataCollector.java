@@ -9,6 +9,9 @@ import org.reactivestreams.Publisher;
 import javax.inject.Singleton;
 import java.util.*;
 
+/**
+ * Default implementation of {@link LoggersDataCollector}.
+ */
 @Singleton
 @Requires(beans = LoggersEndpoint.class)
 public class RxLoggersDataCollector implements LoggersDataCollector<Map<String, Object>> {

@@ -20,7 +20,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Represents the configuration of a {@link LoggingSystem} logger
+ * Represents the configuration of a {@link LoggingSystem} logger.
  *
  * @author Matthew Moss
  * @since 1.0
