@@ -11,6 +11,8 @@ Metrics support has been improved with support for metrics for:
 
 Micronaut can now be used to build Message-Driven Microservices with Apache Kafka. See the <<kafka, Kafka>> section of the documentation for more information.
 
+The Micronaut CLI now includes a Kafka *feature*, which adds the necessary dependency and config to use Kafka within your project. In addition, the CLI also includes a Kafka *profile*, which can be used to create messaging services without the need for an HTTP server. See the <<kafkaCli, Kafka>> section for more information.
+
 === Annotation Metadata Processing Support Improved
 
 All annotation metadata in Micronaut is produced as compile time, resulting in significant improvements to startup time and memory consumption over traditional frameworks.

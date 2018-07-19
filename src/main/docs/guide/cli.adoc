@@ -70,19 +70,23 @@ mn>
 
 
 
-
 == Help and Info
 
 General usage information can be viewed using the `help` command.
 
 [source,bash]
 ----
-mn> help
-Usage (optionals marked with *):'
-mn [target] [arguments]*'
-
-| Examples:
-$ mn create-app my-app
+mn> help create-app
+    Usage: mn create-app [-hinvVx] [-b=BUILD-TOOL] [-l=LANG] [-p=PROFILE] [-f=FEATURE[,FEATURE...]]...
+                         [NAME]
+    Creates an application
+          [NAME]               The name of the application to create.
+      -b, --build=BUILD-TOOL   Which build tool to configure. Possible values: gradle, maven.
+      -f, --features=FEATURE[,FEATURE...]
+                               The features to use
+      -h, --help               Show this help message and exit.
+      -i, --inplace            Create a service using the current directory
+      -l, --lang=LANG          Which language to use. Possible values: java, groovy, kotlin.
 ...
 ----
 
@@ -108,12 +112,13 @@ A list of available profiles can be viewed using the `list-profiles` command.
 mn> list-profiles
 | Available Profiles
 --------------------
-* function-aws - The function profile for AWS Lambda
-* service-function - The function profile
-* function - The function profile
-* federation - The federation profile
-* service - The service profile
-* base - The base profile
+  base          The base profile
+  federation    The federation profile
+  function      The function profile
+  function-aws  The function profile for AWS Lambda
+  kafka         The Kafka messaging profile
+  profile       A profile for creating new Micronaut profiles
+  service       The service profile
 ----
 
 To view details on a specific profile, use the `profile-info` command, followed by the profile name.
@@ -121,22 +126,24 @@ To view details on a specific profile, use the `profile-info` command, followed 
 [source,bash]
 ----
 mn> profile-info service
-Profile: service
---------------------
-The service profile
+    | Profile: service
+    --------------------
+    The service profile
 
-Provided Commands:
---------------------
-* help - Prints help information for a specific command
-* create-job - Creates a job with scheduled method
-* create-bean - Creates a singleton bean
-* create-controller - Creates a controller and associated test
-* create-client - Creates a client interface
+    | Provided Commands:
+    --------------------
+      create-bean        Creates a singleton bean
+      create-client      Creates a client interface
+      create-controller  Creates a controller and associated test
+      create-job         Creates a job with scheduled method
+      help               Prints help information for a specific command
 
-Provided Features:
---------------------
-* discovery-consul - Adds support for Service Discovery with Consul (https://www.consul.io)
-* hibernate-jpa - Adds support for Hibernate/JPA
-* mongo-gorm - Configures GORM for MongoDB for Groovy applications
+    | Provided Features:
+    --------------------
+      annotation-api    Adds Java annotation API
+      config-consul     Adds support for Distributed Configuration with Consul (https://www.consul.io)
+      discovery-consul  Adds support for Service Discovery with Consul (https://www.consul.io)
+      discovery-eureka  Adds support for Service Discovery with Eureka
+      groovy            Creates a Groovy application
 ...
 ----
