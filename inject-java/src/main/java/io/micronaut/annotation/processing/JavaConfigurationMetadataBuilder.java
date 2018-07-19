@@ -19,6 +19,7 @@ package io.micronaut.annotation.processing;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 
 import javax.lang.model.element.Element;
@@ -130,9 +131,9 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
             if (annotationMetadata.hasDeclaredAnnotation(EachProperty.class)) {
                 return path + ".*";
             }
-            String prefix = annotationMetadata.getValue("io.micronaut.management.endpoint.Endpoint", "prefix", String.class)
+            String prefix = annotationMetadata.getValue(ConfigurationReader.class, "prefix", String.class)
                 .orElse(null);
-            if (prefix != null) {
+            if (StringUtils.isNotEmpty(prefix)) {
                 return prefix + "." + path;
             } else {
                 return path;

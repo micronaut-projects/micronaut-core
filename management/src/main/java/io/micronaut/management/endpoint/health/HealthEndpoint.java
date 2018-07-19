@@ -53,19 +53,16 @@ public class HealthEndpoint {
 
     private HealthAggregator<HealthResult> healthAggregator;
     private HealthIndicator[] healthIndicators;
-    private HealthLevelOfDetailResolver healthLevelOfDetailResolver;
+    private DetailsVisibility detailsVisible = DetailsVisibility.AUTHENTICATED;
 
     /**
      * @param healthAggregator            The {@link HealthAggregator}
      * @param healthIndicators            The {@link HealthIndicator}
-     * @param healthLevelOfDetailResolver The {@link HealthLevelOfDetailResolver}
      */
     public HealthEndpoint(HealthAggregator<HealthResult> healthAggregator,
-                          HealthIndicator[] healthIndicators,
-                          HealthLevelOfDetailResolver healthLevelOfDetailResolver) {
+                          HealthIndicator[] healthIndicators) {
         this.healthAggregator = healthAggregator;
         this.healthIndicators = healthIndicators;
-        this.healthLevelOfDetailResolver = healthLevelOfDetailResolver;
     }
 
     /**
@@ -74,9 +71,49 @@ public class HealthEndpoint {
      */
     @Read
     public Single<HealthResult> getHealth(@Nullable Principal principal) {
-        HealthLevelOfDetail detail = healthLevelOfDetailResolver.levelOfDetail(principal);
+        HealthLevelOfDetail detail = levelOfDetail(principal);
         return Single.fromPublisher(
                 healthAggregator.aggregate(healthIndicators, detail)
         );
+    }
+
+    /**
+     * @return The visibility policy for health information.
+     */
+    public DetailsVisibility getDetailsVisible() {
+        return detailsVisible;
+    }
+
+    /**
+     * Sets the visibility policy for health information.
+     * @param detailsVisible The {@link DetailsVisibility}
+     */
+    public void setDetailsVisible(DetailsVisibility detailsVisible) {
+        this.detailsVisible = detailsVisible;
+    }
+
+
+    /**
+     * Returns the level of detail that should be returned by the endpoint.
+     *
+     * @param principal Authenticated user
+     * @return The {@link HealthLevelOfDetail}
+     */
+    protected HealthLevelOfDetail levelOfDetail(@Nullable Principal principal) {
+        boolean showDetails = false;
+        switch (detailsVisible) {
+            case AUTHENTICATED:
+                showDetails = principal != null;
+                break;
+            case ANONYMOUS:
+                showDetails = true;
+            default:
+                // no-op
+        }
+        if (showDetails) {
+            return HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS;
+        } else {
+            return HealthLevelOfDetail.STATUS;
+        }
     }
 }
