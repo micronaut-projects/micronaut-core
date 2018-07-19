@@ -16,6 +16,9 @@
 
 package io.micronaut.management.endpoint.health;
 
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.health.HealthStatus;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.management.endpoint.Read;
@@ -25,7 +28,11 @@ import io.micronaut.management.health.indicator.HealthResult;
 import io.reactivex.Single;
 
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import java.security.Principal;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 
 /**
  * <p>Exposes an {@link Endpoint} to provide information about the health of the application.</p>
@@ -54,6 +61,7 @@ public class HealthEndpoint {
     private HealthAggregator<HealthResult> healthAggregator;
     private HealthIndicator[] healthIndicators;
     private DetailsVisibility detailsVisible = DetailsVisibility.AUTHENTICATED;
+    private StatusConfiguration statusConfiguration;
 
     /**
      * @param healthAggregator            The {@link HealthAggregator}
@@ -92,6 +100,24 @@ public class HealthEndpoint {
         this.detailsVisible = detailsVisible;
     }
 
+    /**
+     * @return The status configuration
+     */
+    public StatusConfiguration getStatusConfiguration() {
+        return statusConfiguration;
+    }
+
+    /**
+     * Sets the status configuration.
+     *
+     * @param statusConfiguration The status configuration
+     */
+    @Inject
+    public void setStatusConfiguration(StatusConfiguration statusConfiguration) {
+        if (statusConfiguration != null) {
+            this.statusConfiguration = statusConfiguration;
+        }
+    }
 
     /**
      * Returns the level of detail that should be returned by the endpoint.
@@ -114,6 +140,49 @@ public class HealthEndpoint {
             return HealthLevelOfDetail.STATUS_DESCRIPTION_DETAILS;
         } else {
             return HealthLevelOfDetail.STATUS;
+        }
+    }
+
+    /**
+     * Configuration related to handling of the {@link io.micronaut.health.HealthStatus}
+     *
+     * @author graemerocher
+     * @since 1.0
+     */
+    @ConfigurationProperties("status")
+    public static class StatusConfiguration {
+        private Map<String, HttpStatus> httpMapping = new HashMap<>();
+
+        /**
+         * Default constructor.
+         */
+        public StatusConfiguration() {
+            httpMapping.put(HealthStatus.NAME_DOWN, HttpStatus.SERVICE_UNAVAILABLE);
+            httpMapping.put(HealthStatus.NAME_UP, HttpStatus.OK);
+            httpMapping.put(HealthStatus.UNKNOWN.getName(), HttpStatus.OK);
+        }
+
+        /**
+         * @return How {@link io.micronaut.health.HealthStatus} map to {@link HttpStatus} codes
+         */
+        public Map<String, HttpStatus> getHttpMapping() {
+            return httpMapping;
+        }
+
+        /**
+         * Set how {@link io.micronaut.health.HealthStatus} map to {@link HttpStatus} codes
+         *
+         * @param httpMapping The http mappings
+         */
+        public void setHttpMapping(Map<String, HttpStatus> httpMapping) {
+            if (httpMapping != null) {
+                for (Map.Entry<String, HttpStatus> entry : httpMapping.entrySet()) {
+                    this.httpMapping.put(
+                            entry.getKey().toUpperCase(Locale.ENGLISH),
+                            entry.getValue()
+                    );
+                }
+            }
         }
     }
 }
