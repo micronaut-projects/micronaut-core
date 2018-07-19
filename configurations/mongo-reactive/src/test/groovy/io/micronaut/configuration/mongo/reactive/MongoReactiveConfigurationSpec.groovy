@@ -16,21 +16,24 @@
 
 package io.micronaut.configuration.mongo.reactive
 
-import com.mongodb.async.client.MongoClientSettings
+import com.mongodb.MongoClientSettings
+import com.mongodb.ReadConcern
+import com.mongodb.ReadPreference
+import com.mongodb.WriteConcern
 import com.mongodb.reactivestreams.client.MongoClient
+import com.mongodb.reactivestreams.client.Success
 import groovy.transform.NotYetImplemented
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.inject.qualifiers.Qualifiers
-import spock.lang.IgnoreIf
+import io.reactivex.Single
 import spock.lang.Specification
 import spock.lang.Unroll
 
-@IgnoreIf({ System.getenv("JENKINS_URL") })
 class MongoReactiveConfigurationSpec extends Specification {
 
-    void "test a basic connection"() {
+    void "test connection with connection string"() {
         when:
         ApplicationContext applicationContext = ApplicationContext.run((MongoSettings.MONGODB_URI): "mongodb://localhost:${SocketUtils.findAvailableTcpPort()}")
         MongoClient mongoClient = applicationContext.getBean(MongoClient)
@@ -38,19 +41,76 @@ class MongoReactiveConfigurationSpec extends Specification {
         then:
         !Flowable.fromPublisher(mongoClient.listDatabaseNames()).blockingIterable().toList().isEmpty()
 
+        when:"A POJO is saved"
+        Success success = Single.fromPublisher(mongoClient.getDatabase("test").getCollection("test", Book).insertOne(new Book(
+                title: "The Stand"
+        ))).blockingGet()
+
+        then:
+        success != null
+
         cleanup:
         applicationContext.stop()
     }
+
+    void "test connection with host"() {
+        when:
+        ApplicationContext applicationContext = ApplicationContext.run((MongoSettings.MONGODB_HOST): "")
+        MongoClient mongoClient = applicationContext.getBean(MongoClient)
+
+        then:
+        !Flowable.fromPublisher(mongoClient.listDatabaseNames()).blockingIterable().toList().isEmpty()
+
+        when:"A POJO is saved"
+        Success success = Single.fromPublisher(mongoClient.getDatabase("test").getCollection("test", Book).insertOne(new Book(
+                title: "The Stand"
+        ))).blockingGet()
+
+        then:
+        success != null
+
+        cleanup:
+        applicationContext.stop()
+    }
+
+
+    @Unroll
+    void "test configure #property client setting"() {
+        given:
+        ApplicationContext context = ApplicationContext.run(
+                (MongoSettings.EMBEDDED): false,
+                ("${MongoSettings.PREFIX}.${property}".toString()): value
+        )
+
+        DefaultReactiveMongoConfiguration configuration = context.getBean(DefaultReactiveMongoConfiguration)
+        MongoClientSettings clientSettings = configuration.buildSettings()
+
+
+        expect:
+        clientSettings."$property" == expected
+
+        and:
+        context.stop()
+
+        where:
+        property         | value          | expected
+        "readConcern"    | "LINEARIZABLE" | ReadConcern.LINEARIZABLE
+        "writeConcern"   | "W1"           | WriteConcern.W1
+        "readPreference" | "SECONDARY"    | ReadPreference.secondary()
+
+    }
+
 
     @Unroll
     void "test configure #property pool setting"() {
         given:
         ApplicationContext context = ApplicationContext.run(
+                (MongoSettings.EMBEDDED): false,
                 (MongoSettings.MONGODB_URI): "mongodb://localhost:${SocketUtils.findAvailableTcpPort()}",
                 ("${MongoSettings.PREFIX}.connectionPool.${property}".toString()): value
         )
 
-        ReactiveMongoConfiguration configuration = context.getBean(ReactiveMongoConfiguration)
+        DefaultReactiveMongoConfiguration configuration = context.getBean(DefaultReactiveMongoConfiguration)
         MongoClientSettings clientSettings = configuration.buildSettings()
 
 
@@ -75,12 +135,13 @@ class MongoReactiveConfigurationSpec extends Specification {
     void "test configure #property cluster setting"() {
         given:
         ApplicationContext context = ApplicationContext.run(
+                (MongoSettings.EMBEDDED): false,
                 ("${MongoSettings.PREFIX}.cluster.${property}".toString()): value,
                 (MongoSettings.MONGODB_URI): "mongodb://localhost:27017"
 
         )
 
-        ReactiveMongoConfiguration configuration = context.getBean(ReactiveMongoConfiguration)
+        DefaultReactiveMongoConfiguration configuration = context.getBean(DefaultReactiveMongoConfiguration)
         MongoClientSettings clientSettings = configuration.buildSettings()
 
         expect:
@@ -96,21 +157,19 @@ class MongoReactiveConfigurationSpec extends Specification {
 
     @Unroll
     void "test configure #property cluster setting for hosts"() {
+
         given:
         ApplicationContext context = ApplicationContext.run(
+                (MongoSettings.EMBEDDED): false,
                 ("${MongoSettings.PREFIX}.cluster.${property}".toString()): value,
-                ("${MongoSettings.PREFIX}.cluster.hosts".toString()): "localhost:27017"
 
         )
 
-        ReactiveMongoConfiguration configuration = context.getBean(ReactiveMongoConfiguration)
+        DefaultReactiveMongoConfiguration configuration = context.getBean(DefaultReactiveMongoConfiguration)
         MongoClientSettings clientSettings = configuration.buildSettings()
 
         expect:
         clientSettings.clusterSettings."$property" == value
-        clientSettings.clusterSettings.hosts.size() == 1
-        clientSettings.clusterSettings.hosts[0].host == 'localhost'
-        clientSettings.clusterSettings.hosts[0].port == 27017
 
 
         and:
@@ -126,6 +185,7 @@ class MongoReactiveConfigurationSpec extends Specification {
     void "test configure #property pool setting for named server"() {
         given:
         ApplicationContext context = ApplicationContext.run(
+                (MongoSettings.EMBEDDED): false,
                 'mongodb.servers.myServer.uri': "mongodb://localhost:27017",
                 ("mongodb.servers.myServer.connectionPool.${property}".toString()): value
         )
@@ -142,4 +202,8 @@ class MongoReactiveConfigurationSpec extends Specification {
         property  | value
         "maxSize" | 10
     }
+
+     static class Book {
+         String title
+     }
 }

@@ -39,7 +39,7 @@ class WebFunctionSpec extends Specification {
 
     void "test the function registry"() {
         given:
-        LocalFunctionRegistry registry = ApplicationContext.run(LocalFunctionRegistry)
+        LocalFunctionRegistry registry = ApplicationContext.run().getBean(LocalFunctionRegistry)
 
         expect:
         registry.findConsumer("consumer/string").isPresent()
@@ -102,6 +102,22 @@ class WebFunctionSpec extends Specification {
         embeddedServer.stop()
     }
 
+    void 'test camel cased function bean'() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange('/helloWorld', String)
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body() == 'hello there world'
+
+        cleanup:
+        embeddedServer.stop()
+    }
+
     void "test string consumer with text plain"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
@@ -142,10 +158,23 @@ class WebFunctionSpec extends Specification {
 
     @FunctionBean("supplier/string")
     static class StringSupplier implements Supplier<String> {
-
+        String getValue() {
+            return "value"
+        }
         @Override
         String get() {
-            return "value"
+            return getValue()
+        }
+    }
+
+    @FunctionBean("helloWorld")
+    static class CamelCaseSupplier implements Supplier<String> {
+        String getValue() {
+            return "hello there world"
+        }
+        @Override
+        String get() {
+            return getValue()
         }
     }
 

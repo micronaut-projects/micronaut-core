@@ -22,7 +22,6 @@ import io.micronaut.context.env.PropertySource
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
-import io.micronaut.inject.BeanFactory
 
 /**
  * @author Graeme Rocher

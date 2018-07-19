@@ -62,7 +62,7 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T> {
 
-    public static final AttributeKey<NettyHttpRequest> KEY = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
+    private static final AttributeKey<NettyHttpRequest> KEY = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
 
     private final NettyHttpHeaders headers;
     private final ChannelHandlerContext channelHandlerContext;
@@ -325,23 +325,22 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      * @param ctx The context
      * @return The request or null if it is not present
      */
-    public static NettyHttpRequest get(ChannelHandlerContext ctx) {
+    static NettyHttpRequest get(ChannelHandlerContext ctx) {
         Channel channel = ctx.channel();
         io.netty.util.Attribute<NettyHttpRequest> attr = channel.attr(KEY);
         return attr.get();
     }
 
     /**
-     * Lookup the current request from the context.
+     * Remove the current request from the context.
      *
      * @param ctx The context
      * @return The request or null if it is not present
      */
-    public static NettyHttpRequest current(ChannelHandlerContext ctx) {
-        NettyHttpRequest current = get(ctx);
-        if (current == null) {
-            throw new IllegalStateException("Current request not present");
-        }
-        return current;
+    static NettyHttpRequest remove(ChannelHandlerContext ctx) {
+        Channel channel = ctx.channel();
+        io.netty.util.Attribute<NettyHttpRequest> attr = channel.attr(KEY);
+        return attr.getAndSet(null);
     }
+
 }

@@ -20,10 +20,13 @@ import groovy.transform.CompileDynamic
 import groovy.transform.CompileStatic
 import io.micronaut.cli.MicronautCli
 import io.micronaut.cli.boot.DependencyVersions
+import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.profile.Profile
+import io.micronaut.cli.util.VersionInfo
 import org.eclipse.aether.artifact.Artifact
 import org.eclipse.aether.artifact.DefaultArtifact
 import org.eclipse.aether.graph.Dependency
+import org.eclipse.aether.transfer.ArtifactNotFoundException
 import org.springframework.boot.cli.compiler.grape.AetherGrapeEngine
 import org.springframework.boot.cli.compiler.grape.DependencyResolutionContext
 import org.springframework.boot.cli.compiler.grape.DependencyResolutionFailedException
@@ -40,7 +43,8 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
     public static final RepositoryConfiguration DEFAULT_REPO
 
     static {
-        def version = MicronautCli.getPackage().getImplementationVersion()
+        def version = VersionInfo.getVersion(MicronautCli)
+
         if(version == null || version.endsWith("-SNAPSHOT")) {
             DEFAULT_REPO = new RepositoryConfiguration(
                     "micronautSnapshots",
@@ -62,6 +66,7 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
     DependencyResolutionContext resolutionContext
     DependencyVersions profileDependencyVersions
     private boolean resolved = false
+    private String mavenLocalLocation
 
     MavenProfileRepository(List<RepositoryConfiguration> repositoryConfigurations) {
         this.repositoryConfigurations = repositoryConfigurations
@@ -105,18 +110,20 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
             grapeEngine.grab(group: art.groupId,
                              module: art.artifactId,
                              version: art.version ?: null)
-        } catch (DependencyResolutionFailedException e) {
+        } catch (ArtifactNotFoundException | DependencyResolutionFailedException e) {
 
-            def localData = new File(System.getProperty("user.home"), "/.m2/repository/${art.groupId.replace('.', '/')}/$art.artifactId/maven-metadata-local.xml")
+            def localData = new File(mavenLocal, "/${art.groupId.replace('.', '/')}/$art.artifactId/maven-metadata-local.xml")
             if (localData.exists()) {
                 def currentVersion = parseCurrentVersion(localData)
                 def profileFile = new File(localData.parentFile, "$currentVersion/${art.artifactId}-${currentVersion}.jar")
                 if (profileFile.exists()) {
                     classLoader.addURL(profileFile.toURI().toURL())
                 } else {
+                    MicronautConsole.instance.error("${profileFile} not found in ${localData}")
                     throw e
                 }
             } else {
+                MicronautConsole.instance.error("Also: ${localData} not found")
                 throw e
             }
         }
@@ -137,22 +144,48 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
         }
     }
 
+    @CompileDynamic
+    protected String getMavenLocal() {
+        if(!mavenLocalLocation) {
+
+            File settingsXml = new File(System.getProperty("user.home"), "/.m2/settings.xml")
+            if(settingsXml.exists()) {
+                String localRepo = new XmlSlurper().parseText(settingsXml.text)?.localRepository
+                if(localRepo) {
+                    mavenLocalLocation = "${localRepo.replace('${user.home}', System.getProperty("user.home"))}"
+                }
+            }
+
+            if(!mavenLocalLocation) {
+                mavenLocalLocation = "${System.getProperty("user.home")}/.m2/repository/"
+            }
+        }
+
+        mavenLocalLocation
+    }
+
     @Override
     List<Profile> getAllProfiles() {
         if (!resolved) {
             List<Map> profiles = []
             resolutionContext.managedDependencies.each { Dependency dep ->
-                if (dep.artifact.groupId == "io.micronaut.cli.profiles") {
+                if (dep.artifact.groupId == "io.micronaut.profiles") {
                     profiles.add([group: dep.artifact.groupId, module: dep.artifact.artifactId])
                 }
             }
             profiles.sort { it.module }
 
-            for (Map profile in profiles) {
-                grapeEngine.grab(profile)
+            try {
+                for (Map profile in profiles) {
+                    grapeEngine.grab(profile)
+                }
+            } catch (ArtifactNotFoundException | DependencyResolutionFailedException e) {
+                if (Boolean.getBoolean("micronaut.verbose")) {
+                    MicronautConsole.instance.warn("Ignoring error: " + e)
+                }
             }
 
-            def localData = new File(System.getProperty("user.home"), "/.m2/repository/io/micronaut/profiles")
+            def localData = new File(mavenLocal, "/io/micronaut/profiles")
             if (localData.exists()) {
                 localData.eachDir { File dir ->
                     if (!dir.name.startsWith('.')) {

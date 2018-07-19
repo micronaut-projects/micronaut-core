@@ -18,10 +18,8 @@ package io.micronaut.core.reflect;
 
 import io.micronaut.core.util.ArrayUtils;
 
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import javax.annotation.Nullable;
+import java.util.*;
 
 /**
  * Utility methods for loading classes.
@@ -85,10 +83,10 @@ public class ClassUtils {
      * Check whether the given class is present in the given classloader.
      *
      * @param name        The name of the class
-     * @param classLoader The classloader
+     * @param classLoader The classloader. If null will fallback to attempt the thread context loader, otherwise the system loader
      * @return True if it is
      */
-    public static boolean isPresent(String name, ClassLoader classLoader) {
+    public static boolean isPresent(String name, @Nullable ClassLoader classLoader) {
         return forName(name, classLoader).isPresent();
     }
 
@@ -137,11 +135,18 @@ public class ClassUtils {
      * Attempt to load a class for the given name from the given class loader.
      *
      * @param name        The name of the class
-     * @param classLoader The classloader
+     * @param classLoader The classloader. If null will fallback to attempt the thread context loader, otherwise the system loader
      * @return An optional of the class
      */
-    public static Optional<Class> forName(String name, ClassLoader classLoader) {
+    public static Optional<Class> forName(String name, @Nullable ClassLoader classLoader) {
         try {
+            if (classLoader == null) {
+                classLoader = Thread.currentThread().getContextClassLoader();
+            }
+            if (classLoader == null) {
+                classLoader = ClassLoader.getSystemClassLoader();
+            }
+
             Optional<Class> commonType = Optional.ofNullable(COMMON_CLASS_MAP.get(name));
             if (commonType.isPresent()) {
                 return commonType;
@@ -150,6 +155,50 @@ public class ClassUtils {
             }
         } catch (ClassNotFoundException | NoClassDefFoundError e) {
             return Optional.empty();
+        }
+    }
+
+    /**
+     * Builds a class hierarchy that includes all super classes
+     * and interfaces that the given class implements or extends from.
+     *
+     * @param type The class to start with
+     * @return The class hierarchy
+     */
+    public static List<Class> resolveHierarchy(Class<?> type) {
+        Class<?> superclass = type.getSuperclass();
+        List<Class> hierarchy = new ArrayList<>();
+        if (superclass != null) {
+            populateHierarchyInterfaces(type, hierarchy);
+
+            while (superclass != Object.class) {
+                populateHierarchyInterfaces(superclass, hierarchy);
+                superclass = superclass.getSuperclass();
+            }
+        } else if (type.isInterface()) {
+            populateHierarchyInterfaces(type, hierarchy);
+        }
+
+        if (type.isArray()) {
+            if (!type.getComponentType().isPrimitive()) {
+                hierarchy.add(Object[].class);
+            }
+        } else {
+            hierarchy.add(Object.class);
+        }
+
+        return hierarchy;
+    }
+
+    private static void populateHierarchyInterfaces(Class<?> superclass, List<Class> hierarchy) {
+        if (!hierarchy.contains(superclass)) {
+            hierarchy.add(superclass);
+        }
+        for (Class<?> aClass : superclass.getInterfaces()) {
+            if (!hierarchy.contains(aClass)) {
+                hierarchy.add(aClass);
+            }
+            populateHierarchyInterfaces(aClass, hierarchy);
         }
     }
 }

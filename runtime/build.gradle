@@ -33,8 +33,9 @@ dependencies {
     testCompile dependencyVersion("reactor")
     testCompile project(":inject-java")
     testCompile project(":inject-groovy")
-
+    testCompile "com.google.testing.compile:compile-testing:0.12"
     testCompile dependencyModuleVersion("gorm", "grails-datastore-gorm")
+    testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
 }
 
 shadowJar {

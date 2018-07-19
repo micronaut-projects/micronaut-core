@@ -428,6 +428,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                     invokeMethodVisitor.visitMaxs(AbstractClassFileWriter.DEFAULT_MAX_STACK, 1);
                     invokeMethodVisitor.visitEnd();
                 }
+
             };
             executableMethodWriter.makeInner(proxyInternalName, classWriter);
             executableMethodWriter.visitMethod(declaringType, returnType, genericReturnType, returnTypeGenericTypes, methodName, argumentTypes, argumentAnnotationMetadata, genericTypes);

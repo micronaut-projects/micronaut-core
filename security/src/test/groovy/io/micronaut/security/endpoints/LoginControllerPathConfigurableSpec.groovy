@@ -33,7 +33,6 @@ import io.micronaut.security.handlers.LoginHandler
 import io.reactivex.Flowable
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
-import spock.lang.IgnoreIf
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -55,7 +54,6 @@ class LoginControllerPathConfigurableSpec extends Specification {
     RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
 
-    @IgnoreIf({System.getenv("TRAVIS")}) //TODO no idea why it fails on travis
     void "LoginController is not accessible at /login but at /auth"() {
         given:
         UsernamePasswordCredentials creds = new UsernamePasswordCredentials('user', 'password')

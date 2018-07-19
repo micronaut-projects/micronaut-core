@@ -17,11 +17,14 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
+
+import javax.annotation.Nonnull;
 
 /**
  * Base class for types that also write {@link io.micronaut.core.annotation.AnnotationMetadata}.
@@ -29,6 +32,7 @@ import org.objectweb.asm.commons.GeneratorAdapter;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFileWriter {
 
     /**
@@ -65,7 +69,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
      * @param classWriter The {@link ClassWriter}
      */
     protected void writeGetAnnotationMetadataMethod(ClassWriter classWriter) {
-        GeneratorAdapter annotationMetadataMethod = startPublicMethod(classWriter, "getAnnotationMetadata", AnnotationMetadata.class.getName());
+        GeneratorAdapter annotationMetadataMethod = beginAnnotationMetadataMethod(classWriter);
         annotationMetadataMethod.loadThis();
 
         // in order to save memory of a method doesn't have any annotations of its own but merely references class metadata
@@ -82,6 +86,16 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
         annotationMetadataMethod.returnValue();
         annotationMetadataMethod.visitMaxs(1, 1);
         annotationMetadataMethod.visitEnd();
+    }
+
+    /**
+     * Returns the generator adaptor for the method that resolves the annotation metadata.
+     *
+     * @param classWriter  The class writer
+     * @return The generator adapter
+     */
+    protected @Nonnull GeneratorAdapter beginAnnotationMetadataMethod(ClassWriter classWriter) {
+        return startPublicMethod(classWriter, "getAnnotationMetadata", AnnotationMetadata.class.getName());
     }
 
     /**

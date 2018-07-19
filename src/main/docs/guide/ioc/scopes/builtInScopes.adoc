@@ -17,3 +17,11 @@
 |===
 
 Additional scopes can be added by defining a `@Singleton` bean that implements the link:{api}/io/micronaut/context/scope/CustomScope.html[CustomScope] interface.
+
+Note that with Micronaut when starting a api:context.ApplicationContext[] by default `@Singleton` scoped beans are created lazily and on demand. This is by design and to optimize startup time.
+
+If this is presents are problem for your use case you have the option of using the ann:context.annotation.Context[] annotation which binds the lifecycle of your object to the lifecycle of the api:context.ApplicationContext[]. In other words when the api:context.ApplicationContext[] is started your bean will be created.
+
+Alternatively you can annotate any `@Singleton` scoped bean with ann:context.annotation.Parallel[] which allows parallel initialization of your bean without impacting overall startup time.
+
+NOTE: If your bean fails to initialize in parallel then the application will be automatically shutdown.

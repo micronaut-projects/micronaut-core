@@ -16,10 +16,6 @@
 package io.micronaut.aop.simple
 
 import io.micronaut.aop.interceptors.Mutating
-import io.micronaut.aop.interceptors.Mutating
-
-import java.util.Collections
-import java.util.List
 
 /**
  * @author Graeme Rocher

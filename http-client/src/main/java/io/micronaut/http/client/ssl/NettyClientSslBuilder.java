@@ -17,10 +17,7 @@
 package io.micronaut.http.client.ssl;
 
 import io.micronaut.core.io.ResourceResolver;
-import io.micronaut.http.ssl.ClientAuthentication;
-import io.micronaut.http.ssl.SslBuilder;
-import io.micronaut.http.ssl.SslConfiguration;
-import io.micronaut.http.ssl.SslConfigurationException;
+import io.micronaut.http.ssl.*;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
@@ -48,17 +45,18 @@ public class NettyClientSslBuilder extends SslBuilder<SslContext> {
      * @param ssl              The SSL configuration
      * @param resourceResolver The resource resolver
      */
-    public NettyClientSslBuilder(SslConfiguration ssl, ResourceResolver resourceResolver) {
+    @Inject
+    public NettyClientSslBuilder(ClientSslConfiguration ssl, ResourceResolver resourceResolver) {
         super(ssl, resourceResolver);
     }
 
     /**
      * @param ssl The SSL configuration
      */
-    @Inject
     public NettyClientSslBuilder(SslConfiguration ssl/*, ResourceResolver resourceResolver*/) {
         super(ssl, new ResourceResolver());
     }
+
 
     /**
      * @return The SSL configuration

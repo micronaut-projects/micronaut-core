@@ -28,7 +28,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -41,6 +40,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class AnnotationUtil {
 
     /**
@@ -139,25 +139,11 @@ public class AnnotationUtil {
      */
     public static Optional<Annotation> findAnnotationWithStereoType(AnnotatedElement element, String stereotypeName) {
         if (element instanceof Class) {
-            return findAnnotationWithStereoType((Class) element, stereotypeName);
+            return findAnnotationWithStereoType(element, stereotypeName);
         } else {
             Annotation[] annotations = element.getAnnotations();
             return findAnnotationWithStereoType(stereotypeName, annotations);
         }
-    }
-
-    /**
-     * Finds an annotation on the given class for the given stereotype. The result of this method is cached.
-     * This method should not be used in runtime code that is executed repeatedly. Consumers of this method should be aware
-     * that code that utilizes the method should be executed once upon startup.
-     *
-     * @param type       The type
-     * @param stereotype The stereotype
-     * @return The annotation
-     */
-    public static Optional<Annotation> findAnnotationWithStereoType(Class type, Class stereotype) {
-        String stereotypeName = stereotype.getName();
-        return findAnnotationWithStereoType(type, stereotypeName);
     }
 
     /**
@@ -289,80 +275,6 @@ public class AnnotationUtil {
             }
         }
         return Optional.empty();
-    }
-
-    /**
-     * Finds an annotation from the given array of annotations that matches the given stereotype.
-     *
-     * @param stereotype  The stereotype
-     * @param annotations The annotations to search
-     * @return The annotation
-     */
-    public static Collection<Annotation> findAnnotationsWithStereoType(Class<?> stereotype, Annotation... annotations) {
-        String stereotypeName = stereotype.getName();
-        Collection<Annotation> annotationList = new ArrayList<>();
-        for (Annotation ann : annotations) {
-            if (stereotypeName.equals(ann.annotationType().getName())) {
-                annotationList.add(ann);
-            } else if (isNotInternalAnnotation(ann)) {
-                if (findAnnotationWithStereoType(ann.annotationType(), stereotype).isPresent()) {
-                    annotationList.add(ann);
-                }
-            }
-        }
-        return Collections.unmodifiableCollection(annotationList);
-    }
-
-    /**
-     * Finds an annotation from the given array of annotations that matches the given stereotype.
-     *
-     * @param stereotypeName The stereotype
-     * @param annotations    The annotations to search
-     * @return The annotation
-     */
-    public static Collection<Annotation> findAnnotationsWithStereoType(String stereotypeName, Annotation... annotations) {
-        Collection<Annotation> annotationList = new ArrayList<>();
-        for (Annotation ann : annotations) {
-            if (stereotypeName.equals(ann.annotationType().getName())) {
-                annotationList.add(ann);
-            } else if (isNotInternalAnnotation(ann)) {
-                if (findAnnotationWithStereoType(stereotypeName, ann.annotationType().getAnnotations()).isPresent()) {
-                    annotationList.add(ann);
-                }
-            }
-        }
-        return Collections.unmodifiableCollection(annotationList);
-    }
-
-    /**
-     * Find all the annotations on the given {@link AnnotatedElement} candidates for the given stereotype.
-     *
-     * @param candidates The annotated element
-     * @param stereotype The stereotype
-     * @return The collection of annotations
-     */
-    public static Collection<Annotation> findAnnotationsWithStereoType(AnnotatedElement[] candidates, Class<?> stereotype) {
-        Collection<Annotation> annotations = new ArrayList<>();
-        for (AnnotatedElement candidate : candidates) {
-            Collection<? extends Annotation> found = findAnnotationsWithStereoType(candidate, stereotype);
-            for (Annotation annotation : found) {
-                if (!annotations.contains(annotation)) {
-                    annotations.add(annotation);
-                }
-            }
-        }
-        return annotations;
-    }
-
-    /**
-     * Find all the annotations on the given {@link AnnotatedElement} for the given stereotype.
-     *
-     * @param annotatedElement The annotated element
-     * @param stereotype       The stereotype
-     * @return The collection of annotations
-     */
-    public static Collection<? extends Annotation> findAnnotationsWithStereoType(AnnotatedElement annotatedElement, Class<?> stereotype) {
-        return findAnnotationsWithStereoType(stereotype, annotatedElement.getAnnotations());
     }
 
     private static boolean isNotInternalAnnotation(Annotation ann) {

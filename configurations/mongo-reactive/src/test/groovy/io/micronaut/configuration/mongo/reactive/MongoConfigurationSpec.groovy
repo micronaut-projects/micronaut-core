@@ -21,14 +21,12 @@ import com.mongodb.MongoClientOptions
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
 import org.bson.Document
-import spock.lang.IgnoreIf
 import spock.lang.Specification
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-@IgnoreIf({ System.getenv("JENKINS_URL") })
 class MongoConfigurationSpec extends Specification {
 
     void "test a basic blocking driver connection"() {

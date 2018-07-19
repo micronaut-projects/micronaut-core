@@ -17,22 +17,14 @@
 package io.micronaut.configuration.mongo.reactive.test;
 
 import com.mongodb.ConnectionString;
-import com.mongodb.ServerAddress;
-import de.flapdoodle.embed.mongo.MongodExecutable;
 import de.flapdoodle.embed.mongo.MongodProcess;
-import de.flapdoodle.embed.mongo.MongodStarter;
-import de.flapdoodle.embed.mongo.config.IMongodConfig;
-import de.flapdoodle.embed.mongo.config.MongodConfigBuilder;
-import de.flapdoodle.embed.mongo.config.Net;
-import de.flapdoodle.embed.mongo.distribution.Version;
-import de.flapdoodle.embed.process.runtime.Network;
 import io.micronaut.configuration.mongo.reactive.DefaultMongoConfiguration;
+import io.micronaut.configuration.mongo.reactive.MongoSettings;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.io.socket.SocketUtils;
 
 import javax.annotation.PreDestroy;
 import javax.inject.Singleton;
@@ -47,30 +39,16 @@ import java.util.Optional;
 @Requires(classes = MongodProcess.class)
 @Requires(beans = DefaultMongoConfiguration.class)
 @Requires(env = Environment.TEST)
+@Requires(property = MongoSettings.EMBEDDED, notEquals = "false", defaultValue = "true")
 @Singleton
-public class MongoProcessFactory implements BeanCreatedEventListener<DefaultMongoConfiguration>, Closeable {
-    private MongodProcess process;
+public class MongoProcessFactory extends AbstractMongoProcessFactory implements BeanCreatedEventListener<DefaultMongoConfiguration>, Closeable {
 
     @Override
     public DefaultMongoConfiguration onCreated(BeanCreatedEvent<DefaultMongoConfiguration> event) {
         DefaultMongoConfiguration configuration = event.getBean();
         try {
             Optional<ConnectionString> connectionString = configuration.getConnectionString();
-            if (connectionString.isPresent()) {
-                String first = connectionString.get().getHosts().get(0);
-                if (SocketUtils.isTcpPortAvailable(new ServerAddress(first).getPort())) {
-
-                    // should be ok to do this without checking unless MongoNotAvailableCondition is not working properly
-                    int port = new ServerAddress(first).getPort();
-                    IMongodConfig mongodConfig = new MongodConfigBuilder()
-                        .version(Version.Main.PRODUCTION)
-                        .net(new Net("localhost", port, Network.localhostIsIPv6()))
-                        .build();
-
-                    MongodExecutable mongodExecutable = MongodStarter.getDefaultInstance().prepare(mongodConfig);
-                    this.process = mongodExecutable.start();
-                }
-            }
+            startEmbeddedMongoIfPossible(connectionString.orElse(null), null);
         } catch (IOException e) {
             throw new ConfigurationException("Error starting Embedded MongoDB server: " + e.getMessage(), e);
         }

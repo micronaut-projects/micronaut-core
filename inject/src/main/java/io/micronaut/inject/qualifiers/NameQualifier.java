@@ -26,7 +26,6 @@ import io.micronaut.inject.BeanType;
 
 import javax.inject.Named;
 import java.lang.annotation.Annotation;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -66,7 +65,7 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
                     }
                     return candidate.getBeanType().getSimpleName();
                 });
-                return typeName.equalsIgnoreCase(name) || typeName.toLowerCase(Locale.ENGLISH).startsWith(name);
+                return typeName.equalsIgnoreCase(name) || typeName.equalsIgnoreCase(name + beanType.getSimpleName());
             }
         );
     }

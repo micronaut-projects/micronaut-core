@@ -17,6 +17,8 @@
 package io.micronaut.http.client;
 
 import io.micronaut.core.convert.format.ReadableBytes;
+import io.micronaut.http.ssl.ClientSslConfiguration;
+import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.netty.channel.ChannelOption;
 
@@ -26,6 +28,7 @@ import java.net.SocketAddress;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
@@ -40,11 +43,6 @@ import java.util.concurrent.ThreadFactory;
  */
 public abstract class HttpClientConfiguration {
 
-    /**
-     * Constant for localhost.
-     */
-    public static final String LOCALHOST = "localhost";
-
     private Map<ChannelOption, Object> channelOptions = Collections.emptyMap();
 
     private Integer numOfThreads = null;
@@ -57,6 +55,8 @@ public abstract class HttpClientConfiguration {
     private Duration connectTimeout;
 
     private Duration readTimeout = Duration.ofSeconds(10);
+
+    private Duration readIdleTime = Duration.of(60, ChronoUnit.SECONDS);
 
     private Duration shutdownTimeout = Duration.ofMillis(100);
 
@@ -74,6 +74,8 @@ public abstract class HttpClientConfiguration {
 
     private boolean followRedirects = true;
 
+    private SslConfiguration sslConfiguration = new ClientSslConfiguration();
+
     /**
      * Default constructor.
      */
@@ -87,6 +89,22 @@ public abstract class HttpClientConfiguration {
         if (applicationConfiguration != null) {
             this.defaultCharset = applicationConfiguration.getDefaultCharset();
         }
+    }
+
+    /**
+     * @return The {@link SslConfiguration} for the client
+     */
+    public SslConfiguration getSslConfiguration() {
+        return sslConfiguration;
+    }
+
+    /**
+     * Sets the SSL configuration for the client.
+     *
+     * @param sslConfiguration The SSL configuration
+     */
+    public void setSslConfiguration(SslConfiguration sslConfiguration) {
+        this.sslConfiguration = sslConfiguration;
     }
 
     /**
@@ -144,6 +162,18 @@ public abstract class HttpClientConfiguration {
         return Optional.ofNullable(readTimeout);
     }
 
+
+    /**
+     * For streaming requests, the {@link #getReadTimeout()} method does not apply instead a configurable
+     * idle timeout is applied.
+     *
+     * @return The default amount of time to allow read operation connections  to remain idle
+     */
+    public Optional<Duration> getReadIdleTime() {
+        return Optional.ofNullable(readIdleTime);
+    }
+
+
     /**
      * @return The default connect timeout. Defaults to Netty default.
      */
@@ -176,6 +206,15 @@ public abstract class HttpClientConfiguration {
      */
     public void setReadTimeout(@Nullable Duration readTimeout) {
         this.readTimeout = readTimeout;
+    }
+
+    /**
+     * Sets the max read idle time for streaming requests.
+     *
+     * @param readIdleTime The read idle time
+     */
+    public void setReadIdleTime(@Nullable Duration readIdleTime) {
+        this.readIdleTime = readIdleTime;
     }
 
     /**
@@ -293,6 +332,7 @@ public abstract class HttpClientConfiguration {
     /**
      * @return The proxy password to use.
      */
+    @SuppressWarnings("WeakerAccess")
     public Optional<String> getProxyPassword() {
         String type = proxyType.name().toLowerCase();
         return proxyPassword != null ? Optional.of(proxyPassword) : Optional.ofNullable(System.getProperty(type + ".proxyPassword"));

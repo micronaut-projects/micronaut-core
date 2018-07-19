@@ -23,3 +23,5 @@ Reading tokens from Cookies is disabled by default. Note that using JWT tokens f
 |===
 
 See the javadoc for api:security.token.jwt.cookie.JwtCookieConfigurationProperties[] for more information.
+
+TIP: Read the http://guides.micronaut.io/micronaut-security-jwt-cookie/guide/index.html[Micronaut JWT Authentication with Cookies] to learn more.

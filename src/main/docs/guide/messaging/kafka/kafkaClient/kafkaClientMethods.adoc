@@ -1,0 +1,112 @@
+=== Specifying the Key and the Value
+
+The Kafka key can be specified by providing a parameter annotated with `@KafkaKey`. If no such parameter is specified the record is sent with a `null` key.
+
+The value to send is resolved by selecting the argument annotated with ann:messaging.annotation.Body[], otherwise the first argument with no specific binding annotation is used. For example:
+
+[source,java]
+----
+@Topic("my-products")
+void sendProduct(@KafkaKey String brand, String name);
+----
+
+The method above will use the parameter `brand` as the key and the parameter `name` as the value.
+
+=== Including Message Headers
+
+There are a number of ways you can include message headers. One way is to annotate an argument with the ann:messaging.annotation.Header[] annotation and include a value when calling the method:
+
+[source,java]
+----
+@Topic("my-products")
+void sendProduct(
+    @KafkaKey String brand,
+    String name,
+    @Header("My-Header") String myHeader);
+----
+
+The example above will include the value of the `myHeader` argument as a header called `My-Header`.
+
+Another way to include headers is at the type level with the values driven from configuration:
+
+.Declaring @KafkaClient Headers
+[source,java]
+----
+include::{testskafka}/producer/headers/ProductClient.java[tags=imports, indent=0]
+
+include::{testskafka}/producer/headers/ProductClient.java[tags=clazz, indent=0]
+    ...
+}
+----
+
+The above example will send a header called `X-Token` with the value read from the setting `my.application.token` in `application.yml` (or the environnment variable `MY_APPLICATION_TOKEN`).
+
+If the `my.application.token` is not set then an error will occur creating the client.
+
+=== Reactive and Non-Blocking Method Definitions
+
+The ann:configuration.kafka.annotation.KafkaClient[] annotation supports the definition of reactive return types (such as rx:Flowable[] or Reactor `Flux`) as well as Futures.
+
+The following sections cover possible method signatures and behaviour:
+
+==== Single Value and Return Type
+
+[source,java]
+----
+Single<Book> sendBook(
+    @KafkaKey String author,
+    Single<Book> book
+);
+----
+
+The implementation will return a rx:Single[] that when subscribed to will subscribe to the passed rx:Single[] and send the emitted item as a `ProducerRecord` emitting the item again if successful or an error otherwise.
+
+==== Flowable Value and Return Type
+
+[source,java]
+----
+Flowable<Book> sendBooks(
+    @KafkaKey String author,
+    Flowable<Book> book
+);
+----
+
+The implementation will return a rx:Flowable[] that when subscribed to will subscribe to the passed rx:Flowable[] and for each emitted item will send a `ProducerRecord` emitting the item again if successful or an error otherwise.
+
+==== Flowable Value and Return Type
+
+[source,java]
+----
+Flux<RecordMetadata> sendBooks(
+    @KafkaKey String author,
+    Flux<Book> book
+);
+----
+
+The implementation will return a Reactor `Flux` that when subscribed to will subscribe to the passed `Flux` and for each emitted item will send a `ProducerRecord` emitting the resulting Kafka `RecordMetadata` if successful or an error otherwise.
+
+=== Available Annotations
+
+There are a number of annotations available that allow you to specify how a method argument is treated.
+
+The following table summarizes the annotations and their purpose, with an example:
+
+.Kafka Messaging Annotations
+|===
+|Annotation |Description |Example
+
+|ann:messaging.annotation.Body[]
+| Allows explicitly indicating the body of the message to sent
+|`@Body Product product`
+
+|ann:messaging.annotation.Header[]
+| Allows specifying a parameter that should be sent as a header
+|`@Header("X-My-Header") String myHeader`
+
+|ann:configuration.kafka.annotation.KafkaKey[]
+| Allows specifying the parameter that is the Kafka key
+|`@KafkaKey String key`
+
+|===
+
+For example, you can use the ann:messaging.annotation.Header[] annotation to bind a parameter value to a header in the `ProducerRecord`.

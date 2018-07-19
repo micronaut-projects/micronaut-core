@@ -16,6 +16,7 @@
 
 package io.micronaut.context;
 
+import io.micronaut.context.env.Environment;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -23,7 +24,10 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ConstructorInjectionPoint;
+import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 
+import javax.annotation.Nullable;
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
 import java.util.Objects;
@@ -37,13 +41,15 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T> {
+class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T>, EnvironmentConfigurable {
 
     private final BeanDefinition<T> declaringBean;
     private final Class<T> declaringType;
     private final Class[] argTypes;
     private final AnnotationMetadata annotationMetadata;
     private final Argument<?>[] arguments;
+
+    private Environment environment;
 
     /**
      * @param declaringBean      The declaring bean
@@ -60,8 +66,17 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
         this.argTypes = Argument.toClassArray(arguments);
         this.declaringBean = declaringBean;
         this.declaringType = declaringType;
-        this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
+        if (!(annotationMetadata instanceof DefaultAnnotationMetadata)) {
+            this.annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
+        } else {
+            this.annotationMetadata = new ConstructorAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
+        }
         this.arguments = arguments == null ? Argument.ZERO_ARGUMENTS : arguments;
+    }
+
+    @Override
+    public void configure(Environment environment) {
+        this.environment = environment;
     }
 
     @Override
@@ -117,5 +132,20 @@ class DefaultConstructorInjectionPoint<T> implements ConstructorInjectionPoint<T
     @Override
     public String toString() {
         return declaringType.getName() + "(" + Argument.toString(arguments) + ")";
+    }
+
+    /**
+     * Internal environment aware annotation metadata delegate.
+     */
+    private final class ConstructorAnnotationMetadata extends AbstractEnvironmentAnnotationMetadata {
+        ConstructorAnnotationMetadata(DefaultAnnotationMetadata targetMetadata) {
+            super(targetMetadata);
+        }
+
+        @Nullable
+        @Override
+        protected Environment getEnvironment() {
+            return environment;
+        }
     }
 }

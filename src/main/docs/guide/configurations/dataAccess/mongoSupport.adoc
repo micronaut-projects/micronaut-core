@@ -1,0 +1,122 @@
+==== Setting up the Native MongoDB Driver
+
+Micronaut features the ability to automatically configure the native MongoDB Java driver.
+
+To enable this you first need to add the `mongo-reactive` module to your classpath:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut.configuration:mongo-reactive"
+----
+
+Then configure the URI of the MongoDB server in `application.yml`:
+
+.Configuring a MongoDB server
+[source,yaml]
+----
+mongodb:
+    uri: mongodb://username:password@localhost:27017/databaseName
+----
+
+TIP: The `mongodb.uri` follows the https://docs.mongodb.com/manual/reference/connection-string[MongoDB Connection String] format.
+
+A non-blocking Reactive Streams http://mongodb.github.io/mongo-java-driver-reactivestreams/1.8/javadoc/com/mongodb/reactivestreams/client/MongoClient.html[MongoClient] is then available for dependency injection.
+
+To use the blocking driver, add a dependency to your application to the mongo-java-driver.
+
+[source,groovy]
+----
+compile "org.mongodb:mongo-java-driver"
+----
+
+Then the blocking http://mongodb.github.io/mongo-java-driver/3.7/javadoc/com/mongodb/MongoClient.html[MongoClient] will be available for injection.
+
+==== Configuring the MongoDB Driver
+
+The configuration options for the blocking client and the non-blocking client differ at the driver level.
+
+To configure the blocking client options you can use the `mongodb.options` setting which allows you to configure any property of the `MongoClientOptions.Builder` class. For example in `application.yml`:
+
+.Configuring Blocking Driver Options
+[source,yaml]
+----
+mongodb:
+    ...
+    options:
+        maxConnectionIdleTime: 10000
+        readConcern: majority
+----
+
+See the API for api:configuration.mongo.reactive.DefaultMongoConfiguration[] for more information on the available configuration options.
+
+For the Reactive driver, the api:configuration.mongo.reactive.ReactiveMongoConfiguration[] exposes options to configure the Reactive Streams driver. For example:
+
+
+.Configuring the Reactive Streams Driver
+[source,yaml]
+----
+mongodb:
+    ...
+    cluster:
+        maxWaitQueueSize: 5
+    connectionPool:
+        maxSize: 20
+----
+
+==== Using Embedded MongoDB for Testing
+
+For testing you can add a dependency on https://github.com/flapdoodle-oss/de.flapdoodle.embed.mongo[Embedded MongoDB] and if the MongoDB server is not available on the configured port for the test environment an embedded MongoDB will be bootstrapped and made available for testing:
+
+.Add Embedded MongoDB
+[source,groovy]
+----
+testCompile "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.0.1"
+----
+
+==== Multiple MongoDB Drivers
+
+You can create multiple MongoDB connections using the `mongodb.servers` setting. For example in `application.yml`:
+
+.Configuring Multiple MongoDB Drivers
+[source,yaml]
+----
+mongodb:
+    servers:
+        another:
+            uri: mongodb://localhost:27018
+----
+
+With the above configuration in place you can inject a `MongoClient` using the name `another`:
+
+[source,java]
+----
+import com.mongodb.reactivestreams.client.*;
+import javax.inject.*;
+...
+@Inject @Named("another") MongoClient mongoClient;
+----
+
+==== MongoDB Health Checks
+
+When the `mongo-reactive` module is activated a api:configuration.mongo.reactive.health.MongoHealthIndicator[] is activated resulting in the `/health` endpoint and api:health.CurrentHealthStatus[] interface resolving the health of the MongoDB connection.
+
+See the section on the <<healthEndpoint, Health Endpoint>> for more information.
+
+==== Using GORM for MongoDB
+
+For Groovy users and users familiar with Grails, special support has been added to Micronaut for using http://gorm.grails.org/latest/mongodb/manual[GORM for MongoDB].
+
+To add support for GORM for MongoDB, first configure the MongoDB connection as per instructions earlier in the guide, then add the following dependency to your application:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut.configuration:mongo-gorm"
+----
+
+The following should be noted regarding using GORM for MongoDB in Micronaut:
+
+* Each class you wish to be a GORM entity should be annotated with the `grails.gorm.annotation.Entity` annotation.
+* Each method that interacts with GORM should be annotated with GORM's `grails.gorm.transactions.Transactional` to ensure a session is present. You can also add the `@Transactional` annotation to the class.
+* By default Micronaut will scan for entities relative to your `Application` class. If you wish to customize this specify additional packages via the api:context.ApplicationContextBuilder[] when starting your application.

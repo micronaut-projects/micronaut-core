@@ -1,0 +1,12 @@
+dependencies {
+    compileOnly project(":inject-java")
+
+    compile project(":configurations:micrometer-core")
+
+    compile "javax.validation:validation-api:$validationVersion"
+    compile "io.micrometer:micrometer-registry-graphite:$micrometerVersion"
+
+    testCompile project(":inject-groovy")
+    testCompile project(":inject-java")
+    testCompile project(":http-server-netty")
+}

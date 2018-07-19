@@ -15,9 +15,6 @@
  */
 package io.micronaut.aop.compile
 
-import io.micronaut.context.DefaultBeanContext
-import io.micronaut.inject.BeanDefinition
-import io.micronaut.inject.BeanFactory
 import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.BeanDefinition

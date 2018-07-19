@@ -15,14 +15,10 @@
  */
 package io.micronaut.inject.method.arrayinjection
 
-import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
-import spock.lang.Specification
-
-import javax.inject.Named
 
 class SetterArrayInjectionSpec extends AbstractTypeElementSpec {
 

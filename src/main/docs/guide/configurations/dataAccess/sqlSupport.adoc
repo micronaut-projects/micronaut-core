@@ -1,0 +1,118 @@
+Java data sources can be configured for one of three currently provided implementations. Apache DBCP2, Hikari, and Tomcat are supported by default.
+
+== Configuring a JDBC DataSource
+
+To get started, simply add a dependency to one of the JDBC configurations that corresponds to the implementation you would like to use.
+
+.build.gradle
+[source,groovy]
+----
+dependencies {
+    // Choose one of the following
+    compile "io.micronaut.configuration:jdbc-tomcat"
+    compile "io.micronaut.configuration:jdbc-hikari"
+    compile "io.micronaut.configuration:jdbc-dbcp"
+}
+----
+
+You also need to add a JDBC driver dependency to your classpath. For example to add the http://www.h2database.com[H2 In-Memory Database]:
+
+.build.gradle
+[source,groovy]
+----
+runtime "com.h2database:h2:1.4.196"
+----
+
+== Configuring JDBC Connection Pools
+
+All of the implementation specific parameters can be configured. Effort was made to allow basic configuration to be consistent across the implementations.
+
+* Hikari: The URL is able to be configured through `url` in addition to `jdbcUrl`. The JNDI name can be configured through `jndiName` in addition to `dataSourceJNDI`.
+* Tomcat: The JNDI name can be configured through `jndiName` in addition to `dataSourceJNDI`.
+
+Several configuration options will be calculated if they are not provided.
+
+[cols="20%,80%"]
+|=======
+|URL |The classpath will be searched for an embedded database driver. If found, the URL will be set to the default value for that driver.
+|Driver Class|If the URL is configured, the driver class will be derived from the URL, otherwise the classpath will be searched for an embedded database driver. If found, the default class name for that driver will be used.
+|Username |If the configured database driver is embedded, the username will be set to "sa"
+|Password |If the configured database driver is embedded, the password will be set to an empty string.
+|=======
+
+For example:
+
+[source,yaml]
+.application.yaml
+----
+datasources.default: {}
+----
+
+The above configuration will result in a single link:{javase}javax/sql/DataSource.html[DataSource] bean being registered with the named qualifier of `default`.
+
+If for example, the H2 driver is on the classpath, it is equivalent to the following:
+
+[source,yaml]
+.application.yaml
+----
+datasources:
+    default:
+        url: jdbc:h2:mem:default;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+        username: sa
+        password: ""
+        driverClassName: org.h2.Driver
+----
+
+For a list of other properties able to be configured, simply refer to the implementation that is being used. All setter methods are candidates for configuration.
+
+[cols="20%,80%"]
+|=======
+|Tomcat |link:https://tomcat.apache.org/tomcat-9.0-doc/api/org/apache/tomcat/jdbc/pool/PoolProperties.html[PoolProperties]
+|Hikari |link:http://static.javadoc.io/com.zaxxer/HikariCP/2.7.1/com/zaxxer/hikari/HikariConfig.html[HikariConfig]
+|Apache DBCP |link:http://commons.apache.org/proper/commons-dbcp/api-2.1.1/org/apache/commons/dbcp2/BasicDataSource.html[BasicDataSource]
+|=======
+
+== Configuring Multiple Data Sources
+
+To register more than one data source, simply configure them under different names.
+
+[source,yaml]
+.application.yaml
+----
+datasources:
+    default:
+        ...
+    warehouse:
+        ...
+----
+
+When injecting link:{javase}javax/sql/DataSource.html[DataSource] beans, the one with the name "default" will be injected unless the injection is qualified with the configured name. If no configuration is named "default", none of the beans will be primary and thus all injections must be qualified. For example:
+
+[source,java]
+----
+@Inject DataSource dataSource // "default" will be injected
+@Inject @Named("warehouse") DataSource dataSource // "warehouse" will be injected
+----
+
+== JDBC Health Checks
+
+Once you have configured a JDBC `DataSource` the api:management.health.indicator.jdbc.JdbcIndicator[] is activated resulting in the `/health` endpoint and api:health.CurrentHealthStatus[] interface resolving the health of the JDBC connection.
+
+See the section on the <<healthEndpoint, Health Endpoint>> for more information.
+
+== Using Spring Transaction Management
+
+If you wish to use Spring-based transaction management you can add the following dependencies to your application:
+
+.build.gradle
+[source,groovy]
+----
+dependencies {
+    compile "io.micronaut:spring"
+    runtime "org.springframework:spring-jdbc"
+}
+----
+
+Micronaut will automatically configure a `DataSourceTransactionManager` and wrap the `DataSource` in a `TransactionAwareDataSourceProxy` for each configured `DataSource`.
+
+You should then use Micronaut's ann:spring.tx.annotation.Transactional[] annotation to ensure low-overhead, compile-time transaction management is applied to your classes.

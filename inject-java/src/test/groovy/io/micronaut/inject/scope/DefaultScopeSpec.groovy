@@ -18,10 +18,6 @@ package io.micronaut.inject.scope
 import io.micronaut.context.annotation.Prototype
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.context.annotation.Prototype
-import io.micronaut.inject.AbstractTypeElementSpec
-import io.micronaut.inject.BeanDefinition
-import spock.lang.Specification
 
 import javax.inject.Singleton
 

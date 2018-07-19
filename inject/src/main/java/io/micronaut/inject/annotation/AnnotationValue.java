@@ -18,9 +18,7 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.core.convert.value.ConvertibleValues;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 
 /**
  * A type for representation annotation values in order to support {@link java.lang.annotation.Repeatable} annotations.
@@ -28,7 +26,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class AnnotationValue {
+public final class AnnotationValue {
 
     private final String annotationName;
     private final ConvertibleValues<Object> convertibleValues;
@@ -49,7 +47,7 @@ public class AnnotationValue {
      */
     @SuppressWarnings("unchecked")
     public AnnotationValue(String annotationName) {
-        this.annotationName = annotationName;
+        this.annotationName = annotationName.intern();
         this.convertibleValues = ConvertibleValues.EMPTY;
         this.values = Collections.EMPTY_MAP;
     }
@@ -59,7 +57,7 @@ public class AnnotationValue {
      * @param convertibleValues The convertible values
      */
     public AnnotationValue(String annotationName, ConvertibleValues<Object> convertibleValues) {
-        this.annotationName = annotationName;
+        this.annotationName = annotationName.intern();
         this.convertibleValues = convertibleValues;
         Map<String, Object> existing = convertibleValues.asMap();
         this.values = new LinkedHashMap<>(existing.size());
@@ -82,7 +80,7 @@ public class AnnotationValue {
     }
 
     /**
-     * @return The attribute values
+     * @return The convertible values
      */
     public ConvertibleValues<Object> getConvertibleValues() {
         return convertibleValues;
@@ -125,4 +123,5 @@ public class AnnotationValue {
 
         return true;
     }
+
 }

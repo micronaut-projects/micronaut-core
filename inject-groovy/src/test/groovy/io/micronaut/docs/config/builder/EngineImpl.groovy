@@ -16,7 +16,6 @@
 package io.micronaut.docs.config.builder
 
 import javax.annotation.concurrent.Immutable
-import javax.inject.Singleton
 
 /**
  * @author Graeme Rocher

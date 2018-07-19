@@ -16,8 +16,6 @@
 package io.micronaut.aop.itfce
 
 import io.micronaut.aop.interceptors.Mutating
-import io.micronaut.aop.interceptors.Mutating
-
 
 /**
  * @author Graeme Rocher

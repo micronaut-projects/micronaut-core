@@ -1,0 +1,111 @@
+The ann:http.client.Client[] annotation can also handle streaming HTTP responses.
+
+=== Streaming JSON with @Client
+
+For example to write a client that streams data from the controller defined in the <<clientStreaming, JSON Streaming>> section of the documentation you can simply define a client that returns an unbound rs:Publisher[] such as a RxJava rx:Flowable[] or Reactor `Flux`:
+
+.HeadlineClient.java
+[source,java]
+----
+include::{testsclient}/streaming/HeadlineClient.java[tags=import, indent=0]
+
+include::{testsclient}/streaming/HeadlineClient.java[tags=class, indent=0]
+}
+----
+
+<1> The `@Get` method is defined as processing responses of type `APPLICATION_JSON_STREAM`
+<2> A rx:Flowable[] is used as the return type
+
+The following example shows how the previously defined `HeadlineClient` can be invoked from a JUnit test:
+
+.Streaming HeadlineClient
+[source,java]
+----
+include::{testsclient}/streaming/HeadlineControllerTest.java[tags=streamingClient, indent=0]
+----
+
+<1> The client is retrieved from the api:context.ApplicationContext[]
+<2> The `firstElement` method is used to return the first emitted item from the rx:Flowable[] as a rx:Maybe[].
+<3> The `blockingGet()` is used in the test to retrieve the result.
+
+
+=== Streaming Clients and Response Types
+
+The example defined in the previous section expects the server to respond with a stream of JSON objects and the content type to be `application/x-json-stream`. For example:
+
+.A JSON Stream
+[source,json]
+----
+{"title":"The Stand"}
+{"title":"The Shining"}
+----
+
+The reason for this is simple, a sequence of JSON object is not, in fact, valid JSON and hence the response content type cannot be `application/json`. For the JSON to be valid it would have to return an array:
+
+.A JSON Array
+[source,json]
+----
+[
+    {"title":"The Stand"},
+    {"title":"The Shining"}
+]
+----
+
+
+Micronaut's client does however support streaming of both individual JSON objects via `application/x-json-stream` and also JSON arrays defined with `application/json`.
+
+If the server returns `application/json` and a non-single rs:Publisher[] is returned (such as an rx:Flowable[] or a Reactor `Flux`) then the client with stream the array elements as they become available.
+
+
+=== Streaming Clients and Read Timeout
+
+When streaming responses from servers, the underlying HTTP client will not apply the default `readTimeout` setting (which defaults to 10 seconds) of the api:http.client.HttpClientConfiguration[] since the delay between reads for streaming responses may differ from normal reads.
+
+Instead the `readIdleTime` setting (which defaults to 60 seconds) is used to dictate when a connection should be closed after becoming idle.
+
+If you are streaming data from a server that defines a longer delay than 60 seconds between items being sent to the client you should adjust the `readIdleTime`. The following configuration in `application.yml` demonstrates how:
+
+.Adjusting the readIdleTime
+[source,yaml]
+----
+micronaut:
+    http:
+        client:
+            readIdleTime: 5m
+----
+
+The above example sets the `readIdleTime` to 5 minutes.
+
+
+=== Streaming Server Sent Events
+
+Micronaut features a native client for Server Sent Events (SSE) defined by the interface api:http.client.sse.SseClient[].
+
+You can use this client to stream SSE events from any server that emits them.
+
+NOTE: Although SSE streams are typically consumed by a browser `EventSource`, there are a few cases where you may wish to consume a SSE stream via api:http.client.sse.SseClient[] such as in unit testing or when a Micronaut service acts as a gateway for another service.
+
+The ann:http.client.Client[] annotation also supports consuming SSE streams. For example, consider the following controller method that produces a stream of SSE events:
+
+.SSE Controller
+[source,java]
+----
+include::{testsclient}/sse/HeadlineController.java[tags=streaming, indent=0]
+----
+
+<1> The controller defines a ann:http.annotation.Get[] annotation that produces a `MediaType.TEXT_EVENT_STREAM`
+<2> The method itself uses Reactor to emit a hypothetical `Headline` object
+<3> The `repeat` method is used to repeat the emission 100 times
+<4> With a delay of 1 second between each item emitted.
+
+Notice that the return type of the controller is also api:http.sse.Event[] and that the `Event.of` method is used to create events to stream to the client.
+
+To define a client that consumes the events you simply have to define a method that processes `MediaType.TEXT_EVENT_STREAM`:
+
+.SSE Client
+[source,java]
+----
+include::{testsclient}/sse/HeadlineClient.java[tags=class, indent=0]
+----
+
+The generic type of the `Flux` or `Flowable` can be either an api:http.sse.Event[], in which case you will receive the full event object, or a POJO, in which case you will receive only the data contained within the event converted from JSON.

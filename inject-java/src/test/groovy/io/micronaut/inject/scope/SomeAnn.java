@@ -17,8 +17,6 @@ package io.micronaut.inject.scope;
 
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.DefaultScope;
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.DefaultScope;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Documented;

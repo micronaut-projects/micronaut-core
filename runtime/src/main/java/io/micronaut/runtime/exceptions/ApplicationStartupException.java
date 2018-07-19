@@ -37,4 +37,14 @@ public class ApplicationStartupException extends RuntimeException {
     public ApplicationStartupException(String message, Throwable cause) {
         super(message, cause);
     }
+
+    /**
+     * Create exception with detailed message and cause.
+     *
+     * @param  message the detail message (which is saved for later retrieval
+     *         by the {@link #getMessage()} method).
+     */
+    public ApplicationStartupException(String message) {
+        super(message);
+    }
 }

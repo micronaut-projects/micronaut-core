@@ -18,6 +18,7 @@ package io.micronaut.function;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Executable;
 
 import javax.inject.Singleton;
@@ -43,5 +44,19 @@ public @interface FunctionBean {
     /**
      * @return An optional ID of the function which may or may not be used depending on the target platform
      */
+    @AliasFor(member = "name")
     String value() default "";
+
+    /**
+     * @return An optional ID of the function which may or may not be used depending on the target platform
+     */
+    @AliasFor(member = "value")
+    String name() default "";
+
+    /**
+     * The method name of a function within the class that is the function to invoke. The method should take no more than two arguments
+     *
+     * @return The method name
+     */
+    String method() default "";
 }

@@ -16,7 +16,6 @@
 
 package io.micronaut.http.ssl;
 
-import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.Toggleable;
 
 import java.util.Optional;
@@ -27,8 +26,11 @@ import java.util.Optional;
  * @author James Kleeh
  * @since 1.0
  */
-@ConfigurationProperties("micronaut.ssl")
 public class SslConfiguration implements Toggleable {
+    /**
+     * The prefix used to resolve this configuration.
+     */
+    public static final String PREFIX = "micronaut.ssl";
     protected boolean enabled = false;
     protected int port = 8443;
     protected boolean buildSelfSigned = false;
@@ -36,10 +38,10 @@ public class SslConfiguration implements Toggleable {
     protected KeyConfiguration key = new KeyConfiguration();
     protected KeyStoreConfiguration keyStore = new KeyStoreConfiguration();
     protected TrustStoreConfiguration trustStore = new TrustStoreConfiguration();
-    protected Optional<ClientAuthentication> clientAuthentication = Optional.empty();
-    protected Optional<String[]> ciphers = Optional.empty();
-    protected Optional<String[]> protocols = Optional.empty();
-    protected Optional<String> protocol = Optional.of("TLS");
+    protected ClientAuthentication clientAuthentication;
+    protected String[] ciphers;
+    protected String[] protocols;
+    protected String protocol = "TLS";
 
     /**
      * @return Whether SSL is enabled.
@@ -50,7 +52,7 @@ public class SslConfiguration implements Toggleable {
     }
 
     /**
-     * Whether SSL is enabled
+     * Whether SSL is enabled.
      *
      * @param enabled True if SSL is enabled
      */
@@ -76,21 +78,21 @@ public class SslConfiguration implements Toggleable {
      * @return The type of client authentication
      */
     public Optional<ClientAuthentication> getClientAuthentication() {
-        return clientAuthentication;
+        return Optional.ofNullable(clientAuthentication);
     }
 
     /**
      * @return Which SSL ciphers to use
      */
     public Optional<String[]> getCiphers() {
-        return ciphers;
+        return Optional.ofNullable(ciphers);
     }
 
     /**
      * @return Which protocols to use
      */
     public Optional<String[]> getProtocols() {
-        return protocols;
+        return Optional.ofNullable(protocols);
     }
 
     /**
@@ -118,107 +120,141 @@ public class SslConfiguration implements Toggleable {
      * @return The protocol to use
      */
     public Optional<String> getProtocol() {
-        return protocol;
+        return Optional.ofNullable(protocol);
+    }
+
+    /**
+     * Reads an existing config.
+     *
+     * @param defaultSslConfiguration The default SSL config
+     * @param defaultKeyConfiguration The default key config
+     * @param defaultKeyStoreConfiguration The default keystore config
+     * @param defaultTrustStoreConfiguration The Default truststore config
+     */
+    protected final void readExisting(
+            SslConfiguration defaultSslConfiguration,
+            KeyConfiguration defaultKeyConfiguration,
+            KeyStoreConfiguration defaultKeyStoreConfiguration,
+            TrustStoreConfiguration defaultTrustStoreConfiguration) {
+        if (defaultKeyConfiguration != null) {
+            this.key = defaultKeyConfiguration;
+        }
+        if (defaultKeyStoreConfiguration != null) {
+            this.keyStore = defaultKeyStoreConfiguration;
+        }
+        if (defaultKeyConfiguration != null) {
+            this.trustStore = defaultTrustStoreConfiguration;
+        }
+        if (defaultSslConfiguration != null) {
+            this.port = defaultSslConfiguration.getPort();
+            this.enabled = defaultSslConfiguration.isEnabled();
+            this.buildSelfSigned = defaultSslConfiguration.buildSelfSigned();
+            defaultSslConfiguration.getProtocols().ifPresent(strings -> this.protocols = strings);
+            defaultSslConfiguration.getProtocol().ifPresent(protocol -> this.protocol = protocol);
+            defaultSslConfiguration.getCiphers().ifPresent(ciphers -> this.ciphers = ciphers);
+            defaultSslConfiguration.getClientAuthentication().ifPresent(ca -> this.clientAuthentication = ca);
+        }
     }
 
     /**
      * Configuration properties for SSL key.
      */
-    @ConfigurationProperties("key")
+
     public static class KeyConfiguration {
-        protected Optional<String> password = Optional.empty();
-        protected Optional<String> alias = Optional.empty();
+        public static final String PREFIX = "key";
+        protected String password;
+        protected String alias;
 
         /**
          * @return The password of the key
          */
         public Optional<String> getPassword() {
-            return password;
+            return Optional.ofNullable(password);
         }
 
         /**
          * @return The alias of the key
          */
         public Optional<String> getAlias() {
-            return alias;
+            return Optional.ofNullable(alias);
         }
     }
 
     /**
      * Configuration properties for SSL key store.
      */
-    @ConfigurationProperties("keyStore")
     public static class KeyStoreConfiguration {
-        protected Optional<String> path = Optional.empty();
-        protected Optional<String> password = Optional.empty();
-        protected Optional<String> type = Optional.empty();
-        protected Optional<String> provider = Optional.empty();
+        public static final String PREFIX = "key-store";
+        protected String path;
+        protected String password;
+        protected String type;
+        protected String provider;
 
         /**
          * @return The path to the key store (typically .jks). Can use classpath: and file:.
          */
         public Optional<String> getPath() {
-            return path;
+            return Optional.ofNullable(path);
         }
 
         /**
          * @return The password to the keyStore
          */
         public Optional<String> getPassword() {
-            return password;
+            return Optional.ofNullable(password);
         }
 
         /**
          * @return The key store type
          */
         public Optional<String> getType() {
-            return type;
+            return Optional.ofNullable(type);
         }
 
         /**
          * @return Provider for the key store.
          */
         public Optional<String> getProvider() {
-            return provider;
+            return Optional.ofNullable(provider);
         }
     }
 
     /**
      * Configuration properties for SSL trust store.
      */
-    @ConfigurationProperties("trustStore")
     public static class TrustStoreConfiguration {
-        protected Optional<String> path = Optional.empty();
-        protected Optional<String> password = Optional.empty();
-        protected Optional<String> type = Optional.empty();
-        protected Optional<String> provider = Optional.empty();
+        public static final String PREFIX = "trust-store";
+        protected String path;
+        protected String password;
+        protected String type;
+        protected String provider;
 
         /**
          * @return The path to the trust store (typically .jks). Can use classpath: and file:.
          */
         public Optional<String> getPath() {
-            return path;
+            return Optional.ofNullable(path);
         }
 
         /**
          * @return The password to the keyStore
          */
         public Optional<String> getPassword() {
-            return password;
+            return Optional.ofNullable(password);
         }
 
         /**
          * @return The key store type
          */
         public Optional<String> getType() {
-            return type;
+            return Optional.ofNullable(type);
         }
 
         /**
          * @return Provider for the key store.
          */
         public Optional<String> getProvider() {
-            return provider;
+            return Optional.ofNullable(provider);
         }
     }
 }

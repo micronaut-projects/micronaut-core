@@ -9,18 +9,18 @@ You can setup a `SecretSignatureConfiguration` named `generator` easily via conf
 
 [source, yaml]
 ----
-micronaut:
-  security:
-    enabled: true
-    token:
-      jwt:
-        enabled: true
-        signatures:
-          secret:
-            generator:
-              secret: pleaseChangeThisSecretForANewOne # <1>
-              jwsAlgorithm: HS256 # <2>
+include::{testssecurityjwt}/signandencrypt/SignSecretEncryptRSASpec.groovy[indent=0, tag=yamlconfig]
 ----
 
 <1> **Change this for your own secret and keep it safe**.
 <2> Json Web Token Signature name. In this example, HMAC using SHA-256 hash algorithm.
+
+You can supply the secret with Base64 encoding.
+
+[source, yaml]
+----
+include::{testssecurityjwt}/base64/JwtBase64Spec.groovy[indent=0, tag=yamlconfig]
+----
+
+<1> Secret Base64 encoded
+<2> Signal that the secret is Base64 encoded

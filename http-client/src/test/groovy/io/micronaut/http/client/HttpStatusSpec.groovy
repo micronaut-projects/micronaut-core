@@ -76,7 +76,7 @@ class HttpStatusSpec extends Specification {
 
         then:
             def e = thrown(HttpClientResponseException)
-            e.message == "Not Found"
+            e.message == "success"
             e.status == HttpStatus.NOT_FOUND
     }
 

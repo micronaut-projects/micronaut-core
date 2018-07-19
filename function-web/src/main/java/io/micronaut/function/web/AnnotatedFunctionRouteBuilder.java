@@ -79,7 +79,7 @@ public class AnnotatedFunctionRouteBuilder
         UriNamingStrategy uriNamingStrategy,
         ConversionService<?> conversionService,
         MediaTypeCodecRegistry codecRegistry,
-        @Value("${function.context-path:/}") String contextPath) {
+        @Value("${micronaut.function.context-path:/}") String contextPath) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         this.localFunctionRegistry = new DefaultLocalFunctionRegistry(codecRegistry);
         this.contextPath = contextPath.endsWith("/") ? contextPath : contextPath + '/';
@@ -88,28 +88,35 @@ public class AnnotatedFunctionRouteBuilder
     @SuppressWarnings("unchecked")
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        FunctionBean annotation = method.getAnnotation(FunctionBean.class);
+        FunctionBean annotation = beanDefinition.getAnnotation(FunctionBean.class);
         if (annotation != null) {
-            String functionName = annotation.value();
-            String functionPath = functionName;
+            String methodName = method.getMethodName();
             Class<?> declaringType = method.getDeclaringType();
-            if (StringUtils.isEmpty(functionPath)) {
-                String typeName = declaringType.getSimpleName();
-                if (typeName.contains("$")) {
-                    // generated lambda
-                    functionPath = contextPath + NameUtils.hyphenate(method.getMethodName());
-                } else {
-                    functionPath = contextPath + NameUtils.hyphenate(typeName);
-                }
-            } else {
-                functionPath = contextPath + functionPath;
-            }
+            String functionName = annotation.value();
 
             UriRoute route = null;
             if (Stream.of(java.util.function.Function.class, Consumer.class, BiFunction.class, BiConsumer.class).anyMatch(type -> type.isAssignableFrom(declaringType))) {
+
+                String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
                 route = POST(functionPath, method);
-            } else if (Supplier.class.isAssignableFrom(declaringType)) {
+            } else if (Supplier.class.isAssignableFrom(declaringType) && methodName.equals("get")) {
+                String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
                 route = GET(functionPath, method);
+            } else {
+                String functionMethod = annotation.method();
+                if (StringUtils.isNotEmpty(functionMethod)) {
+                    if (functionMethod.equals(methodName)) {
+                        int argCount = method.getArguments().length;
+                        if (argCount < 3) {
+                            String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
+                            if (argCount == 0) {
+                                route = GET(functionPath, method);
+                            } else {
+                                route = POST(functionPath, method);
+                            }
+                        }
+                    }
+                }
             }
 
             if (route != null) {
@@ -117,6 +124,7 @@ public class AnnotatedFunctionRouteBuilder
                     LOG.debug("Created Route to Function: {}", route);
                 }
 
+                String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
                 availableFunctions.put(functionName, URI.create(functionPath));
                 Class[] argumentTypes = method.getArgumentTypes();
                 int argCount = argumentTypes.length;
@@ -131,6 +139,22 @@ public class AnnotatedFunctionRouteBuilder
                 ((ExecutableMethodProcessor) localFunctionRegistry).process(beanDefinition, method);
             }
         }
+    }
+
+    private String resolveFunctionPath(String methodName, Class<?> declaringType, String functionName) {
+        String functionPath = functionName;
+        if (StringUtils.isEmpty(functionPath)) {
+            String typeName = declaringType.getSimpleName();
+            if (typeName.contains("$")) {
+                // generated lambda
+                functionPath = contextPath + NameUtils.hyphenate(methodName);
+            } else {
+                functionPath = contextPath + NameUtils.hyphenate(typeName);
+            }
+        } else {
+            functionPath = contextPath + functionPath;
+        }
+        return functionPath;
     }
 
     /**

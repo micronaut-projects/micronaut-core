@@ -1,0 +1,56 @@
+By default ann:configuration.kafka.annotation.KafkaListener[] listener methods will receive each link:{kafkaapi}/org/apache/kafka/clients/consumer/ConsumerRecord.html[ConsumerRecord] one by one.
+
+There may be cases where you prefer to receive all of the link:{kafkaapi}/org/apache/kafka/clients/consumer/ConsumerRecord.html[ConsumerRecord] data from the link:{kafkaapi}/org/apache/kafka/clients/consumer/ConsumerRecords.html[ConsumerRecords] holder object in one go.
+
+To achieve this you can set the `batch` member of the ann:configuration.kafka.annotation.KafkaListener[] to `true` and specify a container type (typically `List`) to receive all of the data:
+
+.Receiving a Batch of Records
+[source,java]
+----
+include::{testskafka}/consumer/batch/BookListener.java[tags=imports, indent=0]
+
+include::{testskafka}/consumer/batch/BookListener.java[tags=clazz, indent=0]
+
+include::{testskafka}/consumer/batch/BookListener.java[tags=method, indent=2]
+
+}
+----
+
+<1> The ann:configuration.kafka.annotation.KafkaListener[] annotation's `batch` member is set to `true`
+<2> The method defines that it receives a list of `Book` instances
+<3> The method processes the entire batch
+
+Note in the previous case offsets will automatically be committed for the whole batch by default when the method returns without error.
+
+=== Manually Committing Offsets with Batch
+
+You can also take more control of committing offsets when doing batch processing by specifying a method that receives the offsets in addition to the batch:
+
+.Committing Offsets Manually with Batch
+[source,java]
+----
+include::{testskafka}/consumer/batch/BookListener.java[tags=manual, indent=0]
+----
+
+<1> The method receives the batch of records as well as the offsets, partitions and topics
+<2> Each record is processed
+<3> The offset, partition and topic is read for the record
+<4> Offsets are committed
+
+This example is fairly trivial in that it commits offsets after processing each record in a batch, but you can for example commit after processing every 10, or every 100 or whatever makes sense for your application.
+
+=== Reactive Batch Processing
+
+Batch listeners also support defining reactive types (either rx:Flowable[] or Reactor `Flux`) as the method argument.
+
+In this case the method will be passed a reactive type that can be returned from the method allowing non-blocking processing of the batch:
+
+.Reactive Processing of Batch Records
+[source,java]
+----
+include::{testskafka}/consumer/batch/BookListener.java[tags=reactive, indent=0]
+----
+
+Remember that as with non batch processing, the reactive type will be subscribed to on a different thread and offsets will be committed automatically likely prior to the point when the reactive type is subscribed to.
+
+This means that you should only use reactive processing if message durability is not a requirement and you may wish to implement message re-delivery upon failure.

@@ -1,7 +1,6 @@
 dependencies {
     compile project(":http-server")
     compile project(":http-netty")
-    compile project(":router")
 
     compileOnly project(":inject-java")
 
@@ -9,7 +8,7 @@ dependencies {
     testCompile project(":inject-java")
     testCompile project(":http-client")
     testCompile dependencyModuleVersion("groovy", "groovy-json")
-    testCompile 'com.launchdarkly:okhttp-eventsource:1.5.2'
+    testCompile dependencyModuleVersion("groovy", "groovy-templates")
     testCompile dependencyVersion("rxjava2")
     testCompile dependencyVersion("reactor")
 }

@@ -690,14 +690,33 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      */
     protected GeneratorAdapter startPublicMethod(ClassWriter writer, String methodName, String returnType, String... argumentTypes) {
         return new GeneratorAdapter(writer.visitMethod(
-            ACC_PUBLIC,
-            methodName,
-            getMethodDescriptor(returnType, argumentTypes),
-            null,
-            null
+                ACC_PUBLIC,
+                methodName,
+                getMethodDescriptor(returnType, argumentTypes),
+                null,
+                null
         ), ACC_PUBLIC,
-            methodName,
-            getMethodDescriptor(returnType, argumentTypes));
+                methodName,
+                getMethodDescriptor(returnType, argumentTypes));
+    }
+
+    /**
+     * @param writer        The class writer
+     * @param methodName    The method name
+     * @param returnType    The return type
+     * @param argumentTypes The argument types
+     * @return The {@link GeneratorAdapter}
+     */
+    protected GeneratorAdapter startProtectedMethod(ClassWriter writer, String methodName, String returnType, String... argumentTypes) {
+        return new GeneratorAdapter(writer.visitMethod(
+                ACC_PROTECTED,
+                methodName,
+                getMethodDescriptor(returnType, argumentTypes),
+                null,
+                null
+        ), ACC_PROTECTED,
+                methodName,
+                getMethodDescriptor(returnType, argumentTypes));
     }
 
     /**

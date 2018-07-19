@@ -17,25 +17,19 @@
 package io.micronaut.http.client.docs.streaming;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.client.RxHttpClient;
 import io.micronaut.http.client.RxStreamingHttpClient;
-import io.micronaut.http.client.docs.basics.Book;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.reactivex.Flowable;
+import io.reactivex.Maybe;
 import org.junit.Test;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 import static io.micronaut.http.HttpRequest.*;
-import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
@@ -44,6 +38,25 @@ import static org.junit.Assert.fail;
  * @since 1.0
  */
 public class HeadlineControllerTest {
+
+    // tag::streamingClient[]
+    @Test
+    public void testClientAnnotationStreaming() throws Exception {
+        try( EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer.class) ) {
+            HeadlineClient headlineClient = embeddedServer
+                                                .getApplicationContext()
+                                                .getBean(HeadlineClient.class); // <1>
+
+            Maybe<Headline> firstHeadline = headlineClient.streamHeadlines().firstElement(); // <2>
+
+            Headline headline = firstHeadline.blockingGet(); // <3>
+
+            assertNotNull( headline );
+            assertTrue( headline.getText().startsWith("Latest Headline") );
+        }
+    }
+    // end::streamingClient[]
+
 
     @Test
     public void testStreamingClient() {

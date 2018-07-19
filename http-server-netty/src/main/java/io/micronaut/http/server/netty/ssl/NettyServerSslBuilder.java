@@ -17,10 +17,7 @@
 package io.micronaut.http.server.netty.ssl;
 
 import io.micronaut.core.io.ResourceResolver;
-import io.micronaut.http.ssl.ClientAuthentication;
-import io.micronaut.http.ssl.SslBuilder;
-import io.micronaut.http.ssl.SslConfiguration;
-import io.micronaut.http.ssl.SslConfigurationException;
+import io.micronaut.http.ssl.*;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
@@ -46,15 +43,15 @@ public class NettyServerSslBuilder extends SslBuilder<SslContext> {
      * @param ssl              The SSL configuration
      * @param resourceResolver The resource resolver
      */
-    public NettyServerSslBuilder(SslConfiguration ssl, ResourceResolver resourceResolver) {
+    public NettyServerSslBuilder(ServerSslConfiguration ssl, ResourceResolver resourceResolver) {
         super(ssl, resourceResolver);
     }
 
     /**
      * @return The SSL configuration
      */
-    public SslConfiguration getSslConfiguration() {
-        return ssl;
+    public ServerSslConfiguration getSslConfiguration() {
+        return (ServerSslConfiguration) ssl;
     }
 
     @SuppressWarnings("Duplicates")

@@ -17,7 +17,6 @@
 package io.micronaut.context;
 
 import groovy.lang.GroovySystem;
-import io.micronaut.context.annotation.Requirements;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
@@ -36,15 +35,10 @@ import io.micronaut.core.version.SemanticVersion;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
-import io.micronaut.inject.annotation.AnnotationValue;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
  * An abstract {@link Condition} implementation that is based on the presence
@@ -66,49 +60,23 @@ public class RequiresCondition implements Condition {
         AnnotationMetadataProvider component = context.getComponent();
         boolean isBeanReference = component instanceof BeanDefinitionReference;
         boolean isBeanConfiguration = component instanceof BeanConfiguration;
-        if (annotationMetadata.hasStereotype(Requirements.class)) {
 
-            Optional<AnnotationValue[]> requirements = annotationMetadata.getValue(Requirements.class, AnnotationValue[].class);
+        List<ConvertibleValues<Object>> requirements = annotationMetadata.getAnnotationValuesByType(Requires.class);
 
-            if (requirements.isPresent()) {
-                AnnotationValue[] annotationValues = requirements.get();
-
-                // here we use AnnotationMetadata to avoid loading the classes referenced in the annotations directly
-                if (isBeanReference || isBeanConfiguration) {
-
-                    for (AnnotationValue av : annotationValues) {
-                        ConvertibleValues<Object> convertibleValues = av.getConvertibleValues();
-                        if (processClassRequirements(context, convertibleValues)) {
-                            return false;
-                        }
-                    }
-
-                    return !isBeanConfiguration || !processRequirements(context);
-                } else {
-                    return !processRequirements(context);
-                }
-            }
-        } else if (annotationMetadata.hasStereotype(Requires.class)) {
-            ConvertibleValues<Object> values = annotationMetadata.getValues(Requires.class);
+        if (!requirements.isEmpty()) {
+            // here we use AnnotationMetadata to avoid loading the classes referenced in the annotations directly
             if (isBeanReference || isBeanConfiguration) {
 
-                if (processClassRequirements(context, values)) {
-                    return false;
-                }
-
-                if (isBeanConfiguration) {
-                    Requires ann = annotationMetadata.getAnnotation(Requires.class);
-                    if (ann != null) {
-                        return !processRequires(context, ann);
+                for (ConvertibleValues<Object> requirement : requirements) {
+                    if (processClassRequirements(context, requirement)) {
+                        return false;
                     }
                 }
-            } else {
-                Requires ann = annotationMetadata.getAnnotation(Requires.class);
-                if (ann != null) {
-                    return !processRequires(context, ann);
-                }
-            }
 
+                return !isBeanConfiguration || !processRequirements(context);
+            } else {
+                return !processRequirements(context);
+            }
         }
         return true;
     }
@@ -145,10 +113,10 @@ public class RequiresCondition implements Condition {
 
     private boolean processRequirements(ConditionContext context) {
         // Now it is safe to initialize the annotation requirements
-        Requirements ann = annotationMetadata.getAnnotation(Requirements.class);
+        Requires[] requirements = annotationMetadata.getAnnotationsByType(Requires.class);
 
-        if (ann != null) {
-            for (Requires requires : ann.value()) {
+        if (requirements != null) {
+            for (Requires requires : requirements) {
                 if (processRequires(context, requires)) {
                     return true;
                 }

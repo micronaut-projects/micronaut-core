@@ -1,7 +1,13 @@
-introduction: Introduction
+introduction:
+  title: Introduction
+  whatsNew: What's New?
 quickStart:
   title: Quick Start
-  buildCLI: Build/Install the CLI
+  buildCLI:
+    title: Build/Install the CLI
+    installSdkman: Install with Sdkman
+    installWindows: Install through Binary on Windows
+    buildSource: Building from Source
   creatingServer: Creating a Server Application
   ideSetup: Setting up an IDE
   creatingClient: Creating a Client
@@ -21,7 +27,7 @@ ioc:
   factories: Bean Factories
   conditionalBeans: Conditional Beans
   replaces: Bean Replacement
-  configurations: Bean Configurations
+  beanConfigurations: Bean Configurations
   lifecycle: Life-Cycle Methods
   events: Bean Events
   annotationMetadata: Bean Annotation Metadata
@@ -64,11 +70,13 @@ httpServer:
     title: Reactive HTTP Request Processing
     bodyAnnotation: Using the @Body Annotation
     reactiveResponses: Reactive Responses
-    jsonBinding: JSON Binding with Jackson
+  jsonBinding: JSON Binding with Jackson
+  datavalidation: Data Validation
   staticResources: Serving Static Resources
 #  contentNegotiation: Content Negotiation
   errorHandling: Error Handling
   formData: Handling Form Data
+  serverIO: Writing Response Data
   uploads: File Uploads
   transfers: File Transfers
   sse: Server Sent Events
@@ -92,6 +100,7 @@ httpClient:
   clientAnnotation:
     title: Declarative HTTP Clients with @Client
     clientParameters: Customizing Parameter Binding
+    clientAnnotationStreaming: Streaming with @Client
     clientHeaders: Customizing Request Headers
     clientJackson: Customizing Jackson Settings
     clientRetry: Retry and Circuit Breaker
@@ -131,19 +140,53 @@ serverlessFunctions:
     functionCLI: Functions as CLI Applications
   lambdaFunctions: Deploying Functions to AWS Lambda 
   callingFunctions: Calling Functions with FunctionClient
-dataAccess:
-  title: Configurations for Data Access
-  sqlSupport: Configuring a SQL Data Source
-  hibernateSupport: Configuring Hibernate
-  mongoSupport: Configuring MongoDB
-  neo4jSupport: Configuring Neo4j
-  redisSupport: Configuring Redis
-  cassandraSupport: Configuring Cassandra
+messaging:
+  title: Message-Driven Microservices
+  kafka:
+    title: Kafka Support
+    kafkaQuickStart: Kafka Quick Start
+    kafkaClient:
+      title: Kafka Producers Using @KafkaClient
+      kafkaClientMethods: Defining @KafkaClient Methods
+      kafkaClientConfiguration: Configuring @KafkaClient beans
+      kafkaClientBatch: Sending Records in Batch
+      kafkaClientScope: Injecting Kafka Producer Beans
+      kafkaEmbedded: Embedding Kafka
+    kafkaListener:
+      title: Kafka Consumers Using @KafkaListener
+      kafkaListenerMethods: Defining @KafkaListener Methods
+      kafkaListenerConfiguration: Configuring @KafkaListener beans
+      kafkaOffsets: Commiting Kafka Offsets
+      kafkaListenerBatch: Kafka Batch Processing
+      kafkaSendTo: Forwarding Messages with @SendTo
+      kafkaExceptions: Handling Consumer Exceptions
+    kafkaApplications:
+      title: Running Kafka Applications
+      kafkaHealth: Kafka Health Checks
+    kafkaStream: Building Kafka Stream Applications
+configurations:
+  title: Configurations
+  dataAccess:
+    title: Configurations for Data Access
+    sqlSupport: Configuring a SQL Data Source
+    hibernateSupport: Configuring Hibernate
+    mongoSupport: Configuring MongoDB
+    neo4jSupport: Configuring Neo4j
+    postgresSupport: Configuring Postgres
+    redisSupport: Configuring Redis
+    cassandraSupport: Configuring Cassandra
+  otherConfigurations:
+    title: Other Configurations
+    rabbitmq: RabbitMQ
 languageSupport:
   title: Language Support
   java: Micronaut for Java
   groovy: Micronaut for Groovy
-  kotlin: Micronaut for Kotlin
+  kotlin:
+    title: Micronaut for Kotlin
+    kaptintellij: Kotlin, Kapt and IntelliJ
+    openandaop: Kotlin and AOP Advice
+    kotlinretainparamnames: Kotlin and Retaining Parameter Names
 management:
   title: Management & Monitoring
   buildingEndpoints:
@@ -156,6 +199,7 @@ management:
     beansEndpoint: The Beans Endpoint
     infoEndpoint: The Info Endpoint
     healthEndpoint: The Health Endpoint
+    metricsEndpoint: The Metrics Endpoint
     refreshEndpoint: The Refresh Endpoint
     routesEndpoint: The Routes Endpoint
     stopEndpoint: The Server Stop Endpoint
@@ -191,11 +235,24 @@ security:
     login: Login Controller
     logout: Logout Controller
     refresh: Refresh Controller
+  retrievingAuthenticatedUser: Retrieve the authenticated user
   securityEvents: Security Events
 cli:
   title: Micronaut CLI
   createProject: Creating a Project
-  profiles: Profiles
+  profiles:
+    title: Profiles
+    comparingVersions: Comparing Versions
   features: Features
   commands: Commands
-faq: Frequently Asked Questions (FAQ)
+  reloading:
+    title: Reloading
+    jrebel: JRebel
+    springloaded: Spring-Loaded
+    gradleReload: Reloading with Gradle
+    ideReload: Reloading with an IDE
+appendix:
+  title: Appendices
+  faq: Frequently Asked Questions (FAQ)
+  problems: Common Problems
+  breaks: Breaking Changes

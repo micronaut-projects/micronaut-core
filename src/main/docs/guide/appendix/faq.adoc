@@ -1,0 +1,56 @@
+The following section covers frequently asked questions that you may find yourself asking while considering to use or using Micronaut.
+
+
+==== Does Micronaut modify my byte code?
+
+No. Your classes are your classes. Micronaut does not transform classes or modify the Java byte code you write. Micronaut at compile will produce an additional set of classes that sit next to your original untouched classes.
+
+==== Why Doesn't Micronaut use Spring?
+
+When asking why Micronaut doesn't use Spring, it is typically in reference to the Spring Dependency Injection container.
+
+NOTE: The Spring ecosystem is very broad and there are many Spring libraries you can use directly in Micronaut without requiring the Spring container.
+
+The reason Micronaut features its own native JSR-305 compliant dependency injection is that the cost of these features in Spring (and any reflection based DI/AOP container) is too great in terms of memory consumption and the impact on startup time. In order to support dependency injection at runtime Spring:
+
+* https://github.com/spring-projects/spring-framework/tree/master/spring-core/src/main/java/org/springframework/core/type/classreading[Reads the byte code] of every bean it finds at runtime.
+* https://github.com/spring-projects/spring-framework/blob/a691065d05741a4f1ca17925c8a5deec0f378c8b/spring-core/src/main/java/org/springframework/core/annotation/AnnotationUtils.java#L1465[Synthesizes new annotations] for each annotation on each bean method, constructor, field etc. to support Annotation metadata.
+* https://github.com/spring-projects/spring-framework/blob/master/spring-beans/src/main/java/org/springframework/beans/CachedIntrospectionResults.java[Builds Reflective Metadata] for each bean for every method, constructor, field etc.
+
+The result is a progressive degradation of startup time and memory consumption as your application incorporates more features.
+
+For Microservices and Serverless functions where it is critical that startup time and memory consumption remain low the above behaviour is an undesirable reality of using the Spring container, hence the designers of Micronaut chose not to use Spring.
+
+==== Does Micronaut support Scala?
+
+Micronaut supports any JVM language that supports the Annotation Processor API. Scala currently does not support this API. However, Groovy also doesn't support this API and special support has been built that processes the Groovy AST. It may be technically possible to support Scala future if a similar module to `inject-groovy` is built, but as of this writing Scala is not supported.
+
+
+==== Can Micronaut be used for purposes other than Microservices?
+
+Yes. Micronaut is very modular and you can choose to use just the Dependency Injection and AOP implementation if you want simply by including only the `inject-java` (or `inject-groovy` for Groovy) dependency in your application.
+
+In fact Micronaut's support for <<serverlessFunctions, Serverless Computing>> uses this exact approach.
+
+
+==== What are the advantages of Micronaut's Dependency Injection and AOP implementation?
+
+Micronaut processes your classes at compile time and produces all metadata at compile time. This eliminates the need for reflection, cached reflective metadata and the requirement to analyze your classes at runtime all of which leads to slower startup performance and greater memory consumption.
+
+In addition, Micronaut will build AOP proxies at compile time that are completely reflection free, which improves performances, reduces stack trace sizes and reduces memory consumption.
+
+==== Why does Micronaut have its own Consul and Eureka client implementations?
+
+The majority of Consul and Eureka clients that exist are blocking and include a mountain of external dependencies that inflate your JAR files.
+
+Micronaut's api:discovery.DiscoveryClient[] uses Micronaut's native HTTP client thus greatly reducing the need for external dependencies and providing a reactive API onto both discovery servers.
+
+==== Why am I encountering a NoSuchMethodError occurs loading my beans (Groovy)?
+
+Groovy by default imports the `groovy.lang` package which includes a class called `@Singleton` that is an AST transformation that makes your class a singleton (adding a private constructor and static retrieval method). This annotation is easily confused with the `javax.inject.Singleton` annotation used to define singleton beans in Micronaut. Make sure you are using the correct annotation in your Groovy classes.
+
+==== Why is it taking much longer than it should to start the application
+
+Micronaut's startup time is typically very fast. At the application level, however, it is possible to block startup time so if you are seeing slow startup, review if you have any application startup listeners or `@Context` scope beans that are slowing startup.
+
+Some network issues can, also cause slow startup. On the Mac for example misconfiguration of your `/etc/hosts` file can cause issues. See the following link:https://stackoverflow.com/a/39698914/1264846[stackoverflow answer].

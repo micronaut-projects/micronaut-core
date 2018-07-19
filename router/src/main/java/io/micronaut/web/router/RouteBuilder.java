@@ -1041,6 +1041,9 @@ public interface RouteBuilder {
                 if (len == 1 && uri.charAt(0) == '/') {
                     return "";
                 }
+                if (len > 0 && uri.charAt(uri.length() - 1) == '/') {
+                    return uri.substring(0, uri.length() - 1);
+                }
                 if (len > 0) {
                     return uri;
                 }
@@ -1061,6 +1064,9 @@ public interface RouteBuilder {
                 int len = uri.length();
                 if (len == 1 && uri.charAt(0) == '/') {
                     return "";
+                }
+                if (len > 0 && uri.charAt(uri.length() - 1) == '/') {
+                    return uri.substring(0, uri.length() - 1);
                 }
                 if (len > 0) {
                     return uri;

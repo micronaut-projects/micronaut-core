@@ -93,6 +93,8 @@ public interface ApplicationContextBuilder {
      */
     ApplicationContext build();
 
+
+
     /**
      * Allow customizing the configurations that will be loaded.
      *
@@ -116,5 +118,22 @@ public interface ApplicationContextBuilder {
      */
     default ApplicationContext start() {
         return build().start();
+    }
+
+
+    /**
+     * Run the {@link ApplicationContext} with the given type. Returning an instance of the type.
+     *
+     * @param type         The type of the bean to run
+     * @param <T>          The type, a subclass of {@link ApplicationContextLifeCyle}
+     * @return The running bean
+     */
+    default <T extends ApplicationContextLifeCyle> T run(Class<T> type) {
+        ApplicationContext applicationContext = start();
+        T bean = applicationContext.getBean(type);
+        if (!bean.isRunning()) {
+            bean.start();
+        }
+        return bean;
     }
 }

@@ -57,11 +57,16 @@ class RefreshEndpointSpec extends Specification {
         response.body().contains('"foo.bar"')
 
         when:
-        response = rxClient.exchange("/refreshTest", String).blockingFirst()
+        PollingConditions conditions = new PollingConditions(timeout: 3)
+
 
         then:
-        response.code() == HttpStatus.OK.code
-        response.body() == 'changed changed'
+        conditions.eventually {
+            def res = rxClient.exchange("/refreshTest", String).blockingFirst()
+            res.code() == HttpStatus.OK.code
+            res.body() == 'changed changed'
+
+        }
 1
         cleanup:
         System.setProperty("foo.bar", "")

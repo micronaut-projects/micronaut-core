@@ -18,7 +18,6 @@ package io.micronaut.core.convert;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.format.FormattingTypeConverter;
 import io.micronaut.core.convert.format.ReadableBytesTypeConverter;
@@ -82,6 +81,8 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     private static final int CACHE_MAX = 60;
     private final Map<ConvertiblePair, TypeConverter> typeConverters = new ConcurrentHashMap<>();
     private final Cache<ConvertiblePair, TypeConverter> converterCache = Caffeine.newBuilder()
+                                                                                 // override the executor for GraalVM
+                                                                                 .executor(Runnable::run)
                                                                                  .maximumSize(CACHE_MAX)
                                                                                  .build();
 
@@ -108,8 +109,11 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of((T) object);
         }
 
-        Optional<? extends Class<? extends Annotation>> formattingAnn = AnnotationUtil.findAnnotationWithStereoType(Format.class, context.getAnnotations())
-                                                                                      .map(Annotation::annotationType);
+        Optional<? extends Class<? extends Annotation>> formattingAnn = Optional.empty();
+
+        if (context instanceof ArgumentConversionContext) {
+            formattingAnn = ((ArgumentConversionContext) context).getAnnotationMetadata().getAnnotationTypeByStereotype(Format.class);
+        }
         Class<? extends Annotation> formattingAnnotation = formattingAnn.orElse(null);
         ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, formattingAnnotation);
         TypeConverter typeConverter = converterCache.getIfPresent(pair);
@@ -702,8 +706,8 @@ public class DefaultConversionService implements ConversionService<DefaultConver
      */
     protected <T> TypeConverter findTypeConverter(Class<?> sourceType, Class<T> targetType, Class<? extends Annotation> formattingAnnotation) {
         TypeConverter typeConverter = null;
-        List<Class> sourceHierarchy = resolveHierarchy(sourceType);
-        List<Class> targetHierarchy = resolveHierarchy(targetType);
+        List<Class> sourceHierarchy = ClassUtils.resolveHierarchy(sourceType);
+        List<Class> targetHierarchy = ClassUtils.resolveHierarchy(targetType);
         boolean hasFormatting = formattingAnnotation != null;
         for (Class sourceSuperType : sourceHierarchy) {
             for (Class targetSuperType : targetHierarchy) {
@@ -746,43 +750,6 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             pair = new ConvertiblePair(sourceType, targetType);
         }
         return pair;
-    }
-
-    private void populateHierarchyInterfaces(Class<?> superclass, List<Class> hierarchy) {
-        if (!hierarchy.contains(superclass)) {
-            hierarchy.add(superclass);
-        }
-        for (Class<?> aClass : superclass.getInterfaces()) {
-            if (!hierarchy.contains(aClass)) {
-                hierarchy.add(aClass);
-            }
-            populateHierarchyInterfaces(aClass, hierarchy);
-        }
-    }
-
-    private List<Class> resolveHierarchy(Class<?> type) {
-        Class<?> superclass = type.getSuperclass();
-        List<Class> hierarchy = new ArrayList<>();
-        if (superclass != null) {
-            populateHierarchyInterfaces(type, hierarchy);
-
-            while (superclass != Object.class) {
-                populateHierarchyInterfaces(superclass, hierarchy);
-                superclass = superclass.getSuperclass();
-            }
-        } else if (type.isInterface()) {
-            populateHierarchyInterfaces(type, hierarchy);
-        }
-
-        if (type.isArray()) {
-            if (!type.getComponentType().isPrimitive()) {
-                hierarchy.add(Object[].class);
-            }
-        } else {
-            hierarchy.add(Object.class);
-        }
-
-        return hierarchy;
     }
 
     /**

@@ -24,15 +24,9 @@ import static org.junit.Assert.*;
 
 import org.junit.Assert;
 import org.junit.Test;
-import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.runtime.server.EmbeddedServer;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 

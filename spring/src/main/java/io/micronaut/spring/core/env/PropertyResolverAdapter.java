@@ -71,11 +71,13 @@ public class PropertyResolverAdapter implements PropertyResolver {
     }
 
     @Override
+    @Deprecated
     public <T> Class<T> getPropertyAsClass(String key, Class<T> targetType) {
         Optional<String> property = propertyResolver.getProperty(NameUtils.hyphenate(key), String.class);
         if (property.isPresent()) {
             Optional<Class> aClass = ClassUtils.forName(property.get(), Thread.currentThread().getContextClassLoader());
             if (aClass.isPresent()) {
+                //noinspection unchecked
                 return aClass.get();
             }
         }

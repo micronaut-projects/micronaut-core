@@ -15,7 +15,6 @@
  */
 package io.micronaut.aop.introduction;
 
-import io.micronaut.context.annotation.Type;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Type;
 

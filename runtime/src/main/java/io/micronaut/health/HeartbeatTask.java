@@ -62,7 +62,8 @@ public class HeartbeatTask implements ApplicationEventListener<ServiceStartedEve
     /**
      * Publish the heartbeat event with current health status.
      */
-    @Scheduled(fixedDelay = "${micronaut.heartbeat.interval:15s}", initialDelay = "${micronaut.heartbeat.initial-delay:5s}")
+    @Scheduled(fixedDelay = "${micronaut.heartbeat.interval:15s}",
+               initialDelay = "${micronaut.heartbeat.initial-delay:5s}")
     public void pulsate() {
         ServiceInstance instance = eventReference.get();
         if (instance != null) {

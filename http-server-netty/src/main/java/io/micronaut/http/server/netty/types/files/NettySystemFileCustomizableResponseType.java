@@ -18,14 +18,12 @@ package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.netty.NettyHttpResponse;
+import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.server.netty.SmartHttpContentCompressor;
-import io.micronaut.http.server.netty.async.DefaultCloseHandler;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
 import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType;
-import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.DefaultFileRegion;
 import io.netty.handler.codec.http.DefaultHttpResponse;
@@ -110,9 +108,9 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
     @Override
     public void write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
 
-        if (response instanceof NettyHttpResponse) {
+        if (response instanceof NettyMutableHttpResponse) {
 
-            FullHttpResponse nettyResponse = ((NettyHttpResponse) response).getNativeResponse();
+            FullHttpResponse nettyResponse = ((NettyMutableHttpResponse) response).getNativeResponse();
 
             //The streams codec prevents non full responses from being written
             Optional
@@ -124,7 +122,6 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
             context.write(new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), headers), context.voidPromise());
 
             // Write the content.
-            ChannelFuture flushFuture;
             if (context.pipeline().get(SslHandler.class) == null && SmartHttpContentCompressor.shouldSkip(headers)) {
                 // SSL not enabled - can use zero-copy file transfer.
                 // Remove the content compressor to prevent incorrect behavior with zero-copy
@@ -134,19 +131,18 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
                 }
 
                 context.write(new DefaultFileRegion(raf.getChannel(), 0, getLength()), context.newProgressivePromise());
-                flushFuture = context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
+                context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
             } else {
                 // SSL enabled - cannot use zero-copy file transfer.
                 try {
                     // HttpChunkedInput will write the end marker (LastHttpContent) for us.
-                    flushFuture = context.writeAndFlush(new HttpChunkedInput(new ChunkedFile(raf, 0, getLength(), LENGTH_8K)),
+                    context.writeAndFlush(new HttpChunkedInput(new ChunkedFile(raf, 0, getLength(), LENGTH_8K)),
                         context.newProgressivePromise());
                 } catch (IOException e) {
                     throw new CustomizableResponseTypeException("Could not read file", e);
                 }
             }
 
-            flushFuture.addListener(new DefaultCloseHandler(context, request, response.code()));
         } else {
             throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + response);
         }

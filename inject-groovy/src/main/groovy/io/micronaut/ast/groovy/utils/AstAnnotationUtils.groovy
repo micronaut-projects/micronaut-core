@@ -96,6 +96,26 @@ class AstAnnotationUtils {
     }
 
     /**
+     * Return whether the given element is annotated with any of the given annotation stereotypes.
+     *
+     * @param element     The element
+     * @param stereotypes The stereotypes
+     * @return True if it is
+     */
+    static boolean hasStereotype(AnnotatedNode annotatedNode, List<String> stereotypes) {
+        if (annotatedNode == null) {
+            return false
+        }
+        AnnotationMetadata annotationMetadata = getAnnotationMetadata(annotatedNode)
+        for (String stereotype : stereotypes) {
+            if (annotationMetadata.hasStereotype(stereotype)) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /**
      * Whether the node is annotated with any non internal annotations
      *
      * @param annotatedNode The annotated node

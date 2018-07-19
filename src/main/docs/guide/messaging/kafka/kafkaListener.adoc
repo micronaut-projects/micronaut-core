@@ -1,0 +1,31 @@
+The quick start section presented a trivial example of what is possible with the ann:configuration.kafka.annotation.KafkaListener[] annotation.
+
+Using the `@KafkaListener` annotation Micronaut will build a link:{kafkaapi}/org/apache/kafka/clients/consumer/KafkaConsumer.html[KafkaConsumer] and start the `poll` loop by running the `KafkaConsumer` in a special `consumer` thread pool. You can re-configure the size of the thread pool based on the number of consumers in your application in `application.yml` as desired:
+
+.Configuring the `consumer` thread pool
+[source,yaml]
+----
+micronaut:
+    executors:
+        consumer:
+            type: fixed
+            nThreads: 25
+----
+
+`KafkaConsumer` instances are single threaded, hence for each `@KafkaListener` method you define a new thread is created to execute the `poll` loop.
+
+You may wish to scale the number of consumers you have listening on a particular topic. There are several ways you may achieve this. You could for example run multiple instances of your application each containing a single consumer in each JVM.
+
+Alternatively, you can also scale via threads. By setting the number of `threads` a particular consumer bean will create:
+
+.Scaling with Threads
+[source,java]
+----
+@KafkaListener(groupId="myGroup", threads=10)
+----
+
+The above example will create 10 link:{kafkaapi}/org/apache/kafka/clients/consumer/KafkaConsumer.html[KafkaConsumer] instances, each running in a unique thread and participating in the `myGroup` consumer group.
+
+NOTE: @KafkaListener beans are by default singleton. When using multiple threads you must either synchronize access to local state or declare the bean as `@Prototype`.
+
+By default Micronaut will inspect the method signature of the method annotated with `@Topic` that will listen for `ConsumerRecord` instances and from the types infer an appropriate key and value link:{kafkaapi}/org/apache/kafka/common/serialization/Deserializer.html[Deserializer].

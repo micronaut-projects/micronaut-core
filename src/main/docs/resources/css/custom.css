@@ -109,7 +109,7 @@ a:hover,
 }
 
 @media screen and (min-width: 961px) {
-    #main > div:nth-child(-n+46) {
+    #main > div:nth-child(-n+58) {
         max-width: 62%;
     }
 }
@@ -119,4 +119,15 @@ body {
 }
 #main {
     margin-left: 4%;
+}
+
+#main a {
+    text-decoration: none;
+}
+#main a:hover {
+    text-decoration: underline;
+}
+
+#main .paragraph a {
+    text-decoration: underline;
 }

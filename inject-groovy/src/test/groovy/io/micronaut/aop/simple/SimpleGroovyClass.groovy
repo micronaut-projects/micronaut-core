@@ -16,7 +16,6 @@
 package io.micronaut.aop.simple
 
 import io.micronaut.aop.interceptors.Mutating
-import io.micronaut.aop.interceptors.Mutating
 
 import javax.inject.Singleton
 

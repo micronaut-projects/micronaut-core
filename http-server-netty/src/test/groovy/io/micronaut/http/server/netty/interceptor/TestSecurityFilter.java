@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty.interceptor;
 
-import io.micronaut.http.annotation.Filter;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -50,7 +49,7 @@ public class TestSecurityFilter implements HttpServerFilter {
         }
         else {
             request.getAttributes().put("authenticated", true);
-            return Publishers.then(
+            return Publishers.map(
                     chain.proceed(request),
                     mutableHttpResponse -> mutableHttpResponse.header("X-Test", "Foo " + request.getAttributes().get("SomeServiceValue", String.class, "none"))
             );

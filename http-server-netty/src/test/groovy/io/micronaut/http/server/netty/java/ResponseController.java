@@ -15,9 +15,6 @@
  */
 package io.micronaut.http.server.netty.java;
 
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
 import io.micronaut.http.*;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
@@ -57,6 +54,11 @@ public class ResponseController {
     @Get(produces = MediaType.TEXT_PLAIN)
     public HttpResponse okWithBody() {
         return HttpResponse.ok("some text");
+    }
+
+    @Get(produces = MediaType.TEXT_PLAIN)
+    public HttpResponse errorWithBody() {
+        return HttpResponse.serverError().body("some text");
     }
 
     @Get

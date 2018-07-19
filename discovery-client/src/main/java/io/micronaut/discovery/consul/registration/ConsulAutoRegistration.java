@@ -35,8 +35,10 @@ import io.micronaut.discovery.exceptions.DiscoveryException;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.health.HeartbeatConfiguration;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServerInstance;
+import io.reactivex.Single;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -96,31 +98,28 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
 
             if (status.equals(HealthStatus.UP)) {
                 // send a request to /agent/check/pass/:check_id
-                consulClient.pass(checkId).subscribe(new Subscriber<HttpStatus>() {
-                    @Override
-                    public void onSubscribe(Subscription subscription) {
-                        subscription.request(1);
-                    }
-
-                    @Override
-                    public void onNext(HttpStatus httpStatus) {
+                Single<HttpStatus> passPublisher = Single.fromPublisher(consulClient.pass(checkId));
+                passPublisher.subscribe((httpStatus, throwable) -> {
+                    if (throwable == null) {
                         if (LOG.isDebugEnabled()) {
                             LOG.debug("Successfully reported passing state to Consul");
                         }
-                    }
+                    } else {
+                        if (throwable instanceof HttpClientResponseException) {
+                            // bit of a hack this, but Consul outputs this error when no check is registered
+                            if (throwable.getMessage().contains("does not have associated TTL")) {
+                                if (LOG.isInfoEnabled()) {
+                                    LOG.info("Instance [{}] no longer registered with Consul. Attempting re-registration.", instance.getId());
+                                }
+                                register(instance);
+                                return;
+                            }
+                        }
 
-                    @Override
-                    public void onError(Throwable throwable) {
                         String errorMessage = getErrorMessage(throwable, "Error reporting passing state to Consul: ");
                         if (LOG.isErrorEnabled()) {
                             LOG.error(errorMessage, throwable);
                         }
-
-                    }
-
-                    @Override
-                    public void onComplete() {
-                        // no-op
                     }
                 });
             } else {

@@ -18,8 +18,10 @@ package io.micronaut.http.client;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 /**
@@ -49,5 +51,17 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
     @Inject
     public DefaultHttpClientConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
+    }
+
+    /**
+     * Uses the default SSL configuration.
+     *
+     * @param sslConfiguration The SSL configuration
+     */
+    @Inject
+    public void setClientSslConfiguration(@Nullable ClientSslConfiguration sslConfiguration) {
+        if (sslConfiguration != null) {
+            super.setSslConfiguration(sslConfiguration);
+        }
     }
 }

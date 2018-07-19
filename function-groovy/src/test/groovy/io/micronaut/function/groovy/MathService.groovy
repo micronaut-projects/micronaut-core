@@ -16,7 +16,6 @@
 package io.micronaut.function.groovy
 
 import io.micronaut.context.annotation.Value
-import io.micronaut.context.annotation.Value
 
 import javax.inject.Singleton
 

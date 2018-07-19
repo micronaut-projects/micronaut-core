@@ -49,7 +49,8 @@ micronaut:
         signatures:
           secret:
             generator: 
-              secret: qrD6h8K6S9503Q06Y6Rfk21TErImPYqa #<1>
+              secret: pleaseChangeThisSecretForANewOne #<1>
+              jwsAlgorithm: HS256 # <2>
 #end::yamlconfig[]
 """
 
@@ -67,7 +68,8 @@ micronaut:
                                         'signatures': [
                                                 'secret': [
                                                         'generator': [
-                                                                'secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa'
+                                                                'secret': 'pleaseChangeThisSecretForANewOne',
+                                                                'jwsAlgorithm': 'HS256'
                                                         ]
                                                 ]
                                         ]

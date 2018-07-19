@@ -114,6 +114,10 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         if (uri == null) {
             throw new IllegalArgumentException("Argument 'uri' cannot be null");
         }
+        if (uri.length() > 1 && uri.charAt(uri.length() - 1) == '/') {
+            uri = uri.substring(0, uri.length() - 1);
+        }
+
         int len = uri.length();
         if (isRoot && (len == 0 || (len == 1 && uri.charAt(0) == '/'))) {
             return Optional.of(new DefaultUriMatchInfo(uri, Collections.emptyMap()));
@@ -340,7 +344,12 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
          * @return The variable match pattern
          */
         protected String getVariablePattern(String variable, char operator) {
-            return VARIABLE_MATCH_PATTERN;
+            if (operator == '+') {
+                // Allow reserved characters. See https://tools.ietf.org/html/rfc6570#section-3.2.3
+                return "([\\S]";
+            } else {
+                return VARIABLE_MATCH_PATTERN;
+            }
         }
     }
 }

@@ -35,7 +35,7 @@ import java.util.Map;
 import java.util.Optional;
 
 /**
- * Returns 401 for {@link Endpoint} requests which have sensitive false. Disabled if micronaut.security is enabled.
+ * Returns 401 for {@link Endpoint} requests which have sensitive true. Disabled if micronaut.security is enabled.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -48,7 +48,6 @@ public class EndpointsFilter extends OncePerRequestHttpServerFilter {
 
     /**
      * Constructor.
-     *
      * @param endpointSensitivityProcessor The processor that resolves endpoint sensitivity
      */
     public EndpointsFilter(EndpointSensitivityProcessor endpointSensitivityProcessor) {
@@ -65,7 +64,6 @@ public class EndpointsFilter extends OncePerRequestHttpServerFilter {
     @Override
     protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
         Optional<RouteMatch> routeMatch = RouteMatchUtils.findRouteMatchAtRequest(request);
-
         if (routeMatch.isPresent() && routeMatch.get() instanceof MethodBasedRouteMatch) {
             Method method = ((MethodBasedRouteMatch) routeMatch.get()).getTargetMethod();
             if (endpointMethods.containsKey(method)) {

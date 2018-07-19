@@ -32,7 +32,6 @@ import java.io.OutputStream;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Responsible for writing class files that are instances of {@link AnnotationMetadata}.
@@ -57,10 +56,10 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             "emptyMap"
         )
     );
-    private static final org.objectweb.asm.commons.Method METHOD_SET_OF = org.objectweb.asm.commons.Method.getMethod(
+    private static final org.objectweb.asm.commons.Method METHOD_LIST_OF = org.objectweb.asm.commons.Method.getMethod(
         ReflectionUtils.getRequiredInternalMethod(
             StringUtils.class,
-            "internSetOf",
+            "internListOf",
             Object[].class
         )
     );
@@ -214,7 +213,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         return classWriter;
     }
 
-    private static void pushCreateSetCall(GeneratorAdapter methodVisitor, Set<String> names) {
+    private static void pushCreateListCall(GeneratorAdapter methodVisitor, List<String> names) {
         int totalSize = names == null ? 0 : names.size();
         if (totalSize > 0) {
 
@@ -227,26 +226,26 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 // use the property type as the value
             }
             // invoke the AbstractBeanDefinition.createMap method
-            methodVisitor.invokeStatic(Type.getType(StringUtils.class), METHOD_SET_OF);
+            methodVisitor.invokeStatic(Type.getType(StringUtils.class), METHOD_LIST_OF);
         } else {
             methodVisitor.visitInsn(ACONST_NULL);
         }
     }
 
-    private static void pushCreateAnnotationsByStereotypeData(GeneratorAdapter methodVisitor, Map<String, Set<String>> annotationData) {
+    private static void pushCreateAnnotationsByStereotypeData(GeneratorAdapter methodVisitor, Map<String, List<String>> annotationData) {
         int totalSize = annotationData == null ? 0 : annotationData.size() * 2;
         if (totalSize > 0) {
 
             // start a new array
             pushNewArray(methodVisitor, Object.class, totalSize);
             int i = 0;
-            for (Map.Entry<String, Set<String>> entry : annotationData.entrySet()) {
+            for (Map.Entry<String, List<String>> entry : annotationData.entrySet()) {
                 // use the property name as the key
                 String annotationName = entry.getKey();
                 pushStoreStringInArray(methodVisitor, i++, totalSize, annotationName);
                 // use the property type as the value
                 pushStoreInArray(methodVisitor, i++, totalSize, () ->
-                    pushCreateSetCall(methodVisitor, entry.getValue())
+                    pushCreateListCall(methodVisitor, entry.getValue())
                 );
             }
             // invoke the AbstractBeanDefinition.createMap method

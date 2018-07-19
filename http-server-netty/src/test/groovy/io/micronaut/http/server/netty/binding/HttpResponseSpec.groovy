@@ -15,14 +15,15 @@
  */
 package io.micronaut.http.server.netty.binding
 
-import io.micronaut.http.HttpMessage
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
-import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.server.netty.AbstractMicronautSpec
+import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Shared
 import spock.lang.Unroll
 
@@ -57,6 +58,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         action                | status                        | body                       | headers
         "ok"                  | HttpStatus.OK                 | null                       | [connection: 'close']
         "ok-with-body"        | HttpStatus.OK                 | "some text"                | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
+        "error-with-body"     | HttpStatus.INTERNAL_SERVER_ERROR | "some text"             | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
         "ok-with-body-object" | HttpStatus.OK                 | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
         "status"              | HttpStatus.MOVED_PERMANENTLY  | null                       | [connection: 'close']
         "created-body"        | HttpStatus.CREATED            | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
@@ -88,6 +90,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         action                | status                       | body                       | headers
         "ok"                  | HttpStatus.OK                | null                       | [connection: 'close']
         "ok-with-body"        | HttpStatus.OK                | "some text"                | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
+        "error-with-body"     | HttpStatus.INTERNAL_SERVER_ERROR | "some text"            | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
         "ok-with-body-object" | HttpStatus.OK                | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
         "status"              | HttpStatus.MOVED_PERMANENTLY | null                       | [connection: 'close']
         "created-body"        | HttpStatus.CREATED           | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
@@ -119,52 +122,85 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         response.header("Content-Length") == "3"
     }
 
-   /* @Controller
-    static class ResponseController {
+    void "test server header"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['micronaut.server.serverHeader': 'Foo!', (SPEC_NAME_PROPERTY):getClass().simpleName])
+        def ctx = server.getApplicationContext()
+        RxHttpClient client = ctx.createBean(RxHttpClient, server.getURL())
 
-        @Get
-        HttpResponse accepted() {
-            HttpResponse.accepted()
+        when:
+        def resp = client.exchange(HttpRequest.GET('/test-header')).blockingFirst()
+
+        then:
+        resp.header("Server") == "Foo!"
+
+        cleanup:
+        ctx.stop()
+    }
+
+    void "test default server header"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [(SPEC_NAME_PROPERTY):getClass().simpleName])
+        def ctx = server.getApplicationContext()
+        RxHttpClient client = ctx.createBean(RxHttpClient, server.getURL())
+
+        when:
+        def resp = client.exchange(HttpRequest.GET('/test-header')).blockingFirst()
+
+        then:
+        !resp.header("Server")
+
+        cleanup:
+        ctx.stop()
+    }
+
+    void "test default date header"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [(SPEC_NAME_PROPERTY):getClass().simpleName])
+        def ctx = server.getApplicationContext()
+        RxHttpClient client = ctx.createBean(RxHttpClient, server.getURL())
+
+        when:
+        def resp = client.exchange(HttpRequest.GET('/test-header')).blockingFirst()
+
+        then:
+        resp.header("Date")
+
+        cleanup:
+        ctx.stop()
+    }
+
+    void "test date header turned off"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['micronaut.server.dateHeader': false, (SPEC_NAME_PROPERTY):getClass().simpleName])
+        def ctx = server.getApplicationContext()
+        RxHttpClient client = ctx.createBean(RxHttpClient, server.getURL())
+
+        when:
+        def resp = client.exchange(HttpRequest.GET('/test-header')).blockingFirst()
+
+        then:
+        !resp.header("Date")
+
+        cleanup:
+        ctx.stop()
+    }
+
+    @Controller('/test-header')
+    @Requires(property = 'spec.name', value = 'HttpResponseSpec')
+    static class TestController {
+        @Get('/')
+        HttpStatus index() {
+            HttpStatus.OK
         }
-
-        @Get
-        HttpResponse createdUri() {
-            HttpResponse.created(new URI("http://test.com"))
-        }
-
-        @Get
-        HttpResponse createdBody() {
-            HttpResponse.created(new Foo(name: "blah", age: 10))
-        }
-
-        @Get
-        HttpResponse ok() {
-            HttpResponse.ok()
-        }
-
-        @Get(produces = MediaType.TEXT_PLAIN)
-        HttpResponse okWithBody() {
-            HttpResponse.ok("some text")
-        }
-
-        @Get
-        HttpResponse<Foo> okWithBodyObject() {
-            HttpResponse.ok(new Foo(name: "blah", age: 10))
-                    .headers {
-                it.contentType(MediaType.APPLICATION_JSON_TYPE)
-            }
-        }
-
-        @Get
-        HttpMessage status() {
-            HttpResponse.status(HttpStatus.MOVED_PERMANENTLY)
-        }
-
-
-    }*/
+    }
 
     static class Foo {
         String name
         Integer age
+    }
+
+    Map<String, Object> getConfiguration() {
+        super.getConfiguration() << ['micronaut.server.dateHeader': false]
     }
 }

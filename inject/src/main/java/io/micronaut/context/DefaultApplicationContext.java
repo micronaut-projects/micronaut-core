@@ -389,6 +389,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             String bootstrapName = System.getProperty(BOOTSTRAP_NAME_PROPERTY);
             return StringUtils.isNotEmpty(bootstrapName) ? bootstrapName : BOOTSTRAP_NAME;
         }
+
+        @Override
+        protected boolean shouldDeduceEnvironments() {
+            return false;
+        }
     }
 
     /**
@@ -440,6 +445,16 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             // no-op .. @Context scope beans are not started for bootstrap
         }
 
+        @Override
+        protected void processParallelBeans() {
+            // no-op
+        }
+
+        @Override
+        public void publishEvent(Object event) {
+            // no-op .. the bootstrap context shouldn't publish events
+        }
+
     }
 
     /**
@@ -466,21 +481,27 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         @Override
         protected synchronized List<PropertySource> readPropertySourceList(String name) {
             Set<String> activeNames = getActiveNames();
-            String[] environmentNamesArray = activeNames.toArray(new String[activeNames.size()]);
-            if (this.bootstrapEnvironment == null) {
-                this.bootstrapEnvironment = createBootstrapEnvironment(environmentNamesArray);
-            }
-            BootstrapPropertySourceLocator bootstrapPropertySourceLocator = resolveBootstrapPropertySourceLocator(environmentNamesArray);
 
-            for (PropertySource propertySource : bootstrapPropertySourceLocator.findPropertySources(bootstrapEnvironment)) {
-                addPropertySource(propertySource);
-            }
+            // fast path for functions
+            if (activeNames.contains(Environment.FUNCTION)) {
+                return super.readPropertySourceList(name);
+            } else {
+                String[] environmentNamesArray = activeNames.toArray(new String[activeNames.size()]);
+                if (this.bootstrapEnvironment == null) {
+                    this.bootstrapEnvironment = createBootstrapEnvironment(environmentNamesArray);
+                }
+                BootstrapPropertySourceLocator bootstrapPropertySourceLocator = resolveBootstrapPropertySourceLocator(environmentNamesArray);
 
-            Collection<PropertySource> bootstrapPropertySources = bootstrapEnvironment.getPropertySources();
-            for (PropertySource bootstrapPropertySource : bootstrapPropertySources) {
-                addPropertySource(new BootstrapPropertySource(bootstrapPropertySource));
+                for (PropertySource propertySource : bootstrapPropertySourceLocator.findPropertySources(bootstrapEnvironment)) {
+                    addPropertySource(propertySource);
+                }
+
+                Collection<PropertySource> bootstrapPropertySources = bootstrapEnvironment.getPropertySources();
+                for (PropertySource bootstrapPropertySource : bootstrapPropertySources) {
+                    addPropertySource(new BootstrapPropertySource(bootstrapPropertySource));
+                }
+                return super.readPropertySourceList(name);
             }
-            return super.readPropertySourceList(name);
         }
 
         private BootstrapPropertySourceLocator resolveBootstrapPropertySourceLocator(String... environmentNames) {
@@ -514,6 +535,10 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 bootstrapEnvironment.addPropertySource(source);
             }
             bootstrapEnvironment.start();
+            for (String pkg : bootstrapEnvironment.getPackages()) {
+                addPackage(pkg);
+            }
+
             return bootstrapEnvironment;
         }
     }

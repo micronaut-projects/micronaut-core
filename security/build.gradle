@@ -16,10 +16,10 @@ dependencies {
     testCompile "org.yaml:snakeyaml:$snakeYamlVersion"
 }
 
-tasks.withType(Test) {
-    testLogging {
-        showStandardStreams = true
-        exceptionFormat = 'full'
-    }
-}
+//tasks.withType(Test) {
+//    testLogging {
+//        showStandardStreams = true
+//        exceptionFormat = 'full'
+//    }
+//}
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

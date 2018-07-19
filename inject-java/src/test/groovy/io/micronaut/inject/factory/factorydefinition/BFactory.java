@@ -17,8 +17,6 @@ package io.micronaut.inject.factory.factorydefinition;
 
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Factory;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;

@@ -15,20 +15,21 @@
  */
 package io.micronaut.http.server.netty.sse
 
-import com.launchdarkly.eventsource.EventHandler
-import com.launchdarkly.eventsource.EventSource
-import com.launchdarkly.eventsource.MessageEvent
-import io.reactivex.Flowable
+import groovy.transform.EqualsAndHashCode
+import groovy.transform.ToString
 import io.micronaut.context.annotation.Requires
+import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
+import io.micronaut.http.client.Client
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.sse.Event
-import io.micronaut.http.annotation.Get
+import io.reactivex.Flowable
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Flux
 
 import java.time.Duration
 import java.time.temporal.ChronoUnit
-import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * @author Graeme Rocher
@@ -39,122 +40,77 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
 
     void "test consume event stream object"() {
         given:
-        SseController.complete.set(false)
-        MyEventHandler eventHandler = new MyEventHandler()
-        EventSource eventSource = new EventSource.Builder(
-                eventHandler, new URI("$server/sse/object")
-        ).reconnectTimeMs(1000 * 100).build()
-
-        eventSource.start()
-        while (!SseController.complete.get()) {
-            sleep 100
-        }
+        SseClient client = embeddedServer.applicationContext.getBean(SseClient)
+        List<Event<Foo>> events = client.object().collectList().block()
 
         expect:
-        eventHandler.events.size() == 4
-        eventHandler.events.first().data.data == '{"name":"Foo 1","age":11}'
+        events.size() == 4
+        events.first().data == new Foo(name: "Foo 1",age:11)
 
-        cleanup:
-        eventSource.close()
     }
 
     void "test consume event stream string"() {
         given:
-        SseController.complete.set(false)
-        MyEventHandler eventHandler = new MyEventHandler()
-        EventSource eventSource = new EventSource.Builder(
-                eventHandler, new URI("$server/sse/string")
-        ).reconnectTimeMs(1000 * 100).build()
+        SseClient client = embeddedServer.applicationContext.getBean(SseClient)
+        List<Event<String>> events = client.string().collectList().block()
 
-        eventSource.start()
-        while (!SseController.complete.get()) {
-            sleep 100
-        }
+
 
         expect:
-        eventHandler.events.size() == 4
-        eventHandler.events.first().data.data == 'Foo 1'
-
-        cleanup:
-        eventSource.close()
+        events.size() == 4
+        events.first().data == 'Foo 1'
     }
 
     void "test consume rich event stream object"() {
         given:
-        SseController.complete.set(false)
-        MyEventHandler eventHandler = new MyEventHandler()
-        EventSource eventSource = new EventSource.Builder(
-                eventHandler, new URI("$server/sse/rich")
-        ).reconnectTimeMs(1000 * 100).build()
+        SseClient client = embeddedServer.applicationContext.getBean(SseClient)
+        List<Event<Foo>> events = client.rich().collectList().block()
 
-        when:
-        eventSource.start()
-        while (!SseController.complete.get()) {
-            sleep 100
-        }
+        expect:
+        events.size() == 4
+        events.first().data == new Foo(name: "Foo 1",age:11)
+        events.first().id == "1"
+        events.first().retry == Duration.ofMinutes(2)
 
-        then:
-        eventHandler.events.size() == 4
-        eventHandler.comments.size() == 4
-
-        when:
-        Event event = eventHandler.events.first()
-
-        then:
-        event.name == 'foo'
-
-        cleanup:
-        eventSource.close()
     }
 
     void "test receive error from supplier"() {
+
         given:
-        SseController.complete.set(false)
-        MyEventHandler eventHandler = new MyEventHandler()
-        EventSource eventSource = new EventSource.Builder(
-                eventHandler, new URI("$server/sse/exception")
-        ).reconnectTimeMs(1000 * 100).build()
+        SseClient client = embeddedServer.applicationContext.getBean(SseClient)
 
         when:
-        eventSource.start()
-        while (!SseController.complete.get()) {
-            sleep 100
-        }
+        List<Event<String>> events = client.exception().collectList().block()
 
         then:
-        eventHandler.events.size() == 0
-        eventHandler.comments.size() == 0
+        events.size() == 0
 
-        cleanup:
-        eventSource.close()
     }
 
-    void "test receive error from onError"() {
-        given:
-        SseController.complete.set(false)
-        MyEventHandler eventHandler = new MyEventHandler()
-        EventSource eventSource = new EventSource.Builder(
-                eventHandler, new URI("$server/sse/onError")
-        ).reconnectTimeMs(1000 * 100).build()
 
-        when:
-        eventSource.start()
-        while (!SseController.complete.get()) {
-            sleep 100
-        }
+    @Client('/sse')
+    static interface SseClient {
 
-        then:
-        eventHandler.events.size() == 0
-        eventHandler.comments.size() == 0
+        @Get(uri = '/object', processes = MediaType.TEXT_EVENT_STREAM)
+        Flux<Event<Foo>> object()
 
-        cleanup:
-        eventSource.close()
+        @Get(uri = '/string', processes = MediaType.TEXT_EVENT_STREAM)
+        Flux<Event<String>> string()
+
+        @Get(uri = '/rich', processes = MediaType.TEXT_EVENT_STREAM)
+        Flux<Event<Foo>> rich()
+
+        @Get(uri = '/exception', processes = MediaType.TEXT_EVENT_STREAM)
+        Flux<Event<String>> exception()
+
+        @Get(uri = '/on-error', processes = MediaType.TEXT_EVENT_STREAM)
+        Flux<Event<String>> onError()
+
     }
 
     @Controller
     @Requires(property = 'spec.name', value = 'ServerSentEventSpec')
     static class SseController {
-        static AtomicBoolean complete = new AtomicBoolean(false)
 
         @Get
         Publisher<Event> object() {
@@ -166,7 +122,6 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
                 }
                 else {
                     emitter.onComplete()
-                    complete.set(true)
                 }
             })
         }
@@ -186,7 +141,6 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
                 }
                 else {
                     emitter.onComplete()
-                    complete.set(true)
                 }
             })
         }
@@ -201,7 +155,6 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
                 }
                 else {
                     emitter.onComplete()
-                    complete.set(true)
                 }
             })
         }
@@ -209,7 +162,6 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
         @Get
         Publisher<Event> exception() {
             Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
-                complete.set(true)
                 throw new RuntimeException("bad things happened")
             })
         }
@@ -218,46 +170,14 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
         Publisher<Event> onError() {
             Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
                 emitter.onError(new RuntimeException("bad things happened"))
-                complete.set(true)
             })
         }
     }
 
+    @EqualsAndHashCode
+    @ToString(includePackage = false)
     static class Foo {
         String name
         Integer age
-    }
-}
-
-class MyEventHandler implements EventHandler {
-    boolean opened = false
-    boolean closed = false
-    List<String> comments = []
-    List<Event<MessageEvent>> events = []
-    List<Throwable> errors = []
-
-    @Override
-    void onOpen() throws Exception {
-        opened = true
-    }
-
-    @Override
-    void onClosed() throws Exception {
-        closed = true
-    }
-
-    @Override
-    void onMessage(String event, MessageEvent messageEvent) throws Exception {
-        events.add(Event.of(messageEvent).name(event))
-    }
-
-    @Override
-    void onComment(String comment) throws Exception {
-        comments.add(comment)
-    }
-
-    @Override
-    void onError(Throwable t) {
-        errors.add(t)
     }
 }

@@ -16,6 +16,8 @@
 
 package io.micronaut.http.uri;
 
+import io.micronaut.core.beans.BeanMap;
+
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
@@ -162,6 +164,16 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
         }
         return builder.toString();
+    }
+
+    /**
+     * Expand the string with the given bean.
+     *
+     * @param bean The bean
+     * @return The expanded URI
+     */
+    public String expand(Object bean) {
+        return expand(BeanMap.of(bean));
     }
 
     @Override

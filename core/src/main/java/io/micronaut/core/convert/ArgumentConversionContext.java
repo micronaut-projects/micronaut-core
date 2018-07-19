@@ -16,6 +16,8 @@
 
 package io.micronaut.core.convert;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.type.Argument;
 
 /**
@@ -25,10 +27,33 @@ import io.micronaut.core.type.Argument;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ArgumentConversionContext<T> extends ConversionContext {
+public interface ArgumentConversionContext<T> extends ConversionContext, AnnotationMetadataProvider {
 
     /**
      * @return The {@link Argument} being converted
      */
     Argument<T> getArgument();
+
+    @Override
+    default AnnotationMetadata getAnnotationMetadata() {
+        return getArgument().getAnnotationMetadata();
+    }
+
+    /**
+     * Augment this context with annotation metadata.
+     *
+     * @param annotationMetadata The annotation metadata
+     * @return The conversion context
+     */
+    @SuppressWarnings("unchecked")
+    default ArgumentConversionContext<T> with(AnnotationMetadata annotationMetadata) {
+
+        ConversionContext thisContext = this;
+        return new DefaultArgumentConversionContext(getArgument(), thisContext.getLocale(), thisContext.getCharset()) {
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                return annotationMetadata;
+            }
+        };
+    }
 }

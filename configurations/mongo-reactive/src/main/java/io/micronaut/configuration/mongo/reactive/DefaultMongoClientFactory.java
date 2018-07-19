@@ -21,7 +21,8 @@ import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.runtime.context.scope.Refreshable;
+
+import javax.inject.Singleton;
 
 /**
  * Builds the primary MongoClient.
@@ -41,6 +42,7 @@ public class DefaultMongoClientFactory {
      */
     @Bean(preDestroy = "close")
     @Primary
+    @Singleton
     MongoClient mongoClient(DefaultMongoConfiguration configuration) {
         return new MongoClient(configuration.buildURI());
     }

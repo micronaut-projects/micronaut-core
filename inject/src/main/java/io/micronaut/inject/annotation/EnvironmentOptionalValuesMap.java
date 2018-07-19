@@ -49,15 +49,33 @@ class EnvironmentOptionalValuesMap<V> extends OptionalValuesMap<V> {
             Object value = entry.getValue();
             if (value instanceof CharSequence) {
                 value = placeholderResolver.resolveRequiredPlaceholders(value.toString());
-                ((Map.Entry) entry).setValue(value);
             } else if (value instanceof String[]) {
                 String[] a = (String[]) value;
                 for (int i = 0; i < a.length; i++) {
                     a[i] = placeholderResolver.resolveRequiredPlaceholders(a[i]);
                 }
-                ((Map.Entry) entry).setValue(a);
             }
-            return entry;
+            Object finalValue = value;
+            return new Map.Entry<CharSequence, Object>() {
+                Object val = finalValue;
+
+                @Override
+                public CharSequence getKey() {
+                    return entry.getKey();
+                }
+
+                @Override
+                public Object getValue() {
+                    return val;
+                }
+
+                @Override
+                public Object setValue(Object value) {
+                    Object old = val;
+                    val = value;
+                    return old;
+                }
+            };
         }).collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     }
 }

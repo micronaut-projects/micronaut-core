@@ -1,0 +1,54 @@
+"Spring Loaded is a JVM agent for reloading class file changes whilst a JVM is running." (via the https://github.com/spring-projects/spring-loaded[official README]).
+
+WARNING: Spring-Loaded is not actively maintained and currently only supports Java versions < 9.
+
+== CLI Feature
+
+You can create a new application with Spring-Loaded preconfigured, using the CLI (for supported Java versions). To do this, use the `springloaded` feature.
+
+----
+> mn create-app my-reloading-app --features springloaded
+----
+
+This feature will include the Spring-Loaded agent JAR in your project, and provide the appropriate build tool config for Gradle or Maven to load the agent.
+
+You can start the application with `./gradlew run` (Gradle) or `./mvnw compile exec:exec` (Maven).
+
+
+== Manual Configuration
+
+
+Configuring Spring-Loaded requires the agent JAR file to be downloaded on your system, and configured to be loaded as a `javaagent` by the build tool (or IDE).
+
+.Gradle build.gradle example
+[source,groovy]
+----
+
+run.jvmArgs('-noverify', '-javaagent:/usr/local/libs/springloaded/springloaded-1.2.8.RELEASE.jar')
+----
+
+.Maven pom.xml example
+[source,xml]
+----
+<project>
+    <!-- -->
+    <build>
+        <plugins>
+
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>1.6.0</version>
+                <configuration>
+                    <executable>java</executable>
+                    <arguments>
+                        <argument>-noverify</argument> <!-- 1 -->
+                        <argument>-javaagent:/usr/local/libs/springloaded/springloaded-1.2.8.RELEASE.jar</argument> <!-- 2 -->
+                    </arguments>
+----
+<1> Add `noverify` argument
+<2> Add `javaagent` argument
+
+
+You can now start the application with `./gradlew run` (Gradle) or `./mvnw compile exec:exec` (Maven).
+
