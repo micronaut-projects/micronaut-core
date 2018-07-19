@@ -182,6 +182,7 @@ public class NettyMutableHttpResponse<B> implements MutableHttpResponse<B> {
      */
     public NettyMutableHttpResponse replace(ByteBuf body) {
         this.nettyResponse = this.nettyResponse.replace(body);
+        this.headers.setNettyHeaders(this.nettyResponse.headers());
         return this;
     }
 
