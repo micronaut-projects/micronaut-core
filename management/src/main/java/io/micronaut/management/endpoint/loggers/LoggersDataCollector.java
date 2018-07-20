@@ -19,6 +19,7 @@ package io.micronaut.management.endpoint.loggers;
 import org.reactivestreams.Publisher;
 
 import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 
 /**
  * Used to respond with logger information for the {@link LoggersEndpoint}.
@@ -53,6 +54,7 @@ public interface LoggersDataCollector<T> {
      * @param name The name of the logger to find or create
      * @param level The log level to configure
      */
-    void setLogLevel(LoggingSystem loggingSystem, @NotBlank String name, String level);
+    void setLogLevel(LoggingSystem loggingSystem, @NotBlank String name,
+                     @NotNull LogLevel level);
 
 }
