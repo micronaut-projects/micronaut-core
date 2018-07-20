@@ -17,7 +17,6 @@
 package io.micronaut.management.endpoint.loggers;
 
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.EndpointConfiguration;
@@ -89,6 +88,11 @@ public class LoggersEndpoint {
         return Single.fromPublisher(loggersDataCollector.getOne(loggingSystem, name));
     }
 
+    /**
+     * @param name The name of the logger to configure
+     * @param configuredLevel The {@link LogLevel} as a string to set on the named logger
+     * @return OK status, empty body
+     */
     @Write
     public HttpResponse setLogLevel(@QueryValue @NotBlank String name,
                                     @Nullable String configuredLevel) {

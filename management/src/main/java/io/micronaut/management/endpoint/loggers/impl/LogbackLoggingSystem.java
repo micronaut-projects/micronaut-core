@@ -66,21 +66,19 @@ public class LogbackLoggingSystem implements LoggingSystem {
     protected static LogLevel toLogLevel(Level level) {
         if (level == null) {
             return LogLevel.NOT_SPECIFIED;
-        }
-        else {
+        } else {
             return LogLevel.valueOf(level.toString());
         }
     }
 
     /**
-     * @param level The micronaut {@link LogLevel} to convert
+     * @param logLevel The micronaut {@link LogLevel} to convert
      * @return The converted logback {@link Level}
      */
     protected static Level toLevel(LogLevel logLevel) {
         if (logLevel == LogLevel.NOT_SPECIFIED) {
             return null;
-        }
-        else {
+        } else {
             return Level.valueOf(logLevel.name());
         }
     }
