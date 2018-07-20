@@ -1,37 +1,42 @@
 
 The loggers endpoint returns information about the available loggers in the application and
-permits setting the log level for loggers.
+permits configuring the their log level.
 
-To get a map of all loggers by name with their configured and effective log levels,
-send a GET request to /loggers.
+To get a collection of all loggers by name with their configured and effective log levels,
+send a GET request to /loggers. This will also provide a list of the available log levels.
 
 [source,bash]
 ----
 $ curl http://localhost:8080/loggers
 
 {
-    "levels": ["ALL", "TRACE", ... "OFF", "NOT_SPECIFIED"],
+    "levels": [
+        "ALL", "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "OFF", "NOT_SPECIFIED"
+    ],
     "loggers": {
-        "error": {
-            "configuredLevel": "ERROR",
-            "effectiveLevel": "ERROR"
-        },
         "ROOT": {
             "configuredLevel": "INFO",
             "effectiveLevel": "INFO"
-        }
+        },
+        "io": {
+            "configuredLevel": "NOT_SPECIFIED",
+            "effectiveLevel": "INFO"
+        },
+        "io.micronaut": {
+            "configuredLevel": "NOT_SPECIFIED",
+            "effectiveLevel": "INFO"
+        },
+        // etc...
     }
 }
 ----
 
-
-To get the log levels of a single logger, send a GET request to /loggers/<name> with the
-name of the logger. If the logger does not exist, it will be created with a configured log
-level of NOT_SPECIFIED (and its effective log level usually matching the ROOT logger).
+To get the log levels of a particular logger, include the logger name in your GET request. For
+example, to access the log levels of the logger 'io.micronaut.http':
 
 [source,bash]
 ----
-$ curl http://localhost:8080/loggers/whatever
+$ curl http://localhost:8080/loggers/io.micronaut.http
 
 {
     "configuredLevel": "NOT_SPECIFIED",
@@ -39,16 +44,29 @@ $ curl http://localhost:8080/loggers/whatever
 }
 ----
 
-To set the log level of a single logger, set a POST request to /loggers/<name> with a
-body providing the log level to configure.
+If the named logger does not exist, it will be created with an unspecified (i.e. `NOT_SPECIFIED`)
+configured log level. (It's effective log level will usually be that of the root logger.)
+
+To update the log level of a single logger, send a POST request to the named logger URL and include
+a body providing the log level to configure.
 
 
 [source,bash]
 ----
-$ curl -X POST \
+$ curl -i -X POST
        -H "Content-Type: application/json" \
        -d '{ "configuredLevel": "ERROR" }' \
        http://localhost:8080/loggers/ROOT
+
+HTTP/1.1 200 OK
+
+$ curl http://localhost:8080/loggers/ROOT
+
+{
+    "configuredLevel": "ERROR",
+    "effectiveLevel": "ERROR"
+}
+
 ----
 
 
@@ -68,5 +86,19 @@ endpoints:
 
 == Customization
 
-TBD.
+The loggers endpoint is composed of a loggers data collector (TODO: manager) and a logging system implementation.
+The loggers data collector
+(link:{api}/io/micronaut/management/endpoint/loggers/LoggersDataCollector.html[LoggersDataCollector])
+is responsible for returning a Publisher that will return data collected and transformed for the response.
+The logging system
+(link:{api}/io/micronaut/management/endpoint/loggers/LoggingSystem.html[LoggingSystem])
+is responsible for gaining access to Logger instances and accessing or updating their settings.
+
+To override the default behavior for either of the helper classes, either extend the default implementations
+(link:{api}/io/micronaut/management/endpoint/loggers/impl/RxLoggersDataCollector.html[RxLoggersDataCollector],
+ link:{api}/io/micronaut/management/endpoint/loggers/impl/LogbackLoggingSystem.html[LogbackLoggingSystem])
+or implement the relevant interface directly. To ensure your implementation is used instead of the default,
+add the link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the
+value being the default implementation.
+
 
