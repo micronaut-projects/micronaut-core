@@ -32,14 +32,7 @@
 
 package io.micronaut.context;
 
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.ConfigurationReader;
-import io.micronaut.context.annotation.EachBean;
-import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Property;
-import io.micronaut.context.annotation.Provided;
-import io.micronaut.context.annotation.Value;
+import io.micronaut.context.annotation.*;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.BeanInitializedEventListener;
 import io.micronaut.context.event.BeanInitializingEvent;
@@ -54,16 +47,11 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.GenericTypeUtils;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
-import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ConstructorInjectionPoint;
-import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.FieldInjectionPoint;
-import io.micronaut.inject.MethodInjectionPoint;
+import io.micronaut.inject.*;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -78,7 +66,6 @@ import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -245,13 +232,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         if (invocableMethod != null) {
             return Optional.of(invocableMethod);
         } else {
-            Optional<Method> method = ReflectionUtils.findMethod(type, name, argumentTypes);
-            return method.map(theMethod -> {
-                    ReflectionExecutableMethod<T, R> reflectionMethod = new ReflectionExecutableMethod<>(this, theMethod);
-                    executableMethodMap.put(methodKey, reflectionMethod);
-                    return reflectionMethod;
-                }
-            );
+            return Optional.empty();
         }
     }
 
@@ -264,9 +245,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 .stream()
                 .filter((method) -> method.getMethodName().equals(name));
         } else {
-            return ReflectionUtils
-                .findMethodsByName(type, name)
-                .map((method) -> new ReflectionExecutableMethod<>(this, method));
+            return Stream.empty();
         }
     }
 

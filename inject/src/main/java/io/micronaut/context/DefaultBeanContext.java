@@ -2269,8 +2269,7 @@ public class DefaultBeanContext implements BeanContext {
 
         @Override
         public <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class[] argumentTypes) {
-            Optional<Method> method = ReflectionUtils.findMethod(singletonClass, name, argumentTypes);
-            return method.map(theMethod -> new ReflectionExecutableMethod(this, theMethod));
+            return Optional.empty();
         }
 
         @Override
@@ -2290,8 +2289,7 @@ public class DefaultBeanContext implements BeanContext {
 
         @Override
         public Stream<ExecutableMethod<T, ?>> findPossibleMethods(String name) {
-            return ReflectionUtils.findMethodsByName(singletonClass, name)
-                .map((method -> new ReflectionExecutableMethod(this, method)));
+            return Stream.empty();
         }
 
         @Override
