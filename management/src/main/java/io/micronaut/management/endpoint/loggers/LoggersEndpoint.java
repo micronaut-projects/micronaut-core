@@ -75,9 +75,7 @@ public class LoggersEndpoint {
      */
     @Read
     public Single loggers() {
-        return Single.fromPublisher(
-                loggersDataCollector.getAll(loggingSystem)
-        );
+        return Single.fromPublisher(loggersDataCollector.getAll(loggingSystem));
     }
 
     /**
@@ -86,9 +84,7 @@ public class LoggersEndpoint {
      */
     @Read
     public Single getLogger(@QueryValue @NotBlank String name) {
-        return Single.fromPublisher(
-                loggersDataCollector.getOne(loggingSystem, name)
-        );
+        return Single.fromPublisher(loggersDataCollector.getOne(loggingSystem, name));
     }
 
     /**
@@ -98,9 +94,7 @@ public class LoggersEndpoint {
     @Write
     public void setLogLevel(@QueryValue @NotBlank String name,
                             @Nullable LogLevel configuredLevel) {
-        loggersDataCollector.setLogLevel(
-                loggingSystem, name,
-                configuredLevel != null ? configuredLevel : LogLevel.NOT_SPECIFIED)
-        ;
+        loggersDataCollector.setLogLevel(loggingSystem, name,
+                configuredLevel != null ? configuredLevel : LogLevel.NOT_SPECIFIED);
     }
 }
