@@ -22,13 +22,13 @@ import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 
 /**
- * Used to respond with logger information for the {@link LoggersEndpoint}.
+ * Used to retrieve and update logger information for the {@link LoggersEndpoint}.
  *
- * @param <T> the type
+ * @param <T> The type
  * @author Matthew Moss
  * @since 1.0
  */
-public interface LoggersDataCollector<T> {
+public interface LoggersManager<T> {
 
     /**
      * Collect all existing loggers in the system.
