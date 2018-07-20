@@ -24,7 +24,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import static io.micronaut.http.HttpRequest.GET
+import static io.micronaut.http.HttpRequest.*
 
 class LoggersEndpointSpec extends Specification {
 
@@ -49,6 +49,12 @@ class LoggersEndpointSpec extends Specification {
             'no-level': [configuredLevel: NOT_SPECIFIED, effectiveLevel: INFO],
             'no-config': [configuredLevel: NOT_SPECIFIED, effectiveLevel: INFO],
     ]
+
+    // Default levels for a newly-created logger (b/c ROOT)
+    static final defaultLogLevels = [configuredLevel: NOT_SPECIFIED, effectiveLevel: INFO]
+
+    // Some know loggers, internal to micronaut (not exhaustive)
+    static final expectedBuiltinLoggers = ['io.micronaut', 'io.netty']
 
     void setup() {
         server = ApplicationContext.run(EmbeddedServer)
@@ -84,7 +90,6 @@ class LoggersEndpointSpec extends Specification {
 
         when:
         Map result = response.body()
-        println ">> Result: $result"
 
         then:
         result.containsKey 'loggers'
@@ -94,28 +99,58 @@ class LoggersEndpointSpec extends Specification {
             assert result.loggers.containsKey(log)
             assert result.loggers[log] == configuredLoggers[log]
         }
+
+        and: 'we have some expected builtin loggers'
+        expectedBuiltinLoggers.every {
+            result.loggers.containsKey it
+        }
     }
 
     @Unroll
-    void 'test that a configured logger #name can be retrieved by name from the endpoint'() {
+    void 'test that a configured logger "#name" can be retrieved by name from the endpoint'() {
         when:
         def response = client.exchange(GET("/loggers/${name}"), Map).blockingFirst()
 
         then:
         response.status == HttpStatus.OK
-
-        when:
-        def result = response.body()
-
-        then:
-        result.configuredLevel == configuredLevel
-        result.effectiveLevel == effectiveLevel
+        response.body() == configuredLoggers[name] ?: defaultLogLevels
 
         where:
-        name     | configuredLevel | effectiveLevel
-        'foo'    | NOT_SPECIFIED   | INFO
-        'ROOT'   | INFO            | INFO
-        'errors' | ERROR           | ERROR
+        name << ['journal', 'ROOT', 'errors']
     }
 
+    @Unroll
+    void 'test that log levels on logger "#name" can be configured via the loggers endpoint'() {
+        given:
+        def uri = "/loggers/${name}".toString()
+
+        when:
+        def response = client.exchange(GET(uri), Map).blockingFirst()
+
+        then:
+        response.status == HttpStatus.OK
+        response.body() == configuredLoggers[name] ?: defaultLogLevels
+
+        when: 'we request the log level on the logger is changed'
+        response = client.exchange(POST(uri, [configuredLevel: level]))
+                .blockingFirst()
+
+        then: 'we get back success but no content'
+        response.status == HttpStatus.NO_CONTENT
+
+        when: 'we again request info on the logger'
+        response = client.exchange(GET(uri), Map).blockingFirst()
+
+        then: 'we get back the newly configured level'
+        response.status == HttpStatus.OK
+        with (response.body()) {
+            configuredLevel == expectedConfiguredLevel
+            effectiveLevel == expectedEffectiveLevel
+        }
+
+        where:
+        name        | level  | expectedConfiguredLevel | expectedEffectiveLevel
+        'errors'    | null   | NOT_SPECIFIED           | INFO
+        'whatever'  | WARN   | WARN                    | WARN
+    }
 }

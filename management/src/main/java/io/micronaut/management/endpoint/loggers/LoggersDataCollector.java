@@ -46,4 +46,13 @@ public interface LoggersDataCollector<T> {
      */
     Publisher<T> getOne(LoggingSystem loggingSystem, @NotBlank String name);
 
+    /**
+     * Set the log level for the named logger in the system.
+     *
+     * @param loggingSystem The {@link LoggingSystem} in use
+     * @param name The name of the logger to find or create
+     * @param level The log level to configure
+     */
+    void setLogLevel(LoggingSystem loggingSystem, @NotBlank String name, String level);
+
 }

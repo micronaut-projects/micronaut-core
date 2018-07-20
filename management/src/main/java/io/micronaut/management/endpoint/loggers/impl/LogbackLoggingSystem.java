@@ -14,8 +14,6 @@ import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.stream.Collectors;
 
-// TODO Implement methods of this class against logback.
-
 /**
  * An implementation of {@link LoggingSystem} that works with logback.
  */
@@ -39,6 +37,7 @@ public class LogbackLoggingSystem implements LoggingSystem {
 
     @Override
     public void setLogLevel(String name, LogLevel level) {
+        getLoggerContext().getLogger(name).setLevel(toLevel(level));
     }
 
     /**
@@ -70,6 +69,19 @@ public class LogbackLoggingSystem implements LoggingSystem {
         }
         else {
             return LogLevel.valueOf(level.toString());
+        }
+    }
+
+    /**
+     * @param level The micronaut {@link LogLevel} to convert
+     * @return The converted logback {@link Level}
+     */
+    protected static Level toLevel(LogLevel logLevel) {
+        if (logLevel == LogLevel.NOT_SPECIFIED) {
+            return null;
+        }
+        else {
+            return Level.valueOf(logLevel.name());
         }
     }
 }

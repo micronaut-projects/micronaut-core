@@ -14,7 +14,8 @@ import java.util.*;
  */
 @Singleton
 @Requires(beans = LoggersEndpoint.class)
-public class RxLoggersDataCollector implements LoggersDataCollector<Map<String, Object>> {
+public class RxLoggersDataCollector
+        implements LoggersDataCollector<Map<String, Object>> {
 
     @Override
     public Publisher<Map<String, Object>> getData(LoggingSystem loggingSystem) {
@@ -29,15 +30,23 @@ public class RxLoggersDataCollector implements LoggersDataCollector<Map<String, 
     }
 
     @Override
-    public Publisher<Map<String, Object>> getOne(LoggingSystem loggingSystem, String name) {
+    public Publisher<Map<String, Object>> getOne(LoggingSystem loggingSystem,
+                                                 String name) {
         return getLogger(loggingSystem.getLogger(name)).toFlowable();
+    }
+
+    @Override
+    public void setLogLevel(LoggingSystem loggingSystem, String name, String level) {
+        // TODO Make reactive?
+        loggingSystem.setLogLevel(name, toLogLevel(level));
     }
 
     /**
      * @param configurations The logger configurations
      * @return A {@link Single} that wraps a Map
      */
-    protected Single<Map<String, Object>> getLoggers(Collection<LoggerConfiguration> configurations) {
+    protected static Single<Map<String, Object>> getLoggers(
+            Collection<LoggerConfiguration> configurations) {
         Map<String, Object> loggers = new HashMap<>(configurations.size());
 
         return Flowable
@@ -51,18 +60,32 @@ public class RxLoggersDataCollector implements LoggersDataCollector<Map<String, 
      * @param configuration The logger configuration
      * @return A {@link Single} that wraps the configuration data
      */
-    protected Single<Map<String, Object>> getLogger(LoggerConfiguration configuration) {
+    protected static Single<Map<String, Object>> getLogger(
+            LoggerConfiguration configuration) {
         return Single.just(configuration.getData());
     }
 
     /**
      * @return A list with all {@link LogLevel} values as strings
      */
-    protected Single<List<String>> getLogLevels() {
+    protected static Single<List<String>> getLogLevels() {
         return Flowable
                 .fromArray(LogLevel.values())
                 .map(LogLevel::name)
                 .toList();
+    }
+
+    /**
+     * @param level The log level as a String, or null
+     * @return The {@link LogLevel} corresponding to the string, or NOT_SPECIFIED if string was null
+     * @throws IllegalArgumentException if level is invalid (non-null, doesn't match any {@link LogLevel})
+     */
+    protected static LogLevel toLogLevel(String level) {
+        if (level == null) {
+            return LogLevel.NOT_SPECIFIED;
+        }
+
+        return LogLevel.valueOf(level);
     }
 
 }

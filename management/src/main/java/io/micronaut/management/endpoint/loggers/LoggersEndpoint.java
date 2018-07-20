@@ -16,12 +16,16 @@
 
 package io.micronaut.management.endpoint.loggers;
 
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.management.endpoint.Read;
+import io.micronaut.management.endpoint.Write;
 import io.reactivex.Single;
 
+import javax.annotation.Nullable;
 import javax.validation.constraints.NotBlank;
 
 /**
@@ -83,5 +87,12 @@ public class LoggersEndpoint {
     @Read
     public Single getLogger(@QueryValue @NotBlank String name) {
         return Single.fromPublisher(loggersDataCollector.getOne(loggingSystem, name));
+    }
+
+    @Write
+    public HttpResponse setLogLevel(@QueryValue @NotBlank String name,
+                                    @Nullable String configuredLevel) {
+        loggersDataCollector.setLogLevel(loggingSystem, name, configuredLevel);
+        return HttpResponse.noContent();
     }
 }
