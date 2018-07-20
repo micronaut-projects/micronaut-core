@@ -18,7 +18,7 @@ public class RxLoggersDataCollector
         implements LoggersDataCollector<Map<String, Object>> {
 
     @Override
-    public Publisher<Map<String, Object>> getData(LoggingSystem loggingSystem) {
+    public Publisher<Map<String, Object>> getAll(LoggingSystem loggingSystem) {
         return Single.zip(getLoggers(loggingSystem.getLoggers()), getLogLevels(),
                 (loggers, levels) -> {
                     Map<String, Object> data = new HashMap<>(2);

@@ -77,7 +77,7 @@ public class LoggersEndpoint {
      */
     @Read
     public Single loggers() {
-        return Single.fromPublisher(loggersDataCollector.getData(loggingSystem));
+        return Single.fromPublisher(loggersDataCollector.getAll(loggingSystem));
     }
 
     /**
