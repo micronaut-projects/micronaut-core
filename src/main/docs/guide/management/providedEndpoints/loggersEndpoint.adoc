@@ -86,19 +86,40 @@ endpoints:
 
 == Customization
 
-The loggers endpoint is composed of a loggers data collector (TODO: manager) and a logging system implementation.
-The loggers data collector
-(link:{api}/io/micronaut/management/endpoint/loggers/LoggersDataCollector.html[LoggersDataCollector])
-is responsible for returning a Publisher that will return data collected and transformed for the response.
+The loggers endpoint is composed of two customizable parts: a loggers manager and a logging system.
+
+The loggers manager
+(link:{api}/io/micronaut/management/endpoint/loggers/LoggersManager.html[LoggersManager])
+is responsible for returning a Publisher that will return data collected and transformed for the response,
+and it is also responsible for updating a logger with a new log level.
+
 The logging system
 (link:{api}/io/micronaut/management/endpoint/loggers/LoggingSystem.html[LoggingSystem])
-is responsible for gaining access to Logger instances and accessing or updating their settings.
+is responsible for processing requests from the loggers manager against a particular logging
+library (e.g. logback, log4j, etc.)
 
-To override the default behavior for either of the helper classes, either extend the default implementations
-(link:{api}/io/micronaut/management/endpoint/loggers/impl/RxLoggersDataCollector.html[RxLoggersDataCollector],
- link:{api}/io/micronaut/management/endpoint/loggers/impl/LogbackLoggingSystem.html[LogbackLoggingSystem])
-or implement the relevant interface directly. To ensure your implementation is used instead of the default,
-add the link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the
+To override the default behavior for the loggers manager, either extend the default implementation
+(link:{api}/io/micronaut/management/endpoint/loggers/impl/RxLoggersDataCollector.html[RxLoggersDataCollector])
+or implement the link:{api}/io/micronaut/management/endpoint/loggers/LoggersManager.html[LoggersManager]
+interface directly. To ensure your implementation is used instead of the default, add the
+link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the
 value being the default implementation.
 
+The current default implementation for the logging system is
+link:{api}/io/micronaut/management/endpoint/loggers/impl/LogbackLoggingSystem.html[LogbackLoggingSystem],
+which works with the https://logback.qos.ch/[logback] logging framework. Additional logging systems will
+be implemented in future revisions of Micronaut. For custom logging system behavior,  implement
+the link:{api}/io/micronaut/management/endpoint/loggers/LoggingSystem.html[LoggingSystem] interface directly.
+To ensure your implementation is used instead of the default, add the
+link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the
+value being the default implementation.
+
+[source,java]
+----
+@Singleton
+@Replaces(LogbackLoggingSystem.class)
+public class CustomLoggingSystem implements LoggingSystem {
+    // ...
+}
+----
 

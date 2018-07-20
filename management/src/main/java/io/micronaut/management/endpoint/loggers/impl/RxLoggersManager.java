@@ -10,12 +10,12 @@ import javax.inject.Singleton;
 import java.util.*;
 
 /**
- * Default implementation of {@link LoggersDataCollector}.
+ * Default implementation of {@link LoggersManager}.
  */
 @Singleton
 @Requires(beans = LoggersEndpoint.class)
-public class RxLoggersDataCollector
-        implements LoggersDataCollector<Map<String, Object>> {
+public class RxLoggersManager
+        implements LoggersManager<Map<String, Object>> {
 
     @Override
     public Publisher<Map<String, Object>> getLoggers(LoggingSystem loggingSystem) {

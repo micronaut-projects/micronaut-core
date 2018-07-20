@@ -58,16 +58,16 @@ public class LoggersEndpoint {
     public static final boolean DEFAULT_SENSITIVE = false;
 
     private final LoggingSystem loggingSystem;
-    private final LoggersDataCollector loggersDataCollector;
+    private final LoggersManager loggersManager;
 
     /**
      * @param loggingSystem the {@link LoggingSystem}
-     * @param loggersDataCollector the {@link LoggersDataCollector}
+     * @param loggersManager the {@link LoggersManager}
      */
     public LoggersEndpoint(LoggingSystem loggingSystem,
-                           LoggersDataCollector loggersDataCollector) {
+                           LoggersManager loggersManager) {
         this.loggingSystem = loggingSystem;
-        this.loggersDataCollector = loggersDataCollector;
+        this.loggersManager = loggersManager;
     }
 
     /**
@@ -75,7 +75,7 @@ public class LoggersEndpoint {
      */
     @Read
     public Single loggers() {
-        return Single.fromPublisher(loggersDataCollector.getLoggers(loggingSystem));
+        return Single.fromPublisher(loggersManager.getLoggers(loggingSystem));
     }
 
     /**
@@ -84,7 +84,7 @@ public class LoggersEndpoint {
      */
     @Read
     public Single logger(@QueryValue @NotBlank String name) {
-        return Single.fromPublisher(loggersDataCollector.getLogger(loggingSystem, name));
+        return Single.fromPublisher(loggersManager.getLogger(loggingSystem, name));
     }
 
     /**
@@ -94,7 +94,7 @@ public class LoggersEndpoint {
     @Write
     public void setLogLevel(@QueryValue @NotBlank String name,
                             @Nullable LogLevel configuredLevel) {
-        loggersDataCollector.setLogLevel(loggingSystem, name,
+        loggersManager.setLogLevel(loggingSystem, name,
                 configuredLevel != null ? configuredLevel : LogLevel.NOT_SPECIFIED);
     }
 }
