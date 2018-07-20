@@ -75,7 +75,7 @@ public class LoggersEndpoint {
      */
     @Read
     public Single loggers() {
-        return Single.fromPublisher(loggersDataCollector.getAll(loggingSystem));
+        return Single.fromPublisher(loggersDataCollector.getLoggers(loggingSystem));
     }
 
     /**
@@ -83,8 +83,8 @@ public class LoggersEndpoint {
      * @return the {@link LogLevel} (both configured and effective) of the named logger
      */
     @Read
-    public Single getLogger(@QueryValue @NotBlank String name) {
-        return Single.fromPublisher(loggersDataCollector.getOne(loggingSystem, name));
+    public Single logger(@QueryValue @NotBlank String name) {
+        return Single.fromPublisher(loggersDataCollector.getLogger(loggingSystem, name));
     }
 
     /**

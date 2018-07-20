@@ -18,7 +18,7 @@ public class RxLoggersDataCollector
         implements LoggersDataCollector<Map<String, Object>> {
 
     @Override
-    public Publisher<Map<String, Object>> getAll(LoggingSystem loggingSystem) {
+    public Publisher<Map<String, Object>> getLoggers(LoggingSystem loggingSystem) {
         return Single.zip(getLoggers(loggingSystem.getLoggers()), getLogLevels(),
                 (loggers, levels) -> {
                     Map<String, Object> data = new HashMap<>(2);
@@ -30,8 +30,8 @@ public class RxLoggersDataCollector
     }
 
     @Override
-    public Publisher<Map<String, Object>> getOne(LoggingSystem loggingSystem,
-                                                 String name) {
+    public Publisher<Map<String, Object>> getLogger(LoggingSystem loggingSystem,
+                                                    String name) {
         return getLogger(loggingSystem.getLogger(name)).toFlowable();
     }
 

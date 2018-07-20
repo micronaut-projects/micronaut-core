@@ -36,7 +36,7 @@ public interface LoggersDataCollector<T> {
      * @param loggingSystem The {@link LoggingSystem} in use
      * @return A {@link Publisher} of <code>T</code>
      */
-    Publisher<T> getAll(LoggingSystem loggingSystem);
+    Publisher<T> getLoggers(LoggingSystem loggingSystem);
 
     /**
      * Find (or create if not found) the named logger in the system.
@@ -45,7 +45,7 @@ public interface LoggersDataCollector<T> {
      * @param name The name of the logger to find or create
      * @return A {@link Publisher} of <code>T</code>
      */
-    Publisher<T> getOne(LoggingSystem loggingSystem, @NotBlank String name);
+    Publisher<T> getLogger(LoggingSystem loggingSystem, @NotBlank String name);
 
     /**
      * Set the log level for the named logger in the system.
