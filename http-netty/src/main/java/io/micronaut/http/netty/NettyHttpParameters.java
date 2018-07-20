@@ -21,7 +21,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.ConvertibleMultiValuesMap;
-import io.micronaut.http.HttpParameters;
+import io.micronaut.http.MutableHttpParameters;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -30,16 +30,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * Implementation of {@link HttpParameters} for Netty.
+ * Implementation of {@link MutableHttpParameters} for Netty.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
-public class NettyHttpParameters implements HttpParameters {
+public class NettyHttpParameters implements MutableHttpParameters {
 
+    private final LinkedHashMap<CharSequence, List<String>> valuesMap;
     private final ConvertibleMultiValues<String> values;
 
     /**
@@ -47,10 +49,10 @@ public class NettyHttpParameters implements HttpParameters {
      * @param conversionService The conversion service
      */
     public NettyHttpParameters(Map<String, List<String>> parameters, ConversionService conversionService) {
-        LinkedHashMap<CharSequence, List<String>> values = new LinkedHashMap<>(parameters.size());
-        this.values = new ConvertibleMultiValuesMap<>(values, conversionService);
+        this.valuesMap = new LinkedHashMap<>(parameters.size());
+        this.values = new ConvertibleMultiValuesMap<>(valuesMap, conversionService);
         for (Map.Entry<String, List<String>> entry : parameters.entrySet()) {
-            values.put(entry.getKey(), Collections.unmodifiableList(entry.getValue()));
+            valuesMap.put(entry.getKey(), Collections.unmodifiableList(entry.getValue()));
         }
     }
 
@@ -77,5 +79,13 @@ public class NettyHttpParameters implements HttpParameters {
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         return values.get(name, conversionContext);
+    }
+
+    @Override
+    public MutableHttpParameters add(CharSequence name, List<CharSequence> values) {
+        valuesMap.put(name, Collections.unmodifiableList(
+                values.stream().map(v -> v == null ? null : v.toString()).collect(Collectors.toList()))
+        );
+        return this;
     }
 }
