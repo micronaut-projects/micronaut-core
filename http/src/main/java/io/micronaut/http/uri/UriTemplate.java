@@ -202,31 +202,28 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
     @Override
     public int compareTo(UriTemplate o) {
-        if (this.equals(o)) {
-            return 0;
-        }
+        if (this == o) return 0;
+
         List<PathSegment> thisSegments = this.segments;
         List<PathSegment> thatSegments = o.segments;
-        int thisLength = thisSegments.size();
-        int thatLength = thatSegments.size();
-        for (int i = 0; i < thisLength && i < thatLength; i++) {
-            PathSegment thisSeg = thisSegments.get(i);
-            PathSegment thatSeg = thatSegments.get(i);
-            boolean isThisRaw = thisSeg instanceof UriTemplateParser.RawPathSegment;
-            boolean isThatRaw = thatSeg instanceof UriTemplateParser.RawPathSegment;
-            if (isThisRaw && !isThatRaw) {
-                return 1;
-            } else if (!isThisRaw && isThatRaw) {
-                return -1;
-            } else if (isThisRaw && isThatRaw) {
-                // they are both raw
-                int lengthCompare = Integer.valueOf(thisSeg.toString().length()).compareTo(thatSeg.toString().length());
-                if (lengthCompare != 0) {
-                    return lengthCompare;
-                }
-            }
+
+        int s1 = thisSegments.size();
+        int s2 = thatSegments.size();
+        boolean e1 = s1 == 0;
+        boolean e2 = s2 == 0;
+        if (e1 && e2) {
+            return 0;
+        } else if (e1 && !e2) {
+            return -1;
+        } else if (!e1 && e2) {
+            return -1;
+        } else {
+            return Integer.compare(
+                    thisSegments.get(0).toString().length(),
+                    thatSegments.get(0).toString().length()
+            );
         }
-        return 0;
+
     }
 
     /**

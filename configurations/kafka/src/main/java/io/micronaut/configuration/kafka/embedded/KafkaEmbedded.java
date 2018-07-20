@@ -147,7 +147,10 @@ public class KafkaEmbedded implements BeanCreatedEventListener<AbstractKafkaConf
                                .all().get();
                 }
             } catch (Throwable e) {
-                throw new ConfigurationException("Error starting embedded Kafka server: " + e.getMessage(), e);
+                // check server not already running
+                if (!e.getMessage().contains("Address already in use")) {
+                    throw new ConfigurationException("Error starting embedded Kafka server: " + e.getMessage(), e);
+                }
             }
         }
         return config;

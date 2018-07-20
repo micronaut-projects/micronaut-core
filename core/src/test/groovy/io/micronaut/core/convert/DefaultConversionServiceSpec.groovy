@@ -77,34 +77,5 @@ class DefaultConversionServiceSpec extends Specification {
 
     }
 
-    @Format('yyyy/mm/dd')
-    private Date today
 
-    void "test conversion service with formatting and date"() {
-        given:
-        ConversionService conversionService = new DefaultConversionService()
-        Field field = getClass().getDeclaredField("today")
-        expect:
-        conversionService.convert(sourceObject, targetType, ConversionContext.of(Argument.of(field, "today", null), Locale.ENGLISH)).get() == result
-
-        where:
-        sourceObject | targetType | result
-        "1999/01/01" | Date       | new SimpleDateFormat("yyyy/mm/dd").parse("1999/01/01")
-    }
-
-
-    @ReadableBytes
-    private int maxSize
-
-    void "test conversion service with formatting for bytes"() {
-        given:
-        ConversionService conversionService = new DefaultConversionService()
-        Field field = getClass().getDeclaredField("maxSize")
-        expect:
-        conversionService.convert(sourceObject, targetType, ConversionContext.of(Argument.of(field, "maxSize", null), Locale.ENGLISH)).get() == result
-
-        where:
-        sourceObject | targetType | result
-        "1MB"        | Integer    | 1048576
-    }
 }

@@ -301,7 +301,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         null
                 )
             }
-            if (isFactoryClass || isConfigurationProperties || annotationMetadata.hasStereotype(Bean, Scope)) {
+
+            if (isAopProxyType && Modifier.isFinal(targetClassNode.modifiers)) {
+                addError("Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + targetClassNode.name, targetClassNode)
+            }
+            else if (isFactoryClass || isConfigurationProperties || annotationMetadata.hasStereotype(Bean, Scope)) {
                 defineBeanDefinition(concreteClass)
             }
         }
@@ -506,6 +510,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 )
 
                 if (methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) {
+
                     Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
                     OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean)
                     Map<CharSequence, Object> finalSettings = [:]
@@ -699,6 +704,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                         if ((isAopProxyType && isPublic) || (methodAnnotationMetadata.hasStereotype(AROUND_TYPE) && !concreteClass.isAbstract())) {
 
+                            if (methodNode.isFinal()) {
+                                addError("Public method defines AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on class.", methodNode)
+                                return
+                            }
                             Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
                             OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean)
                             AopProxyWriter proxyWriter = resolveProxyWriter(
@@ -1042,27 +1051,68 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if (aopProxyWriter != null) {
                     Map<String, Map<String, Object>> resolvedGenericTypes =
                             [(propertyName): AstGenericUtils.extractPlaceholders(propertyNode.type)]
+                    def propertyType = AstGenericUtils.resolveTypeReference(propertyNode.type)
                     Map<String, Object> resolvedArguments =
-                            [(propertyName): AstGenericUtils.resolveTypeReference(propertyNode.type)]
+                            [(propertyName): propertyType]
 
                     AnnotationMetadata fieldMetadata = AstAnnotationUtils.getAnnotationMetadata(propertyNode.field)
 
                     Map<String, AnnotationMetadata> resolvedAnnotationMetadata
+                    def emptyMap = Collections.emptyMap()
                     if (fieldMetadata != null) {
                         resolvedAnnotationMetadata = [(propertyName): fieldMetadata]
                     } else {
-                        resolvedAnnotationMetadata = Collections.emptyMap()
+                        resolvedAnnotationMetadata = emptyMap
                     }
+
+                    beanWriter.visitExecutableMethod(
+                            propertyNode.getDeclaringClass().name,
+                            void.class,
+                            void.class,
+                            emptyMap,
+                            getSetterName(propertyName),
+                            resolvedArguments,
+                            resolvedAnnotationMetadata,
+                            resolvedGenericTypes,
+                            fieldAnnotationMetadata
+                    )
+
                     aopWriter.visitAroundMethod(
                         propertyNode.getDeclaringClass().name,
                         void.class,
                         void.class,
-                        Collections.emptyMap(),
+                        emptyMap,
                         getSetterName(propertyName),
                         resolvedArguments,
                         resolvedAnnotationMetadata,
                         resolvedGenericTypes,
                         fieldAnnotationMetadata
+                    )
+
+                    // also visit getter to ensure proxying
+
+                    beanWriter.visitExecutableMethod(
+                            propertyNode.getDeclaringClass().name,
+                            propertyType,
+                            propertyType,
+                            emptyMap,
+                            getGetterName(propertyNode),
+                            emptyMap,
+                            emptyMap,
+                            emptyMap,
+                            fieldAnnotationMetadata
+                    )
+
+                    aopWriter.visitAroundMethod(
+                            propertyNode.getDeclaringClass().name,
+                            propertyType,
+                            propertyType,
+                            emptyMap,
+                            getGetterName(propertyNode),
+                            emptyMap,
+                            emptyMap,
+                            emptyMap,
+                            fieldAnnotationMetadata
                     )
                 }
             }
@@ -1084,6 +1134,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 ClassNode providerGenericType = AstGenericUtils.resolveInterfaceGenericType(classNode, Provider)
                 boolean isProvider = providerGenericType != null
                 AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(classNode)
+
+                if(annotationMetadata.hasStereotype(groovy.lang.Singleton)) {
+                    addError("Class annotated with groovy.lang.Singleton instead of javax.inject.Singleton. Import javax.inject.Singleton to use Micronaut Dependency Injection.", classNode)
+                }
                 if(configurationMetadata != null) {
                     annotationMetadata = DefaultAnnotationMetadata.mutateMember(
                             annotationMetadata,

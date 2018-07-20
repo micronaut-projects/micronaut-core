@@ -32,14 +32,7 @@
 
 package io.micronaut.context;
 
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.ConfigurationReader;
-import io.micronaut.context.annotation.EachBean;
-import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Property;
-import io.micronaut.context.annotation.Provided;
-import io.micronaut.context.annotation.Value;
+import io.micronaut.context.annotation.*;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.BeanInitializedEventListener;
 import io.micronaut.context.event.BeanInitializingEvent;
@@ -54,16 +47,11 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.GenericTypeUtils;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
-import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ConstructorInjectionPoint;
-import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.FieldInjectionPoint;
-import io.micronaut.inject.MethodInjectionPoint;
+import io.micronaut.inject.*;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -77,8 +65,6 @@ import javax.inject.Scope;
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -245,13 +231,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         if (invocableMethod != null) {
             return Optional.of(invocableMethod);
         } else {
-            Optional<Method> method = ReflectionUtils.findMethod(type, name, argumentTypes);
-            return method.map(theMethod -> {
-                    ReflectionExecutableMethod<T, R> reflectionMethod = new ReflectionExecutableMethod<>(this, theMethod);
-                    executableMethodMap.put(methodKey, reflectionMethod);
-                    return reflectionMethod;
-                }
-            );
+            return Optional.empty();
         }
     }
 
@@ -264,9 +244,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 .stream()
                 .filter((method) -> method.getMethodName().equals(name));
         } else {
-            return ReflectionUtils
-                .findMethodsByName(type, name)
-                .map((method) -> new ReflectionExecutableMethod<>(this, method));
+            return Stream.empty();
         }
     }
 
@@ -735,7 +713,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         if (context instanceof ApplicationContext) {
             // can't use orElseThrow here due to compiler bug
             try {
-                Value valAnn = argument.getAnnotation(Value.class);
+                String valueAnnStr = argument.getAnnotationMetadata().getValue(Value.class, String.class).orElse(null);
                 Class argumentType = argument.getType();
 
                 if (isInnerConfiguration(argumentType)) {
@@ -743,12 +721,12 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 } else {
                     String argumentName = argument.getName();
                     Class<?> declaringClass = injectionPoint.getMethod().getDeclaringClass();
-                    String valString = resolvePropertyValueName(resolutionContext, injectionPoint.getAnnotationMetadata(), argument, valAnn);
+                    String valString = resolvePropertyValueName(resolutionContext, injectionPoint.getAnnotationMetadata(), argument, valueAnnStr);
 
 
                     ApplicationContext applicationContext = (ApplicationContext) context;
                     ArgumentConversionContext conversionContext = ConversionContext.of(argument);
-                    Optional value = resolveValue(applicationContext, conversionContext, valAnn, valString);
+                    Optional value = resolveValue(applicationContext, conversionContext, valueAnnStr != null, valString);
                     if (argumentType == Optional.class) {
                         return resolveOptionalObject(value);
                     } else {
@@ -790,8 +768,8 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             String argumentName = argument.getName();
             Class<?> declaringClass = injectionPoint.getMethod().getDeclaringClass();
             Class beanType = injectionPoint.getDeclaringBean().getBeanType();
-            Value valAnn = argument.getAnnotation(Value.class);
-            String valString = resolvePropertyValueName(resolutionContext, injectionPoint.getAnnotationMetadata(), argument, valAnn);
+            String valueAnnStr = argument.getAnnotationMetadata().getValue(Value.class, String.class).orElse(null);
+            String valString = resolvePropertyValueName(resolutionContext, injectionPoint.getAnnotationMetadata(), argument, valueAnnStr);
             ApplicationContext applicationContext = (ApplicationContext) context;
             Class type = argument.getType();
             boolean isConfigProps = type.getAnnotation(ConfigurationProperties.class) != null;
@@ -986,12 +964,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             Object result;
             if (context instanceof ApplicationContext) {
                 ApplicationContext propertyResolver = (ApplicationContext) context;
-                Value valAnn = argument.findAnnotation(Value.class)
-                    .orElseThrow(() -> new IllegalStateException("Compiled getValueForMethodArgument(..) call present but @Value annotation missing."));
-
-                String prop = valAnn.value();
+                String prop = argument.getAnnotationMetadata().getValue(Value.class, String.class)
+                        .orElseThrow(() -> new IllegalStateException("Compiled getValueForMethodArgument(..) call present but @Value annotation missing."));
                 ArgumentConversionContext<?> conversionContext = ConversionContext.of(argument);
-                Optional<?> value = resolveValue(propertyResolver, conversionContext, valAnn, prop);
+                Optional<?> value = resolveValue(propertyResolver, conversionContext, true, prop);
                 if (argument.getType() == Optional.class) {
                     return resolveOptionalObject(value);
                 } else {
@@ -1118,26 +1094,24 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
      * @param context           The context
      * @param fieldIndex        The index of the field
      * @return The resolved bean
-     * @throws Throwable A throwable
      */
     @SuppressWarnings("WeakerAccess")
     @Internal
-    protected final Object getValueForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) throws Throwable {
+    protected final Object getValueForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) {
         FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
         BeanResolutionContext.Path path = resolutionContext.getPath();
         path.pushFieldResolve(this, injectionPoint);
         try {
             if (context instanceof PropertyResolver) {
-                Field field = injectionPoint.getField();
-                Value valueAnn = field.getAnnotation(Value.class);
-                Class<?> fieldType = field.getType();
+                String valueAnnVal = injectionPoint.getAnnotationMetadata().getValue(Value.class, String.class).orElse(null);
+                Class<?> fieldType = injectionPoint.getType();
                 if (isInnerConfiguration(fieldType)) {
                     return context.createBean(fieldType);
                 } else {
-                    String valString = resolvePropertyValueName(resolutionContext, injectionPoint, valueAnn);
+                    String valString = resolvePropertyValueName(resolutionContext, injectionPoint, valueAnnVal);
                     Argument fieldArgument = injectionPoint.asArgument();
                     ArgumentConversionContext conversionContext = ConversionContext.of(fieldArgument);
-                    Optional value = resolveValue((ApplicationContext) context, conversionContext, valueAnn, valString);
+                    Optional value = resolveValue((ApplicationContext) context, conversionContext, valueAnnVal != null, valString);
                     if (fieldType == Optional.class) {
                         return resolveOptionalObject(value);
                     } else {
@@ -1200,8 +1174,8 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     protected final boolean containsValueForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) {
         if (context instanceof ApplicationContext) {
             FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
-            Value valueAnn = injectionPoint.getAnnotation(Value.class);
-            String valString = resolvePropertyValueName(resolutionContext, injectionPoint, valueAnn);
+            String valueAnnVal = injectionPoint.getAnnotationMetadata().getValue(Value.class, String.class).orElse(null);
+            String valString = resolvePropertyValueName(resolutionContext, injectionPoint, valueAnnVal);
             ApplicationContext applicationContext = (ApplicationContext) context;
             Class fieldType = injectionPoint.getType();
             boolean isConfigProps = fieldType.getAnnotation(ConfigurationProperties.class) != null;
@@ -1474,10 +1448,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     private Optional resolveValue(
         ApplicationContext context,
         ArgumentConversionContext<?> argument,
-        Value val,
+        boolean hasValueAnnotation,
         String valString) {
 
-        if (val != null) {
+        if (hasValueAnnotation) {
 
             return context.resolvePlaceholders(valString).flatMap(v ->
                 context.getConversionService().convert(v, argument)
@@ -1498,10 +1472,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         BeanResolutionContext resolutionContext,
         AnnotationMetadata annotationMetadata,
         Argument argument,
-        Value valAnn) {
+        String valueAnnStr) {
         String valString;
-        if (valAnn != null) {
-            valString = valAnn.value();
+        if (valueAnnStr != null) {
+            valString = valueAnnStr;
         } else {
             valString = annotationMetadata.getValue(Property.class, "name", String.class)
                 .orElseThrow(() ->
@@ -1520,10 +1494,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     private String resolvePropertyValueName(
         BeanResolutionContext resolutionContext,
         FieldInjectionPoint injectionPoint,
-        Value valueAnn) {
+        String valueAnn) {
         String valString;
         if (valueAnn != null) {
-            valString = valueAnn.value();
+            valString = valueAnn;
         } else {
             valString = injectionPoint.getAnnotationMetadata().getValue(Property.class, "name", String.class)
                 .orElseThrow(() -> new DependencyInjectionException(resolutionContext, injectionPoint, "Value resolution attempted but @Value annotation is missing"));

@@ -19,14 +19,22 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.convert.ArgumentConversionContext
 import io.micronaut.core.type.Argument
+import io.micronaut.health.HealthStatus
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.binding.binders.TypedRequestArgumentBinder
 import io.micronaut.management.health.aggregator.RxJavaHealthAggregator
+import io.micronaut.management.health.indicator.HealthResult
 import io.micronaut.management.health.indicator.diskspace.DiskSpaceIndicator
 import io.micronaut.management.health.indicator.jdbc.JdbcIndicator
 import io.micronaut.runtime.server.EmbeddedServer
+import io.reactivex.Flowable
+import io.reactivex.annotations.NonNull
+import io.reactivex.functions.Function
+import org.reactivestreams.Publisher
 import spock.lang.Specification
 
 import javax.inject.Singleton
@@ -169,12 +177,47 @@ class HealthEndpointSpec extends Specification {
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
 
         when:
-        def response = rxClient.exchange("/health", Map).blockingFirst()
-        Map result = response.body()
+        def response = rxClient.exchange("/health", HealthResult)
+                                .onErrorResumeNext(new Function<Throwable, Publisher<? extends HttpResponse<HealthResult>>>() {
+            @Override
+            Publisher<? extends HttpResponse<HealthResult>> apply(@NonNull Throwable throwable) throws Exception {
+
+                def response = ((HttpClientResponseException) throwable).response
+                response.getBody(HealthResult)
+                return Flowable.just(response)
+            }
+        }).blockingFirst()
+        HealthResult result = response.getBody(HealthResult).get()
+
+        then:
+        response.code() == HttpStatus.SERVICE_UNAVAILABLE.code
+        result.status == HealthStatus.DOWN
+        result.details
+        result.details.diskSpace.status == "DOWN"
+        result.details.diskSpace.details.error.startsWith("Free disk space below threshold.")
+
+        cleanup:
+        embeddedServer.close()
+    }
+
+    void "test health endpoint with custom DOWN mapping"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
+                'endpoints.health.sensitive': false,
+                'endpoints.health.status.http-mapping.DOWN': 200,
+                'endpoints.health.disk-space.threshold': '9999GB'])
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        when:
+        def response = rxClient.exchange("/health", HealthResult)
+                                .blockingFirst()
+        HealthResult result = response.body()
 
         then:
         response.code() == HttpStatus.OK.code
-        result.status == "DOWN"
+        result.status == HealthStatus.DOWN
         result.details
         result.details.diskSpace.status == "DOWN"
         result.details.diskSpace.details.error.startsWith("Free disk space below threshold.")
@@ -195,11 +238,19 @@ class HealthEndpointSpec extends Specification {
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
 
         when:
-        def response = rxClient.exchange("/health", Map).blockingFirst()
-        Map result = response.body()
+        def response = rxClient.exchange("/health", Map).onErrorResumeNext(new Function<Throwable, Publisher<? extends HttpResponse<HealthResult>>>() {
+            @Override
+            Publisher<? extends HttpResponse<HealthResult>> apply(@NonNull Throwable throwable) throws Exception {
+
+                def response = ((HttpClientResponseException) throwable).response
+                response.getBody(Map)
+                return Flowable.just(response)
+            }
+        }).blockingFirst()
+        Map result = response.getBody(Map).get()
 
         then:
-        response.code() == HttpStatus.OK.code
+        response.code() == HttpStatus.SERVICE_UNAVAILABLE.code
         result.status == "DOWN"
         result.details
         result.details.jdbc.status == "DOWN"
@@ -208,7 +259,7 @@ class HealthEndpointSpec extends Specification {
         result.details.jdbc.details."jdbc:h2:mem:oneDb".status == "UP"
 
         cleanup:
-        embeddedServer.close()
+        embeddedServer?.close()
 
     }
 

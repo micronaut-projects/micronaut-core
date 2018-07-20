@@ -19,6 +19,7 @@ package io.micronaut.annotation.processing;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder;
 
 import javax.lang.model.element.Element;
@@ -81,12 +82,8 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
                     AnnotationMetadata enclosingTypeMetadata = annotationUtils.getAnnotationMetadata(enclosingType);
                     Optional<String> parentConfig = enclosingTypeMetadata.getValue(ConfigurationReader.class, String.class);
                     if (parentConfig.isPresent()) {
-                        String parentPath = parentConfig.get();
-                        if (enclosingTypeMetadata.hasDeclaredAnnotation(EachProperty.class)) {
-                            path.insert(0, parentPath + ".*.");
-                        } else {
-                            path.insert(0, parentPath + '.');
-                        }
+                        String parentPath = pathEvaluationFunctionForMetadata(enclosingTypeMetadata).apply(parentConfig.get());
+                        path.insert(0, parentPath + '.');
                         prependSuperclasses(enclosingType, path);
                         if (enclosingType.getNestingKind() == NestingKind.MEMBER) {
                             Element el = enclosingType.getEnclosingElement();
@@ -130,9 +127,9 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
             if (annotationMetadata.hasDeclaredAnnotation(EachProperty.class)) {
                 return path + ".*";
             }
-            String prefix = annotationMetadata.getValue("io.micronaut.management.endpoint.Endpoint", "prefix", String.class)
+            String prefix = annotationMetadata.getValue(ConfigurationReader.class, "prefix", String.class)
                 .orElse(null);
-            if (prefix != null) {
+            if (StringUtils.isNotEmpty(prefix)) {
                 return prefix + "." + path;
             } else {
                 return path;
@@ -150,9 +147,11 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
         while (superclass instanceof DeclaredType) {
             DeclaredType declaredType = (DeclaredType) superclass;
             Element element = declaredType.asElement();
-            Optional<String> parentConfig = annotationUtils.getAnnotationMetadata(element).getValue(ConfigurationReader.class, String.class);
+            AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(element);
+            Optional<String> parentConfig = annotationMetadata.getValue(ConfigurationReader.class, String.class);
             if (parentConfig.isPresent()) {
-                path.insert(0, parentConfig.get() + '.');
+                String parentPath = pathEvaluationFunctionForMetadata(annotationMetadata).apply(parentConfig.get());
+                path.insert(0, parentPath + '.');
                 superclass = ((TypeElement) element).getSuperclass();
             } else {
                 break;
