@@ -16,6 +16,7 @@
 
 package io.micronaut.management.endpoint.loggers;
 
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.EndpointConfiguration;
@@ -92,9 +93,15 @@ public class LoggersEndpoint {
      * @param configuredLevel The {@link LogLevel} to set on the named logger
      */
     @Write
-    public void setLogLevel(@QueryValue @NotBlank String name,
-                            @Nullable LogLevel configuredLevel) {
-        loggersManager.setLogLevel(loggingSystem, name,
-                configuredLevel != null ? configuredLevel : LogLevel.NOT_SPECIFIED);
+    public HttpResponse setLogLevel(@QueryValue @NotBlank String name,
+                                    @Nullable LogLevel configuredLevel) {
+        try {
+            loggersManager.setLogLevel(loggingSystem, name,
+                    configuredLevel != null ? configuredLevel : LogLevel.NOT_SPECIFIED);
+            return HttpResponse.ok();
+        }
+        catch (IllegalArgumentException ex) {
+            return HttpResponse.badRequest(ex.getMessage());
+        }
     }
 }
