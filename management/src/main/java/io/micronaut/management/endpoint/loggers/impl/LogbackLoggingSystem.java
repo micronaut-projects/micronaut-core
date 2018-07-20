@@ -1,5 +1,7 @@
 package io.micronaut.management.endpoint.loggers.impl;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.management.endpoint.loggers.LogLevel;
@@ -10,7 +12,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.util.Collection;
-import java.util.Collections;
+import java.util.stream.Collectors;
 
 // TODO Implement methods of this class against logback.
 
@@ -23,10 +25,11 @@ public class LogbackLoggingSystem implements LoggingSystem {
 
     @Override
     public Collection<LoggerConfiguration> getLoggers() {
-        return Collections.singletonList(
-                new LoggerConfiguration("foo", LogLevel.NOT_SPECIFIED,
-                        LogLevel.NOT_SPECIFIED)
-        );
+        return getLoggerContext()
+                .getLoggerList()
+                .stream()
+                .map(LogbackLoggingSystem::toLoggerConfiguration)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -42,7 +45,32 @@ public class LogbackLoggingSystem implements LoggingSystem {
     /**
      * @return The logback {@link LoggerContext}
      */
-    protected LoggerContext getLoggerContext() {
+    protected static LoggerContext getLoggerContext() {
         return (LoggerContext) LoggerFactory.getILoggerFactory();
+    }
+
+    /**
+     * @param logger The logback {@link Logger} to convert
+     * @return The converted {@link LoggerConfiguration}
+     */
+    protected static LoggerConfiguration toLoggerConfiguration(Logger logger) {
+        return new LoggerConfiguration(
+                logger.getName(),
+                toLogLevel(logger.getLevel()),
+                toLogLevel(logger.getEffectiveLevel())
+        );
+    }
+
+    /**
+     * @param level The logback {@link Level} to convert
+     * @return The converted {@link LogLevel}
+     */
+    protected static LogLevel toLogLevel(Level level) {
+        if (level == null) {
+            return LogLevel.NOT_SPECIFIED;
+        }
+        else {
+            return LogLevel.valueOf(level.toString());
+        }
     }
 }
