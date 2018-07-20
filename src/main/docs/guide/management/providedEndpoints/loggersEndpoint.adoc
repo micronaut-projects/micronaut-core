@@ -1,0 +1,72 @@
+
+The loggers endpoint returns information about the available loggers in the application and
+permits setting the log level for loggers.
+
+To get a map of all loggers by name with their configured and effective log levels,
+send a GET request to /loggers.
+
+[source,bash]
+----
+$ curl http://localhost:8080/loggers
+
+{
+    "levels": ["ALL", "TRACE", ... "OFF", "NOT_SPECIFIED"],
+    "loggers": {
+        "error": {
+            "configuredLevel": "ERROR",
+            "effectiveLevel": "ERROR"
+        },
+        "ROOT": {
+            "configuredLevel": "INFO",
+            "effectiveLevel": "INFO"
+        }
+    }
+}
+----
+
+
+To get the log levels of a single logger, send a GET request to /loggers/<name> with the
+name of the logger. If the logger does not exist, it will be created with a configured log
+level of NOT_SPECIFIED (and its effective log level usually matching the ROOT logger).
+
+[source,bash]
+----
+$ curl http://localhost:8080/loggers/whatever
+
+{
+    "configuredLevel": "NOT_SPECIFIED",
+    "effectiveLevel": "INFO"
+}
+----
+
+To set the log level of a single logger, set a POST request to /loggers/<name> with a
+body providing the log level to configure.
+
+
+[source,bash]
+----
+$ curl -X POST \
+       -H "Content-Type: application/json" \
+       -d '{ "configuredLevel": "ERROR" }' \
+       http://localhost:8080/loggers/ROOT
+----
+
+
+== Configuration
+
+To configure the loggers endpoint, supply configuration through `endpoints.loggers`.
+
+.Loggers Endpoint Configuration Example
+[source,yaml]
+----
+endpoints:
+    loggers:
+        enabled: Boolean
+        sensitive: Boolean
+        id: String
+----
+
+== Customization
+
+TBD.
+
