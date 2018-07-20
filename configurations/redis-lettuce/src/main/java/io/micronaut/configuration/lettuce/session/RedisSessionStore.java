@@ -30,9 +30,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
-import io.micronaut.core.serialize.JdkSerializer;
 import io.micronaut.core.serialize.ObjectSerializer;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -108,7 +106,7 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
      * @param sessionIdGenerator sessionIdGenerator
      * @param sessionConfiguration sessionConfiguration
      * @param beanLocator beanLocator
-     * @param conversionService conversionService
+     * @param defaultSerializer The default value serializer
      * @param scheduledExecutorService scheduledExecutorService
      * @param eventPublisher eventPublisher
      */
@@ -116,7 +114,7 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
             SessionIdGenerator sessionIdGenerator,
             RedisHttpSessionConfiguration sessionConfiguration,
             BeanLocator beanLocator,
-            ConversionService<?> conversionService,
+            ObjectSerializer defaultSerializer,
             @Named(TaskExecutors.SCHEDULED) ExecutorService scheduledExecutorService,
             ApplicationEventPublisher eventPublisher) {
         this.writeMode = sessionConfiguration.getWriteMode();
@@ -124,7 +122,7 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
         this.valueSerializer = sessionConfiguration
                 .getValueSerializer()
                 .flatMap(beanLocator::findOrInstantiateBean)
-                .orElse(new JdkSerializer(conversionService));
+                .orElse(defaultSerializer);
         this.eventPublisher = eventPublisher;
         this.sessionConfiguration = sessionConfiguration;
         this.charset = sessionConfiguration.getCharset();

@@ -17,7 +17,6 @@
 package io.micronaut.context;
 
 import java.io.Closeable;
-import java.io.IOException;
 
 /**
  * A life cycle interface providing a start method and extending Closeable which provides a close() method for
@@ -58,7 +57,7 @@ public interface LifeCycle<T extends LifeCycle> extends Closeable, AutoCloseable
      * Delegates to {@link #stop()}.
      */
     @Override
-    default void close() throws IOException {
+    default void close() {
         stop();
     }
 

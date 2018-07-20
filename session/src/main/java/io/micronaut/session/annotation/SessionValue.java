@@ -18,6 +18,7 @@ package io.micronaut.session.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.core.bind.annotation.Bindable;
 
 import java.lang.annotation.Documented;
@@ -40,5 +41,6 @@ public @interface SessionValue {
     /**
      * @return The name of value from the session
      */
+    @AliasFor(annotation = Bindable.class, member = "value")
     String value() default "";
 }

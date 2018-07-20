@@ -34,7 +34,10 @@ public class EndpointDefaultConfiguration {
      */
     public static final String PREFIX = "endpoints.all";
 
-    private static final String DEFAULT_ENDPOINT_BASE_PATH = "/";
+    /**
+     * The default base path
+     */
+    public static final String DEFAULT_ENDPOINT_BASE_PATH = "/";
 
     protected Optional<Boolean> enabled = Optional.empty();
     protected Optional<Boolean> sensitive = Optional.empty();

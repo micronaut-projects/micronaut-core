@@ -20,16 +20,11 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
-import io.micronaut.context.exceptions.BeanContextException;
-import io.micronaut.context.exceptions.BeanInstantiationException;
-import io.micronaut.context.exceptions.DependencyInjectionException;
-import io.micronaut.context.exceptions.NoSuchBeanException;
-import io.micronaut.context.exceptions.NonUniqueBeanException;
+import io.micronaut.context.exceptions.*;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -45,23 +40,7 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.StreamUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
-import io.micronaut.inject.BeanConfiguration;
-import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.BeanDefinitionMethodReference;
-import io.micronaut.inject.BeanDefinitionReference;
-import io.micronaut.inject.BeanFactory;
-import io.micronaut.inject.BeanIdentifier;
-import io.micronaut.inject.ConstructorInjectionPoint;
-import io.micronaut.inject.DisposableBeanDefinition;
-import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.FieldInjectionPoint;
-import io.micronaut.inject.InitializingBeanDefinition;
-import io.micronaut.inject.MethodExecutionHandle;
-import io.micronaut.inject.MethodInjectionPoint;
-import io.micronaut.inject.ParametrizedBeanFactory;
-import io.micronaut.inject.ParametrizedProvider;
-import io.micronaut.inject.ProxyBeanDefinition;
-import io.micronaut.inject.ValidatedBeanDefinition;
+import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -75,19 +54,7 @@ import java.io.Closeable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.ServiceLoader;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ForkJoinPool;
@@ -110,6 +77,8 @@ public class DefaultBeanContext implements BeanContext {
     private static final Qualifier PROXY_TARGET_QUALIFIER = Qualifiers.byType(ProxyTarget.class);
 
     protected final AtomicBoolean running = new AtomicBoolean(false);
+    protected final AtomicBoolean initializing = new AtomicBoolean(false);
+    protected final AtomicBoolean terminating = new AtomicBoolean(false);
 
     final Map<BeanKey, BeanRegistration> singletonObjects = new ConcurrentHashMap<>(100);
 
@@ -154,7 +123,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public boolean isRunning() {
-        return running.get();
+        return running.get() && !initializing.get();
     }
 
     /**
@@ -163,30 +132,35 @@ public class DefaultBeanContext implements BeanContext {
      */
     @Override
     public synchronized BeanContext start() {
-        if (running.compareAndSet(false, true)) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Starting BeanContext");
-            }
-            readAllBeanConfigurations();
-            readAllBeanDefinitionClasses();
-            if (LOG.isDebugEnabled()) {
-                String activeConfigurations = beanConfigurations
-                    .values()
-                    .stream()
-                    .filter(config -> config.isEnabled(this))
-                    .map(BeanConfiguration::getName)
-                    .collect(Collectors.joining(","));
-                if (StringUtils.isNotEmpty(activeConfigurations)) {
-                    LOG.debug("Loaded active configurations: {}", activeConfigurations);
+        if (!isRunning()) {
+
+            if (initializing.compareAndSet(false, true)) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Starting BeanContext");
                 }
+                readAllBeanConfigurations();
+                readAllBeanDefinitionClasses();
+                if (LOG.isDebugEnabled()) {
+                    String activeConfigurations = beanConfigurations
+                            .values()
+                            .stream()
+                            .filter(config -> config.isEnabled(this))
+                            .map(BeanConfiguration::getName)
+                            .collect(Collectors.joining(","));
+                    if (StringUtils.isNotEmpty(activeConfigurations)) {
+                        LOG.debug("Loaded active configurations: {}", activeConfigurations);
+                    }
+                }
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("BeanContext Started.");
+                }
+                publishEvent(new StartupEvent(this));
             }
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("BeanContext Started.");
-            }
-            publishEvent(new StartupEvent(this));
+            // start thread for parallel beans
+            processParallelBeans();
+            running.set(true);
+            initializing.set(false);
         }
-        // start thread for parallel beans
-        processParallelBeans();
         return this;
     }
 
@@ -196,8 +170,8 @@ public class DefaultBeanContext implements BeanContext {
      * singletons.
      */
     @Override
-    public BeanContext stop() {
-        if (running.compareAndSet(true, false)) {
+    public synchronized BeanContext stop() {
+        if (terminating.compareAndSet(false, true)) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Stopping BeanContext");
             }
@@ -250,6 +224,9 @@ public class DefaultBeanContext implements BeanContext {
                     ((LifeCycle) bean).stop();
                 }
             }
+
+            terminating.set(false);
+            running.set(false);
         }
         return this;
     }
@@ -1042,9 +1019,7 @@ public class DefaultBeanContext implements BeanContext {
                                     if (method.hasDeclaredStereotype(Parallel.class)) {
                                         ForkJoinPool.commonPool().execute(() -> {
                                             try {
-                                                if (isRunning()) {
-                                                    processor.process(beanDefinition, method);
-                                                }
+                                                processor.process(beanDefinition, method);
                                             } catch (Throwable e) {
                                                 if (LOG.isErrorEnabled()) {
                                                     LOG.error("Error processing bean method " + beanDefinition + "." + method + " with processor (" + processor + "): " + e.getMessage(), e);
@@ -1461,7 +1436,8 @@ public class DefaultBeanContext implements BeanContext {
         Optional<BeanResolutionContext.Segment> currentSegment = resolutionContext.getPath().currentSegment();
         Optional<Class<? extends Annotation>> scope = Optional.empty();
         if (currentSegment.isPresent()) {
-            scope = AnnotationUtil.findAnnotationWithStereoType(Scope.class, currentSegment.get().getArgument().getAnnotations()).map(Annotation::annotationType);
+            Argument argument = currentSegment.get().getArgument();
+            scope = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Scope.class);
         }
         if (!scope.isPresent()) {
             scope = isProxy ? Optional.empty() : definition.getScope();
@@ -1766,27 +1742,13 @@ public class DefaultBeanContext implements BeanContext {
     private void readAllBeanDefinitionClasses() {
         List<BeanDefinitionReference> contextScopeBeans = new ArrayList<>();
         List<BeanDefinitionReference> processedBeans = new ArrayList<>();
-        Map<String, BeanDefinitionReference> beanDefinitionsClassesByType = new HashMap<>();
-        Map<String, BeanDefinitionReference> beanDefinitionsClassesByDefinition = new HashMap<>();
-        List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences();
+        List<BeanDefinitionReference> allReferences = new ArrayList<>();
+        List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences()
+                                                                        .stream()
+                                                                        .filter(beanDefinitionReference -> beanDefinitionReference.isEnabled(DefaultBeanContext.this)).collect(Collectors.toList());
 
         for (BeanDefinitionReference beanDefinitionReference : beanDefinitionReferences) {
-            if (!beanDefinitionReference.isEnabled(this)) {
-                continue;
-            } else {
-                Optional<BeanConfiguration> beanConfiguration = beanConfigurations.values().stream().filter(c -> c.isWithin(beanDefinitionReference)).findFirst();
-                if (beanConfiguration.isPresent() && !beanConfiguration.get().isEnabled(this)) {
-                    if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                        AbstractBeanContextConditional.LOG.debug(
-                            "Bean [{}] will not be loaded because the configuration [{}] is not enabled",
-                            beanDefinitionReference.getName(),
-                            beanConfiguration);
-                    }
-                    continue;
-                }
-            }
-            beanDefinitionsClassesByType.put(beanDefinitionReference.getName(), beanDefinitionReference);
-            beanDefinitionsClassesByDefinition.put(beanDefinitionReference.toString(), beanDefinitionReference);
+            allReferences.add(beanDefinitionReference);
             if (beanDefinitionReference.isContextScope()) {
                 contextScopeBeans.add(beanDefinitionReference);
             }
@@ -1795,7 +1757,23 @@ public class DefaultBeanContext implements BeanContext {
             }
         }
 
-        this.beanDefinitionsClasses.addAll(beanDefinitionsClassesByDefinition.values());
+        this.beanDefinitionsClasses.addAll(allReferences);
+        this.beanDefinitionsClasses.removeIf(beanDefinitionReference -> {
+            Optional<BeanConfiguration> beanConfiguration = beanConfigurations.values().stream().filter(c -> c.isWithin(beanDefinitionReference)).findFirst();
+            if (beanConfiguration.isPresent() && !beanConfiguration.get().isEnabled(this)) {
+                if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
+                    AbstractBeanContextConditional.LOG.debug(
+                            "Bean [{}] will not be loaded because the configuration [{}] is not enabled",
+                            beanDefinitionReference.getName(),
+                            beanConfiguration);
+                }
+                contextScopeBeans.remove(beanDefinitionReference);
+                processedBeans.remove(beanDefinitionReference);
+                return true;
+            }
+
+            return false;
+        });
 
         initializeContext(contextScopeBeans, processedBeans);
     }
@@ -2268,8 +2246,7 @@ public class DefaultBeanContext implements BeanContext {
 
         @Override
         public <R> Optional<ExecutableMethod<T, R>> findMethod(String name, Class[] argumentTypes) {
-            Optional<Method> method = ReflectionUtils.findMethod(singletonClass, name, argumentTypes);
-            return method.map(theMethod -> new ReflectionExecutableMethod(this, theMethod));
+            return Optional.empty();
         }
 
         @Override
@@ -2289,8 +2266,7 @@ public class DefaultBeanContext implements BeanContext {
 
         @Override
         public Stream<ExecutableMethod<T, ?>> findPossibleMethods(String name) {
-            return ReflectionUtils.findMethodsByName(singletonClass, name)
-                .map((method -> new ReflectionExecutableMethod(this, method)));
+            return Stream.empty();
         }
 
         @Override

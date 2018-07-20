@@ -28,7 +28,7 @@ The <<cli, Command Line Interface>> for Micronaut includes special support for G
 [source,bash]
 .Create a Micronaut Groovy application
 ----
-$ mn create-app hello-world -lang groovy
+$ mn create-app hello-world --lang groovy
 ----
 
 The above will generate a Groovy project, built with Gradle. You can use the `-build maven` flag to generate a project built with Maven instead.
@@ -65,7 +65,7 @@ class HelloBean {
 }
 ----
 
-WARNING: Groovy automatically imports `groovy.lang.Singleton` which can be confusing as it conflicts with `javax.inject.Singleton`. Make sure you include the `javax.inject.Singleton` import when declaring a singleton bean!
+WARNING: Groovy automatically imports `groovy.lang.Singleton` which can be confusing as it conflicts with `javax.inject.Singleton`. Make sure you include the `javax.inject.Singleton` import when declaring a singleton bean to avoid a compilation error.
 
 We can also create a client - don't forget Micronaut can act as a client or a server!
 

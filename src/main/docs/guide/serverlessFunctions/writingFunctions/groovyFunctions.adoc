@@ -1,6 +1,6 @@
 As is typical in Groovy, writing functions is much simpler than in Java or Kotlin.
 
-TIP: If you have the Micronaut CLI installed you can quickly create a Groovy function with `mn create-function hello-world -lang groovy`
+TIP: If you have the Micronaut CLI installed you can quickly create a Groovy function with `mn create-function hello-world --lang groovy`
 
 To begin, add the `function-groovy` dependency (instead of the provider-specific dependency) which provides additional AST transformations that make writing functions simpler. For example, in `build.gradle`:
 

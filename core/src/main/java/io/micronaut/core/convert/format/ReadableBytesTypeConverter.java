@@ -56,6 +56,7 @@ public class ReadableBytesTypeConverter implements FormattingTypeConverter<CharS
             Long size = Long.valueOf(value);
             return ConversionService.SHARED.convert(size, targetType);
         } catch (NumberFormatException e) {
+            context.reject(value, e);
             return Optional.empty();
         }
     }

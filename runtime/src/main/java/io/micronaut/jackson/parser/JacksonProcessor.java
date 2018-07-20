@@ -150,6 +150,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                         LOG.trace("More input required to parse JSON. Demanding more.");
                     }
                     upstreamSubscription.request(1);
+                    upstreamDemand++;
                 }
             }
         } catch (IOException e) {

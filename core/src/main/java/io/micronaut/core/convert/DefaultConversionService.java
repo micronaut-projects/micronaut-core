@@ -18,7 +18,6 @@ package io.micronaut.core.convert;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.format.FormattingTypeConverter;
 import io.micronaut.core.convert.format.ReadableBytesTypeConverter;
@@ -110,8 +109,11 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of((T) object);
         }
 
-        Optional<? extends Class<? extends Annotation>> formattingAnn = AnnotationUtil.findAnnotationWithStereoType(Format.class, context.getAnnotations())
-                                                                                      .map(Annotation::annotationType);
+        Optional<? extends Class<? extends Annotation>> formattingAnn = Optional.empty();
+
+        if (context instanceof ArgumentConversionContext) {
+            formattingAnn = ((ArgumentConversionContext) context).getAnnotationMetadata().getAnnotationTypeByStereotype(Format.class);
+        }
         Class<? extends Annotation> formattingAnnotation = formattingAnn.orElse(null);
         ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, formattingAnnotation);
         TypeConverter typeConverter = converterCache.getIfPresent(pair);
