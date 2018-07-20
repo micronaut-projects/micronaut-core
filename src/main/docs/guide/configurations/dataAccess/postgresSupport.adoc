@@ -7,7 +7,7 @@ To configure the Reactive Postgres you should first add `postgres-reactive` modu
 [source,groovy]
 .build.gradle
 ----
-include::test-suite/build.gradle[tags=postgres-reactive-dependencies,indent=0]
+compile "io.micronaut.configuration:postgres-reactive"
 ----
 
 You should then configure the URI or https://reactiverse.io/reactive-pg-client/apidocs/index.html[`PoolOptions`] of the Postgres server you wish to communicate with in `application.yml`:
@@ -17,17 +17,18 @@ You should then configure the URI or https://reactiverse.io/reactive-pg-client/a
 ----
 postgres:
 	reactive:
-		port: 5432
-		host: the-host
-		database: the-db
-		user: test
-		password: test
-		maxSize: 5
+	    client:
+            port: 5432
+            host: the-host
+            database: the-db
+            user: test
+            password: test
+            maxSize: 5
 ----
 
-TIP: You can also connect to Postgres using `connectionUri`.
+TIP: You can also connect to Postgres using `uri` instead of the other properties.
 
-Once you have the above configuration in place then you can inject instance of the `io.reactiverse.reactivex.pgclient.PgPool` bean. Following is the simplest way to connect, query:
+Once you have the above configuration in place then you can inject the `io.reactiverse.reactivex.pgclient.PgPool` bean. The following is the simplest way to connect:
 
 [source,groovy]
 ----
@@ -36,7 +37,7 @@ include::{testsuite}/configuration/postgres/reactive/PostgresReactiveSpec.groovy
 
 <1> `client` is an instance of the `io.reactiverse.reactivex.pgclient.PgPool` bean.
 
-For more information on running queries on Postgres using the reactive client please read the "Running quries" section in the documentation of https://reactiverse.io/reactive-pg-client/guide/groovy/index.html[reactive-pg-client].
+For more information on running queries on Postgres using the reactive client please read the "Running queries" section in the documentation of https://reactiverse.io/reactive-pg-client/guide/groovy/index.html[reactive-pg-client].
 
 == Postgres Health Checks
 
