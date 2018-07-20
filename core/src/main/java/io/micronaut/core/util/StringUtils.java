@@ -128,7 +128,9 @@ public final class StringUtils {
         Map<String, Object> answer = new HashMap<>(len / 2);
         int i = 0;
         while (i < values.length - 1) {
-            answer.put(values[i++].toString().intern(), values[i++]);
+            String key = values[i++].toString().intern();
+            Object val = values[i++];
+            answer.put(key, val);
         }
         return answer;
     }
