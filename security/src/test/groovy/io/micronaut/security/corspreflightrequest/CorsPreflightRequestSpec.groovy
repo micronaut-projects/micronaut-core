@@ -2,6 +2,7 @@ package io.micronaut.security.corspreflightrequest
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -32,9 +33,10 @@ class CorsPreflightRequestSpec extends Specification {
                 .header("Origin", "https://foo.bar.org")
 
         when:
-        rxClient.toBlocking().exchange(request)
+        HttpResponse rsp = rxClient.toBlocking().exchange(request)
 
         then:
         noExceptionThrown()
+        rsp.status() == HttpStatus.OK
     }
 }
