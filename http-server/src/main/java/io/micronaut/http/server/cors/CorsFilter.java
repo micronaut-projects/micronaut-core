@@ -28,6 +28,7 @@ import static io.micronaut.http.HttpHeaders.ORIGIN;
 import static io.micronaut.http.HttpHeaders.VARY;
 
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -82,6 +83,11 @@ public class CorsFilter implements HttpServerFilter {
         } else {
             return chain.proceed(request);
         }
+    }
+
+    @Override
+    public int getOrder() {
+        return Ordered.HIGHEST_PRECEDENCE;
     }
 
     /**

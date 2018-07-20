@@ -38,7 +38,7 @@ import java.util.Set;
 @Internal
 public class NettyHttpHeaders implements MutableHttpHeaders {
 
-    final io.netty.handler.codec.http.HttpHeaders nettyHeaders;
+    io.netty.handler.codec.http.HttpHeaders nettyHeaders;
     final ConversionService<?> conversionService;
 
     /**
@@ -64,6 +64,14 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     public io.netty.handler.codec.http.HttpHeaders getNettyHeaders() {
         return nettyHeaders;
     }
+
+    /**
+     * @return The underlying Netty headers.
+     */
+    void setNettyHeaders(io.netty.handler.codec.http.HttpHeaders headers) {
+        this.nettyHeaders = headers;
+    }
+
 
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
