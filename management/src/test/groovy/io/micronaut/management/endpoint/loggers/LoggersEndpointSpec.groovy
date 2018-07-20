@@ -183,4 +183,18 @@ class LoggersEndpointSpec extends Specification {
         e.response.status == HttpStatus.BAD_REQUEST
     }
 
+    void 'test that an attempt to set ROOT logger to NOT_SPECIFIED level will fail'() {
+        given:
+        def uri = '/loggers/ROOT'
+
+        when:
+        client.toBlocking().exchange(POST(uri, [configuredLevel: NOT_SPECIFIED]))
+
+        then:
+        def e = thrown(HttpClientResponseException)
+
+        and:
+        e.response.status == HttpStatus.BAD_REQUEST
+    }
+
 }
