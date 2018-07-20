@@ -36,9 +36,9 @@ public class RxLoggersDataCollector
     }
 
     @Override
-    public void setLogLevel(LoggingSystem loggingSystem, String name, String level) {
+    public void setLogLevel(LoggingSystem loggingSystem, String name, LogLevel level) {
         // TODO Make reactive?
-        loggingSystem.setLogLevel(name, toLogLevel(level));
+        loggingSystem.setLogLevel(name, level);
     }
 
     /**
@@ -73,19 +73,6 @@ public class RxLoggersDataCollector
                 .fromArray(LogLevel.values())
                 .map(LogLevel::name)
                 .toList();
-    }
-
-    /**
-     * @param level The log level as a String, or null
-     * @return The {@link LogLevel} corresponding to the string, or NOT_SPECIFIED if string was null
-     * @throws IllegalArgumentException if level is invalid (non-null, doesn't match any {@link LogLevel})
-     */
-    protected static LogLevel toLogLevel(String level) {
-        if (level == null) {
-            return LogLevel.NOT_SPECIFIED;
-        }
-
-        return LogLevel.valueOf(level);
     }
 
 }

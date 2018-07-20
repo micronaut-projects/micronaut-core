@@ -19,6 +19,7 @@ package io.micronaut.management.endpoint.loggers
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Shared
 import spock.lang.Specification
@@ -153,4 +154,33 @@ class LoggersEndpointSpec extends Specification {
         'errors'    | null   | NOT_SPECIFIED           | INFO
         'whatever'  | WARN   | WARN                    | WARN
     }
+
+    void 'test that an attempt to set log level without specifying the logger name will fail'() {
+        given:
+        def uri = '/loggers'
+
+        when:
+        client.toBlocking().exchange(POST(uri, [:]))
+
+        then:
+        def e = thrown(HttpClientResponseException)
+
+        and: 'without the logger name, uri will match endpoint @Read/GET method, but attempting POST'
+        e.response.status == HttpStatus.METHOD_NOT_ALLOWED
+    }
+
+    void 'test that an attempt to set a bad log level will fail'() {
+        given:
+        def uri = '/loggers/errors'
+
+        when:
+        client.toBlocking().exchange(POST(uri, [configuredLevel: 'FOO']))
+
+        then:
+        def e = thrown(HttpClientResponseException)
+
+        and:
+        e.response.status == HttpStatus.BAD_REQUEST
+    }
+
 }
