@@ -85,16 +85,11 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
     }
 
     private String resolveInputName(Argument requiredArgument) {
-        Optional<Annotation> ann = requiredArgument.findAnnotationWithStereoType(Bindable.class);
-        return ann.map(annotation -> {
-            Optional<String> value = AnnotationUtil.findValueOfType(annotation, String.class);
-            return value.map(s -> {
-                if (StringUtils.isEmpty(s)) {
-                    return requiredArgument.getName();
-                }
-                return s;
-            }).orElse(requiredArgument.getName());
-        }).orElse(requiredArgument.getName());
+        String inputName = requiredArgument.getAnnotationMetadata().getValue(Bindable.class, String.class).orElse(null);
+        if (StringUtils.isEmpty(inputName)) {
+            inputName = requiredArgument.getName();
+        }
+        return inputName;
     }
 
     @Override

@@ -18,6 +18,7 @@ package io.micronaut.http.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.core.bind.annotation.Bindable;
 
 import java.lang.annotation.Documented;
@@ -41,5 +42,6 @@ public @interface Body {
     /**
      * @return A Key or qualifier within the body. For example a reference to a nested JSON attribute
      */
+    @AliasFor(annotation = Bindable.class, member = "value")
     String value() default "";
 }

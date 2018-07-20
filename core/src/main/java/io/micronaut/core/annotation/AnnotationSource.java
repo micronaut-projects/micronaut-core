@@ -36,7 +36,6 @@ import java.util.*;
  *     <li>Factory Class</li>
  * </ol>
  * <p>
- * <p>The {@link #findAnnotation(Class)} method will return this first discovered annotation whilst traversing the above list.</p>
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -53,64 +52,6 @@ public interface AnnotationSource extends AnnotatedElement {
      */
     AnnotatedElement[] getAnnotatedElements();
 
-    /**
-     * Find an annotation by type from the {@link #getAnnotatedElements()} of this class.
-     *
-     * @param type The type
-     * @param <A>  The generic type
-     * @return An {@link Optional} of the type
-     */
-    default <A extends Annotation> Optional<A> findAnnotation(Class<A> type) {
-        AnnotationMetadata annotationMetadata = null;
-        if (this instanceof AnnotationMetadataProvider) {
-            annotationMetadata = ((AnnotationMetadataProvider) this).getAnnotationMetadata();
-        } else if (this instanceof AnnotationMetadata) {
-            annotationMetadata = (AnnotationMetadata) this;
-        }
-
-        if (annotationMetadata != null && annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
-            return Optional.ofNullable(annotationMetadata.getAnnotation(type));
-        } else {
-            AnnotatedElement[] elements = getAnnotatedElements();
-            for (AnnotatedElement element : elements) {
-                Optional<A> optional = AnnotationUtil.findAnnotation(element, type);
-                if (optional.isPresent()) {
-                    return optional;
-                }
-            }
-            return Optional.empty();
-        }
-    }
-
-    /**
-     * Find the first annotation for the given stereotype on the method.
-     *
-     * @param stereotype The method
-     * @return The stereotype
-     */
-    default Optional<Annotation> findAnnotationWithStereoType(Class<? extends Annotation> stereotype) {
-        AnnotationMetadata annotationMetadata = null;
-        if (this instanceof AnnotationMetadataProvider) {
-            annotationMetadata = ((AnnotationMetadataProvider) this).getAnnotationMetadata();
-        } else if (this instanceof AnnotationMetadata) {
-            annotationMetadata = (AnnotationMetadata) this;
-        }
-
-        if (annotationMetadata != null && annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
-            Optional<Class<? extends Annotation>> type = annotationMetadata.getAnnotationTypeByStereotype(stereotype);
-            return type.map(this::getAnnotation);
-        } else {
-            // slow path
-            AnnotatedElement[] candidates = getAnnotatedElements();
-            for (AnnotatedElement candidate : candidates) {
-                Optional<? extends Annotation> opt = AnnotationUtil.findAnnotationWithStereoType(candidate, stereotype);
-                if (opt.isPresent()) {
-                    return (Optional<Annotation>) opt;
-                }
-            }
-            return Optional.empty();
-        }
-    }
 
     /**
      * Get a concrete annotation for the given annotation type searching all of the {@link #getAnnotatedElements()}.
@@ -118,7 +59,6 @@ public interface AnnotationSource extends AnnotatedElement {
      * @param annotationClass The annotation class
      * @param <T>             The annotation generic type
      * @return The annotation or null if it doesn't exist
-     * @see #findAnnotation(Class)
      */
     @Override
     default <T extends Annotation> T getAnnotation(Class<T> annotationClass) {

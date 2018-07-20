@@ -18,6 +18,7 @@ package io.micronaut.http.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.core.bind.annotation.Bindable;
 
 import java.lang.annotation.Documented;
@@ -41,5 +42,6 @@ public @interface Part {
     /**
      * @return The name of the part, otherwise it is inferred from the parameter name
      */
+    @AliasFor(annotation = Bindable.class, member = "value")
     String value() default "";
 }

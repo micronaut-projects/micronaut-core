@@ -69,10 +69,10 @@ public class ConsumerRecordBinderRegistry implements ArgumentBinderRegistry<Cons
 
     @Override
     public <T> Optional<ArgumentBinder<T, ConsumerRecord<?, ?>>> findArgumentBinder(Argument<T> argument, ConsumerRecord<?, ?> source) {
-        Optional<Annotation> annotation = argument.findAnnotationWithStereoType(Bindable.class);
-        if (annotation.isPresent()) {
+        Optional<Class<? extends Annotation>> annotationType = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Bindable.class);
+        if (annotationType.isPresent()) {
             @SuppressWarnings("unchecked") ConsumerRecordBinder<T> consumerRecordBinder =
-                    (ConsumerRecordBinder<T>) byAnnotation.get(annotation.get().annotationType());
+                    (ConsumerRecordBinder<T>) byAnnotation.get(annotationType.get());
 
             return Optional.ofNullable(consumerRecordBinder);
         } else {
