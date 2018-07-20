@@ -35,7 +35,7 @@ public interface LoggersDataCollector<T> {
      * @param loggingSystem The {@link LoggingSystem} in use
      * @return A {@link Publisher} of <code>T</code>
      */
-    Publisher<T> getData(LoggingSystem loggingSystem);
+    Publisher<T> getAll(LoggingSystem loggingSystem);
 
     /**
      * Find (or create if not found) the named logger in the system.
