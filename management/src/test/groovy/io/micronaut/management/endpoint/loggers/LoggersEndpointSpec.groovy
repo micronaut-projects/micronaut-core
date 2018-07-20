@@ -135,8 +135,8 @@ class LoggersEndpointSpec extends Specification {
         response = client.exchange(POST(uri, [configuredLevel: level]))
                 .blockingFirst()
 
-        then: 'we get back success but no content'
-        response.status == HttpStatus.NO_CONTENT
+        then: 'we get back success'
+        response.status == HttpStatus.OK
 
         when: 'we again request info on the logger'
         response = client.exchange(GET(uri), Map).blockingFirst()
