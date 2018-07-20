@@ -2,9 +2,7 @@ dependencies {
     testCompile project(":http-server-netty")
     testCompile project(":http-client")
     testCompile project(":configurations:hibernate-validator")
-    // tag::postgres-reactive-dependencies[]
     testCompile project(":configurations:postgres-reactive")
-    // end::postgres-reactive-dependencies[]
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
     testCompile project(":tracing")

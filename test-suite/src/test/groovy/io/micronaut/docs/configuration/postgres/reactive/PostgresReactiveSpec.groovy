@@ -18,14 +18,14 @@ package io.micronaut.docs.configuration.postgres.reactive
 //tag::appcontext-import[]
 import io.micronaut.context.ApplicationContext
 //end::appcontext-import[]
+import io.reactiverse.reactivex.pgclient.PgIterator
 import io.reactiverse.reactivex.pgclient.PgPool
-import io.reactivex.Single
+import io.reactiverse.reactivex.pgclient.PgRowSet
 //tag::pg-testcontainer-import[]
 import org.testcontainers.containers.PostgreSQLContainer
+//end::pg-testcontainer-import[]
 import spock.lang.AutoCleanup
 import spock.lang.Shared
-
-//end::pg-testcontainer-import[]
 import spock.lang.Specification
 
 /**
@@ -64,15 +64,15 @@ class PostgresReactiveSpec extends Specification {
         // end::pgPool-bean[]
 
         // tag::query[]
-        result = Single.create({emitter->
-            client.query('SELECT * FROM pg_stat_database', {ar-> // <1>
-                if (ar.succeeded()) {
-                    emitter.onSuccess("Size: " + ar.result().size())
-                } else {
-                    emitter.onSuccess(ar.cause().getMessage())
-                }
-            })
-        }).toFlowable().blockingFirst()
+        result = client.rxQuery('SELECT * FROM pg_stat_database').map({ PgRowSet pgRowSet -> // <1>
+            int size = 0
+            PgIterator iterator = pgRowSet.iterator()
+            while (iterator.hasNext()) {
+                iterator.next()
+                size++
+            }
+            return "Size: ${size}"
+        }).blockingGet()
         // end::query[]
 
         then:
