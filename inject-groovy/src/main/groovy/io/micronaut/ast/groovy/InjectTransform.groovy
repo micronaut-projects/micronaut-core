@@ -1051,27 +1051,68 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 if (aopProxyWriter != null) {
                     Map<String, Map<String, Object>> resolvedGenericTypes =
                             [(propertyName): AstGenericUtils.extractPlaceholders(propertyNode.type)]
+                    def propertyType = AstGenericUtils.resolveTypeReference(propertyNode.type)
                     Map<String, Object> resolvedArguments =
-                            [(propertyName): AstGenericUtils.resolveTypeReference(propertyNode.type)]
+                            [(propertyName): propertyType]
 
                     AnnotationMetadata fieldMetadata = AstAnnotationUtils.getAnnotationMetadata(propertyNode.field)
 
                     Map<String, AnnotationMetadata> resolvedAnnotationMetadata
+                    def emptyMap = Collections.emptyMap()
                     if (fieldMetadata != null) {
                         resolvedAnnotationMetadata = [(propertyName): fieldMetadata]
                     } else {
-                        resolvedAnnotationMetadata = Collections.emptyMap()
+                        resolvedAnnotationMetadata = emptyMap
                     }
+
+                    beanWriter.visitExecutableMethod(
+                            propertyNode.getDeclaringClass().name,
+                            void.class,
+                            void.class,
+                            emptyMap,
+                            getSetterName(propertyName),
+                            resolvedArguments,
+                            resolvedAnnotationMetadata,
+                            resolvedGenericTypes,
+                            fieldAnnotationMetadata
+                    )
+
                     aopWriter.visitAroundMethod(
                         propertyNode.getDeclaringClass().name,
                         void.class,
                         void.class,
-                        Collections.emptyMap(),
+                        emptyMap,
                         getSetterName(propertyName),
                         resolvedArguments,
                         resolvedAnnotationMetadata,
                         resolvedGenericTypes,
                         fieldAnnotationMetadata
+                    )
+
+                    // also visit getter to ensure proxying
+
+                    beanWriter.visitExecutableMethod(
+                            propertyNode.getDeclaringClass().name,
+                            propertyType,
+                            propertyType,
+                            emptyMap,
+                            getGetterName(propertyNode),
+                            emptyMap,
+                            emptyMap,
+                            emptyMap,
+                            fieldAnnotationMetadata
+                    )
+
+                    aopWriter.visitAroundMethod(
+                            propertyNode.getDeclaringClass().name,
+                            propertyType,
+                            propertyType,
+                            emptyMap,
+                            getGetterName(propertyNode),
+                            emptyMap,
+                            emptyMap,
+                            emptyMap,
+                            fieldAnnotationMetadata
                     )
                 }
             }
