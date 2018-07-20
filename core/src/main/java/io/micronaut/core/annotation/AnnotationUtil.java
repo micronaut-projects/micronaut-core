@@ -243,18 +243,6 @@ public class AnnotationUtil {
             .findFirst();
     }
 
-    /**
-     * Finds an annotation on the given class for the given stereotype.
-     *
-     * @param stereotype  The stereotype
-     * @param annotations The annotations to search
-     * @param <T>         The annotation generic type
-     * @return The annotation
-     */
-    public static <T extends Annotation> Optional<T> findAnnotationWithStereoType(Class stereotype, Annotation... annotations) {
-        String stereotypeName = stereotype.getName();
-        return findAnnotationWithStereoType(stereotypeName, annotations);
-    }
 
     /**
      * Finds an annotation on the given class for the given stereotype.
