@@ -34,8 +34,7 @@ public class LogbackLoggingSystem implements LoggingSystem {
 
     @Override
     public LoggerConfiguration getLogger(String name) {
-        return new LoggerConfiguration("foo", LogLevel.NOT_SPECIFIED,
-                LogLevel.NOT_SPECIFIED);
+        return toLoggerConfiguration(getLoggerContext().getLogger(name));
     }
 
     @Override

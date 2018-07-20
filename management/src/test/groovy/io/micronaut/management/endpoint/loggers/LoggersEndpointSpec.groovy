@@ -22,6 +22,7 @@ import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Shared
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import static io.micronaut.http.HttpRequest.GET
 
@@ -42,14 +43,11 @@ class LoggersEndpointSpec extends Specification {
 
     // Loggers configured in logback-test.xml
     static final configuredLoggers = [
-//            ROOT: [configuredLevel: INFO, effectiveLevel: INFO],
-//            errors: [configuredLevel: INFO, effectiveLevel: INFO],
-//            'no-appenders': [configuredLevel: INFO, effectiveLevel: INFO],
-//            'no-level': [configuredLevel: INFO, effectiveLevel: INFO],
-//            'no-config': [configuredLevel: INFO, effectiveLevel: INFO],
-
-            // Currently stubbed in implementation
-            foo: [configuredLevel: NOT_SPECIFIED, effectiveLevel: NOT_SPECIFIED]
+            ROOT: [configuredLevel: INFO, effectiveLevel: INFO],
+            errors: [configuredLevel: ERROR, effectiveLevel: ERROR],
+            'no-appenders': [configuredLevel: WARN, effectiveLevel: WARN],
+            'no-level': [configuredLevel: NOT_SPECIFIED, effectiveLevel: INFO],
+            'no-config': [configuredLevel: NOT_SPECIFIED, effectiveLevel: INFO],
     ]
 
     void setup() {
@@ -85,21 +83,22 @@ class LoggersEndpointSpec extends Specification {
         response.status == HttpStatus.OK
 
         when:
-        def result = response.body()
+        Map result = response.body()
+        println ">> Result: $result"
 
         then:
         result.containsKey 'loggers'
 
         and: 'we have all the loggers expected from configuration'
-        configuredLoggers.every { log, levels ->
-            result.loggers.containsKey log
-            result.loggers."${log}" == levels
+        configuredLoggers.each { log, _ ->
+            assert result.loggers.containsKey(log)
+            assert result.loggers[log] == configuredLoggers[log]
         }
     }
 
-    void 'test that a configured logger can be retrieved by name from the endpoint'() {
+    @Unroll
+    void 'test that a configured logger #name can be retrieved by name from the endpoint'() {
         when:
-        def name = 'foo'
         def response = client.exchange(GET("/loggers/${name}"), Map).blockingFirst()
 
         then:
@@ -109,8 +108,14 @@ class LoggersEndpointSpec extends Specification {
         def result = response.body()
 
         then:
-        result.configuredLevel == configuredLoggers.foo.configuredLevel
-        result.effectiveLevel == configuredLoggers.foo.effectiveLevel
+        result.configuredLevel == configuredLevel
+        result.effectiveLevel == effectiveLevel
+
+        where:
+        name     | configuredLevel | effectiveLevel
+        'foo'    | NOT_SPECIFIED   | INFO
+        'ROOT'   | INFO            | INFO
+        'errors' | ERROR           | ERROR
     }
 
 }
