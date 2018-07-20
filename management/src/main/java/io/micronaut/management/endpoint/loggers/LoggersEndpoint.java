@@ -91,6 +91,7 @@ public class LoggersEndpoint {
     /**
      * @param name The name of the logger to configure
      * @param configuredLevel The {@link LogLevel} to set on the named logger
+     * @return The {@link HttpResponse} with status code and message on error
      */
     @Write
     public HttpResponse setLogLevel(@QueryValue @NotBlank String name,
@@ -99,8 +100,7 @@ public class LoggersEndpoint {
             loggersManager.setLogLevel(loggingSystem, name,
                     configuredLevel != null ? configuredLevel : LogLevel.NOT_SPECIFIED);
             return HttpResponse.ok();
-        }
-        catch (IllegalArgumentException ex) {
+        } catch (IllegalArgumentException ex) {
             return HttpResponse.badRequest(ex.getMessage());
         }
     }
