@@ -93,6 +93,6 @@ public class LoggersEndpoint {
     public HttpResponse setLogLevel(@QueryValue @NotBlank String name,
                                     @Nullable String configuredLevel) {
         loggersDataCollector.setLogLevel(loggingSystem, name, configuredLevel);
-        return HttpResponse.noContent();
+        return HttpResponse.ok();
     }
 }
