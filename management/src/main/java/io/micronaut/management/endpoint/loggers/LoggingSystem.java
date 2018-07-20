@@ -21,7 +21,7 @@ import javax.validation.constraints.NotNull;
 import java.util.Collection;
 
 /**
- * Abstraction for a logging system
+ * Abstraction for a logging system.
  *
  * @author Matthew Moss
  * @since 1.0
