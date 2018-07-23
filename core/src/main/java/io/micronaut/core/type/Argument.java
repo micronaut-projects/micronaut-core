@@ -25,7 +25,6 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 
 import javax.annotation.Nullable;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -58,11 +57,6 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * @return The type of the argument
      */
     Class<T> getType();
-
-    /**
-     * @return The qualifier or null if there is none
-     */
-    Annotation getQualifier();
 
     /**
      * Whether the types are equivalent. The regular {@link Object#equals(Object)} implementation includes the argument
@@ -150,22 +144,6 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
             }
         }
         return baseString.toString();
-    }
-
-    /**
-     * Creates a new argument for the given type, name and qualifier.
-     *
-     * @param type      The type
-     * @param name      The name
-     * @param qualifier The qualifier
-     * @param <T>       The generic type
-     * @return The argument instance
-     */
-    static <T> Argument<T> of(
-        Class<T> type,
-        String name,
-        Annotation qualifier) {
-        return new DefaultArgument<>(type, name, qualifier);
     }
 
     /**

@@ -16,15 +16,17 @@
 
 package io.micronaut.core.annotation;
 
-import javax.annotation.Nullable;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
+
 import java.lang.annotation.*;
 import java.lang.reflect.AnnotatedElement;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 /**
- * Utility methods for annotations.
+ * Internal utility methods for annotations. For Internal and framework use only. Do not use in application code.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -60,6 +62,7 @@ public class AnnotationUtil {
      * Constant indicating an zero annotation.
      */
     public static final AnnotatedElement[] ZERO_ANNOTATED_ELEMENTS = new AnnotatedElement[0];
+
     /**
      * An empty re-usable element.
      */
@@ -80,22 +83,61 @@ public class AnnotationUtil {
         }
     };
 
+    private static final Map<Integer, List<String>> INTERN_LIST_POOL = new ConcurrentHashMap<>();
+    private static final Map<String, Map<String, Object>> INTERN_MAP_POOL = new ConcurrentHashMap<>();
 
     /**
-     * Finds an annotation on the given class for the given type.
+     * Converts the given objects into a set of interned strings contained within an internal pool of lists. See {@link String#intern()}.
      *
-     * @param annotations The annotations
-     * @param type        The annotation type
-     * @param <T>         The annotation generic type
-     * @return The annotation
+     * <p>This method serves the purpose of reducing memory footprint by pooling common lists of annotations in compiled {@link AnnotationMetadata}</p>
+     *
+     * @param objects The objects
+     * @return A unmodifiable, pooled set of strings
      */
-    public static <T extends Annotation> Optional<T> findAnnotation(Annotation[] annotations, @Nullable Class<T> type) {
-        if (type == null) {
-            return Optional.empty();
+    @SuppressWarnings({"unused", "unchecked"})
+    public static List<String> internListOf(Object... objects) {
+        if (objects == null || objects.length == 0) {
+            return Collections.EMPTY_LIST;
         }
-        return (Optional<T>) Arrays.stream(annotations)
-            .filter(ann -> ann.annotationType() == type)
-            .findFirst();
+
+        Integer hash = Arrays.hashCode(objects);
+        return INTERN_LIST_POOL.computeIfAbsent(hash, integer -> StringUtils.internListOf(objects));
     }
 
+
+    /**
+     * Converts the given objects into a map of interned strings where the keys and values are alternating entries in the passed array. See {@link String#intern()}.
+     *
+     * <p>The values stored at even number positions will be converted to strings and interned.</p>
+     *
+     * @param values The objects
+     * @return An unmodifiable set of strings
+     * @see CollectionUtils#mapOf(Object...)
+     */
+    @SuppressWarnings("unused")
+    public static Map<String, Object> internMapOf(Object... values) {
+        if (values == null || values.length == 0) {
+            return Collections.emptyMap();
+        }
+        int len = values.length;
+        if (len % 2 != 0) {
+            throw new IllegalArgumentException("Number of arguments should be an even number representing the keys and values");
+        }
+
+        // if the length is 2 then only a single annotation is defined, so tried use internal pool
+        if (len == 2) {
+            Object value = values[1];
+            if (value == Collections.EMPTY_MAP) {
+                String key = values[0].toString().intern();
+                return INTERN_MAP_POOL.computeIfAbsent(key, s ->
+                        Collections.singletonMap(s, Collections.EMPTY_MAP)
+                );
+            } else {
+                return StringUtils.internMapOf(values);
+            }
+
+        } else {
+            return StringUtils.internMapOf(values);
+        }
+    }
 }

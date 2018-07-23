@@ -26,6 +26,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ParametrizedBeanFactory;
 
+import javax.inject.Qualifier;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.Collections;
@@ -120,8 +121,8 @@ public abstract class AbstractParametrizedBeanDefinition<T> extends AbstractBean
     private Argument[] resolveRequiredArguments() {
         return Arrays.stream(getConstructor().getArguments())
             .filter(arg -> {
-                Annotation qualifier = arg.getQualifier();
-                return qualifier != null && qualifier.annotationType() == Parameter.class;
+                Optional<Class<? extends Annotation>> qualifierType = arg.getAnnotationMetadata().getAnnotationTypeByStereotype(Qualifier.class);
+                return qualifierType.isPresent() && qualifierType.get() == Parameter.class;
             })
             .toArray(Argument[]::new);
     }

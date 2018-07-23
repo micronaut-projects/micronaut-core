@@ -25,7 +25,6 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.FieldInjectionPoint;
 
 import javax.annotation.Nullable;
-import javax.inject.Qualifier;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.util.Objects;
@@ -112,13 +111,6 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
     @Override
     public Class<T> getType() {
         return fieldType;
-    }
-
-    @Override
-    public Annotation getQualifier() {
-        return annotationMetadata.getAnnotationTypeByStereotype(Qualifier.class)
-            .map(annotationMetadata::getAnnotation)
-            .orElse(null);
     }
 
     @Override
