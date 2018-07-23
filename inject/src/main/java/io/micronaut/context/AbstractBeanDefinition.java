@@ -1639,15 +1639,19 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
 
     private Qualifier resolveQualifier(BeanResolutionContext resolutionContext, Argument argument) {
         Qualifier qualifier = null;
-        Annotation ann = argument.getQualifier();
-        if (ann != null) {
-            qualifier = Qualifiers.byAnnotation(ann);
+        AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+        Optional<Class<? extends Annotation>> qualifierType = annotationMetadata.getAnnotationTypeByStereotype(javax.inject.Qualifier.class);
+        if (qualifierType.isPresent()) {
+            qualifier = Qualifiers.byAnnotation(
+                    annotationMetadata,
+                    qualifierType.get()
+            );
         }
 
         if (qualifier == null) {
-            io.micronaut.context.annotation.Type typeAnn = argument.getDeclaredAnnotation(io.micronaut.context.annotation.Type.class);
-            if (typeAnn != null) {
-                qualifier = Qualifiers.byAnnotation(typeAnn);
+            Class<?>[] byType = annotationMetadata.getValue(Type.class, Class[].class).orElse(null);
+            if (byType != null) {
+                qualifier = Qualifiers.byType(byType);
             } else {
                 Optional<Qualifier> optional = resolutionContext.get(javax.inject.Qualifier.class.getName(), Map.class)
                     .map(map -> (Qualifier) map.get(argument));

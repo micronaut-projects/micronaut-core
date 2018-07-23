@@ -87,11 +87,6 @@ class MissingMethodInjectionPoint implements MethodInjectionPoint {
     }
 
     @Override
-    public AnnotatedElement[] getAnnotatedElements() {
-        return AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
-    }
-
-    @Override
     public Argument<?>[] getArguments() {
         return argTypes;
     }

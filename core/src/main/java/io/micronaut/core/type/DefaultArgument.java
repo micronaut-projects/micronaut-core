@@ -127,20 +127,6 @@ class DefaultArgument<T> implements Argument<T> {
     }
 
     @Override
-    public Annotation getQualifier() {
-        if (this.qualifier != null) {
-            return this.qualifier;
-        } else {
-
-            AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-            this.qualifier = annotationMetadata.getAnnotationTypeByStereotype("javax.inject.Qualifier")
-                                               .map(annotationMetadata::getAnnotation)
-                                               .orElse(null);
-            return qualifier;
-        }
-    }
-
-    @Override
     public AnnotatedElement[] getAnnotatedElements() {
         return new AnnotatedElement[]{annotatedElement};
     }

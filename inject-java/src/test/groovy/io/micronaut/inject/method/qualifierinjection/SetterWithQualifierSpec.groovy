@@ -20,6 +20,8 @@ import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 
+import javax.inject.Qualifier
+
 class SetterWithQualifierSpec extends AbstractTypeElementSpec {
 
     void "test setter with qualifier compile"() {
@@ -78,8 +80,8 @@ class TwoA implements A {
 ''')
         then:"the state is correct"
         beanDefinition.injectedMethods.size() == 2
-        beanDefinition.injectedMethods[0].arguments[0].qualifier
-        beanDefinition.injectedMethods[1].arguments[0].qualifier
+        beanDefinition.injectedMethods[0].arguments[0].getAnnotationMetadata().getAnnotationTypeByStereotype(Qualifier).isPresent()
+        beanDefinition.injectedMethods[1].arguments[0].getAnnotationMetadata().getAnnotationTypeByStereotype(Qualifier).isPresent()
     }
 
     void "test that a property with a qualifier is injected correctly"() {

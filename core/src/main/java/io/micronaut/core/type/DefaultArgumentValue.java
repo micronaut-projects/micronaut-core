@@ -70,11 +70,6 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
     }
 
     @Override
-    public Annotation getQualifier() {
-        return argument.getQualifier();
-    }
-
-    @Override
     public V getValue() {
         return value;
     }
