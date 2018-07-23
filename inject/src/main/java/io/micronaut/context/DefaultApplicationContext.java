@@ -228,11 +228,13 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                             if (dependentCandidate instanceof BeanDefinitionDelegate) {
                                 BeanDefinitionDelegate<?> parentDelegate = (BeanDefinitionDelegate) dependentCandidate;
                                 optional = parentDelegate.get(Named.class.getName(), String.class).map(Qualifiers::byName);
-                                parentDelegate.get(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, Boolean.class).ifPresent(isPrimary -> delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, isPrimary));
-                                delegate.put(EachProperty.class.getName(), dependentType);
                             } else {
                                 Optional<String> qualiferName = dependentCandidate.getAnnotationNameByStereotype(javax.inject.Qualifier.class);
                                 optional = qualiferName.map(name -> Qualifiers.byAnnotation(dependentCandidate, name));
+                            }
+
+                            if (dependentCandidate.isPrimary()) {
+                                delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
                             }
 
                             optional.ifPresent(qualifier -> {
