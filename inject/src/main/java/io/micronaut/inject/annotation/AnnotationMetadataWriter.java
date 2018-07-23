@@ -17,9 +17,9 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.writer.AbstractClassFileWriter;
 import io.micronaut.inject.writer.ClassGenerationException;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
@@ -44,21 +44,15 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     private static final Type TYPE_DEFAULT_ANNOTATION_METADATA = Type.getType(DefaultAnnotationMetadata.class);
     private static final org.objectweb.asm.commons.Method METHOD_MAP_OF = org.objectweb.asm.commons.Method.getMethod(
         ReflectionUtils.getRequiredInternalMethod(
-            StringUtils.class,
+            AnnotationUtil.class,
             "internMapOf",
             Object[].class
         )
     );
 
-    private static final org.objectweb.asm.commons.Method METHOD_EMPTY_MAP = org.objectweb.asm.commons.Method.getMethod(
-        ReflectionUtils.getRequiredInternalMethod(
-            Collections.class,
-            "emptyMap"
-        )
-    );
     private static final org.objectweb.asm.commons.Method METHOD_LIST_OF = org.objectweb.asm.commons.Method.getMethod(
         ReflectionUtils.getRequiredInternalMethod(
-            StringUtils.class,
+            AnnotationUtil.class,
             "internListOf",
             Object[].class
         )
@@ -88,6 +82,9 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             Map.class
         )
     );
+
+    private static final Type EMPTY_MAP_TYPE = Type.getType(Map.class);
+    private static final String EMPTY_MAP = "EMPTY_MAP";
 
     private final String className;
     private final DefaultAnnotationMetadata annotationMetadata;
@@ -175,7 +172,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             );
         }
         // invoke the AbstractBeanDefinition.createMap method
-        generatorAdapter.invokeStatic(Type.getType(StringUtils.class), METHOD_MAP_OF);
+        generatorAdapter.invokeStatic(Type.getType(AnnotationUtil.class), METHOD_MAP_OF);
     }
 
     private static void instantiateInternal(GeneratorAdapter generatorAdapter, DefaultAnnotationMetadata annotationMetadata, boolean isNew) {
@@ -226,7 +223,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 // use the property type as the value
             }
             // invoke the AbstractBeanDefinition.createMap method
-            methodVisitor.invokeStatic(Type.getType(StringUtils.class), METHOD_LIST_OF);
+            methodVisitor.invokeStatic(Type.getType(AnnotationUtil.class), METHOD_LIST_OF);
         } else {
             methodVisitor.visitInsn(ACONST_NULL);
         }
@@ -249,7 +246,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 );
             }
             // invoke the AbstractBeanDefinition.createMap method
-            methodVisitor.invokeStatic(Type.getType(StringUtils.class), METHOD_MAP_OF);
+            methodVisitor.invokeStatic(Type.getType(AnnotationUtil.class), METHOD_MAP_OF);
         } else {
             methodVisitor.visitInsn(ACONST_NULL);
         }
@@ -270,7 +267,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 Map<CharSequence, Object> attributes = entry.getValue();
                 if (attributes.isEmpty()) {
                     pushStoreInArray(methodVisitor, i++, totalSize, () ->
-                        methodVisitor.invokeStatic(Type.getType(Collections.class), METHOD_EMPTY_MAP)
+                        methodVisitor.getStatic(Type.getType(Collections.class), EMPTY_MAP, EMPTY_MAP_TYPE)
                     );
                 } else {
                     pushStoreInArray(methodVisitor, i++, totalSize, () ->
@@ -279,7 +276,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 }
             }
             // invoke the StringUtils.mapOf method
-            methodVisitor.invokeStatic(Type.getType(StringUtils.class), METHOD_MAP_OF);
+            methodVisitor.invokeStatic(Type.getType(AnnotationUtil.class), METHOD_MAP_OF);
         } else {
             methodVisitor.visitInsn(ACONST_NULL);
         }
