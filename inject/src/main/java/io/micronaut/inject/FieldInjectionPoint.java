@@ -19,7 +19,6 @@ package io.micronaut.inject;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.type.Argument;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Field;
 
@@ -46,11 +45,6 @@ public interface FieldInjectionPoint<T> extends InjectionPoint, AnnotatedElement
      * @return The required component type
      */
     Class<T> getType();
-
-    /**
-     * @return The qualifier
-     */
-    Annotation getQualifier();
 
     /**
      * @param instance the instance

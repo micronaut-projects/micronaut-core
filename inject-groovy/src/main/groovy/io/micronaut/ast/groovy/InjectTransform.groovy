@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy
 
+import io.micronaut.ast.groovy.utils.AstClassUtils
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.PropertySource
 import io.micronaut.inject.annotation.AnnotationValue
@@ -170,18 +171,24 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             AnnotatedNode beanClassNode = entry.key
             try {
                 String beanDefinitionName = beanDefWriter.beanDefinitionName
-                BeanDefinitionReferenceWriter beanReferenceWriter = new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionName, beanDefWriter.annotationMetadata)
+
+                if (beanClassNode instanceof ClassNode) {
+                    ClassNode cn = (ClassNode) beanClassNode
+                    ClassNode providerType = AstGenericUtils.resolveInterfaceGenericType(cn, Provider.class)
+
+                    if(providerType != null) {
+                        beanTypeName = providerType.name
+                    }
+                }
+
+                BeanDefinitionReferenceWriter beanReferenceWriter = new BeanDefinitionReferenceWriter(
+                        beanTypeName,
+                        beanDefinitionName,
+                        beanDefWriter.annotationMetadata
+                )
 
                 beanReferenceWriter.setRequiresMethodProcessing(beanDefWriter.requiresMethodProcessing());
                 beanReferenceWriter.setContextScope(AstAnnotationUtils.hasStereotype(beanClassNode, Context))
-
-                Optional<String> replacesOpt = AstAnnotationUtils
-                    .getAnnotationMetadata(beanClassNode)
-                    .getValue(Replaces, String.class)
-
-                if (replacesOpt.isPresent()) {
-                    beanReferenceWriter.setReplaceBeanName(replacesOpt.get())
-                }
                 beanDefWriter.visitBeanDefinitionEnd()
                 if (classesDir != null) {
                     beanReferenceWriter.accept(outputVisitor)

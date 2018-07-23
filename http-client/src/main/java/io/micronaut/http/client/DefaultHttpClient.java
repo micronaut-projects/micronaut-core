@@ -1377,7 +1377,15 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
 
                     try {
                         if (errorStatus) {
-                            emitter.onError(new HttpClientResponseException(status.reasonPhrase(), response));
+                            try {
+                                HttpClientResponseException clientError = new HttpClientResponseException(
+                                        status.reasonPhrase(),
+                                        response
+                                );
+                                emitter.onError(clientError);
+                            } catch (Exception e) {
+                                emitter.onError(new HttpClientException("Exception occurred decoding error response: " + e.getMessage(), e));
+                            }
                         } else {
                             emitter.onNext(response);
                         }

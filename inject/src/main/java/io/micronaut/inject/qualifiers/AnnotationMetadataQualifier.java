@@ -21,6 +21,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanType;
 
 import javax.inject.Named;
+import java.lang.annotation.Annotation;
 import java.util.stream.Stream;
 
 /**
@@ -33,6 +34,7 @@ import java.util.stream.Stream;
 class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
 
     private final AnnotationMetadata annotationMetadata;
+    private final Class<? extends Annotation> annotationType;
 
     /**
      * @param metadata The annotation metadata
@@ -41,6 +43,17 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
     AnnotationMetadataQualifier(AnnotationMetadata metadata, String name) {
         super(name);
         this.annotationMetadata = metadata;
+        this.annotationType = null;
+    }
+
+    /**
+     * @param metadata The annotation metadata
+     * @param annotationType     The name
+     */
+    AnnotationMetadataQualifier(AnnotationMetadata metadata, Class<? extends Annotation> annotationType) {
+        super(annotationType.getSimpleName());
+        this.annotationMetadata = metadata;
+        this.annotationType = annotationType;
     }
 
     @Override
@@ -59,5 +72,10 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
         }
 
         return reduceByAnnotation(beanType, candidates, name);
+    }
+
+    @Override
+    public String toString() {
+        return annotationType == null ? super.toString() : "@" + annotationType.getSimpleName();
     }
 }

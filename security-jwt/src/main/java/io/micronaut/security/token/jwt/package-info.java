@@ -22,9 +22,11 @@
  */
 
 @Configuration
+@Requires(property = SecurityConfigurationProperties.PREFIX + ".enabled")
 @Requires(property = JwtConfigurationProperties.PREFIX + ".enabled")
 package io.micronaut.security.token.jwt;
 
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.security.config.SecurityConfigurationProperties;
 import io.micronaut.security.token.jwt.config.JwtConfigurationProperties;

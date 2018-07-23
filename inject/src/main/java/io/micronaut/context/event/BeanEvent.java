@@ -18,7 +18,6 @@ package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.BeanIdentifier;
 
 /**
  * An abstract bean event.

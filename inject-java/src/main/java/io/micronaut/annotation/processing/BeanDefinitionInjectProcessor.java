@@ -234,6 +234,25 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             String beanDefinitionName = beanDefinitionWriter.getBeanDefinitionName();
             String beanTypeName = beanDefinitionWriter.getBeanTypeName();
 
+            List<? extends TypeMirror> interfaces = beanClassElement.getInterfaces();
+            for (TypeMirror anInterface : interfaces) {
+
+                if (anInterface instanceof DeclaredType) {
+                    DeclaredType declaredType = (DeclaredType) anInterface;
+                    Element element = declaredType.asElement();
+                    if (element instanceof TypeElement) {
+                        TypeElement te = (TypeElement) element;
+                        String name = te.getQualifiedName().toString();
+                        if (Provider.class.getName().equals(name)) {
+                            List<? extends TypeMirror> typeArguments = declaredType.getTypeArguments();
+                            if (!typeArguments.isEmpty()) {
+                                beanTypeName = genericUtils.resolveTypeReference(typeArguments.get(0)).toString();
+                            }
+                        }
+                    }
+                }
+            }
+
             AnnotationMetadata annotationMetadata = beanDefinitionWriter.getAnnotationMetadata();
             BeanDefinitionReferenceWriter beanDefinitionReferenceWriter =
                     new BeanDefinitionReferenceWriter(beanTypeName, beanDefinitionName, annotationMetadata);
@@ -244,8 +263,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             beanDefinitionReferenceWriter.setContextScope(
                     annotationUtils.hasStereotype(beanClassElement, Context.class));
 
-            Optional<String> replacesType = annotationUtils.getAnnotationMetadata(beanClassElement).getValue(Replaces.class, String.class);
-            replacesType.ifPresent(beanDefinitionReferenceWriter::setReplaceBeanName);
             beanDefinitionReferenceWriter.accept(classWriterOutputVisitor);
         } catch (IOException e) {
             // raise a compile error
