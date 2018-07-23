@@ -16,16 +16,10 @@
 
 package io.micronaut.configuration.picocli;
 
-import io.micronaut.configuration.picocli.MicronautFactory;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.Environment;
 import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.ExecutionException;
-import picocli.CommandLine.IFactory;
-import picocli.CommandLine.InitializationException;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
+import picocli.CommandLine.*;
 
 import java.util.concurrent.Callable;
 
@@ -34,6 +28,7 @@ import java.util.concurrent.Callable;
  * a micronaut application context.
  *
  * @author Remko Popma
+ * @since 1.0
  */
 public class PicocliRunner {
     /**
@@ -48,6 +43,8 @@ public class PicocliRunner {
      * </p>
      * @param cls the Callable command class
      * @param args the command line arguments
+     * @param <C> The callable type
+     * @param <T> The callable return type
      * @return {@code null} if an error occurred while parsing the command line options,
      *      or if help was requested and printed. Otherwise returns the result of calling the Callable
      * @throws InitializationException if the specified command object does not have
@@ -73,6 +70,9 @@ public class PicocliRunner {
      * @param cls the Callable command class
      * @param ctx the ApplicationContext that injects dependencies into the command
      * @param args the command line arguments
+     * @param <C> The callable type
+     * @param <T> The callable return type
+
      * @return {@code null} if an error occurred while parsing the command line options,
      *      or if help was requested and printed. Otherwise returns the result of calling the Callable
      * @throws InitializationException if the specified command object does not have
@@ -95,6 +95,8 @@ public class PicocliRunner {
      * </p>
      * @param cls the Runnable command class
      * @param args the command line arguments
+     * @param <R> The runnable type
+     *
      * @throws InitializationException if the specified command object does not have
      *          a {@link Command}, {@link Option} or {@link Parameters} annotation
      * @throws ExecutionException if the Runnable throws an exception
@@ -118,6 +120,7 @@ public class PicocliRunner {
      * @param cls the Runnable command class
      * @param ctx the ApplicationContext that injects dependencies into the command
      * @param args the command line arguments
+     * @param <R> The runnable type
      * @throws InitializationException if the specified command object does not have
      *          a {@link Command}, {@link Option} or {@link Parameters} annotation
      * @throws ExecutionException if the Runnable throws an exception
