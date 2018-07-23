@@ -182,8 +182,10 @@ public class RequiresCondition implements Condition {
                 PropertyResolver propertyResolver = (PropertyResolver) beanContext;
                 String notEquals = requirements.get("notEquals", String.class).orElse(null);
                 String defaultValue = requirements.get("defaultValue", String.class).orElse(null);
+                String pattern = requirements.get("pattern", String.class).orElse(null);
 
                 boolean hasNotEquals = StringUtils.isNotEmpty(notEquals);
+                boolean hasPattern = StringUtils.isNotEmpty(pattern);
                 if (!propertyResolver.containsProperties(property) && StringUtils.isEmpty(defaultValue)) {
                     if (hasNotEquals) {
                         return true;
@@ -203,6 +205,13 @@ public class RequiresCondition implements Condition {
                     boolean result = resolved == null || !resolved.equals(notEquals);
                     if (!result) {
                         context.fail("Property [" + property + "] with value [" + resolved + "] should not equal: " + notEquals);
+                    }
+                    return result;
+                } else if (hasPattern) {
+                    String resolved = resolvePropertyValue(property, propertyResolver, defaultValue);
+                    boolean result = resolved != null && resolved.matches(pattern);
+                    if (!result) {
+                        context.fail("Property [" + property + "] with value [" + resolved + "] does not match required pattern: " + pattern);
                     }
                     return result;
                 }
