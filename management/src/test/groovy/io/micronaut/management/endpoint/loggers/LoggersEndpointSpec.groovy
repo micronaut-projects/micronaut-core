@@ -181,6 +181,7 @@ class LoggersEndpointSpec extends Specification {
 
         and:
         e.response.status == HttpStatus.BAD_REQUEST
+        e.message.contains 'Cannot deserialize value of type `io.micronaut.management.endpoint.loggers.LogLevel` from String "FOO"'
     }
 
     void 'test that an attempt to set ROOT logger to NOT_SPECIFIED level will fail'() {
@@ -195,6 +196,7 @@ class LoggersEndpointSpec extends Specification {
 
         and:
         e.response.status == HttpStatus.BAD_REQUEST
+        e.message == 'The level of the root logger cannot be set to null'
     }
 
 }

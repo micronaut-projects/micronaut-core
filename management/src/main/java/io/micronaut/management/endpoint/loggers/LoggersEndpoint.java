@@ -18,6 +18,7 @@ package io.micronaut.management.endpoint.loggers;
 
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.QueryValue;
+import io.micronaut.http.hateos.JsonError;
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.management.endpoint.Read;
@@ -101,7 +102,9 @@ public class LoggersEndpoint {
                     configuredLevel != null ? configuredLevel : LogLevel.NOT_SPECIFIED);
             return HttpResponse.ok();
         } catch (IllegalArgumentException ex) {
-            return HttpResponse.badRequest(ex.getMessage());
+            JsonError error = new JsonError(ex.getMessage());
+            return HttpResponse.badRequest(error);
         }
     }
+
 }
