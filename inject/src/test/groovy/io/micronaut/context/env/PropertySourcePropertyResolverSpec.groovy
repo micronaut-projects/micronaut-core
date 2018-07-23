@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.env
 
+import io.micronaut.core.value.MapPropertyResolver
+import io.micronaut.core.value.PropertyResolver
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -75,7 +77,8 @@ class PropertySourcePropertyResolverSpec extends Specification {
         given:
         def values = [
                 'foo.bar': '10',
-                'foo.baz': 20
+                'foo.baz': 20,
+                'bar': 30
         ]
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
                 PropertySource.of("test", [(property): value] + values)
@@ -104,6 +107,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
         'my.property' | '${foo.bar[0]}'                                      | 'my.property' | Integer | 10
         'my.property' | '${USER}'                                            | 'my.property' | String  | System.getenv('USER')
         'my.property' | 'bolt://${NEO4J_HOST:localhost}:${NEO4J_PORT:32781}' | 'my.property' | String  | 'bolt://localhost:32781'
+        'my.property' | '${bar}'                                             | 'my.property' | Integer | 30
     }
 
 
@@ -126,7 +130,6 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.getProperty('my.property', Map).get() == [one: '10 + 50 + 10', two: '10', three: '10 + 20']
     }
 
-
     void "test resolve placeholders for properties"() {
         given:
         def values = [
@@ -145,5 +148,16 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
         resolver.getProperty('my.property', Properties).isPresent()
         resolver.getProperty('my.property', Properties).get() == properties
+    }
+
+    void "test map placeholder resolver"() {
+        given:
+        String template = "Hello \${foo}!"
+        Map<String, Object> parameters = [foo: "bar"]
+        PropertyResolver propertyResolver = new MapPropertyResolver(parameters)
+        DefaultPropertyPlaceholderResolver propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(propertyResolver)
+
+        expect:
+        propertyPlaceholderResolver.resolvePlaceholders(template).get() == "Hello bar!"
     }
 }
