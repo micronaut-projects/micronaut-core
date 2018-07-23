@@ -16,15 +16,13 @@
 
 package io.micronaut.core.annotation;
 
-import javax.annotation.Nullable;
 import java.lang.annotation.*;
 import java.lang.reflect.AnnotatedElement;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
 
 /**
- * Utility methods for annotations.
+ * Internal utility methods for annotations. For Internal and framework use only. Do not use in application code.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -79,23 +77,5 @@ public class AnnotationUtil {
             return ZERO_ANNOTATIONS;
         }
     };
-
-
-    /**
-     * Finds an annotation on the given class for the given type.
-     *
-     * @param annotations The annotations
-     * @param type        The annotation type
-     * @param <T>         The annotation generic type
-     * @return The annotation
-     */
-    public static <T extends Annotation> Optional<T> findAnnotation(Annotation[] annotations, @Nullable Class<T> type) {
-        if (type == null) {
-            return Optional.empty();
-        }
-        return (Optional<T>) Arrays.stream(annotations)
-            .filter(ann -> ann.annotationType() == type)
-            .findFirst();
-    }
 
 }
