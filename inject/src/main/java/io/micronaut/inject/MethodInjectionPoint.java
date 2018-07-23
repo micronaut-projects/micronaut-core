@@ -16,7 +16,6 @@
 
 package io.micronaut.inject;
 
-import io.micronaut.core.annotation.AnnotationSource;
 import io.micronaut.core.type.Executable;
 
 import java.lang.reflect.Method;
@@ -27,7 +26,7 @@ import java.lang.reflect.Method;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MethodInjectionPoint extends CallableInjectionPoint, Executable, AnnotationSource {
+public interface MethodInjectionPoint extends CallableInjectionPoint, Executable {
 
     /**
      * @return The setter to invoke to set said property

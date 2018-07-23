@@ -82,7 +82,18 @@ public class Qualifiers {
      * @return The qualifier
      */
     public static <T> Qualifier<T> byAnnotation(AnnotationMetadata metadata, Class<? extends Annotation> type) {
-        return byAnnotation(metadata, type.getName());
+        if (Type.class == type) {
+            Optional<Class> aClass = metadata.classValue(type);
+            if (aClass.isPresent()) {
+                return byType(aClass.get());
+            }
+        } else if (Named.class == type) {
+            Optional<String> value = metadata.getValue(type, String.class);
+            if (value.isPresent()) {
+                return byName(value.get());
+            }
+        }
+        return new AnnotationMetadataQualifier<>(metadata, type);
     }
 
     /**

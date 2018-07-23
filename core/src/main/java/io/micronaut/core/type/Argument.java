@@ -60,11 +60,6 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
     Class<T> getType();
 
     /**
-     * @return The qualifier or null if there is none
-     */
-    Annotation getQualifier();
-
-    /**
      * Whether the types are equivalent. The regular {@link Object#equals(Object)} implementation includes the argument
      * name within the comparison so this method offers a variation that just compares types.
      *
