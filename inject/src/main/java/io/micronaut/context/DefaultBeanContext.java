@@ -2356,11 +2356,6 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         @Override
-        public String getReplacesBeanTypeName() {
-            return null;
-        }
-
-        @Override
         public BeanDefinition<T> load() {
             return this;
         }

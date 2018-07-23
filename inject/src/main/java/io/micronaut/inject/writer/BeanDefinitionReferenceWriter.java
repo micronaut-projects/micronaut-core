@@ -22,7 +22,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import org.objectweb.asm.ClassWriter;
-import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
@@ -48,7 +47,6 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     private final String beanDefinitionName;
     private final String beanDefinitionClassInternalName;
     private final String beanDefinitionReferenceClassName;
-    private String replaceBeanName;
     private boolean contextScope = false;
     private boolean requiresMethodProcessing;
 
@@ -96,15 +94,6 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     }
 
     /**
-     * The name of the bean this bean replaces.
-     *
-     * @param replaceBeanName The replace bean name
-     */
-    public void setReplaceBeanName(String replaceBeanName) {
-        this.replaceBeanName = replaceBeanName;
-    }
-
-    /**
      * Sets whether the {@link BeanDefinition#requiresMethodProcessing()} returns true.
      *
      * @param shouldPreProcess True if they should be pre-processed
@@ -132,7 +121,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
 
         Type superType = Type.getType(AbstractBeanDefinitionReference.class);
         startClass(classWriter, beanDefinitionClassInternalName, superType);
-        Type beanType = getTypeReference(beanDefinitionName);
+        Type beanDefinitionType = getTypeReference(beanDefinitionName);
         writeAnnotationMetadataStaticInitializer(classWriter);
 
         GeneratorAdapter cv = startConstructor(classWriter);
@@ -156,9 +145,9 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         GeneratorAdapter loadMethod = startPublicMethodZeroArgs(classWriter, BeanDefinition.class, "load");
 
         // return new BeanDefinition()
-        loadMethod.newInstance(beanType);
+        loadMethod.newInstance(beanDefinitionType);
         loadMethod.dup();
-        loadMethod.invokeConstructor(beanType, METHOD_DEFAULT_CONSTRUCTOR);
+        loadMethod.invokeConstructor(beanDefinitionType, METHOD_DEFAULT_CONSTRUCTOR);
 
         // RETURN
         loadMethod.returnValue();
@@ -172,6 +161,18 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
             isContextScopeMethod.visitMaxs(1, 1);
         }
 
+        // start method: Class getBeanDefinitionType()
+        GeneratorAdapter getBeanDefinitionType = startPublicMethodZeroArgs(classWriter, Class.class, "getBeanDefinitionType");
+        getBeanDefinitionType.push(beanDefinitionType);
+        getBeanDefinitionType.returnValue();
+        getBeanDefinitionType.visitMaxs(2, 1);
+
+        // start method: Class getBeanType()
+        GeneratorAdapter getBeanType = startPublicMethodZeroArgs(classWriter, Class.class, "getBeanType");
+        getBeanType.push(getTypeReference(beanTypeName));
+        getBeanType.returnValue();
+        getBeanType.visitMaxs(2, 1);
+
         //noinspection Duplicates
         if (requiresMethodProcessing) {
             GeneratorAdapter requiresMethodProcessing = startPublicMethod(classWriter, "requiresMethodProcessing", boolean.class.getName());
@@ -183,17 +184,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
 
         writeGetAnnotationMetadataMethod(classWriter);
 
-        // start method: getReplacesBeanTypeName()
-        writeReplacementIfNecessary(classWriter, replaceBeanName, "getReplacesBeanTypeName");
         return classWriter;
     }
 
-    private void writeReplacementIfNecessary(ClassWriter classWriter, String replaceBeanName, String method) {
-        if (replaceBeanName != null) {
-            MethodVisitor getReplacesBeanTypeNameMethod = startPublicMethodZeroArgs(classWriter, String.class, method);
-            getReplacesBeanTypeNameMethod.visitLdcInsn(replaceBeanName);
-            getReplacesBeanTypeNameMethod.visitInsn(ARETURN);
-            getReplacesBeanTypeNameMethod.visitMaxs(1, 1);
-        }
-    }
 }
