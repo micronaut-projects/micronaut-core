@@ -1345,7 +1345,14 @@ public class DefaultBeanContext implements BeanContext {
             if (beanDefinition.isIterable()) {
                 Collection<BeanDefinition> beanCandidates = findBeanCandidates(beanDefinition.getBeanType(), null);
                 for (BeanDefinition beanCandidate : beanCandidates) {
-                    createAndRegisterSingleton(new DefaultBeanResolutionContext(this, beanDefinition), beanCandidate, beanCandidate.getBeanType(), null);
+                    DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(this, beanDefinition);
+
+                    createAndRegisterSingleton(
+                            resolutionContext,
+                            beanCandidate,
+                            beanCandidate.getBeanType(),
+                            null
+                    );
                 }
 
             } else {
