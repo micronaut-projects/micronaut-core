@@ -1271,7 +1271,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             path.pushFieldResolve(this, injectionPoint);
 
             try {
-                Qualifier qualifier = resolveQualifier(injectionPoint);
+                Qualifier qualifier = resolveQualifier(resolutionContext, injectionPoint);
                 @SuppressWarnings("unchecked") Object bean = ((DefaultBeanContext) context).getBean(resolutionContext, beanType, qualifier);
                 path.pop();
                 return bean;
@@ -1612,7 +1612,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             if (!genericType.isPresent()) {
                 throw new DependencyInjectionException(resolutionContext, injectionPoint, "Expected exactly 1 generic type for field");
             }
-            Qualifier qualifier = resolveQualifier(injectionPoint);
+            Qualifier qualifier = resolveQualifier(resolutionContext, injectionPoint);
             @SuppressWarnings("unchecked") B bean = (B) beanResolver.resolveBean(genericType.get(), qualifier);
             path.pop();
             return bean;
@@ -1625,16 +1625,8 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         return isConfigurationProperties;
     }
 
-    private Qualifier resolveQualifier(FieldInjectionPoint injectionPoint) {
-        Qualifier qualifier = null;
-        Annotation ann = injectionPoint.getQualifier();
-        if (ann == null) {
-            ann = injectionPoint.getDeclaredAnnotation(io.micronaut.context.annotation.Type.class);
-        }
-        if (ann != null) {
-            qualifier = Qualifiers.byAnnotation(ann);
-        }
-        return qualifier;
+    private Qualifier resolveQualifier(BeanResolutionContext resolutionContext, FieldInjectionPoint injectionPoint) {
+        return resolveQualifier(resolutionContext, injectionPoint.asArgument());
     }
 
     private Qualifier resolveQualifier(BeanResolutionContext resolutionContext, Argument argument) {
@@ -1649,7 +1641,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         }
 
         if (qualifier == null) {
-            Class<?>[] byType = annotationMetadata.getValue(Type.class, Class[].class).orElse(null);
+            Class<?>[] byType = annotationMetadata.hasDeclaredAnnotation(Type.class) ? annotationMetadata.getValue(Type.class, Class[].class).orElse(null) : null;
             if (byType != null) {
                 qualifier = Qualifiers.byType(byType);
             } else {

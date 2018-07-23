@@ -115,13 +115,6 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
     }
 
     @Override
-    public Annotation getQualifier() {
-        return annotationMetadata.getAnnotationTypeByStereotype(Qualifier.class)
-            .map(annotationMetadata::getAnnotation)
-            .orElse(null);
-    }
-
-    @Override
     public void set(T instance, Object object) {
         Field field = getField();
         try {
