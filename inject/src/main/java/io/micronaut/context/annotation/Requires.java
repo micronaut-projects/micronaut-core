@@ -104,7 +104,8 @@ public @interface Requires {
     String defaultValue() default "";
 
     /**
-     * Used in combination with {@link #property()} to express the required pattern of the property.
+     * Used in combination with {@link #property()} to express the required pattern of the property. The
+     * pattern will be evaluated with {@link String#matches(String)}.
      *
      * @return The required pattern
      */
