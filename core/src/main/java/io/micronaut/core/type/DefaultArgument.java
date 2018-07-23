@@ -20,7 +20,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 
-import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -43,38 +42,7 @@ class DefaultArgument<T> implements Argument<T> {
     private final AnnotatedElement annotatedElement;
     private final Map<String, Argument<?>> typeParameters;
     private final Argument[] typeParameterArray;
-    private Annotation qualifier;
 
-    /**
-     * @param type         The type
-     * @param name         The name
-     * @param qualifier    The qualifier
-     * @param annotations  The annotations
-     * @param genericTypes The generic types
-     */
-    DefaultArgument(Class<T> type, String name, Annotation qualifier, Annotation[] annotations, Argument... genericTypes) {
-        this.type = type;
-        this.name = name;
-        this.annotatedElement = createInternalElement(annotations);
-        this.qualifier = qualifier;
-        this.typeParameters = initializeTypeParameters(genericTypes);
-        this.typeParameterArray = genericTypes;
-    }
-
-    /**
-     * @param type         The type
-     * @param name         The name
-     * @param qualifier    The qualifier
-     * @param genericTypes The generic types
-     */
-    DefaultArgument(Class<T> type, String name, Annotation qualifier, Argument... genericTypes) {
-        this.type = type;
-        this.name = name;
-        this.annotatedElement = AnnotationUtil.EMPTY_ANNOTATED_ELEMENT;
-        this.qualifier = qualifier;
-        this.typeParameters = initializeTypeParameters(genericTypes);
-        this.typeParameterArray = genericTypes;
-    }
 
     /**
      * @param type               The type
@@ -86,11 +54,6 @@ class DefaultArgument<T> implements Argument<T> {
         this.type = type;
         this.name = name;
         this.annotatedElement = annotationMetadata != null ? annotationMetadata : AnnotationUtil.EMPTY_ANNOTATED_ELEMENT;
-        if (annotationMetadata != null) {
-            this.qualifier = annotationMetadata.getAnnotationTypeByStereotype("javax.inject.Qualifier")
-                .map(annotationMetadata::getAnnotation)
-                .orElse(null);
-        }
         this.typeParameters = initializeTypeParameters(genericTypes);
         this.typeParameterArray = genericTypes;
     }
@@ -190,22 +153,4 @@ class DefaultArgument<T> implements Argument<T> {
         return typeParameters;
     }
 
-    private AnnotatedElement createInternalElement(Annotation[] annotations) {
-        return new AnnotatedElement() {
-            @Override
-            public <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
-                return AnnotationUtil.findAnnotation(annotations, annotationClass).orElse(null);
-            }
-
-            @Override
-            public Annotation[] getAnnotations() {
-                return annotations;
-            }
-
-            @Override
-            public Annotation[] getDeclaredAnnotations() {
-                return annotations;
-            }
-        };
-    }
 }
