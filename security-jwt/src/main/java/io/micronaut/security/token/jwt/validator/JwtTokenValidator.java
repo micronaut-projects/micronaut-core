@@ -40,6 +40,7 @@ import javax.inject.Singleton;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
 
 /**
@@ -65,6 +66,17 @@ public class JwtTokenValidator implements TokenValidator {
                              Collection<EncryptionConfiguration> encryptionConfigurations) {
         this.signatureConfigurations.addAll(signatureConfigurations);
         this.encryptionConfigurations.addAll(encryptionConfigurations);
+    }
+
+    private boolean validateExpirationTime(JWTClaimsSet claimSet) {
+        final Date expTime = claimSet.getExpirationTime();
+        if (expTime != null) {
+            final Date now = new Date();
+            if (expTime.before(now)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private Publisher<Authentication> validatePlainJWT(JWT jwt) throws ParseException {
@@ -191,7 +203,12 @@ public class JwtTokenValidator implements TokenValidator {
             }
             return Flowable.empty();
         }
-
+        if (!validateExpirationTime(jwt.getJWTClaimsSet())) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("JWT expired");
+            }
+            return Flowable.empty();
+        }
         return Flowable.just(new AuthenticationJWTClaimsSetAdapter(claimSet));
     }
 }
