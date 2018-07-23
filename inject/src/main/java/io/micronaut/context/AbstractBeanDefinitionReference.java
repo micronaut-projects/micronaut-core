@@ -18,12 +18,10 @@ package io.micronaut.context;
 
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.exceptions.BeanInstantiationException;
+import io.micronaut.context.exceptions.BeanContextException;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
-import io.micronaut.inject.BeanFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -39,9 +37,7 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
     private static final Logger LOG = LoggerFactory.getLogger(AbstractBeanDefinitionReference.class);
     private final String beanTypeName;
     private final String beanDefinitionTypeName;
-    private Class beanDefinition;
     private Boolean present;
-    private Class beanType;
 
     /**
      * @param beanTypeName           The bean type name
@@ -60,50 +56,6 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
     @Override
     public String getName() {
         return beanTypeName;
-    }
-
-    /**
-     * @return The actual type of the component
-     */
-    @Override
-    public Class getBeanType() {
-        if (isPresent()) {
-            Class beanType = this.beanType;
-            if (beanType == null) {
-                synchronized (this) { // double check
-                    beanType = this.beanType;
-                    if (beanType == null) {
-                        beanType = GenericTypeUtils
-                                .resolveInterfaceTypeArgument(beanDefinition, BeanFactory.class)
-                                .orElse(null);
-                        this.beanType = beanType;
-                    }
-                }
-            }
-            return beanType;
-        }
-        return null;
-    }
-
-    @Override
-    public String getReplacesBeanTypeName() {
-        return null; // no replacement semantics by default
-    }
-
-    /**
-     * @return The loaded component definition
-     */
-    @Override
-    public BeanDefinition load() {
-        if ((present != null && present) || isPresent()) {
-            try {
-                return (BeanDefinition) beanDefinition.newInstance();
-            } catch (Throwable e) {
-                throw new BeanInstantiationException("Error loading bean definition [" + beanTypeName + "]: " + e.getMessage(), e);
-            }
-        } else {
-            throw new BeanInstantiationException("Cannot load bean for type [" + beanTypeName + "]. The type is not present on the classpath");
-        }
     }
 
     @Override
@@ -128,7 +80,20 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
     @Override
     public boolean isPresent() {
         if (present == null) {
-            loadType();
+            try {
+                getBeanDefinitionType();
+                getBeanType();
+                present = true;
+            } catch (Throwable e) {
+                if (e instanceof TypeNotPresentException || e instanceof ClassNotFoundException || e instanceof NoClassDefFoundError) {
+                    if (LOG.isTraceEnabled()) {
+                        LOG.trace("Bean definition for type [" + beanTypeName + "] not loaded since it is not on the classpath", e);
+                    }
+                } else {
+                    throw new BeanContextException("Unexpected error loading bean definition [" + beanDefinitionTypeName + "]: " + e.getMessage(), e);
+                }
+                present = false;
+            }
         }
         return present;
     }
@@ -162,19 +127,10 @@ public abstract class AbstractBeanDefinitionReference extends AbstractBeanContex
         return beanDefinitionTypeName.hashCode();
     }
 
-    private void loadType() {
-        if (present == null && beanDefinition == null) {
-
-            try {
-                beanDefinition = Class.forName(beanDefinitionTypeName, false, getClass().getClassLoader());
-                GenericTypeUtils.resolveInterfaceTypeArgument(beanDefinition, BeanFactory.class);
-                present = true;
-            } catch (TypeNotPresentException | ClassNotFoundException | NoClassDefFoundError e) {
-                if (LOG.isTraceEnabled()) {
-                    LOG.trace("Bean definition for type [" + beanTypeName + "] not loaded since it is not on the classpath", e);
-                }
-                present = false;
-            }
-        }
-    }
+    /**
+     * Implementors should provide an implementation of this method that returns the bean definition type.
+     *
+     * @return The bean definition type.
+     */
+    protected abstract Class<? extends BeanDefinition<?>> getBeanDefinitionType();
 }
