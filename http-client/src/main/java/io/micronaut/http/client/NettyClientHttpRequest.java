@@ -23,8 +23,8 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpParameters;
 import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.MutableHttpParameters;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
@@ -137,7 +137,7 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
     }
 
     @Override
-    public HttpParameters getParameters() {
+    public MutableHttpParameters getParameters() {
         NettyHttpParameters httpParameters = this.httpParameters;
         if (httpParameters == null) {
             synchronized (this) { // double check
