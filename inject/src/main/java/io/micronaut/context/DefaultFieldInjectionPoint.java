@@ -25,7 +25,6 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.FieldInjectionPoint;
 
 import javax.annotation.Nullable;
-import javax.inject.Qualifier;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.util.Objects;
