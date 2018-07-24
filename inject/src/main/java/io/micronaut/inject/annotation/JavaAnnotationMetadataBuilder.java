@@ -22,6 +22,7 @@ import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.annotation.Nullable;
 import javax.lang.model.element.AnnotationMirror;
+import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
@@ -50,6 +51,8 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<Element, AnnotationMirror> {
+
+    public static final Map<String, Map<Element, javax.lang.model.element.AnnotationValue>> ANNOTATION_DEFAULTS = new HashMap<>();
 
     private final Elements elementUtils;
 
@@ -177,6 +180,35 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
+    protected Map<? extends Element, ?> readAnnotationDefaultValues(AnnotationMirror annotationMirror) {
+        Map<String, Map<Element, javax.lang.model.element.AnnotationValue>> defaults = JavaAnnotationMetadataBuilder.ANNOTATION_DEFAULTS;
+
+        Element element = annotationMirror.getAnnotationType().asElement();
+        if (element instanceof  TypeElement) {
+            TypeElement annotationElement = (TypeElement) element;
+            String annotationName = annotationElement.getQualifiedName().toString();
+            if (!defaults.containsKey(annotationName)) {
+
+                Map<Element, AnnotationValue> defaultValues = new HashMap<>();
+                elementUtils.getAllMembers(annotationElement)
+                        .stream()
+                        .filter(member -> member.getEnclosingElement() == annotationElement)
+                        .filter(ExecutableElement.class::isInstance)
+                        .map(ExecutableElement.class::cast)
+                        .filter(executableElement -> executableElement.getDefaultValue() != null)
+                        .forEach(executableElement ->
+                                defaultValues.put(executableElement, executableElement.getDefaultValue())
+                        );
+
+                if (!defaultValues.isEmpty()) {
+                    defaults.put(annotationName, defaultValues);
+                }
+            }
+        }
+        return ANNOTATION_DEFAULTS.get(getAnnotationTypeName(annotationMirror));
+    }
+
+    @Override
     protected String getAnnotationTypeName(AnnotationMirror annotationMirror) {
         return JavaModelUtils.getClassName((TypeElement) annotationMirror.getAnnotationType().asElement());
     }
@@ -258,9 +290,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     private Optional<ExecutableElement> findOverridden(ExecutableElement executableElement, TypeElement supertype) {
         Stream<? extends Element> elements = supertype.getEnclosedElements().stream();
         return elements.filter(el -> el.getKind() == ElementKind.METHOD && el.getEnclosingElement().equals(supertype))
-            .map(el -> (ExecutableElement) el)
-            .filter(method -> elementUtils.overrides(executableElement, method, (TypeElement) method.getEnclosingElement()))
-            .findFirst();
+                .map(el -> (ExecutableElement) el)
+                .filter(method -> elementUtils.overrides(executableElement, method, (TypeElement) method.getEnclosingElement()))
+                .findFirst();
     }
 
     /**
