@@ -70,14 +70,14 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
 
     private static final org.objectweb.asm.commons.Method CONSTRUCTOR_ANNOTATION_VALUE = org.objectweb.asm.commons.Method.getMethod(
         ReflectionUtils.getRequiredInternalConstructor(
-            AnnotationValue.class,
+            io.micronaut.core.annotation.AnnotationValue.class,
             String.class
         )
     );
 
     private static final org.objectweb.asm.commons.Method CONSTRUCTOR_ANNOTATION_VALUE_AND_MAP = org.objectweb.asm.commons.Method.getMethod(
         ReflectionUtils.getRequiredInternalConstructor(
-            AnnotationValue.class,
+            io.micronaut.core.annotation.AnnotationValue.class,
             String.class,
             Map.class
         )
@@ -334,11 +334,11 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         } else if (value instanceof Number) {
             methodVisitor.push(((Number) value).intValue());
             pushBoxPrimitiveIfNecessary(ReflectionUtils.getPrimitiveType(value.getClass()), methodVisitor);
-        } else if (value instanceof AnnotationValue) {
-            AnnotationValue data = (AnnotationValue) value;
+        } else if (value instanceof io.micronaut.core.annotation.AnnotationValue) {
+            io.micronaut.core.annotation.AnnotationValue data = (io.micronaut.core.annotation.AnnotationValue) value;
             String annotationName = data.getAnnotationName();
             Map<CharSequence, Object> values = data.getValues();
-            Type annotationValueType = Type.getType(AnnotationValue.class);
+            Type annotationValueType = Type.getType(io.micronaut.core.annotation.AnnotationValue.class);
             methodVisitor.newInstance(annotationValueType);
             methodVisitor.dup();
             methodVisitor.push(annotationName);

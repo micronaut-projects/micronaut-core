@@ -371,7 +371,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         @Override
         public Object visitAnnotation(AnnotationMirror a, Object o) {
             if (a instanceof javax.lang.model.element.AnnotationValue) {
-                AnnotationValue value = readNestedAnnotationValue(a);
+                io.micronaut.core.annotation.AnnotationValue value = readNestedAnnotationValue(a);
                 annotationValues.put(memberName, value);
             }
             return null;
@@ -488,8 +488,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
             @Override
             public Object visitAnnotation(AnnotationMirror a, Object o) {
-                arrayType = AnnotationValue.class;
-                AnnotationValue annotationValue = readNestedAnnotationValue(a);
+                arrayType = io.micronaut.core.annotation.AnnotationValue.class;
+                io.micronaut.core.annotation.AnnotationValue annotationValue = readNestedAnnotationValue(a);
                 values.add(annotationValue);
                 return null;
             }

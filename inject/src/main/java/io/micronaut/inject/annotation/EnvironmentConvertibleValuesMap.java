@@ -60,16 +60,16 @@ class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
                 a[i] = doResolveIfNecessary(a[i], placeholderResolver);
             }
             return environment.convert(a, conversionContext);
-        } else if (value instanceof AnnotationValue[]) {
-            AnnotationValue[] annotationValues = (AnnotationValue[]) value;
+        } else if (value instanceof io.micronaut.core.annotation.AnnotationValue[]) {
+            io.micronaut.core.annotation.AnnotationValue[] annotationValues = (io.micronaut.core.annotation.AnnotationValue[]) value;
             for (int i = 0; i < annotationValues.length; i++) {
-                AnnotationValue annotationValue = annotationValues[i];
-                annotationValues[i] = new AnnotationValue(annotationValue.getAnnotationName(), new EnvironmentConvertibleValuesMap<>(annotationValue.getValues(), environment));
+                io.micronaut.core.annotation.AnnotationValue annotationValue = annotationValues[i];
+                annotationValues[i] = new io.micronaut.core.annotation.AnnotationValue(annotationValue.getAnnotationName(), new EnvironmentConvertibleValuesMap<>(annotationValue.getValues(), environment));
             }
             return environment.convert(annotationValues, conversionContext);
-        } else if (value instanceof AnnotationValue) {
-            AnnotationValue av = (AnnotationValue) value;
-            av = new AnnotationValue(av.getAnnotationName(), new EnvironmentConvertibleValuesMap<>(av.getValues(), environment));
+        } else if (value instanceof io.micronaut.core.annotation.AnnotationValue) {
+            io.micronaut.core.annotation.AnnotationValue av = (io.micronaut.core.annotation.AnnotationValue) value;
+            av = new io.micronaut.core.annotation.AnnotationValue(av.getAnnotationName(), new EnvironmentConvertibleValuesMap<>(av.getValues(), environment));
             return environment.convert(av, conversionContext);
         } else {
             return super.get(name, conversionContext);
