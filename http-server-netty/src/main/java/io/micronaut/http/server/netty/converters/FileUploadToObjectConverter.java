@@ -26,6 +26,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufInputStream;
 import io.netty.handler.codec.http.multipart.FileUpload;
 
+import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.Optional;
 
@@ -39,15 +40,17 @@ import java.util.Optional;
 public class FileUploadToObjectConverter implements TypeConverter<FileUpload, Object> {
 
     private final ConversionService conversionService;
-    private final MediaTypeCodecRegistry decoderRegistry;
+    private final Provider<MediaTypeCodecRegistry> decoderRegistryProvider;
 
     /**
-     * @param conversionService The conversion service
-     * @param decoderRegistry   The media type decoder registry
+     * @param conversionService       The conversion service
+     * @param decoderRegistryProvider The media type decoder registry provider
      */
-    protected FileUploadToObjectConverter(ConversionService conversionService, MediaTypeCodecRegistry decoderRegistry) {
+    protected FileUploadToObjectConverter(ConversionService conversionService,
+                                          //Prevent early initialization of the codecs
+                                          Provider<MediaTypeCodecRegistry> decoderRegistryProvider) {
         this.conversionService = conversionService;
-        this.decoderRegistry = decoderRegistry;
+        this.decoderRegistryProvider = decoderRegistryProvider;
     }
 
     @Override
@@ -61,7 +64,7 @@ public class FileUploadToObjectConverter implements TypeConverter<FileUpload, Ob
             ByteBuf byteBuf = object.getByteBuf();
             if (contentType != null) {
                 MediaType mediaType = new MediaType(contentType);
-                Optional<MediaTypeCodec> registered = decoderRegistry.findCodec(mediaType);
+                Optional<MediaTypeCodec> registered = decoderRegistryProvider.get().findCodec(mediaType);
                 if (registered.isPresent()) {
                     MediaTypeCodec decoder = registered.get();
                     Object val = decoder.decode(targetType, new ByteBufInputStream(byteBuf));
