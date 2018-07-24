@@ -22,6 +22,7 @@ import java.util.stream.Collectors;
  */
 @Singleton
 @Requires(beans = LoggersEndpoint.class)
+@Requires(classes = ch.qos.logback.classic.LoggerContext.class)
 public class LogbackLoggingSystem implements LoggingSystem {
 
     @Override
