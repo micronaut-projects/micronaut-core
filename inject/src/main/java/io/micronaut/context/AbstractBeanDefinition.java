@@ -772,7 +772,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             String valString = resolvePropertyValueName(resolutionContext, injectionPoint.getAnnotationMetadata(), argument, valueAnnStr);
             ApplicationContext applicationContext = (ApplicationContext) context;
             Class type = argument.getType();
-            boolean isConfigProps = type.getAnnotation(ConfigurationProperties.class) != null;
+            boolean isConfigProps = context.resolveMetadata(type).hasDeclaredStereotype(ConfigurationProperties.class);
             boolean result = isConfigProps || Map.class.isAssignableFrom(type) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
             if (!result && isConfigurationProperties()) {
                 String cliOption = resolveCliOption(argument.getName());
@@ -1178,7 +1178,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             String valString = resolvePropertyValueName(resolutionContext, injectionPoint, valueAnnVal);
             ApplicationContext applicationContext = (ApplicationContext) context;
             Class fieldType = injectionPoint.getType();
-            boolean isConfigProps = fieldType.getAnnotation(ConfigurationProperties.class) != null;
+            boolean isConfigProps = context.resolveMetadata(fieldType).hasDeclaredStereotype(ConfigurationProperties.class);
             boolean result = isConfigProps || Map.class.isAssignableFrom(fieldType) ? applicationContext.containsProperties(valString) : applicationContext.containsProperty(valString);
             if (!result && isConfigurationProperties()) {
                 String cliOption = resolveCliOption(injectionPoint.getName());
