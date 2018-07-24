@@ -26,7 +26,9 @@ import java.util.function.Function;
  * You should NOT perform any overly complex, blocking or slow conversions in implementations of this interface.
  * </p>
  * <p>
- * <p>If dependency injection is required, carefully consider what you inject. Databases and I/O bound interfaces are not good candidates.</p>
+ * <p>If dependency injection is required, carefully consider what you inject. Databases and I/O bound interfaces are not good candidates.
+ * In addition, injecting dependencies that may trigger the evaluation of beans that depend on configuration will cause problems because
+ * all type converters have not been registered yet.</p>
  *
  * @param <S> The source type
  * @param <T> The target type
