@@ -673,7 +673,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected final void injectBeanField(BeanResolutionContext resolutionContext, DefaultBeanContext context, int index, Object bean) {
         FieldInjectionPoint fieldInjectionPoint = fieldInjectionPoints.get(index);
-        boolean isInject = fieldInjectionPoint.getField().getAnnotation(Inject.class) != null;
+        boolean isInject = fieldInjectionPoint.getAnnotationMetadata().hasDeclaredAnnotation(Inject.class);
         try {
             Object value;
             if (isInject) {
@@ -975,7 +975,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     if (value.isPresent()) {
                         result = value.get();
                     } else {
-                        if (argument.getAnnotation(Nullable.class) != null) {
+                        if (argument.getAnnotationMetadata().hasDeclaredAnnotation(Nullable.class)) {
                             result = null;
                         } else {
                             throw new DependencyInjectionException(resolutionContext, conversionContext, prop);

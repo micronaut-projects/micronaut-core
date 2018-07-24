@@ -18,6 +18,7 @@ package io.micronaut.management.endpoint.processors;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
@@ -171,6 +172,7 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
         if (nonPathTypes.contains(argument.getType().getName())) {
             return false;
         }
-        return argument.getAnnotations().length == 0 || argument.getAnnotation(QueryValue.class) != null;
+        AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+        return annotationMetadata.isEmpty() || annotationMetadata.hasDeclaredAnnotation(QueryValue.class);
     }
 }

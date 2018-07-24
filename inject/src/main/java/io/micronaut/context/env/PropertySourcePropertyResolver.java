@@ -17,6 +17,7 @@
 package io.micronaut.context.env;
 
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.format.MapFormat;
@@ -280,8 +281,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     protected Properties resolveSubProperties(String name, Map<String, Object> entries, ArgumentConversionContext<?> conversionContext) {
         // special handling for maps for resolving sub keys
         Properties properties = new Properties();
-        MapFormat mapFormat = conversionContext.getAnnotation(MapFormat.class);
-        StringConvention keyConvention = mapFormat != null ? mapFormat.keyFormat() : StringConvention.RAW;
+        AnnotationMetadata annotationMetadata = conversionContext.getAnnotationMetadata();
+        StringConvention keyConvention = annotationMetadata.getValue(MapFormat.class, "keyFormat", StringConvention.class)
+                                                           .orElse(StringConvention.RAW);
         String prefix = name + '.';
         entries.entrySet().stream()
             .filter(map -> map.getKey().startsWith(prefix))
