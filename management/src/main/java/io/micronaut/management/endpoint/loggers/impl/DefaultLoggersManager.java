@@ -17,7 +17,7 @@ import java.util.stream.Collectors;
  */
 @Singleton
 @Requires(beans = LoggersEndpoint.class)
-public class RxLoggersManager implements LoggersManager<Map<String, Object>> {
+public class DefaultLoggersManager implements LoggersManager<Map<String, Object>> {
 
     @Override
     public Publisher<Map<String, Object>> getLoggers(LoggingSystem loggingSystem) {
