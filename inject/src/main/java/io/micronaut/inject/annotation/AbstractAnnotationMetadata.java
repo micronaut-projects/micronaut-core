@@ -156,19 +156,19 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
      * @param results The results
      * @param values The values
      */
-    protected final void addAnnotationValuesFromData(List<ConvertibleValues<Object>> results, Map<CharSequence, Object> values) {
+    protected final void addAnnotationValuesFromData(List<io.micronaut.core.annotation.AnnotationValue> results, Map<CharSequence, Object> values) {
         if (values != null) {
             Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
-            if (v instanceof AnnotationValue[]) {
-                AnnotationValue[] avs = (AnnotationValue[]) v;
-                for (AnnotationValue av : avs) {
-                    addValuesToResults(results, av.getConvertibleValues());
+            if (v instanceof io.micronaut.core.annotation.AnnotationValue[]) {
+                io.micronaut.core.annotation.AnnotationValue[] avs = (io.micronaut.core.annotation.AnnotationValue[]) v;
+                for (io.micronaut.core.annotation.AnnotationValue av : avs) {
+                    addValuesToResults(results, av);
                 }
             } else if (v instanceof Collection) {
                 Collection c = (Collection) v;
                 for (Object o : c) {
-                    if (o instanceof AnnotationValue) {
-                        addValuesToResults(results, ((AnnotationValue) o).getConvertibleValues());
+                    if (o instanceof io.micronaut.core.annotation.AnnotationValue) {
+                        addValuesToResults(results, ((io.micronaut.core.annotation.AnnotationValue) o));
                     }
                 }
             }
@@ -181,7 +181,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
      * @param results The results
      * @param values The values
      */
-    protected void addValuesToResults(List<ConvertibleValues<Object>> results, ConvertibleValues<Object> values) {
+    protected void addValuesToResults(List<io.micronaut.core.annotation.AnnotationValue> results, io.micronaut.core.annotation.AnnotationValue values) {
         results.add(values);
     }
 }

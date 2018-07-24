@@ -169,7 +169,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @param annotationType The annotation type
      * @return A list of values
      */
-    List<ConvertibleValues<Object>> getAnnotationValuesByType(Class<? extends Annotation> annotationType);
+    List<AnnotationValue> getAnnotationValuesByType(Class<? extends Annotation> annotationType);
 
     /**
      * Gets only declared annotation values by the given repeatable type.
@@ -177,7 +177,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @param annotationType The annotation type
      * @return A list of values
      */
-    List<ConvertibleValues<Object>> getDeclaredAnnotationValuesByType(Class<? extends Annotation> annotationType);
+    List<AnnotationValue> getDeclaredAnnotationValuesByType(Class<? extends Annotation> annotationType);
 
     /**
      * Return the default value for the given annotation member.
@@ -204,7 +204,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
     default <T> Optional<T> getValue(Class<? extends Annotation> annotation, String member, Class<T> requiredType) {
         Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
         if (repeatable != null) {
-            List<ConvertibleValues<Object>> values = getAnnotationValuesByType(annotation);
+            List<AnnotationValue> values = getAnnotationValuesByType(annotation);
             if (!values.isEmpty()) {
                 return values.iterator().next().get(member, requiredType);
             } else {
@@ -346,9 +346,9 @@ public interface AnnotationMetadata extends AnnotatedElement {
     default ConvertibleValues<Object> getValues(Class<? extends Annotation> annotation) {
         Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
         if (repeatable != null) {
-            List<ConvertibleValues<Object>> values = getAnnotationValuesByType(annotation);
+            List<AnnotationValue> values = getAnnotationValuesByType(annotation);
             if (!values.isEmpty()) {
-                return values.iterator().next();
+                return values.iterator().next().getConvertibleValues();
             } else {
                 //noinspection unchecked
                 return ConvertibleValues.EMPTY;
@@ -572,17 +572,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @return An {@link Optional} of the value
      */
     default Optional<Object> getValue(Class<? extends Annotation> annotation) {
-        Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
-        if (repeatable != null) {
-            List<ConvertibleValues<Object>> values = getAnnotationValuesByType(annotation);
-            if (!values.isEmpty()) {
-                return values.iterator().next().get("value", Object.class);
-            } else {
-                return Optional.empty();
-            }
-        } else {
-            return getValue(annotation.getName(), Object.class);
-        }
+        return getValue(annotation, AnnotationMetadata.VALUE_MEMBER, Object.class);
     }
 
     /**
@@ -594,17 +584,7 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @return An {@link Optional} of the value
      */
     default <T> Optional<T> getValue(Class<? extends Annotation> annotation, Class<T> requiredType) {
-        Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
-        if (repeatable != null) {
-            List<ConvertibleValues<Object>> values = getAnnotationValuesByType(annotation);
-            if (!values.isEmpty()) {
-                return values.iterator().next().get("value", requiredType);
-            } else {
-                return Optional.empty();
-            }
-
-        }
-        return getValue(annotation.getName(), requiredType);
+        return getValue(annotation, AnnotationMetadata.VALUE_MEMBER, requiredType);
     }
 
     /**

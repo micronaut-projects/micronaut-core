@@ -115,7 +115,7 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
             return Optional.ofNullable(requiredInputs.get(bodyArgument));
         } else {
             for (Argument argument : getArguments()) {
-                if (argument.getAnnotation(Body.class) != null) {
+                if (argument.getAnnotationMetadata().hasAnnotation(Body.class)) {
                     return Optional.of(argument);
                 }
             }

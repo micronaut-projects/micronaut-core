@@ -1178,10 +1178,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 if (finalRoute instanceof MethodBasedRouteMatch) {
                     final MethodBasedRouteMatch rm = (MethodBasedRouteMatch) finalRoute;
                     if (rm.hasAnnotation(Status.class)) {
-                        status = rm.getAnnotation(Status.class).value();
+                        status = rm.getValue(Status.class, HttpStatus.class).orElse(null);
                     }
                 }
-                response = HttpResponse.status(status).body(message);
+
+                if (status != null) {
+                    response = HttpResponse.status(status).body(message);
+                } else {
+                    response = HttpResponse.ok(message);
+                }
             }
         }
         return response;
