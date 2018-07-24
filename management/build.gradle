@@ -11,5 +11,5 @@ dependencies {
     testCompile "com.h2database:h2:1.4.196"
     testCompile "mysql:mysql-connector-java:6.0.6"
 
-    implementation "ch.qos.logback:logback-classic:1.2.3"
+    compileOnly "ch.qos.logback:logback-classic:1.2.3"
 }
