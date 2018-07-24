@@ -2,12 +2,12 @@ package io.micronaut.management.endpoint.loggers.impl;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.management.endpoint.loggers.*;
-import io.reactivex.Flowable;
 import io.reactivex.Single;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Default implementation of {@link LoggersManager}.
@@ -17,65 +17,57 @@ import java.util.*;
  */
 @Singleton
 @Requires(beans = LoggersEndpoint.class)
-public class RxLoggersManager
-        implements LoggersManager<Map<String, Object>> {
+public class RxLoggersManager implements LoggersManager<Map<String, Object>> {
 
     @Override
     public Publisher<Map<String, Object>> getLoggers(LoggingSystem loggingSystem) {
-        return Single.zip(getLoggers(loggingSystem.getLoggers()), getLogLevels(),
-                (loggers, levels) -> {
-                    Map<String, Object> data = new HashMap<>(2);
-                    data.put("loggers", loggers);
-                    data.put("levels", levels);
-                    return data;
-                })
-                .toFlowable();
+        Map<String, Object> data = new HashMap<>(2);
+
+        data.put("levels", getLogLevels());
+        data.put("loggers", getLoggerData(loggingSystem.getLoggers()));
+
+        return Single.just(data).toFlowable();
     }
 
     @Override
     public Publisher<Map<String, Object>> getLogger(LoggingSystem loggingSystem,
                                                     String name) {
-        return getLogger(loggingSystem.getLogger(name)).toFlowable();
+        return Single.just(getLoggerData(loggingSystem.getLogger(name)))
+                .toFlowable();
     }
 
     @Override
     public void setLogLevel(LoggingSystem loggingSystem, String name, LogLevel level) {
-        // TODO Make reactive?
         loggingSystem.setLogLevel(name, level);
     }
 
     /**
      * @param configurations The logger configurations
-     * @return A {@link Single} that wraps a Map
+     * @return A Map from logger name to logger configuration data
      */
-    protected static Single<Map<String, Object>> getLoggers(
+    protected static Map<String, Object> getLoggerData(
             Collection<LoggerConfiguration> configurations) {
-        Map<String, Object> loggers = new HashMap<>(configurations.size());
-
-        return Flowable
-                .fromIterable(configurations)
-                .collectInto(loggers, (map, configuration) ->
-                    map.put(configuration.getName(), configuration.getData())
-                );
+        return configurations
+                .stream()
+                .collect(Collectors.toMap(
+                        LoggerConfiguration::getName,
+                        LoggerConfiguration::getData));
     }
 
     /**
      * @param configuration The logger configuration
-     * @return A {@link Single} that wraps the configuration data
+     * @return The logger configuration data
      */
-    protected static Single<Map<String, Object>> getLogger(
+    protected static Map<String, Object> getLoggerData(
             LoggerConfiguration configuration) {
-        return Single.just(configuration.getData());
+        return configuration.getData();
     }
 
     /**
-     * @return A list with all {@link LogLevel} values as strings
+     * @return A list with all {@link LogLevel} values
      */
-    protected static Single<List<String>> getLogLevels() {
-        return Flowable
-                .fromArray(LogLevel.values())
-                .map(LogLevel::name)
-                .toList();
+    protected static List<LogLevel> getLogLevels() {
+        return Arrays.asList(LogLevel.values());
     }
 
 }
