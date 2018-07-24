@@ -18,6 +18,7 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
@@ -82,6 +83,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     Map<String, Map<CharSequence, Object>> allStereotypes;
     Map<String, List<String>> annotationsByStereotype;
 
+    private Map<Class, List<io.micronaut.core.annotation.AnnotationValue>> annotationValuesByType = new HashMap<>();
     // The following fields are used only at compile time, and
     // should not be used in any of the read methods
     private Map<String, String> repeated = null;
@@ -187,10 +189,13 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Override
     public List<io.micronaut.core.annotation.AnnotationValue> getAnnotationValuesByType(Class<? extends Annotation> annotationType) {
         if (annotationType != null) {
-            List<io.micronaut.core.annotation.AnnotationValue> results = resolveAnnotationValuesByType(annotationType, allAnnotations, allStereotypes);
-            if (results != null) {
-                return results;
-            }
+            return this.annotationValuesByType.computeIfAbsent(annotationType, aClass -> {
+                List<AnnotationValue> results = resolveAnnotationValuesByType(annotationType, allAnnotations, allStereotypes);
+                if (results != null) {
+                    return results;
+                }
+                return Collections.emptyList();
+            });
         }
         return Collections.emptyList();
     }
