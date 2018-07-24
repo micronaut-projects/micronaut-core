@@ -27,6 +27,7 @@ import io.reactivex.Single;
 
 import javax.annotation.Nullable;
 import javax.validation.constraints.NotBlank;
+import java.util.Map;
 
 /**
  * Exposes an {@link Endpoint} to manage loggers.
@@ -76,7 +77,7 @@ public class LoggersEndpoint {
      * @return the loggers as a {@link Single}
      */
     @Read
-    public Single loggers() {
+    public Single<Map<String, Object>> loggers() {
         return Single.fromPublisher(loggersManager.getLoggers(loggingSystem));
     }
 
@@ -85,7 +86,7 @@ public class LoggersEndpoint {
      * @return the {@link LogLevel} (both configured and effective) of the named logger
      */
     @Read
-    public Single logger(@QueryValue @NotBlank String name) {
+    public Single<Map<String, Object>> logger(@QueryValue @NotBlank String name) {
         return Single.fromPublisher(loggersManager.getLogger(loggingSystem, name));
     }
 
