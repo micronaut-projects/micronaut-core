@@ -11,6 +11,9 @@ import java.util.*;
 
 /**
  * Default implementation of {@link LoggersManager}.
+ *
+ * @author Matthew Moss
+ * @since 1.0
  */
 @Singleton
 @Requires(beans = LoggersEndpoint.class)

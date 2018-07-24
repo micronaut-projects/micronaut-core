@@ -16,6 +16,9 @@ import java.util.stream.Collectors;
 
 /**
  * An implementation of {@link LoggingSystem} that works with logback.
+ *
+ * @author Matthew Moss
+ * @since 1.0
  */
 @Singleton
 @Requires(beans = LoggersEndpoint.class)

@@ -22,6 +22,9 @@ package io.micronaut.management.endpoint.loggers;
  * Typically, a logging system may permit the log level to be null, representing
  * an unspecified log level. For {@link LoggingSystem} and the loggers endpoint,
  * we prefer to return the NOT_SPECIFIED pseudo-level instead of null.
+ *
+ * @author Matthew Moss
+ * @since 1.0
  */
 public enum LogLevel {
     ALL,
