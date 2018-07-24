@@ -587,7 +587,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     PropertySource.class.getName(),
                     AnnotationMetadata.VALUE_MEMBER,
                     Collections.singletonList(
-                            new io.micronaut.inject.annotation.AnnotationValue(
+                            new io.micronaut.core.annotation.AnnotationValue(
                                     Property.class.getName(),
                                     Collections.singletonMap(
                                             "name",
@@ -1078,7 +1078,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                     PropertySource.class.getName(),
                                     AnnotationMetadata.VALUE_MEMBER,
                                     Collections.singletonList(
-                                            new io.micronaut.inject.annotation.AnnotationValue(
+                                            new io.micronaut.core.annotation.AnnotationValue(
                                                     Property.class.getName(),
                                                     Collections.singletonMap(
                                                             "name",

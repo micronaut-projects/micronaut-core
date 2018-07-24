@@ -15,10 +15,9 @@
  */
 package io.micronaut.ast.groovy
 
-import io.micronaut.ast.groovy.utils.AstClassUtils
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.PropertySource
-import io.micronaut.inject.annotation.AnnotationValue
+import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata
 import io.micronaut.inject.configuration.ConfigurationMetadata
 import io.micronaut.inject.configuration.PropertyMetadata
@@ -43,8 +42,6 @@ import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
 import io.micronaut.ast.groovy.utils.PublicAbstractMethodVisitor
 import io.micronaut.ast.groovy.utils.PublicMethodVisitor
-import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
-import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Configuration
 import io.micronaut.context.annotation.ConfigurationBuilder
@@ -52,19 +49,15 @@ import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Context
 import io.micronaut.context.annotation.Executable
 import io.micronaut.context.annotation.Factory
-import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.annotation.Value
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Internal
-import io.micronaut.core.io.service.ServiceDefinition
-import io.micronaut.core.io.service.SoftServiceLoader
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.core.util.ArrayUtils
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AnnotationMetadataReference
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
 import io.micronaut.inject.processing.ProcessedTypes
-import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter
 import io.micronaut.inject.writer.BeanDefinitionVisitor

@@ -94,7 +94,7 @@ public @interface Requires {
     /**
      * Used in combination with {@link #property()} to express the required value of the property.
      *
-     * @return THe required value
+     * @return The required value
      */
     String value() default "";
 
@@ -102,6 +102,14 @@ public @interface Requires {
      * @return The default value if no value is specified
      */
     String defaultValue() default "";
+
+    /**
+     * Used in combination with {@link #property()} to express the required pattern of the property. The
+     * pattern will be evaluated with {@link String#matches(String)}.
+     *
+     * @return The required pattern
+     */
+    String pattern() default "";
 
     /**
      * Used in combination with {@link #sdk()}, {@link #configuration()}, {@link #classes()} or {@link #beans()} to

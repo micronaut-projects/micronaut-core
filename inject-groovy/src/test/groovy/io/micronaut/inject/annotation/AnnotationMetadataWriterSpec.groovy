@@ -150,9 +150,9 @@ class Test {
         metadata != null
         metadata.hasDeclaredAnnotation(Requirements)
         metadata.getValue(Requirements).get().size() == 2
-        metadata.getValue(Requirements).get()[0] instanceof AnnotationValue
+        metadata.getValue(Requirements).get()[0] instanceof io.micronaut.core.annotation.AnnotationValue
         metadata.getValue(Requirements).get()[0].values.get('property') == 'blah'
-        metadata.getValue(Requirements).get()[1] instanceof AnnotationValue
+        metadata.getValue(Requirements).get()[1] instanceof io.micronaut.core.annotation.AnnotationValue
         metadata.getValue(Requirements).get()[1].values.get('classes') == ['test.Test'] as Object[]
 
         when:

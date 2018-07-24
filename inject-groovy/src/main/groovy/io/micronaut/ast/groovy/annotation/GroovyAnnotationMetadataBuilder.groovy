@@ -19,7 +19,6 @@ import groovy.transform.CompileStatic
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
-import io.micronaut.inject.annotation.AnnotationValue
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.AnnotationNode
 import org.codehaus.groovy.ast.ClassHelper
@@ -146,7 +145,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             Class arrayType = Object.class
             for (exp in le.expressions) {
                 if (exp instanceof AnnotationConstantExpression) {
-                    arrayType = AnnotationValue
+                    arrayType = io.micronaut.core.annotation.AnnotationValue
                     AnnotationConstantExpression ann = (AnnotationConstantExpression) exp
                     AnnotationNode value = (AnnotationNode) ann.getValue()
                     converted.add(readNestedAnnotationValue(value))
