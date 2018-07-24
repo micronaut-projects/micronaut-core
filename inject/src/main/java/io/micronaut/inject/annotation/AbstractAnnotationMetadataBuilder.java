@@ -127,6 +127,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     protected abstract Object readAnnotationValue(String memberName, Object annotationValue);
 
+
+    /**
+     * Read the raw default annotation values from the given annotation.
+     *
+     * @param annotationMirror The annotation
+     * @return The values
+     */
+    protected abstract Map<? extends T, ?> readAnnotationDefaultValues(A annotationMirror);
+
     /**
      * Read the raw annotation values from the given annotation.
      *
@@ -204,6 +213,21 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         DefaultAnnotationMetadata metadata,
         boolean isDeclared) {
         String annotationName = getAnnotationTypeName(annotationMirror);
+
+        Map<? extends T, ?> elementDefaultValues = readAnnotationDefaultValues(annotationMirror);
+        if (elementDefaultValues != null) {
+            Map<CharSequence, Object> defaultValues = new LinkedHashMap<>();
+            for (Map.Entry<? extends T, ?> entry : elementDefaultValues.entrySet()) {
+                T member = entry.getKey();
+                String memberName = getAnnotationMemberName(member);
+                if (!defaultValues.containsKey(memberName)) {
+                    Object annotationValue = entry.getValue();
+                    readAnnotationRawValues(memberName, annotationValue, defaultValues);
+                }
+            }
+            metadata.addDefaultAnnotationValues(annotationName, defaultValues);
+        }
+
         List<String> parentAnnotations = new ArrayList<>();
         parentAnnotations.add(annotationName);
         Map<? extends T, ?> elementValues = readAnnotationRawValues(annotationMirror);
