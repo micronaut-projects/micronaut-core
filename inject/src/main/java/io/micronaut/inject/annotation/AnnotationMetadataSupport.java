@@ -16,6 +16,7 @@
 
 package io.micronaut.inject.annotation;
 
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.reflect.ClassUtils;
@@ -27,7 +28,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -109,7 +109,7 @@ class AnnotationMetadataSupport {
             }
             Map<String, Object> values = new HashMap<>(getDefaultValues(annotationClass));
             values.putAll(annotationValues.asMap());
-            int hashCode = calculateHashCode(values);
+            int hashCode = AnnotationUtil.calculateHashCode(values);
 
             Optional instantiated = InstantiationUtils.tryInstantiate(proxyClass.get(), (InvocationHandler) new AnnotationProxyHandler(hashCode, annotationClass, resolvedValues));
             if (instantiated.isPresent()) {
@@ -117,79 +117,6 @@ class AnnotationMetadataSupport {
             }
         }
         throw new AnnotationMetadataException("Failed to build annotation for type: " + annotationClass.getName());
-    }
-
-    /**
-     * Calculates the hash code.
-     *
-     * @param values The map to calculate values' hash code
-     * @return The hash code
-     */
-    @SuppressWarnings("MagicNumber")
-    static int calculateHashCode(Map<? extends CharSequence, Object> values) {
-        int hashCode = 0;
-
-        for (Map.Entry<? extends CharSequence, Object> member : values.entrySet()) {
-            Object value = member.getValue();
-
-            int nameHashCode = member.getKey().hashCode();
-
-            int valueHashCode =
-                !value.getClass().isArray() ? value.hashCode() :
-                    value.getClass() == boolean[].class ? Arrays.hashCode((boolean[]) value) :
-                        value.getClass() == byte[].class ? Arrays.hashCode((byte[]) value) :
-                            value.getClass() == char[].class ? Arrays.hashCode((char[]) value) :
-                                value.getClass() == double[].class ? Arrays.hashCode((double[]) value) :
-                                    value.getClass() == float[].class ? Arrays.hashCode((float[]) value) :
-                                        value.getClass() == int[].class ? Arrays.hashCode((int[]) value) :
-                                            value.getClass() == long[].class ? Arrays.hashCode(
-                                                (long[]) value
-                                            ) :
-                                                value.getClass() == short[].class ? Arrays
-                                                    .hashCode((short[]) value) :
-                                                    Arrays.hashCode((Object[]) value);
-
-            hashCode += 127 * nameHashCode ^ valueHashCode;
-        }
-
-        return hashCode;
-    }
-
-    /**
-     * @param o1 One object
-     * @param o2 Another object
-     * @return Whether both objects are equal
-     */
-    static boolean areEqual(Object o1, Object o2) {
-        return
-            !o1.getClass().isArray() ? o1.equals(o2) :
-                o1.getClass() == boolean[].class ? Arrays.equals((boolean[]) o1, (boolean[]) o2) :
-                    o1.getClass() == byte[].class ? Arrays.equals((byte[]) o1, (byte[]) o2) :
-                        o1.getClass() == char[].class ? Arrays.equals((char[]) o1, (char[]) o2) :
-                            o1.getClass() == double[].class ? Arrays.equals(
-                                (double[]) o1,
-                                (double[]) o2
-                            ) :
-                                o1.getClass() == float[].class ? Arrays.equals(
-                                    (float[]) o1,
-                                    (float[]) o2
-                                ) :
-                                    o1.getClass() == int[].class ? Arrays.equals(
-                                        (int[]) o1,
-                                        (int[]) o2
-                                    ) :
-                                        o1.getClass() == long[].class ? Arrays.equals(
-                                            (long[]) o1,
-                                            (long[]) o2
-                                        ) :
-                                            o1.getClass() == short[].class ? Arrays.equals(
-                                                (short[]) o1,
-                                                (short[]) o2
-                                            ) :
-                                                Arrays.equals(
-                                                    (Object[]) o1,
-                                                    (Object[]) o2
-                                                );
     }
 
     /**
@@ -241,7 +168,7 @@ class AnnotationMetadataSupport {
                 Object value = member.getValue();
                 Object otherValue = otherValues.get(member.getKey());
 
-                if (!areEqual(value, otherValue)) {
+                if (!AnnotationUtil.areEqual(value, otherValue)) {
                     return false;
                 }
             }

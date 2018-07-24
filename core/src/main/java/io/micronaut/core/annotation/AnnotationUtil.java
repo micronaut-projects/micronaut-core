@@ -23,7 +23,6 @@ import java.lang.annotation.*;
 import java.lang.reflect.AnnotatedElement;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 
 /**
  * Internal utility methods for annotations. For Internal and framework use only. Do not use in application code.
@@ -139,5 +138,80 @@ public class AnnotationUtil {
         } else {
             return StringUtils.internMapOf(values);
         }
+    }
+
+    /**
+     * Calculates the hash code of annotation values.
+     *
+     * @param values The map to calculate values' hash code
+     * @return The hash code
+     */
+    @SuppressWarnings("MagicNumber")
+    public static int calculateHashCode(Map<? extends CharSequence, Object> values) {
+        int hashCode = 0;
+
+        for (Map.Entry<? extends CharSequence, Object> member : values.entrySet()) {
+            Object value = member.getValue();
+
+            int nameHashCode = member.getKey().hashCode();
+
+            int valueHashCode =
+                !value.getClass().isArray() ? value.hashCode() :
+                    value.getClass() == boolean[].class ? Arrays.hashCode((boolean[]) value) :
+                        value.getClass() == byte[].class ? Arrays.hashCode((byte[]) value) :
+                            value.getClass() == char[].class ? Arrays.hashCode((char[]) value) :
+                                value.getClass() == double[].class ? Arrays.hashCode((double[]) value) :
+                                    value.getClass() == float[].class ? Arrays.hashCode((float[]) value) :
+                                        value.getClass() == int[].class ? Arrays.hashCode((int[]) value) :
+                                            value.getClass() == long[].class ? Arrays.hashCode(
+                                                (long[]) value
+                                            ) :
+                                                value.getClass() == short[].class ? Arrays
+                                                    .hashCode((short[]) value) :
+                                                    Arrays.hashCode((Object[]) value);
+
+            hashCode += 127 * nameHashCode ^ valueHashCode;
+        }
+
+        return hashCode;
+    }
+
+    /**
+     * Computes whether 2 annotation values are equal.
+     *
+     * @param o1 One object
+     * @param o2 Another object
+     * @return Whether both objects are equal
+     */
+    public static boolean areEqual(Object o1, Object o2) {
+        return
+            !o1.getClass().isArray() ? o1.equals(o2) :
+                o1.getClass() == boolean[].class ? Arrays.equals((boolean[]) o1, (boolean[]) o2) :
+                    o1.getClass() == byte[].class ? Arrays.equals((byte[]) o1, (byte[]) o2) :
+                        o1.getClass() == char[].class ? Arrays.equals((char[]) o1, (char[]) o2) :
+                            o1.getClass() == double[].class ? Arrays.equals(
+                                (double[]) o1,
+                                (double[]) o2
+                            ) :
+                                o1.getClass() == float[].class ? Arrays.equals(
+                                    (float[]) o1,
+                                    (float[]) o2
+                                ) :
+                                    o1.getClass() == int[].class ? Arrays.equals(
+                                        (int[]) o1,
+                                        (int[]) o2
+                                    ) :
+                                        o1.getClass() == long[].class ? Arrays.equals(
+                                            (long[]) o1,
+                                            (long[]) o2
+                                        ) :
+                                            o1.getClass() == short[].class ? Arrays.equals(
+                                                (short[]) o1,
+                                                (short[]) o2
+                                            ) :
+                                                Arrays.equals(
+                                                    (Object[]) o1,
+                                                    (Object[]) o2
+                                                );
     }
 }
