@@ -17,6 +17,7 @@ package io.micronaut.ast.groovy.annotation
 
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.Context
+import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.annotation.MultipleAlias
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
@@ -28,7 +29,6 @@ import io.micronaut.context.annotation.Primary
 import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.inject.annotation.AnnotationValue
 import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.ScopedProxy
 import spock.lang.Ignore
