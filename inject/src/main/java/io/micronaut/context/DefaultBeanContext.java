@@ -25,6 +25,7 @@ import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -244,11 +245,12 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     @Nonnull
     public AnnotationMetadata resolveMetadata(Class<?> type) {
-        Optional<? extends BeanDefinition<?>> candidate = findConcreteCandidate(type, null, false, false);
-        if (candidate.isPresent()) {
-            return candidate.get();
+        if (type == null) {
+            return AnnotationMetadata.EMPTY_METADATA;
+        } else {
+            Optional<? extends BeanDefinition<?>> candidate = findConcreteCandidate(type, null, false, false);
+            return candidate.map(AnnotationMetadataProvider::getAnnotationMetadata).orElse(AnnotationMetadata.EMPTY_METADATA);
         }
-        return AnnotationMetadata.EMPTY_METADATA;
     }
 
     @SuppressWarnings({"SuspiciousMethodCalls", "unchecked"})
