@@ -16,9 +16,9 @@
 
 package io.micronaut.management.endpoint.loggers;
 
-import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.QueryValue;
-import io.micronaut.http.hateos.JsonError;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.management.endpoint.Endpoint;
 import io.micronaut.management.endpoint.EndpointConfiguration;
 import io.micronaut.management.endpoint.Read;
@@ -93,18 +93,15 @@ public class LoggersEndpoint {
     /**
      * @param name The name of the logger to configure
      * @param configuredLevel The {@link LogLevel} to set on the named logger
-     * @return The {@link HttpResponse} with status code and message on error
      */
     @Write
-    public HttpResponse setLogLevel(@QueryValue @NotBlank String name,
-                                    @Nullable LogLevel configuredLevel) {
+    public void setLogLevel(@QueryValue @NotBlank String name,
+                            @Nullable LogLevel configuredLevel) {
         try {
             loggersManager.setLogLevel(loggingSystem, name,
                     configuredLevel != null ? configuredLevel : LogLevel.NOT_SPECIFIED);
-            return HttpResponse.ok();
         } catch (IllegalArgumentException ex) {
-            JsonError error = new JsonError(ex.getMessage());
-            return HttpResponse.badRequest(error);
+            throw new HttpStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
         }
     }
 
