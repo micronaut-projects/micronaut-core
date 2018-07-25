@@ -730,7 +730,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                         if (value.isPresent()) {
                             return value.get();
                         } else {
-                            if (argument.getDeclaredAnnotation(Nullable.class) != null) {
+                            if (argument.isDeclaredAnnotationPresent(Nullable.class)) {
                                 return null;
                             }
                             throw new DependencyInjectionException(resolutionContext, injectionPoint, conversionContext, valString);
@@ -917,7 +917,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         } else {
             BeanResolutionContext.Path path = resolutionContext.getPath();
             BeanResolutionContext.Segment current = path.peek();
-            boolean isNullable = argument.getDeclaredAnnotation(Nullable.class) != null;
+            boolean isNullable = argument.isDeclaredAnnotationPresent(Nullable.class);
             if (isNullable && current != null && current.getArgument().equals(argument)) {
                 return null;
             } else {
@@ -1115,7 +1115,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                         if (value.isPresent()) {
                             return value.get();
                         } else {
-                            if (fieldArgument.getDeclaredAnnotation(Nullable.class) != null) {
+                            if (fieldArgument.isDeclaredAnnotationPresent(Nullable.class)) {
                                 return null;
                             }
                             throw new DependencyInjectionException(resolutionContext, injectionPoint, "Error resolving field value [" + valString + "]. Property doesn't exist or cannot be converted");
@@ -1273,7 +1273,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 path.pop();
                 return bean;
             } catch (NoSuchBeanException e) {
-                if (injectionPoint.getDeclaredAnnotation(Nullable.class) != null) {
+                if (injectionPoint.isDeclaredAnnotationPresent(Nullable.class)) {
                     path.pop();
                     return null;
                 }
@@ -1433,7 +1433,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 path.pop();
                 return bean;
             } catch (NoSuchBeanException e) {
-                if (argument.getDeclaredAnnotation(Nullable.class) != null) {
+                if (argument.isDeclaredAnnotationPresent(Nullable.class)) {
                     path.pop();
                     return null;
                 }

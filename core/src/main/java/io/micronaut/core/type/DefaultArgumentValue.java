@@ -16,10 +16,10 @@
 
 package io.micronaut.core.type;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedElement;
 import java.util.Map;
 import java.util.Optional;
 
@@ -75,11 +75,6 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
     }
 
     @Override
-    public AnnotatedElement[] getAnnotatedElements() {
-        return argument.getAnnotatedElements();
-    }
-
-    @Override
     public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
         return argument.getAnnotation(annotationClass);
     }
@@ -102,5 +97,10 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
     @Override
     public int typeHashCode() {
         return argument.typeHashCode();
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return argument.getAnnotationMetadata();
     }
 }
