@@ -16,7 +16,7 @@
 
 package io.micronaut.core.convert;
 
-import io.micronaut.core.annotation.AnnotationSource;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.TypeVariableResolver;
 import io.micronaut.core.util.ArrayUtils;
@@ -36,7 +36,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ConversionContext extends AnnotationSource, TypeVariableResolver, ErrorsContext {
+public interface ConversionContext extends AnnotationMetadataProvider, TypeVariableResolver, ErrorsContext {
 
     /**
      * The default conversion context.
