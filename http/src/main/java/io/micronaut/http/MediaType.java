@@ -38,8 +38,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -273,7 +271,6 @@ public class MediaType implements CharSequence {
     private static final String SEMICOLON = ";";
 
     @SuppressWarnings("ConstantName")
-    private static final CompletableFuture<Map<String, String>> mediaTypeFileExtensionsFuture = CompletableFuture.supplyAsync(MediaType::loadMimeTypes);
     private static final Logger LOG = LoggerFactory.getLogger(MediaType.class);
     private static final String MIME_TYPES_FILE_NAME = "META-INF/http/mime.types";
     private static Map<String, String> mediaTypeFileExtensions;
@@ -566,7 +563,7 @@ public class MediaType implements CharSequence {
                 extensions = mediaTypeFileExtensions;
                 if (extensions == null) {
                     try {
-                        extensions = mediaTypeFileExtensionsFuture.get(5, TimeUnit.SECONDS);
+                        extensions = loadMimeTypes();
                         mediaTypeFileExtensions = extensions;
                     } catch (Exception e) {
                         mediaTypeFileExtensions = Collections.emptyMap();

@@ -286,9 +286,7 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                     return new PropertiesPropertySourceLoader();
                 case "yml":
                 case "yaml":
-                    if (ClassUtils.isPresent("org.yaml.snakeyaml.Yaml", YamlPropertySourceLoader.class.getClassLoader())) {
-                        return new YamlPropertySourceLoader();
-                    }
+                    return new YamlPropertySourceLoader();
                 default:
                     // no-op
             }
