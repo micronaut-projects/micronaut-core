@@ -591,14 +591,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected Object postConstruct(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
         DefaultBeanContext defaultContext = (DefaultBeanContext) context;
-        Collection<BeanInitializedEventListener> initializedEventListeners = defaultContext.getBeansOfType(resolutionContext, BeanInitializedEventListener.class, null);
+        Collection<BeanInitializedEventListener> initializedEventListeners = defaultContext.getBeansOfType(resolutionContext, BeanInitializedEventListener.class, Qualifiers.byTypeArguments(getBeanType()));
         for (BeanInitializedEventListener listener : initializedEventListeners) {
-            Optional<Class> targetType = GenericTypeUtils.resolveInterfaceTypeArgument(listener.getClass(), BeanInitializedEventListener.class);
-            if (!targetType.isPresent() || targetType.get().isInstance(bean)) {
-                bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));
-                if (bean == null) {
-                    throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
-                }
+            bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));
+            if (bean == null) {
+                throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
             }
         }
         for (int i = 0; i < methodInjectionPoints.size(); i++) {

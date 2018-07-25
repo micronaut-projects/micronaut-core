@@ -83,11 +83,11 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     Map<String, Map<CharSequence, Object>> allStereotypes;
     Map<String, List<String>> annotationsByStereotype;
 
-    private Map<Class, List<io.micronaut.core.annotation.AnnotationValue>> annotationValuesByType = new HashMap<>();
-    // The following fields are used only at compile time, and
     // should not be used in any of the read methods
+    // The following fields are used only at compile time, and
     Map<String, Map<CharSequence, Object>> annotationDefaultValues;
     private Map<String, String> repeated = null;
+    private Map<Class, List<io.micronaut.core.annotation.AnnotationValue>> annotationValuesByType = new HashMap<>();
 
     /**
      * Constructs empty annotation metadata.

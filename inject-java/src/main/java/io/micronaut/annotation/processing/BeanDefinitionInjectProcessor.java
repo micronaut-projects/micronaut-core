@@ -1218,7 +1218,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             if (configurationMetadata != null) {
                 // unfortunate we have to do this
                 String existingPrefix = annotationMetadata.getValue(
-                        "io.micronaut.management.endpoint.Endpoint",
+                        ConfigurationReader.class,
                         "prefix", String.class)
                         .orElse("");
 
