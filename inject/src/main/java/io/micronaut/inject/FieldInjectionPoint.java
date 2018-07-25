@@ -29,7 +29,7 @@ import java.lang.reflect.Field;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface FieldInjectionPoint<T> extends InjectionPoint, AnnotatedElement, AnnotationMetadataProvider {
+public interface FieldInjectionPoint<T> extends InjectionPoint, AnnotationMetadataProvider {
 
     /**
      * @return The name of the field

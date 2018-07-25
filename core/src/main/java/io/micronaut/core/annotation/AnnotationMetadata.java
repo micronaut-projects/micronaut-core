@@ -23,7 +23,6 @@ import io.micronaut.core.value.OptionalValues;
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
-import java.lang.reflect.AnnotatedElement;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -43,7 +42,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface AnnotationMetadata extends AnnotatedElement {
+public interface AnnotationMetadata extends AnnotationSource {
     /**
      * A constant for representing empty metadata.
      */
@@ -178,6 +177,22 @@ public interface AnnotationMetadata extends AnnotatedElement {
      * @return A list of values
      */
     List<AnnotationValue> getDeclaredAnnotationValuesByType(Class<? extends Annotation> annotationType);
+
+    /**
+     * @see AnnotationSource#isAnnotationPresent(Class)
+     */
+    @Override
+    default boolean isAnnotationPresent(Class<? extends Annotation> annotationClass) {
+        return hasAnnotation(annotationClass);
+    }
+
+    /**
+     * @see AnnotationSource#isAnnotationPresent(Class)
+     */
+    @Override
+    default boolean isDeclaredAnnotationPresent(Class<? extends Annotation> annotationClass) {
+        return hasDeclaredAnnotation(annotationClass);
+    }
 
     /**
      * Return the default value for the given annotation member.

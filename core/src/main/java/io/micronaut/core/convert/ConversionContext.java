@@ -17,14 +17,12 @@
 package io.micronaut.core.convert;
 
 import io.micronaut.core.annotation.AnnotationSource;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.TypeVariableResolver;
 import io.micronaut.core.util.ArrayUtils;
 
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedElement;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
@@ -70,11 +68,6 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
      */
     default Charset getCharset() {
         return StandardCharsets.UTF_8;
-    }
-
-    @Override
-    default AnnotatedElement[] getAnnotatedElements() {
-        return AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
     }
 
     /**
