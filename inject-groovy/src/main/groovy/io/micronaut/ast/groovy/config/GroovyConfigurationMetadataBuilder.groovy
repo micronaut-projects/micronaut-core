@@ -21,6 +21,7 @@ import io.micronaut.ast.groovy.utils.AstGenericUtils
 import io.micronaut.context.annotation.ConfigurationReader
 import io.micronaut.context.annotation.EachProperty
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.util.StringUtils
 import io.micronaut.inject.configuration.ConfigurationMetadataBuilder
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
@@ -79,7 +80,7 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
         AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(declaringType)
         return annotationMetadata.getValue(ConfigurationReader.class, String.class)
                 .map(pathEvaluationFunction(annotationMetadata)).orElseGet( {->
-            AnnotationMetadata ownerMetadata = AstAnnotationUtils.getAnnotationMetadata(owningType);
+            AnnotationMetadata ownerMetadata = AstAnnotationUtils.getAnnotationMetadata(owningType)
             return ownerMetadata.getValue(ConfigurationReader.class, String.class)
                                 .map(pathEvaluationFunction(ownerMetadata)).orElseThrow({ ->
                 new IllegalStateException("Non @ConfigurationProperties type visited")
@@ -92,8 +93,9 @@ class GroovyConfigurationMetadataBuilder extends ConfigurationMetadataBuilder<Cl
             if (annotationMetadata.hasDeclaredAnnotation(EachProperty.class)) {
                 return path + ".*"
             }
-            String prefix = annotationMetadata.getValue("io.micronaut.management.endpoint.Endpoint", "prefix", String.class).orElse(null)
-            if (prefix != null) {
+            String prefix = annotationMetadata.getValue(ConfigurationReader.class, "prefix", String.class)
+                    .orElse(null)
+            if (StringUtils.isNotEmpty(prefix)) {
                 return prefix + "." + path
             } else {
                 return path
