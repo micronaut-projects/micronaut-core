@@ -17,11 +17,9 @@
 package io.micronaut.context.env.yaml;
 
 import io.micronaut.context.env.AbstractPropertySourceLoader;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import org.yaml.snakeyaml.Yaml;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
 import java.util.Set;
@@ -34,11 +32,9 @@ import java.util.Set;
  */
 public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
 
-    private static final String YAML_CLASS_NAME = "org.yaml.snakeyaml.Yaml";
-
     @Override
     public boolean isEnabled() {
-        return ClassUtils.isPresent(YAML_CLASS_NAME, getClass().getClassLoader());
+        return isSnakeYamlPresent();
     }
 
     @Override
@@ -47,7 +43,7 @@ public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
     }
 
     @Override
-    protected void processInput(String name, InputStream input, Map<String, Object> finalMap) throws IOException {
+    protected void processInput(String name, InputStream input, Map<String, Object> finalMap) {
         Yaml yaml = new Yaml();
         Iterable<Object> objects = yaml.loadAll(input);
         for (Object object : objects) {
@@ -56,6 +52,15 @@ public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
                 String prefix = "";
                 processMap(finalMap, map, prefix);
             }
+        }
+    }
+
+    private static boolean isSnakeYamlPresent() {
+        try {
+            Class<Yaml> yamlClass = Yaml.class;
+            return true;
+        } catch (Throwable e) {
+            return false;
         }
     }
 

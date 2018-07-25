@@ -17,9 +17,7 @@
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationSource;
-import io.micronaut.core.annotation.AnnotationUtil;
 
-import java.lang.reflect.AnnotatedElement;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -63,11 +61,6 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationSource {
             @Override
             public Class<T1> getType() {
                 return type;
-            }
-
-            @Override
-            public AnnotatedElement[] getAnnotatedElements() {
-                return AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
             }
 
             @Override

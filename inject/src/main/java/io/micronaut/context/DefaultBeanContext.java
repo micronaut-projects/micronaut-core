@@ -28,7 +28,6 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.StreamSoftServiceLoader;
@@ -40,7 +39,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.StreamUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.slf4j.Logger;
@@ -2295,61 +2293,6 @@ public class DefaultBeanContext implements BeanContext {
         @Override
         public int hashCode() {
             return singletonClass.hashCode();
-        }
-
-        @Override
-        public boolean hasDeclaredAnnotation(String annotation) {
-            return false;
-        }
-
-        @Override
-        public boolean hasAnnotation(String annotation) {
-            return false;
-        }
-
-        @Override
-        public boolean hasStereotype(String annotation) {
-            return false;
-        }
-
-        @Override
-        public boolean hasDeclaredStereotype(String annotation) {
-            return false;
-        }
-
-        @Override
-        public List<String> getAnnotationNamesByStereotype(String stereotype) {
-            return Collections.emptyList();
-        }
-
-        @Override
-        public ConvertibleValues<Object> getValues(String annotation) {
-            return ConvertibleValues.empty();
-        }
-
-        @Override
-        public <T> OptionalValues<T> getValues(String annotation, Class<T> valueType) {
-            return OptionalValues.empty();
-        }
-
-        @Override
-        public <T> Optional<T> getDefaultValue(String annotation, String member, Class<T> requiredType) {
-            return Optional.empty();
-        }
-
-        @Override
-        public <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
-            return singletonClass.getAnnotation(annotationClass);
-        }
-
-        @Override
-        public Annotation[] getAnnotations() {
-            return singletonClass.getAnnotations();
-        }
-
-        @Override
-        public Annotation[] getDeclaredAnnotations() {
-            return singletonClass.getDeclaredAnnotations();
         }
 
         @Override

@@ -72,16 +72,7 @@ import javax.lang.model.type.TypeVariable;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.ElementScanner8;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.ServiceConfigurationError;
-import java.util.ServiceLoader;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -1227,7 +1218,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             if (configurationMetadata != null) {
                 // unfortunate we have to do this
                 String existingPrefix = annotationMetadata.getValue(
-                        "io.micronaut.management.endpoint.Endpoint",
+                        ConfigurationReader.class,
                         "prefix", String.class)
                         .orElse("");
 

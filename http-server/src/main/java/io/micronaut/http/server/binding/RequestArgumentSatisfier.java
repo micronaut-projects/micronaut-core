@@ -127,7 +127,7 @@ public class RequestArgumentSatisfier {
                     }
                 } else if (bindingResult.isPresentAndSatisfied()) {
                     value = bindingResult.get();
-                } else if (HttpMethod.requiresRequestBody(request.getMethod()) || argument.getDeclaredAnnotation(Nullable.class) != null) {
+                } else if (HttpMethod.requiresRequestBody(request.getMethod()) || argument.isDeclaredAnnotationPresent(Nullable.class)) {
                     value = (UnresolvedArgument) () -> {
                         ArgumentBinder.BindingResult result = argumentBinder.bind(conversionContext, request);
                         Optional<ConversionError> lastError = conversionContext.getLastError();

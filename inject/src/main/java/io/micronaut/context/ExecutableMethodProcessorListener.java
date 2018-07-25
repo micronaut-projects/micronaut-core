@@ -52,7 +52,7 @@ class ExecutableMethodProcessorListener implements BeanCreatedEventListener<Exec
             Class annotationType = targetAnnotation.get();
             Collection<BeanDefinition<?>> beanDefinitions = beanContext.getBeanDefinitions(Qualifiers.byStereotype(annotationType));
 
-            boolean isParallel = annotationType.getAnnotation(Parallel.class) != null;
+            boolean isParallel = annotationType.isAnnotationPresent(Parallel.class);
 
             if (isParallel) {
                 for (BeanDefinition<?> beanDefinition : beanDefinitions) {

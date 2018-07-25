@@ -90,11 +90,6 @@ class DefaultArgument<T> implements Argument<T> {
     }
 
     @Override
-    public AnnotatedElement[] getAnnotatedElements() {
-        return new AnnotatedElement[]{annotatedElement};
-    }
-
-    @Override
     public String getName() {
         return name;
     }

@@ -155,7 +155,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
             beanContext.getBeanRegistrations(Qualifiers.byStereotype(ConfigurationProperties.class));
         for (BeanRegistration<?> registration : registrations) {
             BeanDefinition<?> definition = registration.getBeanDefinition();
-            Optional<String> value = definition.getValue(ConfigurationReader.class, String.class);
+            Optional<String> value = definition.getValue(ConfigurationReader.class, "prefix", String.class);
             if (value.isPresent()) {
                 String configPrefix = value.get();
                 if (keySet.stream().anyMatch(key -> key.startsWith(configPrefix))) {

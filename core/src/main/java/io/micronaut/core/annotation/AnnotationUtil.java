@@ -16,7 +16,6 @@
 
 package io.micronaut.core.annotation;
 
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.lang.annotation.*;
@@ -111,7 +110,7 @@ public class AnnotationUtil {
      *
      * @param values The objects
      * @return An unmodifiable set of strings
-     * @see CollectionUtils#mapOf(Object...)
+     * @see io.micronaut.core.util.CollectionUtils#mapOf(Object...)
      */
     @SuppressWarnings("unused")
     public static Map<String, Object> internMapOf(Object... values) {

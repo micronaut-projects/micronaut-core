@@ -16,6 +16,7 @@
 
 package io.micronaut.http.server.binding.binders;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -46,8 +47,8 @@ public class HeaderAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<H
     @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> argument, HttpRequest<?> source) {
         ConvertibleMultiValues<String> parameters = source.getHeaders();
-        Header annotation = argument.getAnnotation(Header.class);
-        String parameterName = annotation.value();
+        AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+        String parameterName = annotationMetadata.getValue(Header.class, String.class).orElse(null);
         return doBind(argument, parameters, parameterName);
     }
 

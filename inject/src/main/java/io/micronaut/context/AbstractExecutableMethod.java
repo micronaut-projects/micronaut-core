@@ -18,7 +18,6 @@ package io.micronaut.context;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -28,8 +27,6 @@ import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 
 import javax.annotation.Nullable;
-import java.lang.reflect.AnnotatedElement;
-import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
@@ -206,20 +203,6 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
                 return (Class<Object>) genericReturnType.getType();
             } else {
                 return (Class<Object>) getTargetMethod().getReturnType();
-            }
-        }
-
-        @Override
-        public AnnotatedElement[] getAnnotatedElements() {
-            Method method = getTargetMethod();
-            if (method != null) {
-                return new AnnotatedElement[]{method.getAnnotatedReturnType(), method};
-            } else {
-                if (genericReturnType != null) {
-                    return genericReturnType.getAnnotatedElements();
-                } else {
-                    return AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
-                }
             }
         }
 
