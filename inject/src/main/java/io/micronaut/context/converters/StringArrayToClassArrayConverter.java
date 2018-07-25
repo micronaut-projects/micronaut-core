@@ -17,8 +17,8 @@
 package io.micronaut.context.converters;
 
 import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
-import io.micronaut.core.reflect.ClassUtils;
 
 import javax.inject.Singleton;
 import java.util.Arrays;
@@ -33,20 +33,20 @@ import java.util.Optional;
 @Singleton
 public class StringArrayToClassArrayConverter implements TypeConverter<Object[], Class[]> {
 
-    private final ClassLoader classLoader;
+    private final ConversionService<?> conversionService;
 
     /**
-     * @param classLoader The class loader
+     * @param conversionService The conversion service
      */
-    public StringArrayToClassArrayConverter(ClassLoader classLoader) {
-        this.classLoader = classLoader;
+    public StringArrayToClassArrayConverter(ConversionService<?> conversionService) {
+        this.conversionService = conversionService;
     }
 
     @Override
     public Optional<Class[]> convert(Object[] object, Class<Class[]> targetType, ConversionContext context) {
         Class[] classes = Arrays
             .stream(object)
-            .map(str -> ClassUtils.forName(str.toString(), classLoader))
+            .map(str -> conversionService.convert(str, Class.class))
             .filter(Optional::isPresent)
             .map(Optional::get)
             .toArray(Class[]::new);

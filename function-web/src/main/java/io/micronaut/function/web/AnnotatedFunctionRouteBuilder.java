@@ -88,11 +88,10 @@ public class AnnotatedFunctionRouteBuilder
     @SuppressWarnings("unchecked")
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        FunctionBean annotation = beanDefinition.getAnnotation(FunctionBean.class);
-        if (annotation != null) {
+        if (beanDefinition.hasAnnotation(FunctionBean.class)) {
             String methodName = method.getMethodName();
             Class<?> declaringType = method.getDeclaringType();
-            String functionName = annotation.value();
+            String functionName = beanDefinition.getValue(FunctionBean.class, String.class).orElse(methodName);
 
             UriRoute route = null;
             if (Stream.of(java.util.function.Function.class, Consumer.class, BiFunction.class, BiConsumer.class).anyMatch(type -> type.isAssignableFrom(declaringType))) {
@@ -103,7 +102,7 @@ public class AnnotatedFunctionRouteBuilder
                 String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
                 route = GET(functionPath, method);
             } else {
-                String functionMethod = annotation.method();
+                String functionMethod = beanDefinition.getValue(FunctionBean.class, "method", String.class).orElse(null);
                 if (StringUtils.isNotEmpty(functionMethod)) {
                     if (functionMethod.equals(methodName)) {
                         int argCount = method.getArguments().length;

@@ -18,7 +18,6 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import io.micronaut.core.annotation.AnnotationSource;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -36,7 +35,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Named, AnnotationMetadataProvider {
+public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMetadataProvider {
 
     /**
      * Constant representing zero arguments.
@@ -74,11 +73,6 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * @return The type hash code
      */
     int typeHashCode();
-
-    @Override
-    default AnnotatedElement[] getAnnotatedElements() {
-        return new AnnotatedElement[] { getAnnotationMetadata() };
-    }
 
     /**
      * Returns the string representation of the argument type, including generics.
@@ -245,6 +239,5 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
             return new DefaultArgument<>(type, type.getSimpleName(), AnnotationMetadata.EMPTY_METADATA, typeArguments);
         }
     }
-
 
 }

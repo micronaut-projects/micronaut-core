@@ -32,6 +32,7 @@ import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
@@ -88,7 +89,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private final AtomicBoolean running = new AtomicBoolean(false);
     private Collection<PropertySourceLoader> propertySourceLoaderList;
     private final Map<String, PropertySourceLoader> loaderByFormatMap = new ConcurrentHashMap<>();
-
+    private final Map<String, Boolean> presenceCache = new ConcurrentHashMap<>();
     private final AtomicBoolean reading = new AtomicBoolean(false);
 
     /**
@@ -141,10 +142,15 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             CharSequence.class, Class.class, new StringToClassConverter(classLoader)
         );
         conversionService.addConverter(
-            Object[].class, Class[].class, new StringArrayToClassArrayConverter(classLoader)
+            Object[].class, Class[].class, new StringArrayToClassArrayConverter(conversionService)
         );
         this.resourceLoader = resourceLoader;
         this.annotationScanner = createAnnotationScanner(classLoader);
+    }
+
+    @Override
+    public boolean isPresent(String className) {
+        return presenceCache.computeIfAbsent(className, s -> ClassUtils.isPresent(className, getClassLoader()));
     }
 
     @Override

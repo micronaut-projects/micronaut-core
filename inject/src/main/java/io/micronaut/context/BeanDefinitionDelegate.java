@@ -22,23 +22,11 @@ import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.value.OptionalValues;
 import io.micronaut.core.value.ValueResolver;
-import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.BeanFactory;
-import io.micronaut.inject.ConstructorInjectionPoint;
-import io.micronaut.inject.DelegatingBeanDefinition;
-import io.micronaut.inject.DisposableBeanDefinition;
-import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.FieldInjectionPoint;
-import io.micronaut.inject.InitializingBeanDefinition;
-import io.micronaut.inject.MethodInjectionPoint;
-import io.micronaut.inject.ParametrizedBeanFactory;
-import io.micronaut.inject.ValidatedBeanDefinition;
+import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.lang.annotation.Annotation;
@@ -247,66 +235,6 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
      */
     public void put(String name, Object value) {
         this.attributes.put(name, value);
-    }
-
-    @Override
-    public boolean hasDeclaredAnnotation(String annotation) {
-        return getTarget().hasDeclaredAnnotation(annotation);
-    }
-
-    @Override
-    public boolean hasAnnotation(String annotation) {
-        return getTarget().hasAnnotation(annotation);
-    }
-
-    @Override
-    public boolean hasStereotype(String annotation) {
-        return getTarget().hasStereotype(annotation);
-    }
-
-    @Override
-    public boolean hasDeclaredStereotype(String annotation) {
-        return getTarget().hasDeclaredStereotype(annotation);
-    }
-
-    @Override
-    public List<String> getAnnotationNamesByStereotype(String stereotype) {
-        return getTarget().getAnnotationNamesByStereotype(stereotype);
-    }
-
-    @Override
-    public ConvertibleValues<Object> getValues(String annotation) {
-        return getTarget().getValues(annotation);
-    }
-
-    @Override
-    public <T1> OptionalValues<T1> getValues(String annotation, Class<T1> valueType) {
-        return getTarget().getValues(annotation, valueType);
-    }
-
-    @Override
-    public <T> Optional<T> getDefaultValue(String annotation, String member, Class<T> requiredType) {
-        return getTarget().getDefaultValue(annotation, member, requiredType);
-    }
-
-    @Override
-    public <T> Optional<T> getDefaultValue(Class<? extends Annotation> annotation, String member, Class<T> requiredType) {
-        return getTarget().getDefaultValue(annotation, member, requiredType);
-    }
-
-    @Override
-    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        return getTarget().getAnnotation(annotationClass);
-    }
-
-    @Override
-    public Annotation[] getAnnotations() {
-        return getTarget().getAnnotations();
-    }
-
-    @Override
-    public Annotation[] getDeclaredAnnotations() {
-        return getTarget().getDeclaredAnnotations();
     }
 
     @Override

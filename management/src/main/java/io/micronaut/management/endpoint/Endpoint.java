@@ -20,7 +20,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.ConfigurationReader;
-import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Requires;
 
 import javax.inject.Singleton;

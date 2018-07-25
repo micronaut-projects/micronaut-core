@@ -18,6 +18,7 @@ package io.micronaut.ast.groovy
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.PropertySource
 import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.core.util.StringUtils
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata
 import io.micronaut.inject.configuration.ConfigurationMetadata
 import io.micronaut.inject.configuration.PropertyMetadata
@@ -474,6 +475,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         @Override
         protected void visitConstructorOrMethod(MethodNode methodNode, boolean isConstructor) {
+            if (methodNode.isSynthetic()) return
+
             String methodName = methodNode.name
             ClassNode declaringClass = methodNode.declaringClass
             AnnotationMetadata methodAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(methodNode)
@@ -1139,11 +1142,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     addError("Class annotated with groovy.lang.Singleton instead of javax.inject.Singleton. Import javax.inject.Singleton to use Micronaut Dependency Injection.", classNode)
                 }
                 if(configurationMetadata != null) {
+                    String existingPrefix = annotationMetadata.getValue(
+                            ConfigurationReader.class,
+                            "prefix", String.class)
+                            .orElse("")
+
                     annotationMetadata = DefaultAnnotationMetadata.mutateMember(
                             annotationMetadata,
                             ConfigurationReader.class.getName(),
                             "prefix",
-                            configurationMetadata.getName()
+                            StringUtils.isNotEmpty(existingPrefix) ? existingPrefix + "." + configurationMetadata.getName() : configurationMetadata.getName()
                     )
                 }
                 if (isProvider) {

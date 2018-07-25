@@ -20,6 +20,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.value.ValueResolver;
 
+import java.lang.annotation.Annotation;
 import java.util.*;
 
 /**
@@ -27,8 +28,9 @@ import java.util.*;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @param <A> The annotation type
  */
-public class AnnotationValue implements ValueResolver<CharSequence> {
+public class AnnotationValue<A extends Annotation> implements ValueResolver<CharSequence> {
 
     private final String annotationName;
     private final ConvertibleValues<Object> convertibleValues;

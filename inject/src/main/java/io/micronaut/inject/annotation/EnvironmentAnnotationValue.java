@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.ConvertibleValues;
 
+import java.lang.annotation.Annotation;
 import java.util.Optional;
 
 /**
@@ -28,8 +29,9 @@ import java.util.Optional;
  *
  * @author graemerocher
  * @since 1.0
+ * @param <A> The annotation type
  */
-class EnvironmentAnnotationValue extends AnnotationValue {
+class EnvironmentAnnotationValue<A extends Annotation> extends AnnotationValue<A> {
     private final ConvertibleValues<Object> convertibleValues;
 
     /**

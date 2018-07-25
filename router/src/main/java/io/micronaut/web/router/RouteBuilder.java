@@ -1058,8 +1058,7 @@ public interface RouteBuilder {
          * @return The URI to use
          */
         default String resolveUri(BeanDefinition<?> beanDefinition) {
-            Controller annotation = beanDefinition.getAnnotation(Controller.class);
-            String uri = annotation != null ? annotation.value() : null;
+            String uri = beanDefinition.getValue(Controller.class, String.class).orElse(null);
             if (uri != null) {
                 int len = uri.length();
                 if (len == 1 && uri.charAt(0) == '/') {

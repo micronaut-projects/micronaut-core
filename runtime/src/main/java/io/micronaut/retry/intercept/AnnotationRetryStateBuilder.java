@@ -17,7 +17,7 @@
 package io.micronaut.retry.intercept;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.type.Argument;
 import io.micronaut.retry.RetryState;
 import io.micronaut.retry.RetryStateBuilder;
@@ -56,7 +56,8 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
 
     @Override
     public RetryState build() {
-        ConvertibleValues<?> retry = annotationMetadata.getValues(Retryable.class);
+        AnnotationValue<Retryable> retry = annotationMetadata.getValues(Retryable.class)
+                                                             .orElseThrow(() -> new IllegalStateException("Missing @Retryable annotation"));
         int attempts = retry.get(ATTEMPTS, Integer.class).orElse(DEFAULT_RETRY_ATTEMPTS);
         Duration delay = retry.get(DELAY, Duration.class).orElse(Duration.ofSeconds(1));
         Set<Class<? extends Throwable>> includes = resolveIncludes(retry, INCLUDES);
@@ -73,7 +74,7 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
     }
 
     @SuppressWarnings("unchecked")
-    private Set<Class<? extends Throwable>> resolveIncludes(ConvertibleValues<?> retry, String includes) {
+    private Set<Class<? extends Throwable>> resolveIncludes(AnnotationValue<Retryable> retry, String includes) {
         return retry
             .get(includes, Argument.of(Set.class, Argument.of(Class.class, Throwable.class)))
             .orElse(Collections.emptySet());

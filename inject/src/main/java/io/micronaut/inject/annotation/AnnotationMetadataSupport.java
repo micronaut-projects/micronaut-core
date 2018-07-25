@@ -19,9 +19,10 @@ package io.micronaut.inject.annotation;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
@@ -34,7 +35,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.Function;
 
 /**
  * Support method for {@link io.micronaut.core.annotation.AnnotationMetadata}.
@@ -54,8 +54,7 @@ class AnnotationMetadataSupport {
      */
     @SuppressWarnings("unchecked")
     static Map<String, Object> getDefaultValues(String annotation) {
-        Optional<Class> cls = ClassUtils.forName(annotation, AnnotationMetadataSupport.class.getClassLoader());
-        return cls.map((Function<Class, Map>) AnnotationMetadataSupport::getDefaultValues).orElseGet(Collections::emptyMap);
+        return ANNOTATION_DEFAULTS.computeIfAbsent(annotation, s -> Collections.EMPTY_MAP);
     }
 
     /**
@@ -64,17 +63,29 @@ class AnnotationMetadataSupport {
      */
     @SuppressWarnings("unchecked")
     static Map<String, Object> getDefaultValues(Class<? extends Annotation> annotation) {
-        return ANNOTATION_DEFAULTS.computeIfAbsent(annotation.getName().intern(), aClass -> {
-            Map<String, Object> defaultValues = new LinkedHashMap<>();
-            Method[] declaredMethods = annotation.getDeclaredMethods();
-            for (Method declaredMethod : declaredMethods) {
-                Object defaultValue = declaredMethod.getDefaultValue();
-                if (defaultValue != null) {
-                    defaultValues.put(declaredMethod.getName().intern(), defaultValue);
-                }
-            }
-            return defaultValues;
-        });
+        return getDefaultValues(annotation.getName());
+    }
+
+    /**
+     * Whether default values for the given annotation are present.
+     *
+     * @param annotation The annotation
+     * @return True if they are
+     */
+    static boolean hasDefaultValues(String annotation) {
+        return ANNOTATION_DEFAULTS.containsKey(annotation);
+    }
+
+    /**
+     * Registers default values for the given annotation and values.
+     *
+     * @param annotation The annotation
+     * @param defaultValues The default values
+     */
+    static void registerDefaultValues(String annotation, Map<String, Object> defaultValues) {
+        if (StringUtils.isNotEmpty(annotation) && CollectionUtils.isNotEmpty(defaultValues)) {
+            ANNOTATION_DEFAULTS.put(annotation.intern(), defaultValues);
+        }
     }
 
     /**

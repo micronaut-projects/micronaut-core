@@ -52,6 +52,9 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
         this.elements = elements;
         this.annotationUtils = new AnnotationUtils(elements);
         this.modelUtils = new ModelUtils(elements, types);
+        // ensure initialization
+        annotationUtils.getAnnotationMetadata(elements.getTypeElement(ConfigurationReader.class.getName()));
+        annotationUtils.getAnnotationMetadata(elements.getTypeElement(EachProperty.class.getName()));
     }
 
     /**
@@ -114,8 +117,8 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
                     return ownerMetadata
                         .getValue(ConfigurationReader.class, String.class)
                         .map(pathEvaluationFunctionForMetadata(ownerMetadata))
-                        .orElseThrow(() ->
-                            new IllegalStateException("Non @ConfigurationProperties type visited")
+                        .orElseGet(() ->
+                            pathEvaluationFunctionForMetadata(annotationMetadata).apply("")
                         );
                 }
 
