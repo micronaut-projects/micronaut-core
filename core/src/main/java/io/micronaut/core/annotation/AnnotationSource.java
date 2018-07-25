@@ -18,7 +18,6 @@ package io.micronaut.core.annotation;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedElement;
-import java.util.*;
 
 /**
  * Subclass of {@link AnnotatedElement} that provides default implementations.

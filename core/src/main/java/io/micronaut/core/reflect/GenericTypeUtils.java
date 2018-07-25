@@ -16,7 +16,6 @@
 
 package io.micronaut.core.reflect;
 
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArrayUtils;
 
 import java.lang.reflect.Field;
@@ -34,7 +33,6 @@ import java.util.Set;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Internal
 public class GenericTypeUtils {
 
 
@@ -123,6 +121,21 @@ public class GenericTypeUtils {
     }
 
     /**
+     * Resolves the type arguments for a generic type.
+     *
+     * @param genericType The generic type
+     * @return The type arguments
+     */
+    public static Class[] resolveTypeArguments(Type genericType) {
+        Class[] typeArguments = ReflectionUtils.EMPTY_CLASS_ARRAY;
+        if (genericType instanceof ParameterizedType) {
+            ParameterizedType pt = (ParameterizedType) genericType;
+            typeArguments = resolveParameterizedType(pt);
+        }
+        return typeArguments;
+    }
+
+    /**
      * Resolves a single type argument from the given interface of the given class. Also
      * searches superclasses.
      *
@@ -181,21 +194,6 @@ public class GenericTypeUtils {
             }
         }
         return Optional.empty();
-    }
-
-    /**
-     * Resolves the type arguments for a generic type.
-     *
-     * @param genericType The generic type
-     * @return The type arguments
-     */
-    private static Class[] resolveTypeArguments(Type genericType) {
-        Class[] typeArguments = ReflectionUtils.EMPTY_CLASS_ARRAY;
-        if (genericType instanceof ParameterizedType) {
-            ParameterizedType pt = (ParameterizedType) genericType;
-            typeArguments = resolveParameterizedType(pt);
-        }
-        return typeArguments;
     }
 
     /**

@@ -142,7 +142,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             CharSequence.class, Class.class, new StringToClassConverter(classLoader)
         );
         conversionService.addConverter(
-            Object[].class, Class[].class, new StringArrayToClassArrayConverter(classLoader)
+            Object[].class, Class[].class, new StringArrayToClassArrayConverter(conversionService)
         );
         this.resourceLoader = resourceLoader;
         this.annotationScanner = createAnnotationScanner(classLoader);
