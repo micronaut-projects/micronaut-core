@@ -16,7 +16,6 @@
 
 package io.micronaut.core.annotation;
 
-import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.value.OptionalValues;
 
 import javax.annotation.Nullable;
@@ -103,7 +102,7 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default ConvertibleValues<Object> getValues(Class<? extends Annotation> annotation) {
+    default <T extends Annotation> Optional<AnnotationValue<T>> getValues(Class<T> annotation) {
         return getAnnotationMetadata().getValues(annotation);
     }
 
@@ -293,7 +292,7 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default ConvertibleValues<Object> getValues(String annotation) {
+    default <T extends Annotation> Optional<AnnotationValue<T>> getValues(String annotation) {
         return getAnnotationMetadata().getValues(annotation);
     }
 
@@ -303,7 +302,7 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default ConvertibleValues<Object> getDeclaredValues(String annotation) {
+    default <T extends Annotation> Optional<AnnotationValue<T>> getDeclaredValues(String annotation) {
         return getAnnotationMetadata().getValues(annotation);
     }
 
@@ -328,12 +327,12 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default List<AnnotationValue> getAnnotationValuesByType(Class<? extends Annotation> annotationType) {
+    default <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(Class<T> annotationType) {
         return getAnnotationMetadata().getAnnotationValuesByType(annotationType);
     }
 
     @Override
-    default List<AnnotationValue> getDeclaredAnnotationValuesByType(Class<? extends Annotation> annotationType) {
+    default <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(Class<T> annotationType) {
         return getAnnotationMetadata().getDeclaredAnnotationValuesByType(annotationType);
     }
 

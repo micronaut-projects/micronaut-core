@@ -23,7 +23,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.core.convert.value.ConvertibleValuesMap;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -87,7 +86,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     // The following fields are used only at compile time, and
     Map<String, Map<CharSequence, Object>> annotationDefaultValues;
     private Map<String, String> repeated = null;
-    private Map<Class, List<io.micronaut.core.annotation.AnnotationValue>> annotationValuesByType = new HashMap<>();
+    private Map<Class, List> annotationValuesByType = new HashMap<>();
 
     /**
      * Constructs empty annotation metadata.
@@ -125,7 +124,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
         final boolean isRepeatable = repeatable != null;
         if (isRepeatable) {
-            List<io.micronaut.core.annotation.AnnotationValue> values = getAnnotationValuesByType(annotation);
+            List<? extends AnnotationValue<? extends Annotation>> values = getAnnotationValuesByType(annotation);
             if (!values.isEmpty()) {
                 return values.iterator().next().get(member, requiredType);
             } else {
@@ -173,25 +172,12 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return Optional.empty();
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public List<io.micronaut.core.annotation.AnnotationValue> getDeclaredAnnotationValuesByType(Class<? extends Annotation> annotationType) {
-        if (annotationType != null) {
-            Map<String, Map<CharSequence, Object>> sourceAnnotations = this.declaredAnnotations;
-            Map<String, Map<CharSequence, Object>> sourceStereotypes = this.declaredStereotypes;
-
-            List<io.micronaut.core.annotation.AnnotationValue> results = resolveAnnotationValuesByType(annotationType, sourceAnnotations, sourceStereotypes);
-            if (results != null) {
-                return results;
-            }
-        }
-        return Collections.emptyList();
-    }
-
-    @Override
-    public List<io.micronaut.core.annotation.AnnotationValue> getAnnotationValuesByType(Class<? extends Annotation> annotationType) {
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(Class<T> annotationType) {
         if (annotationType != null) {
             return this.annotationValuesByType.computeIfAbsent(annotationType, aClass -> {
-                List<AnnotationValue> results = resolveAnnotationValuesByType(annotationType, allAnnotations, allStereotypes);
+                List<AnnotationValue<T>> results = resolveAnnotationValuesByType(annotationType, allAnnotations, allStereotypes);
                 if (results != null) {
                     return results;
                 }
@@ -201,12 +187,26 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         return Collections.emptyList();
     }
 
+    @Override
+    public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(Class<T> annotationType) {
+        if (annotationType != null) {
+            Map<String, Map<CharSequence, Object>> sourceAnnotations = this.declaredAnnotations;
+            Map<String, Map<CharSequence, Object>> sourceStereotypes = this.declaredStereotypes;
+
+            List<AnnotationValue<T>> results = resolveAnnotationValuesByType(annotationType, sourceAnnotations, sourceStereotypes);
+            if (results != null) {
+                return results;
+            }
+        }
+        return Collections.emptyList();
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public <T extends Annotation> T[] getAnnotationsByType(Class<T> annotationClass) {
 
         if (annotationClass != null) {
-            List<io.micronaut.core.annotation.AnnotationValue> values = getAnnotationValuesByType(annotationClass);
+            List<AnnotationValue<T>> values = getAnnotationValuesByType(annotationClass);
 
             return values.stream()
                         .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries.getConvertibleValues()))
@@ -220,7 +220,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Override
     public <T extends Annotation> T[] getDeclaredAnnotationsByType(Class<T> annotationClass) {
         if (annotationClass != null) {
-            List<io.micronaut.core.annotation.AnnotationValue> values = getAnnotationValuesByType(annotationClass);
+            List<AnnotationValue<T>> values = getAnnotationValuesByType(annotationClass);
 
             return values.stream()
                     .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, entries.getConvertibleValues()))
@@ -322,30 +322,36 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @SuppressWarnings("Duplicates")
     @Override
-    public ConvertibleValues<Object> getValues(String annotation) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> getValues(String annotation) {
         if (allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
             Map<CharSequence, Object> values = allAnnotations.get(annotation);
             if (values != null) {
-                return convertibleValuesOf(values);
+                return Optional.of(new AnnotationValue<>(annotation, values));
             } else if (allStereotypes != null) {
-                return convertibleValuesOf(allStereotypes.get(annotation));
+                values = allStereotypes.get(annotation);
+                if (values != null) {
+                    return Optional.of(new AnnotationValue<>(annotation, values));
+                }
             }
         }
-        return ConvertibleValuesMap.empty();
+        return Optional.empty();
     }
 
     @SuppressWarnings("Duplicates")
     @Override
-    public ConvertibleValues<Object> getDeclaredValues(String annotation) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> getDeclaredValues(String annotation) {
         if (declaredAnnotations != null && StringUtils.isNotEmpty(annotation)) {
             Map<CharSequence, Object> values = declaredAnnotations.get(annotation);
             if (values != null) {
-                return convertibleValuesOf(values);
+                return Optional.of(new AnnotationValue<>(annotation, values));
             } else if (declaredStereotypes != null) {
-                return convertibleValuesOf(declaredStereotypes.get(annotation));
+                values = declaredStereotypes.get(annotation);
+                if (values != null) {
+                    return Optional.of(new AnnotationValue<>(annotation, values));
+                }
             }
         }
-        return ConvertibleValuesMap.empty();
+        return Optional.empty();
     }
 
     @Override
@@ -665,12 +671,12 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         System.out.println("annotationsByStereotype = " + annotationsByStereotype);
     }
 
-    private List<io.micronaut.core.annotation.AnnotationValue> resolveAnnotationValuesByType(Class<? extends Annotation> annotationType, Map<String, Map<CharSequence, Object>> sourceAnnotations, Map<String, Map<CharSequence, Object>> sourceStereotypes) {
+    private <T extends Annotation> List<io.micronaut.core.annotation.AnnotationValue<T>> resolveAnnotationValuesByType(Class<T> annotationType, Map<String, Map<CharSequence, Object>> sourceAnnotations, Map<String, Map<CharSequence, Object>> sourceStereotypes) {
         Repeatable repeatable = annotationType.getAnnotation(Repeatable.class);
         if (repeatable != null) {
             Class<? extends Annotation> repeatableType = repeatable.value();
             if (hasStereotype(repeatableType)) {
-                List<io.micronaut.core.annotation.AnnotationValue> results = new ArrayList<>();
+                List<io.micronaut.core.annotation.AnnotationValue<T>> results = new ArrayList<>();
                 if (sourceAnnotations != null) {
                     Map<CharSequence, Object> values = sourceAnnotations.get(repeatableType.getName());
                     addAnnotationValuesFromData(results, values);

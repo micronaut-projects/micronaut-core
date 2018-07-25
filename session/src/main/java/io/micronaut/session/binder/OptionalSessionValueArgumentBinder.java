@@ -62,12 +62,8 @@ public class OptionalSessionValueArgumentBinder implements TypedRequestArgumentB
             return ArgumentBinder.BindingResult.UNSATISFIED;
         }
 
-        SessionValue annotation = context.getAnnotation(SessionValue.class);
         Argument<Optional> argument = context.getArgument();
-        String name = annotation != null ? annotation.value() : argument.getName();
-        if (StringUtils.isEmpty(name)) {
-            name = argument.getName();
-        }
+        String name = context.getAnnotationMetadata().getValue(SessionValue.class, String.class).orElse(argument.getName());
         Optional<Session> existing = attrs.get(HttpSessionFilter.SESSION_ATTRIBUTE, Session.class);
         if (existing.isPresent()) {
             String finalName = name;

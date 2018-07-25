@@ -20,6 +20,7 @@ import io.micronaut.aop.InterceptPhase;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -38,6 +39,7 @@ import javax.inject.Singleton;
 import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
@@ -73,89 +75,90 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
-        ConvertibleValues<?> retry = context.getValues(Retryable.class);
-        boolean isCircuitBreaker = context.hasStereotype(CircuitBreaker.class);
-        if (retry != null) {
-            MutableRetryState retryState;
-            AnnotationRetryStateBuilder retryStateBuilder = new AnnotationRetryStateBuilder(
-                context
-            );
+        Optional<AnnotationValue<Retryable>> opt = context.getValues(Retryable.class);
+        if (!opt.isPresent()) {
+            return context.proceed();
+        }
 
-            if (isCircuitBreaker) {
-                long timeout = context
-                    .getValue(CircuitBreaker.class, "reset", Duration.class)
-                    .map(Duration::toMillis).orElse(Duration.ofSeconds(DEFAULT_CIRCUIT_BREAKER_TIMEOUT_IN_MILLIS).toMillis());
-                retryState = circuitContexts.computeIfAbsent(
-                    context.getTargetMethod(),
-                    method -> new CircuitBreakerRetry(timeout, retryStateBuilder, context, eventPublisher)
-                );
+        AnnotationValue<Retryable> retry = opt.get();
+        boolean isCircuitBreaker = context.hasStereotype(CircuitBreaker.class);
+        MutableRetryState retryState;
+        AnnotationRetryStateBuilder retryStateBuilder = new AnnotationRetryStateBuilder(
+            context
+        );
+
+        if (isCircuitBreaker) {
+            long timeout = context
+                .getValue(CircuitBreaker.class, "reset", Duration.class)
+                .map(Duration::toMillis).orElse(Duration.ofSeconds(DEFAULT_CIRCUIT_BREAKER_TIMEOUT_IN_MILLIS).toMillis());
+            retryState = circuitContexts.computeIfAbsent(
+                context.getTargetMethod(),
+                method -> new CircuitBreakerRetry(timeout, retryStateBuilder, context, eventPublisher)
+            );
+        } else {
+            retryState = (MutableRetryState) retryStateBuilder.build();
+        }
+
+        retryState.open();
+
+        MutableConvertibleValues<Object> attrs = context.getAttributes();
+        attrs.put(RetryState.class.getName(), retry);
+
+        ReturnType<Object> returnType = context.getReturnType();
+        Class<Object> javaReturnType = returnType.getType();
+        if (Publishers.isConvertibleToPublisher(javaReturnType)) {
+            ConversionService<?> conversionService = ConversionService.SHARED;
+            Object result = context.proceed();
+            if (result == null) {
+                return result;
             } else {
-                retryState = (MutableRetryState) retryStateBuilder.build();
+                Flowable observable = conversionService
+                    .convert(result, Flowable.class)
+                    .orElseThrow(() -> new IllegalStateException("Unconvertible Reactive type: " + result));
+                Flowable retryObservable = observable.onErrorResumeNext(retryFlowable(context, retryState, observable))
+                    .map(o -> {
+                        retryState.close(null);
+                        return o;
+                    });
+
+                return conversionService
+                    .convert(retryObservable, returnType.asArgument())
+                    .orElseThrow(() -> new IllegalStateException("Unconvertible Reactive type: " + result));
             }
 
-            retryState.open();
-
-            MutableConvertibleValues<Object> attrs = context.getAttributes();
-            attrs.put(RetryState.class.getName(), retry);
-
-            ReturnType<Object> returnType = context.getReturnType();
-            Class<Object> javaReturnType = returnType.getType();
-            if (Publishers.isConvertibleToPublisher(javaReturnType)) {
-                ConversionService<?> conversionService = ConversionService.SHARED;
-                Object result = context.proceed();
-                if (result == null) {
+        } else {
+            while (true) {
+                try {
+                    Object result = context.proceed(this);
+                    retryState.close(null);
                     return result;
-                } else {
-                    Flowable observable = conversionService
-                        .convert(result, Flowable.class)
-                        .orElseThrow(() -> new IllegalStateException("Unconvertible Reactive type: " + result));
-                    Flowable retryObservable = observable.onErrorResumeNext(retryFlowable(context, retryState, observable))
-                        .map(o -> {
-                            retryState.close(null);
-                            return o;
-                        });
-
-                    return conversionService
-                        .convert(retryObservable, returnType.asArgument())
-                        .orElseThrow(() -> new IllegalStateException("Unconvertible Reactive type: " + result));
-                }
-
-            } else {
-                while (true) {
-                    try {
-                        Object result = context.proceed(this);
-                        retryState.close(null);
-                        return result;
-                    } catch (RuntimeException e) {
-                        if (!retryState.canRetry(e)) {
+                } catch (RuntimeException e) {
+                    if (!retryState.canRetry(e)) {
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("Cannot retry anymore. Rethrowing original exception for method: {}", context);
+                        }
+                        retryState.close(e);
+                        throw e;
+                    } else {
+                        long delayMillis = retryState.nextDelay();
+                        try {
+                            if (eventPublisher != null) {
+                                try {
+                                    eventPublisher.publishEvent(new RetryEvent(context, retryState, e));
+                                } catch (Exception e1) {
+                                    LOG.error("Error occurred publishing RetryEvent: " + e1.getMessage(), e1);
+                                }
+                            }
                             if (LOG.isDebugEnabled()) {
-                                LOG.debug("Cannot retry anymore. Rethrowing original exception for method: {}", context);
+                                LOG.debug("Retrying execution for method [{}] after delay of {}ms for exception: {}", context, delayMillis, e.getMessage());
                             }
-                            retryState.close(e);
+                            Thread.sleep(delayMillis);
+                        } catch (InterruptedException e1) {
                             throw e;
-                        } else {
-                            long delayMillis = retryState.nextDelay();
-                            try {
-                                if (eventPublisher != null) {
-                                    try {
-                                        eventPublisher.publishEvent(new RetryEvent(context, retryState, e));
-                                    } catch (Exception e1) {
-                                        LOG.error("Error occurred publishing RetryEvent: " + e1.getMessage(), e1);
-                                    }
-                                }
-                                if (LOG.isDebugEnabled()) {
-                                    LOG.debug("Retrying execution for method [{}] after delay of {}ms for exception: {}", context, delayMillis, e.getMessage());
-                                }
-                                Thread.sleep(delayMillis);
-                            } catch (InterruptedException e1) {
-                                throw e;
-                            }
                         }
                     }
                 }
             }
-        } else {
-            return context.proceed();
         }
     }
 
