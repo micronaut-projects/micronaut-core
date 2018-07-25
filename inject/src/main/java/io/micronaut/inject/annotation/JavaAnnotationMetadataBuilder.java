@@ -17,6 +17,7 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.processing.JavaModelUtils;
 
@@ -195,7 +196,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                         .filter(member -> member.getEnclosingElement() == annotationElement)
                         .filter(ExecutableElement.class::isInstance)
                         .map(ExecutableElement.class::cast)
-                        .filter(executableElement -> executableElement.getDefaultValue() != null)
+                        .filter(this::isValidDefaultValue)
                         .forEach(executableElement ->
                                 defaultValues.put(executableElement, executableElement.getDefaultValue())
                         );
@@ -206,6 +207,21 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             }
         }
         return ANNOTATION_DEFAULTS.get(getAnnotationTypeName(annotationMirror));
+    }
+
+    private boolean isValidDefaultValue(ExecutableElement executableElement) {
+        AnnotationValue defaultValue = executableElement.getDefaultValue();
+        if (defaultValue != null) {
+            Object v = defaultValue.getValue();
+            if (v != null) {
+                if (v instanceof String) {
+                    return StringUtils.isNotEmpty((CharSequence) v);
+                } else {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     @Override
