@@ -18,6 +18,7 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.reflect.ClassUtils;
@@ -71,7 +72,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
         if (hasAnnotation(annotationClass) || hasStereotype(annotationClass)) {
             String annotationName = annotationClass.getName().intern();
             return (T) annotationMap.computeIfAbsent(annotationName, s -> {
-                ConvertibleValues<Object> annotationValues = getValues(annotationClass);
+                ConvertibleValues<Object> annotationValues = getValues(annotationClass).map(AnnotationValue::getConvertibleValues).orElse(ConvertibleValues.empty());
                 return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValues);
 
             });
@@ -88,7 +89,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
         String annotationName = annotationClass.getName().intern();
         if (hasAnnotation(annotationName) || hasStereotype(annotationName)) {
             return (T) declaredAnnotationMap.computeIfAbsent(annotationName, s -> {
-                ConvertibleValues<Object> annotationValues = getValues(annotationClass);
+                ConvertibleValues<Object> annotationValues = getValues(annotationClass).map(AnnotationValue::getConvertibleValues).orElse(ConvertibleValues.empty());
                 return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValues);
 
             });
@@ -156,7 +157,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
      * @param results The results
      * @param values The values
      */
-    protected final void addAnnotationValuesFromData(List<io.micronaut.core.annotation.AnnotationValue> results, Map<CharSequence, Object> values) {
+    protected final void addAnnotationValuesFromData(List results, Map<CharSequence, Object> values) {
         if (values != null) {
             Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
             if (v instanceof io.micronaut.core.annotation.AnnotationValue[]) {
