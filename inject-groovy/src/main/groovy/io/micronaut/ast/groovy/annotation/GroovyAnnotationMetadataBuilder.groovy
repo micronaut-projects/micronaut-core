@@ -17,6 +17,7 @@ package io.micronaut.ast.groovy.annotation
 
 import groovy.transform.CompileStatic
 import io.micronaut.core.convert.ConversionService
+import io.micronaut.core.util.StringUtils
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import org.codehaus.groovy.ast.AnnotatedNode
@@ -131,7 +132,13 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
                         if (defaultValue instanceof Class) {
                             defaultValues.put(method, new ClassExpression(ClassHelper.makeCached((Class)defaultValue)))
                         } else {
-                            defaultValues.put(method, new ConstantExpression(defaultValue))
+                            if (defaultValue instanceof String) {
+                                if (StringUtils.isNotEmpty((String)defaultValue)) {
+                                    defaultValues.put(method, new ConstantExpression(defaultValue))
+                                }
+                            } else {
+                                defaultValues.put(method, new ConstantExpression(defaultValue))
+                            }
                         }
                     }
                 }
@@ -142,8 +149,15 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
                         def expression = ((ReturnStatement) stmt).expression
                         if (expression instanceof ConstantExpression) {
                             ConstantExpression ce = (ConstantExpression) expression
-                            if (ce.value != null) {
-                                defaultValues.put(method, (Expression)expression)
+                            def v = ce.value
+                            if (v != null) {
+                                if (v instanceof String) {
+                                    if (StringUtils.isNotEmpty((String)v)) {
+                                        defaultValues.put(method, new ConstantExpression(v))
+                                    }
+                                } else {
+                                    defaultValues.put(method, (Expression)expression)
+                                }
                             }
                         }
                     }
