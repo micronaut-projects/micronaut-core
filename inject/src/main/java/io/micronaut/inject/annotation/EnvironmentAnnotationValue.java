@@ -17,6 +17,7 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -51,6 +52,11 @@ class EnvironmentAnnotationValue<A extends Annotation> extends AnnotationValue<A
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         return convertibleValues.get(name, conversionContext);
+    }
+
+    @Override
+    public <T> Optional<T> getValue(ArgumentConversionContext<T> conversionContext) {
+        return convertibleValues.get(AnnotationMetadata.VALUE_MEMBER, conversionContext);
     }
 
     @Override
