@@ -536,7 +536,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
                     DeserializationFeature[] disabledDeserializationFeatures = jacksonFeatures.get("disabledDeserializationFeatures", DeserializationFeature[].class).orElse(null);
 
-                    if (enabledDeserializationFeatures != null) {
+                    if (disabledDeserializationFeatures != null) {
                         for (DeserializationFeature feature : disabledDeserializationFeatures) {
                             objectMapper.configure(feature, false);
                         }
