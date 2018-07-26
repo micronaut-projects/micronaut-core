@@ -25,14 +25,13 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 import io.micronaut.management.endpoint.annotation.Selector;
 import io.micronaut.management.endpoint.annotation.Write;
-import io.micronaut.management.endpoint.annotation.Endpoint;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 
 /**
- * A processor that processes references to {@link Write} operations {@link Endpoint}
+ * A processor that processes references to {@link Write} operations {@link io.micronaut.management.endpoint.annotation.Endpoint}
  * instances.
  *
  * @author Graeme Rocher
