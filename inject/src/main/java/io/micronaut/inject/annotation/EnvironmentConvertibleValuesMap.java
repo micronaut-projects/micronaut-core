@@ -67,11 +67,12 @@ class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         V value = map.get(name);
-        PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
         if (value instanceof CharSequence) {
+            PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
             String str = doResolveIfNecessary((CharSequence) value, placeholderResolver);
             return environment.convert(str, conversionContext);
         } else if (value instanceof String[]) {
+            PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
             String[] a = (String[]) value;
             for (int i = 0; i < a.length; i++) {
                 a[i] = doResolveIfNecessary(a[i], placeholderResolver);
@@ -81,12 +82,12 @@ class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
             io.micronaut.core.annotation.AnnotationValue[] annotationValues = (io.micronaut.core.annotation.AnnotationValue[]) value;
             for (int i = 0; i < annotationValues.length; i++) {
                 io.micronaut.core.annotation.AnnotationValue annotationValue = annotationValues[i];
-                annotationValues[i] = new io.micronaut.core.annotation.AnnotationValue(annotationValue.getAnnotationName(), new EnvironmentConvertibleValuesMap<>(annotationValue.getValues(), environment));
+                annotationValues[i] = new EnvironmentAnnotationValue(environment, annotationValue);
             }
             return environment.convert(annotationValues, conversionContext);
         } else if (value instanceof io.micronaut.core.annotation.AnnotationValue) {
             io.micronaut.core.annotation.AnnotationValue av = (io.micronaut.core.annotation.AnnotationValue) value;
-            av = new io.micronaut.core.annotation.AnnotationValue(av.getAnnotationName(), new EnvironmentConvertibleValuesMap<>(av.getValues(), environment));
+            av = new EnvironmentAnnotationValue(environment, av);
             return environment.convert(av, conversionContext);
         } else {
             return super.get(name, conversionContext);

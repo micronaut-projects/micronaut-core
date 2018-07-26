@@ -73,7 +73,7 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
     /**
      * @return The annotation name
      */
-    public String getAnnotationName() {
+    public final String getAnnotationName() {
         return annotationName;
     }
 
@@ -82,14 +82,14 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
      * @param member The member
      * @return True if it is
      */
-    public boolean contains(String member) {
+    public final boolean contains(String member) {
         return this.values.containsKey(member);
     }
 
     /**
      * @return The names of the members
      */
-    public Set<CharSequence> getMemberNames() {
+    public final Set<CharSequence> getMemberNames() {
         return values.keySet();
     }
 
@@ -131,7 +131,7 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
      * @param <T> The type
      * @return The result
      */
-    public <T> Optional<T> getValue(Argument<T> argument) {
+    public final <T> Optional<T> getValue(Argument<T> argument) {
         return getValue(ConversionContext.of(argument));
     }
 
@@ -142,7 +142,7 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
      * @param <T> The type
      * @return The result
      */
-    public <T> Optional<T> getValue(Class<T> type) {
+    public final <T> Optional<T> getValue(Class<T> type) {
         return getValue(ConversionContext.of(type));
     }
 
