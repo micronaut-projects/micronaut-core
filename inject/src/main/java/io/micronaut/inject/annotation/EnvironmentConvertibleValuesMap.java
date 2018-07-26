@@ -19,8 +19,10 @@ package io.micronaut.inject.annotation;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.ConvertibleValuesMap;
+import io.micronaut.core.type.Argument;
 
 import java.util.Collection;
 import java.util.Map;
@@ -45,6 +47,21 @@ class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
     EnvironmentConvertibleValuesMap(Map<? extends CharSequence, V> map, Environment environment) {
         super(map, environment);
         this.environment = environment;
+    }
+
+    @Override
+    public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
+        return get(name, ConversionContext.of(requiredType));
+    }
+
+    @Override
+    public <T> Optional<T> get(CharSequence name, Argument<T> requiredType) {
+        return get(name, ConversionContext.of(requiredType));
+    }
+
+    @Override
+    public <T> T get(CharSequence name, Class<T> requiredType, T defaultValue) {
+        return get(name, ConversionContext.of(requiredType)).orElse(defaultValue);
     }
 
     @Override

@@ -22,15 +22,10 @@ import io.micronaut.context.LifeCycle;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.scope.CustomScope;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.client.Client;
-import io.micronaut.http.client.DefaultHttpClient;
-import io.micronaut.http.client.HttpClient;
-import io.micronaut.http.client.HttpClientConfiguration;
-import io.micronaut.http.client.LoadBalancer;
-import io.micronaut.http.client.LoadBalancerResolver;
+import io.micronaut.http.client.*;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
@@ -41,7 +36,6 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Provider;
 import javax.inject.Singleton;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -86,7 +80,7 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
             new IllegalStateException("@Client used in invalid location")
         );
         Argument argument = segment.getArgument();
-        Client annotation = argument.getAnnotation(Client.class);
+        AnnotationValue<Client> annotation = argument.getAnnotationMetadata().getValues(Client.class).orElse(null);
         if (annotation == null) {
             throw new DependencyInjectionException(resolutionContext, argument, "ClientScope called for injection point that is not annotated with @Client");
         }
@@ -96,40 +90,37 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
         if (!(provider instanceof ParametrizedProvider)) {
             throw new DependencyInjectionException(resolutionContext, argument, "ClientScope called with invalid bean provider");
         }
-        String[] value = annotation.value();
-        if (ArrayUtils.isEmpty(value) || StringUtils.isEmpty(value[0])) {
-            String serviceId = annotation.id();
-            if (StringUtils.isEmpty(serviceId)) {
-                throw new DependencyInjectionException(resolutionContext, argument, "No value specified for @Client");
-            } else {
-                value = new String[]{serviceId};
-            }
-        }
-
-        String[] finalValue = value;
+        String value = annotation.getValue(String.class).orElseThrow(() ->
+                new DependencyInjectionException(resolutionContext, argument, "No value specified for @Client")
+        );
         LoadBalancer loadBalancer = loadBalancerResolver.resolve(value)
             .orElseThrow(() ->
-                new DependencyInjectionException(resolutionContext, argument, "Invalid service reference [" + ArrayUtils.toString((Object[]) finalValue) + "] specified to @Client")
+                new DependencyInjectionException(resolutionContext, argument, "Invalid service reference [" + value + "] specified to @Client")
             );
 
         //noinspection unchecked
         return (T) clients.computeIfAbsent(new ClientKey(identifier, value), clientKey -> {
             String contextPath = null;
-            String annotationPath = annotation.path();
-            String[] annotationValue = annotation.value();
+            String annotationPath = annotation.get("path", String.class).orElse(null);
             if (StringUtils.isNotEmpty(annotationPath)) {
                 contextPath = annotationPath;
-            } else if (ArrayUtils.isNotEmpty(annotationValue) && annotationValue[0].startsWith("/")) {
-                contextPath = annotationValue[0];
+            } else if (StringUtils.isNotEmpty(value) && value.startsWith("/")) {
+                contextPath = value;
             } else {
                 if (loadBalancer instanceof FixedLoadBalancer) {
                     contextPath = ((FixedLoadBalancer) loadBalancer).getUrl().getPath();
                 }
             }
-            HttpClientConfiguration configuration = beanContext.getBean(annotation.configuration());
+            Class<?> configurationClass = annotation.get("configuration", Class.class).orElse(HttpClientConfiguration.class);
+            Object bean = beanContext.getBean(configurationClass);
+
+            if (!(bean instanceof HttpClientConfiguration)) {
+                throw new IllegalStateException("Referenced HTTP client configuration class must be an instance of HttpClientConfiguration for injection point: " + segment);
+            }
+            HttpClientConfiguration configuration = (HttpClientConfiguration) bean;
             HttpClient httpClient = (HttpClient) ((ParametrizedProvider<T>) provider).get(loadBalancer, configuration, contextPath);
             if (httpClient instanceof DefaultHttpClient) {
-                ((DefaultHttpClient) httpClient).setClientIdentifiers(finalValue);
+                ((DefaultHttpClient) httpClient).setClientIdentifiers(value);
             }
             return httpClient;
         });
@@ -165,9 +156,9 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
      */
     private static class ClientKey {
         final BeanIdentifier identifier;
-        final String[] value;
+        final String value;
 
-        public ClientKey(BeanIdentifier identifier, String[] value) {
+        public ClientKey(BeanIdentifier identifier, String value) {
             this.identifier = identifier;
             this.value = value;
         }
@@ -182,14 +173,12 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
             }
             ClientKey clientKey = (ClientKey) o;
             return Objects.equals(identifier, clientKey.identifier) &&
-                Arrays.equals(value, clientKey.value);
+                    Objects.equals(value, clientKey.value);
         }
 
         @Override
         public int hashCode() {
-            int result = identifier.hashCode();
-            result = 31 * result + Arrays.hashCode(value);
-            return result;
+            return Objects.hash(identifier, value);
         }
     }
 }

@@ -23,6 +23,8 @@ import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.codec.CodecConfiguration;
 import io.micronaut.context.BeanContext;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.beans.BeanMap;
@@ -66,7 +68,6 @@ import javax.annotation.Nullable;
 import javax.annotation.PreDestroy;
 import javax.inject.Singleton;
 import java.io.Closeable;
-import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -96,7 +97,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     private final int HEADERS_INITIAL_CAPACITY = 3;
     private final BeanContext beanContext;
-    private final Map<Integer, HttpClient> clients = new ConcurrentHashMap<>();
+    private final Map<String, HttpClient> clients = new ConcurrentHashMap<>();
     private final ReactiveClientResultTransformer[] transformers;
     private final LoadBalancerResolver loadBalancerResolver;
 
@@ -125,10 +126,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
-        Client clientAnnotation = context.getAnnotation(Client.class);
-        if (clientAnnotation == null) {
-            throw new IllegalStateException("Client advice called from type that is not annotated with @Client: " + context);
-        }
+        AnnotationValue<Client> clientAnnotation = context.getValues(Client.class).orElseThrow(() ->
+                new IllegalStateException("Client advice called from type that is not annotated with @Client: " + context)
+        );
 
         for (MutableArgumentValue<?> argumentValue : context.getParameters().values()) {
             if (argumentValue.getValue() == null && !argumentValue.isAnnotationPresent(Nullable.class)) {
@@ -140,7 +140,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
         HttpClient httpClient = getClient(context, clientAnnotation);
         Optional<Class<? extends Annotation>> httpMethodMapping = context.getAnnotationTypeByStereotype(HttpMethodMapping.class);
-        if (httpMethodMapping.isPresent() && httpClient != null) {
+        if (context.hasStereotype(HttpMethodMapping.class) && httpClient != null) {
             String uri = context.getValue(HttpMethodMapping.class, String.class).orElse("");
             if (StringUtils.isEmpty(uri)) {
                 uri = "/" + context.getMethodName();
@@ -170,31 +170,26 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             Map<String, String> headers = new LinkedHashMap<>(HEADERS_INITIAL_CAPACITY);
 
-            Headers headersAnnotation = context.getAnnotation(Headers.class);
-            if (headersAnnotation != null) {
-                Header[] headerArray = headersAnnotation.value();
-                for (Header header : headerArray) {
-                    String headerName = header.name();
-                    String headerValue = header.value();
+            List<AnnotationValue<Header>> headerAnnotations = context.getAnnotationValuesByType(Header.class);
+            for (AnnotationValue<Header> headerAnnotation : headerAnnotations) {
+                String headerName = headerAnnotation.get("name", String.class).orElse(null);
+                String headerValue = headerAnnotation.getValue(String.class).orElse(null);
+                if (StringUtils.isNotEmpty(headerName) && StringUtils.isNotEmpty(headerValue)) {
                     headers.put(headerName, headerValue);
                 }
-            }
-
-            Header headerAnnotation = context.getAnnotation(Header.class);
-            if (headerAnnotation != null) {
-                headers.put(headerAnnotation.name(), headerAnnotation.value());
             }
 
             List<NettyCookie> cookies = new ArrayList<>();
             List<Argument> bodyArguments = new ArrayList<>();
             for (Argument argument : arguments) {
                 String argumentName = argument.getName();
+                AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
                 if (argument.isAnnotationPresent(Body.class)) {
                     body = parameters.get(argumentName).getValue();
                     break;
-                } else if (argument.isAnnotationPresent(Header.class)) {
+                } else if (annotationMetadata.isAnnotationPresent(Header.class)) {
 
-                    String headerName = argument.getAnnotation(Header.class).value();
+                    String headerName = annotationMetadata.getValue(Header.class, String.class).orElse(null);
                     if (StringUtils.isEmpty(headerName)) {
                         headerName = NameUtils.hyphenate(argumentName);
                     }
@@ -202,9 +197,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     String finalHeaderName = headerName;
                     ConversionService.SHARED.convert(value.getValue(), String.class)
                         .ifPresent(o -> headers.put(finalHeaderName, o));
-                } else if (argument.isAnnotationPresent(CookieValue.class)) {
+                } else if (annotationMetadata.isAnnotationPresent(CookieValue.class)) {
                     Object cookieValue = parameters.get(argumentName).getValue();
-                    String cookieName = argument.getAnnotation(CookieValue.class).value();
+                    String cookieName = annotationMetadata.getValue(CookieValue.class, String.class).orElse(null);
                     if (StringUtils.isEmpty(cookieName)) {
                         cookieName = argumentName;
                     }
@@ -213,8 +208,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     ConversionService.SHARED.convert(cookieValue, String.class)
                         .ifPresent(o -> cookies.add(new NettyCookie(finalCookieName, o)));
 
-                } else if (argument.isAnnotationPresent(QueryValue.class)) {
-                    String parameterName = argument.getAnnotation(QueryValue.class).value();
+                } else if (annotationMetadata.isAnnotationPresent(QueryValue.class)) {
+                    String parameterName = annotationMetadata.getValue(QueryValue.class, String.class).orElse(null);
                     if (!StringUtils.isEmpty(parameterName)) {
                         MutableArgumentValue<?> value = parameters.get(argumentName);
                         ConversionService.SHARED.convert(value.getValue(), String.class)
@@ -271,7 +266,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             // Set the URI template used to make the request for tracing purposes
             request.setAttribute(HttpAttributes.URI_TEMPLATE, resolveTemplate(clientAnnotation, uriTemplate.toString()));
-            String serviceId = clientAnnotation.value()[0];
+            String serviceId = clientAnnotation.getValue(String.class).orElse(null);
             request.setAttribute(HttpAttributes.SERVICE_ID, serviceId);
 
 
@@ -446,15 +441,15 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      * @param templateString   template to be applied
      * @return resolved template contents
      */
-    private String resolveTemplate(Client clientAnnotation, String templateString) {
-        String path = clientAnnotation.path();
+    private String resolveTemplate(AnnotationValue<Client> clientAnnotation, String templateString) {
+        String path = clientAnnotation.get("path", String.class).orElse(null);
         if (StringUtils.isNotEmpty(path)) {
             return path + templateString;
         } else {
-            String[] value = clientAnnotation.value();
-            if (ArrayUtils.isNotEmpty(value)) {
-                if (value[0].startsWith("/")) {
-                    return value[0] + templateString;
+            String value = clientAnnotation.getValue(String.class).orElse(null);
+            if (StringUtils.isNotEmpty(value)) {
+                if (value.startsWith("/")) {
+                    return value + templateString;
                 }
             }
             return templateString;
@@ -468,23 +463,23 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      * @param clientAnn client annotation
      * @return client registration
      */
-    private HttpClient getClient(MethodInvocationContext<Object, Object> context, Client clientAnn) {
-        String[] clientId = clientAnn.value();
-        if (ArrayUtils.isEmpty(clientId)) {
+    private HttpClient getClient(MethodInvocationContext<Object, Object> context, AnnotationValue<Client> clientAnn) {
+        String clientId = clientAnn.getValue(String.class).orElse(null);
+        if (StringUtils.isEmpty(clientId)) {
             return null;
         }
 
-        return clients.computeIfAbsent(Arrays.hashCode(clientId), integer -> {
+        return clients.computeIfAbsent(clientId, integer -> {
             LoadBalancer loadBalancer = loadBalancerResolver.resolve(clientId)
                 .orElseThrow(() ->
-                    new HttpClientException("Invalid service reference [" + ArrayUtils.toString(clientId) + "] specified to @Client")
+                    new HttpClientException("Invalid service reference [" + clientId + "] specified to @Client")
                 );
             String contextPath = null;
-            String path = clientAnn.path();
+            String path = clientAnn.get("path", String.class).orElse(null);
             if (StringUtils.isNotEmpty(path)) {
                 contextPath = path;
-            } else if (ArrayUtils.isNotEmpty(clientId) && clientId[0].startsWith("/")) {
-                contextPath = clientId[0];
+            } else if (StringUtils.isNotEmpty(clientId) && clientId.startsWith("/")) {
+                contextPath = clientId;
             } else {
                 if (loadBalancer instanceof FixedLoadBalancer) {
                     contextPath = ((FixedLoadBalancer) loadBalancer).getUrl().getPath();
@@ -494,14 +489,15 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             HttpClientConfiguration configuration;
             Optional<HttpClientConfiguration> clientSpecificConfig = beanContext.findBean(
                 HttpClientConfiguration.class,
-                Qualifiers.byName(clientId[0])
+                Qualifiers.byName(clientId)
             );
-            configuration = clientSpecificConfig.orElseGet(() -> beanContext.getBean(clientAnn.configuration()));
+            Class<HttpClientConfiguration> defaultConfiguration = clientAnn.get("configuration", Class.class).orElse(HttpClientConfiguration.class);
+            configuration = clientSpecificConfig.orElseGet(() -> beanContext.getBean(defaultConfiguration));
             HttpClient client = beanContext.createBean(HttpClient.class, loadBalancer, configuration, contextPath);
             if (client instanceof DefaultHttpClient) {
                 DefaultHttpClient defaultClient = (DefaultHttpClient) client;
                 defaultClient.setClientIdentifiers(clientId);
-                JacksonFeatures jacksonFeatures = context.getAnnotation(JacksonFeatures.class);
+                AnnotationValue<JacksonFeatures> jacksonFeatures = context.getValues(JacksonFeatures.class).orElse(null);
 
                 if (jacksonFeatures != null) {
                     Optional<MediaTypeCodec> existingCodec = defaultClient.getMediaTypeCodecRegistry().findCodec(MediaType.APPLICATION_JSON_TYPE);
@@ -516,20 +512,34 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         objectMapper = new ObjectMapperFactory().objectMapper(Optional.empty(), Optional.empty());
                     }
 
-                    for (SerializationFeature serializationFeature : jacksonFeatures.enabledSerializationFeatures()) {
-                        objectMapper.configure(serializationFeature, true);
+                    SerializationFeature[] enabledSerializationFeatures = jacksonFeatures.get("enabledSerializationFeatures", SerializationFeature[].class).orElse(null);
+                    if (enabledSerializationFeatures != null) {
+                        for (SerializationFeature serializationFeature : enabledSerializationFeatures) {
+                            objectMapper.configure(serializationFeature, true);
+                        }
                     }
 
-                    for (DeserializationFeature serializationFeature : jacksonFeatures.enabledDeserializationFeatures()) {
-                        objectMapper.configure(serializationFeature, true);
+                    DeserializationFeature[] enabledDeserializationFeatures = jacksonFeatures.get("enabledDeserializationFeatures", DeserializationFeature[].class).orElse(null);
+
+                    if (enabledDeserializationFeatures != null) {
+                        for (DeserializationFeature serializationFeature : enabledDeserializationFeatures) {
+                            objectMapper.configure(serializationFeature, true);
+                        }
                     }
 
-                    for (SerializationFeature serializationFeature : jacksonFeatures.disabledSerializationFeatures()) {
-                        objectMapper.configure(serializationFeature, false);
+                    SerializationFeature[] disabledSerializationFeatures = jacksonFeatures.get("disabledSerializationFeatures", SerializationFeature[].class).orElse(null);
+                    if (disabledSerializationFeatures != null) {
+                        for (SerializationFeature serializationFeature : disabledSerializationFeatures) {
+                            objectMapper.configure(serializationFeature, false);
+                        }
                     }
 
-                    for (DeserializationFeature feature : jacksonFeatures.disabledDeserializationFeatures()) {
-                        objectMapper.configure(feature, false);
+                    DeserializationFeature[] disabledDeserializationFeatures = jacksonFeatures.get("disabledDeserializationFeatures", DeserializationFeature[].class).orElse(null);
+
+                    if (enabledDeserializationFeatures != null) {
+                        for (DeserializationFeature feature : disabledDeserializationFeatures) {
+                            objectMapper.configure(feature, false);
+                        }
                     }
 
                     defaultClient.setMediaTypeCodecRegistry(
@@ -546,11 +556,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     /**
      * Cleanup method to prevent resource leaking.
      *
-     * @throws IOException
      */
     @Override
     @PreDestroy
-    public void close() throws IOException {
+    public void close() {
         for (HttpClient client : clients.values()) {
             client.close();
         }

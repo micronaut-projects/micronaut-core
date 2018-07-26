@@ -17,7 +17,9 @@
 package io.micronaut.core.annotation;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.ValueResolver;
 
 import java.lang.annotation.Annotation;
@@ -107,8 +109,41 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
     }
 
     @Override
-    public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
-        return convertibleValues.get(name, conversionContext);
+    public <T> Optional<T> get(CharSequence member, ArgumentConversionContext<T> conversionContext) {
+        return convertibleValues.get(member, conversionContext);
+    }
+
+    /**
+     * Get the value of the {@code value} member of the annotation
+     *
+     * @param conversionContext The conversion context
+     * @param <T> The type
+     * @return The result
+     */
+    public <T> Optional<T> getValue(ArgumentConversionContext<T> conversionContext) {
+        return convertibleValues.get(AnnotationMetadata.VALUE_MEMBER, conversionContext);
+    }
+
+    /**
+     * Get the value of the {@code value} member of the annotation
+     *
+     * @param argument The argument
+     * @param <T> The type
+     * @return The result
+     */
+    public <T> Optional<T> getValue(Argument<T> argument) {
+        return getValue(ConversionContext.of(argument));
+    }
+
+    /**
+     * Get the value of the {@code value} member of the annotation
+     *
+     * @param type The type
+     * @param <T> The type
+     * @return The result
+     */
+    public <T> Optional<T> getValue(Class<T> type) {
+        return getValue(ConversionContext.of(type));
     }
 
     @Override
