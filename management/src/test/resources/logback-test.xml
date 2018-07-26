@@ -1,0 +1,29 @@
+<configuration debug="true">
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <logger name="errors" level="ERROR" additivity="false">
+        <appender-ref ref="JSON"/>
+    </logger>
+
+    <logger name="no-level">
+        <appender-ref ref="STDOUT"/>
+    </logger>
+
+    <logger name="no-appenders" level="WARN"/>
+
+    <logger name="no-config"/>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>
