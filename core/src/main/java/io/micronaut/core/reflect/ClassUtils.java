@@ -17,6 +17,8 @@
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.util.ArrayUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.util.*;
@@ -32,6 +34,7 @@ public class ClassUtils {
     public static final int EMPTY_OBJECT_ARRAY_HASH_CODE = Arrays.hashCode(ArrayUtils.EMPTY_OBJECT_ARRAY);
     public static final Map<String, Class> COMMON_CLASS_MAP = new HashMap<>();
     public static final String CLASS_EXTENSION = ".class";
+    private static final Logger LOG = LoggerFactory.getLogger(ClassUtils.class);
 
     static {
         COMMON_CLASS_MAP.put(boolean.class.getName(), boolean.class);
@@ -140,6 +143,10 @@ public class ClassUtils {
      */
     public static Optional<Class> forName(String name, @Nullable ClassLoader classLoader) {
         try {
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Attempting to load class: " + name);
+            }
+
             if (classLoader == null) {
                 classLoader = Thread.currentThread().getContextClassLoader();
             }
