@@ -65,6 +65,24 @@ class NameUtilsSpec extends Specification {
     }
 
     @Unroll
+    void "test hyphenate #value lowercase"() {
+        expect:
+        NameUtils.hyphenate(value, true) == result
+
+        where:
+        value                             | result
+        'micronaut.config-client.enabled' | 'micronaut.config-client.enabled'
+        "com.fooBar.FooBar"               | "com.foo-bar.foo-bar"
+        "FooBar"                          | "foo-bar"
+        "com.bar.FooBar"                  | "com.bar.foo-bar"
+        "Foo"                             | 'foo'
+        "FooBBar"                         | 'foo-bbar'
+        "FOO_BAR"                         | 'foo-bar'
+        "fooBBar"                         | 'foo-bbar'
+        "fooBar"                          | 'foo-bar'
+    }
+
+    @Unroll
     void "test environment name separate #value"() {
         expect:
         NameUtils.environmentName(value) == result
@@ -142,7 +160,7 @@ class NameUtilsSpec extends Specification {
         where:
         path                       | filename
         "test.xml"                 | "test"
-        "/test/one/two.xml"         | "two"
+        "/test/one/two.xml"        | "two"
         "test.one.two.xml"         | "test.one.two"
         "test-one.json"            | "test-one"
         "three.one-two.properties" | "three.one-two"
