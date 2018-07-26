@@ -27,8 +27,15 @@ import picocli.CommandLine.Parameters
 
 import java.nio.file.Paths
 
+/**
+ * Command for creating Micronaut functions
+ *
+ * @author Zachary Klein
+ * @author Remko Popma
+ * @since 1.0
+ */
 @CompileStatic
-@picocli.CommandLine.Command(name = "create-function", description = "Creates a serverless function application")
+@Command(name = "create-function", description = "Creates a serverless function application")
 class CreateFunctionCommand extends AbstractCreateCommand {
     public static final String NAME = "create-function"
 
