@@ -27,6 +27,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.ProxyBeanDefinition;
 
 import java.util.List;
 import java.util.function.Supplier;
@@ -1058,6 +1059,7 @@ public interface RouteBuilder {
          * @return The URI to use
          */
         default String resolveUri(BeanDefinition<?> beanDefinition) {
+
             String uri = beanDefinition.getValue(Controller.class, String.class).orElse(null);
             if (uri != null) {
                 int len = uri.length();
@@ -1071,7 +1073,14 @@ public interface RouteBuilder {
                     return uri;
                 }
             }
-            return '/' + TypeConvention.CONTROLLER.asPropertyName(beanDefinition.getBeanType());
+            Class<?> beanType;
+            if (beanDefinition instanceof ProxyBeanDefinition) {
+                ProxyBeanDefinition pbd = (ProxyBeanDefinition) beanDefinition;
+                beanType = pbd.getTargetType();
+            } else {
+                beanType = beanDefinition.getBeanType();
+            }
+            return '/' + TypeConvention.CONTROLLER.asPropertyName(beanType);
         }
 
         /**

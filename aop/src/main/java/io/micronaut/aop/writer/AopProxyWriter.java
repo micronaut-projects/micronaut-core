@@ -112,6 +112,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     private static final Method METHOD_PROXY_TARGET_TYPE = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(ProxyBeanDefinition.class, "getTargetDefinitionType"));
 
+    private static final Method METHOD_PROXY_TARGET_CLASS = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(ProxyBeanDefinition.class, "getTargetType"));
+
     private static final java.lang.reflect.Method RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveIntroductionInterceptors", BeanContext.class, ExecutableMethod.class, Interceptor[].class);
 
     private static final java.lang.reflect.Method RESOLVE_AROUND_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveAroundInterceptors", BeanContext.class, ExecutableMethod.class, Interceptor[].class);
@@ -584,6 +586,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             constructorGenericTypes);
 
         GeneratorAdapter targetDefinitionGenerator = null;
+        GeneratorAdapter targetTypeGenerator = null;
         if (parentWriter != null) {
             proxyBeanDefinitionWriter.visitBeanDefinitionInterface(ProxyBeanDefinition.class);
             ClassVisitor pcw = proxyBeanDefinitionWriter.getClassWriter();
@@ -596,6 +599,17 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             targetDefinitionGenerator.loadThis();
             targetDefinitionGenerator.push(getTypeReference(parentWriter.getBeanDefinitionName()));
             targetDefinitionGenerator.returnValue();
+
+
+            targetTypeGenerator = new GeneratorAdapter(pcw.visitMethod(ACC_PUBLIC,
+                    METHOD_PROXY_TARGET_CLASS.getName(),
+                    METHOD_PROXY_TARGET_CLASS.getDescriptor(),
+                    null, null
+
+            ), ACC_PUBLIC, METHOD_PROXY_TARGET_CLASS.getName(), METHOD_PROXY_TARGET_CLASS.getDescriptor());
+            targetTypeGenerator.loadThis();
+            targetTypeGenerator.push(getTypeReference(parentWriter.getBeanTypeName()));
+            targetTypeGenerator.returnValue();
         }
 
         Class interceptedInterface = isIntroduction ? Introduced.class : Intercepted.class;
@@ -806,6 +820,12 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             targetDefinitionGenerator.visitMaxs(1, 1);
             targetDefinitionGenerator.visitEnd();
         }
+
+        if (targetTypeGenerator != null) {
+            targetTypeGenerator.visitMaxs(1, 1);
+            targetTypeGenerator.visitEnd();
+        }
+
 
         proxyClassWriter.visitEnd();
     }

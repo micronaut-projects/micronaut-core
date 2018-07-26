@@ -29,4 +29,10 @@ public interface ProxyBeanDefinition<T> extends BeanDefinition<T> {
      * @return The target type
      */
     Class<BeanDefinition<T>> getTargetDefinitionType();
+
+
+    /**
+     * @return The target type
+     */
+    Class<T> getTargetType();
 }
