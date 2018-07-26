@@ -28,6 +28,10 @@ When the `management` dependency is added to your project, the following built-i
 | `/routes`
 |Returns information about URIs available to be called for your application (see <<routesEndpoint, RoutesEndpoint>>)
 
+|api:management.endpoint.loggers.LoggersEndpoint[]
+| `/loggers`
+|Returns information about available loggers and permits changing the configured log level (see <<loggersEndpoint, LoggersEndpoint>>)
+
 |===
 
 In addition, the following built-in endpoint(s) are provided by the `management` dependency but are not enabled by default:
