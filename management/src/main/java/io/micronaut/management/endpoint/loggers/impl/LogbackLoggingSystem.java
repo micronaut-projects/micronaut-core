@@ -47,7 +47,7 @@ public class LogbackLoggingSystem implements LoggingSystem {
     /**
      * @return The logback {@link LoggerContext}
      */
-    protected static LoggerContext getLoggerContext() {
+    private static LoggerContext getLoggerContext() {
         return (LoggerContext) LoggerFactory.getILoggerFactory();
     }
 
@@ -55,7 +55,7 @@ public class LogbackLoggingSystem implements LoggingSystem {
      * @param logger The logback {@link Logger} to convert
      * @return The converted {@link LoggerConfiguration}
      */
-    protected static LoggerConfiguration toLoggerConfiguration(Logger logger) {
+    private static LoggerConfiguration toLoggerConfiguration(Logger logger) {
         return new LoggerConfiguration(
                 logger.getName(),
                 toLogLevel(logger.getLevel()),
@@ -67,7 +67,7 @@ public class LogbackLoggingSystem implements LoggingSystem {
      * @param level The logback {@link Level} to convert
      * @return The converted {@link LogLevel}
      */
-    protected static LogLevel toLogLevel(Level level) {
+    private static LogLevel toLogLevel(Level level) {
         if (level == null) {
             return LogLevel.NOT_SPECIFIED;
         } else {
@@ -79,7 +79,7 @@ public class LogbackLoggingSystem implements LoggingSystem {
      * @param logLevel The micronaut {@link LogLevel} to convert
      * @return The converted logback {@link Level}
      */
-    protected static Level toLevel(LogLevel logLevel) {
+    private static Level toLevel(LogLevel logLevel) {
         if (logLevel == LogLevel.NOT_SPECIFIED) {
             return null;
         } else {

@@ -18,6 +18,7 @@ package io.micronaut.management.endpoint;
 
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
+import io.micronaut.management.endpoint.annotation.Endpoint;
 
 import java.util.Optional;
 

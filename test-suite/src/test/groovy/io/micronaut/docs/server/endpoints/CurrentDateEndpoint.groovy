@@ -17,19 +17,21 @@
 package io.micronaut.docs.server.endpoints
 
 //tag::endpointImport[]
-import io.micronaut.management.endpoint.Endpoint
+import io.micronaut.management.endpoint.annotation.Endpoint
 //end::endpointImport[]
 
 //tag::readImport[]
-import io.micronaut.management.endpoint.Read
+import io.micronaut.management.endpoint.annotation.Read
 //end::readImport[]
 
 //tag::mediaTypeImport[]
 import io.micronaut.http.MediaType
+import io.micronaut.management.endpoint.annotation.Selector
+
 //end::mediaTypeImport[]
 
 //tag::writeImport[]
-import io.micronaut.management.endpoint.Write
+import io.micronaut.management.endpoint.annotation.Write
 //end::writeImport[]
 
 import javax.annotation.PostConstruct
@@ -60,7 +62,7 @@ class CurrentDateEndpoint {
 
     //tag::readArg[]
     @Read(produces = MediaType.TEXT_PLAIN) //<1>
-    String currentDatePrefix(String prefix) {
+    String currentDatePrefix(@Selector String prefix) {
         return "${prefix}: ${currentDate}"
     }
     //end::readArg[]

@@ -22,11 +22,16 @@ import io.micrometer.core.instrument.Statistic;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry;
 import io.micronaut.configuration.metrics.annotation.RequiresMetrics;
-import io.micronaut.management.endpoint.Endpoint;
-import io.micronaut.management.endpoint.Read;
+import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
+import io.micronaut.core.type.Argument;
+import io.micronaut.management.endpoint.annotation.Endpoint;
+import io.micronaut.management.endpoint.annotation.Read;
+import io.micronaut.management.endpoint.annotation.Selector;
 
+import javax.annotation.Nullable;
 import java.util.*;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -81,11 +86,12 @@ public class MetricsEndpoint {
      * Will return a 404 if the metric is not found.
      *
      * @param name the name of the metric to get the details for
+     * @param tag The tags
      * @return single with metric details response
      */
     @Read
-    public MetricDetails getMetricDetails(String name) {
-        return getMetricDetailsResponse(name);
+    public MetricDetails getMetricDetails(@Selector String name, @Nullable List<String> tag) {
+        return getMetricDetailsResponse(name, tag);
     }
 
     /**
@@ -110,10 +116,20 @@ public class MetricsEndpoint {
      * Will return a 404 if the metric is not found.
      *
      * @param name the name of the meter to get the details for.
+     * @param tagNames The tags
      * @return single with metric details response
      */
-    private MetricDetails getMetricDetailsResponse(String name) {
-        List<Tag> tags = Collections.emptyList();
+    private MetricDetails getMetricDetailsResponse(String name, List<String> tagNames) {
+        List<Tag> tags = tagNames == null ? Collections.emptyList() : tagNames.stream().map(s -> {
+            if (s.contains(":")) {
+                String[] tv = s.split(":");
+                if (tv.length == 2) {
+                    return Tag.of(tv[0], tv[1]);
+                }
+            }
+            throw new UnsatisfiedArgumentException(Argument.of(List.class, "tags"), "Tags must be in the form key:value");
+        }).collect(Collectors.toList());
+
         List<Meter> meters = new ArrayList<>();
         collectMeters(meters, this.meterRegistries, name, tags, new HashSet<>());
         if (meters.isEmpty()) {

@@ -22,6 +22,10 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.management.endpoint.annotation.Endpoint
+import io.micronaut.management.endpoint.annotation.Read
+import io.micronaut.management.endpoint.annotation.Selector
+import io.micronaut.management.endpoint.annotation.Write
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
@@ -133,7 +137,7 @@ class Simple implements Toggleable {
     }
 
     @Read
-    String named(String name) {
+    String named(@Selector String name) {
         "test $name"
     }
 

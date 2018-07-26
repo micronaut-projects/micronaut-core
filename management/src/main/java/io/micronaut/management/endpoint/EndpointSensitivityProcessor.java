@@ -19,6 +19,7 @@ package io.micronaut.management.endpoint;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.management.endpoint.annotation.Endpoint;
 
 import javax.inject.Singleton;
 import java.lang.reflect.Method;

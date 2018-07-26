@@ -17,6 +17,7 @@
 package io.micronaut.management.endpoint;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.management.endpoint.annotation.Endpoint;
 
 import java.util.Optional;
 

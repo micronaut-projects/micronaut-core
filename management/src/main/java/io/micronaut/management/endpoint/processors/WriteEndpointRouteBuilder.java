@@ -20,18 +20,19 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
-import io.micronaut.management.endpoint.Write;
+import io.micronaut.management.endpoint.annotation.Selector;
+import io.micronaut.management.endpoint.annotation.Write;
+import io.micronaut.management.endpoint.annotation.Endpoint;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 
 /**
- * A processor that processes references to {@link Write} operations {@link io.micronaut.management.endpoint.Endpoint}
+ * A processor that processes references to {@link Write} operations {@link Endpoint}
  * instances.
  *
  * @author Graeme Rocher
@@ -71,6 +72,6 @@ public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
 
     @Override
     protected boolean isPathParameter(Argument argument) {
-        return argument.getAnnotation(QueryValue.class) != null;
+        return argument.isDeclaredAnnotationPresent(Selector.class);
     }
 }

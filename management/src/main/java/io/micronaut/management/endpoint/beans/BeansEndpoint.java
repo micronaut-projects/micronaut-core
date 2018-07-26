@@ -17,8 +17,8 @@
 package io.micronaut.management.endpoint.beans;
 
 import io.micronaut.context.BeanContext;
-import io.micronaut.management.endpoint.Endpoint;
-import io.micronaut.management.endpoint.Read;
+import io.micronaut.management.endpoint.annotation.Endpoint;
+import io.micronaut.management.endpoint.annotation.Read;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 
