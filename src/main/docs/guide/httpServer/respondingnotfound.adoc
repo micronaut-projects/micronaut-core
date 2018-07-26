@@ -1,0 +1,15 @@
+Often, you want to respond 404 (Not Found) when you don't find an item in your persistence layer or in similar scenarios.
+
+To simplify this scenario, a 404 is returned if your controller method returns null. See the following example:
+
+[source,java]
+----
+include::{testshttpservernetty}/respondingnotfound/BooksController.java[tags=clazz]
+include::{testshttpservernetty}/respondingnotfound/BooksController.java[tags=stock]
+include::{testshttpservernetty}/respondingnotfound/BooksController.java[tags=bookInventoryByIsbn]
+----
+
+<1> Returning `null` triggers a 404 (Not Found) response.
+
+You can do the same if you return reactive type such as `Maybe`. For example,
+if you return `Maybe.empty()` a 404 is returned since an item is not emitted.
