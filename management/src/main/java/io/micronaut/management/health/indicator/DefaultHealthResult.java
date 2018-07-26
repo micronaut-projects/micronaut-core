@@ -18,7 +18,6 @@ package io.micronaut.management.health.indicator;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonValue;
 import io.micronaut.health.HealthStatus;
 
 import java.util.Map;

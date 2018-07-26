@@ -22,14 +22,13 @@ import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 import io.micronaut.management.endpoint.annotation.Read;
-import io.micronaut.management.endpoint.annotation.Endpoint;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.Collection;
 
 /**
- * A processor that processes references to {@link Read} operations {@link Endpoint}
+ * A processor that processes references to {@link Read} operations {@link io.micronaut.management.endpoint.annotation.Endpoint}
  * instances.
  *
  * @author Graeme Rocher
