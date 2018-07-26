@@ -16,9 +16,9 @@
 
 package io.micronaut.management.endpoint.info;
 
-import io.micronaut.management.endpoint.Endpoint;
+import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.EndpointConfiguration;
-import io.micronaut.management.endpoint.Read;
+import io.micronaut.management.endpoint.annotation.Read;
 import io.reactivex.Single;
 
 /**

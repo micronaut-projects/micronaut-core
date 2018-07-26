@@ -23,10 +23,13 @@ import java.util.Map;
  * Represents the configuration of a {@link LoggingSystem} logger.
  *
  * @author Matthew Moss
+ * @author graemerocher
  * @since 1.0
  */
 public class LoggerConfiguration {
 
+    private static final String CONFIGURED_LEVEL = "configuredLevel";
+    private static final String EFFECTIVE_LEVEL = "effectiveLevel";
     private final String name;
     private final LogLevel configuredLevel;
     private final LogLevel effectiveLevel;
@@ -69,8 +72,8 @@ public class LoggerConfiguration {
      */
     public Map<String, Object> getData() {
         Map<String, Object> data = new HashMap<>(2);
-        data.put("configuredLevel", getConfiguredLevel());
-        data.put("effectiveLevel", getEffectiveLevel());
+        data.put(CONFIGURED_LEVEL, getConfiguredLevel());
+        data.put(EFFECTIVE_LEVEL, getEffectiveLevel());
         return data;
     }
 

@@ -20,6 +20,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.async.subscriber.Completable;
+import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
@@ -27,8 +28,9 @@ import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.management.endpoint.Endpoint;
+import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
+import io.micronaut.management.endpoint.annotation.Selector;
 import io.micronaut.web.router.DefaultRouteBuilder;
 
 import java.lang.annotation.Annotation;
@@ -173,6 +175,6 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
             return false;
         }
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-        return annotationMetadata.isEmpty() || annotationMetadata.hasDeclaredAnnotation(QueryValue.class);
+        return annotationMetadata.hasDeclaredAnnotation(Selector.class);
     }
 }

@@ -13,25 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.security.rules.sensitive
 
-import io.micronaut.context.annotation.Requires
-import io.micronaut.management.endpoint.annotation.Endpoint
-import io.micronaut.management.endpoint.annotation.Read
+package io.micronaut.management.endpoint.annotation;
 
-import javax.annotation.Nullable
-import java.security.Principal
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
-@Requires(property = 'spec.name', value = 'sensitive')
-@Endpoint("defaultendpoint")
-class DefaultEndpoint {
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-    @Read
-    String hello(@Nullable Principal principal) {
-        if (principal == null) {
-            "Not logged in"
-        } else {
-            "Logged in as ${principal.name}"
-        }
-    }
+/**
+ * Annotation that can be applied to arguments that should be included in the endpoint URI.
+ *
+ * @author graemerocher
+ * @since 1.0
+ */
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.PARAMETER})
+public @interface Selector {
 }

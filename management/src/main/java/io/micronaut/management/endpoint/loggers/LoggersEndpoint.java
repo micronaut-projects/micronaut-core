@@ -16,13 +16,13 @@
 
 package io.micronaut.management.endpoint.loggers;
 
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.annotation.QueryValue;
-import io.micronaut.http.exceptions.HttpStatusException;
-import io.micronaut.management.endpoint.Endpoint;
+import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
+import io.micronaut.core.type.Argument;
+import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.EndpointConfiguration;
-import io.micronaut.management.endpoint.Read;
-import io.micronaut.management.endpoint.Write;
+import io.micronaut.management.endpoint.annotation.Read;
+import io.micronaut.management.endpoint.annotation.Selector;
+import io.micronaut.management.endpoint.annotation.Write;
 import io.reactivex.Single;
 
 import javax.annotation.Nullable;
@@ -61,14 +61,14 @@ public class LoggersEndpoint {
     public static final boolean DEFAULT_SENSITIVE = false;
 
     private final LoggingSystem loggingSystem;
-    private final LoggersManager loggersManager;
+    private final LoggersManager<Map<String, Object>> loggersManager;
 
     /**
      * @param loggingSystem the {@link LoggingSystem}
      * @param loggersManager the {@link LoggersManager}
      */
     public LoggersEndpoint(LoggingSystem loggingSystem,
-                           LoggersManager loggersManager) {
+                           LoggersManager<Map<String, Object>> loggersManager) {
         this.loggingSystem = loggingSystem;
         this.loggersManager = loggersManager;
     }
@@ -86,7 +86,7 @@ public class LoggersEndpoint {
      * @return the {@link LogLevel} (both configured and effective) of the named logger
      */
     @Read
-    public Single<Map<String, Object>> logger(@QueryValue @NotBlank String name) {
+    public Single<Map<String, Object>> logger(@NotBlank @Selector String name) {
         return Single.fromPublisher(loggersManager.getLogger(loggingSystem, name));
     }
 
@@ -95,13 +95,16 @@ public class LoggersEndpoint {
      * @param configuredLevel The {@link LogLevel} to set on the named logger
      */
     @Write
-    public void setLogLevel(@QueryValue @NotBlank String name,
+    public void setLogLevel(@NotBlank @Selector String name,
                             @Nullable LogLevel configuredLevel) {
         try {
             loggersManager.setLogLevel(loggingSystem, name,
                     configuredLevel != null ? configuredLevel : LogLevel.NOT_SPECIFIED);
         } catch (IllegalArgumentException ex) {
-            throw new HttpStatusException(HttpStatus.BAD_REQUEST, ex.getMessage());
+            throw new UnsatisfiedArgumentException(
+                    Argument.of(LogLevel.class, "configuredLevel"),
+                    "Invalid log level specified: " + configuredLevel
+            );
         }
     }
 

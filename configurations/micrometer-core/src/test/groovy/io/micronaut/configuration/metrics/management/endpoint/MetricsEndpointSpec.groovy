@@ -170,6 +170,38 @@ class MetricsEndpointSpec extends Specification {
         ]
     }
 
+
+    @Unroll
+    void "test metrics endpoint get jvm details #name success with tags"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'endpoints.metrics.sensitive'          : false,
+                (MICRONAUT_METRICS_ENABLED)            : true,
+                "micronaut.metrics.binders.jvm.enabled": true
+        ])
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        when:
+        def response = rxClient.exchange("/metrics/jvm.buffer.count?tag=id:direct", Map).blockingFirst()
+        Map result = response.body() as Map
+
+        then:
+        result
+
+
+        when:
+        rxClient.exchange("/metrics/jvm.buffer.count?tag=id:blah", Map).blockingFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.NOT_FOUND
+
+        cleanup:
+        embeddedServer.close()
+
+    }
+
     @Unroll
     void "test metrics endpoint get jvm details #name disabled"() {
         given:
