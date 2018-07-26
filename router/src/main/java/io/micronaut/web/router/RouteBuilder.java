@@ -1051,7 +1051,6 @@ public interface RouteBuilder {
          * @return The URI to use
          */
         default String resolveUri(BeanDefinition<?> beanDefinition) {
-
             String uri = beanDefinition.getValue(Controller.class, String.class).orElse(null);
             String x = normalizeUri(uri);
             if (x != null) return x;

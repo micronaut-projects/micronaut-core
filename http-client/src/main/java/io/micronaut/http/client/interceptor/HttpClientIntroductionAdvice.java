@@ -78,6 +78,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 
 /**
  * Introduction advice that implements the {@link Client} annotation.
@@ -100,6 +101,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private final Map<String, HttpClient> clients = new ConcurrentHashMap<>();
     private final ReactiveClientResultTransformer[] transformers;
     private final LoadBalancerResolver loadBalancerResolver;
+    private final JsonMediaTypeCodec jsonMediaTypeCodec;
 
     /**
      * Constructor for advice class to setup things like Headers, Cookies, Parameters for Clients.
@@ -110,9 +112,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     public HttpClientIntroductionAdvice(
         BeanContext beanContext,
+        JsonMediaTypeCodec jsonMediaTypeCodec,
         LoadBalancerResolver loadBalancerResolver,
         ReactiveClientResultTransformer... transformers) {
 
+        this.jsonMediaTypeCodec = jsonMediaTypeCodec;
         this.beanContext = beanContext;
         this.loadBalancerResolver = loadBalancerResolver;
         this.transformers = transformers != null ? transformers : new ReactiveClientResultTransformer[0];
@@ -328,9 +332,16 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                 )).map(Event::getData);
                             }
                         } else {
-                            publisher = streamingHttpClient.jsonStream(
-                                    request, publisherArgument
-                            );
+                            boolean isJson = Arrays.stream(acceptTypes).anyMatch(mediaType -> mediaType.getExtension().equals("json") || jsonMediaTypeCodec.getMediaTypes().contains(mediaType));
+                            if (isJson) {
+                                publisher = streamingHttpClient.jsonStream(
+                                        request, publisherArgument
+                                );
+                            } else {
+                                publisher = streamingHttpClient.dataStream(
+                                        request
+                                );
+                            }
                         }
                     }
 
