@@ -207,16 +207,14 @@ public class UriTemplate implements Comparable<UriTemplate> {
         List<PathSegment> thisSegments = this.segments;
         List<PathSegment> thatSegments = o.segments;
 
-        int s1 = thisSegments.size();
-        int s2 = thatSegments.size();
-        boolean e1 = s1 == 0;
-        boolean e2 = s2 == 0;
+        boolean e1 = thisSegments.isEmpty();
+        boolean e2 = thatSegments.isEmpty();
         if (e1 && e2) {
             return 0;
         } else if (e1 && !e2) {
             return -1;
         } else if (!e1 && e2) {
-            return -1;
+            return 1;
         } else {
             return Integer.compare(
                     thisSegments.get(0).toString().length(),
