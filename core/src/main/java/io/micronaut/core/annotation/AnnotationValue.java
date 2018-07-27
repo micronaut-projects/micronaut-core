@@ -18,6 +18,7 @@ package io.micronaut.core.annotation;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.ValueResolver;
@@ -37,15 +38,31 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
     private final String annotationName;
     private final ConvertibleValues<Object> convertibleValues;
     private final Map<CharSequence, Object> values;
+    private final Map<String, Object> defaultValues;
 
     /**
      * @param annotationName The annotation name
      * @param values         The values
      */
+    @SuppressWarnings("unchecked")
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values) {
         this.annotationName = annotationName.intern();
-        this.convertibleValues = ConvertibleValues.of(values);
+        this.convertibleValues = newConvertibleValues(values);
         this.values = values;
+        this.defaultValues = Collections.EMPTY_MAP;
+    }
+
+    /**
+     * @param annotationName The annotation name
+     * @param values         The values
+     * @param defaultValues The default values
+     */
+    @SuppressWarnings("unchecked")
+    public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<String, Object> defaultValues) {
+        this.annotationName = annotationName.intern();
+        this.convertibleValues = newConvertibleValues(values);
+        this.values = values;
+        this.defaultValues = defaultValues != null ? defaultValues : Collections.EMPTY_MAP;
     }
 
     /**
@@ -56,6 +73,7 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
         this.annotationName = annotationName.intern();
         this.convertibleValues = ConvertibleValues.EMPTY;
         this.values = Collections.EMPTY_MAP;
+        this.defaultValues = Collections.EMPTY_MAP;
     }
 
     /**
@@ -68,6 +86,21 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
         Map<String, Object> existing = convertibleValues.asMap();
         this.values = new HashMap<>(existing.size());
         this.values.putAll(existing);
+        this.defaultValues = Collections.EMPTY_MAP;
+    }
+
+    /**
+     * Internal copy constructor.
+     * @param target The target
+     * @param defaultValues The default values
+     * @param convertibleValues The convertible values
+     */
+    @Internal
+    protected AnnotationValue(AnnotationValue<A> target, Map<String, Object> defaultValues, ConvertibleValues<Object> convertibleValues) {
+        this.annotationName = target.annotationName;
+        this.defaultValues = defaultValues != null ? defaultValues : target.defaultValues;
+        this.values = target.values;
+        this.convertibleValues = convertibleValues;
     }
 
     /**
@@ -110,22 +143,29 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
 
     @Override
     public <T> Optional<T> get(CharSequence member, ArgumentConversionContext<T> conversionContext) {
-        return convertibleValues.get(member, conversionContext);
+        Optional<T> result = convertibleValues.get(member, conversionContext);
+        if (!result.isPresent()) {
+            Object dv = defaultValues.get(member.toString());
+            if (dv != null) {
+                return ConversionService.SHARED.convert(dv, conversionContext);
+            }
+        }
+        return result;
     }
 
     /**
-     * Get the value of the {@code value} member of the annotation
+     * Get the value of the {@code value} member of the annotation.
      *
      * @param conversionContext The conversion context
      * @param <T> The type
      * @return The result
      */
     public <T> Optional<T> getValue(ArgumentConversionContext<T> conversionContext) {
-        return convertibleValues.get(AnnotationMetadata.VALUE_MEMBER, conversionContext);
+        return get(AnnotationMetadata.VALUE_MEMBER, conversionContext);
     }
 
     /**
-     * Get the value of the {@code value} member of the annotation
+     * Get the value of the {@code value} member of the annotation.
      *
      * @param argument The argument
      * @param <T> The type
@@ -136,7 +176,7 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
     }
 
     /**
-     * Get the value of the {@code value} member of the annotation
+     * Get the value of the {@code value} member of the annotation.
      *
      * @param type The type
      * @param <T> The type
@@ -144,6 +184,30 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
      */
     public final <T> Optional<T> getValue(Class<T> type) {
         return getValue(ConversionContext.of(type));
+    }
+
+    /**
+     * Get the value of the {@code value} member of the annotation.
+     *
+     * @param type The type
+     * @param <T> The type
+     * @return The result
+     */
+    public final <T> T getRequiredValue(Class<T> type) {
+        return getRequiredValue(AnnotationMetadata.VALUE_MEMBER, type);
+    }
+
+    /**
+     * Get the value of the {@code value} member of the annotation.
+     *
+     * @param member The member
+     * @param type The type
+     * @param <T> The type
+     * @throws IllegalStateException If no member is available that conforms to the given name and type
+     * @return The result
+     */
+    public final <T> T getRequiredValue(String member, Class<T> type) {
+        return get(member, ConversionContext.of(type)).orElseThrow(() -> new IllegalStateException("No value available for annotation member @" + annotationName + "[" + member + "] of type: " + type));
     }
 
     @Override
@@ -182,6 +246,16 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
         }
 
         return true;
+    }
+
+    /**
+     * Subclasses can override to provide a custom convertible values instance.
+     *
+     * @param values The values
+     * @return The instance
+     */
+    private ConvertibleValues<Object> newConvertibleValues(Map<CharSequence, Object> values) {
+        return ConvertibleValues.of(values);
     }
 
 }

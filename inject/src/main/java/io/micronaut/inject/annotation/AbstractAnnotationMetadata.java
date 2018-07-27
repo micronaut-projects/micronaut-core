@@ -133,24 +133,6 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
         return annotations;
     }
 
-    private Annotation[] initializeAnnotations(Set<String> names) {
-        if (CollectionUtils.isNotEmpty(names)) {
-            List<Annotation> annotations = new ArrayList<>();
-            for (String name : names) {
-                Optional<Class> loaded = ClassUtils.forName(name, getClass().getClassLoader());
-                loaded.ifPresent(aClass -> {
-                    Annotation ann = synthesize(aClass);
-                    if (ann != null) {
-                        annotations.add(ann);
-                    }
-                });
-            }
-            return annotations.toArray(new Annotation[annotations.size()]);
-        }
-
-        return AnnotationUtil.ZERO_ANNOTATIONS;
-    }
-
     /**
      * Adds any annotation values found in the values map to the results.
      *
@@ -184,5 +166,23 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
      */
     protected void addValuesToResults(List<io.micronaut.core.annotation.AnnotationValue> results, io.micronaut.core.annotation.AnnotationValue values) {
         results.add(values);
+    }
+
+    private Annotation[] initializeAnnotations(Set<String> names) {
+        if (CollectionUtils.isNotEmpty(names)) {
+            List<Annotation> annotations = new ArrayList<>();
+            for (String name : names) {
+                Optional<Class> loaded = ClassUtils.forName(name, getClass().getClassLoader());
+                loaded.ifPresent(aClass -> {
+                    Annotation ann = synthesize(aClass);
+                    if (ann != null) {
+                        annotations.add(ann);
+                    }
+                });
+            }
+            return annotations.toArray(new Annotation[annotations.size()]);
+        }
+
+        return AnnotationUtil.ZERO_ANNOTATIONS;
     }
 }

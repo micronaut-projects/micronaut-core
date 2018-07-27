@@ -16,7 +16,9 @@
 
 package io.micronaut.core.annotation;
 
+import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
+import java.util.Optional;
 
 /**
  * An interface for a type that provides {@link AnnotationMetadata}.
@@ -60,4 +62,38 @@ public interface AnnotationMetadataProvider extends AnnotationSource {
         return getAnnotationMetadata().isDeclaredAnnotationPresent(annotationClass);
     }
 
+    @Override
+    default <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass) {
+        return getAnnotationMetadata().synthesizeDeclared(annotationClass);
+    }
+
+    @Override
+    default <T extends Annotation> T[] synthesizeAnnotationsByType(Class<T> annotationClass) {
+        return getAnnotationMetadata().synthesizeAnnotationsByType(annotationClass);
+    }
+
+    @Override
+    default <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(Class<T> annotationClass) {
+        return getAnnotationMetadata().synthesizeDeclaredAnnotationsByType(annotationClass);
+    }
+
+    @Override
+    default <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
+        return getAnnotationMetadata().findAnnotation(annotation);
+    }
+
+    @Override
+    default <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(Class<T> annotation) {
+        return getAnnotationMetadata().findAnnotation(annotation);
+    }
+
+    @Override
+    default <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(String annotation) {
+        return getAnnotationMetadata().findDeclaredAnnotation(annotation);
+    }
+
+    @Override
+    default <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(Class<T> annotation) {
+        return getAnnotationMetadata().findDeclaredAnnotation(annotation);
+    }
 }

@@ -76,6 +76,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
         return values;
     }
 
+    @Override
     public <T extends Annotation> T[] synthesizeAnnotationsByType(Class<T> annotationClass) {
         Environment environment = getEnvironment();
         if (environment != null) {
