@@ -218,7 +218,7 @@ class Test {
 
         then:
         metadata.synthesize(Primary) instanceof Primary
-        metadata.synthesizeDeclared.size() == 1
+        metadata.synthesizeDeclared().size() == 1
         metadata != null
         metadata.hasDeclaredAnnotation(Primary)
         !metadata.hasDeclaredAnnotation(Singleton)
