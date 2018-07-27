@@ -32,13 +32,10 @@ import io.micronaut.management.endpoint.annotation.Selector;
 import io.micronaut.web.router.DefaultRouteBuilder;
 
 import java.lang.annotation.Annotation;
-import java.util.Collection;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * Abstract {@link io.micronaut.web.router.RouteBuilder} implementation for {@link Endpoint} method processors.
@@ -54,29 +51,20 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
 
     private final ApplicationContext beanContext;
 
-    private final List<String> nonPathTypes;
-
     private final EndpointDefaultConfiguration endpointDefaultConfiguration;
 
     /**
      * @param applicationContext The application context
      * @param uriNamingStrategy  The URI naming strategy
      * @param conversionService  The conversion service
-     * @param nonPathTypesProviders A list of providers which defines paths not to be used as Path paramters
      * @param endpointDefaultConfiguration Endpoints default Configuration
      */
     AbstractEndpointRouteBuilder(ApplicationContext applicationContext,
                                  UriNamingStrategy uriNamingStrategy,
                                  ConversionService<?> conversionService,
-                                 Collection<NonPathTypesProvider> nonPathTypesProviders,
                                  EndpointDefaultConfiguration endpointDefaultConfiguration) {
         super(applicationContext, uriNamingStrategy, conversionService);
         this.beanContext = applicationContext;
-        nonPathTypes = nonPathTypesProviders.stream()
-                .map(NonPathTypesProvider::nonPathTypes)
-                .flatMap(List::stream)
-                .map(Class::getName)
-                .collect(Collectors.toList());
         this.endpointDefaultConfiguration = endpointDefaultConfiguration;
     }
 
@@ -172,9 +160,6 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
      * @return Whether the argument is a path parameter
      */
     protected boolean isPathParameter(Argument argument) {
-        if (nonPathTypes.contains(argument.getType().getName())) {
-            return false;
-        }
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
         return annotationMetadata.hasDeclaredAnnotation(Selector.class);
     }
