@@ -107,7 +107,7 @@ public class TransactionInterceptor implements MethodInterceptor<Object, Object>
             //noinspection unchecked
             attribute.setRollbackFor(annotation.get("rollbackFor", Class[].class).orElse(ReflectionUtils.EMPTY_CLASS_ARRAY));
             //noinspection unchecked
-            attribute.setRollbackFor(annotation.get("noRollbackFor", Class[].class).orElse(ReflectionUtils.EMPTY_CLASS_ARRAY));
+            attribute.setNoRollbackFor(annotation.get("noRollbackFor", Class[].class).orElse(ReflectionUtils.EMPTY_CLASS_ARRAY));
             attribute.setPropagationBehavior(annotation.getRequiredValue("propagation", Propagation.class).value());
             attribute.setIsolationLevel(annotation.getRequiredValue("isolation", Isolation.class).value());
             attribute.setQualifier(transactionManagerName);
