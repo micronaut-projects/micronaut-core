@@ -65,15 +65,15 @@ class ParentConfig {
 }
 ''')
         then:
-        beanDefinition.getAnnotation(ConfigurationReader).prefix() == 'foo.bar.baz'
+        beanDefinition.synthesize(ConfigurationReader).prefix() == 'foo.bar.baz'
         beanDefinition.injectedFields.size() == 1
         beanDefinition.injectedMethods.size() == 1
         beanDefinition.injectedFields[0].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.injectedFields[0].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.bar.baz.stuff'
+        beanDefinition.injectedFields[0].getAnnotationMetadata().synthesize(Property).name() == 'foo.bar.baz.stuff'
         beanDefinition.injectedFields[0].name == 'stuff'
 
         beanDefinition.injectedMethods[0].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.injectedMethods[0].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.bar.baz.foo'
+        beanDefinition.injectedMethods[0].getAnnotationMetadata().synthesize(Property).name() == 'foo.bar.baz.foo'
         beanDefinition.injectedMethods[0].name == 'setFoo'
     }
 
@@ -105,11 +105,11 @@ class MyConfig {
 }
 ''')
         then:
-        beanDefinition.getAnnotation(ConfigurationReader).prefix() == 'foo.bar.baz'
+        beanDefinition.synthesize(ConfigurationReader).prefix() == 'foo.bar.baz'
         beanDefinition.injectedFields.size() == 1
         beanDefinition.injectedMethods.size() == 0
         beanDefinition.injectedFields[0].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.injectedFields[0].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.bar.baz.stuff'
+        beanDefinition.injectedFields[0].getAnnotationMetadata().synthesize(Property).name() == 'foo.bar.baz.stuff'
         beanDefinition.injectedFields[0].name == 'stuff'
     }
 
@@ -152,7 +152,7 @@ class MyConfig {
         beanDefinition.injectedFields.size() == 0
         beanDefinition.injectedMethods.size() == 1
         beanDefinition.injectedMethods[0].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.injectedMethods[0].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.bar.baz.stuff'
+        beanDefinition.injectedMethods[0].getAnnotationMetadata().synthesize(Property).name() == 'foo.bar.baz.stuff'
         beanDefinition.injectedMethods[0].name == 'setStuff'
     }
 
@@ -209,7 +209,7 @@ class MyConfig {
         beanDefinition.injectedFields.size() == 0
         beanDefinition.injectedMethods.size() == 1
         beanDefinition.injectedMethods[0].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.injectedMethods[0].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.bar.baz.more.stuff'
+        beanDefinition.injectedMethods[0].getAnnotationMetadata().synthesize(Property).name() == 'foo.bar.baz.more.stuff'
         beanDefinition.injectedMethods[0].name == 'setStuff'
     }
 
@@ -257,7 +257,7 @@ class ParentConfig {
         beanDefinition.injectedFields.size() == 0
         beanDefinition.injectedMethods.size() == 1
         beanDefinition.injectedMethods[0].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.injectedMethods[0].getAnnotationMetadata().getAnnotation(Property).name() == 'parent.foo.bar.baz.stuff'
+        beanDefinition.injectedMethods[0].getAnnotationMetadata().synthesize(Property).name() == 'parent.foo.bar.baz.stuff'
         beanDefinition.injectedMethods[0].name == 'setStuff'
     }
 
@@ -375,12 +375,12 @@ class ChildConfig extends MyConfig {
         beanDefinition.injectedFields.size() == 1
         beanDefinition.injectedMethods.size() == 2
         beanDefinition.injectedFields[0].name == 'port'
-        beanDefinition.injectedFields[0].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.bar.port'
+        beanDefinition.injectedFields[0].getAnnotationMetadata().synthesize(Property).name() == 'foo.bar.port'
         beanDefinition.injectedMethods[1].name == 'setStuff'
         beanDefinition.injectedMethods[1].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.injectedMethods[1].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.bar.baz.stuff'
+        beanDefinition.injectedMethods[1].getAnnotationMetadata().synthesize(Property).name() == 'foo.bar.baz.stuff'
         beanDefinition.injectedMethods[0].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.injectedMethods[0].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.bar.host'
+        beanDefinition.injectedMethods[0].getAnnotationMetadata().synthesize(Property).name() == 'foo.bar.host'
         beanDefinition.injectedMethods[0].name == 'setHost'
     }
 
@@ -409,7 +409,7 @@ public class HttpClientConfiguration {
         then:
         beanDefinition.injectedFields.size() == 0
         beanDefinition.injectedMethods.size() == 1
-        beanDefinition.injectedMethods[0].arguments[0].getAnnotation(ReadableBytes)
+        beanDefinition.injectedMethods[0].arguments[0].synthesize(ReadableBytes)
     }
 
     void "test annotation on setters arguments"() {
@@ -437,8 +437,8 @@ public class HttpClientConfiguration {
         then:
         beanDefinition.injectedFields.size() == 0
         beanDefinition.injectedMethods.size() == 1
-        beanDefinition.injectedMethods[0].arguments[0].getAnnotations().size() == 1
-        beanDefinition.injectedMethods[0].arguments[0].getAnnotation(ReadableBytes)
+        beanDefinition.injectedMethods[0].arguments[0].synthesizeAll().size() == 1
+        beanDefinition.injectedMethods[0].arguments[0].synthesize(ReadableBytes)
     }
 
     void "test different inject types for config properties"() {
@@ -529,9 +529,9 @@ class Parent {
         beanDefinition.injectedMethods.size() == 2
         beanDefinition.injectedMethods[0].name == 'setParentTest'
         beanDefinition.injectedMethods[0].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.injectedMethods[0].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.parent-test'
+        beanDefinition.injectedMethods[0].getAnnotationMetadata().synthesize(Property).name() == 'foo.parent-test'
         beanDefinition.injectedMethods[1].getAnnotationMetadata().hasAnnotation(Property)
-        beanDefinition.injectedMethods[1].getAnnotationMetadata().getAnnotation(Property).name() == 'foo.setter-test'
+        beanDefinition.injectedMethods[1].getAnnotationMetadata().synthesize(Property).name() == 'foo.setter-test'
         beanDefinition.injectedMethods[1].name == 'setSetterTest'
 
 

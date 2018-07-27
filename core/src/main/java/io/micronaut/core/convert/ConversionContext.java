@@ -84,22 +84,22 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
         ConversionContext thisContext = this;
         return new DefaultArgumentConversionContext(argument, thisContext.getLocale(), thisContext.getCharset()) {
             @Override
-            public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-                T annotation = childContext.getAnnotation(annotationClass);
+            public <T extends Annotation> T synthesize(Class<T> annotationClass) {
+                T annotation = childContext.synthesize(annotationClass);
                 if (annotation == null) {
-                    return thisContext.getAnnotation(annotationClass);
+                    return thisContext.synthesize(annotationClass);
                 }
                 return annotation;
             }
 
             @Override
-            public Annotation[] getAnnotations() {
-                return ArrayUtils.concat(childContext.getAnnotations(), thisContext.getAnnotations());
+            public Annotation[] synthesizeAll() {
+                return ArrayUtils.concat(childContext.synthesizeAll(), thisContext.synthesizeAll());
             }
 
             @Override
-            public Annotation[] getDeclaredAnnotations() {
-                return ArrayUtils.concat(childContext.getDeclaredAnnotations(), thisContext.getDeclaredAnnotations());
+            public Annotation[] synthesizeDeclared() {
+                return ArrayUtils.concat(childContext.synthesizeDeclared(), thisContext.synthesizeDeclared());
             }
 
             @Override

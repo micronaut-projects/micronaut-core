@@ -95,7 +95,7 @@ public class KafkaClientScope implements CustomScope<KafkaClient>, LifeCycle<Kaf
                 new IllegalStateException("@KafkaClient used in invalid location")
         );
         Argument argument = segment.getArgument();
-        KafkaClient annotation = argument.getAnnotation(KafkaClient.class);
+        KafkaClient annotation = argument.synthesize(KafkaClient.class);
         if (annotation == null) {
             throw new DependencyInjectionException(resolutionContext, argument, "KafkaClientScope called for injection point that is not annotated with @KafkaClient");
         }

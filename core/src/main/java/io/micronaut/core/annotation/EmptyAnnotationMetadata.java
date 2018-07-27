@@ -72,12 +72,12 @@ class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public <T extends Annotation> Optional<AnnotationValue<T>> getValues(String annotation) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
         return Optional.empty();
     }
 
     @Override
-    public <T extends Annotation> Optional<AnnotationValue<T>> getDeclaredValues(String annotation) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(String annotation) {
         return Optional.empty();
     }
 
@@ -102,17 +102,17 @@ class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+    public <T extends Annotation> T synthesize(Class<T> annotationClass) {
         return null;
     }
 
     @Override
-    public Annotation[] getAnnotations() {
+    public Annotation[] synthesizeAll() {
         return AnnotationUtil.ZERO_ANNOTATIONS;
     }
 
     @Override
-    public Annotation[] getDeclaredAnnotations() {
+    public Annotation[] synthesizeDeclared() {
         return AnnotationUtil.ZERO_ANNOTATIONS;
     }
 }

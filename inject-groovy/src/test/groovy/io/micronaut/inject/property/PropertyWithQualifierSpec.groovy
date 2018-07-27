@@ -58,7 +58,7 @@ interface SomeInterface {
         beanDefinition != null
         beanDefinition.injectedMethods.size() == 1
         beanDefinition.injectedMethods[0].arguments[0].name == "injected"
-        beanDefinition.injectedMethods[0].arguments[0].getAnnotation(One)
+        beanDefinition.injectedMethods[0].arguments[0].synthesize(One)
 
     }
 

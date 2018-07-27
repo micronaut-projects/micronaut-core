@@ -91,8 +91,8 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         Class<io.micronaut.configuration.hystrix.annotation.HystrixCommand> annotationType = io.micronaut.configuration.hystrix.annotation.HystrixCommand.class;
-        Hystrix settings = context.getAnnotation(Hystrix.class);
-        io.micronaut.configuration.hystrix.annotation.HystrixCommand cmd = context.getAnnotation(annotationType);
+        Hystrix settings = context.synthesize(Hystrix.class);
+        io.micronaut.configuration.hystrix.annotation.HystrixCommand cmd = context.synthesize(annotationType);
         if (cmd == null) {
             return context.proceed();
         } else {

@@ -102,8 +102,8 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default <T extends Annotation> Optional<AnnotationValue<T>> getValues(Class<T> annotation) {
-        return getAnnotationMetadata().getValues(annotation);
+    default <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(Class<T> annotation) {
+        return getAnnotationMetadata().findAnnotation(annotation);
     }
 
     @Override
@@ -247,11 +247,6 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default <T extends Annotation> T getDeclaredAnnotation(Class<T> annotationClass) {
-        return getAnnotationMetadata().getDeclaredAnnotation(annotationClass);
-    }
-
-    @Override
     default boolean hasDeclaredAnnotation(String annotation) {
         return getAnnotationMetadata().hasDeclaredAnnotation(annotation);
     }
@@ -292,8 +287,8 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default <T extends Annotation> Optional<AnnotationValue<T>> getValues(String annotation) {
-        return getAnnotationMetadata().getValues(annotation);
+    default <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
+        return getAnnotationMetadata().findAnnotation(annotation);
     }
 
     @Override
@@ -302,8 +297,8 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default <T extends Annotation> Optional<AnnotationValue<T>> getDeclaredValues(String annotation) {
-        return getAnnotationMetadata().getValues(annotation);
+    default <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(String annotation) {
+        return getAnnotationMetadata().findAnnotation(annotation);
     }
 
     @Override
@@ -312,18 +307,18 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        return getAnnotationMetadata().getAnnotation(annotationClass);
+    default <T extends Annotation> T synthesize(Class<T> annotationClass) {
+        return getAnnotationMetadata().synthesize(annotationClass);
     }
 
     @Override
-    default Annotation[] getAnnotations() {
-        return getAnnotationMetadata().getAnnotations();
+    default Annotation[] synthesizeAll() {
+        return getAnnotationMetadata().synthesizeAll();
     }
 
     @Override
-    default Annotation[] getDeclaredAnnotations() {
-        return getAnnotationMetadata().getDeclaredAnnotations();
+    default Annotation[] synthesizeDeclared() {
+        return getAnnotationMetadata().synthesizeDeclared();
     }
 
     @Override
@@ -336,13 +331,4 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
         return getAnnotationMetadata().getDeclaredAnnotationValuesByType(annotationType);
     }
 
-    @Override
-    default <T extends Annotation> T[] getAnnotationsByType(Class<T> annotationClass) {
-        return getAnnotationMetadata().getAnnotationsByType(annotationClass);
-    }
-
-    @Override
-    default <T extends Annotation> T[] getDeclaredAnnotationsByType(Class<T> annotationClass) {
-        return getAnnotationMetadata().getDeclaredAnnotationsByType(annotationClass);
-    }
 }

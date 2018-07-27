@@ -56,7 +56,7 @@ class AnnotationRetryStateBuilder implements RetryStateBuilder {
 
     @Override
     public RetryState build() {
-        AnnotationValue<Retryable> retry = annotationMetadata.getValues(Retryable.class)
+        AnnotationValue<Retryable> retry = annotationMetadata.findAnnotation(Retryable.class)
                                                              .orElseThrow(() -> new IllegalStateException("Missing @Retryable annotation"));
         int attempts = retry.get(ATTEMPTS, Integer.class).orElse(DEFAULT_RETRY_ATTEMPTS);
         Duration delay = retry.get(DELAY, Duration.class).orElse(Duration.ofSeconds(1));

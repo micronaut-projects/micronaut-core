@@ -363,7 +363,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             this.targetMethod = targetMethod;
             this.conversionService = conversionService;
             this.acceptedMediaTypes = mediaTypes;
-            Produces produces = targetMethod.getAnnotation(Produces.class);
+            Produces produces = targetMethod.synthesize(Produces.class);
             if (produces != null) {
                 this.producesMediaTypes = Arrays.stream(produces.value())
                     .map(MediaType::new)

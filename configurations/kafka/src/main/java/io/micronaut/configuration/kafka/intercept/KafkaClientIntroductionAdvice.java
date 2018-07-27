@@ -107,7 +107,7 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
     public final Object intercept(MethodInvocationContext<Object, Object> context) {
 
         if (context.hasAnnotation(Topic.class) && context.hasAnnotation(KafkaClient.class)) {
-            KafkaClient client = context.getAnnotation(KafkaClient.class);
+            KafkaClient client = context.synthesize(KafkaClient.class);
             boolean isBatchSend = client.batch();
             String topic = context.getValue(Topic.class, String.class).orElse(null);
 
@@ -120,13 +120,13 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
             }
 
             Argument keyArgument = Arrays.stream(context.getArguments())
-                    .filter(arg -> arg.getAnnotation(KafkaKey.class) != null)
+                    .filter(arg -> arg.synthesize(KafkaKey.class) != null)
                     .findFirst().orElse(null);
 
             KafkaProducer kafkaProducer = getProducer(bodyArgument, keyArgument, context);
 
             List<Header> kafkaHeaders = new ArrayList<>();
-            io.micronaut.messaging.annotation.Header[] headers = context.getAnnotationsByType(io.micronaut.messaging.annotation.Header.class);
+            io.micronaut.messaging.annotation.Header[] headers = context.synthesizeAnnotationsByType(io.micronaut.messaging.annotation.Header.class);
 
             for (io.micronaut.messaging.annotation.Header header : headers) {
                 kafkaHeaders.add(
@@ -141,7 +141,7 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
             Map<String, Object> parameterValues = context.getParameterValueMap();
 
             for (Argument argument : arguments) {
-                io.micronaut.messaging.annotation.Header headerAnn = argument.getAnnotation(io.micronaut.messaging.annotation.Header.class);
+                io.micronaut.messaging.annotation.Header headerAnn = argument.synthesize(io.micronaut.messaging.annotation.Header.class);
                 if (headerAnn != null) {
                     String name = headerAnn.name();
                     if (StringUtils.isEmpty(name)) {
@@ -571,7 +571,7 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
                 );
             }
 
-            Property[] additionalProperties = metadata.getAnnotation(KafkaClient.class).properties();
+            Property[] additionalProperties = metadata.synthesize(KafkaClient.class).properties();
 
             for (Property additionalProperty : additionalProperties) {
                 newProperties.put(

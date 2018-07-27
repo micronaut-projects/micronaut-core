@@ -130,7 +130,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
-        AnnotationValue<Client> clientAnnotation = context.getValues(Client.class).orElseThrow(() ->
+        AnnotationValue<Client> clientAnnotation = context.findAnnotation(Client.class).orElseThrow(() ->
                 new IllegalStateException("Client advice called from type that is not annotated with @Client: " + context)
         );
 
@@ -516,7 +516,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             if (client instanceof DefaultHttpClient) {
                 DefaultHttpClient defaultClient = (DefaultHttpClient) client;
                 defaultClient.setClientIdentifiers(clientId);
-                AnnotationValue<JacksonFeatures> jacksonFeatures = context.getValues(JacksonFeatures.class).orElse(null);
+                AnnotationValue<JacksonFeatures> jacksonFeatures = context.findAnnotation(JacksonFeatures.class).orElse(null);
 
                 if (jacksonFeatures != null) {
                     Optional<MediaTypeCodec> existingCodec = defaultClient.getMediaTypeCodecRegistry().findCodec(MediaType.APPLICATION_JSON_TYPE);

@@ -91,7 +91,7 @@ public class TransactionInterceptor implements MethodInterceptor<Object, Object>
         AnnotationMetadata annotationMetadata,
         String transactionManagerName) {
         return transactionDefinitionMap.computeIfAbsent(targetMethod, method -> {
-            Transactional annotation = annotationMetadata.getAnnotation(Transactional.class);
+            Transactional annotation = annotationMetadata.synthesize(Transactional.class);
             BindableRuleBasedTransactionAttribute attribute = new BindableRuleBasedTransactionAttribute();
             attribute.setReadOnly(annotation.readOnly());
             attribute.setTimeout(annotation.timeout());

@@ -65,14 +65,14 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+    public <T extends Annotation> T synthesize(Class<T> annotationClass) {
         if (annotationClass == null || annotationMap == null) {
             return null;
         }
         if (hasAnnotation(annotationClass) || hasStereotype(annotationClass)) {
             String annotationName = annotationClass.getName().intern();
             return (T) annotationMap.computeIfAbsent(annotationName, s -> {
-                ConvertibleValues<Object> annotationValues = getValues(annotationClass).map(AnnotationValue::getConvertibleValues).orElse(ConvertibleValues.empty());
+                ConvertibleValues<Object> annotationValues = findAnnotation(annotationClass).map(AnnotationValue::getConvertibleValues).orElse(ConvertibleValues.empty());
                 return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValues);
 
             });
@@ -82,14 +82,14 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T extends Annotation> T getDeclaredAnnotation(Class<T> annotationClass) {
+    public <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass) {
         if (annotationClass == null || declaredAnnotationMap == null) {
             return null;
         }
         String annotationName = annotationClass.getName().intern();
         if (hasAnnotation(annotationName) || hasStereotype(annotationName)) {
             return (T) declaredAnnotationMap.computeIfAbsent(annotationName, s -> {
-                ConvertibleValues<Object> annotationValues = getValues(annotationClass).map(AnnotationValue::getConvertibleValues).orElse(ConvertibleValues.empty());
+                ConvertibleValues<Object> annotationValues = findAnnotation(annotationClass).map(AnnotationValue::getConvertibleValues).orElse(ConvertibleValues.empty());
                 return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValues);
 
             });
@@ -98,7 +98,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public Annotation[] getAnnotations() {
+    public Annotation[] synthesizeAll() {
         if (annotationMap == null) {
             return AnnotationUtil.ZERO_ANNOTATIONS;
         }
@@ -116,7 +116,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public Annotation[] getDeclaredAnnotations() {
+    public Annotation[] synthesizeDeclared() {
         if (declaredAnnotationMap == null) {
             return AnnotationUtil.ZERO_ANNOTATIONS;
         }
@@ -139,7 +139,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
             for (String name : names) {
                 Optional<Class> loaded = ClassUtils.forName(name, getClass().getClassLoader());
                 loaded.ifPresent(aClass -> {
-                    Annotation ann = getAnnotation(aClass);
+                    Annotation ann = synthesize(aClass);
                     if (ann != null) {
                         annotations.add(ann);
                     }

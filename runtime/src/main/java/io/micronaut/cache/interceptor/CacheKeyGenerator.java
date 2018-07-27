@@ -16,7 +16,8 @@
 
 package io.micronaut.cache.interceptor;
 
-import java.lang.reflect.AnnotatedElement;
+import io.micronaut.core.annotation.AnnotationMetadata;
+
 
 /**
  * <p>An interface for generating keys used by {@link io.micronaut.cache.annotation.Cacheable}.</p>
@@ -29,9 +30,9 @@ public interface CacheKeyGenerator {
     /**
      * Generate a key for the given annotated element and parameters.
      *
-     * @param annotatedElement The annotated element
+     * @param annotationMetadata The annotated metadata
      * @param params           The parameters
      * @return The generated key. Never null.
      */
-    Object generateKey(AnnotatedElement annotatedElement, Object... params);
+    Object generateKey(AnnotationMetadata annotationMetadata, Object... params);
 }

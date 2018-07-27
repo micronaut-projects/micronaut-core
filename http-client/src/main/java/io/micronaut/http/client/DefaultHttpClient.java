@@ -1059,7 +1059,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
             if (filter instanceof Toggleable && !((Toggleable) filter).isEnabled()) {
                 continue;
             }
-            Optional<AnnotationValue<Filter>> filterOpt = annotationMetadataResolver.resolveMetadata(filter).getValues(Filter.class);
+            Optional<AnnotationValue<Filter>> filterOpt = annotationMetadataResolver.resolveMetadata(filter).findAnnotation(Filter.class);
             if (filterOpt.isPresent()) {
                 AnnotationValue<Filter> filterAnn = filterOpt.get();
                 String[] clients = filterAnn.get("serviceId", String[].class).orElse(null);
