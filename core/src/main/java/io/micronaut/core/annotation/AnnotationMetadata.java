@@ -362,6 +362,25 @@ public interface AnnotationMetadata extends AnnotationSource {
     }
 
     /**
+     * {@inheritDoc}
+     */
+    @Override
+    default <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(Class<T> annotation) {
+        Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
+        if (repeatable != null) {
+            List<AnnotationValue<T>> values = getDeclaredAnnotationValuesByType(annotation);
+            if (!values.isEmpty()) {
+                return Optional.of(values.iterator().next());
+            } else {
+                //noinspection unchecked
+                return Optional.empty();
+            }
+        } else {
+            return this.findDeclaredAnnotation(annotation.getName());
+        }
+    }
+
+    /**
      * Get the value of the given annotation member.
      *
      * @param annotation   The annotation class

@@ -18,6 +18,7 @@ package io.micronaut.core.annotation;
 
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Array;
 import java.util.Optional;
 
 /**
@@ -99,7 +100,7 @@ public interface AnnotationSource {
      */
     @SuppressWarnings("unchecked")
     default <T extends Annotation> T[] synthesizeAnnotationsByType(Class<T> annotationClass) {
-        return (T[]) AnnotationUtil.ZERO_ANNOTATIONS;
+        return (T[]) Array.newInstance(annotationClass, 0);
     }
 
     /**
@@ -113,7 +114,7 @@ public interface AnnotationSource {
      */
     @SuppressWarnings("unchecked")
     default <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(Class<T> annotationClass) {
-        return (T[]) AnnotationUtil.ZERO_ANNOTATIONS;
+        return (T[]) Array.newInstance(annotationClass, 0);
     }
 
     /**
@@ -150,6 +151,17 @@ public interface AnnotationSource {
     }
 
     /**
+     * Get all of the values for the given annotation that are directly declared on the annotated element.
+     *
+     * @param annotation The annotation name
+     * @param <T> The annotation type
+     * @return A {@link AnnotationValue} instance
+     */
+    default <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(Class<T> annotation) {
+        return Optional.empty();
+    }
+
+    /**
      * Find an {@link AnnotationValue} for the given annotation name.
      *
      * @param annotation The annotation name
@@ -182,7 +194,16 @@ public interface AnnotationSource {
         return this.<T>findDeclaredAnnotation(annotation).orElse(null);
     }
 
-
+    /**
+     * Find an {@link AnnotationValue} for the given annotation name.
+     *
+     * @param annotation The annotation name
+     * @param <T> The annotation type
+     * @return A {@link AnnotationValue} instance or null
+     */
+    default @Nullable <T extends Annotation> AnnotationValue<T> getDeclaredAnnotation(Class<T> annotation) {
+        return this.findDeclaredAnnotation(annotation).orElse(null);
+    }
     /**
      * Return whether an annotation is present.
      *
