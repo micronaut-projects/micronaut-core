@@ -312,7 +312,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
      * @return The operations to cause the return value to be cached within the given cache name.
      */
     protected CachePut[] putOperations(MethodInvocationContext context) {
-        return context.getAnnotationsByType(CachePut.class);
+        return context.synthesizeAnnotationsByType(CachePut.class);
     }
 
     /**
@@ -322,7 +322,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
      * @return The operations to cause the eviction of the given caches
      */
     protected CacheInvalidate[] invalidateOperations(MethodInvocationContext context) {
-        return context.getAnnotationsByType(CacheInvalidate.class);
+        return context.synthesizeAnnotationsByType(CacheInvalidate.class);
     }
 
     private Object interceptPublisher(MethodInvocationContext<Object, Object> context, ReturnType returnTypeObject, Class returnType) {
@@ -710,13 +710,13 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
             this.context = context;
             this.returnType = returnType;
 
-            this.defaultConfig = context.getAnnotation(CacheConfig.class);
+            this.defaultConfig = context.synthesize(CacheConfig.class);
             this.defaultKeyGenerator = resolveKeyGenerator(defaultConfig.keyGenerator());
             boolean isVoid = isVoid();
             this.putOperations = isVoid ? null : putOperations(context);
             this.invalidateOperations = invalidateOperations(context);
             if (!isVoid && context.hasStereotype(Cacheable.class)) {
-                Cacheable cacheable = context.getAnnotation(Cacheable.class);
+                Cacheable cacheable = context.synthesize(Cacheable.class);
                 String[] names = resolveCacheNames(defaultConfig, cacheable);
                 if (ArrayUtils.isNotEmpty(names)) {
                     this.cacheableCacheName = names[0];

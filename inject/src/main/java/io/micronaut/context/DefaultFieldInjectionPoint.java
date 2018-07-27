@@ -145,17 +145,17 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
     }
 
     @Override
-    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        return getAnnotationMetadata().getAnnotation(annotationClass);
+    public <T extends Annotation> T synthesize(Class<T> annotationClass) {
+        return getAnnotationMetadata().synthesize(annotationClass);
     }
 
     @Override
-    public Annotation[] getAnnotations() {
-        return getAnnotationMetadata().getAnnotations();
+    public Annotation[] synthesizeAll() {
+        return getAnnotationMetadata().synthesizeAll();
     }
 
     @Override
-    public Annotation[] getDeclaredAnnotations() {
-        return getAnnotationMetadata().getDeclaredAnnotations();
+    public Annotation[] synthesizeDeclared() {
+        return getAnnotationMetadata().synthesizeDeclared();
     }
 }

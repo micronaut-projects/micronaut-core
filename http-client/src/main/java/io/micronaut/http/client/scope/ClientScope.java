@@ -80,7 +80,7 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
             new IllegalStateException("@Client used in invalid location")
         );
         Argument argument = segment.getArgument();
-        AnnotationValue<Client> annotation = argument.getAnnotationMetadata().getValues(Client.class).orElse(null);
+        AnnotationValue<Client> annotation = argument.getAnnotationMetadata().findAnnotation(Client.class).orElse(null);
         if (annotation == null) {
             throw new DependencyInjectionException(resolutionContext, argument, "ClientScope called for injection point that is not annotated with @Client");
         }

@@ -76,8 +76,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
         return values;
     }
 
-    @Override
-    public <T extends Annotation> T[] getAnnotationsByType(Class<T> annotationClass) {
+    public <T extends Annotation> T[] synthesizeAnnotationsByType(Class<T> annotationClass) {
         Environment environment = getEnvironment();
         if (environment != null) {
 
@@ -87,12 +86,12 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
                     .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, EnvironmentConvertibleValuesMap.of(environment, entries.getValues())))
                     .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
         } else {
-            return annotationMetadata.getAnnotationsByType(annotationClass);
+            return annotationMetadata.synthesizeAnnotationsByType(annotationClass);
         }
     }
 
     @Override
-    public <T extends Annotation> T[] getDeclaredAnnotationsByType(Class<T> annotationClass) {
+    public <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(Class<T> annotationClass) {
         Environment environment = getEnvironment();
         if (environment != null) {
 
@@ -102,7 +101,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
                     .map(entries -> AnnotationMetadataSupport.buildAnnotation(annotationClass, EnvironmentConvertibleValuesMap.of(environment, entries.getValues())))
                     .toArray(value -> (T[]) Array.newInstance(annotationClass, value));
         } else {
-            return annotationMetadata.getDeclaredAnnotationsByType(annotationClass);
+            return annotationMetadata.synthesizeDeclaredAnnotationsByType(annotationClass);
         }
     }
 
@@ -147,10 +146,10 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     }
 
     @Override
-    public <T extends Annotation> Optional<AnnotationValue<T>> getValues(String annotation) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
         Environment env = getEnvironment();
 
-        Optional<AnnotationValue<T>> values = annotationMetadata.getValues(annotation);
+        Optional<AnnotationValue<T>> values = annotationMetadata.findAnnotation(annotation);
 
         if (env != null) {
             return values.map(av -> new EnvironmentAnnotationValue<>(env, av));
@@ -159,10 +158,10 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     }
 
     @Override
-    public <T extends Annotation> Optional<AnnotationValue<T>> getDeclaredValues(String annotation) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(String annotation) {
         Environment env = getEnvironment();
 
-        Optional<AnnotationValue<T>> values = annotationMetadata.getDeclaredValues(annotation);
+        Optional<AnnotationValue<T>> values = annotationMetadata.findDeclaredAnnotation(annotation);
 
         if (env != null) {
             return values.map(av -> new EnvironmentAnnotationValue<>(env, av));

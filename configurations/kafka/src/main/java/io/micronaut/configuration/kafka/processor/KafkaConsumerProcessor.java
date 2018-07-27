@@ -137,11 +137,11 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
 
-        Topic[] topicAnnotations = method.getDeclaredAnnotationsByType(Topic.class);
-        KafkaListener consumerAnnotation = method.getAnnotation(KafkaListener.class);
+        Topic[] topicAnnotations = method.synthesizeDeclaredAnnotationsByType(Topic.class);
+        KafkaListener consumerAnnotation = method.synthesize(KafkaListener.class);
 
         if (ArrayUtils.isEmpty(topicAnnotations)) {
-            topicAnnotations = beanDefinition.getAnnotationsByType(Topic.class);
+            topicAnnotations = beanDefinition.synthesizeAnnotationsByType(Topic.class);
         }
 
         if (consumerAnnotation != null && ArrayUtils.isNotEmpty(topicAnnotations)) {
@@ -657,7 +657,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
         if (!properties.containsKey(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG)) {
             if (!consumerConfiguration.getKeyDeserializer().isPresent()) {
                 Optional<Argument> keyArgument = Arrays.stream(method.getArguments())
-                        .filter(arg -> arg.getAnnotation(KafkaKey.class) != null).findFirst();
+                        .filter(arg -> arg.synthesize(KafkaKey.class) != null).findFirst();
 
                 if (keyArgument.isPresent()) {
                     consumerConfiguration.setKeyDeserializer(

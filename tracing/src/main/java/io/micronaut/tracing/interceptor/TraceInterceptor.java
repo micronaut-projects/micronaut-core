@@ -82,7 +82,7 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         boolean isContinue = context.hasAnnotation(ContinueSpan.class);
-        NewSpan newSpan = context.getAnnotation(NewSpan.class);
+        NewSpan newSpan = context.synthesize(NewSpan.class);
         boolean isNew = newSpan != null;
         if (!isContinue && !isNew) {
             return context.proceed();
@@ -230,7 +230,7 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
 
     private void tagArguments(Span span, MethodInvocationContext<Object, Object> context) {
         for (MutableArgumentValue<?> argumentValue : context.getParameters().values()) {
-            SpanTag spanTag = argumentValue.getAnnotation(SpanTag.class);
+            SpanTag spanTag = argumentValue.synthesize(SpanTag.class);
             Object v = argumentValue.getValue();
             if (spanTag != null && v != null) {
                 String tagName = spanTag.value();
