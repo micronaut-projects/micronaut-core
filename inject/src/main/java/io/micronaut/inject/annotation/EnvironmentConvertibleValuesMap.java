@@ -18,6 +18,7 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -74,17 +75,19 @@ class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
         } else if (value instanceof String[]) {
             PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
             String[] a = (String[]) value;
+            String[] b = new String[a.length];
             for (int i = 0; i < a.length; i++) {
-                a[i] = doResolveIfNecessary(a[i], placeholderResolver);
+                b[i] = doResolveIfNecessary(a[i], placeholderResolver);
             }
-            return environment.convert(a, conversionContext);
+            return environment.convert(b, conversionContext);
         } else if (value instanceof io.micronaut.core.annotation.AnnotationValue[]) {
             io.micronaut.core.annotation.AnnotationValue[] annotationValues = (io.micronaut.core.annotation.AnnotationValue[]) value;
+            io.micronaut.core.annotation.AnnotationValue[] b = new AnnotationValue[annotationValues.length];
             for (int i = 0; i < annotationValues.length; i++) {
                 io.micronaut.core.annotation.AnnotationValue annotationValue = annotationValues[i];
-                annotationValues[i] = new EnvironmentAnnotationValue(environment, annotationValue);
+                b[i] = new EnvironmentAnnotationValue(environment, annotationValue);
             }
-            return environment.convert(annotationValues, conversionContext);
+            return environment.convert(b, conversionContext);
         } else if (value instanceof io.micronaut.core.annotation.AnnotationValue) {
             io.micronaut.core.annotation.AnnotationValue av = (io.micronaut.core.annotation.AnnotationValue) value;
             av = new EnvironmentAnnotationValue(environment, av);

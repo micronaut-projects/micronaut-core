@@ -30,6 +30,8 @@ import java.util.*;
  * @since 1.0
  */
 public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, AnnotationMetadata {
+
+
     @Override
     default <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass) {
         return getAnnotationMetadata().synthesizeDeclared(annotationClass);
