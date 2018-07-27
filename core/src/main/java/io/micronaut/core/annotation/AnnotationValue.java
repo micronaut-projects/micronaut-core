@@ -21,8 +21,10 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.value.ValueResolver;
 
+import javax.annotation.Nonnull;
 import java.lang.annotation.Annotation;
 import java.util.*;
 
@@ -106,7 +108,7 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
     /**
      * @return The annotation name
      */
-    public final String getAnnotationName() {
+    public @Nonnull final String getAnnotationName() {
         return annotationName;
     }
 
@@ -122,7 +124,7 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
     /**
      * @return The names of the members
      */
-    public final Set<CharSequence> getMemberNames() {
+    public @Nonnull final Set<CharSequence> getMemberNames() {
         return values.keySet();
     }
 
@@ -130,14 +132,14 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
      * @return The attribute values
      */
     @SuppressWarnings("unchecked")
-    public Map<CharSequence, Object> getValues() {
+    public @Nonnull Map<CharSequence, Object> getValues() {
         return Collections.unmodifiableMap(values);
     }
 
     /**
      * @return The convertible values
      */
-    public ConvertibleValues<Object> getConvertibleValues() {
+    public @Nonnull ConvertibleValues<Object> getConvertibleValues() {
         return convertibleValues;
     }
 
@@ -191,9 +193,10 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
      *
      * @param type The type
      * @param <T> The type
+     * @throws IllegalStateException If no member is available that conforms to the given type
      * @return The result
      */
-    public final <T> T getRequiredValue(Class<T> type) {
+    public @Nonnull final <T> T getRequiredValue(Class<T> type) {
         return getRequiredValue(AnnotationMetadata.VALUE_MEMBER, type);
     }
 
@@ -206,8 +209,33 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
      * @throws IllegalStateException If no member is available that conforms to the given name and type
      * @return The result
      */
-    public final <T> T getRequiredValue(String member, Class<T> type) {
+    public @Nonnull final <T> T getRequiredValue(String member, Class<T> type) {
         return get(member, ConversionContext.of(type)).orElseThrow(() -> new IllegalStateException("No value available for annotation member @" + annotationName + "[" + member + "] of type: " + type));
+    }
+
+    /**
+     * Gets a list of {@link AnnotationValue} for the given member.
+     *
+     * @param member The member
+     * @param type The type
+     * @param <T> The type
+     * @throws IllegalStateException If no member is available that conforms to the given name and type
+     * @return The result
+     */
+    public @Nonnull final <T extends Annotation> List<AnnotationValue<T>> getAnnotations(String member, Class<T> type) {
+        AnnotationValue[] values = get(member, AnnotationValue[].class).orElse(null);
+        if (ArrayUtils.isNotEmpty(values)) {
+            List<AnnotationValue<T>> list = new ArrayList<>(values.length);
+            String typeName = type.getName();
+            for (AnnotationValue value : values) {
+                if (value.getAnnotationName().equals(typeName)) {
+                    //noinspection unchecked
+                    list.add(value);
+                }
+            }
+            return list;
+        }
+        return Collections.emptyList();
     }
 
     @Override
