@@ -16,7 +16,6 @@
 
 package io.micronaut.core.annotation;
 
-import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.Optional;
 
