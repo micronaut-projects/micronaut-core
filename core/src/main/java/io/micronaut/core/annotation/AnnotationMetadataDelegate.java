@@ -30,6 +30,49 @@ import java.util.*;
  * @since 1.0
  */
 public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, AnnotationMetadata {
+    @Override
+    default <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass) {
+        return getAnnotationMetadata().synthesizeDeclared(annotationClass);
+    }
+
+    @Override
+    default <T extends Annotation> T[] synthesizeAnnotationsByType(Class<T> annotationClass) {
+        return getAnnotationMetadata().synthesizeAnnotationsByType(annotationClass);
+    }
+
+    @Override
+    default <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(Class<T> annotationClass) {
+        return getAnnotationMetadata().synthesizeDeclaredAnnotationsByType(annotationClass);
+    }
+
+    @Nullable
+    @Override
+    default <T extends Annotation> AnnotationValue<T> getAnnotation(String annotation) {
+        return getAnnotationMetadata().getAnnotation(annotation);
+    }
+
+    @Nullable
+    @Override
+    default <T extends Annotation> AnnotationValue<T> getAnnotation(Class<T> annotation) {
+        return getAnnotationMetadata().getAnnotation(annotation);
+    }
+
+    @Nullable
+    @Override
+    default <T extends Annotation> AnnotationValue<T> getDeclaredAnnotation(String annotation) {
+        return getAnnotationMetadata().getDeclaredAnnotation(annotation);
+    }
+
+    @Override
+    default <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(Class<T> annotation) {
+        return getAnnotationMetadata().findDeclaredAnnotation(annotation);
+    }
+
+    @Nullable
+    @Override
+    default <T extends Annotation> AnnotationValue<T> getDeclaredAnnotation(Class<T> annotation) {
+        return getAnnotationMetadata().getDeclaredAnnotation(annotation);
+    }
 
     @Override
     default boolean isAnnotationPresent(Class<? extends Annotation> annotationClass) {
