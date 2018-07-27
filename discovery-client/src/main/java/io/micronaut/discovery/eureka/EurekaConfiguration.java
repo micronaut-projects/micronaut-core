@@ -125,6 +125,24 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
      */
     @ConfigurationProperties(DiscoveryConfiguration.PREFIX)
     public static class EurekaDiscoveryConfiguration extends DiscoveryConfiguration {
+
+        private boolean useSecurePort;
+
+        /**
+         * @return Whether the secure port is used for communication.
+         */
+        public boolean isUseSecurePort() {
+            return useSecurePort;
+        }
+
+        /**
+         * Sets whether the secure port is used for communication.
+         *
+         * @param useSecurePort True if the secure port should be used
+         */
+        public void setUseSecurePort(boolean useSecurePort) {
+            this.useSecurePort = useSecurePort;
+        }
     }
 
     /**
