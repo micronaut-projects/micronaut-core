@@ -41,15 +41,13 @@ public class ReadEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
      * @param beanContext The application context
      * @param uriNamingStrategy The URI naming strategy
      * @param conversionService The conversion service
-     * @param nonPathTypesProviders A list of providers which defines types not to be used as Path parameters
      * @param endpointDefaultConfiguration Endpoints default Configuration
      */
     public ReadEndpointRouteBuilder(ApplicationContext beanContext,
                                     UriNamingStrategy uriNamingStrategy,
                                     ConversionService<?> conversionService,
-                                    Collection<NonPathTypesProvider> nonPathTypesProviders,
                                     EndpointDefaultConfiguration endpointDefaultConfiguration) {
-        super(beanContext, uriNamingStrategy, conversionService, nonPathTypesProviders, endpointDefaultConfiguration);
+        super(beanContext, uriNamingStrategy, conversionService, endpointDefaultConfiguration);
     }
 
     @Override
