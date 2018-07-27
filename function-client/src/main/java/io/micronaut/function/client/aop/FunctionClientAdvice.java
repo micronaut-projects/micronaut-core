@@ -70,7 +70,7 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
 
         Object body;
         if (len == 1) {
-            Optional<Argument> bodyArg = Arrays.stream(context.getArguments()).filter(arg -> arg.getAnnotation(Body.class) != null).findFirst();
+            Optional<Argument> bodyArg = Arrays.stream(context.getArguments()).filter(arg -> arg.isAnnotationPresent(Body.class)).findFirst();
             if (bodyArg.isPresent()) {
                 body = parameterValueMap.get(bodyArg.get().getName());
             } else {
