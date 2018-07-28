@@ -23,5 +23,7 @@ package io.micronaut.docs.config.properties
 interface Engine { // <1>
     int getCylinders()
     String start()
+
+    Map getSensors()
 }
 // end::class[]

@@ -90,3 +90,18 @@ include::{testsdir}/config/builder/VehicleSpec.groovy[tags=start, indent=0]
 ----
 
 The above example prints: `"Subaru Engine Starting V4 [rodLength=4.0]"`
+
+== MapFormat
+
+For some use cases it may be desirable to accept a map of arbitrary configuration properties that can be supplied to a bean, especially if the bean represents a third-party API where not all of the possible configuration properties are known by the developer. For example, a datasource may accept a map of configuration properties specific to a particular database driver, allowing the user to specify any desired options in the map without coding every single property explicitly.
+
+[source,groovy]
+----
+Map sensors
+
+void setSensors(@MapFormat(transformation = MapFormat.MapTransformation.FLAT) Map<Integer,String> sensors) {
+    this.sensors = sensors
+}
+----
+
+

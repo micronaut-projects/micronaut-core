@@ -30,7 +30,7 @@ class VehicleSpec extends Specification {
         when:
         // tag::start[]
         ApplicationContext applicationContext = ApplicationContext.run(
-                ['my.engine.cylinders':'8'],
+                ['my.engine.cylinders': '8', 'my.engine.sensors': [0: 'thermostat', 1: 'fuel pressure']],
                 "test"
         )
 
@@ -40,6 +40,6 @@ class VehicleSpec extends Specification {
         // end::start[]
 
         then:
-        vehicle.start() == "Ford Engine Starting V8 [rodLength=6.0]"
+        vehicle.start() == "Ford Engine Starting V8 [rodLength=6.0, sensors=2]"
     }
 }
