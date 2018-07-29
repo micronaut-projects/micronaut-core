@@ -51,7 +51,6 @@ import javax.inject.Scope;
 import javax.inject.Singleton;
 import java.io.Closeable;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -228,16 +227,6 @@ public class DefaultBeanContext implements BeanContext {
             running.set(false);
         }
         return this;
-    }
-
-    @Override
-    @Nonnull
-    public AnnotatedElement resolveElement(Class<?> type) {
-        Optional<? extends BeanDefinition<?>> candidate = findConcreteCandidate(type, null, false, false);
-        if (candidate.isPresent()) {
-            return candidate.get();
-        }
-        return type;
     }
 
     @Override

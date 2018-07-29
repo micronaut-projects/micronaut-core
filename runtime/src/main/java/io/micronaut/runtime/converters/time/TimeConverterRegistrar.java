@@ -149,8 +149,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
     }
 
     private DateTimeFormatter resolveFormatter(ConversionContext context) {
-        Format ann = context.getAnnotation(Format.class);
-        Optional<String> format = ann != null ? Optional.of(ann.value()) : Optional.empty();
+        Optional<String> format = context.getAnnotationMetadata().getValue(Format.class, String.class);
         return format
             .map((pattern) -> DateTimeFormatter.ofPattern(pattern, context.getLocale()))
             .orElse(DateTimeFormatter.RFC_1123_DATE_TIME);

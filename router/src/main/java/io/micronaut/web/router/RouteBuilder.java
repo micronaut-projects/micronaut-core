@@ -27,7 +27,9 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.ProxyBeanDefinition;
 
+import javax.annotation.Nullable;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -1035,18 +1037,9 @@ public interface RouteBuilder {
          */
         default String resolveUri(Class<?> type) {
             Controller annotation = type.getAnnotation(Controller.class);
-            String uri = annotation != null ? annotation.value() : null;
+            String uri = normalizeUri(annotation != null ? annotation.value() : null);
             if (uri != null) {
-                int len = uri.length();
-                if (len == 1 && uri.charAt(0) == '/') {
-                    return "";
-                }
-                if (len > 0 && uri.charAt(uri.length() - 1) == '/') {
-                    return uri.substring(0, uri.length() - 1);
-                }
-                if (len > 0) {
-                    return uri;
-                }
+                return uri;
             }
             return '/' + TypeConvention.CONTROLLER.asPropertyName(type);
         }
@@ -1059,19 +1052,16 @@ public interface RouteBuilder {
          */
         default String resolveUri(BeanDefinition<?> beanDefinition) {
             String uri = beanDefinition.getValue(Controller.class, String.class).orElse(null);
-            if (uri != null) {
-                int len = uri.length();
-                if (len == 1 && uri.charAt(0) == '/') {
-                    return "";
-                }
-                if (len > 0 && uri.charAt(uri.length() - 1) == '/') {
-                    return uri.substring(0, uri.length() - 1);
-                }
-                if (len > 0) {
-                    return uri;
-                }
+            String x = normalizeUri(uri);
+            if (x != null) return x;
+            Class<?> beanType;
+            if (beanDefinition instanceof ProxyBeanDefinition) {
+                ProxyBeanDefinition pbd = (ProxyBeanDefinition) beanDefinition;
+                beanType = pbd.getTargetType();
+            } else {
+                beanType = beanDefinition.getBeanType();
             }
-            return '/' + TypeConvention.CONTROLLER.asPropertyName(beanDefinition.getBeanType());
+            return '/' + TypeConvention.CONTROLLER.asPropertyName(beanType);
         }
 
         /**
@@ -1099,6 +1089,27 @@ public interface RouteBuilder {
          */
         default String resolveUri(Class type, PropertyConvention id) {
             return resolveUri(type) + "/{" + id.lowerCaseName() + "}";
+        }
+
+        /**
+         * Normalizes a URI, ensuring the first character starts with a /
+         * @param uri The URI
+         * @return The normalized URI or null
+         */
+        default String normalizeUri(@Nullable String uri) {
+            if (uri != null) {
+                int len = uri.length();
+                if (len == 1 && uri.charAt(0) == '/') {
+                    return "";
+                }
+                if (len > 0 && uri.charAt(uri.length() - 1) == '/') {
+                    return uri.substring(0, uri.length() - 1);
+                }
+                if (len > 0) {
+                    return uri;
+                }
+            }
+            return null;
         }
     }
 }

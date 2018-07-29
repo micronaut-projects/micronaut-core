@@ -84,7 +84,7 @@ class Test {
         metadata.getValue(TopLevel, "nested", Nested).get().num() == 10
 
         when:
-        TopLevel topLevel = metadata.getAnnotation(TopLevel)
+        TopLevel topLevel = metadata.synthesize(TopLevel)
 
         then:
         topLevel.nested().num() == 10
@@ -185,14 +185,14 @@ class Test {
         metadata.getValue(Requirements).get()[1].values.get('classes') == ['test.Test'] as Object[]
 
         when:
-        Requires[] requires = metadata.getAnnotation(Requirements).value()
+        Requires[] requires = metadata.synthesize(Requirements).value()
 
         then:
         requires.size() == 2
         requires[0].property() == 'blah'
 
         when:
-        requires = metadata.getAnnotationsByType(Requires)
+        requires = metadata.synthesizeAnnotationsByType(Requires)
 
         then:
         requires.size() == 2
@@ -217,8 +217,8 @@ class Test {
         AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
 
         then:
-        metadata.getAnnotation(Primary) instanceof Primary
-        metadata.declaredAnnotations.size() == 1
+        metadata.synthesize(Primary) instanceof Primary
+        metadata.synthesizeDeclared().size() == 1
         metadata != null
         metadata.hasDeclaredAnnotation(Primary)
         !metadata.hasDeclaredAnnotation(Singleton)

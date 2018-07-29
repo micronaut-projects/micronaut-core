@@ -20,7 +20,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.management.endpoint.Delete;
+import io.micronaut.management.endpoint.annotation.Delete;
 import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 
 import javax.inject.Singleton;
@@ -28,7 +28,7 @@ import java.lang.annotation.Annotation;
 import java.util.Collection;
 
 /**
- * A processor that processes references to {@link Delete} operations {@link io.micronaut.management.endpoint.Endpoint}
+ * A processor that processes references to {@link Delete} operations {@link io.micronaut.management.endpoint.annotation.Endpoint}
  * instances.
  *
  * @author Graeme Rocher
@@ -41,15 +41,13 @@ public class DeleteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
      * @param beanContext       The application contect
      * @param uriNamingStrategy The URI naming strategy
      * @param conversionService The conversion service
-     * @param nonPathTypesProviders A list of providers which defines types not to be used as Path parameters
      * @param endpointDefaultConfiguration Endpoints default Configuration
      */
     public DeleteEndpointRouteBuilder(ApplicationContext beanContext,
                                       UriNamingStrategy uriNamingStrategy,
                                       ConversionService<?> conversionService,
-                                      Collection<NonPathTypesProvider> nonPathTypesProviders,
                                       EndpointDefaultConfiguration endpointDefaultConfiguration) {
-        super(beanContext, uriNamingStrategy, conversionService, nonPathTypesProviders, endpointDefaultConfiguration);
+        super(beanContext, uriNamingStrategy, conversionService, endpointDefaultConfiguration);
     }
 
     @Override

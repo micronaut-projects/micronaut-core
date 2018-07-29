@@ -17,7 +17,6 @@
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.util.ArrayUtils;
-
 import javax.annotation.Nullable;
 import java.util.*;
 

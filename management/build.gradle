@@ -10,5 +10,7 @@ dependencies {
     testCompile dependencyModuleVersion("groovy", "groovy-json")
     testCompile "com.h2database:h2:1.4.196"
     testCompile "mysql:mysql-connector-java:6.0.6"
+
+    compileOnly "ch.qos.logback:logback-classic:1.2.3"
 }
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

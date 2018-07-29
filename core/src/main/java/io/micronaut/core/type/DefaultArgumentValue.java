@@ -75,18 +75,18 @@ class DefaultArgumentValue<V> implements ArgumentValue<V> {
     }
 
     @Override
-    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        return argument.getAnnotation(annotationClass);
+    public <T extends Annotation> T synthesize(Class<T> annotationClass) {
+        return argument.synthesize(annotationClass);
     }
 
     @Override
-    public Annotation[] getAnnotations() {
-        return argument.getAnnotations();
+    public Annotation[] synthesizeAll() {
+        return argument.synthesizeAll();
     }
 
     @Override
-    public Annotation[] getDeclaredAnnotations() {
-        return argument.getDeclaredAnnotations();
+    public Annotation[] synthesizeDeclared() {
+        return argument.synthesizeDeclared();
     }
 
     @Override

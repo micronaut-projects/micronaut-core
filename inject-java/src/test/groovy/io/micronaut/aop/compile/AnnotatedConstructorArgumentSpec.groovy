@@ -61,7 +61,7 @@ class MyBean {
         beanDefinition.constructor.arguments[0].name == 'val'
         beanDefinition.constructor.arguments[1].name == 'beanContext'
         beanDefinition.constructor.arguments[2].name == 'interceptors'
-        beanDefinition.constructor.arguments[2].getAnnotation(Type.class).value()[0] == Mutating
+        beanDefinition.constructor.arguments[2].synthesize(Type.class).value()[0] == Mutating
 
         when:
         def context = ApplicationContext.run('foo.bar':'test')

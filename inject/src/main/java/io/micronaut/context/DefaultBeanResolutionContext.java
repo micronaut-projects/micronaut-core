@@ -238,7 +238,7 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
             ConstructorInjectionPoint constructorInjectionPoint = getDeclaringType().getConstructor();
             if (constructorInjectionPoint instanceof MethodInjectionPoint) {
                 MethodInjectionPoint methodInjectionPoint = (MethodInjectionPoint) constructorInjectionPoint;
-                StringBuilder baseString = new StringBuilder(methodInjectionPoint.getMethod().getDeclaringClass().getSimpleName()).append('.');
+                StringBuilder baseString = new StringBuilder(methodInjectionPoint.getDeclaringBean().getBeanType().getSimpleName()).append('.');
                 baseString.append(methodInjectionPoint.getName());
                 outputArguments(baseString, methodInjectionPoint.getArguments());
                 return baseString.toString();
@@ -271,7 +271,7 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
 
         @Override
         public String toString() {
-            StringBuilder baseString = new StringBuilder(methodInjectionPoint.getMethod().getDeclaringClass().getSimpleName()).append('.');
+            StringBuilder baseString = new StringBuilder(methodInjectionPoint.getDeclaringBean().getBeanType().getSimpleName()).append('.');
             baseString.append(getName());
             outputArguments(baseString, methodInjectionPoint.getArguments());
             return baseString.toString();

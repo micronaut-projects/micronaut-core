@@ -203,6 +203,7 @@ management:
     metricsEndpoint: The Metrics Endpoint
     refreshEndpoint: The Refresh Endpoint
     routesEndpoint: The Routes Endpoint
+    loggersEndpoint: The Loggers Endpoint
     stopEndpoint: The Server Stop Endpoint
 security:
   title: Security

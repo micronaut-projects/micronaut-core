@@ -31,7 +31,7 @@ public class ArgMutatingInterceptor implements Interceptor {
 
     @Override
     public Object intercept(InvocationContext context) {
-        Mutating m = context.getAnnotation(Mutating.class);
+        Mutating m = context.synthesize(Mutating.class);
         MutableArgumentValue arg = (MutableArgumentValue) context.getParameters().get(m.value());
         if(arg != null) {
             Object value = arg.getValue();

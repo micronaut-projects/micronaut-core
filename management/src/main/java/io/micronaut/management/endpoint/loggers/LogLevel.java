@@ -14,25 +14,25 @@
  * limitations under the License.
  */
 
-package io.micronaut.security;
-
-import io.micronaut.management.endpoint.processors.NonPathTypesProvider;
-import io.micronaut.security.authentication.Authentication;
-
-import javax.inject.Singleton;
-import java.util.Collections;
-import java.util.List;
+package io.micronaut.management.endpoint.loggers;
 
 /**
+ * Logging levels supported by a {@link LoggingSystem}
  *
- * @author Sergio del Amo
+ * Typically, a logging system may permit the log level to be null, representing
+ * an unspecified log level. For {@link LoggingSystem} and the loggers endpoint,
+ * we prefer to return the NOT_SPECIFIED pseudo-level instead of null.
+ *
+ * @author Matthew Moss
  * @since 1.0
  */
-@Singleton
-public class SecurityNonPathTypesProvider implements NonPathTypesProvider {
-
-    @Override
-    public List<Class> nonPathTypes() {
-        return Collections.singletonList(Authentication.class);
-    }
+public enum LogLevel {
+    ALL,
+    TRACE,
+    DEBUG,
+    INFO,
+    WARN,
+    ERROR,
+    OFF,
+    NOT_SPECIFIED
 }

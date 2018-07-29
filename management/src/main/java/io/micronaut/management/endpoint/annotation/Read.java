@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.management.endpoint;
+package io.micronaut.management.endpoint.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 

@@ -16,7 +16,11 @@
 package io.micronaut.management.endpoint
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.annotation.QueryValue
+import io.micronaut.management.endpoint.annotation.Delete
+import io.micronaut.management.endpoint.annotation.Endpoint
+import io.micronaut.management.endpoint.annotation.Read
+import io.micronaut.management.endpoint.annotation.Selector
+import io.micronaut.management.endpoint.annotation.Write
 import io.micronaut.web.router.Router
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -93,25 +97,25 @@ class EndpointRouteSpec extends Specification {
     static class CEndpoint {
 
         @Read
-        String one(@QueryValue String name) {}
+        String one(@Selector String name) {}
 
         @Write
-        String two(@QueryValue String name) {}
+        String two(@Selector String name) {}
 
         @Delete
-        String three(@QueryValue String name) {}
+        String three(@Selector String name) {}
     }
 
     @Endpoint('d')
     static class DEndpoint {
 
         @Read
-        String one(String name) {}
+        String one(@Selector String name) {}
 
         @Write
         String two(String name) {}
 
         @Delete
-        String three(String name) {}
+        String three(@Selector String name) {}
     }
 }

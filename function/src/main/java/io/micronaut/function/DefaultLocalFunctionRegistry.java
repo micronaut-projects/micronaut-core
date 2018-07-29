@@ -143,10 +143,9 @@ public class DefaultLocalFunctionRegistry implements ExecutableMethodProcessor<F
 
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        FunctionBean annotation = method.getAnnotation(FunctionBean.class);
-        if (annotation != null) {
+        if (method.hasAnnotation(FunctionBean.class)) {
 
-            String functionId = annotation.value();
+            String functionId = method.getValue(FunctionBean.class, String.class).orElse(null);
             Class<?> declaringType = method.getDeclaringType();
             if (StringUtils.isEmpty(functionId)) {
                 String typeName = declaringType.getSimpleName();

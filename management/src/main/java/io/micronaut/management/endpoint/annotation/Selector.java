@@ -14,23 +14,23 @@
  * limitations under the License.
  */
 
-package io.micronaut.management.endpoint.processors;
+package io.micronaut.management.endpoint.annotation;
 
-import javax.inject.Singleton;
-import java.security.Principal;
-import java.util.Collections;
-import java.util.List;
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
+ * Annotation that can be applied to arguments that should be included in the endpoint URI.
  *
- * @author Sergio del Amo
+ * @author graemerocher
  * @since 1.0
  */
-@Singleton
-public class DefaultNonPathTypesProvider implements NonPathTypesProvider {
-
-    @Override
-    public List<Class> nonPathTypes() {
-        return Collections.singletonList(Principal.class);
-    }
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.PARAMETER})
+public @interface Selector {
 }

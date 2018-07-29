@@ -118,7 +118,7 @@ public class EurekaServiceInstance implements ServiceInstance {
     private URI createURI(InstanceInfo instanceInfo) {
         int securePort = instanceInfo.getSecurePort();
         if (securePort > 0) {
-            int port = instanceInfo.getPort();
+            int port = instanceInfo.getSecurePort();
             String portStr = port > 0 ? ":" + port : "";
             return URI.create("https://" + instanceInfo.getHostName() + portStr);
         } else {

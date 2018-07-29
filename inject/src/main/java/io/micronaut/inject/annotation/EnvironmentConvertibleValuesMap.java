@@ -18,9 +18,12 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.ConvertibleValuesMap;
+import io.micronaut.core.type.Argument;
 
 import java.util.Collection;
 import java.util.Map;
@@ -48,28 +51,46 @@ class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
     }
 
     @Override
+    public <T> Optional<T> get(CharSequence name, Class<T> requiredType) {
+        return get(name, ConversionContext.of(requiredType));
+    }
+
+    @Override
+    public <T> Optional<T> get(CharSequence name, Argument<T> requiredType) {
+        return get(name, ConversionContext.of(requiredType));
+    }
+
+    @Override
+    public <T> T get(CharSequence name, Class<T> requiredType, T defaultValue) {
+        return get(name, ConversionContext.of(requiredType)).orElse(defaultValue);
+    }
+
+    @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         V value = map.get(name);
-        PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
         if (value instanceof CharSequence) {
+            PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
             String str = doResolveIfNecessary((CharSequence) value, placeholderResolver);
             return environment.convert(str, conversionContext);
         } else if (value instanceof String[]) {
+            PropertyPlaceholderResolver placeholderResolver = environment.getPlaceholderResolver();
             String[] a = (String[]) value;
+            String[] b = new String[a.length];
             for (int i = 0; i < a.length; i++) {
-                a[i] = doResolveIfNecessary(a[i], placeholderResolver);
+                b[i] = doResolveIfNecessary(a[i], placeholderResolver);
             }
-            return environment.convert(a, conversionContext);
+            return environment.convert(b, conversionContext);
         } else if (value instanceof io.micronaut.core.annotation.AnnotationValue[]) {
             io.micronaut.core.annotation.AnnotationValue[] annotationValues = (io.micronaut.core.annotation.AnnotationValue[]) value;
+            io.micronaut.core.annotation.AnnotationValue[] b = new AnnotationValue[annotationValues.length];
             for (int i = 0; i < annotationValues.length; i++) {
                 io.micronaut.core.annotation.AnnotationValue annotationValue = annotationValues[i];
-                annotationValues[i] = new io.micronaut.core.annotation.AnnotationValue(annotationValue.getAnnotationName(), new EnvironmentConvertibleValuesMap<>(annotationValue.getValues(), environment));
+                b[i] = new EnvironmentAnnotationValue(environment, annotationValue);
             }
-            return environment.convert(annotationValues, conversionContext);
+            return environment.convert(b, conversionContext);
         } else if (value instanceof io.micronaut.core.annotation.AnnotationValue) {
             io.micronaut.core.annotation.AnnotationValue av = (io.micronaut.core.annotation.AnnotationValue) value;
-            av = new io.micronaut.core.annotation.AnnotationValue(av.getAnnotationName(), new EnvironmentConvertibleValuesMap<>(av.getValues(), environment));
+            av = new EnvironmentAnnotationValue(environment, av);
             return environment.convert(av, conversionContext);
         } else {
             return super.get(name, conversionContext);

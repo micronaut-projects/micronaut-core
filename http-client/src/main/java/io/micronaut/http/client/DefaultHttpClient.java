@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.convert.ConversionService;
@@ -114,7 +115,6 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Consumer;
 
 /**
  * Default implementation of the {@link HttpClient} interface based on Netty.
@@ -1059,26 +1059,27 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
             if (filter instanceof Toggleable && !((Toggleable) filter).isEnabled()) {
                 continue;
             }
-            Filter filterAnn = annotationMetadataResolver.resolveElement(filter).getAnnotation(Filter.class);
-            if (filterAnn != null) {
-                String[] clients = filterAnn.serviceId();
+            Optional<AnnotationValue<Filter>> filterOpt = annotationMetadataResolver.resolveMetadata(filter).findAnnotation(Filter.class);
+            if (filterOpt.isPresent()) {
+                AnnotationValue<Filter> filterAnn = filterOpt.get();
+                String[] clients = filterAnn.get("serviceId", String[].class).orElse(null);
                 if (!clientIdentifiers.isEmpty() && ArrayUtils.isNotEmpty(clients)) {
                     if (Arrays.stream(clients).noneMatch(id -> clientIdentifiers.contains(id))) {
                         // no matching clients
                         continue;
                     }
                 }
-                io.micronaut.http.HttpMethod[] methods = filterAnn.methods();
+                io.micronaut.http.HttpMethod[] methods = filterAnn.get("methods", io.micronaut.http.HttpMethod[].class, null);
                 if (ArrayUtils.isNotEmpty(methods)) {
                     if (!Arrays.asList(methods).contains(method)) {
                         continue;
                     }
                 }
-                String[] value = filterAnn.value();
-                if (value.length == 0) {
+                String[] patterns = filterAnn.getValue(String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
+                if (patterns.length == 0) {
                     filterList.add(filter);
                 } else {
-                    for (String pathPattern : value) {
+                    for (String pathPattern : patterns) {
                         if (PathMatcher.ANT.matches(pathPattern, requestPath)) {
                             filterList.add(filter);
                         }

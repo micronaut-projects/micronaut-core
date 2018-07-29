@@ -21,10 +21,14 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionSystemException;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.interceptor.TransactionAttribute;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -91,14 +95,21 @@ public class TransactionInterceptor implements MethodInterceptor<Object, Object>
         AnnotationMetadata annotationMetadata,
         String transactionManagerName) {
         return transactionDefinitionMap.computeIfAbsent(targetMethod, method -> {
-            Transactional annotation = annotationMetadata.getAnnotation(Transactional.class);
+            AnnotationValue<Transactional> annotation = annotationMetadata.getAnnotation(Transactional.class);
+
+            if (annotation == null) {
+                throw new IllegalStateException("No declared @Transactional annotation present");
+            }
+
             BindableRuleBasedTransactionAttribute attribute = new BindableRuleBasedTransactionAttribute();
-            attribute.setReadOnly(annotation.readOnly());
-            attribute.setTimeout(annotation.timeout());
-            attribute.setRollbackFor(annotation.rollbackFor());
-            attribute.setNoRollbackFor(annotation.noRollbackFor());
-            attribute.setPropagationBehavior(annotation.propagation().value());
-            attribute.setIsolationLevel(annotation.isolation().value());
+            attribute.setReadOnly(annotation.getRequiredValue("readOnly", Boolean.class));
+            attribute.setTimeout(annotation.getRequiredValue("timeout", Integer.class));
+            //noinspection unchecked
+            attribute.setRollbackFor(annotation.get("rollbackFor", Class[].class).orElse(ReflectionUtils.EMPTY_CLASS_ARRAY));
+            //noinspection unchecked
+            attribute.setNoRollbackFor(annotation.get("noRollbackFor", Class[].class).orElse(ReflectionUtils.EMPTY_CLASS_ARRAY));
+            attribute.setPropagationBehavior(annotation.getRequiredValue("propagation", Propagation.class).value());
+            attribute.setIsolationLevel(annotation.getRequiredValue("isolation", Isolation.class).value());
             attribute.setQualifier(transactionManagerName);
             return attribute;
         });
