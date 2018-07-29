@@ -125,24 +125,6 @@ public interface AnnotationMetadata extends AnnotationSource {
     List<String> getDeclaredAnnotationNamesTypeByStereotype(String stereotype);
 
     /**
-     * Get all of the values for the given annotation.
-     *
-     * @param annotation The annotation name
-     * @param <T> The annotation type
-     * @return A {@link AnnotationValue} instance
-     */
-    <T extends Annotation> Optional<AnnotationValue<T>> getValues(String annotation);
-
-    /**
-     * Get all of the values for the given annotation that are directly declared on the annotated element.
-     *
-     * @param annotation The annotation name
-     * @param <T> The annotation type
-     * @return A {@link AnnotationValue} instance
-     */
-    <T extends Annotation> Optional<AnnotationValue<T>> getDeclaredValues(String annotation);
-
-    /**
      * Get all of the values for the given annotation and type of the underlying values.
      *
      * @param annotation The annotation name
@@ -230,7 +212,7 @@ public interface AnnotationMetadata extends AnnotationSource {
             }
         } else {
 
-            Optional<? extends AnnotationValue<? extends Annotation>> values = getValues(annotation);
+            Optional<? extends AnnotationValue<? extends Annotation>> values = findAnnotation(annotation);
             Optional<T> value = values.flatMap(av -> av.get(member, requiredType));
             if (!value.isPresent()) {
                 if (hasStereotype(annotation)) {
@@ -363,7 +345,8 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param <T> The annotation type
      * @return The {@link AnnotationValue}
      */
-    default <T extends Annotation> Optional<AnnotationValue<T>> getValues(Class<T> annotation) {
+    @Override
+    default <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(Class<T> annotation) {
         Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
         if (repeatable != null) {
             List<AnnotationValue<T>> values = getAnnotationValuesByType(annotation);
@@ -374,7 +357,26 @@ public interface AnnotationMetadata extends AnnotationSource {
                 return Optional.empty();
             }
         } else {
-            return this.getValues(annotation.getName());
+            return this.findAnnotation(annotation.getName());
+        }
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    default <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(Class<T> annotation) {
+        Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
+        if (repeatable != null) {
+            List<AnnotationValue<T>> values = getDeclaredAnnotationValuesByType(annotation);
+            if (!values.isEmpty()) {
+                return Optional.of(values.iterator().next());
+            } else {
+                //noinspection unchecked
+                return Optional.empty();
+            }
+        } else {
+            return this.findDeclaredAnnotation(annotation.getName());
         }
     }
 
@@ -388,7 +390,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return An {@link Optional} of the value
      */
     default <T> Optional<T> getValue(String annotation, String member, Class<T> requiredType) {
-        Optional<T> value = getValues(annotation).flatMap(av -> av.get(member, requiredType));
+        Optional<T> value = findAnnotation(annotation).flatMap(av -> av.get(member, requiredType));
         if (!value.isPresent()) {
             if (hasStereotype(annotation)) {
                 return getDefaultValue(annotation, member, requiredType);
@@ -539,7 +541,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @return True if the value is true
      */
     default boolean isPresent(String annotation, String member) {
-        return getValues(annotation).map(av -> av.contains(member)).orElse(false);
+        return findAnnotation(annotation).map(av -> av.contains(member)).orElse(false);
     }
 
     /**

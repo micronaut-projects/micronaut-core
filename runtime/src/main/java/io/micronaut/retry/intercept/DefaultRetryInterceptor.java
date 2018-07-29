@@ -23,7 +23,6 @@ import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.retry.RetryState;
@@ -75,7 +74,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
 
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
-        Optional<AnnotationValue<Retryable>> opt = context.getValues(Retryable.class);
+        Optional<AnnotationValue<Retryable>> opt = context.findAnnotation(Retryable.class);
         if (!opt.isPresent()) {
             return context.proceed();
         }

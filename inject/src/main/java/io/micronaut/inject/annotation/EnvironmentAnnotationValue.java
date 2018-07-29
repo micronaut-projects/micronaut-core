@@ -18,11 +18,8 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.value.ConvertibleValues;
 
 import java.lang.annotation.Annotation;
-import java.util.Optional;
 
 /**
  * Adapts an {@link AnnotationValue} to the environment.
@@ -32,7 +29,6 @@ import java.util.Optional;
  * @param <A> The annotation type
  */
 class EnvironmentAnnotationValue<A extends Annotation> extends AnnotationValue<A> {
-    private final ConvertibleValues<Object> convertibleValues;
 
     /**
      * Default constructor.
@@ -40,21 +36,11 @@ class EnvironmentAnnotationValue<A extends Annotation> extends AnnotationValue<A
      * @param environment The environment
      * @param target The target
      */
-    EnvironmentAnnotationValue(Environment environment, AnnotationValue target) {
-        super(target.getAnnotationName(), target.getValues());
-        this.convertibleValues = EnvironmentConvertibleValuesMap.of(
+    EnvironmentAnnotationValue(Environment environment, AnnotationValue<A> target) {
+        super(target, AnnotationMetadataSupport.getDefaultValues(target.getAnnotationName()), EnvironmentConvertibleValuesMap.of(
                 environment,
                 target.getValues()
-        );
+        ));
     }
 
-    @Override
-    public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
-        return convertibleValues.get(name, conversionContext);
-    }
-
-    @Override
-    public ConvertibleValues<Object> getConvertibleValues() {
-        return convertibleValues;
-    }
 }

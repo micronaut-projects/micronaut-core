@@ -31,7 +31,6 @@ import io.micronaut.core.value.OptionalValues;
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
-import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Array;
 import java.util.*;
 
@@ -46,7 +45,7 @@ import java.util.*;
  * @since 1.0
  */
 @Internal
-public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implements AnnotationMetadata, AnnotatedElement, Cloneable {
+public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implements AnnotationMetadata, Cloneable {
 
     static {
         ConversionService.SHARED.addConverter(io.micronaut.core.annotation.AnnotationValue.class, Annotation.class, (TypeConverter<io.micronaut.core.annotation.AnnotationValue, Annotation>) (object, targetType, context) -> {
@@ -203,7 +202,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T extends Annotation> T[] getAnnotationsByType(Class<T> annotationClass) {
+    public <T extends Annotation> T[] synthesizeAnnotationsByType(Class<T> annotationClass) {
 
         if (annotationClass != null) {
             List<AnnotationValue<T>> values = getAnnotationValuesByType(annotationClass);
@@ -218,7 +217,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public <T extends Annotation> T[] getDeclaredAnnotationsByType(Class<T> annotationClass) {
+    public <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(Class<T> annotationClass) {
         if (annotationClass != null) {
             List<AnnotationValue<T>> values = getAnnotationValuesByType(annotationClass);
 
@@ -322,15 +321,15 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @SuppressWarnings("Duplicates")
     @Override
-    public <T extends Annotation> Optional<AnnotationValue<T>> getValues(String annotation) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
         if (allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
             Map<CharSequence, Object> values = allAnnotations.get(annotation);
             if (values != null) {
-                return Optional.of(new AnnotationValue<>(annotation, values));
+                return Optional.of(new AnnotationValue<>(annotation, values, AnnotationMetadataSupport.getDefaultValues(annotation)));
             } else if (allStereotypes != null) {
                 values = allStereotypes.get(annotation);
                 if (values != null) {
-                    return Optional.of(new AnnotationValue<>(annotation, values));
+                    return Optional.of(new AnnotationValue<>(annotation, values, AnnotationMetadataSupport.getDefaultValues(annotation)));
                 }
             }
         }
@@ -339,15 +338,15 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @SuppressWarnings("Duplicates")
     @Override
-    public <T extends Annotation> Optional<AnnotationValue<T>> getDeclaredValues(String annotation) {
+    public <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(String annotation) {
         if (declaredAnnotations != null && StringUtils.isNotEmpty(annotation)) {
             Map<CharSequence, Object> values = declaredAnnotations.get(annotation);
             if (values != null) {
-                return Optional.of(new AnnotationValue<>(annotation, values));
+                return Optional.of(new AnnotationValue<>(annotation, values, AnnotationMetadataSupport.getDefaultValues(annotation)));
             } else if (declaredStereotypes != null) {
                 values = declaredStereotypes.get(annotation);
                 if (values != null) {
-                    return Optional.of(new AnnotationValue<>(annotation, values));
+                    return Optional.of(new AnnotationValue<>(annotation, values, AnnotationMetadataSupport.getDefaultValues(annotation)));
                 }
             }
         }

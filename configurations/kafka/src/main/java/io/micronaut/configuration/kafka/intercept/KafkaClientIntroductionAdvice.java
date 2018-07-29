@@ -29,6 +29,7 @@ import io.micronaut.configuration.kafka.serde.SerdeRegistry;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
@@ -65,6 +66,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 /**
  * Implementation of the {@link io.micronaut.configuration.kafka.annotation.KafkaClient} advice annotation.
@@ -107,8 +109,9 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
     public final Object intercept(MethodInvocationContext<Object, Object> context) {
 
         if (context.hasAnnotation(Topic.class) && context.hasAnnotation(KafkaClient.class)) {
-            KafkaClient client = context.getAnnotation(KafkaClient.class);
-            boolean isBatchSend = client.batch();
+            AnnotationValue<KafkaClient> client = context.findAnnotation(KafkaClient.class).orElseThrow(() -> new IllegalStateException("No @KafkaClient annotation present on method: " + context));
+
+            boolean isBatchSend = client.getRequiredValue("batch", Boolean.class);
             String topic = context.getValue(Topic.class, String.class).orElse(null);
 
             if (StringUtils.isEmpty(topic)) {
@@ -120,39 +123,37 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
             }
 
             Argument keyArgument = Arrays.stream(context.getArguments())
-                    .filter(arg -> arg.getAnnotation(KafkaKey.class) != null)
+                    .filter(arg -> arg.isAnnotationPresent(KafkaKey.class))
                     .findFirst().orElse(null);
 
             KafkaProducer kafkaProducer = getProducer(bodyArgument, keyArgument, context);
 
             List<Header> kafkaHeaders = new ArrayList<>();
-            io.micronaut.messaging.annotation.Header[] headers = context.getAnnotationsByType(io.micronaut.messaging.annotation.Header.class);
+            List<AnnotationValue<io.micronaut.messaging.annotation.Header>> headers = context.getAnnotationValuesByType(io.micronaut.messaging.annotation.Header.class);
 
-            for (io.micronaut.messaging.annotation.Header header : headers) {
-                kafkaHeaders.add(
-                        new RecordHeader(
-                                header.name(),
-                                header.value().getBytes(StandardCharsets.UTF_8)
-                        )
-                );
+            for (AnnotationValue<io.micronaut.messaging.annotation.Header> header : headers) {
+                String name = header.get("name", String.class).orElse(null);
+                String value = header.getValue(String.class).orElse(null);
+
+                if (StringUtils.isNotEmpty(name) && StringUtils.isNotEmpty(value)) {
+                    kafkaHeaders.add(
+                            new RecordHeader(
+                                    name,
+                                    value.getBytes(StandardCharsets.UTF_8)
+                            )
+                    );
+                }
             }
 
             Argument[] arguments = context.getArguments();
             Map<String, Object> parameterValues = context.getParameterValueMap();
 
             for (Argument argument : arguments) {
-                io.micronaut.messaging.annotation.Header headerAnn = argument.getAnnotation(io.micronaut.messaging.annotation.Header.class);
+                AnnotationValue<io.micronaut.messaging.annotation.Header> headerAnn = argument.getAnnotation(io.micronaut.messaging.annotation.Header.class);
                 if (headerAnn != null) {
-                    String name = headerAnn.name();
-                    if (StringUtils.isEmpty(name)) {
-                        name = headerAnn.value();
-                    }
-
-                    if (StringUtils.isEmpty(name)) {
-                        name = argument.getName();
-                    }
-
-                    Object v = parameterValues.get(argument.getName());
+                    String argumentName = argument.getName();
+                    String name = headerAnn.get("name", String.class).orElse(headerAnn.getValue(String.class).orElse(argumentName));
+                    Object v = parameterValues.get(argumentName);
 
                     if (v != null) {
 
@@ -427,7 +428,7 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
 
     private Flowable buildSendFlowable(
             MethodInvocationContext<Object, Object> context,
-            KafkaClient client,
+            AnnotationValue<KafkaClient> client,
             String topic,
             Argument bodyArgument,
             KafkaProducer kafkaProducer,
@@ -458,7 +459,7 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
 
     private Flowable<Object> buildSendFlowable(
             MethodInvocationContext<Object, Object> context,
-            KafkaClient client,
+            AnnotationValue<KafkaClient> client,
             String topic,
             KafkaProducer kafkaProducer,
             List<Header> kafkaHeaders,
@@ -515,11 +516,11 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
     }
 
     @SuppressWarnings("unchecked")
-    private ProducerRecord buildProducerRecord(KafkaClient client, String topic, List<Header> kafkaHeaders, Object key, Object value) {
+    private ProducerRecord buildProducerRecord(AnnotationValue<KafkaClient> client, String topic, List<Header> kafkaHeaders, Object key, Object value) {
         return new ProducerRecord(
                         topic,
                         null,
-                        client.timestamp() ? System.currentTimeMillis() : null,
+                        client.getRequiredValue("timestamp", Boolean.class) ? System.currentTimeMillis() : null,
                         key,
                         value,
                         kafkaHeaders.isEmpty() ? null : kafkaHeaders
@@ -571,13 +572,17 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
                 );
             }
 
-            Property[] additionalProperties = metadata.getAnnotation(KafkaClient.class).properties();
+            List<AnnotationValue<Property>> additionalProperties = metadata.findAnnotation(KafkaClient.class).map(ann ->
+                    ann.getAnnotations("properties", Property.class)
+            ).orElse(Collections.emptyList());
 
-            for (Property additionalProperty : additionalProperties) {
-                newProperties.put(
-                        additionalProperty.name(),
-                        additionalProperty.value()
-                );
+            for (AnnotationValue<Property> additionalProperty : additionalProperties) {
+                String v = additionalProperty.getValue(String.class).orElse(null);
+                String n = additionalProperty.get("name", String.class).orElse(null);
+
+                if (StringUtils.isNotEmpty(n) && StringUtils.isNotEmpty(v)) {
+                    newProperties.put(n, v);
+                }
             }
 
             if (LOG.isDebugEnabled()) {

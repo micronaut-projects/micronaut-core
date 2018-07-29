@@ -14,13 +14,15 @@
  * limitations under the License.
  */
 
-package io.micronaut.management.endpoint;
+package io.micronaut.management.endpoint.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.management.endpoint.EndpointConfiguration;
+import io.micronaut.management.endpoint.EndpointEnabledCondition;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Documented;

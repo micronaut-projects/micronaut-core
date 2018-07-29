@@ -308,14 +308,19 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     protected Map<String, Object> resolveSubMap(String name, Map<String, Object> entries, ArgumentConversionContext<?> conversionContext) {
         // special handling for maps for resolving sub keys
         Map<String, Object> subMap = new LinkedHashMap<>();
-        MapFormat mapFormat = conversionContext.getAnnotation(MapFormat.class);
-        StringConvention keyConvention = mapFormat != null ? mapFormat.keyFormat() : StringConvention.RAW;
+        AnnotationMetadata annotationMetadata = conversionContext.getAnnotationMetadata();
+        StringConvention keyConvention = annotationMetadata.getValue(MapFormat.class, "keyFormat", StringConvention.class).orElse(StringConvention.RAW);
         String prefix = name + '.';
         for (Map.Entry<String, Object> map : entries.entrySet()) {
             if (map.getKey().startsWith(prefix)) {
                 String subMapKey = map.getKey().substring(prefix.length());
                 Object value = resolvePlaceHoldersIfNecessary(map.getValue());
-                MapFormat.MapTransformation transformation = mapFormat != null ? mapFormat.transformation() : MapFormat.MapTransformation.NESTED;
+                MapFormat.MapTransformation transformation = annotationMetadata.getValue(
+                        MapFormat.class,
+                        "transformation",
+                        MapFormat.MapTransformation.class)
+                .orElse(MapFormat.MapTransformation.NESTED);
+
                 if (transformation == MapFormat.MapTransformation.FLAT) {
                     subMapKey = keyConvention.format(subMapKey);
                     subMap.put(subMapKey, value);

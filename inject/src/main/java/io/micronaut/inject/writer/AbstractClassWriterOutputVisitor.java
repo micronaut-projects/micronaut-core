@@ -72,12 +72,18 @@ public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOut
                         serviceTypes.add(line);
                         line = bufferedReader.readLine();
                     }
-                } catch (FileNotFoundException x) {
-                    // doesn't exist
-                } catch (java.nio.file.NoSuchFileException x) {
+                } catch (FileNotFoundException | java.nio.file.NoSuchFileException x) {
                     // doesn't exist
                 } catch (IOException x) {
-                    throw new ClassGenerationException("Failed to load existing service definition files: " + x);
+                    Throwable cause = x.getCause();
+                    if (isNotEclipseNotFound(cause)) {
+                        throw new ClassGenerationException("Failed to load existing service definition files: " + x, x);
+                    }
+                } catch (Throwable e) {
+                    // horrible hack to support Eclipse
+                    if (isNotEclipseNotFound(e)) {
+                        throw new ClassGenerationException("Failed to load existing service definition files: " + e, e);
+                    }
                 }
 
                 // write out new definitions
@@ -87,11 +93,16 @@ public abstract class AbstractClassWriterOutputVisitor implements ClassWriterOut
                         writer.newLine();
                     }
                 } catch (IOException x) {
-                    throw new ClassGenerationException("Failed to load existing service definition files: " + x);
+                    throw new ClassGenerationException("Failed to open writer for service definition files: " + x);
                 }
 
             }
         }
+    }
+
+    private boolean isNotEclipseNotFound(Throwable e) {
+        String message = e.getMessage();
+        return !message.contains("does not exist") || !e.getClass().getName().equals("org.eclipse.core.internal.resources.ResourceException");
     }
 
 }

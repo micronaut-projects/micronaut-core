@@ -20,6 +20,9 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.TypeConvention;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.web.router.RouteBuilder;
 
 import javax.inject.Singleton;
@@ -36,6 +39,23 @@ public class HyphenatedUriNamingStrategy implements RouteBuilder.UriNamingStrate
     @Override
     public String resolveUri(Class type) {
         return '/' + TypeConvention.CONTROLLER.asHyphenatedName(type);
+    }
+
+    @Override
+    public String resolveUri(BeanDefinition<?> beanDefinition) {
+        String uri = normalizeUri(beanDefinition.getValue(Controller.class, String.class).orElse(null));
+        if (uri != null) {
+            return uri;
+        }
+
+        Class<?> beanType;
+        if (beanDefinition instanceof ProxyBeanDefinition) {
+            ProxyBeanDefinition pbd = (ProxyBeanDefinition) beanDefinition;
+            beanType = pbd.getTargetType();
+        } else {
+            beanType = beanDefinition.getBeanType();
+        }
+        return '/' + TypeConvention.CONTROLLER.asHyphenatedName(beanType);
     }
 
     @Override

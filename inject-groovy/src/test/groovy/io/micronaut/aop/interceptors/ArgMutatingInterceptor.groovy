@@ -29,7 +29,7 @@ class ArgMutatingInterceptor implements Interceptor {
 
     @Override
     Object intercept(InvocationContext context) {
-        Mutating m = context.getAnnotation(Mutating)
+        Mutating m = context.synthesize(Mutating)
         def arg = context.getParameters().get(m.value())
         if(arg != null) {
             def value = arg.value

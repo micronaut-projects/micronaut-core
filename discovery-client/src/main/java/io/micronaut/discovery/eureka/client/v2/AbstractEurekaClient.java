@@ -61,6 +61,17 @@ import java.util.stream.Collectors;
 @RequiresEureka
 abstract class AbstractEurekaClient implements EurekaClient {
 
+    private final EurekaConfiguration.EurekaDiscoveryConfiguration discoveryConfiguration;
+
+    /**
+     * Default constructor.
+     *
+     * @param discoveryConfiguration The discovery configuration.
+     */
+    protected AbstractEurekaClient(EurekaConfiguration.EurekaDiscoveryConfiguration discoveryConfiguration) {
+        this.discoveryConfiguration = discoveryConfiguration;
+    }
+
     @Override
     public String getDescription() {
         return EurekaClient.SERVICE_ID;
@@ -72,7 +83,12 @@ abstract class AbstractEurekaClient implements EurekaClient {
         Flowable<List<ServiceInstance>> flowable = Flowable.fromPublisher(getApplicationInfo(serviceId)).map(applicationInfo -> {
             List<InstanceInfo> instances = applicationInfo.getInstances();
             return instances.stream()
-                .map(EurekaServiceInstance::new)
+                .map(ii -> {
+                    if (!discoveryConfiguration.isUseSecurePort()) {
+                        ii.setSecurePort(-1);
+                    }
+                    return new EurekaServiceInstance(ii);
+                })
                 .collect(Collectors.toList());
         });
 

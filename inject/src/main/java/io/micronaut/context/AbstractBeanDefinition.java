@@ -46,7 +46,6 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
-import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -717,7 +716,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     return ((DefaultBeanContext) context).createBean(resolutionContext, argumentType, null);
                 } else {
                     String argumentName = argument.getName();
-                    Class<?> declaringClass = injectionPoint.getMethod().getDeclaringClass();
                     String valString = resolvePropertyValueName(resolutionContext, injectionPoint.getAnnotationMetadata(), argument, valueAnnStr);
 
 
@@ -763,7 +761,6 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
             Argument argument = injectionPoint.getArguments()[argIndex];
             String argumentName = argument.getName();
-            Class<?> declaringClass = injectionPoint.getMethod().getDeclaringClass();
             Class beanType = injectionPoint.getDeclaringBean().getBeanType();
             String valueAnnStr = argument.getAnnotationMetadata().getValue(Value.class, String.class).orElse(null);
             String valString = resolvePropertyValueName(resolutionContext, injectionPoint.getAnnotationMetadata(), argument, valueAnnStr);

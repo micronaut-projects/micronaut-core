@@ -29,12 +29,12 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.configuration.hystrix.annotation.Hystrix;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.retry.intercept.RecoveryInterceptor;
@@ -43,11 +43,13 @@ import rx.SingleSubscriber;
 
 import javax.inject.Singleton;
 import java.lang.reflect.Method;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Supplier;
 
 /**
  * A {@link MethodInterceptor} that adds support for decorating methods for Hystrix.
@@ -91,20 +93,16 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         Class<io.micronaut.configuration.hystrix.annotation.HystrixCommand> annotationType = io.micronaut.configuration.hystrix.annotation.HystrixCommand.class;
-        Hystrix settings = context.getAnnotation(Hystrix.class);
-        io.micronaut.configuration.hystrix.annotation.HystrixCommand cmd = context.getAnnotation(annotationType);
+        AnnotationValue<Hystrix> settings = context.getAnnotation(Hystrix.class);
+        AnnotationValue<io.micronaut.configuration.hystrix.annotation.HystrixCommand> cmd = context.getAnnotation(annotationType);
         if (cmd == null) {
             return context.proceed();
         } else {
 
             String hystrixGroup = resolveHystrixGroup(context, settings);
-            String commandName = cmd.value();
-            if (StringUtils.isEmpty(commandName)) {
-                commandName = context.getMethodName();
-            }
-            boolean hasSettings = settings != null;
-            String threadPool = hasSettings ? settings.threadPool() : null;
-            boolean wrapExceptions = hasSettings && settings.wrapExceptions();
+            String commandName = cmd.getValue(String.class).orElse(context.getMethodName());
+            String threadPool = settings != null ? settings.get("threadPool", String.class, null) : null;
+            boolean wrapExceptions = settings != null ? settings.getRequiredValue("wrapExceptions", Boolean.class) : false;
 
             ReturnType<Object> returnType = context.getReturnType();
             Class<Object> javaReturnType = returnType.getType();
@@ -113,9 +111,8 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
 
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
             if (Publishers.isConvertibleToPublisher(javaReturnType) || isFuture) {
-                String finalCommandName = commandName;
                 HystrixObservableCommand.Setter setter = observableSetterMap.computeIfAbsent(context.getTargetMethod(), method ->
-                    buildObservableSetter(hystrixGroup, finalCommandName, settings)
+                    buildObservableSetter(hystrixGroup, commandName, settings)
                 );
 
                 HystrixObservableCommand<Object> command = new HystrixObservableCommand<Object>(setter) {
@@ -224,7 +221,7 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
     }
 
     @SuppressWarnings("Duplicates")
-    private HystrixCommand.Setter buildSetter(String hystrixGroup, String commandName, String threadPool, Hystrix settings) {
+    private HystrixCommand.Setter buildSetter(String hystrixGroup, String commandName, String threadPool, AnnotationValue<Hystrix> settings) {
         HystrixCommand.Setter setter = HystrixCommand.Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey(hystrixGroup));
         HystrixCommandKey commandKey = HystrixCommandKey.Factory.asKey(commandName);
         setter.andCommandKey(commandKey);
@@ -232,16 +229,17 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
             setter.andThreadPoolKey(HystrixThreadPoolKey.Factory.asKey(threadPool));
         }
         if (settings != null) {
-            Property[] properties = settings.commandProperties();
-            if (ArrayUtils.isNotEmpty(properties)) {
+            List<AnnotationValue<Property>> properties = settings.getAnnotations("commandProperties", Property.class);
+            if (!properties.isEmpty()) {
 
                 HystrixCommandProperties.Setter instance = buildCommandProperties(properties);
                 setter.andCommandPropertiesDefaults(
                     instance
                 );
             }
-            Property[] threadPoolProps = settings.threadPoolProperties();
-            if (ArrayUtils.isNotEmpty(threadPoolProps)) {
+
+            List<AnnotationValue<Property>> threadPoolProps = settings.getAnnotations("threadPoolProperties", Property.class);
+            if (!threadPoolProps.isEmpty()) {
 
                 HystrixThreadPoolProperties.Setter threadPoolPropsInstance = buildThreadPoolProperties(properties);
                 setter.andThreadPoolPropertiesDefaults(
@@ -253,24 +251,24 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
         return setter;
     }
 
-    private HystrixCommandProperties.Setter buildCommandProperties(Property[] properties) {
+    private HystrixCommandProperties.Setter buildCommandProperties(List<AnnotationValue<Property>> properties) {
         Class<HystrixCommandProperties.Setter> setterClass = HystrixCommandProperties.Setter.class;
         HystrixCommandProperties.Setter instance = HystrixCommandProperties.defaultSetter();
         return buildPropertiesDynamic(properties, setterClass, instance);
     }
 
-    private HystrixThreadPoolProperties.Setter buildThreadPoolProperties(Property[] properties) {
+    private HystrixThreadPoolProperties.Setter buildThreadPoolProperties(List<AnnotationValue<Property>> properties) {
         return buildPropertiesDynamic(
             properties,
             HystrixThreadPoolProperties.Setter.class,
             HystrixThreadPoolProperties.defaultSetter());
     }
 
-    private <T> T buildPropertiesDynamic(Property[] properties, Class<T> setterClass, T instance) {
-        for (Property property : properties) {
-            String name = property.name();
+    private <T> T buildPropertiesDynamic(List<AnnotationValue<Property>> properties, Class<T> setterClass, T instance) {
+        for (AnnotationValue<Property> property : properties) {
+            String name = property.get("name", String.class).orElse(null);
             if (StringUtils.isNotEmpty(name)) {
-                String value = property.value();
+                String value = property.getValue(String.class).orElse(null);
                 if (StringUtils.isNotEmpty(value)) {
                     String methodName = "with" + NameUtils.capitalize(name);
                     Optional<Method> method = ReflectionUtils.findMethodsByName(setterClass, methodName)
@@ -299,15 +297,14 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
     }
 
     @SuppressWarnings("Duplicates")
-    private HystrixObservableCommand.Setter buildObservableSetter(String hystrixGroup, String commandName, Hystrix settings) {
+    private HystrixObservableCommand.Setter buildObservableSetter(String hystrixGroup, String commandName, AnnotationValue<Hystrix> settings) {
         HystrixObservableCommand.Setter setter = HystrixObservableCommand.Setter.withGroupKey(HystrixCommandGroupKey.Factory.asKey(hystrixGroup));
         HystrixCommandKey commandKey = HystrixCommandKey.Factory.asKey(commandName);
         setter.andCommandKey(commandKey);
 
         if (settings != null) {
-            Property[] properties = settings.commandProperties();
-            if (ArrayUtils.isNotEmpty(properties)) {
-
+            List<AnnotationValue<Property>> properties = settings.getAnnotations("commandProperties", Property.class);
+            if (!properties.isEmpty()) {
                 HystrixCommandProperties.Setter instance = buildCommandProperties(properties);
                 setter.andCommandPropertiesDefaults(
                     instance
@@ -319,11 +316,16 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
     }
 
     private String resolveHystrixGroup(MethodInvocationContext<Object, Object> context,
-                                       Hystrix ann) {
-        String group = ann != null ? ann.group() : null;
-        if (StringUtils.isEmpty(group)) {
-            return context.getValue("io.micronaut.http.client.Client", "id", String.class).orElse(context.getDeclaringType().getSimpleName());
+                                       AnnotationValue<Hystrix> settings) {
+
+        Supplier<String> groupSupplier = () ->
+                context.getValue("io.micronaut.http.client.Client", "id", String.class)
+                        .orElse(context.getDeclaringType().getSimpleName());
+
+        if (settings != null) {
+            return settings.get("group", String.class).orElseGet(groupSupplier);
+        } else {
+            return groupSupplier.get();
         }
-        return group;
     }
 }

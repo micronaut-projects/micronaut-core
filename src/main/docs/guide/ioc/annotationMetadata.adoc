@@ -16,7 +16,7 @@ Collection<BeanDefinition> definitions =
     beanContext.getBeanDefinitions(Qualifiers.byStereotype(Controller.class))
 
 for(BeanDefinition definition : definitions) {
-    Controller controllerAnn = definition.getAnnotation(Controller.class);
+    Controller controllerAnn = definition.synthesize(Controller.class);
     // do something with the annotation
 }
 ----

@@ -16,9 +16,9 @@
 
 package io.micronaut.configuration.kafka.bind;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.messaging.annotation.Header;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.common.header.Headers;
@@ -44,17 +44,11 @@ public class KafkaHeaderBinder<T> implements AnnotatedConsumerRecordBinder<Heade
     @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> context, ConsumerRecord<?, ?> source) {
         Headers headers = source.headers();
-        Header annotation = context.getAnnotation(Header.class);
+        AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
 
-        String name = annotation.name();
-        if (StringUtils.isEmpty(name)) {
-            name = annotation.value();
-        }
-
-        if (StringUtils.isEmpty(name)) {
-            name = context.getArgument().getName();
-        }
-
+        String name = annotationMetadata.getValue(Header.class, "name", String.class)
+                                        .orElseGet(() -> annotationMetadata.getValue(Header.class, String.class)
+                                                                           .orElse(context.getArgument().getName()));
         Iterable<org.apache.kafka.common.header.Header> value = headers.headers(name);
 
         if (value.iterator().hasNext()) {

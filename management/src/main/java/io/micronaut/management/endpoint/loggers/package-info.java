@@ -14,20 +14,10 @@
  * limitations under the License.
  */
 
-package io.micronaut.management.endpoint.processors;
-
-import java.util.List;
-
 /**
- * Defines a list of types which will not be used as path parameters.
+ * Loggers management endpoint.
  *
- * @author Sergio del Amo
+ * @author Matthew Moss
  * @since 1.0
  */
-public interface NonPathTypesProvider {
-
-    /**
-     * @return The non-path types
-     */
-    List<Class> nonPathTypes();
-}
+package io.micronaut.management.endpoint.loggers;
