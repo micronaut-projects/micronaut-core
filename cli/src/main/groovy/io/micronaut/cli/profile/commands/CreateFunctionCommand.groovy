@@ -54,6 +54,8 @@ class CreateFunctionCommand extends AbstractCreateCommand {
     @Option(names = ['-b', '--build'], paramLabel = 'BUILD-TOOL', description = 'Which build tool to configure. Possible values: ${COMPLETION-CANDIDATES}.')
     SupportedBuildTool build = SupportedBuildTool.gradle
 
+    protected static final String DEFAULT_PROFILE_NAME = "function-aws"
+
     CreateFunctionCommand() {
     }
 
@@ -81,7 +83,8 @@ class CreateFunctionCommand extends AbstractCreateCommand {
         final CreateServiceCommandObject cmd = new CreateServiceCommandObject(
                 appName: this.functionName,
                 baseDir: executionContext.baseDir,
-                profileName: this.profile ?: getDefaultProfile(),
+                lang: lang.name(),
+                profileName: functionProfile,
                 micronautVersion: VersionInfo.getVersion(MicronautCli),
                 features: selectedFeatures,
                 inplace: this.inplace,
