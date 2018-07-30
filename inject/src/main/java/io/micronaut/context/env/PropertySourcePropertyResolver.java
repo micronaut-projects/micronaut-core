@@ -32,7 +32,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Properties;
+import java.util.Random;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -202,11 +215,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                     value = resolvePlaceHoldersIfNecessary(value);
                     Optional<T> converted = conversionService.convert(value, conversionContext);
                     if (LOG.isTraceEnabled()) {
-                       if (converted.isPresent()) {
-                           LOG.trace("Resolved value [{}] for property: {}", converted.get(), name);
-                       } else {
-                           LOG.trace("Resolved value [{}] cannot be converted to type [{}] for property: {}", value, conversionContext.getArgument(), name);
-                       }
+                        if (converted.isPresent()) {
+                            LOG.trace("Resolved value [{}] for property: {}", converted.get(), name);
+                        } else {
+                            LOG.trace("Resolved value [{}] cannot be converted to type [{}] for property: {}", value, conversionContext.getArgument(), name);
+                        }
                     }
                     return converted;
                 } else if (Properties.class.isAssignableFrom(requiredType)) {
@@ -222,7 +235,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             }
         }
         if (LOG.isTraceEnabled()) {
-                LOG.trace("No value found for property: {}", name);
+            LOG.trace("No value found for property: {}", name);
         }
 
         Class<T> requiredType = conversionContext.getArgument().getType();
@@ -319,7 +332,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                         MapFormat.class,
                         "transformation",
                         MapFormat.MapTransformation.class)
-                .orElse(MapFormat.MapTransformation.NESTED);
+                        .orElse(MapFormat.MapTransformation.NESTED);
 
                 if (transformation == MapFormat.MapTransformation.FLAT) {
                     subMapKey = keyConvention.format(subMapKey);
@@ -376,17 +389,26 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                             switch (type) {
                                 case "port":
                                     randomValue = String.valueOf(SocketUtils.findAvailableTcpPort());
-                                break;
+                                    break;
                                 case "int":
                                 case "integer":
                                     randomValue = String.valueOf(random.nextInt());
-                                break;
+                                    break;
                                 case "long":
                                     randomValue = String.valueOf(random.nextLong());
-                                break;
+                                    break;
                                 case "float":
                                     randomValue = String.valueOf(random.nextFloat());
-                                break;
+                                    break;
+                                case "shortuuid":
+                                    randomValue = UUID.randomUUID().toString().substring(25, 35);
+                                    break;
+                                case "uuid":
+                                    randomValue = UUID.randomUUID().toString();
+                                    break;
+                                case "uuid2":
+                                    randomValue = UUID.randomUUID().toString().replaceAll("-", "");
+                                    break;
                                 default:
                                     throw new ConfigurationException("Invalid random expression " + matcher.group(0) + " for property: " + property);
                             }
