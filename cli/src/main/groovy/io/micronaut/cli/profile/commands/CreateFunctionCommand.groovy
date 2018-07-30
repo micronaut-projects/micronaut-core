@@ -74,7 +74,7 @@ class CreateFunctionCommand extends AbstractCreateCommand {
         final CreateServiceCommandObject cmd = new CreateServiceCommandObject(
                 appName: this.functionName,
                 baseDir: executionContext.baseDir,
-                profileName: this.profile ?: getDefaultProfile(),
+                profileName: functionProfile,
                 micronautVersion: VersionInfo.getVersion(MicronautCli),
                 features: selectedFeatures,
                 inplace: this.inplace,
@@ -90,7 +90,7 @@ class CreateFunctionCommand extends AbstractCreateCommand {
     }
 
     protected String evaluateLangFeature(String profile) {
-        "${profile}-${lang}"
+        "${profile}-${lang.name()}"
     }
 
     protected String evaluateTestFeature() {
