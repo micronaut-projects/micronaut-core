@@ -13,30 +13,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.config.properties
+package io.micronaut.docs.config.mapFormat
 
-import javax.inject.Singleton
+import io.micronaut.context.ApplicationContext
+import spock.lang.Specification
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-// tag::class[]
-@Singleton
-class EngineImpl implements Engine {
-    final EngineConfig config
+class VehicleSpec extends Specification {
 
-    EngineImpl(EngineConfig config) { // <1>
-        this.config = config
-    }
+    void "test start vehicle"() {
 
-    @Override
-    int getCylinders() {
-        config.cylinders
-    }
 
-    String start() { // <2>
-        "${config.manufacturer} Engine Starting V${config.cylinders} [rodLength=${config.crankShaft.rodLength.orElse(6.0d)}]"
+        when:
+        // tag::start[]
+        ApplicationContext applicationContext = ApplicationContext.run(
+                ['my.engine.cylinders': '8', 'my.engine.sensors': [0: 'thermostat', 1: 'fuel pressure']],
+                "test"
+        )
+
+        Vehicle vehicle = applicationContext
+                .getBean(Vehicle)
+        println(vehicle.start())
+        // end::start[]
+
+        then:
+        vehicle.start() == "Engine Starting V8 [sensors=2]"
     }
 }
-// end::class[]

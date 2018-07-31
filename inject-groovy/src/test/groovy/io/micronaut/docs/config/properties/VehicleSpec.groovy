@@ -30,7 +30,7 @@ class VehicleSpec extends Specification {
         when:
         // tag::start[]
         ApplicationContext applicationContext = ApplicationContext.run(
-                ['my.engine.cylinders':'8'],
+                ['my.engine.cylinders': '8'],
                 "test"
         )
 

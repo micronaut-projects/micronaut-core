@@ -13,7 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.config.properties
+package io.micronaut.docs.config.mapFormat
+
 
 import javax.inject.Singleton
 
@@ -23,20 +24,15 @@ import javax.inject.Singleton
  */
 // tag::class[]
 @Singleton
-class EngineImpl implements Engine {
-    final EngineConfig config
+class Vehicle {
+    final Engine engine
 
-    EngineImpl(EngineConfig config) { // <1>
-        this.config = config
+    Vehicle(Engine engine) {
+        this.engine = engine
     }
 
-    @Override
-    int getCylinders() {
-        config.cylinders
-    }
-
-    String start() { // <2>
-        "${config.manufacturer} Engine Starting V${config.cylinders} [rodLength=${config.crankShaft.rodLength.orElse(6.0d)}]"
+    String start() {
+        engine.start()
     }
 }
 // end::class[]
