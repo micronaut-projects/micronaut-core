@@ -23,6 +23,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.filter.HttpFilter;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.net.URI;
 import java.util.*;
@@ -49,7 +50,8 @@ public class DefaultRouter implements Router {
      *
      * @param builders The builders
      */
-    public DefaultRouter(RouteBuilder... builders) {
+    @Inject
+    public DefaultRouter(Collection<RouteBuilder> builders) {
         List<UriRoute> getRoutes = new ArrayList<>();
         List<UriRoute> putRoutes = new ArrayList<>();
         List<UriRoute> postRoutes = new ArrayList<>();
@@ -134,6 +136,15 @@ public class DefaultRouter implements Router {
                     // no-op
             }
         }
+    }
+
+    /**
+     * Construct a new router for the given route builders.
+     *
+     * @param builders The builders
+     */
+    public DefaultRouter(RouteBuilder... builders) {
+        this(Arrays.asList(builders));
     }
 
     @SuppressWarnings("unchecked")
