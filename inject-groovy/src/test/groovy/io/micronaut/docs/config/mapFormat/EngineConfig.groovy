@@ -13,37 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.config.properties
+package io.micronaut.docs.config.mapFormat
 
 import io.micronaut.context.annotation.ConfigurationProperties
-import io.micronaut.core.convert.format.MapFormat
+import javax.validation.constraints.Min
 
 // tag::imports[]
-import org.hibernate.validator.constraints.NotBlank
-import io.micronaut.context.annotation.ConfigurationProperties
-
-import javax.validation.constraints.Min
+import io.micronaut.core.convert.format.MapFormat
 // end::imports[]
 
 /**
- * @author Graeme Rocher
+ * @author Zachary Klein
  * @since 1.0
  */
 // tag::class[]
-@ConfigurationProperties('my.engine') // <1>
+@ConfigurationProperties('my.engine')
 class EngineConfig {
-
-    @NotBlank // <2>
-    String manufacturer = "Ford" // <3>
 
     @Min(1L)
     int cylinders
-    CrankShaft crankShaft = new CrankShaft()
 
-    @ConfigurationProperties('crank-shaft')
-    static class CrankShaft { // <4>
-        Optional<Double> rodLength = Optional.empty() // <5>
-    }
+    @MapFormat(transformation = MapFormat.MapTransformation.FLAT) //<1>
+    Map<Integer, String> sensors
 
 }
 // end::class[]
