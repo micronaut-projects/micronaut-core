@@ -37,7 +37,7 @@ abstract class AbstractCreateAppCommand extends AbstractCreateCommand {
 
     // note: description contains a variable that will be replaced by picocli, not by Groovy
     @Option(names = ['-l', '--lang'], paramLabel = 'LANG', description = 'Which language to use. Possible values: ${COMPLETION-CANDIDATES}.')
-    SupportedLanguage lang = SupportedLanguage.java
+    SupportedLanguage lang
 
     // note: description contains a variable that will be replaced by picocli, not by Groovy
     @Option(names = ['-b', '--build'], paramLabel = 'BUILD-TOOL', description = 'Which build tool to configure. Possible values: ${COMPLETION-CANDIDATES}.')
@@ -51,9 +51,6 @@ abstract class AbstractCreateAppCommand extends AbstractCreateCommand {
 
         Set<String> selectedFeatures = new HashSet<>()
         selectedFeatures.addAll(features)
-        if (profileName != 'profile') {
-            selectedFeatures.add(resolveLang())
-        }
 
         CreateServiceCommandObject cmd = new CreateServiceCommandObject(
                 appName: this.nameOfAppToCreate,
@@ -61,6 +58,7 @@ abstract class AbstractCreateAppCommand extends AbstractCreateCommand {
                 profileName: profileName,
                 micronautVersion: VersionInfo.getVersion(MicronautCli),
                 features: selectedFeatures,
+                lang: (profileName != 'profile') ? resolveLang() : null,
                 inplace: this.inplace,
                 build: this.build.name(),
                 console: executionContext.console
