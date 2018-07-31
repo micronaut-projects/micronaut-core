@@ -1,3 +1,0 @@
-Often you want to run your Microservice as a standalone application in its own process.
-You may want your standalone application to support some command line options and positional parameters to allow users control the behaviour of the application.
-Alternatively you may want to create command line clients to remotely administer your microservices.
