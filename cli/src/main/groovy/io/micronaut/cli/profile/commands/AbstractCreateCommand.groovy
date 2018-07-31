@@ -23,30 +23,20 @@ import io.micronaut.cli.MicronautCli
 import io.micronaut.cli.console.logging.ConsoleAntBuilder
 import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.io.IOUtils
-import io.micronaut.cli.io.support.FileSystemResource
-import io.micronaut.cli.io.support.GradleBuildTokens
-import io.micronaut.cli.io.support.MavenBuildTokens
-import io.micronaut.cli.io.support.Resource
-import io.micronaut.cli.io.support.XmlMerger
+import io.micronaut.cli.io.support.*
 import io.micronaut.cli.profile.Feature
-import io.micronaut.cli.profile.OneOfFeature
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.ProfileRepository
 import io.micronaut.cli.profile.ProfileRepositoryAware
 import io.micronaut.cli.util.NameUtils
 import io.micronaut.cli.util.VersionInfo
-import picocli.CommandLine
 import picocli.CommandLine.Command
 import picocli.CommandLine.Mixin
+import picocli.CommandLine.Model.CommandSpec
 import picocli.CommandLine.Option
 import picocli.CommandLine.Spec
-import picocli.CommandLine.Model.CommandSpec
 
-import java.nio.file.FileVisitResult
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.Paths
-import java.nio.file.SimpleFileVisitor
+import java.nio.file.*
 import java.nio.file.attribute.BasicFileAttributes
 
 /**
@@ -86,7 +76,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
     String defaultpackagename
     File targetDirectory
 
-    AbstractCreateCommand() { }
+    AbstractCreateCommand() {}
 
     abstract String getName();
 
@@ -115,14 +105,19 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         // the command to get the profile repository, the selected profile, and selected features from
         private AbstractCreateCommand createCommand
 
-        @Override Iterator<String> iterator() {
-            if (!createCommand) { return Collections.emptyIterator() }
+        @Override
+        Iterator<String> iterator() {
+            if (!createCommand) {
+                return Collections.emptyIterator()
+            }
 
             def profile = createCommand.profileRepository.getProfile(createCommand.profile ?: createCommand.getDefaultProfile())
             def featureNames = profile.features.collect() { Feature f -> f.name }
 
             // if no feature specified, show all features for the selected profile
-            if (!createCommand.features) { return featureNames.iterator() }
+            if (!createCommand.features) {
+                return featureNames.iterator()
+            }
 
             // otherwise only show features not chosen yet
             featureNames.findAll { String f ->
@@ -131,7 +126,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         }
 
         static void initCommandArgs(AbstractCreateCommand command) {
-            command.commandSpec.options().each              { init(it.completionCandidates(), command) }
+            command.commandSpec.options().each { init(it.completionCandidates(), command) }
             command.commandSpec.positionalParameters().each { init(it.completionCandidates(), command) }
         }
 
@@ -274,7 +269,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             return false
         }
 
-        List<Feature> features = evaluateFeatures(profileInstance, cmd.features).toList()
+        List<Feature> features = evaluateFeatures(profileInstance, cmd.features, cmd.lang).toList()
 
         if (profileInstance) {
             if (!initializeGroupAndName(cmd.appName, cmd.inplace)) {
@@ -364,7 +359,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         return true
     }
 
-    protected boolean validateBuild(String buildName) {
+    protected boolean  validateBuild(String buildName) {
         if (!SupportedBuildTool.names().contains(buildName)) {
             MicronautConsole.instance.error("Build not one of the supported types [$buildName]. Supported types are ${SupportedBuildTool.quoted().join(', ')}.")
             return false
@@ -448,7 +443,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         }
     }
 
-    protected String evaluateTestFramework(List<String> features) {
+    protected static String evaluateTestFramework(List<String> features) {
         String testFramework = null
         if (features.contains("spock"))
             testFramework = "spock"
@@ -460,7 +455,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         testFramework
     }
 
-    protected String evaluateSourceLanguage(List<String> features) {
+    protected static String evaluateSourceLanguage(List<String> features) {
         String sourceLanguage = null
         if (features.contains("groovy"))
             sourceLanguage = "groovy"
@@ -477,13 +472,39 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
     }
 
     @CompileStatic(TypeCheckingMode.SKIP)
-    protected Iterable<Feature> evaluateFeatures(Profile profile, Set<String> requestedFeatures) {
+    protected static Iterable<Feature> evaluateFeatures(Profile profile, Set<String> requestedFeatures, String lang) {
+
+        def (Set<Feature> features, List<String> validRequestedFeatureNames) = populateFeatures(profile, requestedFeatures, lang)
+        features = pruneOneOfFeatures(profile, features)
+
+
+        println "Generating ${getLanguage(features).capitalize()} project..."
+
+
+        List<String> removedFeatures = validRequestedFeatureNames.findAll { !features*.name.contains(it) }
+
+        if (removedFeatures) {
+            StringBuilder warning = new StringBuilder("The following features are incompatible with your language selection and have been removed from the project")
+            warning.append(System.getProperty('line.separator'))
+            warning.append("| ${removedFeatures.join(", ")}")
+            MicronautConsole.getInstance().warn(warning.toString())
+        }
+
+        features = addDependentFeatures(profile, features)
+        features
+    }
+
+    @CompileStatic(TypeCheckingMode.SKIP)
+    protected static Tuple populateFeatures(Profile profile, Set<String> requestedFeatures, String lang) {
         Set<Feature> features = []
-        List<String> validRequestedFeatureNames
+        List<String> validRequestedFeatureNames = []
 
         if (requestedFeatures) {
             List<String> allFeatureNames = profile.features*.name
             validRequestedFeatureNames = requestedFeatures.intersect(allFeatureNames) as List<String>
+
+            if (lang) validRequestedFeatureNames.add(lang)
+
             requestedFeatures.removeAll(allFeatureNames)
             requestedFeatures.each { String invalidFeature ->
                 List possibleSolutions = allFeatureNames.findAll {
@@ -504,56 +525,81 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             features.addAll(profile.defaultFeatures)
         }
 
+        Feature langFeature = profile.features.find { Feature f ->
+            if (lang) return f.name == lang
+            return f.name == SupportedLanguage.java.name()
+        } as Feature
+
+        features.add(langFeature)
         features.addAll(profile.requiredFeatures)
-
-        if (!profile.oneOfFeatures.empty) {
-            List<Feature> toRemove = []
-            boolean remove = false
-            for (OneOfFeature oneOf: profile.oneOfFeatures) {
-                boolean isOneOf = features.contains(oneOf.feature)
-                if (isOneOf) {
-                    if (remove) {
-                        toRemove.add(oneOf.feature)
-                    } else {
-                        remove = true
-                    }
-                }
-            }
-
-            features.removeAll(toRemove)
-        }
-
-        Integer javaVersion = VersionInfo.getJavaVersion()
-
-        features = features.findAll { it.isSupported(javaVersion) }
-
-        for (int i = 0; i < features.size(); i++) {
-            Iterator<Feature> dependents = features[i].getDependentFeatures(profile).iterator()
-            while (dependents.hasNext()) {
-                Feature d = dependents.next()
-                if (d.isSupported(javaVersion)) {
-                    features.add(d)
-                }
-            }
-        }
 
         if (validRequestedFeatureNames) {
             features = features.each { feature ->
-                if (validRequestedFeatureNames.contains(feature.name)) {
-                    feature.setRequested(true)
+                if (validRequestedFeatureNames.contains(feature.name) || (lang && feature.name == lang)) {
+                    feature.requested = true
                 }
             }.toSet()
+        }
+
+        features = addDependentFeatures(profile, features, true)
+
+        [features, validRequestedFeatureNames]
+    }
+
+
+    protected static Set<Feature> pruneOneOfFeatures(Profile profile, Set<Feature> features) {
+        if (!profile.oneOfFeatures.empty) {
+            Set<Feature> toRemove = features.findAll { profile.oneOfFeatures*.feature.contains(it) }
+
+            Feature requestedOneOf = toRemove.find { it.requested }
+            if (requestedOneOf) {
+                toRemove.remove(requestedOneOf)
+            } else {
+                toRemove.remove(toRemove[0])
+            }
+
+            if (!toRemove.isEmpty()) {
+                features.removeAll(toRemove)
+                features = features.findAll { !it.getDependentFeatures(profile).any { toRemove.contains(it) } }
+            }
+        }
+        features
+    }
+
+    protected static Set<Feature> addDependentFeatures(Profile profile, Set<Feature> features, Boolean oneOfOnly = false) {
+        Integer javaVersion = VersionInfo.getJavaVersion()
+        features = features.findAll { it.isSupported(javaVersion) }
+
+        for (int i = 0; i < features.size(); i++) {
+            Feature feature = features[i]
+
+            Iterator<Feature> dependents = feature.getDependentFeatures(profile).iterator()
+            while (dependents.hasNext()) {
+                Feature d = dependents.next()
+
+                if (!oneOfOnly || profile.oneOfFeatures*.feature*.name?.contains(d.name)) {
+                    if (d.isSupported(javaVersion)) {
+                        if (feature.requested) {
+                            d.requested = true
+                        }
+                        features.add(d)
+                    }
+                }
+            }
         }
 
         features
     }
 
+    protected static String getLanguage(Set<Feature> features) {
+        features.find { SupportedLanguage.values()*.name().contains(it.name)}.name
+    }
 
     protected String getDefaultProfile() {
         ProfileRepository.DEFAULT_PROFILE_NAME
     }
 
-    protected String createNewApplicationYml(String previousYml, String newYml) {
+    protected static String createNewApplicationYml(String previousYml, String newYml) {
         def ln = System.getProperty("line.separator")
         if (newYml != previousYml) {
             StringBuilder appended = new StringBuilder(previousYml.length() + newYml.length() + 30)
@@ -737,6 +783,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         String profileName
         String micronautVersion
         Set<String> features
+        String lang
         boolean inplace = false
         String build = "gradle"
         MicronautConsole console
