@@ -8,7 +8,6 @@ quickStart:
     installSdkman: Install with Sdkman
     installWindows: Install through Binary on Windows
     buildSource: Building from Source
-  usingsnapshots: Using Snapshots
   creatingServer: Creating a Server Application
   ideSetup: Setting up an IDE
   creatingClient: Creating a Client
@@ -256,5 +255,6 @@ cli:
 appendix:
   title: Appendices
   faq: Frequently Asked Questions (FAQ)
+  usingsnapshots: Using Snapshots
   problems: Common Problems
   breaks: Breaking Changes
