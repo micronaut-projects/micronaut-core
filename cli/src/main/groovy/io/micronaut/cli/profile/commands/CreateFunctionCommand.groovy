@@ -100,7 +100,7 @@ class CreateFunctionCommand extends AbstractCreateCommand {
     }
 
     protected String evaluateLangFeature(String profile) {
-        "${profile}-${lang}"
+        "${profile}-${lang.name()}"
     }
 
     protected String evaluateTestFeature() {

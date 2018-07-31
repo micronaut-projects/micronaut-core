@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.env
 
+import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.value.MapPropertyResolver
 import io.micronaut.core.value.PropertyResolver
 import spock.lang.Specification
@@ -78,7 +79,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
         def values = [
                 'foo.bar': '10',
                 'foo.baz': 20,
-                'bar': 30
+                'bar'    : 30
         ]
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
                 PropertySource.of("test", [(property): value] + values)
@@ -159,5 +160,57 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
         expect:
         propertyPlaceholderResolver.resolvePlaceholders(template).get() == "Hello bar!"
+    }
+
+    void "test random placeholders for properties"() {
+        given:
+        def values = [
+                'random.integer'  : '${random.integer}',
+                'random.long'     : '${random.long}',
+                'random.float'    : '${random.float}',
+                'random.uuid'     : '${random.uuid}',
+                'random.uuid2'    : '${random.uuid2}',
+                'random.shortuuid': '${random.shortuuid}'
+        ]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect:
+        resolver.getProperty('random.integer', String).isPresent()
+        resolver.getProperty('random.integer', String).get() =~ /\d+/
+
+        and:
+        resolver.getProperty('random.long', String).isPresent()
+        resolver.getProperty('random.long', String).get() =~ /\d+/
+
+        and:
+        resolver.getProperty('random.float', String).isPresent()
+        resolver.getProperty('random.float', String).get() =~ /\d+/
+
+        and:
+        resolver.getProperty('random.uuid', String).isPresent()
+        resolver.getProperty('random.uuid', String).get().length() == 36
+
+        and:
+        resolver.getProperty('random.uuid2', String).isPresent()
+        resolver.getProperty('random.uuid2', String).get().length() == 32
+
+        and:
+        resolver.getProperty('random.shortuuid', String).isPresent()
+        resolver.getProperty('random.shortuuid', String).get().length() == 10
+    }
+
+    void "test invalid random placeholders for properties"() {
+        when:
+        def values = [
+                'random.invalid': '${random.invalid}'
+        ]
+        new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        then:
+        thrown(ConfigurationException)
     }
 }
