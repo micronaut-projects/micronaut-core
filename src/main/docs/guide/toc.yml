@@ -29,6 +29,7 @@ ioc:
   replaces: Bean Replacement
   beanConfigurations: Bean Configurations
   lifecycle: Life-Cycle Methods
+  contextEvents: Context Events
   events: Bean Events
   annotationMetadata: Bean Annotation Metadata
   springBeans: Micronaut Beans And Spring
@@ -165,6 +166,12 @@ messaging:
       title: Running Kafka Applications
       kafkaHealth: Kafka Health Checks
     kafkaStream: Building Kafka Stream Applications
+commandLineApps:
+  title: Standalone Command Line Applications
+  picocli:
+    title: Picocli Support
+    picocliGenerateProject: Generating a Project with the Micronaut CLI
+    picocliQuickStart: Picocli Quick Start
 configurations:
   title: Configurations
   dataAccess:
