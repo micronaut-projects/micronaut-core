@@ -1,0 +1,41 @@
+Micronaut supports a general event system through the context. The api:context.event.ApplicationEventPublisher[] API is used to publish events and the api:context.event.ApplicationEventListener[] API is used to listen to events. The event system is not limited to the events that Micronaut publishes and can be used for custom events created by the users.
+
+=== Publishing
+
+The api:context.event.ApplicationEventPublisher[] API supports events of any type, however all events that Micronaut publishes extend api:context.event.ApplicationEvent[].
+
+To publish an event, obtain an instance of api:context.event.ApplicationEventPublisher[] either directly from the context or through dependency injection, and execute the `publishEvent` method with your event object.
+
+[source,java]
+----
+@Singleton
+public class MyBean {
+
+    @Inject ApplicationEventPublisher eventPublisher;
+
+    void doSomething() {
+        eventPublisher.publishEvent(...);
+    }
+
+}
+----
+
+WARNING: Publishing an event is *synchronous*! The `publishEvent` method will not return until all listeners have been executed. Move this work off to a thread pool if it is time intensive.
+
+=== Listening
+
+To listen to an event, register a bean that implements api:context.event.ApplicationEventListener[] where the generic type is the type of event the listener should be executed for.
+
+[source,java]
+----
+@Singleton
+public class DoOnStartup implements ApplicationEventListener<ServiceStartedEvent> {
+
+    @Override
+    void onApplicationEvent(ServiceStartedEvent event) {
+        ...
+    }
+}
+----
+
+NOTE: The link:{api}/io/micronaut/context/event/ApplicationEventListener.html#supports-E-[supports] method can be overridden to further clarify events that should be processed.

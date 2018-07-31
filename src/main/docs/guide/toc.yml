@@ -29,6 +29,7 @@ ioc:
   replaces: Bean Replacement
   beanConfigurations: Bean Configurations
   lifecycle: Life-Cycle Methods
+  contextEvents: Context Events
   events: Bean Events
   annotationMetadata: Bean Annotation Metadata
   springBeans: Micronaut Beans And Spring
