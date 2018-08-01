@@ -23,7 +23,6 @@ class BooksSpec extends Specification {
     RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
     def "returning null returns 404"() {
-
         when:
         rxClient.toBlocking().exchange(HttpRequest.GET('/books/stock/XXXXX'))
 
@@ -39,9 +38,22 @@ class BooksSpec extends Specification {
 
 
     def "returning Maybe.empty returns 404"() {
-
         when:
         rxClient.toBlocking().exchange(HttpRequest.GET('/books/maybestock/XXXXX'))
+
+        then:
+        def e = thrown(HttpClientResponseException)
+
+        when:
+        def response = e.response
+
+        then:
+        response.status == HttpStatus.NOT_FOUND
+    }
+
+    def "returning Single.never returns 404"() {
+        when:
+        rxClient.toBlocking().exchange(HttpRequest.GET('/books/singlestock/XXXXX'))
 
         then:
         def e = thrown(HttpClientResponseException)
