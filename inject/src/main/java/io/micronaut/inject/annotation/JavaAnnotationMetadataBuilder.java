@@ -134,6 +134,21 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
             }
             hierarchy.add(element);
             return hierarchy;
+        } else if (element instanceof VariableElement) {
+            List<Element> hierarchy = new ArrayList<>();
+            VariableElement variable = (VariableElement) element;
+            Element enclosingElement = variable.getEnclosingElement();
+            if (enclosingElement instanceof ExecutableElement) {
+                ExecutableElement executableElement = (ExecutableElement) enclosingElement;
+                if (hasAnnotation(executableElement, Override.class)) {
+                    int variableIdx = executableElement.getParameters().indexOf(variable);
+                    for (ExecutableElement overridden: findOverriddenMethods(executableElement)) {
+                        hierarchy.add(overridden.getParameters().get(variableIdx));
+                    }
+                }
+            }
+            hierarchy.add(variable);
+            return hierarchy;
         } else {
             ArrayList<Element> single = new ArrayList<>();
             single.add(element);
