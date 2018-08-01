@@ -34,7 +34,7 @@ import javax.inject.Singleton;
 
 @Singleton
 @Produces
-public class UnsatisfiedArgumentHandler implements ExceptionHandler<UnsatisfiedArgumentException, HttpResponse>{
+public class UnsatisfiedArgumentHandler implements ExceptionHandler<UnsatisfiedArgumentException, HttpResponse> {
     @Override
     public HttpResponse handle(HttpRequest request, UnsatisfiedArgumentException exception) {
         JsonError error = new JsonError(exception.getMessage());
