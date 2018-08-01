@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationMetadata
 
+import javax.inject.Named
 import javax.inject.Qualifier
 import javax.inject.Singleton
 import java.lang.annotation.Documented
@@ -200,5 +201,56 @@ class Test {
         !metadata.hasStereotype(Singleton)
     }
 
+
+    void "test basic argument metadata"() {
+        given:
+        AnnotationMetadata metadata = buildFieldAnnotationMetadata("test.Test", '''
+package test;
+
+@javax.inject.Singleton
+class Test {
+
+    void test(@javax.inject.Named("foo") String id) {
+    
+    }
+}
+''', 'test', 'id')
+
+        expect:
+        metadata != null
+        !metadata.empty
+        metadata.hasDeclaredAnnotation(Named)
+        metadata.getValue(Named).get() == "foo"
+    }
+
+    void "test argument metadata inheritance"() {
+        given:
+        AnnotationMetadata metadata = buildFieldAnnotationMetadata("test.Test", '''
+package test;
+
+@javax.inject.Singleton
+class Test implements TestApi {
+
+    @javax.annotation.PostConstruct
+    @java.lang.Override
+    public void test(String id) {
+    
+    }
+}
+
+interface TestApi {
+
+    void test(@javax.inject.Named("foo") String id);
+
+}
+''', 'test', 'id')
+
+        expect:
+        metadata != null
+        !metadata.empty
+        !metadata.hasDeclaredAnnotation(Named)
+        metadata.hasAnnotation(Named)
+        metadata.getValue(Named).get() == "foo"
+    }
 
 }
