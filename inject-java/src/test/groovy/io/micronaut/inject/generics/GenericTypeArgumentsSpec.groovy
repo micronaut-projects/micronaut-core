@@ -147,4 +147,33 @@ class Test {
         definition.getTypeArguments(Function)[0].type == String
         definition.getTypeArguments(Function)[1].type == Integer
     }
+
+    void "test type arguments for factory with inheritance"() {
+        given:
+        BeanDefinition definition = buildBeanDefinition('test.Test$MyFunc','''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@Factory
+class Test {
+
+    @Bean
+    Foo myFunc() {
+        return (str) -> 10;
+    }
+}
+
+interface Foo extends java.util.function.Function<String, Integer> {}
+
+''')
+        expect:
+        definition != null
+        definition.getTypeArguments(Function).size() == 2
+        definition.getTypeArguments(Function)[0].name == 'T'
+        definition.getTypeArguments(Function)[1].name == 'R'
+        definition.getTypeArguments(Function)[0].type == String
+        definition.getTypeArguments(Function)[1].type == Integer
+    }
 }
