@@ -25,6 +25,11 @@ class QueryParametersSpec extends Specification {
         client.search("Riverside").albums.size() == 2
     }
 
+    void "test @QueryValue parameters are appended to the URL"() {
+        expect:
+        client.searchTwo("Riverside").albums.size() == 2
+    }
+
     @Controller('/itunes')
     static class ItunesController {
         Map<String, List<String>> artists = [Riverside:["Out of Myself", "Second Life Syndrome"]]
@@ -44,6 +49,9 @@ class QueryParametersSpec extends Specification {
 
         @Get("/search?limit=25&media=music&entity=album&term={term}")
         SearchResult search(String term)
+
+        @Get("/search")
+        SearchResult searchTwo(@QueryValue String term)
     }
 
     static class SearchResult {
