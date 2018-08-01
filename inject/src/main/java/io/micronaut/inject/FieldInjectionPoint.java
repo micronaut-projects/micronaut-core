@@ -18,8 +18,6 @@ package io.micronaut.inject;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.type.Argument;
-
-import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Field;
 
 /**

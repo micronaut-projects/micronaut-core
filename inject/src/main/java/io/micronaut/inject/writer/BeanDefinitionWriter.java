@@ -26,7 +26,6 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -542,7 +541,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // invoke the AbstractBeanDefinition.createMap method
             visitor.invokeStatic(Type.getType(CollectionUtils.class), METHOD_MAP_OF);
             visitor.returnValue();
-            visitor.visitMaxs(1,1);
+            visitor.visitMaxs(1, 1);
             visitor.visitEnd();
         }
     }

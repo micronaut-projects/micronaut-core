@@ -128,10 +128,19 @@ public interface BeanDefinitionRegistry {
      * @param qualifier The qualifier
      * @return The beans
      */
-    Collection<BeanRegistration<?>> getBeanRegistrations(Qualifier<?> qualifier);
+    Collection<BeanRegistration<?>> getActiveBeanRegistrations(Qualifier<?> qualifier);
 
     /**
      * Find active {@link javax.inject.Singleton} beans for the given bean type.
+     *
+     * @param beanType The bean type
+     * @param <T>      The concrete type
+     * @return The beans
+     */
+    <T> Collection<BeanRegistration<T>> getActiveBeanRegistrations(Class<T> beanType);
+
+    /**
+     * Find and if necessary initialize {@link javax.inject.Singleton} beans for the given bean type, returning all the active registrations.
      *
      * @param beanType The bean type
      * @param <T>      The concrete type
