@@ -613,18 +613,20 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 Element element = dt.asElement();
 
                 List<? extends TypeMirror> typeArguments = dt.getTypeArguments();
-                if (CollectionUtils.isNotEmpty(typeArguments) && element instanceof TypeElement) {
+                Map<String, Map<String, Object>> beanTypeArguments = new HashMap<>();
+                if (CollectionUtils.isNotEmpty(typeArguments)) {
                     TypeElement typeElement = (TypeElement) element;
-                    Map<String, Map<String, Object>> beanTypeArguments = new HashMap<>();
 
                     Map<String, Object> directTypeArguments = genericUtils.resolveBoundTypes(dt);
                     if (CollectionUtils.isNotEmpty(directTypeArguments)) {
                         beanTypeArguments.put(typeElement.getQualifiedName().toString(), directTypeArguments);
                     }
-
-                    populateTypeArguments(typeElement, beanTypeArguments);
-                    beanMethodWriter.visitTypeArguments(beanTypeArguments);
                 }
+
+                if (element instanceof TypeElement) {
+                    populateTypeArguments((TypeElement) element, beanTypeArguments);
+                }
+                beanMethodWriter.visitTypeArguments(beanTypeArguments);
             }
 
             beanDefinitionWriters.put(beanMethod.getSimpleName(), beanMethodWriter);
