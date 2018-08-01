@@ -166,7 +166,7 @@ public class GenericTypeUtils {
      * @param genericType The generic type
      * @return An {@link Optional} of the type
      */
-    private static Optional<Class> resolveSingleTypeArgument(Type genericType) {
+        private static Optional<Class> resolveSingleTypeArgument(Type genericType) {
         if (genericType instanceof ParameterizedType) {
             ParameterizedType pt = (ParameterizedType) genericType;
             Type[] actualTypeArguments = pt.getActualTypeArguments();

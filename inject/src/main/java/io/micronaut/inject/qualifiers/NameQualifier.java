@@ -56,8 +56,7 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
                 String typeName;
                 AnnotationMetadata annotationMetadata = candidate.getAnnotationMetadata();
                 // here we resolved the declared Qualifier of the bean
-                Optional<Class<? extends Annotation>> qualifierType = annotationMetadata.getDeclaredAnnotationTypeByStereotype(javax.inject.Qualifier.class);
-                Optional<String> beanQualifier = qualifierType.isPresent() && qualifierType.get() == Named.class ? annotationMetadata.getValue(Named.class, String.class) : Optional.empty();
+                Optional<String> beanQualifier = annotationMetadata.getValue(Named.class, String.class);
                 typeName = beanQualifier.orElseGet(() -> {
                     if (candidate instanceof NameResolver) {
                         Optional<String> resolvedName = ((NameResolver) candidate).resolveName();

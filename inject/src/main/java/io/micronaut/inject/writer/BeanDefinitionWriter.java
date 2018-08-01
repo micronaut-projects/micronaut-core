@@ -26,6 +26,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -130,6 +131,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         )
     );
 
+    private static final org.objectweb.asm.commons.Method METHOD_MAP_OF = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(
+                    CollectionUtils.class,
+                    "mapOf",
+                    Object[].class
+            )
+    );
     private static final Method POST_CONSTRUCT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "postConstruct", BeanResolutionContext.class, BeanContext.class, Object.class);
 
     private static final Method INJECT_BEAN_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "injectBean", BeanResolutionContext.class, BeanContext.class, Object.class);
@@ -225,6 +233,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private ConfigBuilderState currentConfigBuilderState;
     private int optionalInstanceIndex;
     private boolean preprocessMethods = false;
+    private Map<String, Map<String, Object>> typeArguments;
 
     /**
      * Creates a bean definition writer.
@@ -478,6 +487,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         finalizeInjectMethod();
         finalizeBuildMethod();
         finalizeAnnotationMetadata();
+        finalizeTypeArguments();
 
         if (preprocessMethods) {
             GeneratorAdapter requiresMethodProcessing = startPublicMethod(classWriter, "requiresMethodProcessing", boolean.class.getName());
@@ -507,8 +517,34 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             preDestroyMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, preDestroyMethodLocalCount);
         }
 
+
+
         classWriter.visitEnd();
         this.beanFinalized = true;
+    }
+
+    private void finalizeTypeArguments() {
+        if (CollectionUtils.isNotEmpty(typeArguments)) {
+            GeneratorAdapter visitor = startPublicMethodZeroArgs(classWriter, Map.class, "getTypeArgumentsMap");
+            int totalSize = typeArguments.size() * 2;
+            // start a new array
+            pushNewArray(visitor, Object.class, totalSize);
+            int i = 0;
+            for (Map.Entry<String, Map<String, Object>> entry : typeArguments.entrySet()) {
+                // use the property name as the key
+                String typeName = entry.getKey();
+                pushStoreStringInArray(visitor, i++, totalSize, typeName);
+                // use the property type as the value
+                pushStoreInArray(visitor, i++, totalSize, () -> {
+                    buildTypeArguments(visitor, entry.getValue());
+                });
+            }
+            // invoke the AbstractBeanDefinition.createMap method
+            visitor.invokeStatic(Type.getType(CollectionUtils.class), METHOD_MAP_OF);
+            visitor.returnValue();
+            visitor.visitMaxs(1,1);
+            visitor.visitEnd();
+        }
     }
 
     private void finalizeAnnotationMetadata() {
@@ -861,7 +897,16 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         String methodName,
         Object paramType,
         Map<String, Object> generics) {
-        visitConfigBuilderMethodInternal(prefix, configurationPrefix, returnType, methodName, paramType, generics, false);
+
+        visitConfigBuilderMethodInternal(
+                prefix,
+                configurationPrefix,
+                returnType,
+                methodName,
+                paramType,
+                generics,
+                false
+        );
     }
 
     @Override
@@ -872,6 +917,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public void setRequiresMethodProcessing(boolean shouldPreProcess) {
         this.preprocessMethods = shouldPreProcess;
+    }
+
+    @Override
+    public void visitTypeArguments(Map<String, Map<String, Object>> typeArguments) {
+        this.typeArguments = typeArguments;
     }
 
     @Override

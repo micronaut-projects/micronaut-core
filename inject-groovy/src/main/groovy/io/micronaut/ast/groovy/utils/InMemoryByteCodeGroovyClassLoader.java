@@ -39,6 +39,7 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
      * Default constructor.
      */
     public InMemoryByteCodeGroovyClassLoader() {
+        clearCache();
     }
 
     /**
@@ -46,6 +47,7 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
      */
     public InMemoryByteCodeGroovyClassLoader(ClassLoader loader) {
         super(loader);
+        clearCache();
     }
 
     /**
@@ -53,6 +55,7 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
      */
     public InMemoryByteCodeGroovyClassLoader(GroovyClassLoader parent) {
         super(parent);
+        clearCache();
     }
 
     /**
@@ -62,6 +65,7 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
      */
     public InMemoryByteCodeGroovyClassLoader(ClassLoader parent, CompilerConfiguration config, boolean useConfigurationClasspath) {
         super(parent, config, useConfigurationClasspath);
+        clearCache();
     }
 
     /**
@@ -70,6 +74,7 @@ public class InMemoryByteCodeGroovyClassLoader extends GroovyClassLoader {
      */
     public InMemoryByteCodeGroovyClassLoader(ClassLoader loader, CompilerConfiguration config) {
         super(loader, config);
+        clearCache();
     }
 
     /**

@@ -17,6 +17,7 @@ package io.micronaut.ast.groovy.annotation
 
 import groovy.transform.CompileStatic
 import io.micronaut.core.convert.ConversionService
+import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.util.StringUtils
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
@@ -64,6 +65,12 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             }
         }
         return null
+    }
+
+    @Override
+    protected Optional<AnnotatedNode> getAnnotationMirror(String annotationName) {
+        ClassNode cn = ClassUtils.forName(annotationName, GroovyAnnotationMetadataBuilder.classLoader).map({ Class cls -> ClassHelper.make(cls)}).orElseGet({->ClassHelper.make(annotationName)})
+        return Optional.of(cn)
     }
 
     @Override

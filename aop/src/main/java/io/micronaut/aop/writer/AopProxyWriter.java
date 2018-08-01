@@ -1085,6 +1085,11 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     }
 
     @Override
+    public void visitTypeArguments(Map<String, Map<String, Object>> typeArguments) {
+        proxyBeanDefinitionWriter.visitTypeArguments(typeArguments);
+    }
+
+    @Override
     public boolean requiresMethodProcessing() {
         return proxyBeanDefinitionWriter.requiresMethodProcessing();
     }
