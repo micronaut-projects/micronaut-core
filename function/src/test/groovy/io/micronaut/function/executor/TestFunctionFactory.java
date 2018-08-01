@@ -1,4 +1,4 @@
-package io.micronaut.function.web;
+package io.micronaut.function.executor;
 
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.function.FunctionBean;
@@ -14,7 +14,7 @@ public class TestFunctionFactory {
     // the reason is because when @FunctionBean is defined on a factory
     // we do not go through and visit public Executable methods unless
     // it is an AOP proxy
-    @FunctionBean("java/supplier/string")
+    @FunctionBean("supplier")
     Supplier<String> get() {
         return () -> "myvalue";
     }
@@ -23,17 +23,17 @@ public class TestFunctionFactory {
     // the reason is because when @FunctionBean is defined on a factory
     // we do not go through and visit public Executable methods unless
     // it is an AOP proxy
-    @FunctionBean("java/function/round")
+    @FunctionBean("round")
     Function<Double, Long> round() {
         return (doub) -> Math.round(doub.doubleValue());
     }
 
-    @FunctionBean("java/function/upper")
+    @FunctionBean("upper")
     Function<Name, Name> upper() {
         return (n) -> n.setName(n.getName().toUpperCase());
     }
 
-    @FunctionBean("java/function/fullname")
+    @FunctionBean("fullname")
     BiFunction<String, String, Name> fullname() {
         return (s, s2) -> {
             Name name = new Name();
@@ -55,3 +55,4 @@ public class TestFunctionFactory {
         }
     }
 }
+

@@ -17,7 +17,6 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -36,7 +35,6 @@ import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 
 import javax.annotation.Nullable;
-import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -110,7 +108,13 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
     @SuppressWarnings("unchecked")
     @Override
     public Optional<Argument<?>> getBodyArgument() {
-        String bodyArgument = abstractRoute.bodyArgument;
+
+        Argument<?> arg = abstractRoute.bodyArgument;
+        if (arg != null) {
+            return Optional.of(arg);
+        }
+
+        String bodyArgument = abstractRoute.bodyArgumentName;
         if (bodyArgument != null) {
             return Optional.ofNullable(requiredInputs.get(bodyArgument));
         } else {
@@ -298,6 +302,14 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
         Map<String, Object> newVariables = new LinkedHashMap<>(oldVariables);
         for (Argument requiredArgument : getArguments()) {
             Object value = argumentValues.get(requiredArgument.getName());
+            Optional<Argument<?>> ba = getBodyArgument();
+            if (ba.isPresent()) {
+                Argument<?> a = ba.get();
+                if (a.getName().equals(requiredArgument.getName())) {
+                    requiredArgument = a;
+                }
+            }
+
             if (value != null) {
                 String name = resolveInputName(requiredArgument);
                 if (value instanceof UnresolvedArgument) {

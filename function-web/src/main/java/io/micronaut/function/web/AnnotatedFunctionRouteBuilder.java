@@ -23,6 +23,7 @@ import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.metadata.ServiceInstanceMetadataContributor;
@@ -39,10 +40,7 @@ import io.micronaut.web.router.UriRoute;
 
 import javax.inject.Singleton;
 import java.net.URI;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -92,26 +90,68 @@ public class AnnotatedFunctionRouteBuilder
             String methodName = method.getMethodName();
             Class<?> declaringType = method.getDeclaringType();
             String functionName = beanDefinition.getValue(FunctionBean.class, String.class).orElse(methodName);
+            String functionMethod = beanDefinition.getValue(FunctionBean.class, "method", String.class).orElse(null);
 
             UriRoute route = null;
             if (Stream.of(java.util.function.Function.class, Consumer.class, BiFunction.class, BiConsumer.class).anyMatch(type -> type.isAssignableFrom(declaringType))) {
+                if (methodName.equals("accept") || methodName.equals("apply") || methodName.equals(functionMethod)) {
+                    String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
+                    String[] argumentNames = method.getArgumentNames();
+                    String argumentName = argumentNames[0];
+                    int argCount = argumentNames.length;
 
-                String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
-                route = POST(functionPath, method);
+                    route = POST(functionPath, beanDefinition, method);
+                    if (argCount == 1) {
+                        route.body(argumentName);
+                    }
+
+                    List<Argument<?>> typeArguments = beanDefinition.getTypeArguments();
+                    if (!typeArguments.isEmpty()) {
+                        int size = typeArguments.size();
+
+                        Argument<?> firstArgument = typeArguments.get(0);
+                        if (size < 3 && ClassUtils.isJavaLangType(firstArgument.getType())) {
+                            route.consumes(MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE);
+                        }
+
+                        if (size < 3) {
+                            route.body(Argument.of(firstArgument.getType(), argumentName));
+                        }
+
+                        if (size > 1) {
+                            Argument<?> argument = typeArguments.get(size == 3 ? 2 : 1);
+                            if (ClassUtils.isJavaLangType(argument.getType())) {
+                                route.produces(MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE);
+                            }
+                        }
+                    }
+                    else {
+                        if (argCount == 1 && ClassUtils.isJavaLangType(method.getArgumentTypes()[0])) {
+                            route.consumes(MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE);
+                        }
+                    }
+                }
             } else if (Supplier.class.isAssignableFrom(declaringType) && methodName.equals("get")) {
                 String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
-                route = GET(functionPath, method);
+                route = GET(functionPath, beanDefinition, method);
             } else {
-                String functionMethod = beanDefinition.getValue(FunctionBean.class, "method", String.class).orElse(null);
                 if (StringUtils.isNotEmpty(functionMethod)) {
                     if (functionMethod.equals(methodName)) {
-                        int argCount = method.getArguments().length;
+                        Argument[] argumentTypes = method.getArguments();
+                        int argCount = argumentTypes.length;
                         if (argCount < 3) {
                             String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
                             if (argCount == 0) {
-                                route = GET(functionPath, method);
+                                route = GET(functionPath, beanDefinition, method);
+
                             } else {
-                                route = POST(functionPath, method);
+                                route = POST(functionPath, beanDefinition, method);
+                                if (argCount == 2 || !ClassUtils.isJavaLangType(argumentTypes[0].getType())) {
+                                    route.consumes(MediaType.APPLICATION_JSON_TYPE);
+                                } else {
+                                    route.body(method.getArgumentNames()[0])
+                                            .acceptAll();
+                                }
                             }
                         }
                     }
@@ -125,16 +165,7 @@ public class AnnotatedFunctionRouteBuilder
 
                 String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
                 availableFunctions.put(functionName, URI.create(functionPath));
-                Class[] argumentTypes = method.getArgumentTypes();
-                int argCount = argumentTypes.length;
-                if (argCount > 0) {
-                    if (argCount == 2 || !ClassUtils.isJavaLangType(argumentTypes[0])) {
-                        route.consumes(MediaType.APPLICATION_JSON_TYPE);
-                    } else {
-                        route.body(method.getArgumentNames()[0])
-                            .acceptAll();
-                    }
-                }
+
                 ((ExecutableMethodProcessor) localFunctionRegistry).process(beanDefinition, method);
             }
         }

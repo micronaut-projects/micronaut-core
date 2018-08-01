@@ -93,6 +93,11 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
+    protected Optional<Element> getAnnotationMirror(String annotationName) {
+        return Optional.ofNullable(elementUtils.getTypeElement(annotationName));
+    }
+
+    @Override
     protected Element getTypeForAnnotation(AnnotationMirror annotationMirror) {
         return annotationMirror.getAnnotationType().asElement();
     }

@@ -20,11 +20,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.UriMatchInfo;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * A {@link RouteMatch} that matches a URI and {@link HttpMethod}.
@@ -50,10 +47,21 @@ public interface UriRouteMatch<R> extends UriMatchInfo, MethodBasedRouteMatch<R>
      */
     default List<Argument> getRequiredArguments() {
         Map<String, Object> matchVariables = getVariables();
-        return Arrays
-            .stream(getArguments())
-            .filter((arg) -> !matchVariables.containsKey(arg.getName()))
-            .collect(Collectors.toList());
+
+        Argument[] arguments = getArguments();
+        List<Argument> actualArguments = new ArrayList<>(arguments.length);
+        Argument<?> body = getBodyArgument().orElse(null);
+        for (Argument argument : arguments) {
+            if (!matchVariables.containsKey(argument.getName())) {
+                if (body != null && body.getName().equals(argument.getName())) {
+                    actualArguments.add(body);
+                } else {
+                    actualArguments.add(argument);
+                }
+            }
+        }
+
+        return actualArguments;
     }
 
     /**

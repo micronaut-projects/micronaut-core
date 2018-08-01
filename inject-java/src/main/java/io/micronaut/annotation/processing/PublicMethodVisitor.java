@@ -118,7 +118,7 @@ public abstract class PublicMethodVisitor<R, P> extends AbstractTypeVisitor8<R, 
      */
     protected boolean isAcceptable(ExecutableElement executableElement) {
         Set<Modifier> modifiers = executableElement.getModifiers();
-        return modifiers.contains(Modifier.PUBLIC) && !modifiers.contains(Modifier.FINAL);
+        return modifiers.contains(Modifier.PUBLIC) && !modifiers.contains(Modifier.FINAL) && !modifiers.contains(Modifier.STATIC);
     }
 
     /**

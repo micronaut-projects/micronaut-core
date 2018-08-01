@@ -59,14 +59,9 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
     @Override
     public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
         String name;
-        if (Named.class.getName().equals(getName())) {
-            String v = annotationMetadata.getValue(Named.class, String.class).orElse(null);
-            if (StringUtils.isNotEmpty(v)) {
-                name = Character.toUpperCase(v.charAt(0)) + v.substring(1);
-            } else {
-                name = getName();
-            }
-
+        String v = annotationMetadata.getValue(Named.class, String.class).orElse(null);
+        if (StringUtils.isNotEmpty(v)) {
+            name = Character.toUpperCase(v.charAt(0)) + v.substring(1);
         } else {
             name = getName();
         }

@@ -57,6 +57,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Provider;
@@ -197,6 +198,18 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         }
         this.isConfigurationProperties = hasStereotype(ConfigurationReader.class) || isIterable();
         this.addRequiredComponents(arguments);
+    }
+
+    @Override
+    public @Nonnull List<Argument<?>> getTypeArguments(String type) {
+        if (type == null) return Collections.emptyList();
+
+        Map<String, Argument<?>[]> typeArguments = getTypeArgumentsMap();
+        Argument<?>[] arguments = typeArguments.get(type);
+        if (arguments != null) {
+            return Arrays.asList(arguments);
+        }
+        return Collections.emptyList();
     }
 
     @Override
@@ -1349,6 +1362,16 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         return resolveBeanWithGenericsForField(resolutionContext, injectionPoint, (beanType, qualifier) ->
             ((DefaultBeanContext) context).streamOfType(resolutionContext, beanType, qualifier)
         );
+    }
+
+    /**
+     * A method that subclasses can override to provide information on type arguments.
+     *
+     * @return The type arguments
+     */
+    @Internal
+    protected Map<String, Argument<?>[]> getTypeArgumentsMap() {
+        return Collections.emptyMap();
     }
 
     /**

@@ -31,6 +31,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
@@ -606,6 +607,26 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             ExecutableElementParamInfo beanMethodParams = populateParameterData(beanMethod);
 
             BeanDefinitionWriter beanMethodWriter = createFactoryBeanMethodWriterFor(beanMethod, returnType);
+
+            if (returnType instanceof DeclaredType) {
+                DeclaredType dt = (DeclaredType) returnType;
+                Element element = dt.asElement();
+
+                List<? extends TypeMirror> typeArguments = dt.getTypeArguments();
+                if (CollectionUtils.isNotEmpty(typeArguments) && element instanceof TypeElement) {
+                    TypeElement typeElement = (TypeElement) element;
+                    Map<String, Map<String, Object>> beanTypeArguments = new HashMap<>();
+
+                    Map<String, Object> directTypeArguments = genericUtils.resolveBoundTypes(dt);
+                    if (CollectionUtils.isNotEmpty(directTypeArguments)) {
+                        beanTypeArguments.put(typeElement.getQualifiedName().toString(), directTypeArguments);
+                    }
+
+                    populateTypeArguments(typeElement, beanTypeArguments);
+                    beanMethodWriter.visitTypeArguments(beanTypeArguments);
+                }
+            }
+
             beanDefinitionWriters.put(beanMethod.getSimpleName(), beanMethodWriter);
 
             final String beanMethodName = beanMethod.getSimpleName().toString();
@@ -704,6 +725,44 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         );
                     }
                 }, proxyWriter);
+            } else if (methodAnnotationMetadata.hasStereotype(Executable.class)) {
+
+                returnType.accept(new PublicMethodVisitor<Object, BeanDefinitionWriter>() {
+                    @Override
+                    protected void accept(DeclaredType type, ExecutableElement method, BeanDefinitionWriter beanWriter) {
+                        ExecutableElementParamInfo params = populateParameterData(method);
+                        Object owningType = modelUtils.resolveTypeReference(method.getEnclosingElement());
+                        if (owningType == null) {
+                            throw new IllegalStateException("Owning type cannot be null");
+                        }
+                        Map<String, Object> boundTypes = genericUtils.resolveBoundTypes(type);
+                        TypeMirror returnTypeMirror = method.getReturnType();
+                        Object resolvedReturnType = genericUtils.resolveTypeReference(returnTypeMirror, boundTypes);
+                        Map<String, Object> returnTypeGenerics = genericUtils.resolveGenericTypes(returnTypeMirror, boundTypes);
+                        String methodName = method.getSimpleName().toString();
+                        Map<String, Object> methodParameters = params.getParameters();
+                        Map<String, AnnotationMetadata> methodQualifier = params.getParameterMetadata();
+                        Map<String, Map<String, Object>> methodGenericTypes = params.getGenericTypes();
+
+                        AnnotationMetadata annotationMetadata = new AnnotationMetadataReference(
+                                    beanMethodWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
+                                    methodAnnotationMetadata
+                            );
+
+                        beanMethodWriter.visitExecutableMethod(
+                                owningType,
+                                modelUtils.resolveTypeReference(returnTypeMirror),
+                                resolvedReturnType,
+                                returnTypeGenerics,
+                                methodName,
+                                methodParameters,
+                                methodQualifier,
+                                methodGenericTypes,
+                                annotationMetadata
+                        );
+
+                    }
+                }, beanMethodWriter);
             }
 
             if (methodAnnotationMetadata.isPresent(Bean.class, "preDestroy")) {
@@ -1229,7 +1288,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         StringUtils.isNotEmpty(existingPrefix) ? existingPrefix + "." + configurationMetadata.getName() : configurationMetadata.getName()
                 );
             }
-            return new BeanDefinitionWriter(
+
+
+
+            BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(
                     packageElement.getQualifiedName().toString(),
                     beanClassName,
                     providerTypeParam == null
@@ -1237,6 +1299,72 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             : providerTypeParam.toString(),
                     isInterface,
                     annotationMetadata);
+
+            visitTypeArguments(typeElement, beanDefinitionWriter);
+
+            return beanDefinitionWriter;
+        }
+
+        private void visitTypeArguments(TypeElement typeElement, BeanDefinitionWriter beanDefinitionWriter) {
+            Map<String, Map<String, Object>> typeArguments = new HashMap<>();
+
+            populateTypeArguments(typeElement, typeArguments);
+
+            beanDefinitionWriter.visitTypeArguments(
+                    typeArguments
+            );
+        }
+
+        private void populateTypeArguments(TypeElement typeElement, Map<String, Map<String, Object>> typeArguments) {
+            TypeElement current = typeElement;
+            while (current != null) {
+
+                List<? extends TypeMirror> interfaces = current.getInterfaces();
+                populateTypeArgumentsForInterfaces(typeArguments, interfaces);
+                TypeMirror superclass = current.getSuperclass();
+
+                if (superclass.getKind() == TypeKind.NONE) {
+                    current = null;
+                } else {
+                    if (superclass instanceof DeclaredType) {
+                        DeclaredType dt = (DeclaredType) superclass;
+                        List<? extends TypeMirror> superArguments = dt.getTypeArguments();
+
+
+                        Element te = dt.asElement();
+                        if (te instanceof TypeElement) {
+                            current = (TypeElement) te;
+                            if (CollectionUtils.isNotEmpty(superArguments)) {
+                                Map<String, Object> types = genericUtils.resolveBoundTypes(dt);
+                                String name = current.getQualifiedName().toString();
+                                typeArguments.put(name, types);
+                            }
+                        } else {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+            }
+        }
+
+        private void populateTypeArgumentsForInterfaces(Map<String, Map<String, Object>> typeArguments, List<? extends TypeMirror> interfaces) {
+            for (TypeMirror anInterface : interfaces) {
+                if (anInterface instanceof DeclaredType) {
+                    DeclaredType declaredType = (DeclaredType) anInterface;
+                    Element element = declaredType.asElement();
+                    if (element instanceof TypeElement) {
+                        TypeElement te = (TypeElement) element;
+                        String name = te.getQualifiedName().toString();
+                        if (!typeArguments.containsKey(name)) {
+                            Map<String, Object> types = genericUtils.resolveBoundTypes(declaredType);
+                            typeArguments.put(name, types);
+                        }
+                        populateTypeArgumentsForInterfaces(typeArguments, te.getInterfaces());
+                    }
+                }
+            }
         }
 
         private boolean isConfigurationProperties(TypeElement concreteClass) {

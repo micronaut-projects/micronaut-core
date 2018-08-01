@@ -433,4 +433,11 @@ public interface BeanDefinitionVisitor {
      * @param shouldPreProcess True if they should be pre-processed
      */
     void setRequiresMethodProcessing(boolean shouldPreProcess);
+
+    /**
+     * Visits the type arguments for the bean.
+     *
+     * @param typeArguments The type arguments
+     */
+    void visitTypeArguments(Map<String, Map<String, Object>> typeArguments);
 }
