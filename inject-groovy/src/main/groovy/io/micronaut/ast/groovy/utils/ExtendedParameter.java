@@ -5,6 +5,8 @@ import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 
+import java.util.Objects;
+
 /**
  * This class was created to pass to the {@link io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder} because
  * the method node the parameter belongs to is not available from the {@link org.codehaus.groovy.ast.Parameter} class
@@ -14,11 +16,15 @@ import org.codehaus.groovy.ast.Parameter;
  * @since 1.0
  */
 @Internal
-public class ExtendedParameter extends AnnotatedNode {
+public final class ExtendedParameter extends AnnotatedNode {
 
     private final MethodNode methodNode;
     private final Parameter parameter;
 
+    /**
+     * @param methodNode The method node that contains the parameter
+     * @param parameter  The parameter
+     */
     public ExtendedParameter(MethodNode methodNode, Parameter parameter) {
         this.methodNode = methodNode;
         this.parameter = parameter;
@@ -28,12 +34,23 @@ public class ExtendedParameter extends AnnotatedNode {
         this.setHasNoRealSourcePosition(parameter.hasNoRealSourcePosition());
     }
 
+    /**
+     * @return The method node that contains the parameter
+     */
     public MethodNode getMethodNode() {
         return methodNode;
     }
 
+    /**
+     * @return The parameter
+     */
     public Parameter getParameter() {
         return parameter;
+    }
+
+    @Override
+    public int hashCode() {
+        return parameter.hashCode();
     }
 
     @Override
