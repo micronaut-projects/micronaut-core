@@ -59,7 +59,7 @@ micronaut:
 
 == Allowed Methods
 
-To allow any request method for a given configuration, simply don't include the `allowedHeaders` key in your configuration.
+To allow any request method for a given configuration, simply don't include the `allowedMethods` key in your configuration.
 
 To specify a list of allowed methods, set the `allowedMethods` key of the configuration to a list of strings.
 
