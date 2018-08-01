@@ -22,6 +22,7 @@ import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.reflect.GenericTypeUtils;
+import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -29,6 +30,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ForkJoinPool;
 
@@ -46,10 +48,11 @@ class ExecutableMethodProcessorListener implements BeanCreatedEventListener<Exec
     @Override
     public ExecutableMethodProcessor onCreated(BeanCreatedEvent<ExecutableMethodProcessor> event) {
         ExecutableMethodProcessor processor = event.getBean();
+        BeanDefinition<ExecutableMethodProcessor> processorDefinition = event.getBeanDefinition();
         BeanContext beanContext = event.getSource();
-        Optional<Class> targetAnnotation = GenericTypeUtils.resolveInterfaceTypeArgument(processor.getClass(), ExecutableMethodProcessor.class);
-        if (targetAnnotation.isPresent()) {
-            Class annotationType = targetAnnotation.get();
+        List<Argument<?>> typeArguments = processorDefinition.getTypeArguments(ExecutableMethodProcessor.class);
+        if (!typeArguments.isEmpty()) {
+            Class annotationType = typeArguments.get(0).getType();
             Collection<BeanDefinition<?>> beanDefinitions = beanContext.getBeanDefinitions(Qualifiers.byStereotype(annotationType));
 
             boolean isParallel = annotationType.isAnnotationPresent(Parallel.class);

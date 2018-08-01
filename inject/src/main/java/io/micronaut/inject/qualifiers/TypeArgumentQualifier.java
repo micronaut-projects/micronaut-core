@@ -18,12 +18,16 @@ package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.reflect.GenericTypeUtils;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -49,22 +53,39 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
     @Override
     public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
         return candidates.filter(candidate -> {
-            if (beanType.isInterface()) {
-                Class[] classes = GenericTypeUtils.resolveInterfaceTypeArguments(candidate.getBeanType(), beanType);
-
-                boolean result = areTypesCompatible(classes);
-                if (LOG.isTraceEnabled() && !result) {
-                    LOG.trace("Bean type {} is not compatible with candidate generic types [{}] of candidate {}", beanType, ArrayUtils.toString(classes), candidate);
-                }
-                return result;
-            } else {
-                Class[] classes = GenericTypeUtils.resolveSuperTypeGenericArguments(candidate.getBeanType(), beanType);
-                boolean result = areTypesCompatible(classes);
-                if (LOG.isTraceEnabled() && !result) {
-                    LOG.trace("Bean type {} is not compatible with candidate generic types [{}] of candidate {}", beanType, ArrayUtils.toString(classes), candidate);
-                }
-                return result;
+            if (!beanType.isAssignableFrom(candidate.getBeanType())) {
+                return false;
             }
+
+            if (candidate instanceof BeanDefinition) {
+                BeanDefinition<BT> definition = (BeanDefinition<BT>) candidate;
+                List<Class> typeArguments = definition.getTypeArguments(beanType).stream().map(Argument::getType).collect(Collectors.toList());
+                boolean result = areTypesCompatible(typeArguments);
+                if (LOG.isTraceEnabled() && !result) {
+                    LOG.trace("Bean type {} is not compatible with candidate generic types [{}] of candidate {}", beanType, CollectionUtils.toString(typeArguments), candidate);
+                }
+                return result;
+
+            } else {
+
+                if (beanType.isInterface()) {
+                    Class[] classes = GenericTypeUtils.resolveInterfaceTypeArguments(candidate.getBeanType(), beanType);
+
+                    boolean result = areTypesCompatible(Arrays.asList(classes));
+                    if (LOG.isTraceEnabled() && !result) {
+                        LOG.trace("Bean type {} is not compatible with candidate generic types [{}] of candidate {}", beanType, ArrayUtils.toString(classes), candidate);
+                    }
+                    return result;
+                } else {
+                    Class[] classes = GenericTypeUtils.resolveSuperTypeGenericArguments(candidate.getBeanType(), beanType);
+                    boolean result = areTypesCompatible(Arrays.asList(classes));
+                    if (LOG.isTraceEnabled() && !result) {
+                        LOG.trace("Bean type {} is not compatible with candidate generic types [{}] of candidate {}", beanType, ArrayUtils.toString(classes), candidate);
+                    }
+                    return result;
+                }
+            }
+
         });
     }
 
@@ -79,15 +100,15 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
      * @param classes An array of classes
      * @return Whether the types are compatible
      */
-    protected boolean areTypesCompatible(Class[] classes) {
-        if (classes.length == 0) {
+    protected boolean areTypesCompatible(List<Class> classes) {
+        if (classes.size() == 0) {
             // in this case the type doesn't specify type arguments, so this is the equivalent of using Object
             return true;
-        } else if (classes.length != typeArguments.length) {
+        } else if (classes.size() != typeArguments.length) {
             return false;
         } else {
-            for (int i = 0; i < classes.length; i++) {
-                Class left = classes[i];
+            for (int i = 0; i < classes.size(); i++) {
+                Class left = classes.get(i);
                 Class right = typeArguments[i];
                 if (right == Object.class) {
                     continue;

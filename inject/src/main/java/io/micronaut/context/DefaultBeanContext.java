@@ -34,6 +34,7 @@ import io.micronaut.core.io.service.StreamSoftServiceLoader;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
@@ -2172,6 +2173,7 @@ public class DefaultBeanContext implements BeanContext {
      */
     private static class NoInjectionBeanDefinition<T> implements BeanDefinition<T>, BeanDefinitionReference<T> {
         private final Class<?> singletonClass;
+        private final Map<Class<?>, List<Argument<?>>> typeArguments = new HashMap<>();
 
         /**
          * @param singletonClass The singleton class
@@ -2183,6 +2185,16 @@ public class DefaultBeanContext implements BeanContext {
         @Override
         public Optional<Class<? extends Annotation>> getScope() {
             return Optional.of(Singleton.class);
+        }
+
+        @SuppressWarnings("unchecked")
+        @Nonnull
+        @Override
+        public List<Argument<?>> getTypeArguments(Class<?> type) {
+            return typeArguments.computeIfAbsent(type, aClass -> {
+                Class[] classes = aClass.isInterface() ? GenericTypeUtils.resolveInterfaceTypeArguments(singletonClass, aClass) : GenericTypeUtils.resolveSuperTypeGenericArguments(singletonClass, aClass);
+                return Arrays.stream(classes).map((Function<Class, Argument<?>>) Argument::of).collect(Collectors.toList());
+            });
         }
 
         @Override
