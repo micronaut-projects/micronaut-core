@@ -90,3 +90,35 @@ include::{testsdir}/config/builder/VehicleSpec.groovy[tags=start, indent=0]
 ----
 
 The above example prints: `"Subaru Engine Starting V4 [rodLength=4.0]"`
+
+== MapFormat
+
+For some use cases it may be desirable to accept a map of arbitrary configuration properties that can be supplied to a bean, especially if the bean represents a third-party API where not all of the possible configuration properties are known by the developer. For example, a datasource may accept a map of configuration properties specific to a particular database driver, allowing the user to specify any desired options in the map without coding every single property explicitly.
+
+For this purpose, the api:core.convert.format.MapFormat[] annotation allows you to bind a map to a single configuration property, and specify whether to accept a flat map of keys to values, or a nested map (where the values may be additional maps].
+
+.@MapFormat Example
+[source,groovy]
+----
+include::{testsdir}/config/mapFormat/EngineConfig.groovy[tags=imports, indent=0]
+
+include::{testsdir}/config/mapFormat/EngineConfig.groovy[tags=class, indent=0]
+----
+<1> Note the `transformation` argument to the annotation; possible values are `MapTransformation.FLAT` (for flat maps) and `MapTransformation.NESTED` (for nested maps)
+
+.EngineImpl
+[source,groovy]
+----
+include::{testsdir}/config/mapFormat/EngineImpl.groovy[tags=class, indent=0]
+----
+
+Now a map of properties can be supplied to the `my.engine.sensors` configuration property.
+
+
+.Use Map Configuration
+[source,groovy]
+----
+include::{testsdir}/config/mapFormat/VehicleSpec.groovy[tags=start, indent=0]
+----
+
+The above example prints: `"Engine Starting V8 [sensors=2]"`
