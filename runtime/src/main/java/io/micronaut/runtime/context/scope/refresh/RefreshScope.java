@@ -152,7 +152,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
 
     private void refreshSubsetOfConfigurationProperties(Set<String> keySet) {
         Collection<BeanRegistration<?>> registrations =
-            beanContext.getBeanRegistrations(Qualifiers.byStereotype(ConfigurationProperties.class));
+            beanContext.getActiveBeanRegistrations(Qualifiers.byStereotype(ConfigurationProperties.class));
         for (BeanRegistration<?> registration : registrations) {
             BeanDefinition<?> definition = registration.getBeanDefinition();
             Optional<String> value = definition.getValue(ConfigurationReader.class, "prefix", String.class);
@@ -167,7 +167,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
 
     private void refreshAllConfigurationProperties() {
         Collection<BeanRegistration<?>> registrations =
-            beanContext.getBeanRegistrations(Qualifiers.byStereotype(ConfigurationProperties.class));
+            beanContext.getActiveBeanRegistrations(Qualifiers.byStereotype(ConfigurationProperties.class));
         for (BeanRegistration<?> registration : registrations) {
             beanContext.refreshBean(registration.getIdentifier());
         }

@@ -29,7 +29,6 @@ import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.naming.Named;
-import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
@@ -316,12 +315,13 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param beanContext The bean context
      */
     protected void initializeTypeConverters(BeanContext beanContext) {
-        Collection<TypeConverter> typeConverters = beanContext.getBeansOfType(TypeConverter.class);
-        for (TypeConverter typeConverter : typeConverters) {
-            Class[] genericTypes = GenericTypeUtils.resolveInterfaceTypeArguments(typeConverter.getClass(), TypeConverter.class);
-            if (genericTypes.length == 2) {
-                Class source = genericTypes[0];
-                Class target = genericTypes[1];
+        Collection<BeanRegistration<TypeConverter>> typeConverters = beanContext.getBeanRegistrations(TypeConverter.class);
+        for (BeanRegistration<TypeConverter> typeConverterRegistration : typeConverters) {
+            TypeConverter typeConverter = typeConverterRegistration.getBean();
+            List<Argument<?>> typeArguments = typeConverterRegistration.getBeanDefinition().getTypeArguments(TypeConverter.class);
+            if (typeArguments.size() == 2) {
+                Class source = typeArguments.get(0).getType();
+                Class target = typeArguments.get(1).getType();
                 if (source != null && target != null) {
                     if (!(source == Object.class && target == Object.class)) {
                         getConversionService().addConverter(source, target, typeConverter);

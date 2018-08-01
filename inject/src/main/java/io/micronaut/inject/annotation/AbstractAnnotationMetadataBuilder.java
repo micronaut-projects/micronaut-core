@@ -201,7 +201,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
-     * Return a mirror for the given annotation
+     * Return a mirror for the given annotation.
      *
      * @param annotationName The annotation name
      * @return An optional mirror
@@ -330,8 +330,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             readAnnotationRawValues(aliasedNamed, annotationValue, annotationValues);
         }
     }
-
-
 
     private AnnotationMetadata buildInternal(T parent, T element, DefaultAnnotationMetadata annotationMetadata, boolean inheritTypeAnnotations) {
         List<T> hierarchy = buildHierarchy(element, inheritTypeAnnotations);

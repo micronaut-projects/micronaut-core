@@ -19,6 +19,8 @@ package io.micronaut.context;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 
+import java.util.Objects;
+
 /**
  * <p>A bean registration is an association between a {@link BeanDefinition} and a created bean, typically a
  * {@link javax.inject.Singleton}.</p>
@@ -67,5 +69,23 @@ public class BeanRegistration<T> {
     @Override
     public String toString() {
         return "BeanRegistration: " + bean;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        BeanRegistration<?> that = (BeanRegistration<?>) o;
+        return Objects.equals(identifier, that.identifier) &&
+                Objects.equals(beanDefinition, that.beanDefinition);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(identifier, beanDefinition);
     }
 }

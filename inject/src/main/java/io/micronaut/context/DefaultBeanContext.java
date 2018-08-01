@@ -255,7 +255,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @SuppressWarnings("unchecked")
     @Override
-    public Collection<BeanRegistration<?>> getBeanRegistrations(Qualifier<?> qualifier) {
+    public Collection<BeanRegistration<?>> getActiveBeanRegistrations(Qualifier<?> qualifier) {
         if (qualifier == null) {
             return Collections.emptyList();
         }
@@ -272,7 +272,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T> Collection<BeanRegistration<T>> getBeanRegistrations(Class<T> beanType) {
+    public <T> Collection<BeanRegistration<T>> getActiveBeanRegistrations(Class<T> beanType) {
         if (beanType == null) {
             return Collections.emptyList();
         }
@@ -285,6 +285,16 @@ public class DefaultBeanContext implements BeanContext {
             })
             .collect(Collectors.toList());
         return (Collection<BeanRegistration<T>>) result;
+    }
+
+    @Override
+    public <T> Collection<BeanRegistration<T>> getBeanRegistrations(Class<T> beanType) {
+        if (beanType == null) {
+            return Collections.emptyList();
+        }
+        // initialize the beans
+        getBeansOfType(beanType);
+        return getActiveBeanRegistrations(beanType);
     }
 
     @Override

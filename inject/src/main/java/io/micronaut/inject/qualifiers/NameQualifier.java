@@ -25,7 +25,6 @@ import io.micronaut.core.naming.NameResolver;
 import io.micronaut.inject.BeanType;
 
 import javax.inject.Named;
-import java.lang.annotation.Annotation;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Stream;
