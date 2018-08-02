@@ -50,3 +50,19 @@ include::{testshttpservernetty}/writable/TemplateController.java[tags=clazz, ind
 <1> The controller creates a simple template
 <2> The controller method returns a api:core.io.Writable[]
 <3> The returned function receives a jdk:java.io.Writer[] and calls `writeTo` on the template.
+
+=== 404 Responses
+
+Often, you want to respond 404 (Not Found) when you don't find an item in your persistence layer or in similar scenarios.
+
+See the following example:
+
+[source,java]
+----
+include::{testshttpservernetty}/respondingnotfound/BooksController.java[tags=clazz]
+----
+
+<1> Returning `null` triggers a 404 (Not Found) response.
+<2> Returning an empty `Maybe` triggers a 404 (Not Found) response.
+
+NOTE: Responding with an empty `Publisher` or `Flowable` will result in an empty array being returned if the content type is JSON.

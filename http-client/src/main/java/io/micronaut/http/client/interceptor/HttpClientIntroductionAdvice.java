@@ -68,7 +68,11 @@ import javax.annotation.Nullable;
 import javax.annotation.PreDestroy;
 import javax.inject.Singleton;
 import java.io.Closeable;
+import java.io.UnsupportedEncodingException;
 import java.lang.annotation.Annotation;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -163,6 +167,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
 
             Map<String, Object> paramMap = context.getParameterValueMap();
+            Map<String, String> queryParams = new LinkedHashMap<>();
             List<String> uriVariables = uriTemplate.getVariables();
 
             boolean variableSatisfied = uriVariables.isEmpty() || uriVariables.containsAll(paramMap.keySet());
@@ -214,15 +219,20 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
                 } else if (annotationMetadata.isAnnotationPresent(QueryValue.class)) {
                     String parameterName = annotationMetadata.getValue(QueryValue.class, String.class).orElse(null);
-                    if (!StringUtils.isEmpty(parameterName)) {
-                        MutableArgumentValue<?> value = parameters.get(argumentName);
-                        ConversionService.SHARED.convert(value.getValue(), String.class)
-                            .ifPresent(o -> paramMap.put(parameterName, o));
-                    }
+                    MutableArgumentValue<?> value = parameters.get(argumentName);
+                    ConversionService.SHARED.convert(value.getValue(), String.class).ifPresent(o -> {
+                        if (!StringUtils.isEmpty(parameterName)) {
+                            paramMap.put(parameterName, o);
+                            queryParams.put(parameterName, o);
+                        } else {
+                            queryParams.put(argumentName, o);
+                        }
+                    });
                 } else if (!uriVariables.contains(argumentName)) {
                     bodyArguments.add(argument);
                 }
             }
+
             if (HttpMethod.permitsRequestBody(httpMethod)) {
                 if (body == null && !bodyArguments.isEmpty()) {
                     Map<String, Object> bodyMap = new LinkedHashMap<>();
@@ -240,8 +250,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
                         if (body instanceof Map) {
                             paramMap.putAll((Map) body);
-                            uri = uriTemplate.expand(paramMap);
-                            request = HttpRequest.create(httpMethod, uri);
                         } else {
                             BeanMap<Object> beanMap = BeanMap.of(body);
                             for (Map.Entry<String, Object> entry : beanMap.entrySet()) {
@@ -251,21 +259,17 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                     paramMap.put(k, v);
                                 }
                             }
-                            uri = uriTemplate.expand(paramMap);
-                            request = HttpRequest.create(httpMethod, uri);
                         }
-                    } else {
-                        uri = uriTemplate.expand(paramMap);
-                        request = HttpRequest.create(httpMethod, uri);
                     }
-                    request.body(body);
-                } else {
-                    uri = uriTemplate.expand(paramMap);
-                    request = HttpRequest.create(httpMethod, uri);
                 }
-            } else {
-                uri = uriTemplate.expand(paramMap);
-                request = HttpRequest.create(httpMethod, uri);
+            }
+
+            uri = uriTemplate.expand(paramMap);
+            uriVariables.forEach(queryParams::remove);
+
+            request = HttpRequest.create(httpMethod, appendQuery(uri, queryParams));
+            if (body != null) {
+                request.body(body);
             }
 
             // Set the URI template used to make the request for tracing purposes
@@ -570,6 +574,31 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
             return client;
         });
+    }
+
+    private String appendQuery(String uri, Map<String, String> queryParams) {
+        if (!queryParams.isEmpty()) {
+            try {
+                URI oldUri = new URI(uri);
+
+                StringBuilder sb = new StringBuilder(oldUri.getQuery() == null ? "" : oldUri.getQuery());
+                if (sb.length() > 0) {
+                    sb.append('&');
+                }
+
+                for (Map.Entry<String, String> entry: queryParams.entrySet()) {
+                    sb.append(URLEncoder.encode(entry.getKey(), "UTF-8"));
+                    sb.append('=');
+                    sb.append(URLEncoder.encode(entry.getValue(), "UTF-8"));
+                }
+
+                return new URI(oldUri.getScheme(), oldUri.getAuthority(), oldUri.getPath(),
+                        sb.toString(), oldUri.getFragment()).toString();
+            } catch (URISyntaxException | UnsupportedEncodingException e) {
+                //no-op
+            }
+        }
+        return uri;
     }
 
     /**

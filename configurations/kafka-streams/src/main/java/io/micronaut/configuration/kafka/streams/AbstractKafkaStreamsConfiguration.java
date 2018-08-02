@@ -31,21 +31,22 @@ import java.util.Properties;
  *
  * @author graemerocher
  * @since 1.0
- * @param <K>
- * @param <V>
+ * @param <K> The key deserializer type
+ * @param <V> The value deserializer type
  */
-public class AbtractKafkaStreamsConfiguration<K, V> extends AbstractKafkaConfiguration<K, V> {
+public class AbstractKafkaStreamsConfiguration<K, V> extends AbstractKafkaConfiguration<K, V> {
 
     /**
      * Construct a new {@link KafkaStreamsConfiguration} for the given defaults.
      *
      * @param defaultConfiguration The default configuration
      */
-    protected AbtractKafkaStreamsConfiguration(KafkaDefaultConfiguration defaultConfiguration) {
+    protected AbstractKafkaStreamsConfiguration(KafkaDefaultConfiguration defaultConfiguration) {
         super(new Properties());
         Properties config = getConfig();
         config.putAll(defaultConfiguration.getConfig());
     }
+
     /**
      * Shared initialization.
      *

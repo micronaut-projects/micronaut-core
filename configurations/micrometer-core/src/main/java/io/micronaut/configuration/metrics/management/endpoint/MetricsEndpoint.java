@@ -31,7 +31,6 @@ import io.micronaut.management.endpoint.annotation.Selector;
 import javax.annotation.Nullable;
 import java.util.*;
 import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**

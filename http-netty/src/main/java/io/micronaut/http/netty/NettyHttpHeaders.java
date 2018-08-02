@@ -66,12 +66,13 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
     }
 
     /**
-     * @return The underlying Netty headers.
+     * Sets the underlying netty headers.
+     *
+     * @param headers The Netty http headers
      */
     void setNettyHeaders(io.netty.handler.codec.http.HttpHeaders headers) {
         this.nettyHeaders = headers;
     }
-
 
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
@@ -80,7 +81,6 @@ public class NettyHttpHeaders implements MutableHttpHeaders {
             return conversionService.convert(value, conversionContext);
         }
         return Optional.empty();
-
     }
 
     @Override
