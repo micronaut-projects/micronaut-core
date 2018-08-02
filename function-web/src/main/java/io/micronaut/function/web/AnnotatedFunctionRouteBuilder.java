@@ -124,8 +124,7 @@ public class AnnotatedFunctionRouteBuilder
                                 route.produces(MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE);
                             }
                         }
-                    }
-                    else {
+                    } else {
                         if (argCount == 1 && ClassUtils.isJavaLangType(method.getArgumentTypes()[0])) {
                             route.consumes(MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE);
                         }

@@ -18,8 +18,6 @@ package io.micronaut.security.rules;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.management.endpoint.EndpointSensitivityProcessor;
-import io.micronaut.management.endpoint.health.HealthEndpoint;
-import io.micronaut.management.endpoint.processors.ReadEndpointRouteBuilder;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;
 

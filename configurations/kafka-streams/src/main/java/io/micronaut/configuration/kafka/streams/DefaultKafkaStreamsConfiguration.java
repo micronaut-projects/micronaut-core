@@ -39,7 +39,7 @@ import java.util.Properties;
 @Requires(beans = KafkaDefaultConfiguration.class)
 @Named("default")
 @Primary
-public class DefaultKafkaStreamsConfiguration<K, V> extends AbtractKafkaStreamsConfiguration<K, V> {
+public class DefaultKafkaStreamsConfiguration<K, V> extends AbstractKafkaStreamsConfiguration<K, V> {
     /**
      * Construct a new {@link KafkaStreamsConfiguration} for the given defaults.
      *

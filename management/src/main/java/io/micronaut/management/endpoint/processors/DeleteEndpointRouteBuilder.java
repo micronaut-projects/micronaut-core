@@ -25,7 +25,6 @@ import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
-import java.util.Collection;
 
 /**
  * A processor that processes references to {@link Delete} operations {@link io.micronaut.management.endpoint.annotation.Endpoint}

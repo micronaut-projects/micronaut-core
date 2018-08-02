@@ -594,7 +594,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
                 return new URI(oldUri.getScheme(), oldUri.getAuthority(), oldUri.getPath(),
                         sb.toString(), oldUri.getFragment()).toString();
-            } catch (URISyntaxException|UnsupportedEncodingException e) {
+            } catch (URISyntaxException | UnsupportedEncodingException e) {
                 //no-op
             }
         }

@@ -32,6 +32,7 @@ import java.util.Optional;
  * @since 1.0
  */
 public interface AnnotationSource {
+
     /**
      * An empty annotation source.
      */
@@ -204,6 +205,7 @@ public interface AnnotationSource {
     default @Nullable <T extends Annotation> AnnotationValue<T> getDeclaredAnnotation(Class<T> annotation) {
         return this.findDeclaredAnnotation(annotation).orElse(null);
     }
+
     /**
      * Return whether an annotation is present.
      *

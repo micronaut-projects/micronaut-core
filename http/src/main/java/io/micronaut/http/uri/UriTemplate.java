@@ -202,7 +202,9 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
     @Override
     public int compareTo(UriTemplate o) {
-        if (this == o) return 0;
+        if (this == o) {
+            return 0;
+        }
 
         List<PathSegment> thisSegments = this.segments;
         List<PathSegment> thatSegments = o.segments;
