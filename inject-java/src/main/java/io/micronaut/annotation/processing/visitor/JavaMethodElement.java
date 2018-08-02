@@ -17,9 +17,15 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.inject.visitor.ClassElement;
 import io.micronaut.inject.visitor.MethodElement;
 
+import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.NoType;
+import javax.lang.model.type.TypeMirror;
 
 /**
  * A method element returning data from a {@link ExecutableElement}.
@@ -30,14 +36,41 @@ import javax.lang.model.element.ExecutableElement;
 class JavaMethodElement extends AbstractJavaElement implements MethodElement {
 
     private final ExecutableElement executableElement;
+    private final JavaVisitorContext visitorContext;
 
     /**
      * @param executableElement  The {@link ExecutableElement}
      * @param annotationMetadata The annotation metadata
+     * @param visitorContext The visitor context
      */
-    JavaMethodElement(ExecutableElement executableElement, AnnotationMetadata annotationMetadata) {
+    JavaMethodElement(
+            ExecutableElement executableElement,
+            AnnotationMetadata annotationMetadata,
+            JavaVisitorContext visitorContext) {
         super(executableElement, annotationMetadata);
         this.executableElement = executableElement;
+        this.visitorContext = visitorContext;
     }
 
+    @Override
+    public ClassElement getReturnType() {
+        TypeMirror returnType = executableElement.getReturnType();
+
+        if (returnType instanceof NoType) {
+            return new JavaVoidElement();
+        }
+        else if (returnType instanceof DeclaredType) {
+            Element e = ((DeclaredType) returnType).asElement();
+            if (e instanceof TypeElement) {
+                TypeElement typeElement = (TypeElement) e;
+                return new JavaClassElement(
+                        typeElement,
+                        visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement),
+                        visitorContext
+                );
+            }
+        }
+
+        return null;
+    }
 }

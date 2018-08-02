@@ -57,13 +57,18 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             return false;
         }
 
-        JavaVisitorContext visitorContext = new JavaVisitorContext(processingEnv.getMessager());
+        JavaVisitorContext visitorContext = new JavaVisitorContext(processingEnv.getMessager(), elementUtils, annotationUtils, typeUtils);
         SoftServiceLoader<TypeElementVisitor> serviceLoader = SoftServiceLoader.load(TypeElementVisitor.class, getClass().getClassLoader());
         Map<String, LoadedVisitor> loadedVisitors = new HashMap<>();
         for (ServiceDefinition<TypeElementVisitor> definition : serviceLoader) {
             if (definition.isPresent()) {
                 TypeElementVisitor visitor = definition.load();
-                loadedVisitors.put(definition.getName(), new LoadedVisitor(visitor, visitorContext, genericUtils, processingEnv, annotationUtils));
+                loadedVisitors.put(definition.getName(), new LoadedVisitor(
+                        visitor,
+                        visitorContext,
+                        genericUtils,
+                        processingEnv
+                ));
             }
         }
 
