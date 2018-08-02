@@ -33,7 +33,7 @@ import java.util.Optional;
  */
 @Controller("/java/parameter")
 public class ParameterController {
-    @Get("/")
+    @Get
     String index(Integer max) {
         return "Parameter Value: " + max;
     }

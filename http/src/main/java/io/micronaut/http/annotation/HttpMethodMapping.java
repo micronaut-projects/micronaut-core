@@ -37,8 +37,10 @@ import java.lang.annotation.Target;
 @Executable
 public @interface HttpMethodMapping {
 
+    String DEFAULT_URI = "/";
+
     /**
      * @return The URI of the action
      */
-    String value() default "";
+    String value() default DEFAULT_URI;
 }

@@ -245,7 +245,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
     @Requires(property = 'spec.name', value = 'NettyCorsSpec')
     static class TestController {
 
-        @Get('/')
+        @Get
         HttpResponse index() {
             HttpResponse.noContent()
         }

@@ -74,7 +74,7 @@ public class LoginController {
      * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
      */
     @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})
-    @Post("/")
+    @Post
     public Single<HttpResponse> login(@Body UsernamePasswordCredentials usernamePasswordCredentials, HttpRequest<?> request) {
         Flowable<AuthenticationResponse> authenticationResponseFlowable = Flowable.fromPublisher(authenticator.authenticate(usernamePasswordCredentials));
 

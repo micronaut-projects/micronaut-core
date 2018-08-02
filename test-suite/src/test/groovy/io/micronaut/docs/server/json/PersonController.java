@@ -42,7 +42,7 @@ public class PersonController {
     Map<String, Person> inMemoryDatastore = new LinkedHashMap<>();
 // end::class[]
 
-    @Get("/")
+    @Get
     public Collection<Person> index() {
         return inMemoryDatastore.values();
     }
@@ -56,7 +56,7 @@ public class PersonController {
     }
 
     // tag::single[]
-    @Post("/")
+    @Post
     public Single<HttpResponse<Person>> save(@Body Single<Person> person) { // <1>
         return person.map(p -> {
                     inMemoryDatastore.put(p.getFirstName(), p); // <2>

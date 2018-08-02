@@ -30,7 +30,7 @@ public class TestController {
         this.colorPicker = colorPicker;
     }
 
-    @Get('/')
+    @Get
     public String index() {
         return colorPicker.color();
     }

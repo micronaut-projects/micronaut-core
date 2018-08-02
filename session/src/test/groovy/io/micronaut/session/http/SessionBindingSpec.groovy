@@ -189,7 +189,7 @@ class SessionBindingSpec extends Specification {
     @Controller('/sessiontest')
     static class SessionController {
 
-        @Get
+        @Get("/simple")
         String simple(Session session) {
             return session.get("myValue").orElseGet({
                 session.put("myValue", "value in session")
@@ -197,19 +197,19 @@ class SessionBindingSpec extends Specification {
             })
         }
 
-        @Get
+        @Get("/value")
         String value(@SessionValue Optional<String> myValue) {
             return myValue.orElse(
                 "no value in session"
             )
         }
 
-        @Get
+        @Get("/value-nullable")
         String valueNullable(@SessionValue @Nullable String myValue) {
             return myValue ?:  "no value in session"
         }
 
-        @Get
+        @Get("/optional")
         String optional(Optional<Session> session) {
             if(session.isPresent()) {
                 def s = session.get()

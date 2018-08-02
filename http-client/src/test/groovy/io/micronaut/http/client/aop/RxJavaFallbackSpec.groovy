@@ -179,7 +179,7 @@ class RxJavaFallbackSpec extends Specification{
         @Get("/{id}")
         Maybe<Book> get(Long id)
 
-        @Get('/')
+        @Get
         Single<List<Book>> list()
 
         @Get('/stream')
@@ -188,7 +188,7 @@ class RxJavaFallbackSpec extends Specification{
         @Delete("/{id}")
         Maybe<Book> delete(Long id)
 
-        @Post('/')
+        @Post
         Single<Book> save(String title)
 
         @Patch("/{id}")

@@ -38,10 +38,16 @@ import java.lang.annotation.Target;
 public @interface Get {
 
     /**
-     * @return The URI of the GET route
+     * @return The URI of the GET route if not specified inferred from the method name and arguments
      */
     @AliasFor(annotation = HttpMethodMapping.class, member = "value")
-    String value();
+    String value() default HttpMethodMapping.DEFAULT_URI;
+
+    /**
+     * @return The URI of the TRACE route if not specified inferred from the method name and arguments
+     */
+    @AliasFor(annotation = HttpMethodMapping.class, member = "value")
+    String uri() default HttpMethodMapping.DEFAULT_URI;
 
     /**
      * @return The default produces, otherwise override from controller

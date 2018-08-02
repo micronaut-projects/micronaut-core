@@ -176,13 +176,13 @@ class CompletableFutureFallbackSpec extends Specification {
         @Get("/{id}")
         CompletableFuture<Book> get(Long id)
 
-        @Get('/')
+        @Get
         CompletableFuture<List<Book>> list()
 
         @Delete("/{id}")
         CompletableFuture<Book> delete(Long id)
 
-        @Post('/')
+        @Post
         CompletableFuture<Book> save(String title)
 
         @Patch("/{id}")

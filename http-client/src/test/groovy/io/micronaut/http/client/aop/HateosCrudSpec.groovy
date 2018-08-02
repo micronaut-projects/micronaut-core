@@ -146,13 +146,13 @@ class HateosCrudSpec extends Specification {
         @Get(value = "/{id}", produces = MediaType.APPLICATION_HAL_JSON)
         Book get(Long id)
 
-        @Get('/')
+        @Get
         List<Book> list()
 
         @Delete("/{id}")
         void delete(Long id)
 
-        @Post(value = '/', produces = MediaType.APPLICATION_HAL_JSON)
+        @Post(produces = MediaType.APPLICATION_HAL_JSON)
         Book save(String title)
 
         @Post(value= '/{id}/{embedded}', produces = MediaType.APPLICATION_HAL_JSON)
