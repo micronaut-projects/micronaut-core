@@ -52,17 +52,19 @@ class EndpointRouteSpec extends Specification {
         GET    | '/b'     | true
         POST   | '/b'     | true
         DELETE | '/b'     | true
+
         GET    | '/c/foo' | true
         GET    | '/c'     | false
-        POST   | '/c'     | false
         POST   | '/c/foo' | true
+        POST   | '/c'     | false
         DELETE | '/c/foo' | true
         DELETE | '/c'     | false
-        GET    | '/d/foo' | true
-        GET    | '/d'     | false
+        GET    | '/d/foo' | false
+        GET    | '/d'     | true
+        POST   | '/d/foo' | false
         POST   | '/d'     | true
-        DELETE | '/d/foo' | true
-        DELETE | '/d'     | false
+        DELETE | '/d/foo' | false
+        DELETE | '/d'     | true
         description = exists ? "exists" : "does not exist"
     }
 
@@ -110,12 +112,12 @@ class EndpointRouteSpec extends Specification {
     static class DEndpoint {
 
         @Read
-        String one(@Selector String name) {}
+        String one(String name) {}
 
         @Write
         String two(String name) {}
 
         @Delete
-        String three(@Selector String name) {}
+        String three(String name) {}
     }
 }
