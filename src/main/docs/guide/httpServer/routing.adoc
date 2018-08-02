@@ -142,6 +142,8 @@ The previous example used the link:{api}/io/micronaut/http/annotation/Get.html[@
 
 |===
 
+NOTE: All of the method annotations default to `/`.
+
 == Building Routes Programmatically
 
 If you prefer to not use annotations and declare all of your routes in code then never fear, Micronaut has a flexible link:{api}/io/micronaut/web/router/RouteBuilder.html[RouteBuilder] API that makes it a breeze to define routes programmatically.
