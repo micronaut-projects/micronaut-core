@@ -63,10 +63,10 @@ class AnnotationRouteBuilderSpec extends Specification {
         }
     }
 
-    @Controller
+    @Controller('/person')
     static class PersonController {
 
-        @Get
+        @Get('/name')
         String name(String name) {
             return "Fred $name"
         }

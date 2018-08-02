@@ -241,7 +241,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         'micronaut.server.dateHeader': false]
     }
 
-    @Controller
+    @Controller('/test')
     @Requires(property = 'spec.name', value = 'NettyCorsSpec')
     static class TestController {
 
@@ -250,7 +250,7 @@ class NettyCorsSpec extends AbstractMicronautSpec {
             HttpResponse.noContent()
         }
 
-        @Get
+        @Get('/arbitrary')
         Map arbitrary() {
             [some: 'data']
         }

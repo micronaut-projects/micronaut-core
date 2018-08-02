@@ -108,11 +108,11 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
 
     }
 
-    @Controller
+    @Controller('/sse')
     @Requires(property = 'spec.name', value = 'ServerSentEventSpec')
     static class SseController {
 
-        @Get
+        @Get('/object')
         Publisher<Event> object() {
             int i = 0
             Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
@@ -126,7 +126,7 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
             })
         }
 
-        @Get
+        @Get('/rich')
         Publisher<Event> rich() {
             Integer i = 0
             Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
@@ -145,7 +145,7 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
             })
         }
 
-        @Get
+        @Get('/string')
         Publisher<Event> string() {
             int i = 0
             Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
@@ -159,14 +159,14 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
             })
         }
 
-        @Get
+        @Get('/exception')
         Publisher<Event> exception() {
             Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
                 throw new RuntimeException("bad things happened")
             })
         }
 
-        @Get
+        @Get('on-error')
         Publisher<Event> onError() {
             Flowable.generate( { io.reactivex.Emitter<Event> emitter ->
                 emitter.onError(new RuntimeException("bad things happened"))
