@@ -2067,7 +2067,9 @@ public class DefaultBeanContext implements BeanContext {
         private final BeanContext beanContext;
         private final Class<T> beanType;
         private final Qualifier<T> qualifier;
+        private final boolean isSingleton;
 
+        private T target;
         /**
          * @param beanContext The bean context
          * @param beanType    The bean type
@@ -2079,6 +2081,7 @@ public class DefaultBeanContext implements BeanContext {
             this.beanContext = beanContext;
             this.beanType = beanType;
             this.qualifier = qualifier;
+            this.isSingleton = beanContext.findBeanDefinition(beanType, qualifier).map(BeanDefinition::isSingleton).orElse(false);
         }
 
         @Override
@@ -2093,7 +2096,22 @@ public class DefaultBeanContext implements BeanContext {
 
         @Override
         public R invoke(Object... arguments) {
-            return method.invoke(beanContext.getBean(beanType, qualifier), arguments);
+            if (isSingleton) {
+                T target = this.target;
+                if (target == null) {
+                    synchronized (this) { // double check
+                        target = this.target;
+                        if (target == null) {
+                            target = beanContext.getBean(beanType, qualifier);
+                            this.target = target;
+                        }
+                    }
+                }
+
+                return method.invoke(target, arguments);
+            } else {
+                return method.invoke(beanContext.getBean(beanType, qualifier), arguments);
+            }
         }
     }
 

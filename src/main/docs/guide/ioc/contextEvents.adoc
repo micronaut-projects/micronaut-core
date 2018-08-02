@@ -1,6 +1,6 @@
 Micronaut supports a general event system through the context. The api:context.event.ApplicationEventPublisher[] API is used to publish events and the api:context.event.ApplicationEventListener[] API is used to listen to events. The event system is not limited to the events that Micronaut publishes and can be used for custom events created by the users.
 
-=== Publishing
+=== Publishing Events
 
 The api:context.event.ApplicationEventPublisher[] API supports events of any type, however all events that Micronaut publishes extend api:context.event.ApplicationEvent[].
 
@@ -20,12 +20,13 @@ public class MyBean {
 }
 ----
 
-WARNING: Publishing an event is *synchronous*! The `publishEvent` method will not return until all listeners have been executed. Move this work off to a thread pool if it is time intensive.
+WARNING: Publishing an event is *synchronous* by default! The `publishEvent` method will not return until all listeners have been executed. Move this work off to a thread pool if it is time intensive.
 
-=== Listening
+=== Listening for Events
 
 To listen to an event, register a bean that implements api:context.event.ApplicationEventListener[] where the generic type is the type of event the listener should be executed for.
 
+.Listening for Events with `ApplicationEventListener`
 [source,java]
 ----
 @Singleton
@@ -39,3 +40,42 @@ public class DoOnStartup implements ApplicationEventListener<ServiceStartedEvent
 ----
 
 NOTE: The link:{api}/io/micronaut/context/event/ApplicationEventListener.html#supports-E-[supports] method can be overridden to further clarify events that should be processed.
+
+Alternatively you can use the ann:runtime.event.annotation.EventListener[] annotation if you do not wish to specifically implement an interface:
+
+.Listening for Events with `@EventListener`
+[source,java]
+----
+import io.micronaut.runtime.event.annotation.EventListener;
+...
+@Singleton
+public class DoOnStartup  {
+
+    @EventListener
+    void onStartup(ServiceStartedEvent event) {
+        ...
+    }
+}
+----
+
+If you listener performs work that could take a while then you can use the ann:scheduling.annotation.Async[] annotation to run the operation on a separate thread:
+
+
+.Asynchronously listening for Events with `@EventListener`
+[source,java]
+----
+import io.micronaut.runtime.event.annotation.EventListener;
+import io.micronaut.scheduling.annotation.Async;
+
+...
+@Singleton
+public class DoOnStartup  {
+
+    @EventListener
+    @Async
+    void onStartup(ServiceStartedEvent event) {
+        ...
+    }
+}
+----
+

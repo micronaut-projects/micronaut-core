@@ -16,12 +16,24 @@ Collection<BeanDefinition> definitions =
     beanContext.getBeanDefinitions(Qualifiers.byStereotype(Controller.class))
 
 for(BeanDefinition definition : definitions) {
-    Controller controllerAnn = definition.synthesize(Controller.class);
+    AnnotationValue<Controller> controllerAnn = definition.getAnnotation(Controller.class);
     // do something with the annotation
 }
 ----
 
-The above example will find all link:{api}/io/micronaut/inject/BeanDefinition.html[BeanDefinition] annotated with `@Controller` regardless whether `@Controller` is used directly or inherited via an annotation stereotype.
+The above example will find all api:inject.BeanDefinition[] annotated with `@Controller` regardless whether `@Controller` is used directly or inherited via an annotation stereotype.
+
+Note that the `getAnnotation` method and the variations of the method return a api:core.annotation.AnnotationValue[] type and not a Java annotation. This is by design, and you should generally try to work with this API when reading annotation values.
+
+If you absolutely require a reference to an annotation instance you can use the `synthesize` method, which will create a runtime proxy that implements the annotation interface:
+
+.Synthesizing Annotation Instances
+[source,java]
+----
+Controller controllerAnn = definition.synthesize(Controller.class);
+----
+
+This approach is not recommended however, as it requires reflection and increases memory consumption due to the use of runtime created proxies and should be used as a last resort (for example if you need to an instance of the annotation to integrate with a third party library).
 
 Like Spring, Micronaut also supports an link:{api}/io/micronaut/context/annotation/AliasFor.html[@AliasFor] annotation that allows an annotation member to represent the value of another annotation member.
 
