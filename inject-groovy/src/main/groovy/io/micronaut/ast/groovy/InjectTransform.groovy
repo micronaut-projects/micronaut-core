@@ -1241,6 +1241,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         private void visitAdaptedMethod(MethodNode method, AnnotationMetadata methodAnnotationMetadata) {
             Optional<ClassNode> adaptedType = methodAnnotationMetadata.getValue(Adapter.class, String.class).flatMap({ String s ->
+                ClassNode cn = sourceUnit.AST.classes.find { ClassNode cn -> cn.name == s }
+                if (cn != null) {
+                    return Optional.of(cn)
+                }
                 def type = ClassUtils.forName(s, InjectTransform.classLoader).orElse(null)
                 if (type != null) {
                     return Optional.of(ClassHelper.make(type))
@@ -1309,13 +1313,15 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                         if (targetGenerics) {
                                             String variableName = targetGenerics[0].name
                                             if (typeVariables.containsKey(variableName)) {
+                                                targetType = typeVariables.get(variableName)
+
                                                 genericTypes.put(variableName, AstGenericUtils.resolveTypeReference(sourceType, boundTypes))
                                             }
                                         }
                                     }
 
                                     if (!AstClassUtils.isSubclassOfOrImplementsInterface(sourceType, targetType)) {
-                                        thisVisitor.addError("Cannot adapt method [" + method + "] to target method [" + targetMethod + "]. Type [" + sourceType + "] is not a subtype of type [" + targetType + "].", (MethodNode)method)
+                                        thisVisitor.addError("Cannot adapt method [${method.declaringClass.name}.$method.name(..)] to target method [${targetMethod.declaringClass.name}.$targetMethod.name(..)]. Argument type [" + sourceType.name + "] is not a subtype of type [$targetType.name] at position $i.", (MethodNode)method)
                                         return
                                     }
 
@@ -1381,7 +1387,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
 
                             } else {
-                                thisVisitor.addError("Cannot adapt method [" + method + "] to target method [" + targetMethod + "]. Argument lengths don't match.", (MethodNode)method)
+                                thisVisitor.addError("Cannot adapt method [${method.declaringClass.name}.$method.name(..)] to target method [${targetMethod.declaringClass.name}.$targetMethod.name(..)]. Argument lengths don't match.", (MethodNode)method)
                             }
                         }
                     }
