@@ -16,9 +16,11 @@
 package io.micronaut
 
 import groovy.transform.CompileStatic
+import io.micronaut.ast.groovy.utils.ExtendedParameter
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
+import org.codehaus.groovy.ast.Parameter
 import org.codehaus.groovy.ast.builder.AstBuilder
 import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder
 import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader
@@ -59,6 +61,15 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         MethodNode method = element.getMethods(methodName)[0]
         GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder()
         AnnotationMetadata metadata = method != null ? builder.build(method) : null
+        return metadata
+    }
+
+    AnnotationMetadata buildFieldAnnotationMetadata(String cls, String source, String methodName, String fieldName) {
+        ClassNode element = buildClassNode(source, cls)
+        MethodNode method = element.getMethods(methodName)[0]
+        Parameter parameter = Arrays.asList(method.getParameters()).find { it.name == fieldName }
+        GroovyAnnotationMetadataBuilder builder = new GroovyAnnotationMetadataBuilder()
+        AnnotationMetadata metadata = method != null ? builder.build(new ExtendedParameter(method, parameter)) : null
         return metadata
     }
 

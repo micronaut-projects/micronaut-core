@@ -26,7 +26,9 @@ import io.micronaut.support.Parser
 import spock.lang.Specification
 
 import javax.lang.model.element.Element
+import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
+import javax.lang.model.element.VariableElement
 import javax.tools.JavaFileObject
 
 /**
@@ -46,6 +48,15 @@ abstract class AbstractTypeElementSpec extends Specification {
         Element method = element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
         JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(JavacElements.instance(new Context()))
         AnnotationMetadata metadata = method != null ? builder.build(method) : null
+        return metadata
+    }
+
+    AnnotationMetadata buildFieldAnnotationMetadata(String cls, String methodName, String fieldName) {
+        TypeElement element = buildTypeElement(cls)
+        ExecutableElement method = (ExecutableElement)element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
+        VariableElement argument = method.parameters.find() { it.simpleName.toString() == fieldName }
+        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(JavacElements.instance(new Context()))
+        AnnotationMetadata metadata = argument != null ? builder.build(argument) : null
         return metadata
     }
 

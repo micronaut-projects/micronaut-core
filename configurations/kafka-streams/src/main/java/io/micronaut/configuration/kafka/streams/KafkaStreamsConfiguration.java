@@ -36,7 +36,7 @@ import static io.micronaut.configuration.kafka.streams.KafkaStreamsConfiguration
  */
 @EachProperty(value = PREFIX, primary = "default")
 @Requires(beans = KafkaDefaultConfiguration.class)
-public class KafkaStreamsConfiguration<K, V> extends AbtractKafkaStreamsConfiguration<K, V> {
+public class KafkaStreamsConfiguration<K, V> extends AbstractKafkaStreamsConfiguration<K, V> {
 
     /**
      * The default streams configuration.

@@ -41,6 +41,7 @@ import java.util.Optional;
  */
 @Produces(MediaType.APPLICATION_HAL_JSON)
 public abstract class AbstractResource<Impl extends AbstractResource> implements Resource {
+
     private final Map<CharSequence, List<Link>> linkMap = new LinkedHashMap<>(1);
     private final Map<CharSequence, List<Resource>> embeddedMap = new LinkedHashMap<>(1);
 
