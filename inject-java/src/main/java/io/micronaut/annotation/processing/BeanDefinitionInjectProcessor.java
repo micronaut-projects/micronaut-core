@@ -948,23 +948,41 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                             TypeVariable tv = (TypeVariable) targetType;
                                             String variableName = tv.toString();
 
-                                            TypeMirror lowerBound = tv.getLowerBound();
-                                            if (lowerBound.getKind() == TypeKind.DECLARED) {
-                                                targetType = lowerBound;
-                                            } else {
-                                                TypeMirror upperBound = tv.getUpperBound();
-                                                if (upperBound.getKind() == TypeKind.DECLARED) {
-                                                    targetType = upperBound;
-                                                }
-                                            }
+
 
                                             if (typeVariables.containsKey(variableName)) {
+                                                TypeMirror variableMirror = typeVariables.get(variableName);
+                                                if (variableMirror.getKind() == TypeKind.TYPEVAR) {
+                                                    TypeVariable tv2 = (TypeVariable) variableMirror;
+                                                    TypeMirror lowerBound = tv2.getLowerBound();
+                                                    if (lowerBound.getKind() == TypeKind.DECLARED) {
+                                                        targetType = lowerBound;
+                                                    } else {
+                                                        TypeMirror upperBound = tv2.getUpperBound();
+                                                        if (upperBound.getKind() == TypeKind.DECLARED) {
+                                                            targetType = upperBound;
+                                                        }
+                                                    }
+                                                }
                                                 genericTypes.put(variableName, modelUtils.resolveTypeReference(sourceType));
+                                            } else {
+                                                TypeMirror lowerBound = tv.getLowerBound();
+                                                if (lowerBound.getKind() == TypeKind.DECLARED) {
+                                                    targetType = lowerBound;
+                                                } else {
+                                                    TypeMirror upperBound = tv.getUpperBound();
+                                                    if (upperBound.getKind() == TypeKind.DECLARED) {
+                                                        targetType = upperBound;
+                                                    }
+                                                }
                                             }
 
                                         }
 
-                                        if (!typeUtils.isSubtype(sourceType, targetType)) {
+                                        TypeMirror thisType = typeUtils.erasure(sourceType);
+                                        TypeMirror thatType = typeUtils.erasure(targetType);
+
+                                        if (!typeUtils.isAssignable(thisType, thatType)) {
                                             error(method, "Cannot adapt method [" + method + "] to target method [" + targetMethod + "]. Type [" + sourceType + "] is not a subtype of type [" + targetType + "] for argument at position " + i);
                                             return;
                                         }
