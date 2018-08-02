@@ -66,7 +66,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Function;
 
 /**
  * Implementation of the {@link io.micronaut.configuration.kafka.annotation.KafkaClient} advice annotation.

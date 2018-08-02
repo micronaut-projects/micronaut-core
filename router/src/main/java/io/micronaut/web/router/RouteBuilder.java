@@ -1165,8 +1165,10 @@ public interface RouteBuilder {
          */
         default String resolveUri(BeanDefinition<?> beanDefinition) {
             String uri = beanDefinition.getValue(Controller.class, String.class).orElse(null);
-            String x = normalizeUri(uri);
-            if (x != null) return x;
+            uri = normalizeUri(uri);
+            if (uri != null) {
+                return uri;
+            }
             Class<?> beanType;
             if (beanDefinition instanceof ProxyBeanDefinition) {
                 ProxyBeanDefinition pbd = (ProxyBeanDefinition) beanDefinition;
@@ -1205,7 +1207,8 @@ public interface RouteBuilder {
         }
 
         /**
-         * Normalizes a URI, ensuring the first character starts with a /
+         * Normalizes a URI, ensuring the first character starts with a /.
+         *
          * @param uri The URI
          * @return The normalized URI or null
          */

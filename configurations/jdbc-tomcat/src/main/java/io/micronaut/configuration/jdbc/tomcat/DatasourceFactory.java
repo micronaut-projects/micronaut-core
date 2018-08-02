@@ -16,7 +16,6 @@
 
 package io.micronaut.configuration.jdbc.tomcat;
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import org.slf4j.Logger;
@@ -63,6 +62,5 @@ public class DatasourceFactory implements AutoCloseable {
             }
         }
     }
-
 
 }
