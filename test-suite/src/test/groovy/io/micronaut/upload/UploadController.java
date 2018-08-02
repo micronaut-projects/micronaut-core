@@ -101,7 +101,7 @@ public class UploadController {
         );
     }
 
-    @Post(value = "/receive-flowData", consumes = MediaType.MULTIPART_FORM_DATA)
+    @Post(value = "/receive-flow-data", consumes = MediaType.MULTIPART_FORM_DATA)
     public Publisher<HttpResponse> receiveFlowData(Data data) {
         return Flowable.just(HttpResponse.ok(data.toString()));
     }

@@ -151,31 +151,31 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         AttachedFile                              | true
     }
 
-    @Controller
+    @Controller('/test')
     @Requires(property = 'spec.name', value = 'FileTypeHandlerSpec')
     static class TestController {
 
-        @Get
+        @Get('/html')
         File html() {
             tempFile
         }
 
-        @Get
+        @Get('/not-found')
         File notFound() {
             new File('/xyzabc')
         }
 
-        @Get
+        @Get('/download')
         AttachedFile download() {
             new AttachedFile(tempFile)
         }
 
-        @Get
+        @Get('/different-name')
         AttachedFile differentName() {
             new AttachedFile(tempFile, "abc.xyz")
         }
 
-        @Get
+        @Get('/custom-content-type')
         HttpResponse<AttachedFile> customContentType() {
             HttpResponse.ok(new AttachedFile(tempFile, "temp.html")).contentType(MediaType.TEXT_PLAIN_TYPE)
         }

@@ -44,11 +44,11 @@ class SslFileTypeHandlerSpec extends AbstractMicronautSpec {
         super.getConfiguration() << ['micronaut.ssl.enabled': true, 'micronaut.ssl.buildSelfSigned': true]
     }
 
-    @Controller
+    @Controller('/test')
     @Requires(property = 'spec.name', value = 'SslFileTypeHandlerSpec')
     static class TestController {
 
-        @Get
+        @Get('/html')
         File html() {
             tempFile
         }
