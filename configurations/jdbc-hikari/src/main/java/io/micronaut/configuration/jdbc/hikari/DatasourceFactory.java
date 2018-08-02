@@ -16,10 +16,14 @@
 
 package io.micronaut.configuration.jdbc.hikari;
 
+import com.zaxxer.hikari.HikariDataSource;
+import io.micronaut.configuration.jdbc.hikari.metadata.HikariDataSourcePoolMetadata;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Parameter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.datasource.DelegatingDataSource;
 
 import javax.annotation.PreDestroy;
 import javax.sql.DataSource;
@@ -47,6 +51,18 @@ public class DatasourceFactory implements AutoCloseable {
         HikariUrlDataSource ds = new HikariUrlDataSource(datasourceConfiguration);
         dataSources.add(ds);
         return ds;
+    }
+
+    @EachBean(DataSource.class)
+    public HikariDataSourcePoolMetadata hikariDataSourcePoolMetadata(
+            @Parameter String dataSourceName,
+            DataSource dataSource) {
+        if (dataSource instanceof HikariDataSource) {
+            return new HikariDataSourcePoolMetadata((HikariDataSource) dataSource, dataSourceName);
+        } else if ((dataSource instanceof DelegatingDataSource && ((DelegatingDataSource) dataSource).getTargetDataSource() instanceof HikariDataSource)) {
+            return new HikariDataSourcePoolMetadata((HikariDataSource) ((DelegatingDataSource) dataSource).getTargetDataSource(), dataSourceName);
+        }
+        return null;
     }
 
     @Override

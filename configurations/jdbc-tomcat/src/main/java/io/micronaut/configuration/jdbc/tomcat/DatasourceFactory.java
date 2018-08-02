@@ -13,13 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.configuration.jdbc.tomcat;
 
+import io.micronaut.configuration.jdbc.tomcat.metadata.TomcatDataSourcePoolMetadata;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Requires;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.datasource.DelegatingDataSource;
 
 import javax.annotation.PreDestroy;
 import javax.sql.DataSource;
@@ -30,6 +33,7 @@ import java.util.List;
  * Creates a tomcat data source for each configuration bean.
  *
  * @author James Kleeh
+ * @author Christian Oestreich
  * @since 1.0
  */
 @Factory
@@ -47,6 +51,21 @@ public class DatasourceFactory implements AutoCloseable {
         org.apache.tomcat.jdbc.pool.DataSource ds = new org.apache.tomcat.jdbc.pool.DataSource(datasourceConfiguration);
         dataSources.add(ds);
         return ds;
+    }
+
+    @EachBean(DataSource.class)
+    @Requires(beans = {DataSource.class, DatasourceConfiguration.class})
+    public TomcatDataSourcePoolMetadata tomcatPoolDataSourceMetadataProvider(
+            @Parameter String dataSourceName,
+            DataSource dataSource) {
+
+        LOG.info("\n\n\n\nCreating datasource for " + dataSourceName + "\n\n\n\n");
+        if (dataSource instanceof org.apache.tomcat.jdbc.pool.DataSource) {
+            return new TomcatDataSourcePoolMetadata((org.apache.tomcat.jdbc.pool.DataSource) dataSource, dataSourceName);
+        } else if ((dataSource instanceof DelegatingDataSource && ((DelegatingDataSource) dataSource).getTargetDataSource() instanceof org.apache.tomcat.jdbc.pool.DataSource)) {
+            return new TomcatDataSourcePoolMetadata((org.apache.tomcat.jdbc.pool.DataSource) ((DelegatingDataSource) dataSource).getTargetDataSource(), dataSourceName);
+        }
+        return null;
     }
 
     @Override
