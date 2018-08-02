@@ -22,6 +22,7 @@ import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
 import static javax.lang.model.element.ElementKind.FIELD;
 import static javax.lang.model.type.TypeKind.ARRAY;
 
+import io.micronaut.aop.Adapter;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.aop.writer.AopProxyWriter;
@@ -51,6 +52,7 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.inject.Provider;
 import javax.inject.Scope;
 import javax.lang.model.SourceVersion;
@@ -747,9 +749,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         Map<String, Map<String, Object>> methodGenericTypes = params.getGenericTypes();
 
                         AnnotationMetadata annotationMetadata = new AnnotationMetadataReference(
-                                    beanMethodWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
-                                    methodAnnotationMetadata
-                            );
+                                beanMethodWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
+                                methodAnnotationMetadata
+                        );
 
                         beanMethodWriter.visitExecutableMethod(
                                 owningType,
@@ -816,6 +818,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     params.getParameterMetadata(),
                     params.getGenericTypes(), methodAnnotationMetadata);
 
+            if (methodAnnotationMetadata.hasStereotype(Adapter.class)) {
+                visitAdaptedMethod(method, methodAnnotationMetadata);
+            }
+
             // shouldn't visit around advice on an introduction advice instance
             if (!(beanWriter instanceof AopProxyWriter)) {
                 boolean hasExplicitAround = methodAnnotationMetadata.hasStereotype(AROUND_TYPE);
@@ -865,6 +871,166 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 aroundMethodMetadata);
                     }
 
+                }
+            }
+        }
+
+        private void visitAdaptedMethod(ExecutableElement method, AnnotationMetadata methodAnnotationMetadata) {
+            Optional<DeclaredType> targetType = methodAnnotationMetadata.getValue(Adapter.class, String.class).flatMap(s -> {
+                TypeElement typeElement = elementUtils.getTypeElement(s);
+                if (typeElement != null) {
+                    TypeMirror typeMirror = typeElement.asType();
+                    if (typeMirror instanceof DeclaredType) {
+                        return Optional.of((DeclaredType) typeMirror);
+                    }
+                }
+                return Optional.empty();
+            });
+
+            if (targetType.isPresent()) {
+                DeclaredType typeToImplement = targetType.get();
+                Element element = typeToImplement.asElement();
+                if (element instanceof TypeElement) {
+                    TypeElement typeElement = (TypeElement) element;
+                    boolean isInterface = element.getKind() == ElementKind.INTERFACE;
+                    if (isInterface) {
+
+                        PackageElement packageElement = elementUtils.getPackageOf(concreteClass);
+                        String packageName = packageElement.getQualifiedName().toString();
+                        String declaringClassSimpleName = concreteClass.getSimpleName().toString();
+                        String beanClassName = declaringClassSimpleName + '$' + typeElement.getSimpleName().toString() + '$' + method.getSimpleName().toString();
+
+                        AopProxyWriter aopProxyWriter = new AopProxyWriter(
+                                packageName,
+                                beanClassName,
+                                true,
+                                false,
+                                methodAnnotationMetadata,
+                                new Object[]{modelUtils.resolveTypeReference(typeToImplement)},
+                                ArrayUtils.EMPTY_OBJECT_ARRAY);
+
+                        aopProxyWriter.visitBeanDefinitionConstructor(methodAnnotationMetadata, false);
+
+                        beanDefinitionWriters.put(elementUtils.getName(packageName + '.' + beanClassName), aopProxyWriter);
+
+                        List<? extends TypeMirror> typeArguments = ((DeclaredType) typeElement.asType()).getTypeArguments();
+                        Map<String, TypeMirror> typeVariables = new HashMap<>(typeArguments.size());
+
+                        for (TypeMirror typeArgument : typeArguments) {
+                            typeVariables.put(typeArgument.toString(), typeArgument);
+                        }
+
+                        typeToImplement.accept(new PublicAbstractMethodVisitor<Object, AopProxyWriter>(typeElement, modelUtils, elementUtils) {
+                            boolean first = true;
+
+                            @Override
+                            protected void accept(DeclaredType type, ExecutableElement targetMethod, AopProxyWriter aopProxyWriter) {
+                                if (!first) {
+                                    error(method, "Interface to adapt [" + typeToImplement + "] is not a SAM type. More than one abstract method declared.");
+                                    return;
+                                }
+                                first = false;
+                                List<? extends VariableElement> targetParameters = targetMethod.getParameters();
+                                List<? extends VariableElement> sourceParameters = method.getParameters();
+
+                                if (targetParameters.size() == sourceParameters.size()) {
+
+                                    Map<String, Object> genericTypes = new HashMap<>();
+                                    for (int i = 0; i < targetParameters.size(); i++) {
+
+                                        VariableElement targetElement = targetParameters.get(i);
+                                        VariableElement sourceElement = sourceParameters.get(i);
+
+                                        TypeMirror targetType = targetElement.asType();
+                                        TypeMirror sourceType = sourceElement.asType();
+
+                                        if (targetType.getKind() == TypeKind.TYPEVAR) {
+                                            TypeVariable tv = (TypeVariable) targetType;
+                                            String variableName = tv.toString();
+
+                                            TypeMirror lowerBound = tv.getLowerBound();
+                                            if (lowerBound.getKind() == TypeKind.DECLARED) {
+                                                targetType = lowerBound;
+                                            } else {
+                                                TypeMirror upperBound = tv.getUpperBound();
+                                                if (upperBound.getKind() == TypeKind.DECLARED) {
+                                                    targetType = upperBound;
+                                                }
+                                            }
+
+                                            if (typeVariables.containsKey(variableName)) {
+                                                genericTypes.put(variableName, modelUtils.resolveTypeReference(sourceType));
+                                            }
+
+                                        }
+
+                                        if (!typeUtils.isSubtype(sourceType, targetType)) {
+                                            error(method, "Cannot adapt method [" + method + "] to target method [" + targetMethod + "]. Type [" + sourceType + "] is not a subtype of type [" + targetType + "] for argument at position " + i);
+                                            return;
+                                        }
+                                    }
+
+
+                                    if (!genericTypes.isEmpty()) {
+                                        Map<String, Map<String, Object>> typeData = Collections.singletonMap(
+                                                modelUtils.resolveTypeReference(typeToImplement).toString(),
+                                                genericTypes
+                                        );
+                                        aopProxyWriter.visitTypeArguments(
+                                                typeData
+                                        );
+                                    }
+
+                                    Map<String, Object> boundTypes = genericUtils.resolveBoundTypes(type);
+                                    ExecutableElementParamInfo params = populateParameterData(targetMethod);
+                                    Object owningType = modelUtils.resolveTypeReference(targetMethod.getEnclosingElement());
+                                    if (owningType == null) {
+                                        throw new IllegalStateException("Owning type cannot be null");
+                                    }
+                                    TypeMirror returnTypeMirror = targetMethod.getReturnType();
+                                    Object resolvedReturnType = genericUtils.resolveTypeReference(returnTypeMirror, boundTypes);
+                                    Map<String, Object> returnTypeGenerics = genericUtils.resolveGenericTypes(returnTypeMirror, boundTypes);
+
+                                    String methodName = targetMethod.getSimpleName().toString();
+                                    Map<String, Object> methodParameters = params.getParameters();
+                                    Map<String, AnnotationMetadata> methodQualifier = params.getParameterMetadata();
+                                    Map<String, Map<String, Object>> methodGenericTypes = params.getGenericTypes();
+
+                                    Map members = CollectionUtils.mapOf(
+                                            Adapter.InternalAttributes.ADAPTED_BEAN, modelUtils.resolveTypeName(concreteClass.asType()),
+                                            Adapter.InternalAttributes.ADAPTED_METHOD, method.getSimpleName().toString());
+
+                                    String qualifier = annotationUtils.getAnnotationMetadata(concreteClass).getValue(Named.class, String.class).orElse(null);
+
+                                    if (StringUtils.isNotEmpty(qualifier)) {
+                                        members.put(Adapter.InternalAttributes.ADAPTED_QUALIFIER, qualifier);
+                                    }
+
+                                    AnnotationMetadata annotationMetadata = DefaultAnnotationMetadata.mutateMember(
+                                            methodAnnotationMetadata,
+                                            Adapter.class.getName(),
+                                            members
+                                    );
+
+                                    aopProxyWriter.visitAroundMethod(
+                                            owningType,
+                                            modelUtils.resolveTypeReference(returnTypeMirror),
+                                            resolvedReturnType,
+                                            returnTypeGenerics,
+                                            methodName,
+                                            methodParameters,
+                                            methodQualifier,
+                                            methodGenericTypes,
+                                            annotationMetadata
+                                    );
+
+
+                                } else {
+                                    error(method, "Cannot adapt method [" + method + "] to target method [" + targetMethod + "]. Argument lengths don't match.");
+                                }
+                            }
+                        }, aopProxyWriter);
+                    }
                 }
             }
         }
@@ -1290,7 +1456,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         StringUtils.isNotEmpty(existingPrefix) ? existingPrefix + "." + configurationMetadata.getName() : configurationMetadata.getName()
                 );
             }
-
 
 
             BeanDefinitionWriter beanDefinitionWriter = new BeanDefinitionWriter(

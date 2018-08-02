@@ -15,9 +15,12 @@
  */
 package io.micronaut.ast.groovy
 
+import io.micronaut.aop.Adapter
+import io.micronaut.ast.groovy.utils.AstClassUtils
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.PropertySource
 import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.util.CollectionUtils
 import io.micronaut.core.util.StringUtils
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata
@@ -25,11 +28,13 @@ import io.micronaut.inject.configuration.ConfigurationMetadata
 import io.micronaut.inject.configuration.PropertyMetadata
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
 
+import javax.inject.Named
 import javax.lang.model.element.Element
 import javax.lang.model.element.TypeElement
 import javax.lang.model.type.DeclaredType
 import javax.lang.model.type.TypeKind
 import javax.lang.model.type.TypeMirror
+import java.util.function.Function
 
 import static org.codehaus.groovy.ast.ClassHelper.makeCached
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getGetterName
@@ -177,7 +182,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     ClassNode cn = (ClassNode) beanClassNode
                     ClassNode providerType = AstGenericUtils.resolveInterfaceGenericType(cn, Provider.class)
 
-                    if(providerType != null) {
+                    if (providerType != null) {
                         beanTypeName = providerType.name
                     }
                 }
@@ -227,7 +232,6 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
 
 
-
             } catch (Throwable e) {
                 AstMessageUtils.error(source, beanClassNode, "Error generating bean definition class for dependency injection of class [${beanTypeName}]: $e.message")
                 if (e.message == null) {
@@ -235,7 +239,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
             }
         }
-        if(!beanDefinitionWriters.isEmpty()) {
+        if (!beanDefinitionWriters.isEmpty()) {
 
             try {
                 outputVisitor.finish()
@@ -303,7 +307,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             this.aopSettings = isAopProxyType ? annotationMetadata.getValues(AROUND_TYPE, Boolean.class) : OptionalValues.<Boolean> empty()
             this.isExecutableType = isAopProxyType || annotationMetadata.hasStereotype(Executable)
             this.isConfigurationProperties = configurationProperties != null ? configurationProperties : annotationMetadata.hasDeclaredStereotype(ConfigurationReader)
-            if(isConfigurationProperties) {
+            if (isConfigurationProperties) {
                 this.configurationMetadata = configurationMetadataBuilder.visitProperties(
                         concreteClass,
                         null
@@ -312,8 +316,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
             if (isAopProxyType && Modifier.isFinal(targetClassNode.modifiers)) {
                 addError("Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + targetClassNode.name, targetClassNode)
-            }
-            else if (isFactoryClass || isConfigurationProperties || annotationMetadata.hasStereotype(Bean, Scope)) {
+            } else if (isFactoryClass || isConfigurationProperties || annotationMetadata.hasStereotype(Bean, Scope)) {
                 defineBeanDefinition(concreteClass)
             }
         }
@@ -341,23 +344,23 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 String beanClassName = node.nameWithoutPackage
 
                 Object[] aroundInterceptors = annotationMetadata
-                    .getAnnotationNamesByStereotype(AROUND_TYPE)
-                    .toArray()
+                        .getAnnotationNamesByStereotype(AROUND_TYPE)
+                        .toArray()
                 Object[] introductionInterceptors = annotationMetadata
-                    .getAnnotationNamesByStereotype(Introduction.class)
-                    .toArray()
+                        .getAnnotationNamesByStereotype(Introduction.class)
+                        .toArray()
 
                 Object[] interceptorTypes = ArrayUtils.concat(aroundInterceptors, introductionInterceptors)
                 String[] interfaceTypes = annotationMetadata.getValue(Introduction.class, "interfaces", String[].class).orElse(new String[0])
 
                 boolean isInterface = node.isInterface()
                 AopProxyWriter aopProxyWriter = new AopProxyWriter(
-                    packageName,
-                    beanClassName,
-                    isInterface,
-                    annotationMetadata,
-                    interfaceTypes,
-                    interceptorTypes)
+                        packageName,
+                        beanClassName,
+                        isInterface,
+                        annotationMetadata,
+                        interfaceTypes,
+                        interceptorTypes)
                 populateProxyWriterConstructor(node, aopProxyWriter)
                 beanDefinitionWriters.put(node, aopProxyWriter)
                 visitIntroductionTypePublicMethods(aopProxyWriter, node)
@@ -427,14 +430,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
                     Object resolvedReturnType = AstGenericUtils.resolveTypeReference(methodNode.returnType, boundTypes)
                     Map<String, Object> resolvedGenericTypes = AstGenericUtils.buildGenericTypeInfo(
-                        methodNode.returnType,
-                        boundTypes
+                            methodNode.returnType,
+                            boundTypes
                     )
                     populateParameterData(
-                        methodNode.parameters,
-                        targetMethodParamsToType,
-                        targetAnnotationMetadata,
-                        targetMethodGenericTypeMap)
+                            methodNode.parameters,
+                            targetMethodParamsToType,
+                            targetAnnotationMetadata,
+                            targetMethodGenericTypeMap)
 
 
                     AnnotationMetadata annotationMetadata
@@ -442,20 +445,20 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(node, methodNode)
                     } else {
                         annotationMetadata = new AnnotationMetadataReference(
-                            aopProxyWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
-                            typeAnnotationMetadata
+                                aopProxyWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
+                                typeAnnotationMetadata
                         )
                     }
                     aopProxyWriter.visitAroundMethod(
-                        AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
-                        resolveReturnType(classNode, methodNode, boundTypes),
-                        resolvedReturnType,
-                        resolvedGenericTypes,
-                        methodNode.name,
-                        targetMethodParamsToType,
-                        targetAnnotationMetadata,
-                        targetMethodGenericTypeMap,
-                        annotationMetadata
+                            AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
+                            resolveReturnType(classNode, methodNode, boundTypes),
+                            resolvedReturnType,
+                            resolvedGenericTypes,
+                            methodNode.name,
+                            targetMethodParamsToType,
+                            targetAnnotationMetadata,
+                            targetMethodGenericTypeMap,
+                            annotationMetadata
                     )
                 }
 
@@ -493,26 +496,26 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 String beanDefinitionPackage = concreteClass.packageName
                 String upperCaseMethodName = NameUtils.capitalize(methodNode.getName())
                 String factoryMethodBeanDefinitionName =
-                    beanDefinitionPackage + '.$' + concreteClass.nameWithoutPackage + '$' + upperCaseMethodName + "Definition"
+                        beanDefinitionPackage + '.$' + concreteClass.nameWithoutPackage + '$' + upperCaseMethodName + "Definition"
 
                 BeanDefinitionWriter beanMethodWriter = new BeanDefinitionWriter(
-                    producedType.packageName,
-                    producedType.nameWithoutPackage,
-                    factoryMethodBeanDefinitionName,
-                    producedType.name,
-                    producedType.isInterface(),
-                    methodAnnotationMetadata
+                        producedType.packageName,
+                        producedType.nameWithoutPackage,
+                        factoryMethodBeanDefinitionName,
+                        producedType.name,
+                        producedType.isInterface(),
+                        methodAnnotationMetadata
                 )
 
                 ClassNode returnType = methodNode.getReturnType()
-                Map<String,ClassNode> genericsSpec = AstGenericUtils.createGenericsSpec(returnType)
+                Map<String, ClassNode> genericsSpec = AstGenericUtils.createGenericsSpec(returnType)
                 if (genericsSpec) {
                     GenericsType[] genericsTypes = returnType.redirect().getGenericsTypes()
                     Map<String, Map<String, Object>> typeArguments = [:]
                     Map<String, Object> boundTypes = [:]
-                    for(gt in genericsTypes) {
+                    for (gt in genericsTypes) {
                         ClassNode cn = genericsSpec[gt.name]
-                        boundTypes.put(gt.name, AstGenericUtils.resolveTypeReference(cn) )
+                        boundTypes.put(gt.name, AstGenericUtils.resolveTypeReference(cn))
                     }
 
                     typeArguments.put(AstGenericUtils.resolveTypeReference(returnType).toString(), boundTypes)
@@ -546,9 +549,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     finalSettings.put(Interceptor.PROXY_TARGET, true)
 
                     AopProxyWriter proxyWriter = new AopProxyWriter(
-                        beanMethodWriter,
-                        OptionalValues.of(Boolean.class, finalSettings),
-                        interceptorTypeReferences)
+                            beanMethodWriter,
+                            OptionalValues.of(Boolean.class, finalSettings),
+                            interceptorTypeReferences)
                     if (producedType.isInterface()) {
                         proxyWriter.visitBeanDefinitionConstructor(
                                 AnnotationMetadata.EMPTY_METADATA,
@@ -568,47 +571,47 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             Object resolvedReturnType = AstGenericUtils.resolveTypeReference(targetBeanMethodNode.returnType, boundTypes)
                             Object returnTypeReference = resolveReturnType(classNode, targetBeanMethodNode, boundTypes)
                             Map<String, Object> resolvedGenericTypes = AstGenericUtils.buildGenericTypeInfo(
-                                targetBeanMethodNode.returnType,
-                                boundTypes
+                                    targetBeanMethodNode.returnType,
+                                    boundTypes
                             )
 
                             populateParameterData(
-                                targetBeanMethodNode.parameters,
-                                targetMethodParamsToType,
-                                targetAnnotationMetadata,
-                                targetMethodGenericTypeMap)
+                                    targetBeanMethodNode.parameters,
+                                    targetMethodParamsToType,
+                                    targetAnnotationMetadata,
+                                    targetMethodGenericTypeMap)
                             AnnotationMetadata annotationMetadata
                             if (AstAnnotationUtils.isAnnotated(methodNode)) {
                                 annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(methodNode, targetBeanMethodNode)
                             } else {
                                 annotationMetadata = new AnnotationMetadataReference(
-                                    beanMethodWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
-                                    methodAnnotationMetadata
+                                        beanMethodWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
+                                        methodAnnotationMetadata
                                 )
                             }
 
                             ExecutableMethodWriter writer = beanMethodWriter.visitExecutableMethod(
-                                AstGenericUtils.resolveTypeReference(targetBeanMethodNode.declaringClass),
-                                returnTypeReference,
-                                resolvedReturnType,
-                                resolvedGenericTypes,
-                                targetBeanMethodNode.name,
-                                targetMethodParamsToType,
-                                targetAnnotationMetadata,
-                                targetMethodGenericTypeMap,
-                                annotationMetadata
+                                    AstGenericUtils.resolveTypeReference(targetBeanMethodNode.declaringClass),
+                                    returnTypeReference,
+                                    resolvedReturnType,
+                                    resolvedGenericTypes,
+                                    targetBeanMethodNode.name,
+                                    targetMethodParamsToType,
+                                    targetAnnotationMetadata,
+                                    targetMethodGenericTypeMap,
+                                    annotationMetadata
                             )
 
                             proxyWriter.visitAroundMethod(
-                                AstGenericUtils.resolveTypeReference(targetBeanMethodNode.declaringClass),
-                                returnTypeReference,
-                                resolvedReturnType,
-                                resolvedGenericTypes,
-                                targetBeanMethodNode.name,
-                                targetMethodParamsToType,
-                                targetAnnotationMetadata,
-                                targetMethodGenericTypeMap,
-                                new AnnotationMetadataReference(writer.getClassName(), annotationMetadata)
+                                    AstGenericUtils.resolveTypeReference(targetBeanMethodNode.declaringClass),
+                                    returnTypeReference,
+                                    resolvedReturnType,
+                                    resolvedGenericTypes,
+                                    targetBeanMethodNode.name,
+                                    targetMethodParamsToType,
+                                    targetAnnotationMetadata,
+                                    targetMethodGenericTypeMap,
+                                    new AnnotationMetadataReference(writer.getClassName(), annotationMetadata)
                             )
                         }
                     }.accept(returnType)
@@ -719,14 +722,18 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             getBeanWriter().setRequiresMethodProcessing(true)
                         }
                         ExecutableMethodWriter executableMethodWriter = getBeanWriter().visitExecutableMethod(
-                            AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
-                            AstGenericUtils.resolveTypeReference(methodNode.returnType),
-                            AstGenericUtils.resolveTypeReference(methodNode.returnType),
-                            returnTypeGenerics,
-                            methodName,
-                            paramsToType,
-                            qualifierTypes,
-                            genericTypeMap, methodAnnotationMetadata)
+                                AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
+                                AstGenericUtils.resolveTypeReference(methodNode.returnType),
+                                AstGenericUtils.resolveTypeReference(methodNode.returnType),
+                                returnTypeGenerics,
+                                methodName,
+                                paramsToType,
+                                qualifierTypes,
+                                genericTypeMap, methodAnnotationMetadata)
+
+                        if (methodAnnotationMetadata.hasStereotype(Adapter.class)) {
+                            visitAdaptedMethod(methodNode, methodAnnotationMetadata)
+                        }
 
                         if ((isAopProxyType && isPublic) || (methodAnnotationMetadata.hasStereotype(AROUND_TYPE) && !concreteClass.isAbstract())) {
 
@@ -737,24 +744,24 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
                             OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean)
                             AopProxyWriter proxyWriter = resolveProxyWriter(
-                                aopSettings,
-                                false,
-                                interceptorTypeReferences
+                                    aopSettings,
+                                    false,
+                                    interceptorTypeReferences
                             )
 
                             if (proxyWriter != null && !methodNode.isFinal()) {
 
                                 proxyWriter.visitInterceptorTypes(interceptorTypeReferences)
                                 proxyWriter.visitAroundMethod(
-                                    AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
-                                    AstGenericUtils.resolveTypeReference(methodNode.returnType),
-                                    AstGenericUtils.resolveTypeReference(methodNode.returnType),
-                                    returnTypeGenerics,
-                                    methodName,
-                                    paramsToType,
-                                    qualifierTypes,
-                                    genericTypeMap,
-                                    new AnnotationMetadataReference(executableMethodWriter.getClassName(), methodAnnotationMetadata)
+                                        AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
+                                        AstGenericUtils.resolveTypeReference(methodNode.returnType),
+                                        AstGenericUtils.resolveTypeReference(methodNode.returnType),
+                                        returnTypeGenerics,
+                                        methodName,
+                                        paramsToType,
+                                        qualifierTypes,
+                                        genericTypeMap,
+                                        new AnnotationMetadataReference(executableMethodWriter.getClassName(), methodAnnotationMetadata)
                                 )
                             }
                         }
@@ -783,22 +790,22 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                         new AnnotationValue(
                                                 Property.class.getName(),
                                                 Collections.singletonMap(
-                                                        (CharSequence)"name",
-                                                        (Object)propertyMetadata.getPath()
+                                                        (CharSequence) "name",
+                                                        (Object) propertyMetadata.getPath()
                                                 )
                                         )
                                 )
                         )
 
                         getBeanWriter().visitSetterValue(
-                            AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
-                            methodAnnotationMetadata,
-                            false,
-                            resolveParameterType(parameter),
-                            methodNode.name,
-                            resolveGenericTypes(parameter),
-                            AstAnnotationUtils.getAnnotationMetadata(parameter),
-                            true
+                                AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
+                                methodAnnotationMetadata,
+                                false,
+                                resolveParameterType(parameter),
+                                methodNode.name,
+                                resolveGenericTypes(parameter),
+                                AstAnnotationUtils.getAnnotationMetadata(parameter),
+                                true
                         )
                     }
                 }
@@ -806,16 +813,16 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         }
 
         private AopProxyWriter resolveProxyWriter(
-            OptionalValues<Boolean> aopSettings,
-            boolean isFactoryType,
-            Object[] interceptorTypeReferences) {
+                OptionalValues<Boolean> aopSettings,
+                boolean isFactoryType,
+                Object[] interceptorTypeReferences) {
             AopProxyWriter proxyWriter = (AopProxyWriter) aopProxyWriter
             if (proxyWriter == null) {
 
                 proxyWriter = new AopProxyWriter(
-                    (BeanDefinitionWriter) getBeanWriter(),
-                    aopSettings,
-                    interceptorTypeReferences)
+                        (BeanDefinitionWriter) getBeanWriter(),
+                        aopSettings,
+                        interceptorTypeReferences)
 
                 ClassNode targetClass = concreteClass
                 populateProxyWriterConstructor(targetClass, proxyWriter)
@@ -850,9 +857,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     Map<String, Map<String, Object>> constructorGenericTypeMap = [:]
                     Parameter[] parameters = constructorNode.parameters
                     populateParameterData(parameters,
-                                          constructorParamsToType,
-                                          constructorArgumentMetadata,
-                                          constructorGenericTypeMap)
+                            constructorParamsToType,
+                            constructorArgumentMetadata,
+                            constructorGenericTypeMap)
                     proxyWriter.visitBeanDefinitionConstructor(
                             AstAnnotationUtils.getAnnotationMetadata(constructorNode),
                             constructorNode.isPrivate(),
@@ -909,7 +916,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 getBeanWriter().visitConfigBuilderEnd()
                             }
                         } else {
-                            if(isConfigurationProperties) {
+                            if (isConfigurationProperties) {
                                 PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
                                         concreteClass,
                                         declaringClass,
@@ -926,21 +933,21 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                                 new AnnotationValue(
                                                         Property.class.getName(),
                                                         Collections.singletonMap(
-                                                                (CharSequence)"name",
-                                                                (Object)propertyMetadata.getPath()
+                                                                (CharSequence) "name",
+                                                                (Object) propertyMetadata.getPath()
                                                         )
                                                 )
                                         )
                                 )
                             }
                             getBeanWriter().visitFieldValue(
-                                AstGenericUtils.resolveTypeReference(declaringClass),
-                                fieldType,
-                                fieldName,
-                                requiresReflection,
-                                fieldAnnotationMetadata,
-                                AstGenericUtils.buildGenericTypeInfo(fieldNode.type, Collections.emptyMap()),
-                                isConfigurationProperties
+                                    AstGenericUtils.resolveTypeReference(declaringClass),
+                                    fieldType,
+                                    fieldName,
+                                    requiresReflection,
+                                    fieldAnnotationMetadata,
+                                    AstGenericUtils.buildGenericTypeInfo(fieldNode.type, Collections.emptyMap()),
+                                    isConfigurationProperties
                             )
                         }
                     } else {
@@ -1013,30 +1020,30 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 Object fieldTypeReference = AstGenericUtils.resolveTypeReference(fieldType)
                 if (isInject) {
                     getBeanWriter().visitMethodInjectionPoint(
-                        AstGenericUtils.resolveTypeReference(declaringClass),
-                        false,
-                        void.class,
-                        getSetterName(propertyName),
-                        Collections.singletonMap(propertyName, fieldTypeReference),
-                        Collections.singletonMap(propertyName, fieldAnnotationMetadata),
-                        Collections.singletonMap(propertyName, genericTypeList),
-                        fieldAnnotationMetadata
+                            AstGenericUtils.resolveTypeReference(declaringClass),
+                            false,
+                            void.class,
+                            getSetterName(propertyName),
+                            Collections.singletonMap(propertyName, fieldTypeReference),
+                            Collections.singletonMap(propertyName, fieldAnnotationMetadata),
+                            Collections.singletonMap(propertyName, genericTypeList),
+                            fieldAnnotationMetadata
                     )
                 } else if (isValue) {
                     if (isConfigurationProperties && fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
                         Object resolvedFieldType = fieldNode.type.isResolved() ? fieldNode.type.typeClass : fieldNode.type.name
                         getBeanWriter().visitConfigBuilderMethod(
-                            resolvedFieldType,
-                            getGetterName(propertyNode),
-                            fieldAnnotationMetadata,
-                            configurationMetadataBuilder)
+                                resolvedFieldType,
+                                getGetterName(propertyNode),
+                                fieldAnnotationMetadata,
+                                configurationMetadataBuilder)
                         try {
                             visitConfigurationBuilder(fieldAnnotationMetadata, fieldNode.type, getBeanWriter())
                         } finally {
                             getBeanWriter().visitConfigBuilderEnd()
                         }
                     } else {
-                        if(isConfigurationProperties) {
+                        if (isConfigurationProperties) {
                             PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
                                     concreteClass,
                                     declaringClass,
@@ -1053,22 +1060,22 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                             new AnnotationValue(
                                                     Property.class.getName(),
                                                     Collections.singletonMap(
-                                                            (CharSequence)"name",
-                                                            (Object)propertyMetadata.getPath()
+                                                            (CharSequence) "name",
+                                                            (Object) propertyMetadata.getPath()
                                                     )
                                             )
                                     )
                             )
                         }
                         getBeanWriter().visitSetterValue(
-                            AstGenericUtils.resolveTypeReference(declaringClass),
-                            fieldAnnotationMetadata,
-                            false,
+                                AstGenericUtils.resolveTypeReference(declaringClass),
+                                fieldAnnotationMetadata,
+                                false,
                                 fieldTypeReference,
-                            fieldNode.name,
-                            getSetterName(propertyName),
-                            genericTypeList,
-                            isConfigurationProperties
+                                fieldNode.name,
+                                getSetterName(propertyName),
+                                genericTypeList,
+                                isConfigurationProperties
                         )
                     }
                 }
@@ -1104,15 +1111,15 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     )
 
                     aopWriter.visitAroundMethod(
-                        propertyNode.getDeclaringClass().name,
-                        void.class,
-                        void.class,
-                        emptyMap,
-                        getSetterName(propertyName),
-                        resolvedArguments,
-                        resolvedAnnotationMetadata,
-                        resolvedGenericTypes,
-                        fieldAnnotationMetadata
+                            propertyNode.getDeclaringClass().name,
+                            void.class,
+                            void.class,
+                            emptyMap,
+                            getSetterName(propertyName),
+                            resolvedArguments,
+                            resolvedAnnotationMetadata,
+                            resolvedGenericTypes,
+                            fieldAnnotationMetadata
                     )
 
                     // also visit getter to ensure proxying
@@ -1146,8 +1153,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         protected boolean isInheritedAndNotPublic(AnnotatedNode annotatedNode, ClassNode declaringClass, int modifiers) {
             return declaringClass != concreteClass &&
-                   declaringClass.packageName != concreteClass.packageName &&
-                   ((Modifier.isProtected(modifiers) || !Modifier.isPublic(modifiers)) || !annotatedNode.getAnnotations(makeCached(PackageScope)).isEmpty())
+                    declaringClass.packageName != concreteClass.packageName &&
+                    ((Modifier.isProtected(modifiers) || !Modifier.isPublic(modifiers)) || !annotatedNode.getAnnotations(makeCached(PackageScope)).isEmpty())
         }
 
         @Override
@@ -1155,16 +1162,17 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             return sourceUnit
         }
 
+
         private void defineBeanDefinition(ClassNode classNode) {
             if (!beanDefinitionWriters.containsKey(classNode)) {
                 ClassNode providerGenericType = AstGenericUtils.resolveInterfaceGenericType(classNode, Provider)
                 boolean isProvider = providerGenericType != null
                 AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(classNode)
 
-                if(annotationMetadata.hasStereotype(groovy.lang.Singleton)) {
+                if (annotationMetadata.hasStereotype(groovy.lang.Singleton)) {
                     addError("Class annotated with groovy.lang.Singleton instead of javax.inject.Singleton. Import javax.inject.Singleton to use Micronaut Dependency Injection.", classNode)
                 }
-                if(configurationMetadata != null) {
+                if (configurationMetadata != null) {
                     String existingPrefix = annotationMetadata.getValue(
                             ConfigurationReader.class,
                             "prefix", String.class)
@@ -1179,20 +1187,20 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
                 if (isProvider) {
                     beanWriter = new BeanDefinitionWriter(
-                        classNode.packageName,
-                        classNode.nameWithoutPackage,
-                        providerGenericType.name,
-                        classNode.isInterface(),
-                        annotationMetadata)
+                            classNode.packageName,
+                            classNode.nameWithoutPackage,
+                            providerGenericType.name,
+                            classNode.isInterface(),
+                            annotationMetadata)
                 } else {
 
                     beanWriter = new BeanDefinitionWriter(
-                        classNode.packageName,
-                        classNode.nameWithoutPackage,
-                        annotationMetadata)
+                            classNode.packageName,
+                            classNode.nameWithoutPackage,
+                            annotationMetadata)
                 }
 
-                visitTypeArguments(classNode, (BeanDefinitionWriter)beanWriter)
+                visitTypeArguments(classNode, (BeanDefinitionWriter) beanWriter)
 
                 beanDefinitionWriters.put(classNode, beanWriter)
 
@@ -1237,6 +1245,159 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
+        private void visitAdaptedMethod(MethodNode method, AnnotationMetadata methodAnnotationMetadata) {
+            Optional<ClassNode> adaptedType = methodAnnotationMetadata.getValue(Adapter.class, String.class).flatMap({ String s ->
+                def type = ClassUtils.forName(s, InjectTransform.classLoader).orElse(null)
+                if (type != null) {
+                    return Optional.of(ClassHelper.make(type))
+                }
+                return Optional.empty()
+            } as Function<String, Optional<ClassNode>>)
+
+            if (adaptedType.isPresent()) {
+                ClassNode typeToImplement = adaptedType.get();
+                boolean isInterface = typeToImplement.isInterface();
+                if (isInterface) {
+
+                    String packageName = concreteClass.packageName;
+                    String declaringClassSimpleName = concreteClass.nameWithoutPackage
+                    String beanClassName = declaringClassSimpleName + '$' + typeToImplement.nameWithoutPackage + '$' + method.getName()
+
+                    AopProxyWriter aopProxyWriter = new AopProxyWriter(
+                            packageName,
+                            beanClassName,
+                            true,
+                            false,
+                            methodAnnotationMetadata,
+                            [typeToImplement.name] as Object[],
+                            ArrayUtils.EMPTY_OBJECT_ARRAY)
+
+                    aopProxyWriter.visitBeanDefinitionConstructor(methodAnnotationMetadata, false)
+
+                    beanDefinitionWriters.put(ClassHelper.make(packageName + '.' + beanClassName), aopProxyWriter)
+
+
+                    GenericsType[] typeArguments = typeToImplement.getGenericsTypes()
+                    Map<String, ClassNode> typeVariables = new HashMap<>(typeArguments.size())
+
+                    for (GenericsType typeArgument : typeArguments) {
+                        typeVariables.put(typeArgument.name, typeArgument.type)
+                    }
+
+                    InjectVisitor thisVisitor = this
+                    PublicAbstractMethodVisitor visitor = new PublicAbstractMethodVisitor(sourceUnit) {
+                        boolean first = true;
+
+                        @Override
+                        void accept(ClassNode classNode, MethodNode targetMethod) {
+                            if (!first) {
+                                thisVisitor.addError("Interface to adapt [" + typeToImplement + "] is not a SAM type. More than one abstract method declared.", (MethodNode)method)
+                                return
+                            }
+                            first = false
+                            Parameter[] targetParameters = targetMethod.getParameters()
+                            Parameter[] sourceParameters = method.getParameters()
+                            Map<String, ClassNode> boundTypes = AstGenericUtils.createGenericsSpec(classNode)
+                            if (targetParameters.size() == sourceParameters.size()) {
+
+                                int i = 0
+                                Map<String, Object> genericTypes = new HashMap<>();
+                                for (Parameter targetElement in targetParameters) {
+
+                                    Parameter sourceElement = sourceParameters[i]
+
+                                    ClassNode targetType = targetElement.getType()
+                                    ClassNode sourceType = sourceElement.getType()
+
+                                    if (targetType.isGenericsPlaceHolder()) {
+                                        GenericsType[] targetGenerics = targetType.genericsTypes
+
+                                        if (targetGenerics) {
+                                            String variableName = targetGenerics[0].name
+                                            if (typeVariables.containsKey(variableName)) {
+                                                genericTypes.put(variableName, AstGenericUtils.resolveTypeReference(sourceType, boundTypes))
+                                            }
+                                        }
+                                    }
+
+                                    if (!AstClassUtils.isSubclassOfOrImplementsInterface(sourceType, targetType)) {
+                                        thisVisitor.addError("Cannot adapt method [" + method + "] to target method [" + targetMethod + "]. Type [" + sourceType + "] is not a subtype of type [" + targetType + "].", (MethodNode)method)
+                                        return
+                                    }
+
+                                    i++
+                                }
+
+                                if (!genericTypes.isEmpty()) {
+                                    Map<String, Map<String, Object>> typeData = Collections.<String, Map<String, Object>>singletonMap(
+                                            typeToImplement.name,
+                                            genericTypes
+                                    )
+                                    aopProxyWriter.visitTypeArguments(
+                                            typeData
+                                    )
+                                }
+
+                                Map<String, Object> targetMethodParamsToType = [:]
+                                Map<String, AnnotationMetadata> targetAnnotationMetadata = [:]
+                                Map<String, Map<String, Object>> targetMethodGenericTypeMap = [:]
+
+                                if (!classNode.isPrimaryClassNode()) {
+                                    AstGenericUtils.createGenericsSpec(targetMethod, boundTypes)
+                                }
+                                Object resolvedReturnType = AstGenericUtils.resolveTypeReference(targetMethod.returnType, boundTypes)
+                                Map<String, Object> resolvedGenericTypes = AstGenericUtils.buildGenericTypeInfo(
+                                        targetMethod.returnType,
+                                        boundTypes
+                                )
+                                populateParameterData(
+                                        targetMethod.parameters,
+                                        targetMethodParamsToType,
+                                        targetAnnotationMetadata,
+                                        targetMethodGenericTypeMap)
+
+
+                                def values = CollectionUtils.mapOf(
+                                        Adapter.InternalAttributes.ADAPTED_BEAN, concreteClass.name,
+                                        Adapter.InternalAttributes.ADAPTED_METHOD, method.name
+                                )
+
+
+                                String qualifier = AstAnnotationUtils.getAnnotationMetadata(concreteClass).getValue(Named.class, String.class).orElse(null)
+                                if (StringUtils.isNotEmpty(qualifier)) {
+                                    values.put(Adapter.InternalAttributes.ADAPTED_QUALIFIER, qualifier)
+                                }
+                                AnnotationMetadata annotationMetadata = DefaultAnnotationMetadata.mutateMember(
+                                        methodAnnotationMetadata,
+                                        Adapter.class.getName(),
+                                        values
+                                )
+
+                                aopProxyWriter.visitAroundMethod(
+                                        AstGenericUtils.resolveTypeReference(targetMethod.declaringClass),
+                                        resolveReturnType(classNode, targetMethod, boundTypes),
+                                        resolvedReturnType,
+                                        resolvedGenericTypes,
+                                        targetMethod.name,
+                                        targetMethodParamsToType,
+                                        targetAnnotationMetadata,
+                                        targetMethodGenericTypeMap,
+                                        annotationMetadata
+                                )
+
+
+                            } else {
+                                thisVisitor.addError("Cannot adapt method [" + method + "] to target method [" + targetMethod + "]. Argument lengths don't match.", (MethodNode)method)
+                            }
+                        }
+                    }
+
+                    visitor.accept(typeToImplement)
+                }
+
+            }
+        }
+
         private void visitTypeArguments(ClassNode typeElement, BeanDefinitionWriter beanDefinitionWriter) {
             Map<String, Map<String, Object>> typeArguments = new HashMap<>()
 
@@ -1260,7 +1421,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         Map<String, ClassNode> genericSpec = AstGenericUtils.createGenericsSpec(current)
                         Map<String, Object> arguments = new LinkedHashMap<>()
                         if (genericSpec) {
-                            for(gt in superArguments) {
+                            for (gt in superArguments) {
                                 ClassNode cn = genericSpec.get(gt.name)
                                 if (cn != null) {
                                     arguments.put(gt.name, AstGenericUtils.resolveTypeReference(cn, genericSpec))
@@ -1349,12 +1510,12 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     Parameter paramType = params.size() == 1 ? params[0] : null
                     Object expectedType = paramType != null ? AstGenericUtils.resolveTypeReference(paramType.type) : null
                     writer.visitConfigBuilderMethod(
-                        prefix,
-                        configurationPrefix,
-                        AstGenericUtils.resolveTypeReference(method.getReturnType()),
-                        methodName,
-                        expectedType,
-                        paramType != null ? resolveGenericTypes(paramType) : null
+                            prefix,
+                            configurationPrefix,
+                            AstGenericUtils.resolveTypeReference(method.getReturnType()),
+                            methodName,
+                            expectedType,
+                            paramType != null ? resolveGenericTypes(paramType) : null
                     )
                 }
 

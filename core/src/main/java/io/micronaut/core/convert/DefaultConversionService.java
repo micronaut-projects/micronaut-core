@@ -110,11 +110,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of((T) object);
         }
 
-        Optional<? extends Class<? extends Annotation>> formattingAnn = Optional.empty();
-
-        if (context instanceof ArgumentConversionContext) {
-            formattingAnn = ((ArgumentConversionContext) context).getAnnotationMetadata().getAnnotationTypeByStereotype(Format.class);
-        }
+        Optional<? extends Class<? extends Annotation>> formattingAnn = context.getAnnotationMetadata().getAnnotationTypeByStereotype(Format.class);
         Class<? extends Annotation> formattingAnnotation = formattingAnn.orElse(null);
         ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, formattingAnnotation);
         TypeConverter typeConverter = converterCache.getIfPresent(pair);
