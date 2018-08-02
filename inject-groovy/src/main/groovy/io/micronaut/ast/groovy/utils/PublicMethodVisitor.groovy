@@ -41,7 +41,7 @@ abstract class PublicMethodVisitor extends ClassCodeVisitorSupport {
     }
 
     void accept(ClassNode classNode) {
-        while (classNode.name != Object.class.getName()) {
+        while (classNode != null && classNode.name != Object.class.getName()) {
             this.current = classNode
             classNode.visitContents(this)
             for (i in classNode.getAllInterfaces()) {

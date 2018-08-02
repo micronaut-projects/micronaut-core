@@ -48,6 +48,7 @@ aop:
   title: Aspect Oriented Programming
   aroundAdvice: Around Advice
   introductionAdvice: Introduction Advice
+  adapterAdvice: Method Adapter Advice
   validation:
     title: Validation Advice
   caching: 
