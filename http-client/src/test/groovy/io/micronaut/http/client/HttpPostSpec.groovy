@@ -249,7 +249,7 @@ class HttpPostSpec extends Specification {
             return book
         }
 
-        @Post(value = '/form', consumes = MediaType.APPLICATION_FORM_URLENCODED)
+        @Post(uri = '/form', consumes = MediaType.APPLICATION_FORM_URLENCODED)
         Book form(@Body Book book, @Header String contentType, @Header long contentLength, @Header accept, @Header('X-My-Header') custom) {
             assert contentType == MediaType.APPLICATION_FORM_URLENCODED
             assert contentLength == 26

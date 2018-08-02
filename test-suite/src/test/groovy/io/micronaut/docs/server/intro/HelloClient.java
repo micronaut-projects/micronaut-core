@@ -30,7 +30,7 @@ import io.reactivex.Single;
 @Client("/hello") // <1>
 public interface HelloClient {
 
-    @Get("/") // <2>
+    @Get // <2>
     Single<String> hello(); // <3>
 }
 // end::class[]

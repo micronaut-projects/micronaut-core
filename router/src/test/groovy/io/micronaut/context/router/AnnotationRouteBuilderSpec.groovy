@@ -57,7 +57,7 @@ class AnnotationRouteBuilderSpec extends Specification {
 
     @Controller('/')
     static class ApplicationController {
-        @Get('/')
+        @Get
         String index() {
             'welcome'
         }

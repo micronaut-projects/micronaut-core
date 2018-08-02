@@ -179,13 +179,13 @@ class NullableCrudSpec extends Specification {
         @Get("/show{/id}") // /show to avoid calling list instead
         NullableBook get(@Nullable Long id)
 
-        @Get('/')
+        @Get
         List<NullableBook> list()
 
         @Delete("{/id}")
         void delete(@Nullable Long id)
 
-        @Post('/')
+        @Post
         NullableBook save(@Nullable String title)
 
         @Patch("/{id}")

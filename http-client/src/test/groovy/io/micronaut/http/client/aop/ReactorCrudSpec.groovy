@@ -152,13 +152,13 @@ class ReactorCrudSpec extends Specification {
         @Get("/{id}")
         Mono<Book> get(Long id)
 
-        @Get('/')
+        @Get
         Mono<List<Book>> list()
 
         @Delete("/{id}")
         Mono<Book> delete(Long id)
 
-        @Post('/')
+        @Post
         Mono<Book> save(String title)
 
         @Patch("/{id}")

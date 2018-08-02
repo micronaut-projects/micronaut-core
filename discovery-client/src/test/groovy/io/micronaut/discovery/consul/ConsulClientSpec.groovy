@@ -187,7 +187,7 @@ class ConsulClientSpec extends Specification {
     }
     @Controller('/consul/test')
     static class TestController {
-        @Get("/")
+        @Get
         String index() {
             return "Ok"
         }

@@ -27,13 +27,13 @@ import io.micronaut.http.annotation.Produces
 @Controller("/test")
 public class TestController {
 
-    @Get('/')
+    @Get
     public HttpResponse index() {
         return HttpResponse.ok().body("{\"msg\":\"This is JSON\"}");
     }
 
     @Produces(MediaType.TEXT_HTML) // <1>
-    @Get
+    @Get("/html")
     public String html() {
         return "<html><title><h1>HTML</h1></title><body></body></html>";
     }

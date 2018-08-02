@@ -26,7 +26,7 @@ import io.micronaut.http.annotation.Get;
 @Controller("/secure")
 public class SecureController {
 
-    @Get("/")
+    @Get
     public HttpResponse index(String username) {
         return HttpResponse.ok("Authenticated: " + username);
     }

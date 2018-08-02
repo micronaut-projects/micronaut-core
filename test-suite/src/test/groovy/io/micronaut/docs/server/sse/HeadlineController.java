@@ -30,7 +30,7 @@ import org.reactivestreams.Publisher;
 @Controller("/headlines")
 public class HeadlineController {
 
-    @Get("/")
+    @Get
     public Publisher<Event<Headline>> index() { // <1>
         String[] versions = new String[]{"1.0", "2.0"}; // <2>
 

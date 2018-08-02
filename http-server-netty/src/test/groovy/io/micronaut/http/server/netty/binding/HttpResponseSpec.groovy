@@ -189,7 +189,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
     @Controller('/test-header')
     @Requires(property = 'spec.name', value = 'HttpResponseSpec')
     static class TestController {
-        @Get('/')
+        @Get
         HttpStatus index() {
             HttpStatus.OK
         }
