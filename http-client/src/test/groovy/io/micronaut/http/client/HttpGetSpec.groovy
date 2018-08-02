@@ -334,7 +334,7 @@ class HttpGetSpec extends Specification {
     @Controller("/get")
     static class GetController {
 
-        @Get(uri = "/simple", produces = MediaType.TEXT_PLAIN)
+        @Get(value = "/simple", produces = MediaType.TEXT_PLAIN)
         String simple() {
             return "success"
         }
@@ -349,7 +349,7 @@ class HttpGetSpec extends Specification {
             return [ new Book(title: "The Stand") ]
         }
 
-        @Get(uri = "/error", produces = MediaType.TEXT_PLAIN)
+        @Get(value = "/error", produces = MediaType.TEXT_PLAIN)
         HttpResponse error() {
             return HttpResponse.serverError().body("Server error")
         }

@@ -33,14 +33,14 @@ public class MessageController {
 // end::class[]
 
     // tag::echo[]
-    @Post(consumes = MediaType.TEXT_PLAIN) // <1>
+    @Post(value = "/echo", consumes = MediaType.TEXT_PLAIN) // <1>
     String echo(@Size(max = 1024) @Body String text) { // <2>
         return text; // <3>
     }
     // end::echo[]
 
     // tag::echoReactive[]
-    @Post(consumes = MediaType.TEXT_PLAIN) // <1>
+    @Post(value = "/echo-flow", consumes = MediaType.TEXT_PLAIN) // <1>
     Single<MutableHttpResponse<String>> echoFlow(@Body Flowable<String> text) { //<2>
         return text.collect(StringBuffer::new, StringBuffer::append) // <3>
                    .map(buffer ->

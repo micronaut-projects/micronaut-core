@@ -91,19 +91,19 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
     @Client('/sse')
     static interface SseClient {
 
-        @Get(uri = '/object', processes = MediaType.TEXT_EVENT_STREAM)
+        @Get(value = '/object', processes = MediaType.TEXT_EVENT_STREAM)
         Flux<Event<Foo>> object()
 
-        @Get(uri = '/string', processes = MediaType.TEXT_EVENT_STREAM)
+        @Get(value = '/string', processes = MediaType.TEXT_EVENT_STREAM)
         Flux<Event<String>> string()
 
-        @Get(uri = '/rich', processes = MediaType.TEXT_EVENT_STREAM)
+        @Get(value = '/rich', processes = MediaType.TEXT_EVENT_STREAM)
         Flux<Event<Foo>> rich()
 
-        @Get(uri = '/exception', processes = MediaType.TEXT_EVENT_STREAM)
+        @Get(value = '/exception', processes = MediaType.TEXT_EVENT_STREAM)
         Flux<Event<String>> exception()
 
-        @Get(uri = '/on-error', processes = MediaType.TEXT_EVENT_STREAM)
+        @Get(value = '/on-error', processes = MediaType.TEXT_EVENT_STREAM)
         Flux<Event<String>> onError()
 
     }

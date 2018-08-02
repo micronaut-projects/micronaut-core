@@ -12,10 +12,10 @@ import reactor.core.publisher.Flux;
 @Client("/streaming")
 public interface HeadlineClient {
 
-    @Get(uri = "/headlines", processes = MediaType.APPLICATION_JSON_STREAM) // <1>
+    @Get(value = "/headlines", processes = MediaType.APPLICATION_JSON_STREAM) // <1>
     Flowable<Headline> streamHeadlines(); // <2>
 // end::class[]
 
-    @Get(uri = "/headlines", processes = MediaType.APPLICATION_JSON_STREAM) // <1>
+    @Get(value = "/headlines", processes = MediaType.APPLICATION_JSON_STREAM) // <1>
     Flux<Headline> streamFlux();
 }

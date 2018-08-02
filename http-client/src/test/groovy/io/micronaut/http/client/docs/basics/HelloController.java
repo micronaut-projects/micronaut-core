@@ -64,7 +64,7 @@ public class HelloController {
         return message;
     }
 
-    @Post(uri= "/hello", consumes = MediaType.TEXT_PLAIN, produces = MediaType.TEXT_PLAIN)
+    @Post(value = "/hello", consumes = MediaType.TEXT_PLAIN, produces = MediaType.TEXT_PLAIN)
     @Status(HttpStatus.CREATED)
     String echoHello(@Body String message) {
         return message;

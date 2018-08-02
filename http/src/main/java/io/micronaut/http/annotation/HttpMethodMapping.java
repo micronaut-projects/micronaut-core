@@ -18,7 +18,6 @@ package io.micronaut.http.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
-import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Executable;
 
 import java.lang.annotation.Documented;
@@ -39,14 +38,7 @@ import java.lang.annotation.Target;
 public @interface HttpMethodMapping {
 
     /**
-     * @return The URI of the action if not specified inferred from the method name and arguments
+     * @return The URI of the action
      */
     String value() default "";
-
-    /**
-     * @return An alias for {@link #value()}
-     * @see #value()
-     */
-    @AliasFor(member = "value")
-    String uri() default "";
 }

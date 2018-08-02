@@ -39,16 +39,10 @@ import java.lang.annotation.Target;
 public @interface Options {
 
     /**
-     * @return The URI of the OPTIONS route if not specified inferred from the method name and arguments
+     * @return The URI of the OPTIONS route
      */
     @AliasFor(annotation = HttpMethodMapping.class, member = "value")
-    String value() default "";
-
-    /**
-     * @return The URI of the OPTIONS route if not specified inferred from the method name and arguments
-     */
-    @AliasFor(annotation = HttpMethodMapping.class, member = "value")
-    String uri() default "";
+    String value();
 
     /**
      * @return The default consumes, otherwise override from controller

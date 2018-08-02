@@ -36,7 +36,7 @@ import java.nio.file.*;
  * @since 1.0
  */
 // tag::class[]
-@Controller
+@Controller("/upload")
 public class UploadController {
 // end::class[]
 
