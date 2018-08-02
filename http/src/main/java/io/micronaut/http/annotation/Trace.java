@@ -41,11 +41,5 @@ public @interface Trace {
      * @return The URI of the TRACE route if not specified inferred from the method name and arguments
      */
     @AliasFor(annotation = HttpMethodMapping.class, member = "value")
-    String value() default "";
-
-    /**
-     * @return The URI of the TRACE route if not specified inferred from the method name and arguments
-     */
-    @AliasFor(annotation = HttpMethodMapping.class, member = "value")
-    String uri() default "";
+    String value();
 }

@@ -143,7 +143,7 @@ class HateosCrudSpec extends Specification {
 
     static interface BookApi {
 
-        @Get(uri = "/{id}", produces = MediaType.APPLICATION_HAL_JSON)
+        @Get(value = "/{id}", produces = MediaType.APPLICATION_HAL_JSON)
         Book get(Long id)
 
         @Get('/')
@@ -152,13 +152,13 @@ class HateosCrudSpec extends Specification {
         @Delete("/{id}")
         void delete(Long id)
 
-        @Post(uri = '/', produces = MediaType.APPLICATION_HAL_JSON)
+        @Post(value = '/', produces = MediaType.APPLICATION_HAL_JSON)
         Book save(String title)
 
-        @Post(uri= '/{id}/{embedded}', produces = MediaType.APPLICATION_HAL_JSON)
+        @Post(value= '/{id}/{embedded}', produces = MediaType.APPLICATION_HAL_JSON)
         Book save(Long id, String embedded)
 
-        @Patch(uri = "/{id}", produces = MediaType.APPLICATION_HAL_JSON)
+        @Patch(value = "/{id}", produces = MediaType.APPLICATION_HAL_JSON)
         Book update(Long id, String title)
     }
 

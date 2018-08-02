@@ -33,7 +33,7 @@ import java.util.concurrent.TimeUnit;
 public class HeadlineController {
 
     // tag::streaming[]
-    @Get(uri = "/headlines", produces = MediaType.APPLICATION_JSON_STREAM) // <1>
+    @Get(value = "/headlines", produces = MediaType.APPLICATION_JSON_STREAM) // <1>
     Flowable<Headline> streamHeadlines() {
         return Flowable.fromCallable(() -> {  // <2>
             Headline headline = new Headline();

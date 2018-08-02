@@ -41,13 +41,7 @@ public @interface Post {
      * @return The URI of the POST route if not specified inferred from the method name and arguments
      */
     @AliasFor(annotation = HttpMethodMapping.class, member = "value")
-    String value() default "";
-
-    /**
-     * @return The URI of the POST route if not specified inferred from the method name and arguments
-     */
-    @AliasFor(annotation = HttpMethodMapping.class, member = "value")
-    String uri() default "";
+    String value();
 
     /**
      * @return The default consumes, otherwise override from controller

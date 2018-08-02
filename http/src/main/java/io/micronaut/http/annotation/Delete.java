@@ -38,16 +38,10 @@ import java.lang.annotation.Target;
 public @interface Delete {
 
     /**
-     * @return The URI of the DELETE route if not specified inferred from the method name and arguments
+     * @return The URI of the DELETE route
      */
     @AliasFor(annotation = HttpMethodMapping.class, member = "value")
-    String value() default "";
-
-    /**
-     * @return The URI of the DELETE route if not specified inferred from the method name and arguments
-     */
-    @AliasFor(annotation = HttpMethodMapping.class, member = "value")
-    String uri() default "";
+    String value();
 
     /**
      * @return The default consumes, otherwise override from controller

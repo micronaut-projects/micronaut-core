@@ -57,7 +57,7 @@ class ClientFilterSpec extends Specification{
     @Controller('/filters')
     static class TestController {
 
-        @Get(uri = '/name', produces = MediaType.TEXT_PLAIN)
+        @Get(value = '/name', produces = MediaType.TEXT_PLAIN)
         String name(@Header('X-Auth-Username') String username, @Header('X-Auth-Lastname') Optional<String> lastname) {
             return username + lastname.orElse('')
         }

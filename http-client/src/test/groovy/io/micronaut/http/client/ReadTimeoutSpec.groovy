@@ -59,7 +59,7 @@ class ReadTimeoutSpec extends Specification {
     @Controller("/timeout")
     static class GetController {
 
-        @Get(uri = "/", produces = MediaType.TEXT_PLAIN)
+        @Get(value = "/", produces = MediaType.TEXT_PLAIN)
         String index() {
             sleep 5000
             return "success"
