@@ -16,15 +16,13 @@
 
 package io.micronaut.runtime.event.annotation;
 
+// tag::imports[]
 import io.micronaut.aop.Adapter;
 import io.micronaut.context.event.ApplicationEventListener;
-
-import java.lang.annotation.Documented;
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
+import java.lang.annotation.*;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
+// end::imports[]
 
 /**
  * <p>An {@link Adapter} advice annotation that allows listening for events by implementing the {@link ApplicationEventListener} interface.</p>
@@ -40,9 +38,11 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * @author graemerocher
  * @since 1.0
  */
+// tag::clazz[]
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.ANNOTATION_TYPE, ElementType.METHOD})
-@Adapter(ApplicationEventListener.class)
+@Adapter(ApplicationEventListener.class) // <1>
 public @interface EventListener {
 }
+// end::clazz[]
