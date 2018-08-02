@@ -16,9 +16,11 @@
 package io.micronaut.configuration.jdbc.hikari
 
 import com.zaxxer.hikari.HikariDataSource
+import io.micronaut.configuration.jdbc.hikari.metadata.HikariDataSourcePoolMetadata
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
+import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
@@ -35,6 +37,7 @@ class DatasourceConfigurationSpec extends Specification {
         expect: "No beans are created"
         !applicationContext.containsBean(HikariDataSource)
         !applicationContext.containsBean(DatasourceConfiguration)
+        !applicationContext.containsBean(HikariDataSourcePoolMetadata)
 
         cleanup:
         applicationContext.close()
@@ -52,9 +55,10 @@ class DatasourceConfigurationSpec extends Specification {
         expect:
         applicationContext.containsBean(DataSource)
         applicationContext.containsBean(DatasourceConfiguration)
+        applicationContext.containsBean(HikariDataSourcePoolMetadata)
 
         when:
-        HikariUrlDataSource dataSource = applicationContext.getBean(DataSource)
+        HikariUrlDataSource dataSource = applicationContext.getBean(DataSource).targetDataSource
 
         then: //The default configuration is supplied because H2 is on the classpath
         dataSource.jdbcUrl == 'jdbc:h2:mem:default;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
@@ -78,9 +82,10 @@ class DatasourceConfigurationSpec extends Specification {
         expect:
         applicationContext.containsBean(DataSource)
         applicationContext.containsBean(DatasourceConfiguration)
+        applicationContext.containsBean(HikariDataSourcePoolMetadata)
 
         when:
-        HikariDataSource dataSource = applicationContext.getBean(DataSource)
+        HikariDataSource dataSource = applicationContext.getBean(DataSource).targetDataSource
         ResultSet resultSet = dataSource.getConnection().prepareStatement("SELECT H2VERSION() FROM DUAL").executeQuery()
         resultSet.next()
         String version = resultSet.getString(1)
@@ -97,23 +102,24 @@ class DatasourceConfigurationSpec extends Specification {
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
                 'test',
-                ['datasources.default.connectionTimeout': 500,
-                'datasources.default.idleTimeout': 20000,
-                'datasources.default.catalog': 'foo',
-                'datasources.default.autoCommit': true,
-                'datasources.default.healthCheckProperties.foo': 'bar',
-                'datasources.default.jndiName': 'java:comp/env/FooBarPool',
-                'datasources.default.url': 'jdbc:h2:mem:foo;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
-                'datasources.default.validationQuery': 'select 3']
+                ['datasources.default.connectionTimeout'        : 500,
+                 'datasources.default.idleTimeout'              : 20000,
+                 'datasources.default.catalog'                  : 'foo',
+                 'datasources.default.autoCommit'               : true,
+                 'datasources.default.healthCheckProperties.foo': 'bar',
+                 'datasources.default.jndiName'                 : 'java:comp/env/FooBarPool',
+                 'datasources.default.url'                      : 'jdbc:h2:mem:foo;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
+                 'datasources.default.validationQuery'          : 'select 3']
         ))
         applicationContext.start()
 
         expect:
         applicationContext.containsBean(DataSource)
         applicationContext.containsBean(DatasourceConfiguration)
+        applicationContext.containsBean(HikariDataSourcePoolMetadata)
 
         when:
-        HikariDataSource dataSource = applicationContext.getBean(DataSource)
+        HikariDataSource dataSource = applicationContext.getBean(DataSource).targetDataSource
 
         then:
         dataSource.connectionTimeout == 500
@@ -135,7 +141,7 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.environment.addPropertySource(MapPropertySource.of(
                 'test',
                 ['datasources.default': [:],
-                'datasources.foo': [:]]
+                 'datasources.foo'    : [:]]
         ))
         applicationContext.start()
 
@@ -144,7 +150,7 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.containsBean(DatasourceConfiguration)
 
         when:
-        HikariDataSource dataSource = applicationContext.getBean(DataSource)
+        HikariDataSource dataSource = applicationContext.getBean(DataSource).targetDataSource
 
         then: //The default configuration is supplied because H2 is on the classpath
         dataSource.jdbcUrl == 'jdbc:h2:mem:default;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
@@ -153,7 +159,7 @@ class DatasourceConfigurationSpec extends Specification {
         dataSource.driverClassName == 'org.h2.Driver'
 
         when:
-        dataSource = applicationContext.getBean(DataSource, Qualifiers.byName("foo"))
+        dataSource = applicationContext.getBean(DataSource, Qualifiers.byName("foo")).targetDataSource
 
         then: //The default configuration is supplied because H2 is on the classpath
         dataSource.jdbcUrl == 'jdbc:h2:mem:foo;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
@@ -163,5 +169,81 @@ class DatasourceConfigurationSpec extends Specification {
 
         cleanup:
         applicationContext.close()
+    }
+
+    void "test multiple datasources are all wired"() {
+        given:
+        HikariDataSource dataSource
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(MapPropertySource.of(
+                'test',
+                ['datasources.default': [:],
+                 'datasources.foo'    : [:]]
+        ))
+        applicationContext.start()
+
+        expect:
+        applicationContext.getBeansOfType(DataSource).size() == 2
+        applicationContext.getBeansOfType(DatasourceConfiguration).size() == 2
+        applicationContext.getBeansOfType(HikariDataSourcePoolMetadata).size() == 2
+        applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("default"))
+        applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("foo"))
+
+        when:
+        applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("foo2"))
+
+        then:
+        thrown(NoSuchBeanException)
+
+        when:
+        dataSource = (HikariDataSource) applicationContext.getBean(DataSource, Qualifiers.byName("default")).targetDataSource
+
+        then:
+        dataSource.jdbcUrl == 'jdbc:h2:mem:default;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
+        dataSource.username == 'sa'
+        dataSource.password == ''
+        dataSource.driverClassName == 'org.h2.Driver'
+
+        when:
+        dataSource = (HikariDataSource) applicationContext.getBean(DataSource, Qualifiers.byName("foo")).targetDataSource
+
+        then:
+        dataSource.jdbcUrl == 'jdbc:h2:mem:foo;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
+        dataSource.username == 'sa'
+        dataSource.password == ''
+        dataSource.driverClassName == 'org.h2.Driver'
+
+        cleanup:
+        applicationContext.close()
+    }
+
+    void "test multiple datasources metadata props"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(MapPropertySource.of(
+                'test',
+                ['datasources.default': [:],
+                 'datasources.foo'    : [:]]
+        ))
+        applicationContext.start()
+
+        expect:
+        verifyAll {
+            applicationContext.getBeansOfType(DataSource).size() == 2
+            applicationContext.getBeansOfType(DatasourceConfiguration).size() == 2
+            applicationContext.getBeansOfType(HikariDataSourcePoolMetadata).size() == 2
+            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("default")).validationQuery == 'SELECT 1'
+            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("default")).max == 10
+            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("default")).min == 10
+            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("default")).idle == 1
+            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("default")).defaultAutoCommit
+            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("default")).active == 0
+            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("foo")).validationQuery == 'SELECT 1'
+            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("foo")).max == 10
+            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("foo")).min == 10
+            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("foo")).idle == 1
+            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("foo")).defaultAutoCommit
+            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("foo")).active == 0
+        }
     }
 }
