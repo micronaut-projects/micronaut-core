@@ -70,7 +70,7 @@ public class EC2ServiceInstance implements ServiceInstance, ServiceInstance.Buil
 
     /**
      * Gets the metadata information gathered from AWS for this instance.
-     * @return
+     * @return The metadata
      */
     @Override
     public ConvertibleValues<String> getMetadata() {

@@ -68,7 +68,7 @@ class Route53AutoNamingClientSpec extends Specification {
 
 
     def setupSpec() {
-        namespaceId = client.createNamespace(null,System.getenv("AWS_NAMESPACE_NAME"))
+        namespaceId = client.createNamespace(System.getenv("AWS_NAMESPACE_NAME"))
         serviceId = client.createService(null,"test","micronaut-integration-test",namespaceId,1000L)
         client.route53AutoRegistrationConfiguration.setAwsServiceId(serviceId)
         amazonEC2Client = new AmazonEC2Client(client.clientConfiguration.clientConfiguration)

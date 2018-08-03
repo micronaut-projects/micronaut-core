@@ -22,6 +22,8 @@ import io.micronaut.discovery.registration.RegistrationConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 /**
+ * Configuration for AWS Route 53 registration.
+ *
  * @author Rvanderwerf
  * @since 1.0
  */

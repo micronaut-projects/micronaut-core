@@ -19,6 +19,7 @@ package io.micronaut.discovery.aws.route53.registration;
 import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsync;
 import com.amazonaws.services.servicediscovery.model.GetOperationRequest;
 import com.amazonaws.services.servicediscovery.model.GetOperationResult;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.aws.route53.Route53AutoRegistrationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServerInstance;
@@ -28,14 +29,19 @@ import org.slf4j.LoggerFactory;
 /**
  * This monitors and retries a given operationID when a service is registered. We have to do this in another thread because
  * amazon's async API still requires blocking polling to get the output of a service registration.
+ *
+ * @author Ryan
+ * @author graemerocher
  */
-public class ServiceRegistrationStatusTask implements Runnable {
+@Internal
+class ServiceRegistrationStatusTask implements Runnable {
 
     private static final Logger LOG = LoggerFactory.getLogger(ServiceRegistrationStatusTask.class);
-    String operationId;
-    Route53AutoRegistrationConfiguration route53AutoRegistrationConfiguration;
-    ServiceInstance embeddedServerInstance;
-    AWSServiceDiscoveryAsync discoveryClient;
+
+    private final String operationId;
+    private final Route53AutoRegistrationConfiguration route53AutoRegistrationConfiguration;
+    private final ServiceInstance embeddedServerInstance;
+    private final AWSServiceDiscoveryAsync discoveryClient;
     private boolean registered = false;
 
     /**
@@ -45,10 +51,10 @@ public class ServiceRegistrationStatusTask implements Runnable {
      * @param embeddedServerInstance server instance running to register
      * @param operationId operation after first register call to monitor
      */
-    public ServiceRegistrationStatusTask(AWSServiceDiscoveryAsync discoveryClient,
-                                         Route53AutoRegistrationConfiguration route53AutoRegistrationConfiguration,
-                                         ServiceInstance embeddedServerInstance,
-                                         String operationId) {
+    ServiceRegistrationStatusTask(AWSServiceDiscoveryAsync discoveryClient,
+                                  Route53AutoRegistrationConfiguration route53AutoRegistrationConfiguration,
+                                  ServiceInstance embeddedServerInstance,
+                                  String operationId) {
         this.discoveryClient = discoveryClient;
         this.route53AutoRegistrationConfiguration = route53AutoRegistrationConfiguration;
         this.embeddedServerInstance = embeddedServerInstance;
