@@ -43,7 +43,7 @@ class MyBean{
 }
 ----
 
-The above example will create a new bean at compile time that implements the `ApplicationEventListener` and delegates to the `onStartup` method of `MyBean`. Micronaut will automatically aline the generics (if the SAM type features any) and will also perform checks at compile time to verify the method is a valid candidate.
+The above example will create a new bean at compile time that implements the api:context.event.ApplicationEventListener[] interface and delegates to the `onStartup` method of `MyBean`. Micronaut will automatically align the generic type arguments (if the SAM type features any) and will also perform checks at compile time to verify the method is a valid candidate, failing compilation if it isn't.
 
 === Improved Events API
 
