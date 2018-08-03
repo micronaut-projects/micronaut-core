@@ -68,45 +68,45 @@ class HeaderBindingSpec extends AbstractMicronautSpec {
 
     }
 
-    @Controller
+    @Controller("/header")
     static class HeaderController {
 
-        @Get
+        @Get("/simple")
         String simple(@Header String contentType) {
             "Header: $contentType"
         }
 
-        @Get
+        @Get("/optional")
         String optional(@Header Optional<MediaType> contentType) {
             "Header: ${contentType.map({ it.name }).orElse('Not-Present')}"
         }
 
-        @Get
+        @Get("/date")
         String date(@Header ZonedDateTime date) {
             "Header: ${date.format(DateTimeFormatter.RFC_1123_DATE_TIME)}"
         }
 
-        @Get
+        @Get("/formatted-date")
         String formattedDate(@Format('dd/MM/yyy') @Header LocalDate date) {
             "Header: ${date.format(DateTimeFormatter.ofPattern('dd/MM/yyy'))}"
         }
 
-        @Get
+        @Get("/multiple")
         String multiple(@Header List<String> contentType) {
             "Header: $contentType"
         }
 
-        @Get
+        @Get("/with-value")
         String withValue(@Header(HttpHeaders.CONTENT_TYPE) String contentType) {
             "Header: $contentType"
         }
 
-        @Get
+        @Get("/with-media-type")
         String withMediaType(@Header MediaType contentType) {
             "Header: $contentType"
         }
 
-        @Get
+        @Get("/all")
         String all(HttpHeaders httpHeaders) {
             "Header: ${httpHeaders.get(HttpHeaders.CONTENT_TYPE)}"
         }

@@ -32,7 +32,7 @@ import javax.validation.constraints.*;
 @Validated
 public interface PetOperations {
     // tag::save[]
-    @Post("/")
+    @Post
     Single<Pet> save(@NotBlank String name, @Min(1L) int age);
     // end::save[]
 }

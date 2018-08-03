@@ -59,17 +59,17 @@ class RoutesEndpointSpec extends Specification {
     @Requires(property = 'spec.name', value = 'RoutesEndpointSpec')
     static class TestController {
 
-        @Get('/')
+        @Get
         String index() {
             ""
         }
 
-        @Post
+        @Post("/post")
         HttpResponse post(Integer number, String text) {
             HttpResponse.ok()
         }
 
-        @Put
+        @Put("/generics")
         Map<String, Integer> generics() {
             Collections.emptyMap()
         }

@@ -273,7 +273,7 @@ subprojects { subproject ->
 
     jar {
         manifest {
-            attributes('Automatic-Module-Name': "${subproject.group}.${subproject.name}")
+            attributes('Automatic-Module-Name': "${subproject.group}.${subproject.name}".replaceAll('[^\\w\\.\\$_]', "_"))
         }
     }
 

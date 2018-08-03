@@ -120,7 +120,7 @@ class GroovyRouteBuilderSpec extends Specification {
         }
     }
 
-    @Controller
+    @Controller('/book')
     static class BookController {
 
         String hello(String message) {
@@ -146,7 +146,7 @@ class GroovyRouteBuilderSpec extends Specification {
         }
     }
 
-    @Controller
+    @Controller('/author')
     static class AuthorController {
         List index() {
             ["author"]
@@ -166,18 +166,18 @@ class GroovyRouteBuilderSpec extends Specification {
 
     }
 
-    @Controller
+    @Controller('/error-handling')
     static class ErrorHandlingController {
 
-        @Get
+        @Get('/throws-a')
         String throwsA() { throw new A() }
-        @Get
+        @Get('/throws-b')
         String throwsB() { throw new B() }
-        @Get
+        @Get('/throws-c')
         String throwsC() { throw new C() }
-        @Get
+        @Get('/throws-d')
         String throwsD() { throw new D() }
-        @Get
+        @Get('/throws-e')
         String throwsE() { throw new E() }
 
         @Error

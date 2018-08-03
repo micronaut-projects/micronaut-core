@@ -3,7 +3,7 @@
 To create a project with Picocli support using the Micronaut CLI, supply the `picocli` feature to the `features` flag.
 
 ----
-> mn create-app my-picocli-app --features picocli example
+> mn create-app my-picocli-app --features picocli
 ----
 
 This will create a project with the minimum necessary configuration for picocli.
@@ -15,7 +15,7 @@ The Micronaut CLI includes a specialized profile for picocli-based command line 
 To create a project using the cli profile, use the `--profile=cli` flag:
 
 ----
-> mn create-app my-cli-app --profile cli example
+> mn create-app my-cli-app --profile cli
 ----
 
 Don't build the project yet, let's first create a command.

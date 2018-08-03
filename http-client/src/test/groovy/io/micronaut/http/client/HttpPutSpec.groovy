@@ -194,7 +194,7 @@ class HttpPutSpec extends Specification {
             return book
         }
 
-        @Put(uri = '/form', consumes = MediaType.APPLICATION_FORM_URLENCODED)
+        @Put(value = '/form', consumes = MediaType.APPLICATION_FORM_URLENCODED)
         Book form(@Body Book book, @Header String contentType, @Header long contentLength, @Header accept, @Header('X-My-Header') custom) {
             assert contentType == MediaType.APPLICATION_FORM_URLENCODED
             assert contentLength == 26
@@ -203,7 +203,7 @@ class HttpPutSpec extends Specification {
             return book
         }
 
-        @Put(uri = '/optionalJson', produces = MediaType.TEXT_PLAIN)
+        @Put(value = '/optionalJson', produces = MediaType.TEXT_PLAIN)
         String optionalJson(Optional<Boolean> enable, Optional<Integer> multiFactorCode) {
             StringBuilder sb = new StringBuilder()
             enable.ifPresent( { val ->

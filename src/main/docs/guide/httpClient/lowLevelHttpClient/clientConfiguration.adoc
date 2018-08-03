@@ -13,15 +13,7 @@ The above example sets of `readTimeout` property of the api:http.client.HttpClie
 
 If you wish to have a separate configuration per client then there are a couple of options. An option that fits nicely with <<serviceDiscovery, Service Discovery>> is to define a named bean that is a subclass of api:http.client.HttpClientConfiguration[].
 
-For example given an injected client for a service called `hello` using `@Client`:
-
-.Injecting an HTTP client
-[source,java]
-----
-@Client("hello") @Inject RxHttpClient httpClient;
-----
-
-To configure the property of the HTTP client you can define the following bean:
+You can do that by simply defining a bean that extends from api:http.client.HttpClientConfiguration[] and ensuring that the `javax.inject.Named` annotation is used to name it appropriately:
 
 .Defining an HTTP client configuration bean
 [source,java]
@@ -34,6 +26,15 @@ class HelloConfiguration extends HttpClientConfiguration {
     }
 }
 ----
+
+This configuration will then be picked up if you inject a service called `hello` using `@Client` using <<serviceDiscovery, Service Discovery>>:
+
+.Injecting an HTTP client
+[source,java]
+----
+@Client("hello") @Inject RxHttpClient httpClient;
+----
+
 
 Alternatively if you are not using service discovery then you can use the `configuration` member of `@Client` to refer to a specific type:
 

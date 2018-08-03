@@ -73,7 +73,7 @@ public class OauthController {
      * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
      */
     @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})
-    @Post("/")
+    @Post
     public Single<HttpResponse<AccessRefreshToken>> index(TokenRefreshRequest tokenRefreshRequest) {
         if (!validateTokenRefreshRequest(tokenRefreshRequest)) {
             return Single.just(HttpResponse.status(HttpStatus.BAD_REQUEST));

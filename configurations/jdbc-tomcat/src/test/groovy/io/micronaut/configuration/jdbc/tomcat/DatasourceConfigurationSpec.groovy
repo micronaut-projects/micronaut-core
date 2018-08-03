@@ -105,17 +105,16 @@ class DatasourceConfigurationSpec extends Specification {
         String context = UUID.randomUUID().toString()
         ApplicationContext applicationContext = new DefaultApplicationContext(context)
         applicationContext.environment.addPropertySource(MapPropertySource.of(
-                context,
-                ['datasources.default.abandonWhenPercentageFull'          : 99,
-                 'datasources.default.accessToUnderlyingConnectionAllowed': false,
-                 'datasources.default.alternateUsernameAllowed'           : true,
-                 'datasources.default.commitOnReturn'                     : true,
-                 'datasources.default.connectionProperties'               : 'prop1=value1;prop2=value2',
-                 'datasources.default.jndiName'                           : 'java:comp/env/FooBarPool',
-                 'datasources.default.dbProperties.DB_CLOSE_ON_EXIT'      : true,
-                 'datasources.default.dbProperties.DB_CLOSE_DELAY'        : 1,
-                 'datasources.default.defaultAutoCommit'                  : true,
-                 'datasources.default.defaultCatalog'                     : 'catalog']
+                'test',
+                ['datasources.default.abandonWhenPercentageFull': 99,
+                'datasources.default.accessToUnderlyingConnectionAllowed': false,
+                'datasources.default.alternateUsernameAllowed': true,
+                'datasources.default.commitOnReturn': true,
+                'datasources.default.connectionProperties': 'prop1=value1;prop2=value2',
+                'datasources.default.jndiName': 'java:comp/env/FooBarPool',
+                'datasources.default.dbProperties.fileLock': 'FS',
+                'datasources.default.defaultAutoCommit': true,
+                'datasources.default.defaultCatalog': 'catalog']
         ))
         applicationContext.start()
 
@@ -134,10 +133,10 @@ class DatasourceConfigurationSpec extends Specification {
         dataSource.commitOnReturn
         dataSource.connectionProperties == 'prop1=value1;prop2=value2'
         dataSource.dataSourceJNDI == 'java:comp/env/FooBarPool'
-        dataSource.dbProperties.get('DB_CLOSE_ON_EXIT') == 'true'
-        dataSource.dbProperties.get('DB_CLOSE_DELAY') == '1'
+        dataSource.dbProperties.get('FILE_LOCK') == 'FS'
         dataSource.defaultAutoCommit
         dataSource.defaultCatalog == 'catalog'
+        dataSource.getPool()
 
         cleanup:
         applicationContext.close()

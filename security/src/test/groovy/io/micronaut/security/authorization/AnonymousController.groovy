@@ -23,7 +23,7 @@ import javax.annotation.Nullable
 import java.security.Principal
 
 @Requires(property = 'spec.name', value = 'authorization')
-@Controller
+@Controller('/anonymous')
 class AnonymousController {
 
     @Get("/hello")

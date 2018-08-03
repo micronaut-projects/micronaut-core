@@ -100,7 +100,7 @@ class ThirdPartyClientFilterSpec extends Specification {
     @Controller('/repos')
     static class HeaderController {
 
-        @Get(uri = "/grails")
+        @Get(value = "/grails")
         String echoAuthorization(@Header String authorization) {
             authorization
         }
