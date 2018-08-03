@@ -16,21 +16,16 @@
 package io.micronaut.discovery.route53
 
 import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsync
-import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsyncClient
 import com.amazonaws.services.servicediscovery.model.Service
-import io.micronaut.configurations.aws.AWSClientConfiguration
+import io.micronaut.configuration.aws.AWSClientConfiguration
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.env.Environment
 import io.micronaut.discovery.CompositeDiscoveryClient
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.discovery.ServiceInstance
-import io.micronaut.discovery.ServiceInstanceIdGenerator
 import io.micronaut.discovery.aws.route53.AWSServiceDiscoveryClientResolver
 import io.micronaut.discovery.aws.route53.AWSServiceDiscoveryResolver
-import io.micronaut.discovery.aws.route53.Route53AutoRegistrationConfiguration
-import io.micronaut.discovery.aws.route53.Route53ClientDiscoveryConfiguration
-import io.micronaut.discovery.aws.route53.Route53DiscoveryConfiguration
 import io.micronaut.discovery.aws.route53.client.Route53AutoNamingClient
 import io.micronaut.discovery.aws.route53.registration.Route53AutoNamingRegistrationClient
 import io.micronaut.discovery.client.registration.DiscoveryServiceAutoRegistration
@@ -39,18 +34,13 @@ import io.micronaut.discovery.cloud.ComputeInstanceMetadataResolver
 import io.micronaut.discovery.cloud.NetworkInterface
 import io.micronaut.discovery.cloud.aws.AmazonComputeInstanceMetadataResolver
 import io.micronaut.discovery.cloud.aws.AmazonEC2InstanceMetadata
-import io.micronaut.health.HeartbeatConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.scheduling.TaskExecutors
 import io.reactivex.Flowable
-import spock.lang.*
-import spock.mock.DetachedMockFactory
+import spock.lang.AutoCleanup
+import spock.lang.Shared
+import spock.lang.Specification
+import spock.lang.Stepwise
 import spock.util.concurrent.PollingConditions
-
-import javax.annotation.PostConstruct
-import javax.inject.Inject
-import javax.inject.Named
-import java.util.concurrent.Executor
 
 /**
  * @author Rvanderwerf

@@ -16,7 +16,7 @@
 
 package io.micronaut.discovery.aws.parameterstore;
 
-import io.micronaut.configurations.aws.AWSClientConfiguration;
+import io.micronaut.configuration.aws.AWSClientConfiguration;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
