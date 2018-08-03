@@ -250,59 +250,59 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         response.body() == "[Foo(Fred, 10)]".toString()
     }
 
-    @Controller(produces = io.micronaut.http.MediaType.APPLICATION_JSON)
+    @Controller(value = "/json", produces = io.micronaut.http.MediaType.APPLICATION_JSON)
     static class JsonController {
 
-        @Post
+        @Post("/params")
         String params(String name, int age) {
             "Body: ${new Foo(name: name, age: age)}"
         }
 
-        @Post
+        @Post("/string")
         String string(@Body String text) {
             "Body: ${text}"
         }
 
-        @Post
+        @Post("/map")
         String map(@Body Map<String, Object> json) {
             "Body: ${json}"
         }
 
-        @Post
+        @Post("/object")
         String object(@Body Foo foo) {
             "Body: $foo"
         }
 
-        @Post
+        @Post("/object-to-object")
         Foo objectToObject(@Body Foo foo) {
             return foo
         }
 
-        @Post array(@Body Foo[] foos) {
+        @Post("/array") array(@Body Foo[] foos) {
             "Body: ${foos.join(',')}"
         }
 
-        @Post arrayToArray(@Body Foo[] foos) {
+        @Post("/array-to-array") arrayToArray(@Body Foo[] foos) {
             return foos
         }
 
-        @Post list(@Body List<Foo> foos) {
+        @Post("/list") list(@Body List<Foo> foos) {
             "Body: ${foos.join(',')}"
         }
 
-        @Post
+        @Post("/nested")
         String nested(@Body('foo') Foo foo) {
             "Body: $foo"
         }
 
-        @Post
+        @Post("/future")
         CompletableFuture<String> future(@Body CompletableFuture<String> future) {
             future.thenApply({ String json ->
                 "Body: $json".toString()
             })
         }
 
-        @Post
+        @Post("/future-map")
         CompletableFuture<String> futureMap(@Body CompletableFuture<Map<String,Object>> future) {
             future.thenApply({ Map<String,Object> json ->
                 "Body: $json".toString()
@@ -310,14 +310,14 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         }
 
 
-        @Post
+        @Post("/future-object")
         CompletableFuture<String> futureObject(@Body CompletableFuture<Foo> future) {
             future.thenApply({ Foo foo ->
                 "Body: $foo".toString()
             })
         }
 
-        @Post
+        @Post("/publisher-object")
         Publisher<String> publisherObject(@Body Flowable<Foo> publisher) {
             return publisher
                     .subscribeOn(Schedulers.io())
@@ -325,7 +325,6 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
                         foo.toString()
             })
         }
-
 
         @Error(JsonParseException)
         HttpResponse jsonError(HttpRequest request, JsonParseException jsonParseException) {

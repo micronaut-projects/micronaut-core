@@ -57,16 +57,16 @@ class AnnotationRouteBuilderSpec extends Specification {
 
     @Controller('/')
     static class ApplicationController {
-        @Get('/')
+        @Get
         String index() {
             'welcome'
         }
     }
 
-    @Controller
+    @Controller('/person')
     static class PersonController {
 
-        @Get
+        @Get('/name')
         String name(String name) {
             return "Fred $name"
         }

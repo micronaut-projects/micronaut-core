@@ -28,12 +28,12 @@ import io.micronaut.http.annotation.Post;
 public class TestController {
 
     @Consumes([MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON]) // <1>
-    @Post
+    @Post("/multiple-consumes")
     public HttpResponse multipleConsumes() {
         return HttpResponse.ok();
     }
 
-    @Post("/") // <2>
+    @Post // <2>
     public HttpResponse index() {
         return HttpResponse.ok();
     }

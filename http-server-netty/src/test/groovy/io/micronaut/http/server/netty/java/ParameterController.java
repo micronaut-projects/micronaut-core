@@ -33,58 +33,58 @@ import java.util.Optional;
  */
 @Controller("/java/parameter")
 public class ParameterController {
-    @Get("/")
+    @Get
     String index(Integer max) {
         return "Parameter Value: " + max;
     }
 
-    @Get
+    @Get("/simple")
     String simple(@QueryValue Integer max) {
         return "Parameter Value: " + max;
     }
 
-    @Get
+    @Get("/named")
     String named(@QueryValue("maximum") Integer max) {
         return "Parameter Value: " + max;
     }
 
-    @Get
+    @Get("/optional")
     String optional(@QueryValue Optional<Integer> max) {
         return "Parameter Value: " + max.orElse(10);
     }
 
-    @Get
+    @Get("/nullable")
     String nullable(@Nullable Integer max) {
         return "Parameter Value: " + (max != null ? max : "null");
     }
 
-    @Post(consumes = MediaType.APPLICATION_JSON)
+    @Post(value = "/nullable-body", consumes = MediaType.APPLICATION_JSON)
     String nullableBody(@Nullable Integer max) {
         return "Body Value: " + (max != null ? max : "null");
     }
 
-    @Post(consumes = MediaType.APPLICATION_JSON)
+    @Post(value = "/requires-body", consumes = MediaType.APPLICATION_JSON)
     String requiresBody(Integer max) {
         return "Body Value: " + (max != null ? max : "null");
     }
 
-    @Get
+    @Get("/all")
     String all(HttpParameters parameters) {
         return "Parameter Value: " + parameters.get("max", Integer.class, 10);
     }
 
-    @Get
+    @Get("/map")
     String map(Map<String, Integer> values) {
         return "Parameter Value: " + values.get("max") + values.get("offset");
     }
 
-    @Get
+    @Get("/list")
     String list(List<Integer> values) {
         assert values.stream().allMatch(val -> val instanceof Integer);
         return "Parameter Value: " + values;
     }
 
-    @Get
+    @Get("/optional-list")
     String optionalList(Optional<List<Integer>> values) {
         if (values.isPresent()) {
             assert values.get().stream().allMatch(val -> val instanceof Integer);

@@ -21,7 +21,7 @@ public class TemplateController {
         template = initTemplate(); // <1>
     }
 
-    @Get(uri = "/welcome", produces = MediaType.TEXT_PLAIN)
+    @Get(value = "/welcome", produces = MediaType.TEXT_PLAIN)
     Writable render() { // <2>
         return writer -> template.make( // <3>
             CollectionUtils.mapOf(

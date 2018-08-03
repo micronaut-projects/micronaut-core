@@ -93,7 +93,7 @@ class ErrorSpec extends AbstractMicronautSpec {
     @Controller('/errors')
     static class ErrorController {
 
-        @Get
+        @Get('/server-error')
         String serverError() {
             throw new RuntimeException("bad")
         }

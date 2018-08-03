@@ -42,11 +42,11 @@ class NotFoundSpec extends Specification {
         @Get('/maybe/{isbn}')
         Maybe<Boolean> maybe(String isbn)
 
-        @Get(uri = '/flowable/{isbn}', processes = MediaType.TEXT_PLAIN)
+        @Get(value = '/flowable/{isbn}', processes = MediaType.TEXT_PLAIN)
         Flowable<Boolean> flowable(String isbn)
     }
 
-    @Controller(uri = "/not-found", produces = MediaType.TEXT_PLAIN)
+    @Controller(value = "/not-found", produces = MediaType.TEXT_PLAIN)
     static class InventoryController {
         Map<String, Boolean> stock = [
                 '1234': true

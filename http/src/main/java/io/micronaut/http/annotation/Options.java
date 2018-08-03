@@ -42,13 +42,13 @@ public @interface Options {
      * @return The URI of the OPTIONS route if not specified inferred from the method name and arguments
      */
     @AliasFor(annotation = HttpMethodMapping.class, member = "value")
-    String value() default "";
+    String value() default HttpMethodMapping.DEFAULT_URI;
 
     /**
      * @return The URI of the OPTIONS route if not specified inferred from the method name and arguments
      */
     @AliasFor(annotation = HttpMethodMapping.class, member = "value")
-    String uri() default "";
+    String uri() default HttpMethodMapping.DEFAULT_URI;
 
     /**
      * @return The default consumes, otherwise override from controller
