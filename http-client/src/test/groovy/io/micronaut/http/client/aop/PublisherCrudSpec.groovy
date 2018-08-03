@@ -146,7 +146,7 @@ class PublisherCrudSpec extends Specification {
         @Produces(single = true)
         Publisher<Book> get(Long id)
 
-        @Get('/')
+        @Get
         @Produces(single = true)
         Publisher<List<Book>> list()
 
@@ -154,7 +154,7 @@ class PublisherCrudSpec extends Specification {
         @Produces(single = true)
         Publisher<Book> delete(Long id)
 
-        @Post('/')
+        @Post
         @Produces(single = true)
         Publisher<Book> save(String title)
 

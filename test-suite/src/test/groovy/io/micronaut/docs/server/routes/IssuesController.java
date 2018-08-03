@@ -25,7 +25,7 @@ import io.micronaut.http.annotation.*;
  * @since 1.0
  */
 // tag::class[]
-@Controller // <1>
+@Controller("/issues") // <1>
 public class IssuesController {
 
     @Get("/{number}") // <2>

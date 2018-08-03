@@ -88,7 +88,7 @@ import io.micronaut.http.HttpStatus
 @Client("hello")
 interface HelloClient {
 
-    @Get("/")
+    @Get
     HttpStatus index()
 }
 ----
@@ -120,7 +120,7 @@ import io.micronaut.http.HttpStatus
 @Controller("/hello")
 class HelloController {
 
-    @Get("/")
+    @Get
     HttpStatus index() {
         return HttpStatus.OK
     }

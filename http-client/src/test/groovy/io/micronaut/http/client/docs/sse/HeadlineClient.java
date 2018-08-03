@@ -11,7 +11,7 @@ import reactor.core.publisher.Flux;
 @Client("/streaming/sse")
 public interface HeadlineClient {
 
-    @Get(uri = "/headlines", processes = MediaType.TEXT_EVENT_STREAM)
+    @Get(value = "/headlines", processes = MediaType.TEXT_EVENT_STREAM)
     Flux<Event<Headline>> streamHeadlines();
 }
 // end::class[]

@@ -30,6 +30,7 @@ import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.ParametrizedProvider;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -100,6 +101,11 @@ class ClientScope implements CustomScope<Client>, LifeCycle<ClientScope>, Applic
 
         //noinspection unchecked
         return (T) clients.computeIfAbsent(new ClientKey(identifier, value), clientKey -> {
+            HttpClient existingBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(value)).orElse(null);
+            if (existingBean != null) {
+                return existingBean;
+            }
+
             String contextPath = null;
             String annotationPath = annotation.get("path", String.class).orElse(null);
             if (StringUtils.isNotEmpty(annotationPath)) {

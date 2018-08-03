@@ -53,7 +53,7 @@ class JsonStreamSpec extends Specification {
     static class StreamController {
 
 
-        @Get(uri = '/', produces = MediaType.APPLICATION_JSON_STREAM)
+        @Get(produces = MediaType.APPLICATION_JSON_STREAM)
         Flowable<Book> stream() {
             return Flowable.just(new Book(title: "The Stand"), new Book(title: "The Shining"))
         }

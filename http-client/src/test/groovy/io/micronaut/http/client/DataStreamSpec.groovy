@@ -134,7 +134,7 @@ class DataStreamSpec extends Specification {
     @Controller("/datastream/books")
     static class BookController {
 
-        @Get(uri = '/', produces = MediaType.APPLICATION_JSON_STREAM)
+        @Get(produces = MediaType.APPLICATION_JSON_STREAM)
         Publisher<byte[]> list() {
             return Flowable.just("The Stand".getBytes(StandardCharsets.UTF_8), "The Shining".getBytes(StandardCharsets.UTF_8))
         }

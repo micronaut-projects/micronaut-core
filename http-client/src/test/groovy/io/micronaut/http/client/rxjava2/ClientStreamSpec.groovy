@@ -68,7 +68,7 @@ class ClientStreamSpec extends Specification {
         @Get("/array")
         Flowable<Book> arrayStream()
 
-        @Get(uri = "/json", processes = MediaType.APPLICATION_JSON_STREAM)
+        @Get(value = "/json", processes = MediaType.APPLICATION_JSON_STREAM)
         Flowable<Book> jsonStream()
     }
 

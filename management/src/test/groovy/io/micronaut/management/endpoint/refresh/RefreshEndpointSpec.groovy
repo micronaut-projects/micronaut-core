@@ -131,7 +131,7 @@ class RefreshEndpointSpec extends Specification {
             this.refreshBean = refreshBean
         }
 
-        @Get('/')
+        @Get
         String index() {
             refreshBean.testConfigProps() + ' ' + refreshBean.testValue()
         }

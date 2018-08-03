@@ -57,13 +57,7 @@ public @interface Controller {
      *
      * @return The base URI of the controller in the case of web applications
      */
-    String value() default "";
-
-    /**
-     * @return Same as {@link #value()}
-     */
-    @AliasFor(member = "value")
-    String uri() default "";
+    String value();
 
     /**
      * @return The produced MediaType values. Defaults to application/json

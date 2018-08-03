@@ -9,7 +9,9 @@ This section will document breaking changes that may happen during milestone or 
 * `AnnotationUtil` has seen significant changes and is now marked as an internal class.
 * `BeanContext.getBeanRegistrations` has been renamed to `BeanContext.getActiveBeanRegistrations`.
 * Endpoint annotations have moved packages: `io.micronaut.management.endpoint` -> `io.micronaut.management.endpoint.annotation`.
-* Endpoint method arguments were previously included in the route URI by default. Now endpoint arguments are *not* included in the route URI. An annotation, `@Selector` has been added to indicate an endpoint argument *should* be included in the URI.
+* Endpoint method arguments were previously included in the route URI by default. Now endpoint arguments are *not* included in the route URI by default. An annotation, `@Selector` has been added to indicate an endpoint argument *should* be included in the URI.
+* The `@Controller` annotation now requires a value. Previously a convention was used to determine the URI.
+* The `HttpMethodMapping` annotations (`@Get`, `@Put`, etc) have changed their default behavior. They no longer use a convention based off the method name if the URI was not provided. The URI is still not required, however it now defaults to `/`. The new default means the method will be accessible from the controller URI.
 
 ==== 1.0.0.M3
 

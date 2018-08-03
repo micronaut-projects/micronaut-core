@@ -31,7 +31,7 @@ import java.security.Principal
 class HomeController {
 
     @Produces(MediaType.TEXT_HTML)
-    @Get("/")
+    @Get
     String index(@Nullable Principal principal) {
         return html(principal != null, principal != null ? principal.getName() : null)
     }
