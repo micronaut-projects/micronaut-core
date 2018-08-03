@@ -20,7 +20,7 @@ import com.amazonaws.SdkClientException;
 import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagementAsync;
 import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagementAsyncClient;
 import com.amazonaws.services.simplesystemsmanagement.model.*;
-import io.micronaut.configurations.aws.AWSClientConfiguration;
+import io.micronaut.configuration.aws.AWSClientConfiguration;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.EnvironmentPropertySource;
@@ -323,7 +323,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
      */
     private Publisher<Map<String, Object>> convertParametersToMap(List<Parameter> params) {
 
-        Map<String, Object> output = new HashMap<String, Object>();
+        Map<String, Object> output = new HashMap<>();
         for (Parameter param : params) {
             switch (param.getType()) {
                 case "StringList":

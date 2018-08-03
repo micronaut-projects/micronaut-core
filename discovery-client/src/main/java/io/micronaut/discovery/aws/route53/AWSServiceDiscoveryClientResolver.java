@@ -18,7 +18,7 @@ package io.micronaut.discovery.aws.route53;
 
 import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsync;
 import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsyncClientBuilder;
-import io.micronaut.configurations.aws.AWSClientConfiguration;
+import io.micronaut.configuration.aws.AWSClientConfiguration;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import javax.inject.Singleton;

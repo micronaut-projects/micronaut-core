@@ -18,7 +18,7 @@ package io.micronaut.discovery.aws.route53.client;
 
 import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsync;
 import com.amazonaws.services.servicediscovery.model.*;
-import io.micronaut.configurations.aws.AWSClientConfiguration;
+import io.micronaut.configuration.aws.AWSClientConfiguration;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.async.publisher.Publishers;
