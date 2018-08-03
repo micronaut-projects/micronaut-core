@@ -2,6 +2,7 @@ package io.micronaut.configuration.metrics.binder.web
 
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
+import io.micrometer.core.instrument.search.MeterNotFoundException
 import io.micrometer.core.instrument.search.RequiredSearch
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.annotation.Controller
@@ -36,6 +37,20 @@ class HttpMetricsSpec extends Specification {
         serverTimer.count() == 1
         clientTimer.count() == 1
 
+        when:"A request is sent with a uri template"
+        def result = client.template("foo")
+
+        then:
+        result == 'ok foo'
+        registry.get(WebMetricsPublisher.METRIC_HTTP_CLIENT_REQUESTS).tags('uri','/test-http-metrics/{id}').timer()
+        registry.get(WebMetricsPublisher.METRIC_HTTP_SERVER_REQUESTS).tags('uri','/test-http-metrics/{id}').timer()
+
+        when:
+        registry.get(WebMetricsPublisher.METRIC_HTTP_SERVER_REQUESTS).tags('uri','/test-http-metrics/foo').timer()
+
+        then:
+        thrown(MeterNotFoundException)
+
 
         cleanup:
         embeddedServer.close()
@@ -69,6 +84,9 @@ class HttpMetricsSpec extends Specification {
     static interface TestClient {
         @Get
         String index()
+
+        @Get("/{id}")
+        String template(String id)
     }
 
     @Controller('/test-http-metrics')
@@ -76,6 +94,11 @@ class HttpMetricsSpec extends Specification {
         @Get
         String index() {
             return "ok"
+        }
+
+        @Get("/{id}")
+        String template(String id) {
+            return "ok " + id
         }
     }
 }
