@@ -264,5 +264,6 @@ cli:
 appendix:
   title: Appendices
   faq: Frequently Asked Questions (FAQ)
+  usingsnapshots: Using Snapshots
   problems: Common Problems
   breaks: Breaking Changes
