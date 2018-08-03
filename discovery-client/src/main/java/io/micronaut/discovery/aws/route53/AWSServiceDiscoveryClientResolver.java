@@ -25,11 +25,14 @@ import javax.inject.Singleton;
 
 /**
  * This gets a real amazon service discovery client. It is abstracted to allow for it to be replaced easier during testing.
+ *
+ * @author Ryan
+ * @author graemerocher
  */
 @Requires(env = Environment.AMAZON_EC2)
 @Singleton
 public class AWSServiceDiscoveryClientResolver implements AWSServiceDiscoveryResolver {
-    AWSServiceDiscoveryAsync awsServiceDiscoveryAsync;
+    private final AWSServiceDiscoveryAsync awsServiceDiscoveryAsync;
 
     /**
      * Constructor builds standard client with given Micronaut configuration.
@@ -41,7 +44,7 @@ public class AWSServiceDiscoveryClientResolver implements AWSServiceDiscoveryRes
 
     /**
      * resolve the AWS Service Discovery client when making calls to AWS.
-     * @param environment
+     * @param environment The environment
      * @return AWSServiceDiscoveryAsync interface which works with blocking calls as well so no need for both
      */
     @Override

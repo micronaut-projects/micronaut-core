@@ -27,6 +27,8 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
+ * Configuration for AWS Route 53 discovery.
+ *
  * @author Rvanderwerf
  * @since 1.0
  * See https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html for details info

@@ -21,6 +21,9 @@ import io.micronaut.context.env.Environment;
 
 /**
  * this allows us to swap out the AWS client impl for a mock/fake one to test.
+ *
+ * @author Ryan
+ * @author graemerocher
  */
 public interface AWSServiceDiscoveryResolver {
 

@@ -31,7 +31,6 @@ import io.micronaut.discovery.aws.route53.registration.EC2ServiceInstance;
 import io.micronaut.http.client.Client;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
-import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -40,7 +39,10 @@ import java.util.List;
 import java.util.concurrent.Future;
 
 /**
+ * An implementation of the {@link DiscoveryClient} interface for AWS Route53.
+ *
  * @author Rvanderwerf
+ * @author graemerocher
  * @since 1.0
  */
 @Singleton
@@ -48,19 +50,28 @@ import java.util.concurrent.Future;
 @Requires(env = Environment.AMAZON_EC2)
 @Requires(beans = Route53DiscoveryConfiguration.class)
 @Requires(beans = AWSClientConfiguration.class)
-@Requires(property = "aws.route53.discovery.enabled", value = "true", defaultValue = "false")
+@Requires(property = Route53AutoNamingClient.ENABLED, value = "true", defaultValue = "false")
 public class Route53AutoNamingClient implements DiscoveryClient {
 
-    AWSClientConfiguration awsClientConfiguration;
+    /**
+     * Configuration property for whether route53 is enabled.
+     */
+    public static final String ENABLED = "aws.route53.discovery.enabled";
 
-    Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration;
+    private final AWSClientConfiguration awsClientConfiguration;
+    private final AWSServiceDiscoveryResolver awsServiceDiscoveryResolver;
+    private final Environment environment;
 
-    AWSServiceDiscoveryResolver awsServiceDiscoveryResolver;
+    private Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration;
 
-    Environment environment;
-
-    AWSServiceDiscoveryAsync discoveryClient;
-
+    /**
+     * Default constructor.
+     *
+     * @param awsClientConfiguration The client configuration
+     * @param route53ClientDiscoveryConfiguration The route 53 configuration
+     * @param awsServiceDiscoveryResolver The AWS service discovery resolver
+     * @param environment The environment
+     */
     public Route53AutoNamingClient(AWSClientConfiguration awsClientConfiguration,
                                    Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration,
                                    AWSServiceDiscoveryResolver awsServiceDiscoveryResolver,
@@ -89,24 +100,7 @@ public class Route53AutoNamingClient implements DiscoveryClient {
     }
 
     /**
-     * Used to help with testing.
-     * @param discoveryClient discovery client class
-     */
-    public void setDiscoveryClient(AWSServiceDiscoveryAsync discoveryClient) {
-        this.discoveryClient = discoveryClient;
-    }
-
-    /**
-     * This is to make it easier to replace the client with a mock.
-     * @return AWSServiceDiscoveryAsync to communicate with AWS
-     */
-    private AWSServiceDiscoveryAsync getDiscoveryClient() {
-        return awsServiceDiscoveryResolver.resolve(environment);
-    }
-
-
-    /**
-     * Unused.
+     * The description.
      */
     @Override
     public String getDescription() {
@@ -119,14 +113,14 @@ public class Route53AutoNamingClient implements DiscoveryClient {
      * @return serviceInstance list that micronaut wants
      */
     private Flowable<List<ServiceInstance>> convertInstancesResulttoServiceInstances(ListInstancesResult instancesResult) {
-        List<ServiceInstance> serviceInstances = new ArrayList<ServiceInstance>();
+        List<ServiceInstance> serviceInstances = new ArrayList<>();
         for (InstanceSummary instanceSummary : instancesResult.getInstances()) {
             try {
                 String uri = "http://" + instanceSummary.getAttributes().get("URI");
                 ServiceInstance serviceInstance = new EC2ServiceInstance(instanceSummary.getId(), new URI(uri)).metadata(instanceSummary.getAttributes()).build();
                 serviceInstances.add(serviceInstance);
             } catch (URISyntaxException e) {
-                e.printStackTrace();
+                return Flowable.error(e);
             }
         }
         return Flowable.just(serviceInstances);
@@ -145,8 +139,7 @@ public class Route53AutoNamingClient implements DiscoveryClient {
         ListInstancesRequest instancesRequest = new ListInstancesRequest().withServiceId(serviceId);
         Future<ListInstancesResult> instanceResult = getDiscoveryClient().listInstancesAsync(instancesRequest);
         Flowable<ListInstancesResult> observableInstanceResult = Flowable.fromFuture(instanceResult);
-        Flowable<List<ServiceInstance>> observableInstances = observableInstanceResult.flatMap(result -> convertInstancesResulttoServiceInstances(result));
-        return observableInstances;
+        return observableInstanceResult.flatMap(this::convertInstancesResulttoServiceInstances);
     }
 
     /**
@@ -159,8 +152,15 @@ public class Route53AutoNamingClient implements DiscoveryClient {
         ListServicesRequest listServicesRequest = new ListServicesRequest().withFilters(serviceFilter);
         Future<ListServicesResult> response = getDiscoveryClient().listServicesAsync(listServicesRequest);
         Flowable<ListServicesResult> flowableList = Flowable.fromFuture(response);
-        Flowable<List<String>> flowableInstanceIds = flowableList.flatMap(result -> convertServiceIds(result));
-        return flowableInstanceIds;
+        return flowableList.flatMap(this::convertServiceIds);
+    }
+
+    /**
+     * Close down AWS Client on shutdown.
+     */
+    @Override
+    public void close() {
+        getDiscoveryClient().shutdown();
     }
 
     /**
@@ -170,7 +170,7 @@ public class Route53AutoNamingClient implements DiscoveryClient {
      */
     private Publisher<List<String>> convertServiceIds(ListServicesResult listServicesResult) {
         List<ServiceSummary> services = listServicesResult.getServices();
-        List<String> serviceIds = new ArrayList<String>();
+        List<String> serviceIds = new ArrayList<>();
 
         for (ServiceSummary service : services) {
             serviceIds.add(service.getId());
@@ -182,10 +182,10 @@ public class Route53AutoNamingClient implements DiscoveryClient {
     }
 
     /**
-     * Close down AWS Client on shutdown.
+     * This is to make it easier to replace the client with a mock.
+     * @return AWSServiceDiscoveryAsync to communicate with AWS
      */
-    @Override
-    public void close() {
-        getDiscoveryClient().shutdown();
+    private AWSServiceDiscoveryAsync getDiscoveryClient() {
+        return awsServiceDiscoveryResolver.resolve(environment);
     }
 }

@@ -47,7 +47,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 
 /**
+ * A {@link ConfigurationClient} implementation for AWS ParameterStore.
+ *
  * @author Rvanderwerf
+ * @author graemerocher
+ * @since 1.0
  */
 @Singleton
 @Requires(env = Environment.AMAZON_EC2)
@@ -71,14 +75,17 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
      * @param awsParameterStoreConfiguration configuration for the parameter store
      * @param route53ClientDiscoveryConfiguration configuration for route53 service discovery, if you are using this (not required)
      */
-    AWSParameterStoreConfigClient(AWSClientConfiguration awsConfiguration, AWSParameterStoreConfiguration awsParameterStoreConfiguration, Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration) {
+    AWSParameterStoreConfigClient(
+            AWSClientConfiguration awsConfiguration,
+            AWSParameterStoreConfiguration awsParameterStoreConfiguration,
+            Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration) {
         this.awsConfiguration = awsConfiguration;
         this.awsParameterStoreConfiguration = awsParameterStoreConfiguration;
 
         try {
             this.client = AWSSimpleSystemsManagementAsyncClient.asyncBuilder().withClientConfiguration(awsConfiguration.getClientConfiguration()).build();
         } catch (SdkClientException sce) {
-            LOG.warn("Error creating Simple Systems Management client - check your credentials");
+            LOG.warn("Error creating Simple Systems Management client - check your credentials: " + sce.getMessage(), sce);
         }
 
         this.route53ClientDiscoveryConfiguration = route53ClientDiscoveryConfiguration;
@@ -165,20 +172,16 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
                                     propertiesHierarchy);
 
                             for (String propertySourceName : propertySourceNames) {
-
                                 Map<String, Object> values = propertySources.computeIfAbsent(propertySourceName, s -> new LinkedHashMap<>());
                                 for (Map<String, Object> propMap : properties.toList().blockingGet()) {
                                     values.putAll(propMap);
 
                                 }
-
                             }
 
                         }
                     }
-
                 }
-
 
                 for (Map.Entry<String, Map<String, Object>> entry : propertySources.entrySet()) {
                     String name = entry.getKey();
@@ -212,6 +215,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
 
     /**
      * Description.
+     *
      * @return the description
      */
     @Override
@@ -227,7 +231,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
      */
     private Publisher<GetParametersByPathResult> getHierarchy(String path) {
 
-        GetParametersByPathRequest getRequest = new GetParametersByPathRequest().withWithDecryption(awsParameterStoreConfiguration.useSecureParameters).withPath(path).withRecursive(true);
+        GetParametersByPathRequest getRequest = new GetParametersByPathRequest().withWithDecryption(awsParameterStoreConfiguration.getUseSecureParameters()).withPath(path).withRecursive(true);
 
         Future<GetParametersByPathResult> future = client.getParametersByPathAsync(getRequest);
 
@@ -253,7 +257,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
      */
     private Publisher<GetParametersResult> getParameters(String path) {
 
-        GetParametersRequest getRequest = new GetParametersRequest().withWithDecryption(awsParameterStoreConfiguration.useSecureParameters).withNames(path);
+        GetParametersRequest getRequest = new GetParametersRequest().withWithDecryption(awsParameterStoreConfiguration.getUseSecureParameters()).withNames(path);
 
         Future<GetParametersResult> future = client.getParametersAsync(getRequest);
 
@@ -272,16 +276,6 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
     }
 
     /**
-     * Calculates property names to look for.
-     * @param prefix
-     * @param activeNames active environment names
-     * @return
-     */
-    private Set<String> calcPropertySourceNames(String prefix, Set<String> activeNames) {
-        return ClientUtil.calcPropertySourceNames(prefix, activeNames);
-    }
-
-    /**
      * Execution service to make call to AWS.
      * @param executionService ExectorService
      */
@@ -290,6 +284,16 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
         if (executionService != null) {
             this.executionService = executionService;
         }
+    }
+
+    /**
+     * Calculates property names to look for.
+     * @param prefix The prefix
+     * @param activeNames active environment names
+     * @return A set of calculated property names
+     */
+    private Set<String> calcPropertySourceNames(String prefix, Set<String> activeNames) {
+        return ClientUtil.calcPropertySourceNames(prefix, activeNames);
     }
 
     /**

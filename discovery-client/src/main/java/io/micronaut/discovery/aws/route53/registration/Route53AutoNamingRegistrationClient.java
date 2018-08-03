@@ -25,14 +25,12 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.discovery.ServiceInstance;
-import io.micronaut.discovery.ServiceInstanceIdGenerator;
 import io.micronaut.discovery.aws.route53.AWSServiceDiscoveryResolver;
 import io.micronaut.discovery.aws.route53.Route53AutoRegistrationConfiguration;
 import io.micronaut.discovery.client.registration.DiscoveryServiceAutoRegistration;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
 import io.micronaut.discovery.cloud.aws.AmazonComputeInstanceMetadataResolver;
 import io.micronaut.health.HealthStatus;
-import io.micronaut.health.HeartbeatConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServerInstance;
 import io.micronaut.scheduling.TaskExecutors;
@@ -51,13 +49,16 @@ import java.util.concurrent.Future;
 
 
 /**
+ * An implementation of {@link DiscoveryServiceAutoRegistration} for Route 53.
+ *
  * @author Rvanderwerf
+ * @author graemerocher
  * @since 1.0
  */
 @Singleton
 @Requires(env = Environment.AMAZON_EC2)
 @Requires(beans = {Route53AutoRegistrationConfiguration.class})
-@Requires(property = "aws.route53.registration.enabled", value = "true", defaultValue = "false")
+@Requires(property = Route53AutoNamingRegistrationClient.ENABLED, value = "true", defaultValue = "false")
 @Requires(property = ApplicationConfiguration.APPLICATION_NAME)
 public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoRegistration {
 
@@ -85,13 +86,15 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
      * Constant for AWS alias dns name.
      */
     public static final String AWS_ALIAS_DNS_NAME = "AWS_ALIAS_DNS_NAME";
+    /**
+     * Constant for whether route 53 registration is enabled.
+     */
+    public static final String ENABLED = "aws.route53.registration.enabled";
+
     private static final Logger LOG = LoggerFactory.getLogger(Route53AutoNamingRegistrationClient.class);
     private final Route53AutoRegistrationConfiguration route53AutoRegistrationConfiguration;
     private final Environment environment;
-    private final HeartbeatConfiguration heartbeatConfiguration;
-    private final ServiceInstanceIdGenerator idGenerator;
     private final AWSClientConfiguration clientConfiguration;
-    private AWSServiceDiscoveryAsync discoveryClient;
     private AmazonComputeInstanceMetadataResolver amazonComputeInstanceMetadataResolver;
     private Service discoveryService;
     private Executor executorService;
@@ -103,9 +106,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     /**
      * Constructor for setup.
      * @param environment current environemnts
-     * @param heartbeatConfiguration heartbeat config
      * @param route53AutoRegistrationConfiguration  config for auto registration
-     * @param idGenerator optional id generator (not used here)
      * @param clientConfiguration general client configuraiton
      * @param amazonComputeInstanceMetadataResolver resolver for aws compute metdata
      * @param executorService this is for executing the thread to monitor the register operation for completion
@@ -113,18 +114,14 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
      */
     protected Route53AutoNamingRegistrationClient(
             Environment environment,
-            HeartbeatConfiguration heartbeatConfiguration,
             Route53AutoRegistrationConfiguration route53AutoRegistrationConfiguration,
-            ServiceInstanceIdGenerator idGenerator,
             AWSClientConfiguration clientConfiguration,
             AmazonComputeInstanceMetadataResolver amazonComputeInstanceMetadataResolver,
-            @Named(TaskExecutors.IO)Executor executorService,
+            @Named(TaskExecutors.IO) Executor executorService,
             AWSServiceDiscoveryResolver awsServiceDiscoveryResolver) {
         super(route53AutoRegistrationConfiguration);
         this.environment = environment;
-        this.heartbeatConfiguration = heartbeatConfiguration;
         this.route53AutoRegistrationConfiguration = route53AutoRegistrationConfiguration;
-        this.idGenerator = idGenerator;
         this.clientConfiguration = clientConfiguration;
         this.awsServiceDiscoveryResolver = awsServiceDiscoveryResolver;
         this.amazonComputeInstanceMetadataResolver = amazonComputeInstanceMetadataResolver;
@@ -141,18 +138,31 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
     protected void pulsate(ServiceInstance instance, HealthStatus status) {
         // this only work if you create a health status check when you register it
         // we can't really pulsate anywhere because amazon health checks work inverse from this UNLESS you have a custom health check
-        if (discoveryService != null && discoveryService.getHealthCheckCustomConfig() != null) {
-            CustomHealthStatus customHealthStatus = CustomHealthStatus.UNHEALTHY;
-            if (status.getOperational().isPresent()) {
-                customHealthStatus = CustomHealthStatus.HEALTHY;
-            }
-            getDiscoveryClient().updateInstanceCustomHealthStatus(new UpdateInstanceCustomHealthStatusRequest().withInstanceId(instance.getInstanceId().get()).withServiceId(route53AutoRegistrationConfiguration.getAwsServiceId()).withStatus(customHealthStatus));
-        }
+        Optional<String> opt = instance.getInstanceId();
 
-        if (status.getOperational().isPresent() && !status.getOperational().get()) {
-            getDiscoveryClient().deregisterInstance(new DeregisterInstanceRequest().withInstanceId(instance.getInstanceId().get()).withServiceId(route53AutoRegistrationConfiguration.getAwsServiceId()));
-            LOG.info("Health status is non operational, instance id " + instance.getInstanceId().get() + " was de-registered from the discovery service.");
-        }
+        opt.ifPresent(instanceId -> {
+            if (discoveryService != null && discoveryService.getHealthCheckCustomConfig() != null) {
+                CustomHealthStatus customHealthStatus = CustomHealthStatus.UNHEALTHY;
+
+                if (status.getOperational().isPresent()) {
+                    customHealthStatus = CustomHealthStatus.HEALTHY;
+                }
+
+                UpdateInstanceCustomHealthStatusRequest updateInstanceCustomHealthStatusRequest = new UpdateInstanceCustomHealthStatusRequest()
+                                                                                                            .withInstanceId(instanceId)
+                                                                                                            .withServiceId(route53AutoRegistrationConfiguration.getAwsServiceId())
+                                                                                                            .withStatus(customHealthStatus);
+                getDiscoveryClient().updateInstanceCustomHealthStatus(
+                        updateInstanceCustomHealthStatusRequest);
+            }
+
+            if (status.getOperational().isPresent() && !status.getOperational().get()) {
+                getDiscoveryClient().deregisterInstance(new DeregisterInstanceRequest().withInstanceId(instanceId).withServiceId(route53AutoRegistrationConfiguration.getAwsServiceId()));
+                LOG.info("Health status is non operational, instance id " + instanceId + " was de-registered from the discovery service.");
+            }
+
+        });
+
     }
 
 
@@ -181,7 +191,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         // register service if not
         // register instance to service
 
-        Map<String, String> instanceAttributes = new HashMap<String, String>();
+        Map<String, String> instanceAttributes = new HashMap<>();
 
         // you can't just put anything in there like a custom config. Only certain things are allowed or you get weird errors
         // see https://docs.aws.amazon.com/Route53/latest/APIReference/API_autonaming_RegisterInstance.html
@@ -224,6 +234,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         Flowable<RegisterInstanceResult> flowableResult = Flowable.fromFuture(instanceResult);
 
 
+        //noinspection SubscriberImplementation
         flowableResult.subscribe(new Subscriber<RegisterInstanceResult>() {
 
             @Override
@@ -296,14 +307,10 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
      * This is a helper method for integration tests to create a new namespace.
      * Normally you would do this yourself with your own domain/subdomain on route53.
      *
-     * @param serviceDiscovery service discovery object
      * @param name name of the namespace in your route53
      * @return id of the namespace
      */
-    public String createNamespace(AWSServiceDiscovery serviceDiscovery, String name) {
-        if (serviceDiscovery == null) {
-            serviceDiscovery = AWSServiceDiscoveryClient.builder().withClientConfiguration(clientConfiguration.getClientConfiguration()).build();
-        }
+    public String createNamespace(String name) {
         String requestId = Long.toString(System.nanoTime());
 
         CreatePublicDnsNamespaceRequest publicDnsNamespaceRequest =
@@ -392,18 +399,6 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
      */
     public void setDiscoveryService(Service discoveryService) {
         this.discoveryService = discoveryService;
-    }
-
-    /**
-     * The only reason we need this is to figure out if there is custom health checked enabled for pulsate.
-     * @param serviceId aws id of the service
-     * @return Service object with details of the discovery service
-     */
-    private Service getService(String serviceId) {
-        GetServiceRequest serviceRequest = new GetServiceRequest().withId(serviceId);
-        Future<GetServiceResult> serviceResultFuture = getDiscoveryClient().getServiceAsync(serviceRequest);
-        GetServiceResult serviceResult = Flowable.fromFuture(serviceResultFuture).blockingSingle();
-        return serviceResult.getService();
     }
 
 }

@@ -20,18 +20,29 @@ import io.micronaut.configurations.aws.AWSClientConfiguration;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.util.Toggleable;
 
 /**
  * This is the configuration class for the AWSParameterStoreConfigClient for AWS Parameter Store based configuration.
  */
 @Requires(env = Environment.AMAZON_EC2)
-@Requires(property = "aws.client.system-manager.parameterstore.enabled", value = "true", defaultValue = "false")
-@ConfigurationProperties("system-manager.parameterstore")
-public class AWSParameterStoreConfiguration extends AWSClientConfiguration {
+@Requires(property = AWSParameterStoreConfiguration.ENABLED, value = "true", defaultValue = "false")
+@ConfigurationProperties(AWSParameterStoreConfiguration.CONFIGURATION_PREFIX)
+public class AWSParameterStoreConfiguration extends AWSClientConfiguration implements Toggleable  {
+
+    /**
+     * Constant for whether AWS parameter store is enabled or not.
+     */
+    public static final String ENABLED = "aws.client.system-manager.parameterstore.enabled";
+    /**
+     * The perfix for configuration.
+     */
+    public static final String CONFIGURATION_PREFIX = "system-manager.parameterstore";
 
     private static final String PREFIX = "config";
     private static final String DEFAULT_PATH = "/" + PREFIX + "/";
-    Boolean useSecureParameters = false;
+
+    private boolean useSecureParameters = false;
     private String rootHierarchyPath;
     private Boolean enabled;
 
@@ -39,7 +50,8 @@ public class AWSParameterStoreConfiguration extends AWSClientConfiguration {
      * Enable or disable this feature.
      * @return enable or disable this feature.
      */
-    public Boolean isEnabled() {
+    @Override
+    public boolean isEnabled() {
         return enabled;
     }
 
@@ -47,7 +59,7 @@ public class AWSParameterStoreConfiguration extends AWSClientConfiguration {
      * Enable or disable this feature.
      * @param enabled enable this feature
      */
-    public void setEnabled(Boolean enabled) {
+    public void setEnabled(boolean enabled) {
         this.enabled = enabled;
     }
 
@@ -75,7 +87,17 @@ public class AWSParameterStoreConfiguration extends AWSClientConfiguration {
      * If you set this to off you will not get unencrypted values.
      * @return use auto encryption on SecureString types
      */
-    public Boolean getUseSecureParameters() {
+    public boolean  getUseSecureParameters() {
         return useSecureParameters;
+    }
+
+    /**
+     * This will turn on or off auto-decryption via MKS for SecureString parameters.
+     * If you set this to off you will not get unencrypted values.
+     *
+     * @param useSecureParameters True if secure parameters should be used
+     */
+    public void setUseSecureParameters(boolean  useSecureParameters) {
+        this.useSecureParameters = useSecureParameters;
     }
 }
