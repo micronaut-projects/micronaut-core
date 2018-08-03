@@ -431,7 +431,7 @@ public class RequiresCondition implements Condition {
                             Environment environment = applicationContext.getEnvironment();
                             Class annotationType = type.get();
                             if (!environment.scan(annotationType).findFirst().isPresent()) {
-                                context.fail("No entities found on classpath");
+                                context.fail("No entities found in packages [" + String.join(", ", environment.getPackages()) + "]");
                                 return false;
                             }
                         }
