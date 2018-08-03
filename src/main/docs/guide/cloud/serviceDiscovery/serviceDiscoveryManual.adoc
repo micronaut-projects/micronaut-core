@@ -1,0 +1,41 @@
+If you do not wish to involve a service discovery server like Consul or you are interacting with a third-party service that cannot register with Consul you can instead manually configure services that are available via Service discovery.
+
+To do this you should use the `micronaut.http.services` setting. The following is an example configuration:
+
+.Manually configuring services
+[source,yaml]
+----
+micronaut:
+    http:
+        services:
+            foo:
+                urls:
+                    - http://foo1
+                    - http://foo2
+
+----
+
+You can then inject a client with `@Client("foo")` and it will use the above configuration to load balance between the two configured servers.
+
+TIP: You can override this configuration in production by specifying an environment variable such as `MICRONAUT_HTTP_SERVICES_FOO_URLS=http://prod1,http://prod2`
+
+Note that by default no health checking will happen to assert that the referenced services are operational. You can alter that by enabling health checking and optionally specifying a health check path (the default is `/heath`):
+
+.Enabling Health Checking
+[source,yaml]
+----
+micronaut:
+    http:
+        services:
+            foo:
+                ...
+                health-check: true # <1>
+                health-check-interval: 15s # <2>
+                health-check-uri: /health # <3>
+----
+
+<1> Whether to health check the service
+<2> The interval to wait between checks
+<3> The URI to send the health check request to
+
+Micronaut will start a background thread to check the health status of the service and if any of the configured services respond with an error code, they will be removed from the list of available services.
