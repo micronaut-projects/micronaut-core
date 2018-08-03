@@ -213,4 +213,21 @@ class PropertySourcePropertyResolverSpec extends Specification {
         then:
         thrown(ConfigurationException)
     }
+
+    void "test escaping the value delimiter"() {
+        given:
+        def values = [
+                'foo.bar': '10',
+                'foo.baz': 20,
+                'bar'    : '${foo:some\\:value}',
+                'baz'    : '${foo:some\\:value:some\\:other\\:value}'
+        ]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect:
+        resolver.getProperty("bar", String).get() == "some:value"
+        resolver.getProperty("baz", String).get() == "some:other:value"
+    }
 }
