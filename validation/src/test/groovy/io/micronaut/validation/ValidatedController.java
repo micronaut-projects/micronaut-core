@@ -29,7 +29,7 @@ import javax.validation.constraints.Digits;
 public class ValidatedController {
 
 
-    @Post
+    @Post("/args")
     public String args(@Digits(integer = 3, fraction = 2) String amount) {
         return "$" + amount;
     }

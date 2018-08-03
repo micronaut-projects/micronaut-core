@@ -216,13 +216,13 @@ class BlockingCrudSpec extends Specification {
         @Get("/res/{id}")
         HttpResponse<Book> getResponse(Long id)
 
-        @Get('/')
+        @Get
         List<Book> list()
 
         @Delete("/{id}")
         void delete(Long id)
 
-        @Post('/')
+        @Post
         Book save(String title)
 
         @Patch("/{id}")

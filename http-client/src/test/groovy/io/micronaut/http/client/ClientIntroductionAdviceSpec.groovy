@@ -59,7 +59,7 @@ class ClientIntroductionAdviceSpec extends Specification {
 
 
     static interface MyApi {
-        @Get(value = '/',produces = MediaType.TEXT_PLAIN, consumes = MediaType.TEXT_PLAIN)
+        @Get(produces = MediaType.TEXT_PLAIN, consumes = MediaType.TEXT_PLAIN)
         String index()
     }
 

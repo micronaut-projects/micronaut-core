@@ -223,29 +223,29 @@ class StreamRequestSpec extends Specification {
     @Controller('/stream/request')
     static class StreamController {
 
-        @Post(consumes = MediaType.TEXT_PLAIN)
+        @Post(uri = "/strings", consumes = MediaType.TEXT_PLAIN)
         Single<List<String>> strings(@Body Flowable<String> strings) {
             strings.toList()
         }
 
-        @Post(consumes = MediaType.TEXT_PLAIN)
+        @Post(uri = "/bytes", consumes = MediaType.TEXT_PLAIN)
         Single<List<String>> bytes(@Body Flowable<byte[]> strings) {
             strings.map({ byte[] bytes -> new String(bytes, StandardCharsets.UTF_8)}).toList()
         }
 
-        @Post
+        @Post("/pojos")
         Single<List<Book>> pojos(@Header MediaType contentType, @Body Single<List<Book>> books) {
             assert contentType == MediaType.APPLICATION_JSON_TYPE
             books
         }
 
-        @Post
+        @Post("/pojo-flowable")
         Flowable<Book> pojoFlowable(@Header MediaType contentType, @Body Flowable<Book> books) {
             assert contentType == MediaType.APPLICATION_JSON_TYPE
             books
         }
 
-        @Post
+        @Post("/pojo-flowable-error")
         Flowable<Book> pojoFlowableError(@Header MediaType contentType, @Body Flowable<Book> books) {
             return books.flatMap({ Book book ->
                 if(book.title.endsWith("3")) {
