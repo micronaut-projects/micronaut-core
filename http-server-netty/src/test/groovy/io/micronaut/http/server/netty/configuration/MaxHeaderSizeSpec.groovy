@@ -57,7 +57,7 @@ class MaxHeaderSizeSpec extends Specification {
 
     @Controller('/max-header')
     static class TestController {
-        @Get('/')
+        @Get
         HttpStatus index() {
             HttpStatus.OK
         }

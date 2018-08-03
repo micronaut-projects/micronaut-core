@@ -23,10 +23,10 @@ import io.micronaut.http.annotation.Get;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Controller
+@Controller("/secure")
 public class SecureController {
 
-    @Get("/")
+    @Get
     public HttpResponse index(String username) {
         return HttpResponse.ok("Authenticated: " + username);
     }

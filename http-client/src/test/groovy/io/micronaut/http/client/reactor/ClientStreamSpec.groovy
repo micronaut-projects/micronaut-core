@@ -67,7 +67,7 @@ class ClientStreamSpec extends Specification {
         @Get("/array")
         Flux<Book> arrayStream()
 
-        @Get(uri = "/json", processes = MediaType.APPLICATION_JSON_STREAM)
+        @Get(value = "/json", processes = MediaType.APPLICATION_JSON_STREAM)
         Flux<Book> jsonStream()
     }
 

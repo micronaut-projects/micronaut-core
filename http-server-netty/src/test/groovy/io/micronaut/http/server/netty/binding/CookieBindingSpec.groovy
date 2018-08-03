@@ -76,7 +76,7 @@ class CookieBindingSpec extends AbstractMicronautSpec {
     static interface CookieClient extends CookieApi {
     }
 
-    @Controller
+    @Controller("/cookie")
     static class CookieController implements CookieApi {
 
         @Override
@@ -103,16 +103,16 @@ class CookieBindingSpec extends AbstractMicronautSpec {
 
     static interface CookieApi {
 
-        @Get
+        @Get("/simple")
         String simple(@CookieValue String myVar)
 
-        @Get
+        @Get("/custom")
         String custom(@CookieValue('custom') String myVar)
 
-        @Get
+        @Get("/optional")
         String optional(@CookieValue Optional<Integer> myVar)
 
-        @Get
+        @Get("/all")
         String all(Cookies cookies)
     }
 

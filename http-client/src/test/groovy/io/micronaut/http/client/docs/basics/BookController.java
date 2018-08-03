@@ -27,7 +27,7 @@ import io.micronaut.http.annotation.*;
 @Controller("/amazon")
 public class BookController {
 
-    @Post(uri = "/book/{title}", consumes = {MediaType.APPLICATION_JSON, MediaType.APPLICATION_FORM_URLENCODED})
+    @Post(value = "/book/{title}", consumes = {MediaType.APPLICATION_JSON, MediaType.APPLICATION_FORM_URLENCODED})
     @Status(HttpStatus.CREATED)
     Book save(@Body Book book) {
         return book;

@@ -2,31 +2,6 @@ The link:{api}/io/micronaut/http/annotation/Controller.html[@Controller] annotat
 
 == URI Paths
 
-In the previous example a value of `/hello` was specified as the path to the controller. If no value is specified to the `@Controller` action then the URI is formulated from the class name.
-
-The following table summarizes values for the `@Controller` annotation and the calculated base paths:
-
-
-|===
-|Class Name | Annotation |Path
-
-|`HelloController`
-|`@Controller`
-|`/hello`
-
-|`HelloWorldController`
-|`@Controller`
-|`/hello-world`
-
-|`HelloController`
-|`@Controller("/somepath")`
-|`/somepath`
-
-|`HelloController`
-|`@Controller("/")`
-|`/`
-|===
-
 The value of the `@Controller` annotation is a https://tools.ietf.org/html/rfc6570[RFC-6570 URI template] you can therefore embed URI variables within the path using the syntax defined by the URI template specification.
 
 NOTE: Many other frameworks, including Spring, implement the URI template specification
@@ -167,20 +142,7 @@ The previous example used the link:{api}/io/micronaut/http/annotation/Get.html[@
 
 |===
 
-If no URI path is specified to any of the annotations then the method name is used as the URI. In other words both of the following methods are essentially equivalent and map to the `/hello` URI:
-
-[source,java]
-----
-@Get("/hello")
-String hello() {
-    return "Hello World";
-}
-
-@Get
-String hello() {
-    return "Hello World";
-}
-----
+NOTE: All of the method annotations default to `/`.
 
 == Building Routes Programmatically
 

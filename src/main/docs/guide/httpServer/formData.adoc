@@ -7,7 +7,7 @@ What this means in practise is that in order to bind regular form data the only 
 .Binding Form Data to POJOs
 [source,java]
 ----
-@Post(uri="/", consumes=MediaType.APPLICATION_FORM_URLENCODED)
+@Post(value = "/", consumes = MediaType.APPLICATION_FORM_URLENCODED)
 include::{testsuite}/server/json/PersonController.java[tags=regular, indent=0]
 ----
 
@@ -19,7 +19,7 @@ Alternatively, instead of using a POJO you can bind form data directly to method
 .Binding Form Data to Parameters
 [source,java]
 ----
-@Post(uri="/", consumes=MediaType.APPLICATION_FORM_URLENCODED)
+@Post(value = "/", consumes = MediaType.APPLICATION_FORM_URLENCODED)
 include::{testsuite}/server/json/PersonController.java[tags=args, indent=0]
 ----
 

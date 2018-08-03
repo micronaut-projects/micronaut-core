@@ -147,13 +147,13 @@ class BlockingFallbackSpec extends Specification {
         @Get("/{id}")
         Book get(Long id)
 
-        @Get('/')
+        @Get
         List<Book> list()
 
         @Delete("/{id}")
         void delete(Long id)
 
-        @Post('/')
+        @Post
         Book save(String title)
 
         @Patch("/{id}")

@@ -19,6 +19,7 @@ package io.micronaut.http.client;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -123,6 +124,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @since 1.0
  */
 @Prototype
+@Primary
 public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, RxSseClient, Closeable, AutoCloseable {
 
     protected static final String HANDLER_AGGREGATOR = "http-aggregator";

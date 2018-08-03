@@ -59,7 +59,7 @@ class AnnotationRouteBuilderAbsoluteAndRelativePathsSpec extends Specification {
     @Controller('/city')
     static class CityController {
 
-        @Get('/')
+        @Get
         String index() {
             "Hello city"
         }
@@ -83,7 +83,7 @@ class AnnotationRouteBuilderAbsoluteAndRelativePathsSpec extends Specification {
     @Controller('/city2/')
     static class City2Controller {
 
-        @Get('/')
+        @Get
         String index() {
             "Hello city2"
         }
