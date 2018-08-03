@@ -8,6 +8,7 @@ import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.scheduling.TaskExecutors
 import spock.lang.Specification
 import spock.lang.Unroll
+import spock.util.concurrent.PollingConditions
 
 import java.util.concurrent.ExecutorService
 
@@ -30,8 +31,12 @@ class ExecutorServiceMetricsBinderSpec extends Specification {
 
         Gauge g = search.gauge()
 
+        PollingConditions conditions = new PollingConditions(timeout: 3, delay: 0.1)
+
         then:
-        g.value() == 2
+        conditions.eventually {
+            g.value() == 2
+        }
     }
 
     @Unroll
