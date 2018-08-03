@@ -58,6 +58,7 @@ class MetricsEndpointSpec extends Specification {
         thrown(HttpClientResponseException)
 
         cleanup:
+        rxClient.close()
         embeddedServer.close()
     }
 
@@ -116,6 +117,7 @@ class MetricsEndpointSpec extends Specification {
         }
 
         cleanup:
+        rxClient.close()
         embeddedServer.close()
 
         where:
@@ -148,6 +150,7 @@ class MetricsEndpointSpec extends Specification {
         result
 
         cleanup:
+        rxClient.close()
         embeddedServer.close()
 
         where:
@@ -198,6 +201,7 @@ class MetricsEndpointSpec extends Specification {
         e.status == HttpStatus.NOT_FOUND
 
         cleanup:
+        rxClient.close()
         embeddedServer.close()
 
     }
@@ -220,6 +224,7 @@ class MetricsEndpointSpec extends Specification {
         thrown(HttpClientResponseException)
 
         cleanup:
+        rxClient.close()
         embeddedServer.close()
 
         where:
@@ -261,6 +266,7 @@ class MetricsEndpointSpec extends Specification {
         result
 
         cleanup:
+        rxClient.close()
         embeddedServer.close()
 
         where:
@@ -285,6 +291,7 @@ class MetricsEndpointSpec extends Specification {
         thrown(HttpClientResponseException)
 
         cleanup:
+        rxClient.close()
         embeddedServer.close()
 
         where:
@@ -310,6 +317,7 @@ class MetricsEndpointSpec extends Specification {
         result
 
         cleanup:
+        rxClient.close()
         embeddedServer.close()
 
         where:
@@ -335,6 +343,7 @@ class MetricsEndpointSpec extends Specification {
         thrown(HttpClientResponseException)
 
         cleanup:
+        rxClient.close()
         embeddedServer.close()
 
         where:
@@ -361,6 +370,7 @@ class MetricsEndpointSpec extends Specification {
         result
 
         cleanup:
+        rxClient.close()
         embeddedServer.close()
 
         where:
@@ -388,6 +398,7 @@ class MetricsEndpointSpec extends Specification {
         thrown(HttpClientResponseException)
 
         cleanup:
+        rxClient.close()
         embeddedServer.close()
 
         where:
@@ -416,6 +427,7 @@ class MetricsEndpointSpec extends Specification {
         result
 
         cleanup:
+        rxClient.close()
         embeddedServer.close()
 
         where:
@@ -441,6 +453,7 @@ class MetricsEndpointSpec extends Specification {
         thrown(HttpClientResponseException)
 
         cleanup:
+        rxClient.close()
         embeddedServer.close()
 
         where:
