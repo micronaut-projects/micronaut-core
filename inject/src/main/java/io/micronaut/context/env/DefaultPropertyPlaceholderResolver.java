@@ -21,6 +21,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
 
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * The default {@link PropertyPlaceholderResolver}.
@@ -40,6 +42,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
      */
     public static final String SUFFIX = "}";
 
+    private static final Pattern DELIMITER = Pattern.compile("[^\\\\]:");
     private final PropertyResolver environment;
     private final String prefix;
 
@@ -103,8 +106,9 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
 
     private void resolveExpression(StringBuilder builder, String str, String expr) {
         String defaultValue = null;
-        int j = expr.indexOf(':');
-        if (j > -1) {
+        Matcher matcher = DELIMITER.matcher(expr);
+        if (matcher.find()) {
+            int j = matcher.start() + 1;
             defaultValue = expr.substring(j + 1, expr.length());
             expr = expr.substring(0, j);
         }
@@ -121,13 +125,16 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             }
         }
         if (defaultValue != null) {
-            if (defaultValue.contains(":")) {
+            matcher = DELIMITER.matcher(defaultValue);
+            String value;
+            if (matcher.find()) {
                 StringBuilder resolved = new StringBuilder();
                 resolveExpression(resolved, expr, defaultValue);
-                builder.append(resolved.toString());
+                value = resolved.toString();
             } else {
-                builder.append(defaultValue);
+                value = defaultValue;
             }
+            builder.append(value.replaceAll("\\\\:", ":"));
             return;
         }
         throw new ConfigurationException("Could not resolve placeholder ${" + expr + "} in value: " + str);
