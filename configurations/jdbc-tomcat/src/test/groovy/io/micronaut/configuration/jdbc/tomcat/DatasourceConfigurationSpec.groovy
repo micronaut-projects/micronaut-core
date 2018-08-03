@@ -106,8 +106,7 @@ class DatasourceConfigurationSpec extends Specification {
                 'datasources.default.commitOnReturn': true,
                 'datasources.default.connectionProperties': 'prop1=value1;prop2=value2',
                 'datasources.default.jndiName': 'java:comp/env/FooBarPool',
-                'datasources.default.dbProperties.DB_CLOSE_ON_EXIT': true,
-                'datasources.default.dbProperties.DB_CLOSE_DELAY': 1,
+                'datasources.default.dbProperties.fileLock': 'FS',
                 'datasources.default.defaultAutoCommit': true,
                 'datasources.default.defaultCatalog': 'catalog']
         ))
@@ -127,10 +126,10 @@ class DatasourceConfigurationSpec extends Specification {
         dataSource.commitOnReturn
         dataSource.connectionProperties == 'prop1=value1;prop2=value2'
         dataSource.dataSourceJNDI == 'java:comp/env/FooBarPool'
-        dataSource.dbProperties.get('DB_CLOSE_ON_EXIT') == 'true'
-        dataSource.dbProperties.get('DB_CLOSE_DELAY') == '1'
+        dataSource.dbProperties.get('FILE_LOCK') == 'FS'
         dataSource.defaultAutoCommit
         dataSource.defaultCatalog == 'catalog'
+        dataSource.getPool()
 
         cleanup:
         applicationContext.close()
