@@ -93,13 +93,13 @@ class ServerSentEventStreamingSpec extends Specification {
     @Client("/stream/sse")
     static interface ProductClient {
 
-        @Get(uri = '/pojo/events', processes = MediaType.TEXT_EVENT_STREAM)
+        @Get(value = '/pojo/events', processes = MediaType.TEXT_EVENT_STREAM)
         Flowable<Event<Product>> pojoEventStream()
 
-        @Get(uri = '/pojo/objects', processes = MediaType.TEXT_EVENT_STREAM)
+        @Get(value = '/pojo/objects', processes = MediaType.TEXT_EVENT_STREAM)
         Flowable<Product> pojoStream()
 
-        @Get(uri = '/pojo/delayed', processes = MediaType.TEXT_EVENT_STREAM)
+        @Get(value = '/pojo/delayed', processes = MediaType.TEXT_EVENT_STREAM)
         Flowable<Product> delayedStream()
     }
 
@@ -107,17 +107,17 @@ class ServerSentEventStreamingSpec extends Specification {
     static class SseController {
 
 
-        @Get(uri = '/pojo/events', produces = MediaType.TEXT_EVENT_STREAM)
+        @Get(value = '/pojo/events', produces = MediaType.TEXT_EVENT_STREAM)
         Flowable<Event<Product>> pojoEventStream() {
             return Flowable.fromIterable(dataSet())
         }
 
-        @Get(uri = '/pojo/objects', produces = MediaType.TEXT_EVENT_STREAM)
+        @Get(value = '/pojo/objects', produces = MediaType.TEXT_EVENT_STREAM)
         Flowable<Product> pojoStream() {
             return Flowable.fromIterable(dataSet().collect { it.data })
         }
 
-        @Get(uri = '/pojo/delayed', produces = MediaType.TEXT_EVENT_STREAM)
+        @Get(value = '/pojo/delayed', produces = MediaType.TEXT_EVENT_STREAM)
         Flowable<Product> delayedStream() {
             return Flowable.fromIterable(dataSet().collect { it.data }).delay(
                     5,

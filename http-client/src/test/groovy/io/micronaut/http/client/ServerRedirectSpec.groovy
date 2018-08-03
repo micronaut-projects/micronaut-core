@@ -125,7 +125,7 @@ class ServerRedirectSpec extends Specification {
             HttpResponse.seeOther(URI.create('/redirect'))
         }
 
-        @Get("/")
+        @Get
         String home() {
             return "good"
         }
@@ -154,7 +154,7 @@ class ServerRedirectSpec extends Specification {
             HttpResponse.seeOther(URI.create('/redirect/stream'))
         }
 
-        @Get("/")
+        @Get
         @Produces(MediaType.APPLICATION_JSON_STREAM)
         Flowable<Book> home() {
             Flowable.just(new Book(title: "The Stand"))
@@ -163,7 +163,7 @@ class ServerRedirectSpec extends Specification {
 
     @Client("https://youtube.com")
     static interface YoutubeClient {
-        @Get("/")
+        @Get
         Single<String> test()
     }
 

@@ -62,7 +62,7 @@ class ClientScopeSpec extends Specification {
 
     @Controller('/scope')
     static class ScopeController {
-        @Get(uri = "/", produces = MediaType.TEXT_PLAIN)
+        @Get(produces = MediaType.TEXT_PLAIN)
         String index() {
             return "success"
         }

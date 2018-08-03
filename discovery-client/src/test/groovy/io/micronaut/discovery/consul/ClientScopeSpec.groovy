@@ -97,7 +97,7 @@ class ClientScopeSpec extends Specification implements MockConsulSpec  {
         }
     }
 
-    @Controller
+    @Controller("/message")
     static class MessageController {
         @Inject EmbeddedServer embeddedServer
 

@@ -61,7 +61,7 @@ public class LogoutController {
      * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
      */
     @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})
-    @Post("/")
+    @Post
     public HttpResponse index(HttpRequest<?> request, Authentication authentication) {
         eventPublisher.publishEvent(new LogoutEvent(authentication));
         if (logoutHandler != null) {

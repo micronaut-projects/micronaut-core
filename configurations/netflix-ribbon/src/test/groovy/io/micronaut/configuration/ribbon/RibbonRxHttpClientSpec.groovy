@@ -184,7 +184,7 @@ class RibbonRxHttpClientSpec extends Specification {
         }
     }
 
-    @Controller
+    @Controller('/message')
     static class MessageController {
         @Inject EmbeddedServer embeddedServer
 

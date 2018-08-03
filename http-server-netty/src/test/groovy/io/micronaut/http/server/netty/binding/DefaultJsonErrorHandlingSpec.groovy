@@ -57,14 +57,14 @@ class DefaultJsonErrorHandlingSpec extends AbstractMicronautSpec {
 
     }
 
-    @Controller
+    @Controller("/errors")
     static class ErrorsController {
-        @Post
+        @Post("/string")
         String string(@Body String text) {
             "Body: ${text}"
         }
 
-        @Post
+        @Post("/map")
         String map(@Body Map<String, Object> json) {
             "Body: ${json}"
         }

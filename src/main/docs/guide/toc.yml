@@ -122,6 +122,7 @@ cloud:
     serviceDiscoveryEureka: Eureka Support
     serviceDiscoveryKubernetes: Kubernetes Support
 #    serviceDiscoveryRoute53: AWS Route 53 Support
+    serviceDiscoveryManual: Manual Service Discovery Configuration
   clientSideLoadBalancing:
     title: Client Side Load Balancing
     netflixRibbon: Netflix Ribbon Support
@@ -264,5 +265,6 @@ cli:
 appendix:
   title: Appendices
   faq: Frequently Asked Questions (FAQ)
+  usingsnapshots: Using Snapshots
   problems: Common Problems
   breaks: Breaking Changes

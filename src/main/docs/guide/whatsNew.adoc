@@ -1,49 +1,84 @@
 Apart from https://github.com/micronaut-projects/micronaut-core/milestone/3?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features.
 
-=== Improved Metrics Support
+=== Bean Generics Computed at Compile Time
 
-Metrics support has been improved with support for metrics for:
+Generic information for beans is now calculated at compile time, improving performance and allowing more uses cases.
 
-* Micronaut Thread Pools
-* Kafka Metrics
+For example it is now possible to define converters, serverless functions etc. as Java lambdas because the generic information is computed from the method signature:
 
-=== Apache Kafka Support
-
-Micronaut can now be used to build Message-Driven Microservices with Apache Kafka.
-
-The new ann:configuration.kafka.annotation.KafkaClient[] annotation supports declarative, compile-time creation of Kafka `Producer` instances.
-
-Whilst the ann:configuration.kafka.annotation.KafkaListener[] annotation supports defining Kafka consumers.
-
-See the <<kafka, Kafka>> section of the documentation for more information.
-
-The Micronaut CLI now includes a Kafka *feature*, which adds the necessary dependency and config to use Kafka within your project. In addition, the CLI also includes a Kafka *profile*, which can be used to create messaging services without the need for an HTTP server. See the <<kafkaCli, Kafka>> section for more information.
-
-=== Annotation Metadata Processing Support Improved
-
-All annotation metadata in Micronaut is produced as compile time, resulting in significant improvements to startup time and memory consumption over traditional frameworks.
-
-This support has been enhanced to better support repeated annotations such that repeated annotations are normalized at compile time, avoiding the need to process them and compensate for the difference between a single annotation definition and multiple.
-
-The api:core.annotation.AnnotationMetadata[] interface now includes methods such as `getAnnotationValuesByType` and `getDeclaredAnnotationValuesByType` that allow the retrieval of the repeated annotation values that are computed at compile time.
-
-=== Reactive Postgres Driver Support
-
-Support has been added for the https://github.com/reactiverse/reactive-pg-client[Postgres Reactive Client] project allowing building non-blocking, reactive applications with Postgres SQL and Micronaut. See the documentation on <<postgresSupport, Postgres Reactive Client Support>> for more information.
-
-=== CLI Improvements
-
-Thanks to a contribution from https://github.com/remkop[Remko Popma] the CLI has been re-written on top of https://github.com/remkop/picocli[PicoCLI] resulting in improvements to documentation, TAB completion and code maintainability.
-
-=== Spring Transaction Management for SQL
-
-Regular JDBC support now optionally supports transaction management via Spring's transaction manager with the addition of the following dependencies to your classpath:
-
-.build.gradle
-[source,groovy]
+.Functions as Java Lambdas
+[source,java]
 ----
-dependencies {
-    compile "io.micronaut:spring"
-    runtime "org.springframework:spring-jdbc"
+@Factory
+public class FunctionFactory {
+
+    @FunctionBean("round")
+    Function<Double, Long> round() {
+        return (doub) -> Math.round(doub.doubleValue());
+    }
 }
 ----
+
+The api:inject.BeanDefinition[] interface features a new `getTypeArguments(..)` method that can be used to retrieve the generic types of any bean without using reflection and having to deal with type erasure.
+
+=== New @Adapter AOP Advice
+
+Micronaut's AOP API has been extended introducing a new ann:aop.Adapter[] annotation that allows any method to be adapted to a new SAM (single abstract method) type at compile time that is automatically registered as a bean.
+
+For example:
+
+.Using the `@Adapter` annotation
+[source,java]
+----
+import io.micronaut.aop.*;
+import io.micronaut.context.event.*;
+
+@javax.inject.Singleton
+class MyBean{
+
+    @Adapter(ApplicationEventListener.class)
+    void onStartup(StartupEvent event) {
+        // startup logic
+    }
+}
+----
+
+The above example will create a new bean at compile time that implements the api:context.event.ApplicationEventListener[] interface and delegates to the `onStartup` method of `MyBean`. Micronaut will automatically align the generic type arguments (if the SAM type features any) and will also perform checks at compile time to verify the method is a valid candidate, failing compilation if it isn't.
+
+=== Improved Events API
+
+The ann:aop.Adapter[] annotation can be used as an annotation stereotype (meta annotation), and in fact is already used that way - the new ann:runtime.event.annotation.EventListener[] annotation allows more elegant definition of application event listeners:
+
+.Using the `@EventListener` annotation
+[source,java]
+----
+import io.micronaut.aop.*;
+import io.micronaut.context.event.*;
+import io.micronaut.runtime.event.annotation.EventListener;
+
+@javax.inject.Singleton
+class MyBean{
+
+    @EventListener // <1>
+    void onStartup(StartupEvent event) {
+        // startup logic
+    }
+}
+----
+
+<1> Simply define the `@EventListener` annotation on any method to create a new listener
+
+In addition the ann:scheduling.annotation.Async[] annotation can be used to make any ann:runtime.event.annotation.EventListener[] asynchronous:
+
+[source,java]
+----
+@EventListener // <1>
+@Async // <2>
+void onStartup(StartupEvent event) {
+    // startup logic
+}
+----
+
+<1> An `@EventListener` is defined
+<2> The `@Async` annotation tells Micronaut to run the operation asynchronously (by default on the `scheduled` executor)
+

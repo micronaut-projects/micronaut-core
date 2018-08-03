@@ -103,21 +103,21 @@ class CustomStaticMappingLocalSpec extends AbstractMicronautSpec {
         response.getBody(String).get() == "You sent an unsupported media type - from Test1Controller.unsupportedMediaTypeHandler()"
     }
 
-    @Controller
+    @Controller('/test1')
     @Requires(property = 'spec.name', value = 'CustomStaticMappingLocalSpec')
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED )
     static class Test1Controller {
-        @Get
+        @Get('/bad')
         HttpResponse bad() {
             HttpResponse.badRequest()
         }
 
-        @Post
+        @Post('/simple')
         String simple(String name, Integer age) {
             "name: $name, age: $age"
         }
 
-        @Get
+        @Get('/not-found')
         HttpResponse notFound() {
             null // return a null to simulate a query is not found
         }
@@ -138,16 +138,16 @@ class CustomStaticMappingLocalSpec extends AbstractMicronautSpec {
         }
     }
 
-    @Controller
+    @Controller('/test2')
     @Requires(property = 'spec.name', value = 'CustomStaticMappingLocalSpec')
     @Consumes(MediaType.APPLICATION_FORM_URLENCODED )
     static class Test2Controller {
-        @Get
+        @Get('/bad')
         HttpResponse bad() {
             HttpResponse.badRequest()
         }
 
-        @Post
+        @Post('/simple')
         String simple(String name, Integer age) {
             "name: $name, age: $age"
         }

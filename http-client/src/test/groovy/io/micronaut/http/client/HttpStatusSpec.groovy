@@ -83,19 +83,19 @@ class HttpStatusSpec extends Specification {
     @Controller("/status")
     static class StatusController {
 
-        @Get(uri = "/simple", produces = MediaType.TEXT_PLAIN)
+        @Get(value = "/simple", produces = MediaType.TEXT_PLAIN)
         String simple() {
             return "success"
         }
 
         @Status(HttpStatus.CREATED)
-        @Get(uri = "/simpleCreated", produces = MediaType.TEXT_PLAIN)
+        @Get(value = "/simpleCreated", produces = MediaType.TEXT_PLAIN)
         String simpleCreated() {
             return "success"
         }
 
         @Status(HttpStatus.NOT_FOUND)
-        @Get(uri = "/simple404", produces = MediaType.TEXT_PLAIN)
+        @Get(value = "/simple404", produces = MediaType.TEXT_PLAIN)
         String simple404() {
             return "success"
         }

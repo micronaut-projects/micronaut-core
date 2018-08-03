@@ -139,7 +139,7 @@ curl -X "POST" "{url}/weather/evict"
         @Inject
         ApplicationContext applicationContext
 
-        @Get(uri = "/forecast")
+        @Get(value = "/forecast")
         HttpResponse<Map<String, String>> index() {
             ok([forecast: weatherService.latestForecast()]) as HttpResponse<Map<String, String>>
         }

@@ -121,7 +121,7 @@ class JsonStreamSpec  extends Specification {
     @Controller("/jsonstream/books")
     static class BookController {
 
-        @Get(uri = '/', produces = MediaType.APPLICATION_JSON_STREAM)
+        @Get(produces = MediaType.APPLICATION_JSON_STREAM)
         Publisher<Book> list() {
             return Flowable.just(new Book(title: "The Stand"), new Book(title: "The Shining"))
         }

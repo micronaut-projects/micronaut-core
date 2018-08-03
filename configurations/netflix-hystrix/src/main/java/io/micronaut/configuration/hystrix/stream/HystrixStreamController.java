@@ -68,7 +68,7 @@ public class HystrixStreamController {
      * Hystrix stream endpoint.
      * @return hystrix stream as an event
      */
-    @Get(uri = "/", produces = MediaType.TEXT_EVENT_STREAM)
+    @Get(value = "/", produces = MediaType.TEXT_EVENT_STREAM)
     public Flowable<Event<String>> hystrixStream() {
         return Flowable.interval(interval.toMillis(), TimeUnit.MILLISECONDS)
             .subscribeOn(Schedulers.io())

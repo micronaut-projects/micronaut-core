@@ -23,7 +23,7 @@ import io.micronaut.http.annotation.Get
 @Controller('/books')
 class BookController {
 
-    @Get("/")
+    @Get
     String index() {
         return "Index Action"
     }

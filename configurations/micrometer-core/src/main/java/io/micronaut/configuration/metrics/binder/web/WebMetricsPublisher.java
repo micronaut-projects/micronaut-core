@@ -21,7 +21,6 @@ import io.micrometer.core.instrument.Tag;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MutableHttpResponse;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -32,16 +31,27 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS;
+
 /**
  * A publisher that will deal with the web filter metrics for success and error conditions.
  *
  * @author Christian Oestreich
+ * @author graemerocher
  * @since 1.0
+ * @param <T> The response type
  */
 @SuppressWarnings("PublisherImplementation")
-public class MetricsPublisher implements Publisher<MutableHttpResponse<?>> {
+public class WebMetricsPublisher<T extends HttpResponse<?>> implements Publisher<T> {
 
-    private static final String WEB_METRIC_NAME = "http.server.requests";
+    /**
+     * Constant used to define whether web metrics are enabled or not.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String ENABLED = MICRONAUT_METRICS_BINDERS + ".web.enabled";
+    public static final String METRIC_HTTP_SERVER_REQUESTS = "http.server.requests";
+    public static final String METRIC_HTTP_CLIENT_REQUESTS = "http.client.requests";
+
     private static final Tag URI_NOT_FOUND = Tag.of("uri", "NOT_FOUND");
     private static final Tag URI_REDIRECTION = Tag.of("uri", "REDIRECTION");
     private static final String UNKNOWN = "UNKNOWN";
@@ -49,11 +59,38 @@ public class MetricsPublisher implements Publisher<MutableHttpResponse<?>> {
     private static final String STATUS = "status";
     private static final String URI = "uri";
     private static final String EXCEPTION = "exception";
-    private final Publisher<MutableHttpResponse<?>> publisher;
+
+    private final Publisher<T> publisher;
     private final MeterRegistry meterRegistry;
     private final String requestPath;
     private final long start;
     private final String httpMethod;
+    private final String metricName;
+
+    /**
+     * Publisher constructor.
+     *
+     * @param publisher     The original publisher
+     * @param meterRegistry MeterRegistry bean
+     * @param requestPath   The request path
+     * @param start         The start time of the request
+     * @param httpMethod    The http method name used
+     * @param isServer      Whether the metric relates to the server or the client
+     */
+    WebMetricsPublisher(
+            Publisher<T> publisher,
+            MeterRegistry meterRegistry,
+            String requestPath,
+            long start,
+            String httpMethod,
+            boolean isServer) {
+        this.publisher = publisher;
+        this.meterRegistry = meterRegistry;
+        this.requestPath = requestPath;
+        this.start = start;
+        this.httpMethod = httpMethod;
+        this.metricName = isServer ? METRIC_HTTP_SERVER_REQUESTS : METRIC_HTTP_CLIENT_REQUESTS;
+    }
 
     /**
      * Publisher constructor.
@@ -64,12 +101,13 @@ public class MetricsPublisher implements Publisher<MutableHttpResponse<?>> {
      * @param start         The start time of the request
      * @param httpMethod    The http method name used
      */
-    MetricsPublisher(Publisher<MutableHttpResponse<?>> publisher, MeterRegistry meterRegistry, String requestPath, long start, String httpMethod) {
-        this.publisher = publisher;
-        this.meterRegistry = meterRegistry;
-        this.requestPath = requestPath;
-        this.start = start;
-        this.httpMethod = httpMethod;
+    WebMetricsPublisher(
+            Publisher<T> publisher,
+            MeterRegistry meterRegistry,
+            String requestPath,
+            long start,
+            String httpMethod) {
+        this(publisher, meterRegistry, requestPath, start, httpMethod, true);
     }
 
     /**
@@ -77,10 +115,11 @@ public class MetricsPublisher implements Publisher<MutableHttpResponse<?>> {
      *
      * @param actual the original subscription
      */
+    @SuppressWarnings("SubscriberImplementation")
     @Override
-    public void subscribe(Subscriber<? super MutableHttpResponse<?>> actual) {
+    public void subscribe(Subscriber<? super T> actual) {
 
-        publisher.subscribe(new Subscriber<MutableHttpResponse<?>>() {
+        publisher.subscribe(new Subscriber<T>() {
             /**
              * Subscription handler.
              * @param subscription the subscription
@@ -95,7 +134,7 @@ public class MetricsPublisher implements Publisher<MutableHttpResponse<?>> {
              * @param httpResponse the http response
              */
             @Override
-            public void onNext(MutableHttpResponse<?> httpResponse) {
+            public void onNext(T httpResponse) {
                 success(httpResponse, start, httpMethod, requestPath);
                 actual.onNext(httpResponse);
             }
@@ -229,7 +268,7 @@ public class MetricsPublisher implements Publisher<MutableHttpResponse<?>> {
      */
     private void success(HttpResponse httpResponse, long start, String httpMethod, String requestPath) {
         Iterable<Tag> tags = getTags(httpResponse, httpMethod, requestPath, null);
-        this.meterRegistry.timer(WEB_METRIC_NAME, tags)
+        this.meterRegistry.timer(metricName, tags)
                 .record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
     }
 
@@ -243,7 +282,7 @@ public class MetricsPublisher implements Publisher<MutableHttpResponse<?>> {
      */
     private void error(long start, String httpMethod, String requestPath, Throwable throwable) {
         Iterable<Tag> tags = getTags(null, httpMethod, requestPath, throwable);
-        this.meterRegistry.timer(WEB_METRIC_NAME, tags)
+        this.meterRegistry.timer(metricName, tags)
                 .record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
     }
 }

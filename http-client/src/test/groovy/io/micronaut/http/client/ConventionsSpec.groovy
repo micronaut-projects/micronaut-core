@@ -1,6 +1,5 @@
 package io.micronaut.http.client
 
-import groovy.transform.NotYetImplemented
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -14,7 +13,6 @@ class ConventionsSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
 
-    @NotYetImplemented
     void 'test convention mappings for client'() {
         given:
         HelloConventionClient client = embeddedServer.getApplicationContext().getBean(HelloConventionClient)
@@ -28,7 +26,7 @@ class ConventionsSpec extends Specification {
         RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient, embeddedServer.getURL())
 
         expect:
-        client.toBlocking().retrieve('/hello-convention/foo-bar') == 'good'
+        client.toBlocking().retrieve('/hello-convention') == 'good'
 
         cleanup:
         client.close()
@@ -40,7 +38,7 @@ class ConventionsSpec extends Specification {
         RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient, embeddedServer.getURL())
 
         expect:
-        client.toBlocking().retrieve('/hello-validated/foo-bar') == 'good'
+        client.toBlocking().retrieve('/hello-validated') == 'good'
 
         cleanup:
         client.close()
@@ -52,7 +50,7 @@ class ConventionsSpec extends Specification {
         String fooBar()
     }
 
-    @Controller
+    @Controller('/hello-convention')
     static class HelloConventionController {
         @Get
         String fooBar() {
@@ -60,7 +58,7 @@ class ConventionsSpec extends Specification {
         }
     }
 
-    @Controller
+    @Controller('/hello-validated')
     @Validated
     static class HelloValidatedController {
         @Get

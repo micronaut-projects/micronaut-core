@@ -149,7 +149,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         HttpClient httpClient = getClient(context, clientAnnotation);
         Optional<Class<? extends Annotation>> httpMethodMapping = context.getAnnotationTypeByStereotype(HttpMethodMapping.class);
         if (context.hasStereotype(HttpMethodMapping.class) && httpClient != null) {
-            String uri = context.getValue(HttpMethodMapping.class, String.class).orElse("");
+            AnnotationValue<HttpMethodMapping> mapping = context.getAnnotation(HttpMethodMapping.class);
+            String uri = mapping.getRequiredValue(String.class);
             if (StringUtils.isEmpty(uri)) {
                 uri = "/" + context.getMethodName();
             }
@@ -493,10 +494,16 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
 
         return clients.computeIfAbsent(clientId, integer -> {
+            HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(clientId)).orElse(null);
+            if (null != clientBean) {
+                return clientBean;
+            }
+            
             LoadBalancer loadBalancer = loadBalancerResolver.resolve(clientId)
                 .orElseThrow(() ->
                     new HttpClientException("Invalid service reference [" + clientId + "] specified to @Client")
                 );
+
             String contextPath = null;
             String path = clientAnn.get("path", String.class).orElse(null);
             if (StringUtils.isNotEmpty(path)) {

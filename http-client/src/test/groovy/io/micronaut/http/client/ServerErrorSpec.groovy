@@ -95,18 +95,18 @@ class ServerErrorSpec extends Specification {
     @Controller('/server-errors')
     static class ServerErrorController {
 
-        @Get
+        @Get('/five-hundred')
         HttpResponse fiveHundred() {
             HttpResponse.serverError()
                         .body(new JsonError("Bad things happening"))
         }
 
-        @Get
+        @Get('/exception')
         HttpResponse exception() {
             throw new RuntimeException("Bad things happening")
         }
 
-        @Get
+        @Get('/single-error')
         Single singleError() {
             Single.error(new RuntimeException("Bad things happening"))
         }
