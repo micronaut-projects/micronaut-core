@@ -494,10 +494,16 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
 
         return clients.computeIfAbsent(clientId, integer -> {
+            HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(clientId)).orElse(null);
+            if (null != clientBean) {
+                return clientBean;
+            }
+            
             LoadBalancer loadBalancer = loadBalancerResolver.resolve(clientId)
                 .orElseThrow(() ->
                     new HttpClientException("Invalid service reference [" + clientId + "] specified to @Client")
                 );
+
             String contextPath = null;
             String path = clientAnn.get("path", String.class).orElse(null);
             if (StringUtils.isNotEmpty(path)) {

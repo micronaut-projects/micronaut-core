@@ -18,6 +18,7 @@ package io.micronaut.scheduling;
 
 import static io.micronaut.core.util.ArgumentUtils.check;
 
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.cron.CronExpression;
 
@@ -38,6 +39,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Named(TaskExecutors.SCHEDULED)
+@Primary
 public class ScheduledExecutorTaskScheduler implements TaskScheduler {
 
     private final ScheduledExecutorService executorService;
