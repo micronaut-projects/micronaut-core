@@ -25,11 +25,12 @@ import org.apache.commons.dbcp2.BasicDataSource
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED
 
-class DbcpDataSourcePoolMetadataSpec extends Specification {
+class DbcpDataSourcePoolMetadataSpec extends AbstractDataSourcePoolMetadataSpec {
 
     @Shared
     @AutoCleanup
@@ -66,17 +67,19 @@ class DbcpDataSourcePoolMetadataSpec extends Specification {
         metadata.getMin() >= 0
     }
 
-    def "check metrics endpoint for datasource metrics"() {
+    @Unroll
+    def "check metrics endpoint for datasource metrics for #metric"() {
         when:
         def response = httpClient.exchange("/metrics", Map).blockingFirst()
         Map result = response.body()
 
         then:
         response.code() == HttpStatus.OK.code
-        result.names.contains("jdbc.connections.usage")
-        result.names.contains("jdbc.connections.active")
-        result.names.contains("jdbc.connections.max")
-        result.names.contains("jdbc.connections.min")
+        result.names.contains(metric)
+
+        where:
+        metric << metricNames
+
     }
 
     def "check metrics endpoint for datasource metrics #metric"() {
@@ -103,7 +106,7 @@ class DbcpDataSourcePoolMetadataSpec extends Specification {
         }
 
         where:
-        metric << ['jdbc.connections.usage', 'jdbc.connections.active', 'jdbc.connections.max', 'jdbc.connections.min']
+        metric << metricNames
     }
 
 

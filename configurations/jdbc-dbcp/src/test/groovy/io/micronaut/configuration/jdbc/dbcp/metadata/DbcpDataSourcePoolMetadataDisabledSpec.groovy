@@ -24,13 +24,12 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
-import spock.lang.Specification
 import spock.lang.Unroll
 
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED
 
-class DbcpDataSourcePoolMetadataDisabledSpec extends Specification {
+class DbcpDataSourcePoolMetadataDisabledSpec extends AbstractDataSourcePoolMetadataSpec {
 
     @Shared
     @AutoCleanup
@@ -51,17 +50,17 @@ class DbcpDataSourcePoolMetadataDisabledSpec extends Specification {
     @AutoCleanup
     RxHttpClient httpClient = context.createBean(RxHttpClient, embeddedServer.getURL())
 
-    def "check metrics endpoint for datasource metrics not found"() {
+    def "check metrics endpoint for datasource metrics not found for #metric"() {
         when:
         def response = httpClient.exchange("/metrics", Map).blockingFirst()
         Map result = response.body()
 
         then:
         response.code() == HttpStatus.OK.code
-        !result.names.contains("jdbc.connections.usage")
-        !result.names.contains("jdbc.connections.active")
-        !result.names.contains("jdbc.connections.max")
-        !result.names.contains("jdbc.connections.min")
+        !result.names.contains(metric)
+
+        where:
+        metric << metricNames
     }
 
     @Unroll
@@ -73,7 +72,7 @@ class DbcpDataSourcePoolMetadataDisabledSpec extends Specification {
         thrown(HttpClientResponseException)
 
         where:
-        metric << ['jdbc.connections.usage', 'jdbc.connections.active', 'jdbc.connections.max', 'jdbc.connections.min']
+        metric << metricNames
     }
 
 }
