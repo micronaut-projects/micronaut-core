@@ -43,12 +43,9 @@ public class DatasourceFactory implements AutoCloseable {
     private static final Logger LOG = LoggerFactory.getLogger(DatasourceFactory.class);
     private List<HikariUrlDataSource> dataSources = new ArrayList<>(2);
 
-    private MeterRegistry meterRegistry;
     private ApplicationContext applicationContext;
 
-    public DatasourceFactory(MeterRegistry meterRegistry,
-                             ApplicationContext applicationContext) {
-        this.meterRegistry = meterRegistry;
+    public DatasourceFactory(ApplicationContext applicationContext) {
         this.applicationContext = applicationContext;
     }
 
@@ -68,12 +65,23 @@ public class DatasourceFactory implements AutoCloseable {
     }
 
     private void addMeterRegistry(HikariUrlDataSource ds) {
-        if (ds != null && this.meterRegistry != null &&
-                this.applicationContext
-                        .getProperty(MICRONAUT_METRICS_BINDERS + ".jdbc.enabled",
-                                boolean.class).orElse(true)) {
-            ds.setMetricRegistry(this.meterRegistry);
+        try {
+            MeterRegistry meterRegistry = getMeterRegistry();
+            if (ds != null && meterRegistry != null &&
+                    this.applicationContext
+                            .getProperty(MICRONAUT_METRICS_BINDERS + ".jdbc.enabled",
+                                    boolean.class).orElse(true)) {
+                ds.setMetricRegistry(meterRegistry);
+            }
+        } catch (NoClassDefFoundError ignore) {
+            LOG.info("Could not wire metrics to HikariCP as there is no class of type MeterRegistry on the classpath, io.micronaut.configuration:micrometer-core library missing.");
         }
+    }
+
+    private MeterRegistry getMeterRegistry() {
+
+        return this.applicationContext.containsBean(MeterRegistry.class) ?
+                this.applicationContext.getBean(MeterRegistry.class) : null;
     }
 
     @Override
