@@ -106,15 +106,15 @@ class DatasourceConfigurationSpec extends Specification {
         ApplicationContext applicationContext = new DefaultApplicationContext(context)
         applicationContext.environment.addPropertySource(MapPropertySource.of(
                 'test',
-                ['datasources.default.abandonWhenPercentageFull': 99,
-                'datasources.default.accessToUnderlyingConnectionAllowed': false,
-                'datasources.default.alternateUsernameAllowed': true,
-                'datasources.default.commitOnReturn': true,
-                'datasources.default.connectionProperties': 'prop1=value1;prop2=value2',
-                'datasources.default.jndiName': 'java:comp/env/FooBarPool',
-                'datasources.default.dbProperties.fileLock': 'FS',
-                'datasources.default.defaultAutoCommit': true,
-                'datasources.default.defaultCatalog': 'catalog']
+                ['datasources.default.abandonWhenPercentageFull'          : 99,
+                 'datasources.default.accessToUnderlyingConnectionAllowed': false,
+                 'datasources.default.alternateUsernameAllowed'           : true,
+                 'datasources.default.commitOnReturn'                     : true,
+                 'datasources.default.connectionProperties'               : 'prop1=value1;prop2=value2',
+                 'datasources.default.jndiName'                           : 'java:comp/env/FooBarPool',
+                 'datasources.default.dbProperties.fileLock'              : 'FS',
+                 'datasources.default.defaultAutoCommit'                  : true,
+                 'datasources.default.defaultCatalog'                     : 'catalog']
         ))
         applicationContext.start()
 
@@ -340,7 +340,7 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.start()
 
         when:
-        org.apache.tomcat.jdbc.pool.DataSource dataSource =  applicationContext.getBean(DataSource, Qualifiers.byName("person")).targetDataSource
+        org.apache.tomcat.jdbc.pool.DataSource dataSource = applicationContext.getBean(DataSource, Qualifiers.byName("person")).targetDataSource
 
         then:
         dataSource.getPool()
@@ -380,7 +380,7 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.start()
 
         when:
-        org.apache.tomcat.jdbc.pool.DataSource dataSource =  applicationContext.getBean(DataSource, Qualifiers.byName("person")).targetDataSource
+        org.apache.tomcat.jdbc.pool.DataSource dataSource = applicationContext.getBean(DataSource, Qualifiers.byName("person")).targetDataSource
 
         then:
         dataSource.getPool()

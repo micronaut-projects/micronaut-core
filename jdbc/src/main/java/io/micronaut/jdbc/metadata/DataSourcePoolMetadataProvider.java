@@ -16,24 +16,21 @@
 
 package io.micronaut.jdbc.metadata;
 
-import javax.sql.DataSource;
-
 /**
- * Provide a {@link DataSourcePoolMetadata} based on a {@link DataSource}.
+ * Provide a {@link DataSourcePoolMetadata} based on a {@link javax.sql.DataSource}.
  *
  * @author Stephane Nicoll
  * @author Christian Oestreich
  * @since 2.0.0
  */
+@FunctionalInterface
 public interface DataSourcePoolMetadataProvider {
 
-	/**
-	 * Return the {@link DataSourcePoolMetadata} instance able to manage the specified
-	 * {@link DataSource} or {@code null} if the given data source could not be handled.
-	 * @param dataSource the data source
-	 * @return the data source pool metadata
-	 */
-	DataSourcePoolMetadata getDataSourcePoolMetadata(DataSource dataSource);
-
-	String getName();
+    /**
+     * Return the {@link DataSourcePoolMetadata} instance able to manage the specified
+     * {@link javax.sql.DataSource} or {@code null} if the given data source could not be handled.
+     *
+     * @return the data source pool metadata
+     */
+    DataSourcePoolMetadata getDataSourcePoolMetadata();
 }

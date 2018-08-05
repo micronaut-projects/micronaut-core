@@ -9,5 +9,9 @@ dependencies {
 
     testCompile project(":spring")
     testCompile project(":inject-java")
+    testCompile project(":http-server-netty")
+    testCompile project(":http-client")
+    testCompile project(":management")
+    testCompile project(":configurations:micrometer-core")
     testCompile dependencyModuleVersion("spring", "spring-jdbc")
 }

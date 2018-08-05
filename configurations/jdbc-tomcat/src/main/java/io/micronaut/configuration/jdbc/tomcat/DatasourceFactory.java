@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.jdbc.tomcat;
 
 import io.micronaut.configuration.jdbc.tomcat.metadata.TomcatDataSourcePoolMetadata;
@@ -53,17 +54,23 @@ public class DatasourceFactory implements AutoCloseable {
         return ds;
     }
 
+    /**
+     * Method to create a metadata object that allows pool value lookup for each datasource object.
+     *
+     * @param dataSourceName The name of the datasource
+     * @param dataSource     The datasource
+     * @return a {@link TomcatDataSourcePoolMetadata}
+     */
     @EachBean(DataSource.class)
-    @Requires(beans = {DataSource.class, DatasourceConfiguration.class})
+    @Requires(beans = {DatasourceConfiguration.class})
     public TomcatDataSourcePoolMetadata tomcatPoolDataSourceMetadataProvider(
             @Parameter String dataSourceName,
             DataSource dataSource) {
 
-        LOG.info("\n\n\n\nCreating datasource for " + dataSourceName + "\n\n\n\n");
         if (dataSource instanceof org.apache.tomcat.jdbc.pool.DataSource) {
-            return new TomcatDataSourcePoolMetadata((org.apache.tomcat.jdbc.pool.DataSource) dataSource, dataSourceName);
+            return new TomcatDataSourcePoolMetadata((org.apache.tomcat.jdbc.pool.DataSource) dataSource);
         } else if ((dataSource instanceof DelegatingDataSource && ((DelegatingDataSource) dataSource).getTargetDataSource() instanceof org.apache.tomcat.jdbc.pool.DataSource)) {
-            return new TomcatDataSourcePoolMetadata((org.apache.tomcat.jdbc.pool.DataSource) ((DelegatingDataSource) dataSource).getTargetDataSource(), dataSourceName);
+            return new TomcatDataSourcePoolMetadata((org.apache.tomcat.jdbc.pool.DataSource) ((DelegatingDataSource) dataSource).getTargetDataSource());
         }
         return null;
     }

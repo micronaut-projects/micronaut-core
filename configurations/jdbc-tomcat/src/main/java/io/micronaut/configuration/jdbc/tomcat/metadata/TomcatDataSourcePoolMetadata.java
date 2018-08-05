@@ -23,7 +23,7 @@ import org.apache.tomcat.jdbc.pool.DataSource;
 import java.util.Optional;
 
 /**
- * {@link io.micronaut.jdbc.metadata.DataSourcePoolMetadata} for a Tomcat DataSource.
+ * {@link io.micronaut.jdbc.metadata.DataSourcePoolMetadata} for a Tomcat {@link org.apache.tomcat.jdbc.pool.DataSource}.
  *
  * @author Stephane Nicoll
  * @author Christian Oestreich
@@ -34,8 +34,13 @@ public class TomcatDataSourcePoolMetadata
 
     private final ConnectionPool connectionPool;
 
-    public TomcatDataSourcePoolMetadata(DataSource dataSource, String name) {
-        super(dataSource, name);
+    /**
+     * Tomcat typed {@link io.micronaut.jdbc.metadata.DataSourcePoolMetadata} object.
+     *
+     * @param dataSource The datasource
+     */
+    public TomcatDataSourcePoolMetadata(DataSource dataSource) {
+        super(dataSource);
         this.connectionPool = dataSource.getPool();
     }
 
@@ -49,11 +54,23 @@ public class TomcatDataSourcePoolMetadata
         return Optional.ofNullable(connectionPool).map(ConnectionPool::getActive).orElse(0);
     }
 
-    public long getBorrowed() {
+    /**
+     * Return the number of connections that have been borrowed from the
+     * data source or 0 if that information is not available.
+     *
+     * @return the number of borrowed connections or 0
+     */
+    public final long getBorrowed() {
         return Optional.ofNullable(connectionPool).map(ConnectionPool::getBorrowedCount).orElse(0L);
     }
 
-    public long getReleasedCount() {
+    /**
+     * Return the number of connections that have been released from the
+     * data source or 0 if that information is not available.
+     *
+     * @return the number of borrowed connections or 0
+     */
+    public final long getReleasedCount() {
         return Optional.ofNullable(connectionPool).map(ConnectionPool::getReleasedCount).orElse(0L);
     }
 
@@ -74,6 +91,6 @@ public class TomcatDataSourcePoolMetadata
 
     @Override
     public Boolean getDefaultAutoCommit() {
-        return getDataSource().isDefaultAutoCommit();
+        return Optional.ofNullable(getDataSource().isDefaultAutoCommit()).orElse(false);
     }
 }
