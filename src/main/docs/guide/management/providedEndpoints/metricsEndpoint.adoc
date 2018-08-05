@@ -287,6 +287,43 @@ The logging metrics bindings will provide logging metrics if using Logback.
 | logback.events
 |=======
 
+===== DataSource Metrics
+
+The data source metrics bindings will provide data source pool metrics.
+
+*Control Property*: `micronaut.metrics.binders.jdbc.enabled`
+
+NOTE: There is a different set of pool metric names for HikariCP and other pool providers.
+
+If you are using `io.micronaut.configuration:jdbc-hikari` you will get additional pool metrics as HikariCP has built in support for meter registries.
+
+.HikariCP Metrics Provided
+|=======
+|*Name*
+| hikaricp.connections.idle
+| hikaricp.connections.pending
+| hikaricp.connections
+| hikaricp.connections.active
+| hikaricp.connections.creation
+| hikaricp.connections.max
+| hikaricp.connections.min
+| hikaricp.connections.usage
+| hikaricp.connections.timeout
+| hikaricp.connections.acquire
+|=======
+
+If you are using `io.micronaut.configuration:jdbc-tomcat` or `io.micronaut.configuration:jdbc-dbcp` you will get the following metrics
+
+.Generic Pool Metrics provided
+|=======
+|*Name*
+| jdbc.connections.usage
+| jdbc.connections.active
+| jdbc.connections.max
+| jdbc.connections.min
+|=======
+
+
 == Adding Custom Metrics
 
 To add metrics to your application you can inject a MeterRegistry bean to your class and use the provided methods to access counters, timers, etc.
