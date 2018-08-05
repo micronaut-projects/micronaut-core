@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package io.micronaut.configuration.jdbc.hikari.metadata;
+package io.micronaut.configuration.jdbc.dbcp.metadata;
 
-import com.zaxxer.hikari.HikariDataSource;
-import com.zaxxer.hikari.pool.HikariPool;
 import io.micronaut.jdbc.metadata.AbstractDataSourcePoolMetadata;
+import org.apache.commons.dbcp2.BasicDataSource;
+import org.apache.commons.pool2.impl.GenericObjectPool;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,80 +26,80 @@ import java.lang.reflect.Field;
 import java.util.Optional;
 
 /**
- * {@link io.micronaut.jdbc.metadata.DataSourcePoolMetadata} for a Hikari {@link HikariDataSource}.
+ * {@link io.micronaut.jdbc.metadata.DataSourcePoolMetadata} for a DBCP {@link BasicDataSource}.
  *
  * @author Stephane Nicoll
  * @author Christian Oestreich
  * @since 1.0.0
  */
-public class HikariDataSourcePoolMetadata
-        extends AbstractDataSourcePoolMetadata<HikariDataSource> {
+public class DbcpDataSourcePoolMetadata
+        extends AbstractDataSourcePoolMetadata<BasicDataSource> {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(HikariDataSourcePoolMetadata.class);
+    private static final Logger LOGGER = LoggerFactory.getLogger(DbcpDataSourcePoolMetadata.class);
 
     /**
-     * Hikari typed {@link io.micronaut.jdbc.metadata.DataSourcePoolMetadata} object.
+     * DBCP typed {@link io.micronaut.jdbc.metadata.DataSourcePoolMetadata} object.
      *
      * @param dataSource The datasource
      */
-    public HikariDataSourcePoolMetadata(HikariDataSource dataSource) {
+    public DbcpDataSourcePoolMetadata(BasicDataSource dataSource) {
         super(dataSource);
     }
 
     @Override
     public Integer getIdle() {
-        return getHikariPool()
-                .map(HikariPool::getIdleConnections)
+        return getConnectionPool()
+                .map(GenericObjectPool::getNumIdle)
                 .orElse(0);
     }
 
     @Override
     public Integer getActive() {
-        return getHikariPool()
-                .map(HikariPool::getActiveConnections)
+        return getConnectionPool()
+                .map(GenericObjectPool::getNumActive)
                 .orElse(0);
     }
 
     @Override
     public Integer getMax() {
-        return getDataSource().getMaximumPoolSize();
+        return getDataSource().getMaxTotal();
     }
 
     @Override
     public Integer getMin() {
-        return getDataSource().getMinimumIdle();
+        return getDataSource().getMinIdle();
     }
 
     @Override
     public String getValidationQuery() {
-        return getDataSource().getConnectionTestQuery();
+        return getDataSource().getValidationQuery();
     }
 
     @Override
     public Boolean getDefaultAutoCommit() {
-        return getDataSource().isAutoCommit();
+        return Optional.ofNullable(getDataSource().getDefaultAutoCommit()).orElse(false);
     }
 
-    private Optional<HikariPool> getHikariPool() {
-        return Optional.ofNullable(extractHikariPool());
+    private Optional<GenericObjectPool> getConnectionPool() {
+        return Optional.ofNullable(extractPool());
     }
 
     /**
-     * Method to get the private property pool from {@link HikariDataSource}.  If this is exposed in the future, this will change.
+     * Method to get the private property pool from {@link BasicDataSource}.  If this is exposed in the future, this will change.
      *
-     * @return The {@link HikariPool}
+     * @return The {@link GenericObjectPool}
      */
-    private HikariPool extractHikariPool() {
-        HikariPool pool = null;
+    private GenericObjectPool extractPool() {
+        GenericObjectPool pool = null;
         Field poolField;
         try {
-            poolField = HikariDataSource.class.getDeclaredField("pool");
+            poolField = BasicDataSource.class.getDeclaredField("connectionPool");
             if (poolField != null) {
                 poolField.setAccessible(true);
-                pool = (HikariPool) poolField.get(this.getDataSource());
+                pool = (GenericObjectPool) poolField.get(this.getDataSource());
             }
         } catch (NoSuchFieldException | IllegalAccessException e) {
-            LOGGER.error("Could not get pool from hikari dataSource", e);
+            LOGGER.error("Could not get pool from dbcp dataSource", e);
         }
 
         return pool;

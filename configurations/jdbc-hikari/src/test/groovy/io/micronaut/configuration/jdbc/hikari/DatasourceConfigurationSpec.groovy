@@ -16,16 +16,20 @@
 package io.micronaut.configuration.jdbc.hikari
 
 import com.zaxxer.hikari.HikariDataSource
-import io.micronaut.configuration.jdbc.hikari.metadata.HikariDataSourcePoolMetadata
+import io.micronaut.configuration.metrics.binder.datasource.DataSourcePoolMetricsBinderFactory
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.inject.qualifiers.Qualifiers
+import io.micronaut.jdbc.metadata.DataSourcePoolMetadata
 import spock.lang.Specification
 
 import javax.sql.DataSource
 import java.sql.ResultSet
+
+import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS
+import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED
 
 class DatasourceConfigurationSpec extends Specification {
 
@@ -37,7 +41,7 @@ class DatasourceConfigurationSpec extends Specification {
         expect: "No beans are created"
         !applicationContext.containsBean(HikariDataSource)
         !applicationContext.containsBean(DatasourceConfiguration)
-        !applicationContext.containsBean(HikariDataSourcePoolMetadata)
+        !applicationContext.containsBean(DataSourcePoolMetadata)
 
         cleanup:
         applicationContext.close()
@@ -55,7 +59,7 @@ class DatasourceConfigurationSpec extends Specification {
         expect:
         applicationContext.containsBean(DataSource)
         applicationContext.containsBean(DatasourceConfiguration)
-        applicationContext.containsBean(HikariDataSourcePoolMetadata)
+        applicationContext.containsBean(DataSourcePoolMetadata)
 
         when:
         HikariUrlDataSource dataSource = applicationContext.getBean(DataSource).targetDataSource
@@ -82,7 +86,7 @@ class DatasourceConfigurationSpec extends Specification {
         expect:
         applicationContext.containsBean(DataSource)
         applicationContext.containsBean(DatasourceConfiguration)
-        applicationContext.containsBean(HikariDataSourcePoolMetadata)
+        applicationContext.containsBean(DataSourcePoolMetadata)
 
         when:
         HikariDataSource dataSource = applicationContext.getBean(DataSource).targetDataSource
@@ -116,7 +120,7 @@ class DatasourceConfigurationSpec extends Specification {
         expect:
         applicationContext.containsBean(DataSource)
         applicationContext.containsBean(DatasourceConfiguration)
-        applicationContext.containsBean(HikariDataSourcePoolMetadata)
+        applicationContext.containsBean(DataSourcePoolMetadata)
 
         when:
         HikariDataSource dataSource = applicationContext.getBean(DataSource).targetDataSource
@@ -185,12 +189,12 @@ class DatasourceConfigurationSpec extends Specification {
         expect:
         applicationContext.getBeansOfType(DataSource).size() == 2
         applicationContext.getBeansOfType(DatasourceConfiguration).size() == 2
-        applicationContext.getBeansOfType(HikariDataSourcePoolMetadata).size() == 2
-        applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("default"))
-        applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("foo"))
+        applicationContext.getBeansOfType(DataSourcePoolMetadata).size() == 2
+        applicationContext.getBean(DataSourcePoolMetadata, Qualifiers.byName("default"))
+        applicationContext.getBean(DataSourcePoolMetadata, Qualifiers.byName("foo"))
 
         when:
-        applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("foo2"))
+        applicationContext.getBean(DataSourcePoolMetadata, Qualifiers.byName("foo2"))
 
         then:
         thrown(NoSuchBeanException)
@@ -225,25 +229,75 @@ class DatasourceConfigurationSpec extends Specification {
                 ['datasources.default': [:],
                  'datasources.foo'    : [:]]
         ))
+
+        when:
         applicationContext.start()
 
-        expect:
-        verifyAll {
-            applicationContext.getBeansOfType(DataSource).size() == 2
-            applicationContext.getBeansOfType(DatasourceConfiguration).size() == 2
-            applicationContext.getBeansOfType(HikariDataSourcePoolMetadata).size() == 2
-            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("default")).validationQuery == 'SELECT 1'
-            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("default")).max == 10
-            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("default")).min == 10
-            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("default")).idle == 1
-            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("default")).defaultAutoCommit
-            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("default")).active == 0
-            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("foo")).validationQuery == 'SELECT 1'
-            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("foo")).max == 10
-            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("foo")).min == 10
-            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("foo")).idle == 1
-            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("foo")).defaultAutoCommit
-            applicationContext.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("foo")).active == 0
-        }
+        then:
+        applicationContext.getBeansOfType(DataSource).size() == 2
+        applicationContext.getBeansOfType(DatasourceConfiguration).size() == 2
+        applicationContext.getBeansOfType(DataSourcePoolMetadata).size() == 2
+
+        when:
+        def defaultMetadata = applicationContext.getBean(DataSourcePoolMetadata, Qualifiers.byName("default"))
+        def fooMetadata = applicationContext.getBean(DataSourcePoolMetadata, Qualifiers.byName("foo"))
+
+        then: 'Check default metadta properties'
+        defaultMetadata.validationQuery == 'SELECT 1'
+        defaultMetadata.max == 10
+        defaultMetadata.min == 10
+        defaultMetadata.idle > 0
+        defaultMetadata.defaultAutoCommit
+        defaultMetadata.active == 0
+
+        and: 'Check foo metadta properties'
+        fooMetadata.validationQuery == 'SELECT 1'
+        fooMetadata.max == 10
+        fooMetadata.min == 10
+        fooMetadata.idle > 0
+        fooMetadata.defaultAutoCommit
+        fooMetadata.active == 0
+
+        and: 'Make sure the beans are unique'
+        fooMetadata != defaultMetadata
     }
+
+
+    void "test metrics disabled"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(MapPropertySource.of(
+                'test',
+                ['datasources.default'      : [:],
+                 'datasources.foo'          : [:],
+                 (MICRONAUT_METRICS_ENABLED): false
+                ]
+        ))
+
+        when:
+        applicationContext.start()
+
+        then:
+        !applicationContext.containsBean(DataSourcePoolMetricsBinderFactory)
+    }
+
+    void "test jdbc metrics disabled"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(MapPropertySource.of(
+                'test',
+                ['datasources.default'                        : [:],
+                 'datasources.foo'                            : [:],
+                 (MICRONAUT_METRICS_ENABLED)                  : true,
+                 (MICRONAUT_METRICS_BINDERS + ".jdbc.enabled"): false,
+                ]
+        ))
+
+        when:
+        applicationContext.start()
+
+        then:
+        !applicationContext.containsBean(DataSourcePoolMetricsBinderFactory)
+    }
+
 }

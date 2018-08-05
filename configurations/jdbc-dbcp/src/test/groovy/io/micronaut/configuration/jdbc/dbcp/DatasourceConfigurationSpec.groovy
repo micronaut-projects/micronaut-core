@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.jdbc.dbcp
 
 import org.apache.commons.dbcp2.BasicDataSource
@@ -20,6 +21,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import io.micronaut.inject.qualifiers.Qualifiers
+import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy
 import spock.lang.Specification
 
 import java.sql.ResultSet
@@ -53,7 +55,7 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.containsBean(DatasourceConfiguration)
 
         when:
-        BasicDataSource dataSource = applicationContext.getBean(BasicDataSource)
+        BasicDataSource dataSource = applicationContext.getBean(TransactionAwareDataSourceProxy).targetDataSource as BasicDataSource
 
         then: //The default configuration is supplied because H2 is on the classpath
         dataSource.url == 'jdbc:h2:mem:default;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
@@ -80,7 +82,7 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.containsBean(DatasourceConfiguration)
 
         when:
-        BasicDataSource dataSource = applicationContext.getBean(BasicDataSource)
+        BasicDataSource dataSource = applicationContext.getBean(TransactionAwareDataSourceProxy).targetDataSource as BasicDataSource
         ResultSet resultSet = dataSource.getConnection().prepareStatement("SELECT H2VERSION() FROM DUAL").executeQuery()
         resultSet.next()
         String version = resultSet.getString(1)
@@ -109,7 +111,7 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.containsBean(DatasourceConfiguration)
 
         when:
-        BasicDataSource dataSource = applicationContext.getBean(BasicDataSource)
+        BasicDataSource dataSource = applicationContext.getBean(TransactionAwareDataSourceProxy).targetDataSource as BasicDataSource
 
         then:
         dataSource.maxWaitMillis == 5000
@@ -137,7 +139,7 @@ class DatasourceConfigurationSpec extends Specification {
         applicationContext.containsBean(DatasourceConfiguration)
 
         when:
-        BasicDataSource dataSource = applicationContext.getBean(BasicDataSource)
+        BasicDataSource dataSource = applicationContext.getBean(TransactionAwareDataSourceProxy).targetDataSource as BasicDataSource
 
         then: //The default configuration is supplied because H2 is on the classpath
         dataSource.url == 'jdbc:h2:mem:default;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
@@ -146,7 +148,7 @@ class DatasourceConfigurationSpec extends Specification {
         dataSource.driverClassName == 'org.h2.Driver'
 
         when:
-        dataSource = applicationContext.getBean(BasicDataSource, Qualifiers.byName("foo"))
+        dataSource = applicationContext.getBean(TransactionAwareDataSourceProxy, Qualifiers.byName("foo")).targetDataSource
 
         then: //The default configuration is supplied because H2 is on the classpath
         dataSource.url == 'jdbc:h2:mem:foo;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'

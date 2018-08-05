@@ -1,6 +1,79 @@
 The metrics endpoint returns information about the "metrics" of the application.
 
-To execute the metrics endpoint, send a GET request to /metrics.  This will return a list of the metrics registered with the `MeterRegistry` bean.
+To execute the metrics endpoint, send a GET request to `/metrics`.  This will return a list of the metric names registered with the `MeterRegistry` bean.
+
+You can get specific metrics by using `/metrics/[name]` such as `/metrics/jvm.memory.used`.  This would return something like:
+
+.Sample Metric Detail Json
+```json
+{
+  "name": "jvm.memory.used",
+  "measurements": [
+    {
+      "statistic": "VALUE",
+      "value": 1.45397552E8
+    }
+  ],
+  "availableTags": [
+    {
+      "tag": "area",
+      "values": [
+        "heap",
+        "nonheap"
+      ]
+    },
+    {
+      "tag": "id",
+      "values": [
+        "Compressed Class Space",
+        "PS Survivor Space",
+        "PS Old Gen",
+        "Metaspace",
+        "PS Eden Space",
+        "Code Cache"
+      ]
+    }
+  ]
+}
+```
+
+You can further limit the metric by using a tag like `/metrics/jvm.memory.used?tag=id:PS%20Old%20Gen`.
+
+.Sample Metric Detail Json
+```json
+{
+  "name": "jvm.memory.used",
+  "measurements": [
+    {
+      "statistic": "VALUE",
+      "value": 1.1434488E7
+    }
+  ],
+  "availableTags": [
+    {
+      "tag": "area",
+      "values": [
+        "heap"
+      ]
+    }
+  ]
+}
+```
+
+You may even use multiple/nested tags like `/metrics/jvm.memory.used?tag=id:PS%20Old%20Gen&tag=area:heap`.
+
+.Sample Metric Detail Json
+```json
+{
+  "name": "jvm.memory.used",
+  "measurements": [
+    {
+      "statistic": "VALUE",
+      "value": 1.1434488E7
+    }
+  ]
+}
+```
 
 == Configuration
 
