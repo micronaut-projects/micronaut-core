@@ -47,23 +47,23 @@ public class DataSourcePoolMetricsBinderFactory {
         this.meterRegistry = meterRegistry;
     }
 
-//    /**
-//     * Method to wire beans for each type of datasource.
-//     *
-//     * @param dataSourceName         The parameterized name of the datasource
-//     * @param dataSourcePoolMetadata The datasource metadata object to use for the binder
-//     * @return MeterDinders for each configured {@link DataSourcePoolMetadata}
-//     */
-//    @EachBean(DataSourcePoolMetadata.class)
-//    @Requires(beans = {DataSourcePoolMetadata.class})
-//    @Named
-//    public MeterBinder dataSourceMeterBinder(
-//            @Parameter String dataSourceName,
-//            DataSourcePoolMetadata dataSourcePoolMetadata) {
-//        return new DataSourcePoolMetricsBinder(dataSourcePoolMetadata.getDataSource(),
-//                dataSourcePoolMetadata,
-//                dataSourceName,
-//                Collections.emptyList());
-//    }
+    /**
+     * Method to wire beans for each type of datasource.
+     *
+     * @param dataSourceName         The parameterized name of the datasource
+     * @param dataSourcePoolMetadata The datasource metadata object to use for the binder
+     * @return MeterDinders for each configured {@link DataSourcePoolMetadata}
+     */
+    @EachBean(DataSourcePoolMetadata.class)
+    @Requires(beans = {DataSourcePoolMetadata.class})
+    @Named
+    public MeterBinder dataSourceMeterBinder(
+            @Parameter String dataSourceName,
+            DataSourcePoolMetadata dataSourcePoolMetadata) {
+        return new DataSourcePoolMetricsBinder(dataSourcePoolMetadata.getDataSource(),
+                dataSourcePoolMetadata,
+                dataSourceName,
+                Collections.emptyList());
+    }
 
 }

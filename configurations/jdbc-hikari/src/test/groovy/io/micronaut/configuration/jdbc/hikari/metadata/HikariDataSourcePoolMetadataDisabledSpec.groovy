@@ -42,10 +42,16 @@ class HikariDataSourcePoolMetadataDisabledSpec extends Specification {
 
         then:
         response.code() == HttpStatus.OK.code
-        !result.names.contains("jdbc.connections.usage")
-        !result.names.contains("jdbc.connections.active")
-        !result.names.contains("jdbc.connections.max")
-        !result.names.contains("jdbc.connections.min")
+        !result.names.contains("hikaricp.connections.idle")
+        !result.names.contains("hikaricp.connections.pending")
+        !result.names.contains("hikaricp.connections")
+        !result.names.contains("hikaricp.connections.active")
+        !result.names.contains("hikaricp.connections.creation")
+        !result.names.contains("hikaricp.connections.max")
+        !result.names.contains("hikaricp.connections.min")
+        !result.names.contains("hikaricp.connections.usage")
+        !result.names.contains("hikaricp.connections.timeout")
+        !result.names.contains("hikaricp.connections.acquire")
     }
 
     @Unroll
@@ -57,7 +63,18 @@ class HikariDataSourcePoolMetadataDisabledSpec extends Specification {
         thrown(HttpClientResponseException)
 
         where:
-        metric << ['jdbc.connections.usage', 'jdbc.connections.active', 'jdbc.connections.max', 'jdbc.connections.min']
+        metric << [
+                'hikaricp.connections.idle',
+                'hikaricp.connections.pending',
+                'hikaricp.connections',
+                'hikaricp.connections.active',
+                'hikaricp.connections.creation',
+                'hikaricp.connections.max',
+                'hikaricp.connections.min',
+                'hikaricp.connections.usage',
+                'hikaricp.connections.timeout',
+                'hikaricp.connections.acquire'
+        ]
     }
 
 }

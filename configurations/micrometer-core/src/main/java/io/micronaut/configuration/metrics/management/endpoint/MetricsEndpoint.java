@@ -22,6 +22,7 @@ import io.micrometer.core.instrument.Statistic;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry;
 import io.micronaut.configuration.metrics.annotation.RequiresMetrics;
+import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.management.endpoint.annotation.Endpoint;
@@ -65,17 +66,22 @@ public class MetricsEndpoint {
     static final String NAME = "metrics";
 
     private final Collection<MeterRegistry> meterRegistries;
+    @SuppressWarnings("unused")
     private final Collection<DataSource> dataSources;
 
     /**
      * Constructor for metrics endpoint.
      *
      * @param meterRegistries Meter Registries
+     * @param applicationContext Application Context for looking up beans
      */
     public MetricsEndpoint(Collection<MeterRegistry> meterRegistries,
-                           Collection<DataSource> dataSources) {
+                           ApplicationContext applicationContext) {
         this.meterRegistries = meterRegistries;
-        this.dataSources = dataSources;
+
+        //Make sure the data sources are loaded
+        this.dataSources = applicationContext.containsBean(DataSource.class) ?
+                applicationContext.getBeansOfType(DataSource.class) : null;
 
     }
 

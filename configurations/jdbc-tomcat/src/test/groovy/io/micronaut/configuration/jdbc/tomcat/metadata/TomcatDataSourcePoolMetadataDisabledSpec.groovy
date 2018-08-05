@@ -6,18 +6,14 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
-import org.apache.tomcat.jdbc.pool.ConnectionPool
-import org.apache.tomcat.jdbc.pool.DataSource
 import spock.lang.AutoCleanup
 import spock.lang.Shared
-import spock.lang.Specification
 import spock.lang.Unroll
 
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED
 
-
-class TomcatDataSourcePoolMetadataDisabledSpec extends Specification {
+class TomcatDataSourcePoolMetadataDisabledSpec extends AbstractDataSourcePoolMetadataSpec {
 
     @Shared
     @AutoCleanup
@@ -38,17 +34,18 @@ class TomcatDataSourcePoolMetadataDisabledSpec extends Specification {
     @AutoCleanup
     RxHttpClient httpClient = context.createBean(RxHttpClient, embeddedServer.getURL())
 
-    def "check metrics endpoint for datasource metrics not found"() {
+    @Unroll
+    def "check metrics endpoint for datasource metrics not found for #metric"() {
         when:
         def response = httpClient.exchange("/metrics", Map).blockingFirst()
         Map result = response.body()
 
         then:
         response.code() == HttpStatus.OK.code
-        !result.names.contains("jdbc.connections.usage")
-        !result.names.contains("jdbc.connections.active")
-        !result.names.contains("jdbc.connections.max")
-        !result.names.contains("jdbc.connections.min")
+        !result.names.contains(metric)
+
+        where:
+        metric << metricNames
     }
 
     @Unroll
@@ -60,7 +57,7 @@ class TomcatDataSourcePoolMetadataDisabledSpec extends Specification {
         thrown(HttpClientResponseException)
 
         where:
-        metric << ['jdbc.connections.usage', 'jdbc.connections.active', 'jdbc.connections.max', 'jdbc.connections.min']
+        metric << metricNames
     }
 
 }

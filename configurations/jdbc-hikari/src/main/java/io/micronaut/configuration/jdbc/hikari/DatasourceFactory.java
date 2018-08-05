@@ -16,21 +16,19 @@
 
 package io.micronaut.configuration.jdbc.hikari;
 
-import com.zaxxer.hikari.HikariDataSource;
 import io.micrometer.core.instrument.MeterRegistry;
-import io.micronaut.configuration.jdbc.hikari.metadata.HikariDataSourcePoolMetadata;
+import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Parameter;
-import io.micronaut.jdbc.metadata.DataSourcePoolMetadata;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.datasource.DelegatingDataSource;
 
 import javax.annotation.PreDestroy;
 import javax.sql.DataSource;
 import java.util.ArrayList;
 import java.util.List;
+
+import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS;
 
 /**
  * Creates a Hikari data source for each configuration bean.
@@ -45,44 +43,37 @@ public class DatasourceFactory implements AutoCloseable {
     private static final Logger LOG = LoggerFactory.getLogger(DatasourceFactory.class);
     private List<HikariUrlDataSource> dataSources = new ArrayList<>(2);
 
-
     private MeterRegistry meterRegistry;
+    private ApplicationContext applicationContext;
 
-    public DatasourceFactory(MeterRegistry meterRegistry) {
+    public DatasourceFactory(MeterRegistry meterRegistry,
+                             ApplicationContext applicationContext) {
         this.meterRegistry = meterRegistry;
+        this.applicationContext = applicationContext;
     }
 
     /**
+     * Method to wire up all the HikariCP connections based on the {@link DatasourceConfiguration}.
+     * If a {@link MeterRegistry} bean exists then the registry will be added to the datasource.
+     *
      * @param datasourceConfiguration A {@link DatasourceConfiguration}
      * @return A {@link HikariUrlDataSource}
      */
     @EachBean(DatasourceConfiguration.class)
     public DataSource dataSource(DatasourceConfiguration datasourceConfiguration) {
         HikariUrlDataSource ds = new HikariUrlDataSource(datasourceConfiguration);
-        if(this.meterRegistry != null){
-            ds.setMetricRegistry(this.meterRegistry);
-        }
+        addMeterRegistry(ds);
         dataSources.add(ds);
         return ds;
     }
 
-    /**
-     * Method to create a metadata object that allows pool value lookup for each datasource object.
-     *
-     * @param dataSourceName The name of the datasource
-     * @param dataSource     The datasource
-     * @return a {@link io.micronaut.jdbc.metadata.DataSourcePoolMetadataProvider}
-     */
-    @EachBean(DataSource.class)
-    public DataSourcePoolMetadata hikariDataSourcePoolMetadata(
-            @Parameter String dataSourceName,
-            DataSource dataSource) {
-        if (dataSource instanceof HikariDataSource) {
-            return new HikariDataSourcePoolMetadata((HikariDataSource) dataSource);
-        } else if ((dataSource instanceof DelegatingDataSource && ((DelegatingDataSource) dataSource).getTargetDataSource() instanceof HikariDataSource)) {
-            return new HikariDataSourcePoolMetadata((HikariDataSource) ((DelegatingDataSource) dataSource).getTargetDataSource());
+    private void addMeterRegistry(HikariUrlDataSource ds) {
+        if (ds != null && this.meterRegistry != null &&
+                this.applicationContext
+                        .getProperty(MICRONAUT_METRICS_BINDERS + ".jdbc.enabled",
+                                boolean.class).orElse(true)) {
+            ds.setMetricRegistry(this.meterRegistry);
         }
-        return null;
     }
 
     @Override

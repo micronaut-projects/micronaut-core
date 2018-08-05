@@ -15,9 +15,7 @@
  */
 package io.micronaut.configuration.jdbc.hikari
 
-import io.micronaut.configuration.jdbc.hikari.metadata.HikariDataSourcePoolMetadata
 import io.micronaut.context.ApplicationContext
-import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
 class DatasourceTransactionManagementSpec extends Specification {
@@ -30,11 +28,9 @@ class DatasourceTransactionManagementSpec extends Specification {
                 'datasources.secondary.defaultAutoCommit': false,
                 'datasources.secondary.enableAutoCommitOnReturn': false
         )
-        HikariDataSourcePoolMetadata poolMetadata = ctx.getBean(HikariDataSourcePoolMetadata, Qualifiers.byName("default"))
         BookService bookService = ctx.getBean(BookService)
 
         expect:
-        poolMetadata
         bookService.save("one") == "1"
         bookService.save("two") == "2"
         bookService.saveTwo("one") == "1"
