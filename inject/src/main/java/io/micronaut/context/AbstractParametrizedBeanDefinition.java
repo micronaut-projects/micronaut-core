@@ -87,6 +87,10 @@ public abstract class AbstractParametrizedBeanDefinition<T> extends AbstractBean
         requiredArgumentValues = requiredArgumentValues != null ? new LinkedHashMap<>(requiredArgumentValues) : Collections.emptyMap();
         Argument<?>[] requiredArguments = getRequiredArguments();
         for (Argument<?> requiredArgument : requiredArguments) {
+            if (requiredArgument.getType() == BeanResolutionContext.class) {
+                requiredArgumentValues.put(requiredArgument.getName(), resolutionContext);
+            }
+
             BeanResolutionContext.Path path = resolutionContext.getPath();
             try {
                 path.pushConstructorResolve(this, requiredArgument);
