@@ -1449,13 +1449,6 @@ public class DefaultBeanContext implements BeanContext {
 
     @SuppressWarnings("unchecked")
     private <T> T getScopedBeanForDefinition(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier, boolean throwNoSuchBean, BeanDefinition<T> definition) {
-        if (qualifier == PROXY_TARGET_QUALIFIER) {
-            T createBean = doCreateBean(resolutionContext, definition, qualifier, false, null);
-            if (createBean == null && throwNoSuchBean) {
-                throw new NoSuchBeanException(definition.getBeanType(), qualifier);
-            }
-            return createBean;
-        }
         boolean isProxy = definition.isProxy();
         Optional<BeanResolutionContext.Segment> currentSegment = resolutionContext.getPath().currentSegment();
         Optional<Class<? extends Annotation>> scope = Optional.empty();
@@ -1470,9 +1463,8 @@ public class DefaultBeanContext implements BeanContext {
         Optional<CustomScope> registeredScope = scope.flatMap(customScopeRegistry::findScope);
         if (registeredScope.isPresent()) {
             CustomScope customScope = registeredScope.get();
-            Optional<BeanDefinition<T>> proxiedBeanDefinition = findProxiedBeanDefinition(beanType, qualifier);
-            if (proxiedBeanDefinition.isPresent()) {
-                definition = proxiedBeanDefinition.get();
+            if (isProxy) {
+                definition = getProxiedBeanDefinition(beanType, qualifier);
             }
             BeanDefinition<T> finalDefinition = definition;
             return (T) customScope.get(
