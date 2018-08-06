@@ -914,7 +914,9 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         ConstructorInjectionPoint<T> constructorInjectionPoint = getConstructor();
         Argument<?> argument = constructorInjectionPoint.getArguments()[argIndex];
         Class argumentType = argument.getType();
-        if (argumentType.isArray()) {
+        if (argumentType == BeanResolutionContext.class) {
+            return resolutionContext;
+        } else if (argumentType.isArray()) {
             Collection beansOfType = getBeansOfTypeForConstructorArgument(resolutionContext, context, constructorInjectionPoint, argument);
             return beansOfType.toArray((Object[]) Array.newInstance(argumentType.getComponentType(), beansOfType.size()));
         } else if (Collection.class.isAssignableFrom(argumentType)) {

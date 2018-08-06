@@ -124,6 +124,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
     private static final String FIELD_INTERCEPTORS = "$interceptors";
     private static final String FIELD_BEAN_LOCATOR = "$beanLocator";
+    private static final String FIELD_BEAN_QUALIFIER = "$beanQualifier";
     private static final String FIELD_PROXY_METHODS = "$proxyMethods";
     private static final Type FIELD_TYPE_PROXY_METHODS = Type.getType(ExecutableMethod[].class);
     private static final Type EXECUTABLE_METHOD_TYPE = Type.getType(ExecutableMethod.class);
@@ -656,6 +657,17 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                 null
             );
 
+            // add the $beanQualifier field
+            proxyClassWriter.visitField(
+                    ACC_PRIVATE,
+                    FIELD_BEAN_QUALIFIER,
+                    Type.getType(Qualifier.class).getDescriptor(),
+                    null,
+                    null
+            );
+
+            writeWithQualifierMethod(proxyClassWriter);
+
             if (lazy) {
                 interceptedInterface = InterceptedProxy.class;
             } else {
@@ -1187,7 +1199,9 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         // 1st argument: the type
         resolveTargetMethod.push(targetType);
         // 2nd argument: null qualifier
-        resolveTargetMethod.visitInsn(ACONST_NULL);
+        resolveTargetMethod.loadThis();
+        // the bean qualifier
+        resolveTargetMethod.getField(proxyType, FIELD_BEAN_QUALIFIER, Type.getType(Qualifier.class));
 
         resolveTargetMethod.invokeInterface(
             TYPE_BEAN_LOCATOR,
@@ -1198,6 +1212,17 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         resolveTargetMethod.returnValue();
         resolveTargetMethod.visitMaxs(1, 1);
         return resolveTargetMethodDesc;
+    }
+
+    private void writeWithQualifierMethod(ClassWriter proxyClassWriter) {
+        GeneratorAdapter withQualifierMethod = startPublicMethod(proxyClassWriter, "$withBeanQualifier", void.class.getName(), Qualifier.class.getName());
+
+        withQualifierMethod.loadThis();
+        withQualifierMethod.loadArg(0);
+        withQualifierMethod.putField(proxyType, FIELD_BEAN_QUALIFIER, Type.getType(Qualifier.class));
+        withQualifierMethod.visitInsn(RETURN);
+        withQualifierMethod.visitEnd();
+        withQualifierMethod.visitMaxs(1,1);
     }
 
     private void writeSwapMethod(ClassWriter proxyClassWriter, Type targetType) {

@@ -103,7 +103,7 @@ class AdviceDefinedOnInterfaceFactorySpec extends Specification {
 
         // make sure all the public method are implemented
         def clazz = sessionFactory.getClass()
-        int count = 0
+        int count = 1
         def interfaces = ReflectionUtils.getAllInterfaces(SessionFactory.class)
         interfaces += SessionFactory.class
         for(i in interfaces) {
