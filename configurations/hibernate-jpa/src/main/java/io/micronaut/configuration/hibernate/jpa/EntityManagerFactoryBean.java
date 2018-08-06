@@ -16,6 +16,7 @@
 
 package io.micronaut.configuration.hibernate.jpa;
 
+import io.micronaut.configuration.hibernate.jpa.scope.CurrentSession;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Context;
@@ -27,6 +28,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.hibernate.Interceptor;
+import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.Metadata;
 import org.hibernate.boot.MetadataSources;
@@ -174,6 +176,20 @@ public class EntityManagerFactoryBean {
     protected SessionFactory hibernateSessionFactory(SessionFactoryBuilder sessionFactoryBuilder) {
         return sessionFactoryBuilder.build();
     }
+
+    /**
+     * Obtains the current session for teh given session factory.
+     *
+     * @param sessionFactory The session factory
+     * @param dataSource The name of the data source.
+     * @return The current session
+     */
+    @EachBean(SessionFactory.class)
+    @CurrentSession
+    protected Session currentSession(@Parameter String dataSource, SessionFactory sessionFactory) {
+        return sessionFactory.getCurrentSession();
+    }
+
 
     /**
      * Creates the {@link MetadataSources} for the given registry.
