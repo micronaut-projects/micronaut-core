@@ -24,7 +24,6 @@ import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourceLoader;
 import io.micronaut.context.env.yaml.YamlPropertySourceLoader;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.config.ConfigDiscoveryConfiguration;
@@ -111,6 +110,7 @@ public class ConsulConfigurationClient implements ConfigurationClient {
 
         ConfigDiscoveryConfiguration.Format format = configDiscoveryConfiguration.getFormat();
         String path = configDiscoveryConfiguration.getPath().orElse(ConfigDiscoveryConfiguration.DEFAULT_PATH);
+
         if (!path.endsWith("/")) {
             path += "/";
         }
@@ -118,7 +118,7 @@ public class ConsulConfigurationClient implements ConfigurationClient {
         String pathPrefix = path;
         String commonConfigPath = path + Environment.DEFAULT_NAME;
         final boolean hasApplicationSpecificConfig = serviceId.isPresent();
-        String applicationSpecificPath = hasApplicationSpecificConfig ? path + serviceId.get() : null;
+        String applicationSpecificPath = configDiscoveryConfiguration.getFullPath() ? path : ( hasApplicationSpecificConfig ? path + serviceId.get() : null );
 
         String dc = configDiscoveryConfiguration.getDatacenter().orElse(null);
         Function<Throwable, Publisher<? extends List<KeyValue>>> errorHandler = throwable -> {
@@ -188,7 +188,7 @@ public class ConsulConfigurationClient implements ConfigurationClient {
 
                                 } else if (isApplicationSpecificConfigKey) {
                                     property = resolvePropertyName(applicationSpecificPath, key);
-                                    propertySourceNames = resolvePropertySourceNames(pathPrefix, key, activeNames);
+                                    propertySourceNames = resolvePropertySourceNames(pathPrefix, key, activeNames, configDiscoveryConfiguration.getFullPath());
                                 }
                                 if (property != null && propertySourceNames != null) {
                                     for (String propertySourceName : propertySourceNames) {
@@ -312,6 +312,19 @@ public class ConsulConfigurationClient implements ConfigurationClient {
         int i = prefix.indexOf('/');
         if (i > -1) {
             prefix = prefix.substring(0, i);
+            propertySourceNames = calcPropertySourceNames(prefix, activeNames);
+            if (propertySourceNames == null) {
+                return null;
+            }
+        }
+        return propertySourceNames;
+    }
+
+    private Set<String> resolvePropertySourceNames(String finalPath, String key, Set<String> activeNames, boolean forcedPath) {
+        Set<String> propertySourceNames = null;
+        String prefix = key.substring(finalPath.length());
+        int i = prefix.indexOf('/');
+        if (i > -1 || forcedPath) {
             propertySourceNames = calcPropertySourceNames(prefix, activeNames);
             if (propertySourceNames == null) {
                 return null;
