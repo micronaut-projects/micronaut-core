@@ -10,6 +10,7 @@ buildscript {
         classpath 'io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1'
         classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.2'
         classpath "gradle.plugin.io.sdkman:gradle-sdkvendor-plugin:1.0.0"
+        classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
     }
 }
 
@@ -18,6 +19,7 @@ plugins {
 }
 
 apply plugin: "io.sdkman.vendors"
+apply plugin: 'org.aim42.htmlSanityCheck'
 
 repositories {
     maven { url "https://repo.grails.org/grails/core" }
@@ -424,3 +426,10 @@ sdkman {
     url = "https://github.com/micronaut-projects/micronaut-core/releases/download/v${project.version}/micronaut-${project.version}.zip"
     hashtag = "#micronautfw"
 }
+
+htmlSanityCheck {
+    sourceDir = new File("${rootProject.buildDir}/docs/")
+    sourceDocuments = [ "index.html"]
+
+}
+docs.finalizedBy(htmlSanityCheck)
