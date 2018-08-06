@@ -158,6 +158,15 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     Collection<ExecutableMethod<T, ?>> getExecutableMethods();
 
     /**
+     * Whether this bean definition represents a proxy.
+     *
+     * @return True if it represents a proxy
+     */
+    default boolean isProxy() {
+        return this instanceof ProxyBeanDefinition;
+    }
+
+    /**
      * If the bean itself declares any type arguments this method will return the classes that represent those types.
      *
      * @return The type arguments

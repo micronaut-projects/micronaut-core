@@ -60,6 +60,11 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
         return definition.isAbstract();
     }
 
+    @Override
+    public boolean isProxy() {
+        return definition.isProxy();
+    }
+
     /**
      * @return The bean definition type
      */
