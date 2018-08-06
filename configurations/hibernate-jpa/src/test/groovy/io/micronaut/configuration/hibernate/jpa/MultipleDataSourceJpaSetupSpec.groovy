@@ -30,6 +30,7 @@ import javax.inject.Inject
 import javax.inject.Named
 import javax.inject.Singleton
 import javax.persistence.EntityManager
+import javax.persistence.PersistenceContext
 
 /**
  * @author graemerocher
@@ -72,6 +73,7 @@ class MultipleDataSourceJpaSetupSpec extends Specification{
         service.testViaSF()
         service.testOther()
         service.testEM()
+        service.testContext()
         javaService.testCurrent()
         javaService.testCurrentFromField()
     }
@@ -94,10 +96,21 @@ class MultipleDataSourceJpaSetupSpec extends Specification{
         @Named("other")
         SessionFactory sessionFactory
 
+        @PersistenceContext
+        Session contextSession
+
+        @PersistenceContext(name = "other")
+        Session contextOther
 
         @Transactional
         boolean testCurrent() {
             session.clear()
+            return true
+        }
+
+        @Transactional
+        boolean testContext() {
+            contextSession.clear()
             return true
         }
 
