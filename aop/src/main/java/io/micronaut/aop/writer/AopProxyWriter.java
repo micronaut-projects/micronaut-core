@@ -209,6 +209,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
             NameUtils.getPackageName(proxyFullName),
             proxyShortName,
+            isInterface,
             parent.getAnnotationMetadata());
         startClass(classWriter, getInternalName(proxyFullName), getTypeReference(targetClassFullName));
     }
@@ -274,6 +275,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.proxyBeanDefinitionWriter = new BeanDefinitionWriter(
                 NameUtils.getPackageName(proxyFullName),
                 proxyShortName,
+                isInterface,
                 annotationMetadata);
         startClass(classWriter, proxyInternalName, getTypeReference(targetClassFullName));
     }
