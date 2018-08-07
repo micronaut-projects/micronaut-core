@@ -370,7 +370,7 @@ public abstract class HttpClientConfiguration {
 
         private Duration acquireTimeout;
 
-        private boolean enabled = true;
+        private boolean enabled = false;
 
         /**
          * Whether connection pooling is enabled.
