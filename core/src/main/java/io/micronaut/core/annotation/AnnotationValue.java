@@ -299,6 +299,7 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
      * Start building a new annotation for the given name.
      *
      * @param annotation The annotation name
+     * @param <T> The annotation type
      * @return The builder
      */
     public static <T extends Annotation> AnnotationValueBuilder<T> builder(Class<T> annotation) {
