@@ -8,6 +8,13 @@
 .navLinks {
     padding-top: 15px;
 }
+
+.navLinks a:visited,
+.navLinks a:active,
+.navLinks a:hover,
+.navLinks a {
+    text-decoration: none !important;
+}
 .navTitle {
     width: auto;
     background: none;
@@ -32,11 +39,11 @@
     text-shadow: none !important;
 }
 #navigation .selected a {
-    background: #4CAFDE !important;
+    background: transparent !important;
 }
 #navigation a:hover {
     color: #FFFFFF !important;
-    background: #4CAFDE !important;
+    background: transparent !important;
 }
 
 #navigation .navTitle a:hover {
@@ -68,6 +75,17 @@ a:hover,
 #table-of-content a:hover {
     border-right: 2px solid #255AA8 !important;
 }
+#table-of-content a.toc-item-highlighted {
+    font-weight: bold;
+    color: #000000 !important;
+    border-right: 5px solid #000000 !important;
+}
+
+#table-of-content a.toc-item-highlighted strong {
+    color: #000000 !important;
+}
+
+
 .menu .menu-block h1,
 #main .project strong,
 #main h1,
@@ -127,9 +145,21 @@ a:hover,
     padding-right: 25px;
 }
 
+.docs-content h1,
+.docs-content h2,
+.docs-content h3 {
+    text-align: left !important;
+}
+
 #table-of-content {
     margin-top: 95px;
 }
+
+.toc-content {
+    padding: 20px 5px 50px;
+}
+
+
 @media only screen and (min-width: 768px) {
     .project {
         margin-top: 75px;
@@ -159,4 +189,12 @@ a:hover,
     #table-of-content h2 {
         margin: 0 5px;
     }
+}
+
+*[id]:before {
+    display: block;
+    content: " ";
+    margin-top: -95px;
+    height: 95px;
+    visibility: hidden;
 }
