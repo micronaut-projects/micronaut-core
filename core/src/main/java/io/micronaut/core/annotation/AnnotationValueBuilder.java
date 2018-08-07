@@ -16,6 +16,9 @@
 
 package io.micronaut.core.annotation;
 
+import io.micronaut.core.util.StringUtils;
+
+import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.HashMap;
 import java.util.Map;
@@ -77,8 +80,10 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param str The string
      * @return This builder
      */
-    public AnnotationValueBuilder<T>  value(String str) {
-        values.put(AnnotationMetadata.VALUE_MEMBER, str);
+    public AnnotationValueBuilder<T>  value(@Nullable String str) {
+        if (StringUtils.isNotEmpty(str)) {
+            values.put(AnnotationMetadata.VALUE_MEMBER, str);
+        }
         return this;
     }
 
@@ -99,8 +104,10 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param enumObj The enum
      * @return This builder
      */
-    public AnnotationValueBuilder<T> value(Enum<?> enumObj) {
-        values.put(AnnotationMetadata.VALUE_MEMBER, enumObj);
+    public AnnotationValueBuilder<T> value(@Nullable Enum<?> enumObj) {
+        if (enumObj != null) {
+            values.put(AnnotationMetadata.VALUE_MEMBER, enumObj);
+        }
         return this;
     }
 
@@ -110,8 +117,10 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param type The type
      * @return This builder
      */
-    public AnnotationValueBuilder<T>  value(Class<?> type) {
-        values.put(AnnotationMetadata.VALUE_MEMBER, type);
+    public AnnotationValueBuilder<T>  value(@Nullable Class<?> type) {
+        if (type != null) {
+            values.put(AnnotationMetadata.VALUE_MEMBER, type);
+        }
         return this;
     }
 
@@ -135,7 +144,9 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      */
     public AnnotationValueBuilder<T>  member(String name, String str) {
-        values.put(name, str);
+        if (StringUtils.isNotEmpty(str)) {
+            values.put(name, str);
+        }
         return this;
     }
 
@@ -158,8 +169,10 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param enumObj The enum
      * @return This builder
      */
-    public AnnotationValueBuilder<T> member(String name, Enum<?> enumObj) {
-        values.put(name, enumObj);
+    public AnnotationValueBuilder<T> member(String name, @Nullable Enum<?> enumObj) {
+        if (enumObj != null) {
+            values.put(name, enumObj);
+        }
         return this;
     }
 
@@ -170,8 +183,10 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param type The type
      * @return This builder
      */
-    public AnnotationValueBuilder<T>  member(String name, Class<?> type) {
-        values.put(name, type);
+    public AnnotationValueBuilder<T>  member(String name, @Nullable Class<?> type) {
+        if (type != null) {
+            values.put(name, type);
+        }
         return this;
     }
 
