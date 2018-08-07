@@ -56,14 +56,14 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
         where:
         action                | status                        | body                       | headers
-        "created-uri"         | HttpStatus.CREATED            | null                       | [connection: 'keep-alive', 'location': 'http://test.com']
-        "ok"                  | HttpStatus.OK                 | null                       | [connection: 'keep-alive']
-        "ok-with-body"        | HttpStatus.OK                 | "some text"                | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'keep-alive']
+        "ok"                  | HttpStatus.OK                 | null                       | [connection: 'close']
+        "ok-with-body"        | HttpStatus.OK                 | "some text"                | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
         "error-with-body"     | HttpStatus.INTERNAL_SERVER_ERROR | "some text"             | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
-        "ok-with-body-object" | HttpStatus.OK                 | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'keep-alive']
+        "ok-with-body-object" | HttpStatus.OK                 | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
         "status"              | HttpStatus.MOVED_PERMANENTLY  | null                       | [connection: 'close']
-        "created-body"        | HttpStatus.CREATED            | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'keep-alive']
-        "accepted"            | HttpStatus.ACCEPTED           | null                       | [connection: 'keep-alive']
+        "created-body"        | HttpStatus.CREATED            | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
+        "created-uri"         | HttpStatus.CREATED            | null                       | [connection: 'close', 'location': 'http://test.com']
+        "accepted"            | HttpStatus.ACCEPTED           | null                       | [connection: 'close']
         "disallow"            | HttpStatus.METHOD_NOT_ALLOWED | null                       | [connection: "close", 'allow': 'DELETE']
 
     }
@@ -88,14 +88,14 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
         where:
         action                | status                       | body                       | headers
-        "ok"                  | HttpStatus.OK                | null                       | [connection: 'keep-alive']
-        "ok-with-body"        | HttpStatus.OK                | "some text"                | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'keep-alive']
+        "ok"                  | HttpStatus.OK                | null                       | [connection: 'close']
+        "ok-with-body"        | HttpStatus.OK                | "some text"                | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
         "error-with-body"     | HttpStatus.INTERNAL_SERVER_ERROR | "some text"            | ['content-length': '9', 'content-type': 'text/plain'] + [connection: 'close']
-        "ok-with-body-object" | HttpStatus.OK                | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'keep-alive']
+        "ok-with-body-object" | HttpStatus.OK                | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
         "status"              | HttpStatus.MOVED_PERMANENTLY | null                       | [connection: 'close']
-        "created-body"        | HttpStatus.CREATED           | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'keep-alive']
-        "created-uri"         | HttpStatus.CREATED           | null                       | [connection: 'keep-alive', 'location': 'http://test.com']
-        "accepted"            | HttpStatus.ACCEPTED          | null                       | [connection: 'keep-alive']
+        "created-body"        | HttpStatus.CREATED           | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
+        "created-uri"         | HttpStatus.CREATED           | null                       | [connection: 'close', 'location': 'http://test.com']
+        "accepted"            | HttpStatus.ACCEPTED          | null                       | [connection: 'close']
     }
 
     void "test content encoding"() {
