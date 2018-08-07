@@ -69,6 +69,7 @@ class MultipleDataSourceJpaSetupSpec extends Specification{
         MutipleDataSourceJavaService javaService = applicationContext.getBean(MutipleDataSourceJavaService)
 
         expect:"Methods that retrieve the current session don't throw an exception"
+        service.testContextOther()
         service.testCurrent()
         service.testViaSF()
         service.testOther()
@@ -111,6 +112,12 @@ class MultipleDataSourceJpaSetupSpec extends Specification{
         @Transactional
         boolean testContext() {
             contextSession.clear()
+            return true
+        }
+
+        @Transactional("other")
+        boolean testContextOther() {
+            contextOther.clear()
             return true
         }
 

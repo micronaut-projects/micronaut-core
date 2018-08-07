@@ -18,11 +18,12 @@ package io.micronaut.configuration.hibernate.jpa.scope;
 
 import io.micronaut.core.annotation.AnnotationMapper;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.runtime.context.scope.ScopedProxy;
+import io.micronaut.core.util.StringUtils;
 
 import javax.inject.Inject;
+import javax.inject.Named;
 import javax.persistence.PersistenceContext;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -40,11 +41,18 @@ public class PersistenceContextAnnotationMapper implements AnnotationMapper<Pers
     @Override
     public List<AnnotationValue<?>> map(AnnotationValue<PersistenceContext> annotation) {
         String name = annotation.get("name", String.class).orElse(null);
-        return Arrays.asList(
-                AnnotationValue.builder(Inject.class).build(),
+        List<AnnotationValue<?>> annotationValues = new ArrayList<>(3);
+        annotationValues.add(AnnotationValue.builder(Inject.class).build());
+        annotationValues.add(
                 AnnotationValue.builder(CurrentSession.class)
-                        .value(name)
-                        .build()
+                                .value(name)
+                                .build()
         );
+
+
+        if (StringUtils.isNotEmpty(name)) {
+            annotationValues.add(AnnotationValue.builder(Named.class).value(name).build());
+        }
+        return annotationValues;
     }
 }
