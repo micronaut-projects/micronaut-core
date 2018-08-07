@@ -19,7 +19,6 @@ package io.micronaut.core.annotation;
 import java.lang.annotation.Annotation;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Consumer;
 
 /**
  * A build for annotation values.
@@ -119,6 +118,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     /**
      * Sets the value member to the given integer value.
      *
+     * @param name The name of the member
      * @param i The integer
      * @return This builder
      */
@@ -130,6 +130,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     /**
      * Sets the value member to the given string value.
      *
+     * @param name The name of the member
      * @param str The string
      * @return This builder
      */
@@ -141,6 +142,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     /**
      * Sets the value member to the given boolean value.
      *
+     * @param name The name of the member
      * @param bool The boolean
      * @return This builder
      */
@@ -152,6 +154,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     /**
      * Sets the value member to the given enum object.
      *
+     * @param name The name of the member
      * @param enumObj The enum
      * @return This builder
      */
@@ -163,6 +166,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
     /**
      * Sets the value member to the given type object.
      *
+     * @param name The name of the member
      * @param type The type
      * @return This builder
      */
