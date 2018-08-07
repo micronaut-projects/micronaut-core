@@ -1,0 +1,3 @@
+TIP: Read the HTTP Client Guide (http://guides.micronaut.io/micronaut-http-client/guide/index.html[Java],
+http://guides.micronaut.io/micronaut-http-client-groovy/guide/index.html[Groovy],
+http://guides.micronaut.io/micronaut-http-client-kotlin/guide/index.html[Kotlin]), a step-by-step tutorial, to learn more.

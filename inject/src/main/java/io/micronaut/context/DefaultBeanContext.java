@@ -465,6 +465,15 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     @Override
+    public <T> Collection<BeanDefinition<T>> getBeanDefinitions(Class<T> beanType, Qualifier<T> qualifier) {
+        Collection<BeanDefinition<T>> candidates = findBeanCandidatesInternal(beanType);
+        if (qualifier != null) {
+            candidates = qualifier.reduce(beanType, candidates.stream()).collect(Collectors.toList());
+        }
+        return Collections.unmodifiableCollection(candidates);
+    }
+
+    @Override
     public <T> boolean containsBean(Class<T> beanType, Qualifier<T> qualifier) {
         BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
         if (containsBeanCache.containsKey(beanKey)) {
@@ -1431,7 +1440,7 @@ public class DefaultBeanContext implements BeanContext {
         Class<T> beanType, Qualifier<T> qualifier,
         boolean throwNoSuchBean,
         BeanDefinition<T> definition) {
-        if (definition.isSingleton()) {
+        if (definition.isSingleton() && !definition.hasStereotype("io.micronaut.runtime.context.scope.ScopedProxy")) {
             return createAndRegisterSingleton(resolutionContext, definition, beanType, qualifier);
         } else {
             return getScopedBeanForDefinition(resolutionContext, beanType, qualifier, throwNoSuchBean, definition);
@@ -1440,7 +1449,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @SuppressWarnings("unchecked")
     private <T> T getScopedBeanForDefinition(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier, boolean throwNoSuchBean, BeanDefinition<T> definition) {
-        boolean isProxy = definition instanceof ProxyBeanDefinition;
+        boolean isProxy = definition.isProxy();
         Optional<BeanResolutionContext.Segment> currentSegment = resolutionContext.getPath().currentSegment();
         Optional<Class<? extends Annotation>> scope = Optional.empty();
         if (currentSegment.isPresent()) {

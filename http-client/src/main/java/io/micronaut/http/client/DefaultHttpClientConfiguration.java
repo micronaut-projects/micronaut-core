@@ -38,19 +38,28 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
      * Prefix for HTTP Client settings.
      */
     public static final String PREFIX = "micronaut.http.client";
+    private final DefaultConnectionPoolConfiguration connectionPoolConfiguration;
 
     /**
      * Default constructor.
      */
     public DefaultHttpClientConfiguration() {
+        this.connectionPoolConfiguration = new DefaultConnectionPoolConfiguration();
     }
 
     /**
+     * @param connectionPoolConfiguration The connection pool configuration
      * @param applicationConfiguration The application configuration
      */
     @Inject
-    public DefaultHttpClientConfiguration(ApplicationConfiguration applicationConfiguration) {
+    public DefaultHttpClientConfiguration(DefaultConnectionPoolConfiguration connectionPoolConfiguration, ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
+        this.connectionPoolConfiguration = connectionPoolConfiguration;
+    }
+
+    @Override
+    public ConnectionPoolConfiguration getConnectionPoolConfiguration() {
+        return connectionPoolConfiguration;
     }
 
     /**
@@ -63,5 +72,13 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
         if (sslConfiguration != null) {
             super.setSslConfiguration(sslConfiguration);
         }
+    }
+
+    /**
+     * The default connection pool configuration.
+     */
+    @ConfigurationProperties(ConnectionPoolConfiguration.PREFIX)
+    @Primary
+    public static class DefaultConnectionPoolConfiguration extends ConnectionPoolConfiguration {
     }
 }
