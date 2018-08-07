@@ -17,6 +17,21 @@ And that is it. For each registered SQL `DataSource`, Micronaut will configure t
 * link:{hibernateapi}/org/hibernate/boot/SessionFactoryBuilder.html[SessionFactoryBuilder] - The Hibernate `SessionFactoryBuilder`
 * link:{hibernateapi}/org/hibernate/SessionFactory.html[SessionFactory] - The Hibernate `SessionFactory` bean which also implements the JPA `EntityManagerFactory` interface.
 
+==== Injecting an EntityManager or Hibernate Session
+
+You can use the `javax.persistence.PersistenceContext` annotation to inject an `EntityManager` (or Hibernate `Session`):
+
+.Using `@PersistenceContext`
+----
+@PersistenceContext
+EntityManager entityManager;
+
+@PersistenceContext(name = "other")
+EntityManager otherManager;
+----
+
+Micronaut will inject a compile time scoped proxy that retrieves the `EntityManager` associated with the current transaction when using ann:spring.tx.Transactional[] (see "Using Spring Transaction Management" below).
+
 
 ==== Customizing Hibernate / JPA Configuration
 
@@ -58,14 +73,14 @@ Micronaut is built on Netty which is based on a non-blocking, event loop model. 
 
 When using ann:spring.tx.annotation.Transactional[] the Hibernate `Session` will only be open for the duration of this method execution and then will automatically be closed. This ensures that the blocking operation is kept as short as possible.
 
-There is no notion of OpenSessionInView (OSIV) in Micronaut and never will be, since it is https://vladmihalcea.com/the-open-session-in-view-anti-pattern/[sub-optimal and not recommended]. You should optimize the queries that you write to return all the necessary data Micronaut will need to encode your objects into JSON.
+There is no notion of OpenSessionInView (OSIV) in Micronaut and never will be, since it is https://vladmihalcea.com/the-open-session-in-view-anti-pattern/[sub-optimal and not recommended]. You should optimize the queries that you write to return all the necessary data Micronaut will need to encode your objects into JSON either by using the appropriate join queries or using a https://vladmihalcea.com/the-best-way-to-map-a-projection-query-to-a-dto-with-jpa-and-hibernate/[data transfer object (DTO)].
 
 If you encounter a `LazyInitializationException` when returning a Hibernate entity from a method it is an indication that your query is suboptimal and you should perform a join.
 
 
 ==== Using GORM for Hibernate
 
-For Groovy users and users familiar with Grails framework special support for http://gorm.grails.org[GORM for Hibernate] is available. To use GORM for Hibernate you should not include Micronaut's built in <<sqlSupport, SQL Support>> or the `hibernate-jpa` dependency since GORM itself takes responsibility for creating the `DataSource`, `SessionFactory` etc.
+For Groovy users and users familiar with Grails framework special support for http://gorm.grails.org[GORM for Hibernate] is available. To use GORM for Hibernate you *should not* include Micronaut's built in <<sqlSupport, SQL Support>> or the `hibernate-jpa` dependency since GORM itself takes responsibility for creating the `DataSource`, `SessionFactory` etc.
 
 Instead you should only define the `hibernate-gorm` dependency, a connection pool implementation and the necessary JDBC driver. For example:
 
