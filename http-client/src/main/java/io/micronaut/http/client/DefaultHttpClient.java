@@ -333,6 +333,13 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
                 createDefaultMediaTypeRegistry(), AnnotationMetadataResolver.DEFAULT);
     }
 
+    /**
+     * @return The configuration used by this client
+     */
+    public HttpClientConfiguration getConfiguration() {
+        return configuration;
+    }
+
     @Override
     public HttpClient start() {
         if (!isRunning()) {

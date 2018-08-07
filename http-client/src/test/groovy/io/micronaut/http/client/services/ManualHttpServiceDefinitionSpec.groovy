@@ -4,10 +4,13 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.Client
+import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
+
+import java.time.Duration
 
 class ManualHttpServiceDefinitionSpec extends Specification {
 
@@ -21,15 +24,25 @@ class ManualHttpServiceDefinitionSpec extends Specification {
                 'micronaut.http.services.foo.url': firstApp.getURI(),
                 'micronaut.http.services.foo.path': '/manual/http/service',
                 'micronaut.http.services.foo.health-check':true,
-                'micronaut.http.services.foo.health-check-interval':'100ms'
+                'micronaut.http.services.foo.health-check-interval':'100ms',
+                'micronaut.http.services.foo.read-timeout':'15s',
+                'micronaut.http.services.foo.pool.enabled':false
         )
         TestClient tc = clientApp.getBean(TestClient)
+
+        when:'the config is retrieved'
+        def config = clientApp.getBean(HttpClientConfiguration, Qualifiers.byName("foo"))
+
+        then:
+        config.readTimeout.get() == Duration.ofSeconds(15)
+        !config.getConnectionPoolConfiguration().isEnabled()
 
         when:
         RxHttpClient client = clientApp.getBean(RxHttpClient, Qualifiers.byName("foo"))
         String result = client.retrieve('/').blockingFirst()
 
         then:
+        client.configuration == config
         result == 'ok'
         tc.index() == 'ok'
 
