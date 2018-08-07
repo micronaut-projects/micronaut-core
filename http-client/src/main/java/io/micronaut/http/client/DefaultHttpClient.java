@@ -783,7 +783,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
             Flowable<io.micronaut.http.HttpResponse<O>> responsePublisher = Flowable.create(emitter -> {
 
 
-                if (poolMap !=  null) {
+                if (poolMap !=  null && !MediaType.MULTIPART_FORM_DATA_TYPE.equals(request.getContentType().orElse(null))) {
                     ChannelPool channelPool = poolMap.get(new RequestKey(requestURI));
                     Future<Channel> channelFuture = channelPool.acquire();
                     channelFuture.addListener(future -> {
