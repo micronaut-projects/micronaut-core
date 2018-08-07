@@ -286,6 +286,27 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
     }
 
     /**
+     * Start building a new annotation for the given name.
+     *
+     * @param annotationName The annotation name
+     * @return The builder
+     */
+    public static AnnotationValueBuilder<?> builder(String annotationName) {
+        return new AnnotationValueBuilder<>(annotationName);
+    }
+
+    /**
+     * Start building a new annotation for the given name.
+     *
+     * @param annotation The annotation name
+     * @param <T> The annotation type
+     * @return The builder
+     */
+    public static <T extends Annotation> AnnotationValueBuilder<T> builder(Class<T> annotation) {
+        return new AnnotationValueBuilder<>(annotation);
+    }
+
+    /**
      * Subclasses can override to provide a custom convertible values instance.
      *
      * @param values The values

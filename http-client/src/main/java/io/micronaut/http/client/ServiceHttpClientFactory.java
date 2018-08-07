@@ -19,6 +19,7 @@ package io.micronaut.http.client;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceList;
 import io.micronaut.health.HealthStatus;
@@ -47,6 +48,7 @@ public class ServiceHttpClientFactory {
     private final BeanContext beanContext;
     private final ServiceInstanceListLoadBalancerFactory loadBalancerFactory;
     private final TaskScheduler taskScheduler;
+
     /**
      * Default constructor.
      *
@@ -69,6 +71,7 @@ public class ServiceHttpClientFactory {
      * @return The client bean
      */
     @EachBean(ServiceHttpClientConfiguration.class)
+    @Requires(condition = ServiceHttpClientCondition.class)
     DefaultHttpClient serviceHttpClient(ServiceHttpClientConfiguration configuration) {
         List<URI> originalURLs = configuration.getUrls();
         Collection<URI> loadBalancedURIs = new ConcurrentLinkedQueue<>(originalURLs);
@@ -101,34 +104,29 @@ public class ServiceHttpClientFactory {
 
 
         if (isHealthCheck) {
-            taskScheduler.scheduleWithFixedDelay(configuration.getHealthCheckInterval(), configuration.getHealthCheckInterval(), new Runnable() {
-                @Override
-                public void run() {
-                    Flowable.fromIterable(originalURLs).flatMap(originalURI -> {
-                        URI healthCheckURI = originalURI.resolve(configuration.getHealthCheckUri());
-                        return httpClient.exchange(HttpRequest.GET(healthCheckURI)).onErrorResumeNext(throwable -> {
-                            if (throwable instanceof HttpClientResponseException) {
-                                HttpClientResponseException responseException = (HttpClientResponseException) throwable;
-                                HttpResponse response = responseException.getResponse();
-                                //noinspection unchecked
-                                return Flowable.just(response);
-                            }
-                            return Flowable.just(HttpResponse.serverError());
-                        }).map(response -> Collections.singletonMap(originalURI, response.getStatus()));
-                    }).subscribe(uriToStatusMap -> {
-                        Map.Entry<URI, HttpStatus> entry = uriToStatusMap.entrySet().iterator().next();
+            taskScheduler.scheduleWithFixedDelay(configuration.getHealthCheckInterval(), configuration.getHealthCheckInterval(), () -> Flowable.fromIterable(originalURLs).flatMap(originalURI -> {
+                URI healthCheckURI = originalURI.resolve(configuration.getHealthCheckUri());
+                return httpClient.exchange(HttpRequest.GET(healthCheckURI)).onErrorResumeNext(throwable -> {
+                    if (throwable instanceof HttpClientResponseException) {
+                        HttpClientResponseException responseException = (HttpClientResponseException) throwable;
+                        HttpResponse response = responseException.getResponse();
+                        //noinspection unchecked
+                        return Flowable.just(response);
+                    }
+                    return Flowable.just(HttpResponse.serverError());
+                }).map(response -> Collections.singletonMap(originalURI, response.getStatus()));
+            }).subscribe(uriToStatusMap -> {
+                Map.Entry<URI, HttpStatus> entry = uriToStatusMap.entrySet().iterator().next();
 
-                        URI uri = entry.getKey();
-                        HttpStatus status = entry.getValue();
+                URI uri = entry.getKey();
+                HttpStatus status = entry.getValue();
 
-                        if (status.getCode() >= 300) {
-                            loadBalancedURIs.remove(uri);
-                        } else if (!loadBalancedURIs.contains(uri)) {
-                            loadBalancedURIs.add(uri);
-                        }
-                    });
+                if (status.getCode() >= 300) {
+                    loadBalancedURIs.remove(uri);
+                } else if (!loadBalancedURIs.contains(uri)) {
+                    loadBalancedURIs.add(uri);
                 }
-            });
+            }));
         }
         return httpClient;
     }
