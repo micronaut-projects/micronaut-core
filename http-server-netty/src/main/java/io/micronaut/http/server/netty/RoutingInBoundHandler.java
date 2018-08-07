@@ -1035,10 +1035,21 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private void writeFinalNettyResponse(MutableHttpResponse<?> message, AtomicReference<HttpRequest<?>> requestReference, ChannelHandlerContext context) {
         NettyMutableHttpResponse nettyHttpResponse = (NettyMutableHttpResponse) message;
         FullHttpResponse nettyResponse = nettyHttpResponse.getNativeResponse();
+
+        HttpRequest<?> httpRequest = requestReference.get();
+        io.netty.handler.codec.http.HttpHeaders nettyHeaders = nettyResponse.headers();
+        if (!nettyHeaders.contains(HttpHeaderNames.CONNECTION)) {
+            HttpStatus status = nettyHttpResponse.status();
+            if (status.getCode() > 299 || !httpRequest.getHeaders().isKeepAlive()) {
+                nettyHeaders.add(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+            } else {
+                nettyHeaders.add(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
+            }
+        }
         Optional<NettyCustomizableResponseTypeHandlerInvoker> customizableTypeBody = message.getBody(NettyCustomizableResponseTypeHandlerInvoker.class);
         if (customizableTypeBody.isPresent()) {
             NettyCustomizableResponseTypeHandlerInvoker handler = customizableTypeBody.get();
-            handler.invoke(requestReference.get(), nettyHttpResponse, context);
+            handler.invoke(httpRequest, nettyHttpResponse, context);
         } else {
             // close handled by HttpServerKeepAliveHandler
             context.writeAndFlush(nettyResponse);

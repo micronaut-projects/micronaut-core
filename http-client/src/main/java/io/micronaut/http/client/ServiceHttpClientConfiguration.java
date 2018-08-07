@@ -55,6 +55,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration {
      * Creates a new client configuration for the given service ID.
      *
      * @param serviceId The service id
+     * @param connectionPoolConfiguration The connection pool configuration
      */
     public ServiceHttpClientConfiguration(@Parameter String serviceId, ServiceConnectionPoolConfiguration connectionPoolConfiguration) {
         this.serviceId = serviceId;
