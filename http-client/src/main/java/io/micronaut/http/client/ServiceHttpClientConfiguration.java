@@ -16,6 +16,7 @@
 
 package io.micronaut.http.client;
 
+import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.util.CollectionUtils;
@@ -43,6 +44,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration {
     public static final String PREFIX = "micronaut.http.services";
 
     private final String serviceId;
+    private final ServiceConnectionPoolConfiguration connectionPoolConfiguration;
     private List<URI> urls = Collections.emptyList();
     private String healthCheckUri = "/health";
     private boolean healthCheck = false;
@@ -54,8 +56,9 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration {
      *
      * @param serviceId The service id
      */
-    public ServiceHttpClientConfiguration(@Parameter String serviceId) {
+    public ServiceHttpClientConfiguration(@Parameter String serviceId, ServiceConnectionPoolConfiguration connectionPoolConfiguration) {
         this.serviceId = serviceId;
+        this.connectionPoolConfiguration = connectionPoolConfiguration;
     }
 
     /**
@@ -170,4 +173,17 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration {
             this.healthCheckInterval = healthCheckInterval;
         }
     }
+
+    @Override
+    public ConnectionPoolConfiguration getConnectionPoolConfiguration() {
+        return connectionPoolConfiguration;
+    }
+
+    /**
+     * The default connection pool configuration.
+     */
+    @ConfigurationProperties(ConnectionPoolConfiguration.PREFIX)
+    public static class ServiceConnectionPoolConfiguration extends ConnectionPoolConfiguration {
+    }
+
 }
