@@ -75,7 +75,7 @@ public class DefaultHttpClientConfiguration extends HttpClientConfiguration {
     }
 
     /**
-     * The default connection pool configuration
+     * The default connection pool configuration.
      */
     @ConfigurationProperties(ConnectionPoolConfiguration.PREFIX)
     @Primary
