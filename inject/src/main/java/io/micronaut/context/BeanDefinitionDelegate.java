@@ -41,7 +41,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFactory<T>, NameResolver, ValueResolver<String> {
+class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implements DelegatingBeanDefinition<T>, BeanFactory<T>, NameResolver, ValueResolver<String> {
 
     static final String PRIMARY_ATTRIBUTE = Primary.class.getName();
 
@@ -135,11 +135,6 @@ class BeanDefinitionDelegate<T> implements DelegatingBeanDefinition<T>, BeanFact
     @Override
     public String getName() {
         return definition.getName();
-    }
-
-    @Override
-    public boolean isEnabled(BeanContext beanContext) {
-        return definition.isEnabled(beanContext);
     }
 
     @Override
