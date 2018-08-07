@@ -171,6 +171,11 @@ public class BraveTracerConfiguration implements Toggleable {
             this.clientSenderBuilder = new HttpClientSender.Builder(this);
         }
 
+        @Override
+        public ConnectionPoolConfiguration getConnectionPoolConfiguration() {
+            return new ConnectionPoolConfiguration();
+        }
+
         /**
          * Creates builder.
          *

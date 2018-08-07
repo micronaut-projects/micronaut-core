@@ -63,18 +63,22 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
 
     private static final int EUREKA_DEFAULT_PORT = 8761;
 
+    private final ConnectionPoolConfiguration eurekaConnectionPoolConfiguration;
     private EurekaDiscoveryConfiguration discovery = new EurekaDiscoveryConfiguration();
     private EurekaRegistrationConfiguration registration;
 
     /**
+     * @param eurekaConnectionPoolConfiguration The connection pool configuration
      * @param applicationConfiguration        The application configuration
      * @param eurekaRegistrationConfiguration The optional Eureka registration configuration
      */
     public EurekaConfiguration(
+        EurekaConnectionPoolConfiguration eurekaConnectionPoolConfiguration,
         ApplicationConfiguration applicationConfiguration,
         Optional<EurekaRegistrationConfiguration> eurekaRegistrationConfiguration) {
         super(applicationConfiguration);
         this.registration = eurekaRegistrationConfiguration.orElse(null);
+        this.eurekaConnectionPoolConfiguration = eurekaConnectionPoolConfiguration;
         setPort(EUREKA_DEFAULT_PORT);
     }
 
@@ -118,6 +122,18 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
     @Override
     protected String getServiceID() {
         return EurekaClient.SERVICE_ID;
+    }
+
+    @Override
+    public ConnectionPoolConfiguration getConnectionPoolConfiguration() {
+        return this.eurekaConnectionPoolConfiguration;
+    }
+
+    /**
+     * The default connection pool configuration.
+     */
+    @ConfigurationProperties(ConnectionPoolConfiguration.PREFIX)
+    public static class EurekaConnectionPoolConfiguration extends ConnectionPoolConfiguration {
     }
 
     /**
