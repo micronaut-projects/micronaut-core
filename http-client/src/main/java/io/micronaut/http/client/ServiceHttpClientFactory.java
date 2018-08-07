@@ -47,6 +47,7 @@ public class ServiceHttpClientFactory {
     private final BeanContext beanContext;
     private final ServiceInstanceListLoadBalancerFactory loadBalancerFactory;
     private final TaskScheduler taskScheduler;
+
     /**
      * Default constructor.
      *
