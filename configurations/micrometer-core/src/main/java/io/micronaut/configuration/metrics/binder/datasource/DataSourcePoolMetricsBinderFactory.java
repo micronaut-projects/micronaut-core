@@ -24,7 +24,6 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.jdbc.metadata.DataSourcePoolMetadata;
 
-import javax.inject.Named;
 import java.util.Collections;
 
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS;
@@ -49,7 +48,6 @@ public class DataSourcePoolMetricsBinderFactory {
      */
     @EachBean(DataSourcePoolMetadata.class)
     @Requires(beans = {DataSourcePoolMetadata.class})
-    @Named
     public MeterBinder dataSourceMeterBinder(
             @Parameter String dataSourceName,
             DataSourcePoolMetadata dataSourcePoolMetadata) {
