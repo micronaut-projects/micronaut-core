@@ -82,3 +82,20 @@ void onStartup(StartupEvent event) {
 <1> An `@EventListener` is defined
 <2> The `@Async` annotation tells Micronaut to run the operation asynchronously (by default on the `scheduled` executor)
 
+=== Support for @PersistenceContext in JPA
+
+The JPA support in Micronaut has been improved with support for the `@PersistenceContext` annotation to inject an `EntityManager` (or Hibernate `Session`):
+
+.Using `@PersistenceContext`
+----
+@PersistenceContext
+EntityManager entityManager;
+
+@PersistenceContext(name = "other")
+EntityManager otherManager;
+----
+
+Micronaut will inject a compile time scoped proxy that retrieves the `EntityManager` associated with the current transaction when using ann:spring.tx.Transactional[].
+
+
+
