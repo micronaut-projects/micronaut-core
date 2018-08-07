@@ -1222,7 +1222,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         withQualifierMethod.putField(proxyType, FIELD_BEAN_QUALIFIER, Type.getType(Qualifier.class));
         withQualifierMethod.visitInsn(RETURN);
         withQualifierMethod.visitEnd();
-        withQualifierMethod.visitMaxs(1,1);
+        withQualifierMethod.visitMaxs(1, 1);
     }
 
     private void writeSwapMethod(ClassWriter proxyClassWriter, Type targetType) {
