@@ -25,21 +25,24 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.views.ViewsConfiguration;
 import io.micronaut.views.ViewsRenderer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import io.micronaut.views.exceptions.ViewRenderingException;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.context.IContext;
 import org.thymeleaf.exceptions.TemplateEngineException;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
+
 import javax.inject.Singleton;
 import java.util.Locale;
 import java.util.Map;
 
 /**
  * Renders templates Thymeleaf Java template engine.
- * @see <a href="https://www.thymeleaf.org">https://www.thymeleaf.org</a>
+ *
  * @author Sergio del Amo
+ * @author graemerocher
+ *
+ * @see <a href="https://www.thymeleaf.org">https://www.thymeleaf.org</a>
  * @since 1.0
  */
 @Produces(MediaType.TEXT_HTML)
@@ -47,8 +50,6 @@ import java.util.Map;
 @Requires(classes = TemplateEngine.class)
 @Singleton
 public class ThymeleafViewsRenderer implements ViewsRenderer {
-
-    private static final Logger LOG = LoggerFactory.getLogger(ThymeleafViewsRenderer.class);
 
     protected final ClassLoaderTemplateResolver templateResolver;
 
@@ -58,8 +59,8 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
 
     /**
      * @param viewsConfiguration Views Configuration
-     * @param thConfiguration Thymeleaf template renderer configuration
-     * @param resourceLoader The resource loader
+     * @param thConfiguration    Thymeleaf template renderer configuration
+     * @param resourceLoader     The resource loader
      */
     public ThymeleafViewsRenderer(ViewsConfiguration viewsConfiguration,
                                   ThymeleafViewsRendererConfiguration thConfiguration,
@@ -69,6 +70,24 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
         this.engine = initializeTemplateEngine();
     }
 
+    @Override
+    public Writable render(String viewName, Object data) {
+        return (writer) -> {
+            final IContext context = new Context(Locale.US, variables(data));
+            try {
+                engine.process(viewName, context, writer);
+            } catch (TemplateEngineException e) {
+                throw new ViewRenderingException("Error rendering Thymeleaf view [" + viewName + "]: " + e.getMessage(), e);
+            }
+        };
+    }
+
+    @Override
+    public boolean exists(String viewName) {
+        String location = viewLocation(viewName);
+        return resourceLoader.getResourceAsStream(location).isPresent();
+    }
+
     private TemplateEngine initializeTemplateEngine() {
         TemplateEngine engine = new TemplateEngine();
         engine.setTemplateResolver(templateResolver);
@@ -76,13 +95,12 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
     }
 
     private ClassLoaderTemplateResolver initializeTemplateResolver(ViewsConfiguration viewsConfiguration,
-                                            ThymeleafViewsRendererConfiguration thConfiguration) {
+                                                                   ThymeleafViewsRendererConfiguration thConfiguration) {
         ClassLoaderTemplateResolver templateResolver = new ClassLoaderTemplateResolver();
 
-        StringBuilder sb = new StringBuilder();
-        sb.append(viewsConfiguration.getFolder());
-        sb.append(FILE_SEPARATOR);
-        templateResolver.setPrefix(sb.toString());
+        String sb = viewsConfiguration.getFolder() +
+                FILE_SEPARATOR;
+        templateResolver.setPrefix(sb);
 
         templateResolver.setCharacterEncoding(thConfiguration.getCharacterEncoding());
         templateResolver.setTemplateMode(thConfiguration.getTemplateMode());
@@ -95,25 +113,12 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
         return templateResolver;
     }
 
-    @Override
-    public Writable render(String viewName, Object data) {
-        return (writer) -> {
-            final IContext context = new Context(Locale.US, variables(data));
-            try {
-                engine.process(viewName, context, writer);
-            } catch (TemplateEngineException e) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error(e.getMessage());
-                }
-            }
-        };
-    }
-
     private Map<String, Object> variables(Object data) {
         if (data instanceof Map) {
             return (Map<String, Object>) data;
+        } else {
+            return BeanMap.of(data);
         }
-        return BeanMap.of(data);
     }
 
     private String viewLocation(final String name) {
@@ -122,16 +127,10 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
             sb.append(templateResolver.getPrefix());
             sb.append(FILE_SEPARATOR);
         }
-        sb.append(name);
+        sb.append(name.replace("/", FILE_SEPARATOR));
         if (templateResolver.getSuffix() != null) {
             sb.append(templateResolver.getSuffix());
         }
         return sb.toString();
-    }
-
-    @Override
-    public boolean exists(String viewName) {
-        String location = viewLocation(viewName);
-        return resourceLoader.getResourceAsStream(location).isPresent();
     }
 }

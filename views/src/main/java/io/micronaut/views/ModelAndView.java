@@ -16,10 +16,13 @@
 
 package io.micronaut.views;
 
+import java.util.Optional;
+
 /**
  * Holder for both Model and View.
  *
  * @author Sergio del Amo
+ * @author graemerocher
  * @since 1.0
  */
 public class ModelAndView {
@@ -32,12 +35,12 @@ public class ModelAndView {
      * Empty constructor.
      */
     public ModelAndView() {
-
     }
 
     /**
      * Constructor.
-     * @param view view name to be rendered
+     *
+     * @param view  view name to be rendered
      * @param model Model to be rendered against the view
      */
     public ModelAndView(String view, Object model) {
@@ -46,15 +49,15 @@ public class ModelAndView {
     }
 
     /**
-     *
      * @return view name to be rendered
      */
-    public String getView() {
-        return view;
+    public Optional<String> getView() {
+        return Optional.ofNullable(view);
     }
 
     /**
-     * view Setter.
+     * Sets the view to use.
+     *
      * @param view the view name
      */
     public void setView(String view) {
@@ -64,12 +67,13 @@ public class ModelAndView {
     /**
      * @return model to render
      */
-    public Object getModel() {
-        return model;
+    public Optional<Object> getModel() {
+        return Optional.ofNullable(model);
     }
 
     /**
-     * model Setter.
+     * Sets the model to use.
+     *
      * @param model model to be rendered
      */
     public void setModel(Object model) {

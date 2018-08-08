@@ -34,7 +34,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.METHOD})
 public @interface View {
 
-     /**
+    /**
      * @return The View Name for the route.
      */
     String value() default "";

@@ -20,13 +20,13 @@ import io.micronaut.core.util.Toggleable;
 
 /**
  * Configuration for {@link HandlebarsViewsRenderer}.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */
 public interface HandlebarsViewsRendererConfiguration extends Toggleable {
 
     /**
-     *
      * @return Default extension for templates
      */
     String getDefaultExtension();
