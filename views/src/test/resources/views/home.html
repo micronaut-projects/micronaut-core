@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html th:replace="~{layoutFile :: layout(~{::title}, ~{::section})}">
+<head>
+    <title>Home</title>
+</head>
+<body>
+<section>
+    <h1 th:if="${loggedIn}">username: <span th:text="${username}"></span></h1>
+    <h1 th:unless="${loggedIn}">You are not logged in</h1>
+</section>
+</body>
+</html>
