@@ -27,19 +27,24 @@ import java.io.File;
  * @since 1.0
  */
 public interface ViewsRenderer {
+
+    /**
+     * The file separator to use.
+     */
     String FILE_SEPARATOR = File.separator;
+    /**
+     * The extension separator.
+     */
     String EXTENSION_SEPARATOR = ".";
 
     /**
-     *
      * @param viewName view name to be render
-     * @param data response body to render it with a view
+     * @param data     response body to render it with a view
      * @return A writable where the view will be written to.
      */
     Writable render(String viewName, Object data);
 
     /**
-     *
      * @param viewName view name to be render
      * @return true if a template can be found for the supplied view name.
      */

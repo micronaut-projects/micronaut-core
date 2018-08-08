@@ -19,25 +19,37 @@ package io.micronaut.views.handlebars;
 import com.github.jknack.handlebars.Handlebars;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.views.ViewsConfigurationProperties;
 
 /**
  * {@link ConfigurationProperties} implementation of {@link HandlebarsViewsRendererConfiguration}.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */
 @Requires(classes = Handlebars.class)
 @ConfigurationProperties(HandlebarsViewsRendererConfigurationProperties.PREFIX)
 public class HandlebarsViewsRendererConfigurationProperties implements HandlebarsViewsRendererConfiguration {
+
+    /**
+     * The prefix to use.
+     */
+    @SuppressWarnings("WeakerAccess")
     public static final String PREFIX = ViewsConfigurationProperties.PREFIX + ".handlebars";
+
+    /**
+     * The default extension.
+     */
+    @SuppressWarnings("WeakerAccess")
     public static final String DEFAULT_EXTENSION = "hbs";
 
-    protected boolean enabled = true;
-
-    protected String defaultExtension = DEFAULT_EXTENSION;
+    private boolean enabled = true;
+    private String defaultExtension = DEFAULT_EXTENSION;
 
     /**
      * enabled getter.
+     *
      * @return boolean flag indicating whether {@link HandlebarsViewsRenderer} is enabled.
      */
     @Override
@@ -46,11 +58,30 @@ public class HandlebarsViewsRendererConfigurationProperties implements Handlebar
     }
 
     /**
-     *
      * @return Default extension for templates. By default {@value #DEFAULT_EXTENSION}.
      */
     @Override
     public String getDefaultExtension() {
         return defaultExtension;
+    }
+
+    /**
+     * Whether handlebars view rendering is enabled.
+     *
+     * @param enabled True if is enabled
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    /**
+     * The default extension.
+     *
+     * @param defaultExtension The extension
+     */
+    public void setDefaultExtension(String defaultExtension) {
+        if (StringUtils.isNotEmpty(defaultExtension)) {
+            this.defaultExtension = defaultExtension;
+        }
     }
 }

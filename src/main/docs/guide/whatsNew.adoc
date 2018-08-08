@@ -1,4 +1,4 @@
-Apart from https://github.com/micronaut-projects/micronaut-core/milestone/3?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features.
+Apart from https://github.com/micronaut-projects/micronaut-core/milestone/4?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features.
 
 === Bean Generics Computed at Compile Time
 
