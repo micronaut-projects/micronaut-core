@@ -64,7 +64,7 @@ class JpaSetupSpec extends Specification {
 
         when:
         BindableRuleBasedTransactionAttribute attribute = interceptor.resolveTransactionAttribute(
-                method.getTargetMethod(),
+                method,
                 method.getAnnotationMetadata(),
                 "test"
         )
