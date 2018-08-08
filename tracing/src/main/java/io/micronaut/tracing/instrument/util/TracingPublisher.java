@@ -17,6 +17,8 @@
 package io.micronaut.tracing.instrument.util;
 
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpResponse;
 import io.opentracing.Scope;
 import io.opentracing.Span;
 import io.opentracing.Tracer;
@@ -25,6 +27,8 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import javax.annotation.Nonnull;
+
+import java.util.Optional;
 
 import static io.micronaut.tracing.interceptor.TraceInterceptor.logError;
 
@@ -120,6 +124,20 @@ public class TracingPublisher<T> implements Publisher<T> {
                     @Override
                     public void onNext(T object) {
                         try (Scope ignored = tracer.scopeManager().activate(span, isSingle)) {
+                            if (object instanceof MutableHttpResponse) {
+                                MutableHttpResponse response = (MutableHttpResponse) object;
+                                Optional<?> body = response.getBody();
+                                if (body.isPresent()) {
+                                    Object o = body.get();
+                                    if (Publishers.isConvertibleToPublisher(o)) {
+                                        Class<?> type = o.getClass();
+                                        Publisher<?> resultPublisher = Publishers.convertPublisher(o, Publisher.class);
+                                        Publisher<?> scopedPublisher = new ScopePropagationPublisher(resultPublisher, tracer, span);
+                                        response.body(Publishers.convertPublisher(scopedPublisher, type));
+                                    }
+                                }
+
+                            }
                             TracingPublisher.this.doOnNext(object, span);
                             actual.onNext(object);
                             if (isSingle) {
