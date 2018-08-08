@@ -89,7 +89,12 @@ httpServer:
     title: Configuring the HTTP Server
     threadPools: Configuring Server Thread Pools
     cors: Configuring CORS
-    https: Securing the Server with HTTPS  
+    https: Securing the Server with HTTPS
+  views:
+    title: Views
+    thymeleaf: Thymeleaf
+    handlebars: Handlebars.java
+    velocity: Apache Velocity
 httpClient:
   title: The HTTP Client
   lowLevelHttpClient:
