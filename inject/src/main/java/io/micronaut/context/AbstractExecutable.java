@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.Objects;
 
 /**
@@ -62,6 +63,27 @@ abstract class AbstractExecutable implements Executable {
         } else {
             this.arguments = Argument.ZERO_ARGUMENTS;
         }
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (!(o instanceof AbstractExecutable)) {
+            return false;
+        }
+        AbstractExecutable that = (AbstractExecutable) o;
+        return Objects.equals(declaringType, that.declaringType) &&
+                Objects.equals(methodName, that.methodName) &&
+                Arrays.equals(argTypes, that.argTypes);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(declaringType, methodName);
+        result = 31 * result + Arrays.hashCode(argTypes);
+        return result;
     }
 
     @Override
