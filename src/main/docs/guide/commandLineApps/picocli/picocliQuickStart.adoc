@@ -30,10 +30,10 @@ Picocli does not require configuration. See other sections of the manual for con
 
 This section will show a quick example that provides a command line interface to a HTTP client that communicates with the GitHub API.
 
-When creating the project with the Micronaut CLI, use the `--profile=cli` profile, and also add the `--features=http-client` flag:
+When creating this example project with the Micronaut CLI, use the `create-cli-app` command, and add the `--features=http-client` flag:
 
 ----
-> mn create-app my-cli-app --profile cli --features http-client example
+> mn create-cli-app example.git-star --features http-client
 ----
 This will add the `io.micronaut:http-client` dependency to the build. You can also manually add this to your `gradle.build`:
 
@@ -43,17 +43,6 @@ compile "io.micronaut:http-client"
 
 ==== An Example HTTP Client
 To create a picocli `Command` you create a class with fields annotated with `@Option` or `@Parameters` to capture the values of the command line options or positional parameters, respectively.
-
-Within the new project, you can now run the picocli-specific code generation commands:
-
-----
-> cd example
-> ../mn
-mn> create-command example.gitstar
-| Rendered template Command.java to destination src/main/java/example/GitstarCommand.java
-| Rendered template CommandTest.java to destination src/test/java/example/GitstarCommandTest.java
-----
-
 
 For example the following is a picocli `@Command` that wraps around the GitHub API:
 
@@ -78,15 +67,15 @@ import picocli.CommandLine.Parameters;
 import java.util.*;
 import javax.inject.Inject;
 
-@Command(name = "gitstar", header = {
+@Command(name = "git-star", header = {
         "@|green       _ _      _             |@", // <1>
         "@|green  __ _(_) |_ __| |_ __ _ _ _  |@",
         "@|green / _` | |  _(_-<  _/ _` | '_| |@",
         "@|green \\__, |_|\\__/__/\\__\\__,_|_|   |@",
         "@|green |___/                        |@"},
         description = "Shows GitHub stars for a project",
-        mixinStandardHelpOptions = true, version = "gitstar 0.1") // <2>
-public class GitstarCommand implements Runnable {
+        mixinStandardHelpOptions = true, version = "git-star 0.1") // <2>
+public class GitStarCommand implements Runnable {
 
     @Client("https://api.github.com")
     @Inject RxHttpClient client; // <3>
@@ -99,7 +88,7 @@ public class GitstarCommand implements Runnable {
     List<String> githubSlugs = Arrays.asList("micronaut-projects/micronaut-core", "remkop/picocli");
 
     public static void main(String[] args) throws Exception {
-        PicocliRunner.run(GitstarCommand.class, args);
+        PicocliRunner.run(GitStarCommand.class, args);
     }
 
     public void run() { // <5>
@@ -151,5 +140,5 @@ class TopCommand implements Callable<Object> { // <2>
 ----
 <1> The top-level command has two subcommands, `SubCmd1` and `SubCmd2`.
 <2> Let all commands in the hierarchy implement `Runnable` or `Callable`.
-<2> Start the application with `PicocliRunner`. This creates an `ApplicationContext` that instantiates the commands and performs the dependency injection.
+<3> Start the application with `PicocliRunner`. This creates an `ApplicationContext` that instantiates the commands and performs the dependency injection.
 

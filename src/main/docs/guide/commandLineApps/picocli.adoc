@@ -8,6 +8,7 @@ How it works: annotate your class and picocli initializes it from the command li
 converting the input to strongly typed data. Supports git-like http://picocli.info/#_subcommands[subcommands]
 (and nested http://picocli.info/#_nested_sub_subcommands[sub-subcommands]),
 any option prefix style, POSIX-style http://picocli.info/#_short_options[grouped short options],
+http://picocli.info/#_interactive_password_options[password options],
 custom http://picocli.info/#_custom_type_converters[type converters] and more.
 Parser http://picocli.info/#_tracing[tracing] facilitates troubleshooting.
 
