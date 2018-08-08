@@ -1513,8 +1513,9 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
                             }
                         } else {
                             emitter.onNext(response);
+                            response.onComplete();
+                            emitter.onComplete();
                         }
-                        emitter.onComplete();
                     }
                 } finally {
                     pipeline.remove(this);
