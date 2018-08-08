@@ -436,14 +436,19 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
             @Override
             public <I, O> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request, io.micronaut.core.type.Argument<O> bodyType) {
                 Flowable<io.micronaut.http.HttpResponse<O>> publisher = DefaultHttpClient.this.exchange(request, bodyType);
-                return publisher.doOnNext((res) -> {
+                io.micronaut.http.HttpResponse<O> result = publisher.doOnNext((res) -> {
                     Optional<ByteBuf> byteBuf = res.getBody(ByteBuf.class);
                     byteBuf.ifPresent(bb -> {
                         if (bb.refCnt() > 0) {
                             ReferenceCountUtil.safeRelease(bb);
                         }
                     });
+                    if (res instanceof FullNettyClientHttpResponse) {
+                        ((FullNettyClientHttpResponse) res).onComplete();
+                    }
                 }).blockingFirst();
+
+                return result;
             }
         };
     }
