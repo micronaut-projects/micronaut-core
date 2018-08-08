@@ -37,6 +37,7 @@ import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.*;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
@@ -164,14 +165,15 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
             String groupId = consumerAnnotation.get("groupId", String.class).orElse(null);
 
+            Class<?> beanType = beanDefinition.getBeanType();
             if (StringUtils.isEmpty(groupId)) {
-                groupId = applicationConfiguration.getName().orElse(beanDefinition.getBeanType().getName());
+                groupId = applicationConfiguration.getName().orElse(beanType.getName());
             }
 
             String clientId = consumerAnnotation.get("clientId", String.class).orElse(null);
 
             if (StringUtils.isEmpty(clientId)) {
-                clientId = applicationConfiguration.getName().orElse(null);
+                clientId = applicationConfiguration.getName().map(s -> s + '-' + NameUtils.hyphenate(beanType.getSimpleName())).orElse(null);
             }
 
             OffsetStrategy offsetStrategy = consumerAnnotation.getRequiredValue("offsetStrategy", OffsetStrategy.class);
@@ -252,8 +254,13 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
 
             for (int i = 0; i < consumerThreads; i++) {
+                if (clientId != null && consumerThreads > 1) {
+                    // unique client id per consumer thread
+                    properties.put(ConsumerConfig.CLIENT_ID_CONFIG, clientId + "-" + i);
+                }
+
                 KafkaConsumer kafkaConsumer = beanContext.createBean(KafkaConsumer.class, consumerConfiguration);
-                Object consumerBean = beanContext.getBean(beanDefinition.getBeanType());
+                Object consumerBean = beanContext.getBean(beanType);
 
                 if (consumerBean instanceof KafkaConsumerAware) {
                     //noinspection unchecked
