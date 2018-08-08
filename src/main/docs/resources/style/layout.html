@@ -21,6 +21,9 @@
 
 <body class="body" onload="addJsClass();" onhashchange="highlightMenu()">
 
+<div id="table-of-content-nav-link" class="desktop">
+    <a title="Collapse/Open Table of contents" title="Hide Table of Contents" href="javascript:hideTableOfContents();" class="button">[ + ]</a>
+</div>
 
 <div id="main">
     <div id="navigation">
@@ -29,9 +32,28 @@
         </div>
         <div class="navLinks">
             <ul>
-                <li id="table-of-content-nav-link" class="desktop">
-                    <a title="Collapse/Open Table of contents" href="javascript:hideTableOfContents();" class="button">Table of Contents</a>
-                </li>
+                    <li>
+                        <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)" class="desktop">
+                            <a href="${path}/guide/index.html" class="button">Table of contents</a>
+                            <div id="nav-summary-childs" style="display:none;">
+                                <%
+                                toc.children.eachWithIndex { ch, i ->
+                                if (single) {
+                                %>
+                                <div class="toc-item" style="margin-left:0"><a href="#${ ch.name.encodeAsUrlFragment().encodeAsHtml() }"><strong>${i + 1}</strong><span>${ch.title?.encodeAsHtml()}</span></a></div>
+                                <%
+                                }
+                                else {
+                                %>
+                                <div class="toc-item" style="margin-left:0"><a href="${path}/guide/${ch.name.encodeAsUrlPath().encodeAsHtml()}.html"><strong>${i + 1}</strong><span>${ch.title?.encodeAsHtml()}</span></a></div>
+                                <%
+                                }
+                                }
+                                %>
+                            </div>
+                        </div>
+                    </li>
+
                 <li id="table-of-content-nav-link-mobile" class="mobile">
                     <a title="Scroll to Table of contents" href="javascript:scrollToTop();" class="button">Toc</a>
                 </li>
@@ -110,7 +132,8 @@
     function hideTableOfContents() {
         document.getElementById(tocId).style.display = "none";
         document.getElementById(mainId).style.paddingLeft = "0";
-        document.getElementById(tocLink).getElementsByTagName("a")[0].setAttribute("href", "javascript:showTableOfContents();");
+        var aEl = document.getElementById(tocLink).getElementsByTagName("a")[0];
+        replaceLink(aEl, "javascript:showTableOfContents();", "[ - ]", 'Show Table of Contents');
         goToLocation();
     }
 
@@ -120,10 +143,17 @@
         }
     }
 
+    function replaceLink(anchorElement, href, text, titleAttr) {
+        anchorElement.setAttribute("href", href);
+        anchorElement.setAttribute("title", titleAttr);
+        anchorElement.innerText = text;
+    }
+
     function showTableOfContents() {
         document.getElementById(tocId).style.display = "block";
         document.getElementById(mainId).style.paddingLeft = "25em";
-        document.getElementById(tocLink).getElementsByTagName("a")[0].setAttribute("href", "javascript:hideTableOfContents();");
+        var aEl = document.getElementById(tocLink).getElementsByTagName("a")[0];
+        replaceLink(aEl, "javascript:hideTableOfContents();", "[ + ]", 'Hide Table of Contents');
         goToLocation();
     }
 
