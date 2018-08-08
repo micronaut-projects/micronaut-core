@@ -91,7 +91,7 @@ httpServer:
     cors: Configuring CORS
     https: Securing the Server with HTTPS
   views:
-    title: Views
+    title: Server Side View Rendering
     thymeleaf: Thymeleaf
     handlebars: Handlebars.java
     velocity: Apache Velocity
