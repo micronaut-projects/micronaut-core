@@ -3,8 +3,10 @@ package io.micronaut.docs
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.util.CollectionUtils
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Produces
 import io.micronaut.views.ModelAndView
 import io.micronaut.views.View
 import io.reactivex.Single
@@ -28,6 +30,13 @@ class VelocityController {
     @Get("/home")
     HttpResponse<Person> home() {
         HttpResponse.ok(new Person(loggedIn: true, username: 'sdelamo'))
+    }
+
+    @Produces(MediaType.TEXT_PLAIN)
+    @View("home.vm")
+    @Get("/viewWithNoViewRendererForProduces")
+    Person viewWithNoViewRendererForProduces() {
+        new Person(loggedIn: true, username: 'sdelamo')
     }
 
     @View("home")
