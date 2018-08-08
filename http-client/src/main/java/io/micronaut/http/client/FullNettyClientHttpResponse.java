@@ -194,6 +194,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
         if (complete) {
             return Optional.empty();
         }
+
         Optional<MediaType> contentType = getContentType();
         if (content.refCnt() == 0 || content.readableBytes() == 0) {
             if (LOG.isTraceEnabled()) {
