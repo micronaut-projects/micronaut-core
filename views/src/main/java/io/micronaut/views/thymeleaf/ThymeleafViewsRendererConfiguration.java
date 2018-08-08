@@ -21,64 +21,58 @@ import org.thymeleaf.templatemode.TemplateMode;
 
 /**
  * Configuration for {@link ThymeleafViewsRenderer}.
+ *
  * @author Sergio del Amo
+ * @author graemerocher
  * @since 1.0
  */
 public interface ThymeleafViewsRendererConfiguration extends Toggleable {
 
     /**
-     * @see {@link org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver#getCharacterEncoding()}
-     *
      * @return the character encoding.
+     * @see org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver#getCharacterEncoding()
      */
     String getCharacterEncoding();
 
     /**
-     * @see {@link org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver#getTemplateMode()}
-     *
      * @return the template mode to be used.
+     * @see org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver#getTemplateMode()
      */
     TemplateMode getTemplateMode();
 
     /**
-     * @see {@link org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver#getSuffix()}
-     *
      * @return the suffix.
+     * @see org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver#getSuffix()
      */
     String getSuffix();
 
     /**
-     * @see {@link org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver#getForceSuffix()}
-     *
      * @return whether the suffix will be forced or not.
+     * @see org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver#getForceSuffix()
      */
     boolean getForceSuffix();
 
     /**
-     * @see {@link org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver#getForceTemplateMode()}
-     *
      * @return whether the suffix will be forced or not.
+     * @see org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver#getForceTemplateMode()
      */
     boolean getForceTemplateMode();
 
     /**
-     * @see {@link org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver#getCacheTTLMs()}
-     *
      * @return the cache TTL for resolved templates.
+     * @see org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver#getCacheTTLMs()
      */
     Long getCacheTTLMs();
 
     /**
-     * @see {@link org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver#getCheckExistence()}
-     *
      * @return <tt>true</tt> if resource existence will be checked, <tt>false</tt> if not
+     * @see org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver#getCheckExistence()
      */
     boolean getCheckExistence();
 
     /**
-     * @see {@link org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver#isCacheable()}
-     *
      * @return whether templates resolved are cacheable or not.
+     * @see org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver#isCacheable()
      */
     boolean getCacheable();
 }

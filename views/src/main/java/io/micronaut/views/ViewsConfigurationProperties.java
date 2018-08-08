@@ -17,24 +17,35 @@
 package io.micronaut.views;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.util.StringUtils;
 
 /**
  * Implementation of {@link ViewsConfiguration}. Views configuration properties.
+ *
  * @author Sergio del Amo
+ * @author graemerocher
  * @since 1.0
  */
 @ConfigurationProperties(ViewsConfigurationProperties.PREFIX)
 public class ViewsConfigurationProperties implements ViewsConfiguration {
+
+    /**
+     * The prefix for view configuration.
+     */
     public static final String PREFIX = "micronaut.views";
 
+    /**
+     * The default views folder.
+     */
     public static final String DEFAULT_FOLDER = "views";
 
-    protected boolean enabled = true;
+    private boolean enabled = true;
 
-    protected String folder = DEFAULT_FOLDER;
+    private String folder = DEFAULT_FOLDER;
 
     /**
      * enabled getter.
+     *
      * @return boolean flag indicating whether the security features are enabled.
      */
     @Override
@@ -43,11 +54,41 @@ public class ViewsConfigurationProperties implements ViewsConfiguration {
     }
 
     /**
-     *
      * @return The resources folder where views should be searched for. By default {@value #DEFAULT_FOLDER}
      */
     @Override
     public String getFolder() {
         return this.folder;
+    }
+
+    /**
+     * Whether view rendering is enabled.
+     *
+     * @param enabled True if view rendering is enabled
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    /**
+     * The folder to look for views.
+     *
+     * @param folder The folder
+     */
+    public void setFolder(String folder) {
+        if (StringUtils.isNotEmpty(folder)) {
+            this.folder = folder;
+        }
+    }
+
+    /**
+     * The folder to look for views.
+     *
+     * @param folder The folder
+     */
+    public void setDir(String folder) {
+        if (StringUtils.isNotEmpty(folder)) {
+            this.folder = folder;
+        }
     }
 }

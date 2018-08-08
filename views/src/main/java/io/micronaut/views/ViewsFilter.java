@@ -34,6 +34,7 @@ import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import java.util.Optional;
 
 /**
@@ -52,6 +53,7 @@ public class ViewsFilter extends OncePerRequestHttpServerFilter {
 
     /**
      * Constructor.
+     *
      * @param beanLocator The bean locator
      */
     public ViewsFilter(BeanLocator beanLocator) {
@@ -59,8 +61,8 @@ public class ViewsFilter extends OncePerRequestHttpServerFilter {
     }
 
     @Override
-    protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request,
-                                                             ServerFilterChain chain) {
+    protected final Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request,
+                                                                   ServerFilterChain chain) {
 
         Optional<MethodExecutionHandle> routeMatch = request.getAttribute(HttpAttributes.ROUTE_MATCH,
                 MethodExecutionHandle.class);
@@ -107,50 +109,35 @@ public class ViewsFilter extends OncePerRequestHttpServerFilter {
     }
 
     /**
+     * Resolves the model for the given response body. Subclasses can override to customize.
      *
      * @param responseBody Response body
      * @return the model to be rendered
      */
+    @SuppressWarnings("WeakerAccess")
     protected Object resolveModel(Object responseBody) {
         if (responseBody instanceof ModelAndView) {
-            return ((ModelAndView) responseBody).getModel();
+            return ((ModelAndView) responseBody).getModel().orElse(null);
         }
         return responseBody;
     }
 
     /**
+     * Resolves the view for the given method and response body. Subclasses can override to customize.
      *
-     * @param route Request route
+     * @param route        Request route
      * @param responseBody Response body
      * @return view name to be rendered
      */
+    @SuppressWarnings("WeakerAccess")
     protected Optional<String> resolveView(MethodExecutionHandle route, Object responseBody) {
         Optional optionalViewName = route.getValue(View.class);
         if (optionalViewName.isPresent()) {
             return Optional.of((String) optionalViewName.get());
         } else if (responseBody instanceof ModelAndView) {
-            return Optional.of(((ModelAndView) responseBody).getView());
+            return ((ModelAndView) responseBody).getView();
         }
         return Optional.empty();
-    }
-
-    /**
-     * Store the writable where the view will be written into and the response.
-     */
-    class WritableAndResponse {
-        final Writable writable;
-        final MutableHttpResponse<?> response;
-
-        /**
-         * Constructor.
-         *
-         * @param writable A writable where the view will be written to.
-         * @param response The mutable HTTP response
-         */
-        WritableAndResponse(Writable writable, MutableHttpResponse<?> response) {
-            this.writable = writable;
-            this.response = response;
-        }
     }
 
 }

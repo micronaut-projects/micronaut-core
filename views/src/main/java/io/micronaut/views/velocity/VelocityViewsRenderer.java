@@ -28,18 +28,20 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.views.ViewsConfiguration;
 import io.micronaut.views.ViewsRenderer;
+import io.micronaut.views.exceptions.ViewRenderingException;
 import org.apache.velocity.VelocityContext;
 import org.apache.velocity.app.VelocityEngine;
 import org.apache.velocity.exception.MethodInvocationException;
 import org.apache.velocity.exception.ParseErrorException;
 import org.apache.velocity.exception.ResourceNotFoundException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
  * Renders with templates with Apache Velocity Project.
- * @see <a href="http://velocity.apache.org">http://velocity.apache.org</a>
+ *
  * @author Sergio del Amo
+ * @author graemerocher
+ *
+ * @see <a href="http://velocity.apache.org">http://velocity.apache.org</a>
  * @since 1.0
  */
 @Produces(MediaType.TEXT_HTML)
@@ -48,14 +50,12 @@ import org.slf4j.LoggerFactory;
 @Singleton
 public class VelocityViewsRenderer implements ViewsRenderer {
 
-    private static final Logger LOG = LoggerFactory.getLogger(VelocityViewsRenderer.class);
-
     protected final VelocityEngine velocityEngine;
     protected final ViewsConfiguration viewsConfiguration;
     protected final VelocityViewsRendererConfiguration velocityConfiguration;
 
     /**
-     * @param viewsConfiguration Views Configuration
+     * @param viewsConfiguration    Views Configuration
      * @param velocityConfiguration Velocity Configuration
      */
     VelocityViewsRenderer(ViewsConfiguration viewsConfiguration,
@@ -63,13 +63,6 @@ public class VelocityViewsRenderer implements ViewsRenderer {
         this.viewsConfiguration = viewsConfiguration;
         this.velocityConfiguration = velocityConfiguration;
         this.velocityEngine = initializeVelocityEngine();
-    }
-
-    private VelocityEngine initializeVelocityEngine() {
-        final Properties p = new Properties();
-        p.setProperty("resource.loader", "class");
-        p.setProperty("class.resource.loader.class", "org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader");
-        return new VelocityEngine(p);
     }
 
     @Override
@@ -81,11 +74,26 @@ public class VelocityViewsRenderer implements ViewsRenderer {
             try {
                 velocityEngine.mergeTemplate(viewName, StandardCharsets.UTF_8.name(), velocityContext, writer);
             } catch (ResourceNotFoundException | ParseErrorException | MethodInvocationException e) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error(e.getMessage());
-                }
+                throw new ViewRenderingException("Error rendering Velocity view [" + viewName + "]: " + e.getMessage(), e);
             }
         };
+    }
+
+    @Override
+    public boolean exists(String viewName) {
+        try {
+            velocityEngine.getTemplate(viewName(viewName));
+        } catch (ResourceNotFoundException | ParseErrorException e) {
+            return false;
+        }
+        return true;
+    }
+
+    private VelocityEngine initializeVelocityEngine() {
+        final Properties p = new Properties();
+        p.setProperty("resource.loader", "class");
+        p.setProperty("class.resource.loader.class", "org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader");
+        return new VelocityEngine(p);
     }
 
     private Map<String, Object> context(Object data) {
@@ -101,7 +109,7 @@ public class VelocityViewsRenderer implements ViewsRenderer {
             sb.append(viewsConfiguration.getFolder());
             sb.append(FILE_SEPARATOR);
         }
-        sb.append(name);
+        sb.append(name.replace("/", FILE_SEPARATOR));
         final String extension = extension();
         if (!name.endsWith(extension)) {
             sb.append(extension);
@@ -114,15 +122,5 @@ public class VelocityViewsRenderer implements ViewsRenderer {
         sb.append(EXTENSION_SEPARATOR);
         sb.append(velocityConfiguration.getDefaultExtension());
         return sb.toString();
-    }
-
-    @Override
-    public boolean exists(String viewName) {
-        try {
-            velocityEngine.getTemplate(viewName(viewName));
-        } catch (ResourceNotFoundException | ParseErrorException e) {
-            return false;
-        }
-        return true;
     }
 }
