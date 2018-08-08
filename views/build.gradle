@@ -1,0 +1,25 @@
+ext {
+    snakeYamlVersion = '1.19'
+    velocityEngine = '2.0'
+    handlebarsVersion='4.1.0'
+    thymeleafVersion='3.0.9.RELEASE'
+}
+
+dependencies {
+    compileOnly project(":inject-java")
+    compileOnly "org.apache.velocity:velocity-engine-core:$velocityEngine"
+    compileOnly "com.github.jknack:handlebars:${handlebarsVersion}"
+    compileOnly "org.thymeleaf:thymeleaf:$thymeleafVersion"
+
+    compile project(":runtime")
+    compile project(":http")
+    compile project(":http-server")
+
+    testCompile project(":http-client")
+    testCompile project(":inject-groovy")
+    testCompile project(":http-server-netty")
+    testCompile "org.yaml:snakeyaml:$snakeYamlVersion"
+    testRuntime "org.apache.velocity:velocity-engine-core:$velocityEngine"
+    testRuntime "com.github.jknack:handlebars:${handlebarsVersion}"
+    testRuntime "org.thymeleaf:thymeleaf:$thymeleafVersion"
+}
