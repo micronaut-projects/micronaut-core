@@ -66,16 +66,6 @@ public class ViewsFilter extends OncePerRequestHttpServerFilter {
                 MethodExecutionHandle.class);
         if (routeMatch.isPresent()) {
             MethodExecutionHandle route = routeMatch.get();
-            MediaType type = route.getValue(Produces.class, MediaType.class)
-                    .orElse(MediaType.TEXT_HTML_TYPE);
-            Optional<ViewsRenderer> optionalViewsRenderer = beanLocator.findBean(ViewsRenderer.class,
-                    new ProducesMediaTypeQualifier<>(type));
-
-            if (!optionalViewsRenderer.isPresent()) {
-                return chain.proceed(request);
-            }
-
-            ViewsRenderer viewsRenderer = optionalViewsRenderer.get();
 
             return Flowable.fromPublisher(chain.proceed(request))
                     .switchMap(response -> {
@@ -86,8 +76,18 @@ public class ViewsFilter extends OncePerRequestHttpServerFilter {
                             return Flowable.just(response);
                         }
 
-                        String view = optionalView.get();
+                        MediaType type = route.getValue(Produces.class, MediaType.class)
+                                .orElse((route.getValue(View.class).isPresent() || body instanceof ModelAndView) ? MediaType.TEXT_HTML_TYPE : MediaType.APPLICATION_JSON_TYPE);
+                        Optional<ViewsRenderer> optionalViewsRenderer = beanLocator.findBean(ViewsRenderer.class,
+                                new ProducesMediaTypeQualifier<>(type));
 
+                        if (!optionalViewsRenderer.isPresent()) {
+                            return chain.proceed(request);
+                        }
+
+                        ViewsRenderer viewsRenderer = optionalViewsRenderer.get();
+
+                        String view = optionalView.get();
                         if (!viewsRenderer.exists(view)) {
                             if (LOG.isDebugEnabled()) {
                                 LOG.debug("view {} not found ", view);
