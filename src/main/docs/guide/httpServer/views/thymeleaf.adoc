@@ -17,7 +17,6 @@ The example shown in the <<views, Views>> section, could be rendered with the fo
 .src/main/resources/views/home.html
 ----
 include::{testsviews}/../../../../resources/views/home.html[]
-}
 ----
 
 and layout:
@@ -26,5 +25,4 @@ and layout:
 .src/main/resources/views/layoutFile.html
 ----
 include::{testsviews}/../../../../resources/views/layoutFile.html[]
-}
 ----

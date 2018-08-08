@@ -1,5 +1,5 @@
 Micronaut includes api:views.handlebars.HandlebarsViewsRenderer[] which uses
-the http://jknack.github.io/handlebars.java/[Handlebars.java].
+the http://jknack.github.io/handlebars.java/[Handlebars.java] project.
 
 In addition to the <<views, Views>> dependency, add the following dependency on your classpath. For example, in `build.gradle`
 
