@@ -2083,6 +2083,7 @@ public class DefaultBeanContext implements BeanContext {
         private final boolean isSingleton;
 
         private T target;
+
         /**
          * @param beanContext The bean context
          * @param beanType    The bean type
