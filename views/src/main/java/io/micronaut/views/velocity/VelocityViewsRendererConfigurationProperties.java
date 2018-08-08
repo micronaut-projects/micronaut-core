@@ -23,6 +23,7 @@ import org.apache.velocity.app.VelocityEngine;
 
 /**
  * {@link ConfigurationProperties} implementation of {@link VelocityViewsRendererConfiguration}.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */
@@ -38,6 +39,7 @@ public class VelocityViewsRendererConfigurationProperties implements VelocityVie
 
     /**
      * enabled getter.
+     *
      * @return boolean flag indicating whether {@link VelocityViewsRenderer} is enabled.
      */
     @Override
@@ -46,7 +48,6 @@ public class VelocityViewsRendererConfigurationProperties implements VelocityVie
     }
 
     /**
-     *
      * @return Default extension for templates. By default {@value #DEFAULT_EXTENSION}.
      */
     @Override

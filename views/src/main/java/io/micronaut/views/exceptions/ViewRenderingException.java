@@ -14,20 +14,34 @@
  * limitations under the License.
  */
 
-package io.micronaut.views.velocity;
+package io.micronaut.views.exceptions;
 
-import io.micronaut.core.util.Toggleable;
+import io.micronaut.http.server.exceptions.InternalServerException;
 
 /**
- * Configuration for {@link VelocityViewsRenderer}.
+ * An exception thrown when a view fails to render.
  *
- * @author Sergio del Amo
+ * @author graemerocher
  * @since 1.0
  */
-public interface VelocityViewsRendererConfiguration extends Toggleable {
+public class ViewRenderingException extends InternalServerException {
 
     /**
-     * @return Default extension for templates
+     * Constructor.
+     *
+     * @param message The message
      */
-    String getDefaultExtension();
+    public ViewRenderingException(String message) {
+        super(message);
+    }
+
+    /**
+     * Constructor.
+     *
+     * @param message The message
+     * @param cause The cause
+     */
+    public ViewRenderingException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

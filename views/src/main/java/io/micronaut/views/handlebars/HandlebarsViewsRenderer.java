@@ -26,15 +26,14 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.views.ViewsConfiguration;
 import io.micronaut.views.ViewsRenderer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import io.micronaut.views.exceptions.ViewRenderingException;
 import javax.inject.Singleton;
-import java.io.IOException;
 
 /**
  * Renders Views with with Handlebars.java.
- * @see <a href="http://jknack.github.io/handlebars.java/">http://jknack.github.io/handlebars.java/</a>
+ *
  * @author Sergio del Amo
+ * @see <a href="http://jknack.github.io/handlebars.java/">http://jknack.github.io/handlebars.java/</a>
  * @since 1.0
  */
 @Produces(MediaType.TEXT_HTML)
@@ -42,8 +41,6 @@ import java.io.IOException;
 @Requires(classes = Handlebars.class)
 @Singleton
 public class HandlebarsViewsRenderer implements ViewsRenderer {
-
-    private static final Logger LOG = LoggerFactory.getLogger(HandlebarsViewsRenderer.class);
 
     protected final ViewsConfiguration viewsConfiguration;
 
@@ -55,10 +52,9 @@ public class HandlebarsViewsRenderer implements ViewsRenderer {
 
 
     /**
-     * @param viewsConfiguration Views Configuration.
-     * @param resourceLoader Resource Loader
+     * @param viewsConfiguration                   Views Configuration.
+     * @param resourceLoader                       Resource Loader
      * @param handlebarsViewsRendererConfiguration Handlebars ViewRenderer Configuration.
-     *
      */
     public HandlebarsViewsRenderer(ViewsConfiguration viewsConfiguration,
                                    ClassPathResourceLoader resourceLoader,
@@ -75,33 +71,10 @@ public class HandlebarsViewsRenderer implements ViewsRenderer {
             try {
                 Template template = handlebars.compile(location);
                 template.apply(data, writer);
-            } catch (IOException e) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error(e.getMessage());
-                }
+            } catch (Throwable e) {
+                throw new ViewRenderingException("Error rendering Handlebars view [" + viewName + "]: " + e.getMessage(), e);
             }
         };
-    }
-
-    private String viewLocation(final String name) {
-        final StringBuilder sb = new StringBuilder();
-        if (viewsConfiguration.getFolder() != null) {
-            sb.append(viewsConfiguration.getFolder());
-        }
-        sb.append(FILE_SEPARATOR);
-        sb.append(name);
-        int index = sb.indexOf(extension());
-        if (index != -1) {
-            return sb.substring(0, index);
-        }
-        return sb.toString();
-    }
-
-    private String extension() {
-        StringBuilder sb = new StringBuilder();
-        sb.append(EXTENSION_SEPARATOR);
-        sb.append(handlebarsViewsRendererConfiguration.getDefaultExtension());
-        return sb.toString();
     }
 
     @Override
@@ -113,6 +86,25 @@ public class HandlebarsViewsRenderer implements ViewsRenderer {
             sb.append(extension);
         }
         return resourceLoader.getResourceAsStream(sb.toString()).isPresent();
+    }
+
+    private String viewLocation(final String name) {
+        final StringBuilder sb = new StringBuilder();
+        if (viewsConfiguration.getFolder() != null) {
+            sb.append(viewsConfiguration.getFolder());
+        }
+        sb.append(FILE_SEPARATOR);
+        sb.append(name.replace("/", FILE_SEPARATOR));
+        int index = sb.indexOf(extension());
+        if (index != -1) {
+            return sb.substring(0, index);
+        }
+        return sb.toString();
+    }
+
+    private String extension() {
+        return EXTENSION_SEPARATOR +
+                handlebarsViewsRendererConfiguration.getDefaultExtension();
     }
 
 }
