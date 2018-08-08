@@ -145,3 +145,8 @@ micronaut:
 The above configuration will enable connection pooling for the service named `foo`.
 
 For more information see the section on <<clientConfiguration, HTTP Client>> configuration.
+
+=== Improved Support for Command Line Applications
+
+The command line application support in Micronaut has been improved with a new `create-cli-app` command that generates a project with an example command, and sets the main class of the application to this command.
+For details, see the <<picocliGenerateProject, create-cli-app command>> section of the user guide.
