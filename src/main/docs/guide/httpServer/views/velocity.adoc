@@ -1,0 +1,17 @@
+Micronaut includes api:views.velocity.VelocityViewsRenderer[] which uses
+the http://velocity.apache.org[Apache Velocity] Java-based template engine.
+
+In addition to the <<views, Views>> dependency, add the following dependency on your classpath. For example, in `build.gradle`
+
+[source, groovy]
+----
+runtime "org.apache.velocity:velocity-engine-core:2.0"
+----
+
+The example shown in the <<views, Views>> section, could be rendered with the following Velocity template:
+
+[source,html]
+.src/main/resources/views/home.vm
+----
+include::{testsviews}/../../../../resources/views/home.vm[]
+----
