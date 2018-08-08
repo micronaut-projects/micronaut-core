@@ -1,4 +1,5 @@
 io.micronaut.cli.profile.commands.CreateAppCommand
+io.micronaut.cli.profile.commands.CreateCliAppCommand
 io.micronaut.cli.profile.commands.CreateFederationCommand
 io.micronaut.cli.profile.commands.CreateFunctionCommand
 io.micronaut.cli.profile.commands.CreateProfileCommand
