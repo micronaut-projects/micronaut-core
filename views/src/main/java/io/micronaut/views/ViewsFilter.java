@@ -82,7 +82,7 @@ public class ViewsFilter extends OncePerRequestHttpServerFilter {
                                 new ProducesMediaTypeQualifier<>(type));
 
                         if (!optionalViewsRenderer.isPresent()) {
-                            return chain.proceed(request);
+                            return Flowable.just(response);
                         }
 
                         ViewsRenderer viewsRenderer = optionalViewsRenderer.get();
