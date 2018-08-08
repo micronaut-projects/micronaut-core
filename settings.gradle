@@ -34,6 +34,7 @@ include "bom"
 include "security"
 include "security-jwt"
 include "security-session"
+include "templates"
 
 // configurations
 include "configurations:gorm-common"
