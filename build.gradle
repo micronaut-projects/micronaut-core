@@ -112,7 +112,7 @@ ext {
                 name:'neo4j-harness'
             ],
             'neo4j.bolt': [
-                version: '1.5.1',
+                version: '1.6.2',
                 group:'org.neo4j.driver',
                 name:'neo4j-java-driver'
             ],
