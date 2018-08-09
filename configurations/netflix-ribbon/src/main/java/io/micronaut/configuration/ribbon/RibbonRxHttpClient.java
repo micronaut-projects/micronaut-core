@@ -122,7 +122,7 @@ public class RibbonRxHttpClient extends DefaultHttpClient {
                 URI newURI = loadBalancer.getLoadBalancerContext().reconstructURIWithServer(server, resolveRequestURI(request.getUri()));
                 return RxJavaInterop.toV1Observable(
                     Flowable.fromPublisher(Publishers.just(newURI))
-                        .switchMap(super.buildExchangePublisher(request, bodyType))
+                        .switchMap(super.buildExchangePublisher(request, bodyType, errorType))
                 );
             });
 
