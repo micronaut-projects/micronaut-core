@@ -14,9 +14,10 @@
  * limitations under the License.
  */
 
-package io.micronaut.configuration.jdbc.dbcp
+package io.micronaut.configuration.jdbc.tomcat
 
-import org.apache.commons.dbcp2.BasicDataSource
+
+import org.apache.tomcat.jdbc.pool.DataSource
 import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy
 import spock.lang.Specification
 
@@ -30,10 +31,10 @@ class DatasourceFactorySpec extends Specification {
 
     def "create basic datasource"() {
         given:
-        def dataSource = new BasicDataSource(validationQuery: "SELECT 1")
+        def dataSource = new DataSource(validationQuery: "SELECT 1")
 
         when:
-        def metadata = datasourceFactory.dbcpDataSourcePoolMetadata("test", dataSource)
+        def metadata = datasourceFactory.tomcatPoolDataSourceMetadataProvider("test", dataSource)
 
         then:
         metadata
@@ -46,11 +47,11 @@ class DatasourceFactorySpec extends Specification {
 
     def "create transactional datasource"() {
         given:
-        def dataSource = new BasicDataSource(validationQuery: "SELECT 1")
+        def dataSource = new DataSource(validationQuery: "SELECT 1")
         def transactionalDataSource = new TransactionAwareDataSourceProxy(targetDataSource: dataSource)
 
         when:
-        def metadata = datasourceFactory.dbcpDataSourcePoolMetadata("test", transactionalDataSource)
+        def metadata = datasourceFactory.tomcatPoolDataSourceMetadataProvider("test", transactionalDataSource)
 
         then:
         metadata
