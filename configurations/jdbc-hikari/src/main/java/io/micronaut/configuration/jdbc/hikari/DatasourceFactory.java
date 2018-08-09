@@ -79,7 +79,6 @@ public class DatasourceFactory implements AutoCloseable {
     }
 
     private MeterRegistry getMeterRegistry() {
-
         return this.applicationContext.containsBean(MeterRegistry.class) ?
                 this.applicationContext.getBean(MeterRegistry.class) : null;
     }

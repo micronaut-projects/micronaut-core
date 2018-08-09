@@ -23,12 +23,13 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Requires;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.jdbc.datasource.DelegatingDataSource;
 
 import javax.annotation.PreDestroy;
 import javax.sql.DataSource;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Creates a tomcat data source for each configuration bean.
@@ -67,12 +68,50 @@ public class DatasourceFactory implements AutoCloseable {
             @Parameter String dataSourceName,
             DataSource dataSource) {
 
+        TomcatDataSourcePoolMetadata dataSourcePoolMetadata = null;
+
         if (dataSource instanceof org.apache.tomcat.jdbc.pool.DataSource) {
-            return new TomcatDataSourcePoolMetadata((org.apache.tomcat.jdbc.pool.DataSource) dataSource);
-        } else if ((dataSource instanceof DelegatingDataSource && ((DelegatingDataSource) dataSource).getTargetDataSource() instanceof org.apache.tomcat.jdbc.pool.DataSource)) {
-            return new TomcatDataSourcePoolMetadata((org.apache.tomcat.jdbc.pool.DataSource) ((DelegatingDataSource) dataSource).getTargetDataSource());
+            dataSourcePoolMetadata = new TomcatDataSourcePoolMetadata((org.apache.tomcat.jdbc.pool.DataSource) dataSource);
+        } else if (isDelegatingDataSource(dataSource)) {
+            dataSourcePoolMetadata = getDataSource(dataSource).map(TomcatDataSourcePoolMetadata::new).orElse(null);
         }
-        return null;
+        return dataSourcePoolMetadata;
+    }
+
+    /**
+     * Retrieve the unwrapped datasource if it has been wrapped in a spring transactional aware datasource.
+     *
+     * @param delegatingDataSource a potentially wrapped datasource
+     * @return the unwrapped datasource or null if not  spring transactional aware datasource
+     */
+    private Optional<org.apache.tomcat.jdbc.pool.DataSource> getDataSource(DataSource delegatingDataSource) {
+        org.apache.tomcat.jdbc.pool.DataSource dataSource = null;
+
+        try {
+            Field targetDataSource = delegatingDataSource.getClass().getSuperclass().getDeclaredField("targetDataSource");
+            targetDataSource.setAccessible(true);
+            dataSource = (org.apache.tomcat.jdbc.pool.DataSource) targetDataSource.get(delegatingDataSource);
+        } catch (NoSuchFieldException | IllegalAccessException | NullPointerException ignore) {
+            LOG.debug("Data source is not of type org.apache.tomcat.jdbc.pool.DataSource or DelegatingDataSource, metrics will not be wired.");
+        }
+
+        return Optional.ofNullable(dataSource);
+    }
+
+    /**
+     * Check for whether the datasource has been wrapped in a spring transactional aware datasource.
+     *
+     * @param dataSource The datasource to check for wrapping
+     * @return boolean if the datasource is wrapped
+     */
+    private boolean isDelegatingDataSource(DataSource dataSource) {
+        boolean isDelegatingDataSource = false;
+        try {
+            isDelegatingDataSource = dataSource.getClass().getSuperclass().getDeclaredField("targetDataSource") != null;
+        } catch (NoSuchFieldException | NullPointerException ignore) {
+            LOG.debug("Data source is not of type org.apache.tomcat.jdbc.pool.DataSource or DelegatingDataSource, metrics will not be wired.");
+        }
+        return isDelegatingDataSource;
     }
 
     @Override

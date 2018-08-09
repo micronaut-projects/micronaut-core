@@ -5,7 +5,6 @@ dependencies {
 
     compileOnly project(":configurations:micrometer-core")
     compileOnly project(":inject-java")
-    compileOnly dependencyModuleVersion("spring", "spring-jdbc")
 
     testCompile "com.h2database:h2:1.4.196"
     testCompile project(":spring")

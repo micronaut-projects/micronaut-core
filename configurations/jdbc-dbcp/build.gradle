@@ -2,7 +2,6 @@ dependencies {
     compile project(":jdbc")
     compile project(":inject")
     compileOnly project(":inject-java")
-    compileOnly dependencyModuleVersion("spring", "spring-jdbc")
 
     compile 'org.apache.commons:commons-dbcp2:2.1.1'
 
