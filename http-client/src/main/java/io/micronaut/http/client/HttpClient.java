@@ -145,6 +145,7 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      *
      * @param request  The {@link HttpRequest} to execute
      * @param bodyType The body type
+     * @param errorType The error type
      * @param <I>      The request body type
      * @param <O>      The response body type
      * @param <E>      The error type

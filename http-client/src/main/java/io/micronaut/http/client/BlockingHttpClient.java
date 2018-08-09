@@ -144,6 +144,7 @@ public interface BlockingHttpClient {
                     ));
         }
     }
+
     /**
      * Perform an HTTP request for the given request object emitting the full HTTP response from returned
      * {@link org.reactivestreams.Publisher} and converting the response body to the specified type.
