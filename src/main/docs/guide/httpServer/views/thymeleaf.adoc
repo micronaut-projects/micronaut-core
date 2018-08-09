@@ -1,0 +1,28 @@
+Micronaut includes api:views.thymeleaf.ThymeleafViewsRenderer[] which uses
+the https://www.thymeleaf.org[Thymeleaf] Java template engine.
+
+In addition to the <<views, Views>> dependency, add the following dependency on your classpath. For example, in `build.gradle`
+
+[source, groovy]
+----
+runtime "org.thymeleaf:thymeleaf:3.0.9.RELEASE"
+----
+
+Thymeleaf integration instantiates a `ClassLoaderTemplateResolver`.
+The properties used can be customized by overriding the values of api:io.micronaut.views.ThymeleafConfigurationProperties[].
+
+The example shown in the <<views, Views>> section, could be rendered with the following Thymeleaf template:
+
+[source,html]
+.src/main/resources/views/home.html
+----
+include::{testsviews}/../../../../resources/views/home.html[]
+----
+
+and layout:
+
+[source,html]
+.src/main/resources/views/layoutFile.html
+----
+include::{testsviews}/../../../../resources/views/layoutFile.html[]
+----

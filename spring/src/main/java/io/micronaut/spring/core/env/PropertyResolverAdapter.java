@@ -70,7 +70,6 @@ public class PropertyResolverAdapter implements PropertyResolver {
         return propertyResolver.getProperty(NameUtils.hyphenate(key), targetType, defaultValue);
     }
 
-    @Override
     @Deprecated
     public <T> Class<T> getPropertyAsClass(String key, Class<T> targetType) {
         Optional<String> property = propertyResolver.getProperty(NameUtils.hyphenate(key), String.class);

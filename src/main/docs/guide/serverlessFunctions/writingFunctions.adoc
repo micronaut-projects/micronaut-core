@@ -1,4 +1,4 @@
-To get started writing serverless function you must add the appropriate Micronaut `function` dependency to your classpath. For example, to create functions for AWS Lambda, add the `function-aws` dependency.  The supported providers are listed in the table below.
+To get started writing serverless function you must add the appropriate Micronaut `function` dependency to your classpath. In certain cases there are FaaS platform specific extension which you may wish to include. The following table includes the dependencies for each individual FaaS platform:
 
 .Function Providers
 |===

@@ -36,3 +36,22 @@ public class StartupListener implements ApplicationEventListener<ServerStartupEv
     }
 }
 ----
+
+Alternatively, you can also use the ann:runtime.event.annotation.EventListener[] annotation on a method of any existing bean that accepts `ServerStartupEvent`:
+
+.Using `@EventListener` with `ServerStartupEvent`
+[source,java]
+----
+import io.micronaut.runtime.server.event.*;
+import io.micronaut.runtime.event.annotation.*;
+...
+@Singleton
+public class MyBean {
+
+    @EventListener
+    public void onStartup(ServerStartupEvent event) {
+        // logic here
+        ...
+    }
+}
+----

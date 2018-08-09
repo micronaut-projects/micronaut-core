@@ -342,7 +342,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             MicronautCli.tiggerAppLoad()
             return true
         } else {
-            System.err.println "Cannot find profile $profileName"
+            MicronautConsole.getInstance().error "Cannot find profile $profileName"
             return false
         }
     }
@@ -478,7 +478,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         features = pruneOneOfFeatures(profile, features)
 
 
-        println "Generating ${getLanguage(features).capitalize()} project..."
+        MicronautConsole.getInstance().updateStatus "Generating ${getLanguage(features).capitalize()} project..."
 
 
         List<String> removedFeatures = validRequestedFeatureNames.findAll { !features*.name.contains(it) }

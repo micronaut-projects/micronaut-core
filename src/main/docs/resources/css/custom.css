@@ -1,8 +1,23 @@
+#table-of-content-nav-link {
+    position: fixed;
+    top: 5px;
+    right: 5px;
+    background-color: #000000;
+    width: 44px;
+    height: 44px;
+    z-index: 1000;
+    font-size: 1.5em;
+}
+#table-of-content-nav-link a {
+    color: #ffffff !important;
+    text-decoration: none;
+}
+
 #navigation {
     height: 75px !important;
     position: fixed;
     width: 100%;
-    z-index: 1000;
+    z-index: 999;
     margin-top: -2px;
 }
 .navLinks {
@@ -103,8 +118,12 @@ a:hover,
 
 #navigation #nav-summary-childs {
     background: #000000 !important;
+    margin-top: 75px;
 }
 
+#navigation #nav-summary-childs a:hover {
+    text-decoration: underline;
+}
 .mobile {
     display: block;
 }

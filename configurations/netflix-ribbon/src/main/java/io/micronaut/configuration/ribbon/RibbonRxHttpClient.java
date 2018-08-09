@@ -113,16 +113,15 @@ public class RibbonRxHttpClient extends DefaultHttpClient {
         return Optional.ofNullable(loadBalancer);
     }
 
-    @SuppressWarnings("unchecked")
     @Override
-    public <I, O> Flowable<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType) {
+    public <I, O, E> Flowable<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
         if (loadBalancer != null) {
             LoadBalancerCommand<HttpResponse<O>> loadBalancerCommand = buildLoadBalancerCommand();
             Observable<HttpResponse<O>> requestOperation = loadBalancerCommand.submit(server -> {
                 URI newURI = loadBalancer.getLoadBalancerContext().reconstructURIWithServer(server, resolveRequestURI(request.getUri()));
                 return RxJavaInterop.toV1Observable(
-                    Flowable.fromPublisher(Publishers.just(newURI))
-                        .switchMap(super.buildExchangePublisher(request, bodyType))
+                        Flowable.fromPublisher(Publishers.just(newURI))
+                                .switchMap(super.buildExchangePublisher(request, bodyType, errorType))
                 );
             });
 

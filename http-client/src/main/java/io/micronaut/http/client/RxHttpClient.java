@@ -33,7 +33,17 @@ import java.net.URL;
 public interface RxHttpClient extends HttpClient {
 
     @Override
-    <I, O> Flowable<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType);
+    default <I, O> Flowable<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType) {
+        return Flowable.fromPublisher(HttpClient.super.exchange(request, bodyType));
+    }
+
+    @Override
+    <I, O, E> Flowable<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType);
+
+    @Override
+    default <I, O, E> Flowable<O> retrieve(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
+        return Flowable.fromPublisher(HttpClient.super.retrieve(request, bodyType, errorType));
+    }
 
     @Override
     default <I> Flowable<HttpResponse<ByteBuffer>> exchange(HttpRequest<I> request) {
