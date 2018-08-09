@@ -21,10 +21,12 @@ import brave.Tracer;
 import brave.Tracing;
 import brave.http.HttpServerHandler;
 import brave.http.HttpTracing;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.*;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.tracing.instrument.http.AbstractOpenTracingFilter;
 import io.micronaut.tracing.instrument.http.TraceRequestAttributes;
+import io.micronaut.tracing.instrument.util.ScopePropagationPublisher;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
@@ -44,6 +46,7 @@ public class HttpServerTracingPublisher implements Publisher<MutableHttpResponse
     private final HttpServerHandler<HttpRequest<?>, MutableHttpResponse<?>> serverHandler;
     private final HttpRequest<?> request;
     private final Tracer tracer;
+    private final io.opentracing.Tracer openTracer;
     private final Span initialSpan;
 
     /**
@@ -53,6 +56,7 @@ public class HttpServerTracingPublisher implements Publisher<MutableHttpResponse
      * @param request An extended version of request that allows mutating
      * @param serverHandler The standardize way to instrument client
      * @param httpTracing HttpTracing
+     * @param openTracer The open tracing instance
      * @param initialSpan The initial span
      */
     HttpServerTracingPublisher(
@@ -60,6 +64,7 @@ public class HttpServerTracingPublisher implements Publisher<MutableHttpResponse
             HttpRequest<?> request,
             HttpServerHandler<HttpRequest<?>, MutableHttpResponse<?>> serverHandler,
             HttpTracing httpTracing,
+            io.opentracing.Tracer openTracer,
             Span initialSpan) {
         this.publisher = publisher;
         this.request = request;
@@ -67,6 +72,7 @@ public class HttpServerTracingPublisher implements Publisher<MutableHttpResponse
         this.serverHandler = serverHandler;
         Tracing tracing = httpTracing.tracing();
         this.tracer = tracing.tracer();
+        this.openTracer = openTracer;
     }
 
     @Override
@@ -89,6 +95,22 @@ public class HttpServerTracingPublisher implements Publisher<MutableHttpResponse
                 @Override
                 public void onNext(MutableHttpResponse<?> response) {
                     try (Tracer.SpanInScope ignored = tracer.withSpanInScope(span)) {
+                        Optional<?> body = response.getBody();
+                        if (body.isPresent()) {
+                            Object o = body.get();
+                            if (Publishers.isConvertibleToPublisher(o)) {
+                                Class<?> type = o.getClass();
+                                Publisher<?> resultPublisher = Publishers.convertPublisher(o, Publisher.class);
+                                Publisher scopedPublisher = new ScopePropagationPublisher(
+                                        resultPublisher,
+                                        openTracer,
+                                        openTracer.activeSpan()
+                                );
+
+                                ((MutableHttpResponse) response).body(Publishers.convertPublisher(scopedPublisher, type));
+                            }
+                        }
+
                         configureAttributes(response);
                         configureSpan(span);
                         HttpStatus status = response.getStatus();
