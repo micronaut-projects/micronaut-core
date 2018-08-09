@@ -150,6 +150,11 @@ The above configuration will enable connection pooling for the service named `fo
 
 For more information see the section on <<clientConfiguration, HTTP Client>> configuration.
 
+
+=== Metrics for HTTP Client Requests
+
+The <<metricsEndpoint, Metrics>> support via Micrometer has been enhanced to support Metrics for client requests.
+
 === Initial Support for Server Side View Rendering
 
 Support for rendering views on the server-side has been added using the <<views, Views Module>>. Initially Thymeleaf, Velocity and Handlebars are supported with more implementations planned for the future.
@@ -160,3 +165,19 @@ See the section on <<views, Server Side View Rendering>> for more information.
 
 The command line application support in Micronaut has been improved with a new `create-cli-app` command that generates a project with an example command, and sets the main class of the application to this command.
 For details, see the <<picocliGenerateProject, create-cli-app command>> section of the user guide.
+
+=== Dependency Upgrades
+
+The following dependency upgrades occurred in this release:
+
+- Netty 4.1.28
+- RxJava 2.2.0
+- Groovy 2.5.1
+- Caffeine 2.6.2
+- ASM 6.2.1
+- Mongo Java Driver 3.8.0
+- Neo4j Bolt Driver 1.6.2
+- Kafka 2.0.0
+- Hibernate Core 5.3.4
+- Micrometer 1.0.6
+- Spring 5.0.8
