@@ -250,6 +250,9 @@ subprojects { subproject ->
     else {
         apply plugin:"groovy"
         apply plugin:"java"
+
+
+
         sourceCompatibility = '1.8'
         targetCompatibility = '1.8'
 //        compileJava.options.compilerArgs.add '-parameters'
@@ -319,6 +322,8 @@ subprojects { subproject ->
     }
 
     dependencies {
+        documentation "org.codehaus.groovy:groovy-templates:$groovyVersion"
+        documentation "org.codehaus.groovy:groovy-dateutil:$groovyVersion"
         if (subproject.name != "bom") {
             compile dependencyVersion("slf4j")
         }
@@ -339,6 +344,10 @@ subprojects { subproject ->
 
         testCompile "org.ow2.asm:asm:$asmVersion"
         testCompile "org.ow2.asm:asm-commons:$asmVersion"
+    }
+
+    groovydoc {
+        classpath += project.configurations.documentation
     }
 
     task allDeps(type: DependencyReportTask) {}
