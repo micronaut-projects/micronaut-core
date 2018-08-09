@@ -147,7 +147,10 @@ serverlessFunctions:
     title: Running Functions
     functionWeb: Functions as Web Applications
     functionCLI: Functions as CLI Applications
-  lambdaFunctions: Deploying Functions to AWS Lambda 
+  deployingFunctions:
+    title: Deploying Functions
+    lambdaFunctions: Deploying Functions to AWS Lambda
+    openFaasFunctions: Deploying Functions to OpenFaaS
   callingFunctions: Calling Functions with FunctionClient
 messaging:
   title: Message-Driven Microservices
