@@ -21,7 +21,6 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.reactivex.Flowable;
-import org.reactivestreams.Publisher;
 
 import java.net.URL;
 
