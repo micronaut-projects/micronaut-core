@@ -41,15 +41,18 @@ public class BraveTracingServerFilter extends AbstractBraveTracingFilter impleme
 
     private final HttpServerHandler<HttpRequest<?>, MutableHttpResponse<?>> serverHandler;
     private final TraceContext.Extractor<HttpHeaders> extractor;
-
+    private final io.opentracing.Tracer openTracer;
     /**
      * @param httpTracing The {@link HttpTracing} instance
+     * @param openTracer The open tracing instance
      * @param serverHandler The {@link HttpServerHandler} instance
      */
     public BraveTracingServerFilter(
             HttpTracing httpTracing,
+            io.opentracing.Tracer openTracer,
             HttpServerHandler<HttpRequest<?>, MutableHttpResponse<?>> serverHandler) {
         super(httpTracing);
+        this.openTracer = openTracer;
         this.serverHandler = serverHandler;
         this.extractor = httpTracing.tracing().propagation().extractor(ConvertibleMultiValues::get);
     }
@@ -62,6 +65,7 @@ public class BraveTracingServerFilter extends AbstractBraveTracingFilter impleme
                 request,
                 serverHandler,
                 httpTracing,
+                openTracer,
                 span
         );
     }
