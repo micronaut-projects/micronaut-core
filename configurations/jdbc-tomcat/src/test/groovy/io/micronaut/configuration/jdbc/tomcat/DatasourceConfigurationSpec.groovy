@@ -342,7 +342,6 @@ class DatasourceConfigurationSpec extends Specification {
         dataSource.getPool()
     }
 
-    @Ignore("Submitted issue #466")
     void "test pool is created"() {
         given:
         String context = UUID.randomUUID().toString()
