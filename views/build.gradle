@@ -23,3 +23,5 @@ dependencies {
     testRuntime "com.github.jknack:handlebars:${handlebarsVersion}"
     testRuntime "org.thymeleaf:thymeleaf:$thymeleafVersion"
 }
+
+bintray.pkg.name = "micronaut-views"
