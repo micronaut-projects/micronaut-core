@@ -29,6 +29,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
@@ -50,6 +51,7 @@ import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.client.sse.SseClient;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.hateos.JsonError;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.uri.UriMatchTemplate;
@@ -82,6 +84,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 /**
  * Introduction advice that implements the {@link Client} annotation.
@@ -276,6 +279,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             // Set the URI template used to make the request for tracing purposes
             request.setAttribute(HttpAttributes.URI_TEMPLATE, resolveTemplate(clientAnnotation, uriTemplate.toString()));
             String serviceId = clientAnnotation.getValue(String.class).orElse(null);
+            Argument<?> errorType = clientAnnotation.get("errorType", Class.class).map((Function<Class, Argument>) Argument::of).orElse(HttpClient.DEFAULT_ERROR_TYPE);
             request.setAttribute(HttpAttributes.SERVICE_ID, serviceId);
 
 
@@ -355,18 +359,18 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     if (HttpResponse.class.isAssignableFrom(argumentType)) {
                         request.accept(context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES));
                         publisher = httpClient.exchange(
-                                request, publisherArgument
+                                request, publisherArgument, errorType
                         );
                     } else if (Void.class.isAssignableFrom(argumentType)) {
                         publisher = httpClient.exchange(
-                                request
+                                request, null, errorType
                         );
                     } else {
                         MediaType[] acceptTypes = context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
                         request.accept(acceptTypes);
 
                         publisher = httpClient.retrieve(
-                                request, publisherArgument
+                                request, publisherArgument, errorType
                         );
                     }
                 }
@@ -423,15 +427,15 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 BlockingHttpClient blockingHttpClient = httpClient.toBlocking();
                 if (HttpResponse.class.isAssignableFrom(javaReturnType)) {
                     return blockingHttpClient.exchange(
-                        request, returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)
+                        request, returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT), errorType
                     );
                 } else if (void.class == javaReturnType) {
-                    blockingHttpClient.exchange(request);
+                    blockingHttpClient.exchange(request, null, errorType);
                     return null;
                 } else {
                     try {
                         return blockingHttpClient.retrieve(
-                            request, returnType.asArgument()
+                            request, returnType.asArgument(), errorType
                         );
                     } catch (RuntimeException t) {
                         if (t instanceof HttpClientResponseException && ((HttpClientResponseException) t).getStatus() == HttpStatus.NOT_FOUND) {
