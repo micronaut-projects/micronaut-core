@@ -5,6 +5,7 @@
 
 You should now be able to run the Micronaut CLI from the command prompt as follows:
 
+[source,bash]
 ----
 > mn
 | Starting interactive mode...
