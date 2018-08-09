@@ -1,5 +1,9 @@
 Apart from https://github.com/micronaut-projects/micronaut-core/milestone/4?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features.
 
+=== Documentation Improvements
+
+The documentation you are reading has been improved with a always present Table of Contents and styling improvements including code highlighting with http://highlightjs.org[Highlight.js].
+
 === Bean Generics Computed at Compile Time
 
 Generic information for beans is now calculated at compile time, improving performance and allowing more uses cases.
@@ -145,6 +149,12 @@ micronaut:
 The above configuration will enable connection pooling for the service named `foo`.
 
 For more information see the section on <<clientConfiguration, HTTP Client>> configuration.
+
+=== Initial Support for Server Side View Rendering
+
+Support for rendering views on the server-side has been added using the <<views, Views Module>>. Initially Thymeleaf, Velocity and Handlebars are supported with more implementations planned for the future.
+
+See the section on <<views, Server Side View Rendering>> for more information.
 
 === Improved Support for Command Line Applications
 
