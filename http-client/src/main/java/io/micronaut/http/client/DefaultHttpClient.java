@@ -41,10 +41,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.Filter;
-import io.micronaut.http.client.exceptions.ContentLengthExceededException;
-import io.micronaut.http.client.exceptions.HttpClientException;
-import io.micronaut.http.client.exceptions.HttpClientResponseException;
-import io.micronaut.http.client.exceptions.ReadTimeoutException;
+import io.micronaut.http.client.exceptions.*;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.sse.RxSseClient;
 import io.micronaut.http.client.ssl.NettyClientSslBuilder;
@@ -433,9 +430,10 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
     @Override
     public BlockingHttpClient toBlocking() {
         return new BlockingHttpClient() {
+
             @Override
-            public <I, O> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request, io.micronaut.core.type.Argument<O> bodyType) {
-                Flowable<io.micronaut.http.HttpResponse<O>> publisher = DefaultHttpClient.this.exchange(request, bodyType);
+            public <I, O, E> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
+                Flowable<io.micronaut.http.HttpResponse<O>> publisher = DefaultHttpClient.this.exchange(request, bodyType, errorType);
                 return publisher.doOnNext((res) -> {
                     Optional<ByteBuf> byteBuf = res.getBody(ByteBuf.class);
                     byteBuf.ifPresent(bb -> {
@@ -443,6 +441,9 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
                             ReferenceCountUtil.safeRelease(bb);
                         }
                     });
+                    if (res instanceof FullNettyClientHttpResponse) {
+                        ((FullNettyClientHttpResponse) res).onComplete();
+                    }
                 }).blockingFirst();
             }
         };
@@ -623,10 +624,10 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
     }
 
     @Override
-    public <I, O> Flowable<io.micronaut.http.HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, io.micronaut.core.type.Argument<O> bodyType) {
+    public <I, O, E> Flowable<io.micronaut.http.HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
         Publisher<URI> uriPublisher = resolveRequestURI(request);
         return Flowable.fromPublisher(uriPublisher)
-            .switchMap(buildExchangePublisher(request, bodyType));
+                .switchMap(buildExchangePublisher(request, bodyType, errorType));
     }
 
     /**
@@ -771,13 +772,16 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
     }
 
     /**
-     * @param request  The request
-     * @param bodyType The body type
      * @param <I>      The input type
      * @param <O>      The output type
+     * @param <E>      The error type
+     *
+     * @param request  The request
+     * @param bodyType The body type
+     * @param errorType The error type
      * @return A {@link Function}
      */
-    protected <I, O> Function<URI, Publisher<? extends io.micronaut.http.HttpResponse<O>>> buildExchangePublisher(io.micronaut.http.HttpRequest<I> request, io.micronaut.core.type.Argument<O> bodyType) {
+    protected <I, O, E> Function<URI, Publisher<? extends io.micronaut.http.HttpResponse<O>>> buildExchangePublisher(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
         AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request);
         return requestURI -> {
             Flowable<io.micronaut.http.HttpResponse<O>> responsePublisher = Flowable.create(emitter -> {
@@ -794,6 +798,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
                                         requestURI,
                                         requestWrapper,
                                         bodyType,
+                                        errorType,
                                         emitter,
                                         channel,
                                         channelPool
@@ -820,6 +825,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
                                         requestURI,
                                         requestWrapper,
                                         bodyType,
+                                        errorType,
                                         emitter,
                                         channel,
                                         null);
@@ -1279,10 +1285,11 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
         return new NettyRequestWriter(nettyRequest, postRequestEncoder);
     }
 
-    private <I, O> void sendRequestThroughChannel(
+    private <I, O, E> void sendRequestThroughChannel(
             URI requestURI,
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
             Argument<O> bodyType,
+            Argument<E> errorType,
             FlowableEmitter<io.micronaut.http.HttpResponse<O>> emitter,
             Channel channel,
             ChannelPool channelPool) throws HttpPostRequestEncoder.ErrorDataEncoderException {
@@ -1317,7 +1324,8 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
                 channel,
                 channelPool,
                 emitter,
-                bodyType
+                bodyType,
+                errorType
         );
         requestWriter.writeAndClose(channel, channelPool, emitter);
     }
@@ -1452,12 +1460,12 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
     }
 
     @SuppressWarnings("MagicNumber")
-    private <O> void addFullHttpResponseHandler(
+    private <O, E> void addFullHttpResponseHandler(
             io.micronaut.http.HttpRequest<?> request,
             Channel channel,
             ChannelPool channelPool,
             Emitter<io.micronaut.http.HttpResponse<O>> emitter,
-            io.micronaut.core.type.Argument<O> bodyType) {
+            Argument<O> bodyType, Argument<E> errorType) {
         ChannelPipeline pipeline = channel.pipeline();
         pipeline.addLast(new SimpleChannelInboundHandler<FullHttpResponse>() {
 
@@ -1503,18 +1511,34 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
                     if (complete.compareAndSet(false, true)) {
                         if (errorStatus) {
                             try {
-                                HttpClientResponseException clientError = new HttpClientResponseException(
-                                        status.reasonPhrase(),
-                                        response
-                                );
+                                HttpClientResponseException clientError;
+                                if (errorType != HttpClient.DEFAULT_ERROR_TYPE) {
+                                    clientError = new HttpClientResponseException(
+                                            status.reasonPhrase(),
+                                            null,
+                                            response,
+                                            new HttpClientErrorDecoder() {
+                                                @Override
+                                                public Class<?> getErrorType(MediaType mediaType) {
+                                                    return errorType.getType();
+                                                }
+                                            }
+                                    );
+                                } else {
+                                    clientError = new HttpClientResponseException(
+                                            status.reasonPhrase(),
+                                            response
+                                    );
+                                }
                                 emitter.onError(clientError);
                             } catch (Exception e) {
                                 emitter.onError(new HttpClientException("Exception occurred decoding error response: " + e.getMessage(), e));
                             }
                         } else {
                             emitter.onNext(response);
+                            response.onComplete();
+                            emitter.onComplete();
                         }
-                        emitter.onComplete();
                     }
                 } finally {
                     pipeline.remove(this);

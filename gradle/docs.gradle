@@ -95,6 +95,7 @@ task publishGuide(type: grails.doc.gradle.PublishGuide) {
     resourcesDir = project.file(docResourcesDir)
     properties = [
             'safe':'UNSAFE',
+            'source-highlighter':'highlightjs',
             'version': project.version,
             'subtitle': project.projectDesc,
             'api': '../api',

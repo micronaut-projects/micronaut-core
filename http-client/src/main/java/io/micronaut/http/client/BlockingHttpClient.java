@@ -45,11 +45,34 @@ public interface BlockingHttpClient {
      *
      * @param request  The {@link HttpRequest} to execute
      * @param bodyType The body type
+     * @param errorType The error type
+     * @param <I>      The request body type
+     * @param <O>      The response body type
+     * @param <E>      The error type
+     * @return The full {@link HttpResponse} object
+     */
+    <I, O, E> HttpResponse<O> exchange(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType);
+
+
+    /**
+     * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned
+     * {@link org.reactivestreams.Publisher} and converting the response body to the specified type.</p>
+     * <p>
+     * <p>This method will send a {@code Content-Length} header and except a content length header the response and
+     * is designed for simple non-streaming exchanges of data</p>
+     * <p>
+     * <p>By default the exchange {@code Content-Type} is application/json, unless otherwise specified in the passed
+     * {@link HttpRequest}</p>
+     *
+     * @param request  The {@link HttpRequest} to execute
+     * @param bodyType The body type
      * @param <I>      The request body type
      * @param <O>      The response body type
      * @return The full {@link HttpResponse} object
      */
-    <I, O> HttpResponse<O> exchange(HttpRequest<I> request, Argument<O> bodyType);
+    default <I, O> HttpResponse<O> exchange(HttpRequest<I> request, Argument<O> bodyType) {
+        return exchange(request, bodyType, HttpClient.DEFAULT_ERROR_TYPE);
+    }
 
     /**
      * Perform an HTTP request for the given request object emitting the full HTTP response from returned
@@ -91,16 +114,34 @@ public interface BlockingHttpClient {
      */
     @SuppressWarnings("unchecked")
     default <I, O> O retrieve(HttpRequest<I> request, Argument<O> bodyType) {
-        HttpResponse<O> response = exchange(request, bodyType);
+        return retrieve(request, bodyType, HttpClient.DEFAULT_ERROR_TYPE);
+    }
+
+    /**
+     * Perform an HTTP request for the given request object emitting the full HTTP response from returned
+     * {@link org.reactivestreams.Publisher} and converting the response body to the specified type.
+     *
+     * @param request  The {@link HttpRequest} to execute
+     * @param bodyType The body type
+     * @param errorType The error type
+     * @param <I>      The request body type
+     * @param <O>      The response body type
+     * @param <E>      The error type
+     * @return A result of the given type or null the URI returns a 404
+     * @throws HttpClientResponseException if an error status is returned
+     */
+    @SuppressWarnings("unchecked")
+    default <I, O, E> O retrieve(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
+        HttpResponse<O> response = exchange(request, bodyType, errorType);
         if (HttpStatus.class.isAssignableFrom(bodyType.getType())) {
             return (O) response.getStatus();
         } else {
             return response
-                .getBody()
-                .orElseThrow(() -> new HttpClientResponseException(
-                    "Empty body",
-                    response
-                ));
+                    .getBody()
+                    .orElseThrow(() -> new HttpClientResponseException(
+                            "Empty body",
+                            response
+                    ));
         }
     }
 
