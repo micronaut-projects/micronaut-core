@@ -3,7 +3,6 @@ dependencies {
     compile project(":inject")
     compile "org.apache.tomcat:tomcat-jdbc:9.0.1"
     compileOnly project(":inject-java")
-    compileOnly dependencyModuleVersion("spring", "spring-jdbc")
 
     testCompile "com.h2database:h2:1.4.196"
 
