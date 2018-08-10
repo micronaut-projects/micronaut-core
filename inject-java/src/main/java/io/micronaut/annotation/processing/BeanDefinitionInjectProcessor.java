@@ -1390,6 +1390,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     if (paramCount < 2) {
                         VariableElement paramType = paramCount == 1 ? params.get(0) : null;
                         Object expectedType = paramType != null ? modelUtils.resolveTypeReference(paramType.asType()) : null;
+
+                        metadataBuilder.visitProperty(
+                                expectedType != null ? expectedType.toString() : "boolean",
+                                configurationPrefix + '.' + NameUtils.decapitalize(methodName.substring(prefix.length())),
+                                null,
+                                null
+                        );
+
                         writer.visitConfigBuilderMethod(
                                 prefix,
                                 configurationPrefix,
