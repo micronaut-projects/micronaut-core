@@ -50,15 +50,15 @@ public class ClientSslConfiguration extends SslConfiguration {
             DefaultSslConfiguration.DefaultKeyStoreConfiguration defaultKeyStoreConfiguration,
             DefaultSslConfiguration.TrustStoreConfiguration defaultTrustStoreConfiguration) {
         readExisting(defaultSslConfiguration, defaultKeyConfiguration, defaultKeyStoreConfiguration, defaultTrustStoreConfiguration);
-        this.enabled = true;
-        this.buildSelfSigned = true;
+        setEnabled(true);
+        setBuildSelfSigned(true);
     }
 
     /**
      * The default client configuration.
      */
     public ClientSslConfiguration() {
-        this.enabled = true;
+        setEnabled(true);
     }
 
     /**
@@ -69,7 +69,7 @@ public class ClientSslConfiguration extends SslConfiguration {
     @Inject
     void setKey(@Nullable DefaultKeyConfiguration keyConfiguration) {
         if (keyConfiguration != null) {
-            this.key = keyConfiguration;
+            super.setKey(keyConfiguration);
         }
     }
 
@@ -82,7 +82,7 @@ public class ClientSslConfiguration extends SslConfiguration {
     @Inject
     void setKeyStore(@Nullable DefaultKeyStoreConfiguration keyStoreConfiguration) {
         if (keyStoreConfiguration != null) {
-            this.keyStore = keyStoreConfiguration;
+            super.setKeyStore(keyStoreConfiguration);
         }
     }
 
@@ -95,7 +95,7 @@ public class ClientSslConfiguration extends SslConfiguration {
     @Inject
     void setTrustStore(@Nullable DefaultTrustStoreConfiguration trustStore) {
         if (trustStore != null) {
-            this.trustStore = trustStore;
+            super.setTrustStore(trustStore);
         }
     }
 
