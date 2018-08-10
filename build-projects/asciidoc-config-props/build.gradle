@@ -5,6 +5,3 @@ dependencies {
     compile "org.codehaus.groovy:groovy:$groovyVersion"
 }
 
-compileGroovy.doFirst {
-    delete("$rootProject.projectDir/src/main/docs/guide/appendix/propertyReference.adoc")
-}
