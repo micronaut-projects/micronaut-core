@@ -273,8 +273,8 @@ cli:
     ideReload: Reloading with an IDE
 appendix:
   title: Appendices
-  propertyReference: Configuration Property Reference
   faq: Frequently Asked Questions (FAQ)
   usingsnapshots: Using Snapshots
   problems: Common Problems
   breaks: Breaking Changes
+  propertyReference: Configuration Property Reference
