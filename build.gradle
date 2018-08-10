@@ -257,7 +257,7 @@ subprojects { subproject ->
         targetCompatibility = '1.8'
 //        compileJava.options.compilerArgs.add '-parameters'
 //        compileTestJava.options.compilerArgs.add '-parameters'
-        if(!subproject.name.contains('test-suite')) {
+        if(!subproject.name.contains('test-suite') && !subproject.name.contains('build-projects')) {
             apply from:"${rootProject.rootDir}/gradle/publishing.gradle"
             apply plugin: 'checkstyle'
             
@@ -328,6 +328,9 @@ subprojects { subproject ->
             compile dependencyVersion("slf4j")
         }
 
+        if (subproject.name != 'inject' && subproject.name != 'core' && subproject.name != 'aop' && !subproject.name.contains('asciidoc-config-props')) {
+            compileOnly project(":build-projects:asciidoc-config-props")
+        }
         compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
         testCompile "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
         testCompile dependencyVersion("groovy")

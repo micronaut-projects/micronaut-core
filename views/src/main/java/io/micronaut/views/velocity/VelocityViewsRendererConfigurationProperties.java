@@ -33,9 +33,9 @@ public class VelocityViewsRendererConfigurationProperties implements VelocityVie
     public static final String PREFIX = ViewsConfigurationProperties.PREFIX + ".velocity";
     public static final String DEFAULT_EXTENSION = "vm";
 
-    protected boolean enabled = true;
+    private boolean enabled = true;
 
-    protected String defaultExtension = DEFAULT_EXTENSION;
+    private String defaultExtension = DEFAULT_EXTENSION;
 
     /**
      * enabled getter.
@@ -53,5 +53,23 @@ public class VelocityViewsRendererConfigurationProperties implements VelocityVie
     @Override
     public String getDefaultExtension() {
         return defaultExtension;
+    }
+
+    /**
+     * Whether velocity views are enabled.
+     *
+     * @param enabled True if they are
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    /**
+     * Sets the defautlt extension to use for velocity templates.
+     *
+     * @param defaultExtension The default extension
+     */
+    public void setDefaultExtension(String defaultExtension) {
+        this.defaultExtension = defaultExtension;
     }
 }
