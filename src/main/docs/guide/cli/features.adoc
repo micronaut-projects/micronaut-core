@@ -43,7 +43,7 @@ Provided Features:
   redis-lettuce     Configures the Lettuce driver for Redis
   security-jwt      Adds support for JWT (JSON Web Token) based Authentication
   security-session  Adds support for Session based Authentication
-  spek              Adds support for the Spek testing framewokr
+  spek              Adds support for the Spek testing framework
   spock             Adds support for the Spock testing framework
   springloaded      Adds support for class reloading with Spring-Loaded
   tracing-jaeger    Adds support for distributed tracing with Jaeger (https://www.jaegertracing.io)
