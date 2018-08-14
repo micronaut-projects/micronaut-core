@@ -140,7 +140,7 @@ class Route53AutoNamingClientUnitSpec extends Specification {
     static class AWSServiceDiscoveryAsyncMock extends AWSServiceDiscoveryClientResolver implements AWSServiceDiscoveryResolver {
 
         AWSServiceDiscoveryAsyncMock(AWSClientConfiguration clientConfiguration) {
-            super(clientConfiguration)
+            super(null) // if you don't do this it will throw an error about no region set
         }
 
         @Override
