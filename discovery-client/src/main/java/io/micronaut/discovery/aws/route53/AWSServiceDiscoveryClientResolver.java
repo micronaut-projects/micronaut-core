@@ -39,7 +39,11 @@ public class AWSServiceDiscoveryClientResolver implements AWSServiceDiscoveryRes
      * @param clientConfiguration aws client configuration to use
      */
     public AWSServiceDiscoveryClientResolver(AWSClientConfiguration clientConfiguration) {
-        awsServiceDiscoveryAsync = AWSServiceDiscoveryAsyncClientBuilder.standard().withClientConfiguration(clientConfiguration.getClientConfiguration()).build();
+        if (clientConfiguration != null) {
+            awsServiceDiscoveryAsync = AWSServiceDiscoveryAsyncClientBuilder.standard().withClientConfiguration(clientConfiguration.getClientConfiguration()).build();
+        } else {
+            awsServiceDiscoveryAsync = AWSServiceDiscoveryAsyncClientBuilder.defaultClient();
+        }
     }
 
     /**
