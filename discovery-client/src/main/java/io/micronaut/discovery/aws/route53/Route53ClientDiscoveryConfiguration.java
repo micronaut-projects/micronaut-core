@@ -103,4 +103,9 @@ public class Route53ClientDiscoveryConfiguration extends DiscoveryClientConfigur
     public void setAwsServiceId(String awsServiceId) {
         this.awsServiceId = awsServiceId;
     }
+
+    @Override
+    public ConnectionPoolConfiguration getConnectionPoolConfiguration() {
+        return null;
+    }
 }
