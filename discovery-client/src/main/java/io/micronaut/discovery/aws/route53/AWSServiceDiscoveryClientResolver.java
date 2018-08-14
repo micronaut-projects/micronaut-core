@@ -16,6 +16,7 @@
 
 package io.micronaut.discovery.aws.route53;
 
+import com.amazonaws.regions.Regions;
 import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsync;
 import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsyncClientBuilder;
 import io.micronaut.configuration.aws.AWSClientConfiguration;
@@ -42,7 +43,7 @@ public class AWSServiceDiscoveryClientResolver implements AWSServiceDiscoveryRes
         if (clientConfiguration != null) {
             awsServiceDiscoveryAsync = AWSServiceDiscoveryAsyncClientBuilder.standard().withClientConfiguration(clientConfiguration.getClientConfiguration()).build();
         } else {
-            awsServiceDiscoveryAsync = AWSServiceDiscoveryAsyncClientBuilder.defaultClient();
+            awsServiceDiscoveryAsync = AWSServiceDiscoveryAsyncClientBuilder.standard().withRegion(Regions.DEFAULT_REGION).build();
         }
     }
 
