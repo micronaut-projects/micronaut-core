@@ -58,12 +58,14 @@ import com.amazonaws.services.servicediscovery.model.UpdateInstanceCustomHealthS
 import com.amazonaws.services.servicediscovery.model.UpdateInstanceCustomHealthStatusResult
 import com.amazonaws.services.servicediscovery.model.UpdateServiceRequest
 import com.amazonaws.services.servicediscovery.model.UpdateServiceResult
+import io.micronaut.context.annotation.Requires
 import spock.mock.DetachedMockFactory
 
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Future
 import java.util.function.Supplier
 
+@Requires(env = 'SILLY')
 class AWSServiceDiscoveryAsyncMock implements AWSServiceDiscoveryAsync {
 
 

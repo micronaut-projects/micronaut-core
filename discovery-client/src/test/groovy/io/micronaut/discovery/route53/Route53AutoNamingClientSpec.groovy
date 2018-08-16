@@ -132,14 +132,16 @@ class Route53AutoNamingClientSpec extends Specification {
 
         List<String> serviceIds = Flowable.fromPublisher(discoveryClient.getServiceIds()).blockingFirst()
         assert serviceIds != null
-
+        sleep(3000) // give aws time to register it
         List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances(serviceIds.get(0))).blockingFirst()
+
 
         instances.size() == 1
         instances != null
         serviceIds !=null
 
         then:
+        sleep(3000) // give aws time to register it
         client.deregister(serviceInstance)
 
 
