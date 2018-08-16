@@ -91,6 +91,7 @@ import java.util.stream.Collectors;
  */
 @SupportedAnnotationTypes("*")
 @SupportedSourceVersion(SourceVersion.RELEASE_8)
+@Internal
 public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProcessor {
 
     private static final String[] ANNOTATION_STEREOTYPES = new String[]{
@@ -427,8 +428,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         List<? extends Element> members = elementUtils.getAllMembers(classElement);
                         ElementFilter.fieldsIn(members).forEach(
                                 field -> {
-                                    if (!modelUtils.isStatic(field) && !modelUtils.isFinal(field)) {
-                                        visitConfigurationProperty(field);
+                                    AnnotationMetadata fieldAnnotationMetadata = annotationUtils.getAnnotationMetadata(field);
+                                    boolean isConfigBuilder = fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class);
+                                    if (modelUtils.isStatic(field)) {
+                                        return;
+                                    }
+                                    // its common for builders to be initialized, so allow final
+                                    if (!modelUtils.isFinal(field) || isConfigBuilder) {
+                                        visitConfigurationProperty(field, fieldAnnotationMetadata);
                                     }
                                 }
                         );
@@ -1252,9 +1259,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
          * @param field The {@link VariableElement}
          * @return Returns null after visiting the configuration properties
          */
-        public Object visitConfigurationProperty(VariableElement field) {
+        public Object visitConfigurationProperty(VariableElement field, AnnotationMetadata fieldAnnotationMetadata) {
             Optional<ExecutableElement> setterMethod = modelUtils.findSetterMethodFor(field);
-            AnnotationMetadata fieldAnnotationMetadata = annotationUtils.getAnnotationMetadata(field);
             boolean isInjected = fieldAnnotationMetadata.hasStereotype(Inject.class);
             boolean isValue = fieldAnnotationMetadata.hasStereotype(Value.class);
 
