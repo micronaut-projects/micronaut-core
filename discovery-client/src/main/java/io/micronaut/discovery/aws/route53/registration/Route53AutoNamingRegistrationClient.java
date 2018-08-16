@@ -228,7 +228,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         ConvertibleValues<String> metadata = instance.getMetadata();
 
         RegisterInstanceRequest instanceRequest = new RegisterInstanceRequest().withServiceId(route53AutoRegistrationConfiguration.getAwsServiceId())
-                .withInstanceId(metadata.asMap().get("instanceId")).withCreatorRequestId(Long.toString(System.nanoTime())).withAttributes(instanceAttributes);
+                .withInstanceId(instance.getInstanceId().get()).withCreatorRequestId(Long.toString(System.nanoTime())).withAttributes(instanceAttributes);
 
         Future<RegisterInstanceResult> instanceResult = getDiscoveryClient().registerInstanceAsync(instanceRequest);
         Flowable<RegisterInstanceResult> flowableResult = Flowable.fromFuture(instanceResult);
