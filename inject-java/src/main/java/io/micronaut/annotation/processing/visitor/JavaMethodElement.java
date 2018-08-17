@@ -58,8 +58,7 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
 
         if (returnType instanceof NoType) {
             return new JavaVoidElement();
-        }
-        else if (returnType instanceof DeclaredType) {
+        } else if (returnType instanceof DeclaredType) {
             Element e = ((DeclaredType) returnType).asElement();
             if (e instanceof TypeElement) {
                 TypeElement typeElement = (TypeElement) e;

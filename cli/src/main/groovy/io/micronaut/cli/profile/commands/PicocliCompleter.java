@@ -35,6 +35,11 @@ public class PicocliCompleter implements Completer {
 
     CommandSpec commandSpec;
 
+    /**
+     * Default constructor.
+     *
+     * @param spec The command spec
+     */
     public PicocliCompleter(CommandSpec spec) {
         this.commandSpec = spec;
     }

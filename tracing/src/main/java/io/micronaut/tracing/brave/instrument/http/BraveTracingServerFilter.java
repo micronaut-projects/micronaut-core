@@ -42,6 +42,7 @@ public class BraveTracingServerFilter extends AbstractBraveTracingFilter impleme
     private final HttpServerHandler<HttpRequest<?>, MutableHttpResponse<?>> serverHandler;
     private final TraceContext.Extractor<HttpHeaders> extractor;
     private final io.opentracing.Tracer openTracer;
+
     /**
      * @param httpTracing The {@link HttpTracing} instance
      * @param openTracer The open tracing instance

@@ -39,7 +39,7 @@ public class JavaVisitorContext implements VisitorContext {
     private final Types types;
 
     /**
-     * The default constructor
+     * The default constructor.
      *
      * @param messager The messager
      * @param elements The elements
