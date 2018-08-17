@@ -139,7 +139,7 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         // this only work if you create a health status check when you register it
         // we can't really pulsate anywhere because amazon health checks work inverse from this UNLESS you have a custom health check
         Optional<String> opt = instance.getInstanceId();
-            if (!opt.isPresent()) {
+        if (!opt.isPresent()) {
             // try the metadata
             if (instance.getMetadata().contains("instanceId")) {
                 opt = Optional.of(instance.getMetadata().asMap().get("instanceId"));
