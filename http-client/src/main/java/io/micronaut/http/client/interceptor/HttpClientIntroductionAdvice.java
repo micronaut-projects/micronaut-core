@@ -596,14 +596,14 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
 
                 for (Map.Entry<String, String> entry: queryParams.entrySet()) {
-                    sb.append(URLEncoder.encode(entry.getKey(), "UTF-8"));
+                    sb.append(entry.getKey());
                     sb.append('=');
-                    sb.append(URLEncoder.encode(entry.getValue(), "UTF-8"));
+                    sb.append(entry.getValue());
                 }
 
                 return new URI(oldUri.getScheme(), oldUri.getAuthority(), oldUri.getPath(),
                         sb.toString(), oldUri.getFragment()).toString();
-            } catch (URISyntaxException | UnsupportedEncodingException e) {
+            } catch (URISyntaxException e) {
                 //no-op
             }
         }
