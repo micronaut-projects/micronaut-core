@@ -139,6 +139,16 @@ public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoReg
         // this only work if you create a health status check when you register it
         // we can't really pulsate anywhere because amazon health checks work inverse from this UNLESS you have a custom health check
         Optional<String> opt = instance.getInstanceId();
+            if (!opt.isPresent()) {
+            // try the metadata
+            if (instance.getMetadata().contains("instanceId")) {
+                opt = Optional.of(instance.getMetadata().asMap().get("instanceId"));
+            } else {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Cannot determine the instance ID. Are you sure you are running on AWS EC2?");
+                }
+            }
+        }
 
         opt.ifPresent(instanceId -> {
             if (discoveryService != null && discoveryService.getHealthCheckCustomConfig() != null) {
