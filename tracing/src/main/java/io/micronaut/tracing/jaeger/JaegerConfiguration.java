@@ -17,7 +17,7 @@
 package io.micronaut.tracing.jaeger;
 
 import io.jaegertracing.Configuration;
-import io.jaegertracing.metrics.MetricsFactory;
+import io.jaegertracing.spi.MetricsFactory;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.env.Environment;
