@@ -31,6 +31,7 @@ import io.micronaut.inject.configuration.PropertyMetadata
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
 
 import javax.inject.Named
+import java.util.concurrent.TimeUnit
 import java.util.function.Function
 import static org.codehaus.groovy.ast.ClassHelper.makeCached
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getGetterName
@@ -877,7 +878,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         void visitField(FieldNode fieldNode) {
             if (fieldNode.name == 'metaClass') return
             int modifiers = fieldNode.modifiers
-            if (Modifier.isFinal(modifiers) || Modifier.isStatic(modifiers)) {
+            if (Modifier.isStatic(modifiers)) {
                 return
             }
             if (fieldNode.isSynthetic() && !isPackagePrivate(fieldNode, fieldNode.modifiers)) {
@@ -885,6 +886,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
             ClassNode declaringClass = fieldNode.declaringClass
             AnnotationMetadata fieldAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(fieldNode)
+            if (Modifier.isFinal(modifiers) && !fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder)) {
+                return
+            }
             boolean isInject = fieldAnnotationMetadata.hasStereotype(Inject)
             boolean isValue = !isInject && (fieldAnnotationMetadata.hasStereotype(Value) || isConfigurationProperties)
 
@@ -986,10 +990,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             FieldNode fieldNode = propertyNode.field
             if (fieldNode.name == 'metaClass') return
             def modifiers = propertyNode.getModifiers()
-            if (Modifier.isFinal(modifiers) || Modifier.isStatic(modifiers)) {
+            if (Modifier.isStatic(modifiers)) {
                 return
             }
             AnnotationMetadata fieldAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(fieldNode)
+            if (Modifier.isFinal(modifiers) && !fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder)) {
+                return
+            }
             boolean isInject = fieldNode != null && fieldAnnotationMetadata.hasStereotype(Inject)
             boolean isValue = !isInject && fieldNode != null && (fieldAnnotationMetadata.hasStereotype(Value) || isConfigurationProperties)
             String propertyName = propertyNode.name
@@ -1500,33 +1507,67 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             Boolean allowZeroArgs = annotationMetadata.getValue(ConfigurationBuilder.class, "allowZeroArgs", Boolean.class).orElse(false)
             List<String> prefixes = Arrays.asList(annotationMetadata.getValue(ConfigurationBuilder.class, "prefixes", String[].class).orElse(["set"] as String[]))
             String configurationPrefix = annotationMetadata.getValue(ConfigurationBuilder.class, "configurationPrefix", String.class).orElse("")
+            Set<String> includes = annotationMetadata.getValue(ConfigurationBuilder.class, "includes", Set.class).orElse(Collections.emptySet())
+            Set<String> excludes = annotationMetadata.getValue(ConfigurationBuilder.class, "excludes", Set.class).orElse(Collections.emptySet())
 
             PublicMethodVisitor visitor = new PublicMethodVisitor(sourceUnit) {
                 @Override
                 void accept(ClassNode cn, MethodNode method) {
+                    String name = method.getName()
+                    ClassNode returnType = method.getReturnType()
                     Parameter[] params = method.getParameters()
-                    String methodName = method.getName()
-                    String prefix = getMethodPrefix(methodName)
-                    Parameter paramType = params.size() == 1 ? params[0] : null
-                    Object expectedType = paramType != null ? AstGenericUtils.resolveTypeReference(paramType.type) : null
-                    writer.visitConfigBuilderMethod(
-                            prefix,
-                            configurationPrefix,
-                            AstGenericUtils.resolveTypeReference(method.getReturnType()),
-                            methodName,
-                            expectedType,
-                            paramType != null ? resolveGenericTypes(paramType) : null
-                    )
+                    String prefix = getMethodPrefix(name)
+                    String propertyName = NameUtils.decapitalize(name.substring(prefix.length()));
+                    if (!includes.isEmpty() && !includes.contains(propertyName)) {
+                        return
+                    }
+                    if (!excludes.isEmpty() && excludes.contains(propertyName)) {
+                        return
+                    }
+
+                    int paramCount = params.size()
+                    if (paramCount < 2) {
+                        Parameter paramType = params.size() == 1 ? params[0] : null
+                        Object expectedType = paramType != null ? AstGenericUtils.resolveTypeReference(paramType.type) : null
+
+                        writer.visitConfigBuilderMethod(
+                                prefix,
+                                configurationPrefix,
+                                AstGenericUtils.resolveTypeReference(returnType),
+                                name,
+                                expectedType,
+                                paramType != null ? resolveGenericTypes(paramType) : null
+                        )
+
+                    } else if (paramCount == 2) {
+                        // check the params are a long and a TimeUnit
+                        Parameter first = params[0]
+                        Parameter second = params[1]
+
+                        if (second.type.name == TimeUnit.class.name && first.type.name == "long") {
+                            writer.visitConfigBuilderDurationMethod(
+                                    prefix,
+                                    configurationPrefix,
+                                    AstGenericUtils.resolveTypeReference(returnType),
+                                    name
+                            )
+                        }
+                    }
                 }
 
                 @Override
                 protected boolean isAcceptable(MethodNode node) {
+                    // ignore deprecated methods
+                    if (AstAnnotationUtils.hasStereotype(node, Deprecated.class)) {
+                        return false
+                    }
                     int paramCount = node.getParameters().size()
-                    return (paramCount == 1 || allowZeroArgs && paramCount == 0) && super.isAcceptable(node) && isPrefixedWith(node)
+                    ((paramCount > 0 && paramCount < 3) || (allowZeroArgs && paramCount == 0)) &&
+                            super.isAcceptable(node) &&
+                            isPrefixedWith(node.getName())
                 }
 
-                private boolean isPrefixedWith(MethodNode node) {
-                    String name = node.getName()
+                private boolean isPrefixedWith(String name) {
                     for (String prefix : prefixes) {
                         if (name.startsWith(prefix)) return true
                     }
