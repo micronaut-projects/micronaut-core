@@ -17,7 +17,6 @@
 package io.micronaut.discovery.consul;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.discovery.DiscoveryConfiguration;
 import io.micronaut.discovery.client.DiscoveryClientConfiguration;

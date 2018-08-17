@@ -1257,6 +1257,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
         /**
          * @param field The {@link VariableElement}
+         * @param fieldAnnotationMetadata The annotation metadata for the field
          * @return Returns null after visiting the configuration properties
          */
         public Object visitConfigurationProperty(VariableElement field, AnnotationMetadata fieldAnnotationMetadata) {
