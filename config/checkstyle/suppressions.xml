@@ -6,5 +6,5 @@
 
 <suppressions>
     <suppress checks="FileLength"
-              files="DefaultBeanContext.java|BeanDefinitionWriter.java"/>
+              files="DefaultBeanContext.java|BeanDefinitionWriter.java|DefaultHttpClient.java"/>
 </suppressions>
