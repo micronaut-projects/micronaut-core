@@ -10,6 +10,7 @@ dependencies {
     compileOnly "org.apache.velocity:velocity-engine-core:$velocityEngine"
     compileOnly "com.github.jknack:handlebars:${handlebarsVersion}"
     compileOnly "org.thymeleaf:thymeleaf:$thymeleafVersion"
+    compileOnly project(":security")
 
     compile project(":runtime")
     compile project(":http")
