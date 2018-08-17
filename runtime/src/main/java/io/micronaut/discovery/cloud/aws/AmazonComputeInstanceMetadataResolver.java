@@ -132,6 +132,9 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
             }
 
             ec2InstanceMetadata.metadata = objectMapper.convertValue(ec2InstanceMetadata, Map.class);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("EC2 Metadata found:"+ec2InstanceMetadata.metadata.toString());
+            }
             //TODO make individual calls for building network interfaces.. required recursive http calls for all mac addresses
         } catch (IOException e) {
             LOG.error("Error reading ec2 metadata url", e);
