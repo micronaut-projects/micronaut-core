@@ -1,6 +1,7 @@
 Micronaut provides a compile-time AOP API that does not use reflection. When you use any Micronaut's <<aop, AOP Advice>>,
-it creates a subclass at compile-time to provide the AOP behaviour. Kotlin classes are final by default. Thus, you need to annotate them as `open`
-so that the generated subclasses can extend them.
+it creates a subclass at compile-time to provide the AOP behaviour. This can be a problem because Kotlin classes are final by default. If the application was created with the Micronaut CLI, then the Kotlin link:https://kotlinlang.org/docs/reference/compiler-plugins.html#all-open-compiler-plugin[all-open] plugin is configured for you to automatically change your classes to `open` when an AOP annotation is used. To configure it yourself, simply add the api:io.micronaut.aop.Around[] class to the list of supported annotations.
+
+If you prefer not to or cannot use the `all-open` plugin, you must declare the classes that are annotated with an AOP annotation to be open:
 
 [source, java]
 ----
@@ -15,7 +16,7 @@ import javax.validation.constraints.NotBlank
 open class EmailController { // <1>
 
     @Get("/send")
-    open fun index(@NotBlank recipient: String, // <1>
+    fun index(@NotBlank recipient: String, // <1>
                    @NotBlank subject: String): HttpStatus {
         return HttpStatus.OK
     }
@@ -23,3 +24,5 @@ open class EmailController { // <1>
 ----
 
 <1> if you use `@Validated` AOP Advice, you need to use `open` at class and method level.
+
+NOTE: The `all-open` plugin does not handle methods. If you declare an AOP annotation on a method, you must manually declare it as open.
