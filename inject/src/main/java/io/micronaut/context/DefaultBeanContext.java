@@ -1387,10 +1387,6 @@ public class DefaultBeanContext implements BeanContext {
             return (T) this;
         }
 
-        if (qualifier == null) {
-
-        }
-
         BeanKey beanKey = new BeanKey(beanType, qualifier);
 
         if (LOG.isTraceEnabled()) {
@@ -1851,9 +1847,7 @@ public class DefaultBeanContext implements BeanContext {
                 Object instance = registration.bean;
                 BeanDefinition definition = registration.beanDefinition;
                 if (beanType.isInstance(instance)) {
-
                     if (!beansOfTypeList.contains(instance)) {
-
                         if (!hasQualifier) {
 
                             if (LOG.isTraceEnabled()) {
