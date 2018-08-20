@@ -35,6 +35,7 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import java.util.Optional;
 
 /**
@@ -49,15 +50,28 @@ public class ViewsFilter extends OncePerRequestHttpServerFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(ViewsFilter.class);
 
+    protected final Integer order;
     protected final BeanLocator beanLocator;
 
     /**
      * Constructor.
      *
      * @param beanLocator The bean locator
+     * @param viewsFilterOrderProvider The order provider
      */
-    public ViewsFilter(BeanLocator beanLocator) {
+    public ViewsFilter(BeanLocator beanLocator,
+                       @Nullable ViewsFilterOrderProvider viewsFilterOrderProvider) {
         this.beanLocator = beanLocator;
+        if (viewsFilterOrderProvider != null) {
+            this.order = viewsFilterOrderProvider.getOrder();
+        } else {
+            this.order = 0;
+        }
+    }
+
+    @Override
+    public int getOrder() {
+        return order;
     }
 
     @Override

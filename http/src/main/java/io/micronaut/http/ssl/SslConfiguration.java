@@ -192,6 +192,7 @@ public class SslConfiguration implements Toggleable {
 
     /**
      * Sets the protocols to use.
+     *
      * @param protocols The protocols
      */
     public void setProtocols(String[] protocols) {
@@ -199,7 +200,8 @@ public class SslConfiguration implements Toggleable {
     }
 
     /**
-     * Sets the protocol to use
+     * Sets the protocol to use.
+     *
      * @param protocol The protocol
      */
     public void setProtocol(String protocol) {

@@ -30,7 +30,7 @@ EntityManager entityManager;
 EntityManager otherManager;
 ----
 
-Micronaut will inject a compile time scoped proxy that retrieves the `EntityManager` associated with the current transaction when using ann:spring.tx.Transactional[] (see "Using Spring Transaction Management" below).
+Micronaut will inject a compile time scoped proxy that retrieves the `EntityManager` associated with the current transaction when using ann:spring.tx.annotation.Transactional[] (see "Using Spring Transaction Management" below).
 
 
 ==== Customizing Hibernate / JPA Configuration

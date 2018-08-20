@@ -17,7 +17,6 @@
 package io.micronaut.tracing.instrument.util;
 
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import io.opentracing.Scope;
 import io.opentracing.Span;

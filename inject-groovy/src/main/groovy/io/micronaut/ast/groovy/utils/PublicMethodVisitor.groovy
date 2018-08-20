@@ -16,9 +16,14 @@
 package io.micronaut.ast.groovy.utils
 
 import groovy.transform.CompileStatic
+import io.micronaut.core.annotation.Internal
+import io.micronaut.core.naming.NameUtils
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport
+import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
+import org.codehaus.groovy.ast.Parameter
+import org.codehaus.groovy.ast.PropertyNode
 import org.codehaus.groovy.control.SourceUnit
 
 /**
@@ -26,6 +31,7 @@ import org.codehaus.groovy.control.SourceUnit
  * @since 1.0
  */
 @CompileStatic
+@Internal
 abstract class PublicMethodVisitor extends ClassCodeVisitorSupport {
     final SourceUnit sourceUnit
     private final Set<String> processed = new HashSet<>()
@@ -64,6 +70,44 @@ abstract class PublicMethodVisitor extends ClassCodeVisitorSupport {
                 accept(current ?: node.declaringClass, node)
             }
         }
+    }
+
+    @Override
+    void visitProperty(PropertyNode node) {
+        //Convert the property to a setter method
+        Parameter param = new Parameter(node.type, node.name)
+        MethodNode setter = new MethodNode(NameUtils.setterNameFor(node.name),
+                node.modifiers,
+                ClassHelper.makeCached(Void.TYPE),
+                [param] as Parameter[],
+                null,
+                null)
+        setter.addAnnotations(node.field.getAnnotations())
+        setter.setDeclaringClass(node.getDeclaringClass())
+
+        //Convert the property to a getter method
+        MethodNode getter = new MethodNode(NameUtils.getterNameFor(node.name),
+                node.modifiers,
+                node.type,
+                [] as Parameter[],
+                null,
+                null)
+        getter.addAnnotations(node.field.getAnnotations())
+        getter.setDeclaringClass(node.getDeclaringClass())
+
+        ClassNode classNode = current ?: node.declaringClass
+        //Can't use node.getText() because for properties because it returns <not implemented yet...>
+        String key = classNode.getName() + '#' + node.getName()
+        if (!processed.contains(key)) {
+            processed.add(key)
+            if (isAcceptable(setter)) {
+                accept(classNode, setter)
+            }
+            if (isAcceptable(getter)) {
+                accept(classNode, getter)
+            }
+        }
+
     }
 
     protected boolean isAcceptable(MethodNode node) {

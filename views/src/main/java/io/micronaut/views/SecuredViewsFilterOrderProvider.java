@@ -14,24 +14,29 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.session;
+package io.micronaut.views;
 
-import io.micronaut.security.filters.SecurityFilterOrderProvider;
-import io.micronaut.session.http.HttpSessionFilter;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.security.filters.SecurityFilter;
+
+import javax.inject.Inject;
 import javax.inject.Singleton;
 
 /**
- * {@link SecurityFilterOrderProvider} implementation for Session-Based Authentication.
- * @author Sergio del Amo
+ * Ensures the views filter is applied after the security filter.
+ *
+ * @author James Kleeh
  * @since 1.0
  */
 @Singleton
-public class SessionSecurityFilterOrderProvider implements SecurityFilterOrderProvider {
+@Requires(beans = SecurityFilter.class)
+public class SecuredViewsFilterOrderProvider implements ViewsFilterOrderProvider {
 
-    private static final int ORDER_PADDING = 100;
+    @Inject
+    protected SecurityFilter securityFilter;
 
     @Override
     public int getOrder() {
-        return HttpSessionFilter.ORDER + ORDER_PADDING;
+        return securityFilter.getOrder() + 100;
     }
 }

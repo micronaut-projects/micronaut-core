@@ -289,6 +289,14 @@ class HttpGetSpec extends Specification {
         helper.queryParam() == "a!b"
     }
 
+    void "test query parameter with @Client interface"() {
+        given:
+        MyGetClient client = embeddedServer.applicationContext.getBean(MyGetClient)
+
+        expect:
+        client.queryParam('{"service":["test"]}') == '{"service":["test"]}'
+    }
+
     void "test body availability"() {
         given:
         RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
@@ -371,6 +379,27 @@ class HttpGetSpec extends Specification {
 
     static class Error {
         String message
+    }
+
+    @Client("/get")
+    static interface MyGetClient {
+        @Get(value = "/simple", produces = MediaType.TEXT_PLAIN)
+        String simple()
+
+        @Get("/pojo")
+        Book pojo()
+
+        @Get("/pojoList")
+        List<Book> pojoList()
+
+        @Get(value = "/error", produces = MediaType.TEXT_PLAIN)
+        HttpResponse error()
+
+        @Get("/jsonError")
+        HttpResponse jsonError()
+
+        @Get("/queryParam")
+        String queryParam(@QueryValue String foo)
     }
 
     @javax.inject.Singleton
