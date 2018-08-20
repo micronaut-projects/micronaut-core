@@ -477,9 +477,10 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         def (Set<Feature> features, List<String> validRequestedFeatureNames) = populateFeatures(profile, requestedFeatures, lang)
         features = pruneOneOfFeatures(profile, features)
 
-
-        MicronautConsole.getInstance().updateStatus "Generating ${getLanguage(features).capitalize()} project..."
-
+        String language = getLanguage(features)?.capitalize()
+        if (language) {
+            MicronautConsole.getInstance().updateStatus "Generating ${language} project..."
+        }
 
         List<String> removedFeatures = validRequestedFeatureNames.findAll { !features*.name.contains(it) }
 
@@ -530,7 +531,10 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             return f.name == SupportedLanguage.java.name()
         } as Feature
 
-        features.add(langFeature)
+        if (langFeature) {
+            features.add(langFeature)
+        }
+
         features.addAll(profile.requiredFeatures)
 
         if (validRequestedFeatureNames) {
@@ -592,7 +596,8 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
     }
 
     protected static String getLanguage(Set<Feature> features) {
-        features.find { SupportedLanguage.values()*.name().contains(it.name)}.name
+        List<String> names = SupportedLanguage.values()*.name()
+        features.find { names.contains(it.name) }?.name
     }
 
     protected String getDefaultProfile() {
