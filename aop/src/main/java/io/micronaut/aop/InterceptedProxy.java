@@ -42,5 +42,6 @@ public interface InterceptedProxy<T> extends Intercepted {
      * @param qualifier The bean qualifier to use
      */
     @Internal
+    @SuppressWarnings("MethodName")
     void $withBeanQualifier(Qualifier<T> qualifier);
 }

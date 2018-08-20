@@ -40,6 +40,10 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.TYPE, ElementType.METHOD, ElementType.FIELD, ElementType.PARAMETER})
 @Bean
 public @interface CurrentSession {
+
+    /**
+     * @return The name qualifier of the session bean
+     */
     @AliasFor(annotation = Named.class, member = "value")
     String value() default "";
 }

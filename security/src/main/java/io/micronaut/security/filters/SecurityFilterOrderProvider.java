@@ -16,17 +16,14 @@
 
 package io.micronaut.security.filters;
 
+import io.micronaut.http.filter.FilterOrderProvider;
+
 /**
  * Provides an order for the {@link SecurityFilter}.
  *
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface SecurityFilterOrderProvider {
+public interface SecurityFilterOrderProvider extends FilterOrderProvider {
 
-    /**
-     * Provides the order of the {@link SecurityFilter order}.
-     * @return The {@link SecurityFilter order}
-     */
-    Integer getSecurityFilterOrder();
 }

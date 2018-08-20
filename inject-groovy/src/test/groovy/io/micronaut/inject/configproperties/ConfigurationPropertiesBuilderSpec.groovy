@@ -1,51 +1,32 @@
-/*
- * Copyright 2017-2018 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.inject.configproperties
 
+import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanFactory
 import org.neo4j.driver.v1.Config
 
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
-class ConfigurationPropertiesBuilderSpec extends AbstractTypeElementSpec {
-
+class ConfigurationPropertiesBuilderSpec extends AbstractBeanDefinitionSpec {
     void "test configuration builder with includes"() {
         given:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyPropertiesA', '''
 package test;
 
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("test")
-class MyProperties {
+class MyPropertiesA {
     
     @ConfigurationBuilder(factoryMethod="build", includes="foo")
-    Test test;
-     
+    TestA test
 }
 
-class Test {
-    private String foo;
-    private String bar;
-    private Test() {}
+class TestA {
+    private String foo
+    private String bar
+    
+    private TestA() {}
+    
     public void setFoo(String s) { 
         this.foo = s;
     }
@@ -58,14 +39,14 @@ class Test {
     public String getBar() {
         return bar;
     }
-        
-    static Test build() {
-        return new Test();
+    
+    static TestA build() {
+        new TestA()
     } 
 }
 ''')
 
-        when:"The bean was built and a warning was logged"
+        when:
         BeanFactory factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
                 'test.foo':'good',
@@ -79,67 +60,61 @@ class Test {
     }
 
 
-    void "test configuration builder with factory method"() {
+    void "test configuration builder with factory method and properties"() {
         given:
-        BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
-package test;
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyPropertiesB', '''
+package test
 
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("test")
-class MyProperties {
+class MyPropertiesB {
     
     @ConfigurationBuilder(factoryMethod="build")
-    Test test;
-     
+    TestB test
+    
 }
 
-class Test {
-    private String foo;
-    private Test() {}
-    public void setFoo(String s) { 
-        this.foo = s;
-    }
-    public String getFoo() {
-        return foo;
-    }
-        
-    static Test build() {
-        return new Test();
+class TestB {
+    String bar
+    
+    private TestB() {}
+
+    static TestB build() {
+        new TestB()
     } 
 }
 ''')
 
-        when:"The bean was built and a warning was logged"
+        when:
         BeanFactory factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
-                'test.foo':'good',
+                'test.bar':'good',
         )
         def bean = factory.build(applicationContext, beanDefinition)
 
         then:
-        bean.test.foo == 'good'
+        bean.test.bar == 'good'
     }
 
     void "test catch and log NoSuchMethodError for when underlying builder changes"() {
         given:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
-package test;
+package test
 
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("test")
 class MyProperties {
     
     @ConfigurationBuilder
-    Test test = new Test();
-    
-     
+    TestC test = new TestC()
+   
 }
 
-class Test {
+class TestC {
     public void setFoo(String s) { 
-        throw new NoSuchMethodError("setFoo");
+        throw new NoSuchMethodError("setFoo")
     }
 }
 ''')
@@ -153,36 +128,27 @@ class Test {
     }
 
 
-    void "test with setters that return void"() {
+    void "test with groovy properties"() {
         given:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
-package test;
+package test
 
-import io.micronaut.context.annotation.*;
-import java.lang.Deprecated;
+import io.micronaut.context.annotation.*
 
 @ConfigurationProperties("test")
 class MyProperties {
-    
+
     @ConfigurationBuilder
-    Test test = new Test();
-    
-     
+    TestD test = new TestD()
+
 }
 
-class Test {
-    private String foo;
-    private int bar;
-    private Long baz;
+class TestD {
+    String foo
+    int bar
     
-    public void setFoo(String s) { this.foo = s;}
-    public void setBar(int s) {this.bar = s;}
     @Deprecated
-    public void setBaz(Long s) {this.baz = s;}
-    
-    public String getFoo() { return this.foo; }
-    public int getBar() { return this.bar; }
-    public Long getBaz() { return this.baz; }
+    Long baz
 }
 ''')
 
@@ -205,28 +171,27 @@ class Test {
         then:
         test.foo == 'good'
         test.bar == 10
-        test.baz == null //deprecated properties not settable
+        test.baz == null //deprecated properties are ignored
     }
 
     void "test different inject types for config properties"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.Neo4jProperties', '''
-package test;
+package test
 
-import io.micronaut.context.annotation.*;
-import org.neo4j.driver.v1.*;
+import io.micronaut.context.annotation.*
+import org.neo4j.driver.v1.*
 
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
-    protected java.net.URI uri;
+    protected java.net.URI uri
     
     @ConfigurationBuilder(
         prefixes="with", 
         allowZeroArgs=true
     )
-    Config.ConfigBuilder options = Config.build();
-    
-     
+    Config.ConfigBuilder options = Config.build()
+
 }
 ''')
         then:
@@ -258,23 +223,23 @@ class Neo4jProperties {
     void "test specifying a configuration prefix"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.Neo4jProperties', '''
-package test;
+package test
 
-import io.micronaut.context.annotation.*;
-import org.neo4j.driver.v1.*;
+import io.micronaut.context.annotation.*
+import org.neo4j.driver.v1.*
 
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
-    protected java.net.URI uri;
+
+    protected java.net.URI uri
     
     @ConfigurationBuilder(
         prefixes="with", 
         allowZeroArgs=true,
         configurationPrefix="options"
     )
-    Config.ConfigBuilder options = Config.build();
-    
-     
+    Config.ConfigBuilder options = Config.build()
+   
 }
 ''')
         then:
@@ -306,20 +271,20 @@ class Neo4jProperties {
     void "test builder method long and TimeUnit arguments"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.Neo4jProperties', '''
-package test;
+package test
 
-import io.micronaut.context.annotation.*;
-import org.neo4j.driver.v1.*;
+import io.micronaut.context.annotation.*
+import org.neo4j.driver.v1.*
 
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
-    protected java.net.URI uri;
+    protected java.net.URI uri
     
     @ConfigurationBuilder(
         prefixes="with", 
         allowZeroArgs=true
     )
-    Config.ConfigBuilder options = Config.build();
+    Config.ConfigBuilder options = Config.build()
         
 }
 ''')
@@ -348,10 +313,10 @@ class Neo4jProperties {
     void "test using a builder that is marked final"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.Neo4jProperties', '''
-package test;
+package test
 
-import io.micronaut.context.annotation.*;
-import org.neo4j.driver.v1.*;
+import io.micronaut.context.annotation.*
+import org.neo4j.driver.v1.*
 
 @ConfigurationProperties("neo4j.test")
 class Neo4jProperties {
@@ -360,7 +325,7 @@ class Neo4jProperties {
         prefixes="with", 
         allowZeroArgs=true
     )
-    public final Config.ConfigBuilder options = Config.build();
+    final Config.ConfigBuilder options = Config.build()
         
 }
 ''')

@@ -60,7 +60,11 @@ class LoadedVisitor {
     }
 
     TypeElementVisitor getVisitor() {
-        return visitor
+        visitor
+    }
+
+    GroovyVisitorContext getVisitorContext() {
+        visitorContext
     }
 
     boolean equals(o) {
@@ -124,5 +128,13 @@ class LoadedVisitor {
                 visitor.visitClass(new GroovyClassElement((ClassNode) annotatedNode, annotationMetadata), visitorContext)
                 break
         }
+    }
+
+    void start() {
+        visitor.start(visitorContext)
+    }
+
+    void finish() {
+        visitor.finish(visitorContext)
     }
 }

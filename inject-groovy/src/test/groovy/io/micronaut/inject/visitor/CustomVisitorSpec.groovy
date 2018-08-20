@@ -21,10 +21,13 @@ import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 class CustomVisitorSpec extends AbstractBeanDefinitionSpec {
 
     void setup() {
-        ControllerGetVisitor.VISITED_ELEMENTS = []
-        AllElementsVisitor.VISITED_ELEMENTS = []
-        AllClassesVisitor.VISITED_ELEMENTS = []
-        InjectVisitor.VISITED_ELEMENTS = []
+        ControllerGetVisitor.clearVisited()
+        AllElementsVisitor.clearVisited()
+        AllClassesVisitor.clearVisited()
+        InjectVisitor.clearVisited()
+    }
+
+    void cleanup() {
         AstAnnotationUtils.invalidateCache()
     }
 
@@ -62,9 +65,9 @@ class TestController {
 }
 ''')
         expect:
-        ControllerGetVisitor.VISITED_ELEMENTS == ["test.TestController", "getMethod"]
-        AllElementsVisitor.VISITED_ELEMENTS.toSet() == ["test.TestController", "<init>", "privateField", "protectedField", "publicField", "packagePrivateField", "property", "setterMethod", "getMethod", "postMethod"].toSet()
-        AllClassesVisitor.VISITED_ELEMENTS == ["test.TestController", "getMethod"]
+        ControllerGetVisitor.getVisited() == ["test.TestController", "getMethod"]
+        AllElementsVisitor.getVisited().toSet() == ["test.TestController", "<init>", "privateField", "protectedField", "publicField", "packagePrivateField", "property", "setterMethod", "getMethod", "postMethod"].toSet()
+        AllClassesVisitor.getVisited() == ["test.TestController", "getMethod"]
     }
 
     void "test non controller class is not visited by custom visitor"() {
@@ -100,9 +103,9 @@ public class TestController {
 }
 ''')
         expect:
-        ControllerGetVisitor.VISITED_ELEMENTS == []
-        AllElementsVisitor.VISITED_ELEMENTS == []
-        AllClassesVisitor.VISITED_ELEMENTS == ["test.TestController", "getMethod"]
-        InjectVisitor.VISITED_ELEMENTS == ["test.TestController", "privateField"]
+        ControllerGetVisitor.getVisited().empty
+        AllElementsVisitor.getVisited().empty
+        AllClassesVisitor.getVisited() == ["test.TestController", "getMethod"]
+        InjectVisitor.getVisited() == ["test.TestController", "privateField"]
     }
 }
