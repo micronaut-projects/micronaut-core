@@ -11,7 +11,7 @@
      the specific language governing permissions and limitations under the License.
 */
 
-package hello.world.lambda.java.helloworld.handlers;
+package io.micronaut.function.aws.alexa.handlers;
 
 import com.amazon.ask.dispatcher.request.handler.HandlerInput;
 import com.amazon.ask.dispatcher.request.handler.RequestHandler;
