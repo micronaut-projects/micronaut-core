@@ -25,12 +25,3 @@ math.multiplier = 2
 int round(float value) {
     mathService.round(value) // go
 }
-
-
-void kinesisEvent(KinesisEvent event) {
-
-
-
-
-
-}
