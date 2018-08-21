@@ -1,11 +1,11 @@
 The previous section introduced the ability to embed Kafka for your tests. This is possible in Micronaut by specifying the `kafka.embedded.enabled` setting to `true` and adding the following dependencies to your test classpath:
 
 .Kafka Test Dependencies
-[source,groovy]
+[source,groovy,subs="attributes"]
 ----
-testCompile 'org.apache.kafka:kafka-clients:1.1.0:test'
-testCompile 'org.apache.kafka:kafka_2.12:1.1.0'
-testCompile 'org.apache.kafka:kafka_2.12:1.1.0:test'
+testCompile 'org.apache.kafka:kafka-clients:{kafka-version}:test'
+testCompile 'org.apache.kafka:kafka_2.12:{kafka-version}'
+testCompile 'org.apache.kafka:kafka_2.12:{kafka-version}:test'
 ----
 
 Note that because of the distributed nature of Kafka it is relatively slow to startup so it is generally better to do the initialization with `@BeforeClass` (or `setupSpec` in Spock) and have a large number of test methods rather than many test classes otherwise your test execution performance will suffer.

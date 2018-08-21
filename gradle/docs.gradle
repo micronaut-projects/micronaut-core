@@ -116,7 +116,8 @@ task publishGuide(type: grails.doc.gradle.PublishGuide, dependsOn:mergeConfigPro
             'groovyapi': 'http://docs.groovy-lang.org/latest/html/gapi/',
             'grailsapi': 'http://docs.grails.org/latest/api/',
             'gormapi': 'http://gorm.grails.org/latest/api/',
-            'springapi': 'https://docs.spring.io/spring/docs/current/javadoc-api/'
+            'springapi': 'https://docs.spring.io/spring/docs/current/javadoc-api/',
+            'kafka-version': rootProject.properties['kafkaVersion']
     ]
     doLast {
         ant.move(file:"${project.buildDir}/docs/guide/single.html",
