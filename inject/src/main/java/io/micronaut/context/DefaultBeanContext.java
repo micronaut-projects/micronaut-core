@@ -75,6 +75,7 @@ public class DefaultBeanContext implements BeanContext {
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
     private static final Logger EVENT_LOGGER  = LoggerFactory.getLogger(ApplicationEventPublisher.class);
     private static final Qualifier PROXY_TARGET_QUALIFIER = Qualifiers.byType(ProxyTarget.class);
+    private static final String SCOPED_PROXY_ANN = "io.micronaut.runtime.context.scope.ScopedProxy";
 
     protected final AtomicBoolean running = new AtomicBoolean(false);
     protected final AtomicBoolean initializing = new AtomicBoolean(false);
@@ -461,6 +462,15 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     public <T> Collection<BeanDefinition<T>> getBeanDefinitions(Class<T> beanType) {
         Collection<BeanDefinition<T>> candidates = findBeanCandidatesInternal(beanType);
+        return Collections.unmodifiableCollection(candidates);
+    }
+
+    @Override
+    public <T> Collection<BeanDefinition<T>> getBeanDefinitions(Class<T> beanType, Qualifier<T> qualifier) {
+        Collection<BeanDefinition<T>> candidates = findBeanCandidatesInternal(beanType);
+        if (qualifier != null) {
+            candidates = qualifier.reduce(beanType, candidates.stream()).collect(Collectors.toList());
+        }
         return Collections.unmodifiableCollection(candidates);
     }
 
@@ -1197,8 +1207,7 @@ public class DefaultBeanContext implements BeanContext {
                                  Qualifier<T> qualifier,
                                  boolean isSingleton,
                                  Map<String, Object> argumentValues) {
-        BeanKey beanKey = new BeanKey(beanDefinition.getBeanType(), qualifier);
-        BeanRegistration<T> beanRegistration = isSingleton && !beanDefinition.isIterable() ? singletonObjects.get(beanKey) : null;
+        BeanRegistration<T> beanRegistration = isSingleton && !beanDefinition.isIterable() ? singletonObjects.get(new BeanKey(beanDefinition.getBeanType(), qualifier)) : null;
         T bean;
         if (beanRegistration != null) {
             return beanRegistration.bean;
@@ -1280,10 +1289,13 @@ public class DefaultBeanContext implements BeanContext {
         if (!BeanCreatedEventListener.class.isInstance(bean)) {
 
             Collection<BeanCreatedEventListener> beanCreatedEventListeners = getBeansOfType(resolutionContext, BeanCreatedEventListener.class, Qualifiers.byTypeArguments(beanDefinition.getBeanType()));
-            for (BeanCreatedEventListener listener : beanCreatedEventListeners) {
-                bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, bean));
-                if (bean == null) {
-                    throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
+            if (!beanCreatedEventListeners.isEmpty()) {
+                BeanKey beanKey = new BeanKey(beanDefinition.getBeanType(), qualifier);
+                for (BeanCreatedEventListener listener : beanCreatedEventListeners) {
+                    bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, bean));
+                    if (bean == null) {
+                        throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
+                    }
                 }
             }
         }
@@ -1431,7 +1443,7 @@ public class DefaultBeanContext implements BeanContext {
         Class<T> beanType, Qualifier<T> qualifier,
         boolean throwNoSuchBean,
         BeanDefinition<T> definition) {
-        if (definition.isSingleton()) {
+        if (definition.isSingleton() && !definition.hasStereotype(SCOPED_PROXY_ANN)) {
             return createAndRegisterSingleton(resolutionContext, definition, beanType, qualifier);
         } else {
             return getScopedBeanForDefinition(resolutionContext, beanType, qualifier, throwNoSuchBean, definition);
@@ -1440,7 +1452,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @SuppressWarnings("unchecked")
     private <T> T getScopedBeanForDefinition(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier, boolean throwNoSuchBean, BeanDefinition<T> definition) {
-        boolean isProxy = definition instanceof ProxyBeanDefinition;
+        boolean isProxy = definition.isProxy();
         Optional<BeanResolutionContext.Segment> currentSegment = resolutionContext.getPath().currentSegment();
         Optional<Class<? extends Annotation>> scope = Optional.empty();
         if (currentSegment.isPresent()) {
@@ -2071,6 +2083,7 @@ public class DefaultBeanContext implements BeanContext {
         private final boolean isSingleton;
 
         private T target;
+
         /**
          * @param beanContext The bean context
          * @param beanType    The bean type

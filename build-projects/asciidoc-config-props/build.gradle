@@ -1,0 +1,7 @@
+apply plugin:"groovy"
+
+dependencies {
+    compile project(":inject")
+    compile "org.codehaus.groovy:groovy:$groovyVersion"
+}
+

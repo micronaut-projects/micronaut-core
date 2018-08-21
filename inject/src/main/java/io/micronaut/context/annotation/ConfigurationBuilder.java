@@ -77,6 +77,8 @@ public @interface ConfigurationBuilder {
     boolean allowZeroArgs() default false;
 
     /**
+     * Only to be used if the builder is not being created manually.
+     *
      * @return The name of a static factory method used to create the builder
      */
     String factoryMethod() default "";

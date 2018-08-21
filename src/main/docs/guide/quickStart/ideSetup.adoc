@@ -18,7 +18,7 @@ This is the class that is run when running the application via Gradle or via dep
 
 == Configuring IntelliJ IDEA
 
-The recommended IDE to use for Micronaut is Intellij IDEA. To import a Micronaut project into IntelliJ IDEA simply open the `build.gradle` or `pom.xml` file and follow the instructions to import the project.
+To import a Micronaut project into IntelliJ IDEA simply open the `build.gradle` or `pom.xml` file and follow the instructions to import the project.
 
 For IntelliJ IDEA if you plan to use the IntelliJ compiler then you should enable annotation processing under the "Build, Execution, Deployment -> Compiler -> Annotation Processors" by ticking the "Enable annotation processing" checkbox:
 
@@ -30,5 +30,20 @@ Once you have enabled annotation processing in IntelliJ you can run the applicat
 
 If you wish to use Eclipse IDE, it is recommended you import your Micronaut project into Eclipse using either https://projects.eclipse.org/projects/tools.buildship[Gradle BuildShip] for Gradle or http://www.eclipse.org/m2e/[M2Eclipse] for Maven.
 
-As of this writing, Eclipse has https://bugs.eclipse.org/bugs/show_bug.cgi?id=534501[incomplete support] for Java annotation processors, hence you will have to delegate to BuildShip or M2Eclipse for building and running tests.
+As of this writing, the latest stable version of Eclipse has https://bugs.eclipse.org/bugs/show_bug.cgi?id=534501[incomplete support] for Java annotation processors, this has been resolved in http://download.eclipse.org/eclipse/downloads/drops4/S-4.9M2-201808012000/[Eclipse 4.9 M2] and above, which you will need to download.
+
+=== Eclipse and Gradle
+
+Once you have setup Eclipse 4.9 M2 or above with https://projects.eclipse.org/projects/tools.buildship[Gradle BuildShip] first run the `gradle eclipse` task from the root of your project then import the project by selecting `File -> Import` then choosing `Gradle -> Existing Gradle Project` and navigating to the root directory of your project (where the `build.gradle` is located).
+
+=== Eclipse and Maven
+
+For Eclipse 4.9 M2 and above with Maven you need the following Eclipse plugins:
+
+* http://www.eclipse.org/m2e/[M2Eclipse for Maven]
+* https://github.com/jbosstools/m2e-apt[Maven integration with Eclipse JDT Annotation Processor Toolkit]
+
+Once installed you need to import the project by selecting `File -> Import` then choosing `Maven -> Existing Maven Project` and navigating to the root directory of your project (where the `pom.xml` is located).
+
+You should then enable annotation processing by opening `Eclipse -> Preferences` and navigating to `Maven -> Annotation Processing` and selecting the option `Automatically configure JDT APT`.
 

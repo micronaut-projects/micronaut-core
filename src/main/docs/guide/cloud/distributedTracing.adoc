@@ -21,7 +21,7 @@ The available annotations are:
 
 * The ann:tracing.annotation.NewSpan[] annotation will create a new span, wrapping the method call or reactive type.
 * The ann:tracing.annotation.ContinueSpan[] annotation will continue an existing span, wrapping the method call or reactive type.
-* The ann:tracing.annotation.SpanTag[] annotation can be used on method arguments to include the value of each argument within a Span's tags
+* The ann:tracing.annotation.SpanTag[] annotation can be used on method arguments to include the value of each argument within a Span's tags. When you use `@SpanTag` on a method argument, you need either to annotate the method with `@NewSpan` or `@ContinueSpan`.
 
 The following snippet presents an example of using the annotations:
 

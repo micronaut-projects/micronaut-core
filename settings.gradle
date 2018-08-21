@@ -34,6 +34,7 @@ include "bom"
 include "security"
 include "security-jwt"
 include "security-session"
+include "views"
 
 // configurations
 include "configurations:gorm-common"
@@ -63,3 +64,5 @@ include "configurations:kafka"
 include "configurations:kafka-streams"
 include "configurations:postgres-reactive"
 include "configurations:picocli"
+
+include "build-projects:asciidoc-config-props"

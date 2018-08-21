@@ -83,12 +83,12 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
 
     private String resolvePlaceholders(String str, int startIndex) {
         StringBuilder builder = new StringBuilder(str.substring(0, startIndex));
-        String restOfString = str.substring(startIndex + 2, str.length());
+        String restOfString = str.substring(startIndex + 2);
         int i = restOfString.indexOf('}');
         if (i > -1) {
             String expr = restOfString.substring(0, i).trim();
             if (restOfString.length() > i) {
-                restOfString = restOfString.substring(i + 1, restOfString.length());
+                restOfString = restOfString.substring(i + 1);
             }
             resolveExpression(builder, str, expr);
 
@@ -109,7 +109,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
         Matcher matcher = DELIMITER.matcher(expr);
         if (matcher.find()) {
             int j = matcher.start() + 1;
-            defaultValue = expr.substring(j + 1, expr.length());
+            defaultValue = expr.substring(j + 1);
             expr = expr.substring(0, j);
         }
         if (environment.containsProperty(expr)) {

@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionSystemException;
@@ -33,7 +34,6 @@ import org.springframework.transaction.interceptor.TransactionAttribute;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.inject.Singleton;
-import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -46,7 +46,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Singleton
 public class TransactionInterceptor implements MethodInterceptor<Object, Object> {
 
-    private final Map<Method, TransactionAttribute> transactionDefinitionMap = new ConcurrentHashMap<>();
+    private final Map<ExecutableMethod, TransactionAttribute> transactionDefinitionMap = new ConcurrentHashMap<>();
     private final Map<String, PlatformTransactionManager> transactionManagerMap = new ConcurrentHashMap<>();
     private final BeanLocator beanLocator;
 
@@ -68,7 +68,7 @@ public class TransactionInterceptor implements MethodInterceptor<Object, Object>
 
             String finalTransactionManagerName = transactionManagerName;
             TransactionAttribute transactionDefinition = resolveTransactionAttribute(
-                context.getTargetMethod(),
+                context.getExecutableMethod(),
                 context,
                 finalTransactionManagerName
             );
@@ -91,9 +91,9 @@ public class TransactionInterceptor implements MethodInterceptor<Object, Object>
      * @return The {@link TransactionAttribute}
      */
     protected TransactionAttribute resolveTransactionAttribute(
-        Method targetMethod,
-        AnnotationMetadata annotationMetadata,
-        String transactionManagerName) {
+            ExecutableMethod<Object, Object> targetMethod,
+            AnnotationMetadata annotationMetadata,
+            String transactionManagerName) {
         return transactionDefinitionMap.computeIfAbsent(targetMethod, method -> {
             AnnotationValue<Transactional> annotation = annotationMetadata.getAnnotation(Transactional.class);
 

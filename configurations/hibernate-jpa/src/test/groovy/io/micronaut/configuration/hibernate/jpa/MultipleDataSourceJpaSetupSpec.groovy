@@ -15,13 +15,22 @@
  */
 package io.micronaut.configuration.hibernate.jpa
 
+import io.micronaut.configuration.hibernate.jpa.scope.CurrentSession
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.qualifiers.Qualifiers
+import io.micronaut.spring.tx.annotation.Transactional
+import org.hibernate.Session
 import org.hibernate.SessionFactory
 import org.springframework.orm.hibernate5.HibernateTransactionManager
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+
+import javax.inject.Inject
+import javax.inject.Named
+import javax.inject.Singleton
+import javax.persistence.EntityManager
+import javax.persistence.PersistenceContext
 
 /**
  * @author graemerocher
@@ -30,8 +39,8 @@ import spock.lang.Specification
 class MultipleDataSourceJpaSetupSpec extends Specification{
 
     @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.run(
-            'datasources.default.name':'mydb',
-            'datasources.other.name':'otherdb',
+            'datasources.default.url':'jdbc:h2:mem:mydb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
+            'datasources.other.url':'jdbc:h2:mem:OTHERDB;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
             'jpa.other.packages-to-scan':'io.micronaut.configuration.hibernate.jpa.other',
             'jpa.default.properties.hibernate.hbm2ddl.auto':'create-drop'
     )
@@ -52,5 +61,82 @@ class MultipleDataSourceJpaSetupSpec extends Specification{
         otherTxManager.sessionFactory == otherSessionFactory
         defaultSessionFactory.jdbcServices.jdbcEnvironment.currentCatalog.toString() == "MYDB"
         otherSessionFactory.jdbcServices.jdbcEnvironment.currentCatalog.toString() == "OTHERDB"
+    }
+
+    void "test multiple data source transactional"() {
+        given:
+        MultipleDataSourceService service = applicationContext.getBean(MultipleDataSourceService)
+        MutipleDataSourceJavaService javaService = applicationContext.getBean(MutipleDataSourceJavaService)
+
+        expect:"Methods that retrieve the current session don't throw an exception"
+        service.testContextOther()
+        service.testCurrent()
+        service.testViaSF()
+        service.testOther()
+        service.testEM()
+        service.testContext()
+        javaService.testCurrent()
+        javaService.testCurrentFromField()
+    }
+
+    @Singleton
+    static class MultipleDataSourceService {
+        @Inject
+        @CurrentSession
+        Session session
+
+        @Inject
+        @CurrentSession
+        EntityManager em
+
+        @Inject
+        @CurrentSession("other")
+        Session otherSession
+
+        @Inject
+        @Named("other")
+        SessionFactory sessionFactory
+
+        @PersistenceContext
+        Session contextSession
+
+        @PersistenceContext(name = "other")
+        Session contextOther
+
+        @Transactional
+        boolean testCurrent() {
+            session.clear()
+            return true
+        }
+
+        @Transactional
+        boolean testContext() {
+            contextSession.clear()
+            return true
+        }
+
+        @Transactional("other")
+        boolean testContextOther() {
+            contextOther.clear()
+            return true
+        }
+
+        @Transactional
+        boolean testEM() {
+            em.clear()
+            return true
+        }
+
+        @Transactional("other")
+        boolean testOther() {
+            otherSession.clear()
+            return true
+        }
+
+        @Transactional("other")
+        boolean testViaSF() {
+            sessionFactory.currentSession.clear()
+            return true
+        }
     }
 }

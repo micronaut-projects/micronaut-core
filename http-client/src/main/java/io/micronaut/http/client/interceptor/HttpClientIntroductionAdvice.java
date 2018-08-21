@@ -68,11 +68,9 @@ import javax.annotation.Nullable;
 import javax.annotation.PreDestroy;
 import javax.inject.Singleton;
 import java.io.Closeable;
-import java.io.UnsupportedEncodingException;
 import java.lang.annotation.Annotation;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -82,6 +80,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 /**
  * Introduction advice that implements the {@link Client} annotation.
@@ -276,6 +275,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             // Set the URI template used to make the request for tracing purposes
             request.setAttribute(HttpAttributes.URI_TEMPLATE, resolveTemplate(clientAnnotation, uriTemplate.toString()));
             String serviceId = clientAnnotation.getValue(String.class).orElse(null);
+            Argument<?> errorType = clientAnnotation.get("errorType", Class.class).map((Function<Class, Argument>) Argument::of).orElse(HttpClient.DEFAULT_ERROR_TYPE);
             request.setAttribute(HttpAttributes.SERVICE_ID, serviceId);
 
 
@@ -355,18 +355,18 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     if (HttpResponse.class.isAssignableFrom(argumentType)) {
                         request.accept(context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES));
                         publisher = httpClient.exchange(
-                                request, publisherArgument
+                                request, publisherArgument, errorType
                         );
                     } else if (Void.class.isAssignableFrom(argumentType)) {
                         publisher = httpClient.exchange(
-                                request
+                                request, null, errorType
                         );
                     } else {
                         MediaType[] acceptTypes = context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
                         request.accept(acceptTypes);
 
                         publisher = httpClient.retrieve(
-                                request, publisherArgument
+                                request, publisherArgument, errorType
                         );
                     }
                 }
@@ -423,15 +423,15 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 BlockingHttpClient blockingHttpClient = httpClient.toBlocking();
                 if (HttpResponse.class.isAssignableFrom(javaReturnType)) {
                     return blockingHttpClient.exchange(
-                        request, returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)
+                        request, returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT), errorType
                     );
                 } else if (void.class == javaReturnType) {
-                    blockingHttpClient.exchange(request);
+                    blockingHttpClient.exchange(request, null, errorType);
                     return null;
                 } else {
                     try {
                         return blockingHttpClient.retrieve(
-                            request, returnType.asArgument()
+                            request, returnType.asArgument(), errorType
                         );
                     } catch (RuntimeException t) {
                         if (t instanceof HttpClientResponseException && ((HttpClientResponseException) t).getStatus() == HttpStatus.NOT_FOUND) {
@@ -594,14 +594,14 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
 
                 for (Map.Entry<String, String> entry: queryParams.entrySet()) {
-                    sb.append(URLEncoder.encode(entry.getKey(), "UTF-8"));
+                    sb.append(entry.getKey());
                     sb.append('=');
-                    sb.append(URLEncoder.encode(entry.getValue(), "UTF-8"));
+                    sb.append(entry.getValue());
                 }
 
                 return new URI(oldUri.getScheme(), oldUri.getAuthority(), oldUri.getPath(),
                         sb.toString(), oldUri.getFragment()).toString();
-            } catch (URISyntaxException | UnsupportedEncodingException e) {
+            } catch (URISyntaxException e) {
                 //no-op
             }
         }

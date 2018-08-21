@@ -55,49 +55,17 @@ import static org.codehaus.groovy.ast.ClassHelper.makeCached
 @GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
 class TypeElementVisitorTransform implements ASTTransformation {
 
+    protected static Map<String, LoadedVisitor> loadedVisitors = null
+
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
         ModuleNode moduleNode = source.getAST()
         List<ClassNode> classes = moduleNode.getClasses()
 
-        SoftServiceLoader serviceLoader = SoftServiceLoader.load(TypeElementVisitor, InjectTransform.classLoader)
-        Map<String, LoadedVisitor> loadedVisitors = [:]
-        GroovyVisitorContext visitorContext = new GroovyVisitorContext(source)
-
-        for (ServiceDefinition<TypeElementVisitor> definition: serviceLoader) {
-            if (definition.isPresent()) {
-                TypeElementVisitor visitor = definition.load()
-                LoadedVisitor newLoadedVisitor = new LoadedVisitor(visitor, visitorContext)
-                loadedVisitors.put(definition.getName(), newLoadedVisitor)
-            }
-        }
-
-        for(loadedVisitor in loadedVisitors.values()) {
-            try {
-                loadedVisitor.visitor.start(visitorContext)
-            } catch (Throwable e) {
-                AstMessageUtils.error(
-                        source,
-                        moduleNode,
-                        "Error starting type visitor [$loadedVisitor.visitor]: $e.message")
-            }
-        }
-
         for (ClassNode classNode in classes) {
             if (!(classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers()))) {
                 Collection<LoadedVisitor> matchedVisitors = loadedVisitors.values().findAll { v -> v.matches(classNode) }
                 new ElementVisitor(source, classNode, matchedVisitors).visitClass(classNode)
-            }
-        }
-
-        for(loadedVisitor in loadedVisitors.values()) {
-            try {
-                loadedVisitor.visitor.finish(visitorContext)
-            } catch (Throwable e) {
-                AstMessageUtils.error(
-                        source,
-                        moduleNode,
-                        "Error finalizing type visitor [$loadedVisitor.visitor]: $e.message")
             }
         }
     }

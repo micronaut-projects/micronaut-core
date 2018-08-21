@@ -1,0 +1,59 @@
+Although Micronaut is primarily designed around message encoding / decoding there are occasions where it is convenient to render a view on the server side.
+
+The `views` module provides support for view rendering on the server side and does so by rendering views on the I/O thread pool in order to avoid blocking the Netty event loop.
+
+To use the view rendering features described in this section, add the following dependency on your classpath. For example, in `build.gradle`
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut:views"
+----
+
+Views and templates can then be placed in the `src/main/resource/views` directory of your project.
+
+If you wish to use a different folder instead of `views`, set the property `micronaut.views.folder`.
+
+Your controller's method can render the response with a template with the the api:views.View[] annotation.
+
+The following is an example of a controller which renders a template by passing a model as a `java.util.Map` via the returned response object.
+
+[source,java]
+.src/main/java/myapp/ViewsController.java
+----
+include::{testsviews}/ViewsController.groovy[tags=clazz]
+
+include::{testsviews}/ViewsController.groovy[tags=map]
+
+}
+----
+
+<1> Use `@View` annotation to indicate the view name which should be used to render a view for the route.
+
+In addition, you can return any POJO object and the properties of the POJO will be exposed to the view for rendering:
+
+[source,java]
+.src/main/java/myapp/ViewsController.java
+----
+include::{testsviews}/ViewsController.groovy[tags=clazz]
+
+include::{testsviews}/ViewsController.groovy[tags=pogo]
+
+}
+----
+
+<1> Use `@View` annotation to indicate the view name which should be used to render the POJO responded by the controller.
+
+You can also return a api:views.ModelAndView[] and skip specifying the api:views.View[] annotation.
+
+[source,java]
+.src/main/java/myapp/ViewsController.java
+----
+include::{testsviews}/ViewsController.groovy[tags=clazz]
+
+include::{testsviews}/ViewsController.groovy[tags=modelAndView]
+----
+
+The following sections show different template engines integrations.
+
+To create your own implementation create a class which implements api:views.ViewRenderer[] and annotate it with api:http.annotation.Produces[@Produces] to the media types the view rendering supports producing.

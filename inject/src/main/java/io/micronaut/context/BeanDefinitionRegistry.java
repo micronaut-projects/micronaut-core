@@ -108,6 +108,19 @@ public interface BeanDefinitionRegistry {
     <T> Collection<BeanDefinition<T>> getBeanDefinitions(Class<T> beanType);
 
     /**
+     * Obtain a {@link BeanDefinition} for the given type.
+     *
+     * @param beanType The type
+     * @param qualifier The qualifier
+     * @param <T>      The concrete type
+     * @return An {@link Optional} of the bean definition
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
+     *                                                                for the given type
+     */
+    <T> Collection<BeanDefinition<T>> getBeanDefinitions(Class<T> beanType, Qualifier<T> qualifier);
+
+
+    /**
      * Get all of the {@link BeanDefinition} for the given qualifier.
      *
      * @param qualifier The qualifer

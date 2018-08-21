@@ -1,0 +1,8 @@
+When creating a function you can use the `openfaas` feature to create a function that includes a `Dockerfile` that can be built into an image deployable to OpenFaas:
+
+.Creating an OpenFaaS Function
+[source,bash]
+----
+$ mn create-function hello-world-function --features openfaas
+----
+

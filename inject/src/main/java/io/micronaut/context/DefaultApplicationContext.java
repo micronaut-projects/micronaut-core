@@ -210,7 +210,10 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                 }
                                 delegate.put(EachProperty.class.getName(), delegate.getBeanType());
                                 delegate.put(Named.class.getName(), key.toString());
-                                transformedCandidates.add(delegate);
+
+                                if (delegate.isEnabled(this)) {
+                                    transformedCandidates.add(delegate);
+                                }
                             }
                         }
                     } else {
@@ -250,7 +253,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                     if (qualifier instanceof Named) {
                                         delegate.put(Named.class.getName(), ((Named) qualifier).getName());
                                     }
-                                    transformedCandidates.add((BeanDefinition<T>) delegate);
+                                    if (delegate.isEnabled(this)) {
+                                        transformedCandidates.add((BeanDefinition<T>) delegate);
+                                    }
                                 }
                             );
                         }

@@ -67,7 +67,7 @@ public @interface Adapter {
     Class<?> value();
 
     /**
-     * Internal attributes for the adapter annotation
+     * Internal attributes for the adapter annotation.
      */
     @Internal
     class InternalAttributes {

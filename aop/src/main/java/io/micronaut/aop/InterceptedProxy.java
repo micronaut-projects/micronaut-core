@@ -16,6 +16,9 @@
 
 package io.micronaut.aop;
 
+import io.micronaut.context.Qualifier;
+import io.micronaut.core.annotation.Internal;
+
 /**
  * A {@link Intercepted} that proxies another instance.
  *
@@ -32,4 +35,13 @@ public interface InterceptedProxy<T> extends Intercepted {
      * @return The proxy target
      */
     T interceptedTarget();
+
+    /**
+     * Override the bean qualifier.
+     *
+     * @param qualifier The bean qualifier to use
+     */
+    @Internal
+    @SuppressWarnings("MethodName")
+    void $withBeanQualifier(Qualifier<T> qualifier);
 }
