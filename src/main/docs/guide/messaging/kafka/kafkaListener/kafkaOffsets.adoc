@@ -21,10 +21,10 @@ The following table summarizes the enum values and behaviour:
 |Asynchronously commits offsets manually at the end of each `poll()` loop if no exceptions occur. Sets `enable.auto.commit` to `false`
 
 |api:configuration.kafka.annotation.OffsetStrategy#SYNC_PER_RECORD[]
-|Commits offsets manually after each `ConsumeRecord` is processed. Sets `enable.auto.commit` to `false`
+|Commits offsets manually after each `ConsumerRecord` is processed. Sets `enable.auto.commit` to `false`
 
 |api:configuration.kafka.annotation.OffsetStrategy#ASYNC_PER_RECORD[]
-|Commits offsets asynchronously after each `ConsumeRecord` is processed. Sets `enable.auto.commit` to `false`
+|Commits offsets asynchronously after each `ConsumerRecord` is processed. Sets `enable.auto.commit` to `false`
 
 |===
 
