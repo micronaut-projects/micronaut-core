@@ -17,6 +17,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -51,7 +52,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Internal
-public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
+public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completable {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
 
@@ -63,6 +64,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory;
     private final B body;
+    private boolean complete;
 
     /**
      * @param fullHttpResponse       The full Http response
@@ -189,6 +191,10 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
     }
 
     private <T> Optional convertByteBuf(ByteBuf content, Argument<T> type) {
+        if (complete) {
+            return Optional.empty();
+        }
+
         Optional<MediaType> contentType = getContentType();
         if (content.refCnt() == 0 || content.readableBytes() == 0) {
             if (LOG.isTraceEnabled()) {
@@ -221,5 +227,10 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B> {
         }
         // last chance, try type conversion
         return ConversionService.SHARED.convert(content, ConversionContext.of(type));
+    }
+
+    @Override
+    public void onComplete() {
+        this.complete = true;
     }
 }

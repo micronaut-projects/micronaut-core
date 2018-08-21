@@ -17,6 +17,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.core.convert.format.ReadableBytes;
+import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -90,6 +91,13 @@ public abstract class HttpClientConfiguration {
             this.defaultCharset = applicationConfiguration.getDefaultCharset();
         }
     }
+
+    /**
+     * Obtains the connection pool configuration.
+     *
+     * @return The connection pool configuration.
+     */
+    public abstract ConnectionPoolConfiguration getConnectionPoolConfiguration();
 
     /**
      * @return The {@link SslConfiguration} for the client
@@ -345,5 +353,96 @@ public abstract class HttpClientConfiguration {
      */
     public void setProxyPassword(String proxyPassword) {
         this.proxyPassword = proxyPassword;
+    }
+
+    /**
+     * Configuration for the HTTP client connnection pool.
+     */
+    public static class ConnectionPoolConfiguration implements Toggleable {
+        /**
+         * The prefix to use for configuration.
+         */
+        public static final String PREFIX = "pool";
+
+        private int maxConnections = -1;
+
+        private int maxPendingAcquires = Integer.MAX_VALUE;
+
+        private Duration acquireTimeout;
+
+        private boolean enabled = false;
+
+        /**
+         * Whether connection pooling is enabled.
+         *
+         * @return True if connection pooling is enabled
+         */
+        @Override
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        /**
+         * Sets whether connection pooling is enabled.
+         *
+         * @param enabled True if it is enabled
+         */
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        /**
+         * The maximum number of connections. Defaults to no maximum.
+         *
+         * @return The max connections
+         */
+        public int getMaxConnections() {
+            return maxConnections;
+        }
+
+
+        /**
+         * Sets the maximum number of connections. Defaults to no maximum.
+         * @param maxConnections The count
+         */
+        public void setMaxConnections(int maxConnections) {
+            this.maxConnections = maxConnections;
+        }
+
+        /**
+         * Maximum number of futures awaiting connection acquisition. Defaults to no maximum.
+         *
+         * @return The max pending requires
+         */
+        public int getMaxPendingAcquires() {
+            return maxPendingAcquires;
+        }
+
+        /**
+         * Sets the max pending acquires.
+         *
+         * @param maxPendingAcquires The max pending acquires
+         */
+        public void setMaxPendingAcquires(int maxPendingAcquires) {
+            this.maxPendingAcquires = maxPendingAcquires;
+        }
+
+        /**
+         * The time to wait to acquire a connection.
+         *
+         * @return The timeout as a duration.
+         */
+        public Optional<Duration> getAcquireTimeout() {
+            return Optional.ofNullable(acquireTimeout);
+        }
+
+        /**
+         * Sets the timeout to wait for a connection.
+         *
+         * @param acquireTimeout The acquire timeout
+         */
+        public void setAcquireTimeout(@Nullable Duration acquireTimeout) {
+            this.acquireTimeout = acquireTimeout;
+        }
     }
 }

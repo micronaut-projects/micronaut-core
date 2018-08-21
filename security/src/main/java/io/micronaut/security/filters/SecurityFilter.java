@@ -79,7 +79,7 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
         this.securityRules = securityRules;
         this.authenticationFetchers = authenticationFetchers;
         this.rejectionHandler = rejectionHandler;
-        this.order = securityFilterOrderProvider != null ? securityFilterOrderProvider.getSecurityFilterOrder() : 0;
+        this.order = securityFilterOrderProvider != null ? securityFilterOrderProvider.getOrder() : 0;
     }
 
     @Override

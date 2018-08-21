@@ -18,6 +18,8 @@ package io.micronaut.core.naming;
 
 import java.util.Arrays;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 /**
@@ -29,6 +31,9 @@ import java.util.stream.Collectors;
 public class NameUtils {
 
     private static final int PREFIX_LENTGH = 3;
+    private static final int IS_LENTGH = 2;
+
+    private static final Pattern DOT_UPPER = Pattern.compile("\\.[A-Z\\$]");
 
     /**
      * Converts class name to property name using JavaBean decapitalization.
@@ -123,11 +128,13 @@ public class NameUtils {
      * @return The package name
      */
     public static String getPackageName(String className) {
-        int i = className.lastIndexOf('.');
-        if (i > -1) {
-            return className.substring(0, i);
+        Matcher matcher = DOT_UPPER.matcher(className);
+        if (matcher.find()) {
+            int position = matcher.start();
+            return className.substring(0, position);
+        } else {
+            return "";
         }
-        return "";
     }
 
     /**
@@ -158,11 +165,13 @@ public class NameUtils {
      * @return The simple name of the class
      */
     public static String getSimpleName(String className) {
-        int i = className.lastIndexOf('.');
-        if (i > -1) {
-            return className.substring(i + 1);
+        Matcher matcher = DOT_UPPER.matcher(className);
+        if (matcher.find()) {
+            int position = matcher.start();
+            return className.substring(position + 1);
+        } else {
+            return className;
         }
-        return className;
     }
 
     /**
@@ -190,6 +199,65 @@ public class NameUtils {
             return decapitalize(setterName.substring(PREFIX_LENTGH));
         }
         return setterName;
+    }
+
+    /**
+     * Get the equivalent setter name for the given property.
+     *
+     * @param propertyName The property name
+     * @return The setter name
+     */
+    public static String setterNameFor(String propertyName) {
+        return "set" + Character.toUpperCase(propertyName.charAt(0)) + propertyName.substring(1);
+    }
+
+    /**
+     * Is the given method name a valid getter name.
+     *
+     * @param methodName The method name
+     * @return True if it is a valid getter name
+     */
+    public static boolean isGetterName(String methodName) {
+        int len = methodName.length();
+        int prefixLength = 0;
+        if (methodName.startsWith("get")) {
+            prefixLength = PREFIX_LENTGH;
+        } else if (methodName.startsWith("is")) {
+            prefixLength = IS_LENTGH;
+        }
+        if (len > prefixLength) {
+            return Character.isUpperCase(methodName.charAt(PREFIX_LENTGH));
+        }
+        return false;
+    }
+
+    /**
+     * Get the equivalent property name for the given getter.
+     *
+     * @param getterName The getter
+     * @return The property name
+     */
+    public static String getPropertyNameForGetter(String getterName) {
+        if (isGetterName(getterName)) {
+            int prefixLength = 0;
+            if (getterName.startsWith("get")) {
+                prefixLength = PREFIX_LENTGH;
+            } else if (getterName.startsWith("is")) {
+                prefixLength = IS_LENTGH;
+            }
+            return decapitalize(getterName.substring(prefixLength));
+        }
+        return getterName;
+    }
+
+    /**
+     * Get the equivalent getter name for the given property.
+     *
+     * @param propertyName The property name
+     * @return The getter name
+     */
+    public static String getterNameFor(String propertyName) {
+        return "get" + Character.toUpperCase(propertyName.charAt(0)) + propertyName.substring(1);
     }
 
     /**

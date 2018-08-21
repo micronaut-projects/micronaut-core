@@ -24,6 +24,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.hateos.JsonError;
 import org.reactivestreams.Publisher;
 
 import java.io.Closeable;
@@ -37,6 +38,11 @@ import java.util.Optional;
  * @since 1.0
  */
 public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
+
+    /**
+     * The default error type.
+     */
+    Argument<JsonError> DEFAULT_ERROR_TYPE = Argument.of(JsonError.class);
 
     /**
      * @return A blocking HTTP client suitable for testing and non-production scenarios.
@@ -55,11 +61,33 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      *
      * @param request  The {@link HttpRequest} to execute
      * @param bodyType The body type
+     * @param errorType The error type
+     * @param <I>      The request body type
+     * @param <O>      The response body type
+     * @param <E>      The error type
+     * @return A {@link Publisher} that emits the full {@link HttpResponse} object
+     */
+    <I, O, E> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType);
+
+    /**
+     * <p>Perform an HTTP request for the given request object emitting the full HTTP response from returned
+     * {@link Publisher} and converting the response body to the specified type.</p>
+     * <p>
+     * <p>This method will send a {@code Content-Length} header and except a content length header the response and is
+     * designed for simple non-streaming exchanges of data</p>
+     * <p>
+     * <p>By default the exchange {@code Content-Type} is application/json, unless otherwise specified in the passed
+     * {@link HttpRequest}</p>
+     *
+     * @param request  The {@link HttpRequest} to execute
+     * @param bodyType The body type
      * @param <I>      The request body type
      * @param <O>      The response body type
      * @return A {@link Publisher} that emits the full {@link HttpResponse} object
      */
-    <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType);
+    default <I, O> Publisher<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType) {
+        return exchange(request, bodyType, DEFAULT_ERROR_TYPE);
+    }
 
     /**
      * Perform an HTTP request for the given request object emitting the full HTTP response from returned
@@ -117,23 +145,39 @@ public interface HttpClient extends Closeable, LifeCycle<HttpClient> {
      *
      * @param request  The {@link HttpRequest} to execute
      * @param bodyType The body type
+     * @param errorType The error type
      * @param <I>      The request body type
      * @param <O>      The response body type
+     * @param <E>      The error type
      * @return A {@link Publisher} that emits a result of the given type
      */
-    default <I, O> Publisher<O> retrieve(HttpRequest<I> request, Argument<O> bodyType) {
-        return Publishers.map(exchange(request, bodyType), response -> {
+    default <I, O, E> Publisher<O> retrieve(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
+        return Publishers.map(exchange(request, bodyType, errorType), response -> {
             if (bodyType.getType() == HttpStatus.class) {
                 return (O) response.getStatus();
             } else {
                 Optional<O> body = response.getBody();
                 return body
-                    .orElseThrow(() -> new HttpClientResponseException(
-                        "Empty body",
-                        response
-                    ));
+                        .orElseThrow(() -> new HttpClientResponseException(
+                                "Empty body",
+                                response
+                        ));
             }
         });
+    }
+
+    /**
+     * Perform an HTTP request for the given request object emitting the full HTTP response from returned
+     * {@link Publisher} and converting the response body to the specified type.
+     *
+     * @param request  The {@link HttpRequest} to execute
+     * @param bodyType The body type
+     * @param <I>      The request body type
+     * @param <O>      The response body type
+     * @return A {@link Publisher} that emits a result of the given type
+     */
+    default <I, O> Publisher<O> retrieve(HttpRequest<I> request, Argument<O> bodyType) {
+        return retrieve(request, bodyType, DEFAULT_ERROR_TYPE);
     }
 
     /**

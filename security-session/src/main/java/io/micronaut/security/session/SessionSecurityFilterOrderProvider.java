@@ -31,7 +31,7 @@ public class SessionSecurityFilterOrderProvider implements SecurityFilterOrderPr
     private static final int ORDER_PADDING = 100;
 
     @Override
-    public Integer getSecurityFilterOrder() {
+    public int getOrder() {
         return HttpSessionFilter.ORDER + ORDER_PADDING;
     }
 }

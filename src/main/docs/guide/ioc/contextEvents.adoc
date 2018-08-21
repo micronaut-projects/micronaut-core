@@ -58,7 +58,7 @@ public class DoOnStartup  {
 }
 ----
 
-If you listener performs work that could take a while then you can use the ann:scheduling.annotation.Async[] annotation to run the operation on a separate thread:
+If your listener performs work that could take a while then you can use the ann:scheduling.annotation.Async[] annotation to run the operation on a separate thread:
 
 
 .Asynchronously listening for Events with `@EventListener`

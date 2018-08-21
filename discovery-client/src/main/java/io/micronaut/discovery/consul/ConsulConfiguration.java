@@ -50,6 +50,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
     public static final String PREFIX = "consul.client";
 
     private static final int CONSULT_DEFAULT_PORT = 8500;
+    private final ConsulConnectionPoolConfiguration consulConnectionPoolConfiguration;
 
     private String aslToken;
     private ConsulRegistrationConfiguration registration = new ConsulRegistrationConfiguration();
@@ -61,15 +62,23 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
      */
     public ConsulConfiguration() {
         setPort(CONSULT_DEFAULT_PORT);
+        consulConnectionPoolConfiguration = new ConsulConnectionPoolConfiguration();
     }
 
     /**
+     * @param consulConnectionPoolConfiguration The connection pool configuration
      * @param applicationConfiguration The application configuration
      */
     @Inject
-    public ConsulConfiguration(ApplicationConfiguration applicationConfiguration) {
+    public ConsulConfiguration(ConsulConnectionPoolConfiguration consulConnectionPoolConfiguration, ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
         setPort(CONSULT_DEFAULT_PORT);
+        this.consulConnectionPoolConfiguration = consulConnectionPoolConfiguration;
+    }
+
+    @Override
+    public ConnectionPoolConfiguration getConnectionPoolConfiguration() {
+        return consulConnectionPoolConfiguration;
     }
 
     /**
@@ -273,6 +282,13 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
                 ", passing=" + passing +
                 '}';
         }
+    }
+
+    /**
+     * The default connection pool configuration.
+     */
+    @ConfigurationProperties(ConnectionPoolConfiguration.PREFIX)
+    public static class ConsulConnectionPoolConfiguration extends ConnectionPoolConfiguration {
     }
 
     /**

@@ -15,6 +15,7 @@
  */
 package io.micronaut.configuration.hibernate.jpa
 
+import io.micronaut.configuration.hibernate.jpa.scope.CurrentSession
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanContextException
 import io.micronaut.core.util.CollectionUtils
@@ -25,6 +26,7 @@ import io.micronaut.inject.ExecutableMethod
 import io.micronaut.spring.tx.annotation.BindableRuleBasedTransactionAttribute
 import io.micronaut.spring.tx.annotation.TransactionInterceptor
 import io.micronaut.spring.tx.annotation.Transactional
+import org.hibernate.Session
 import org.hibernate.SessionFactory
 import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.annotation.Isolation
@@ -62,7 +64,7 @@ class JpaSetupSpec extends Specification {
 
         when:
         BindableRuleBasedTransactionAttribute attribute = interceptor.resolveTransactionAttribute(
-                method.getTargetMethod(),
+                method,
                 method.getAnnotationMetadata(),
                 "test"
         )
@@ -165,7 +167,8 @@ class Book {
 class BookService {
 
     @Inject
-    SessionFactory sessionFactory
+    @CurrentSession
+    Session session
 
     @Transactional(
             readOnly = true,
@@ -182,25 +185,25 @@ class BookService {
 
     @Transactional(readOnly = true)
     List<Book> listBooks() {
-        sessionFactory.currentSession.createCriteria(Book).list()
+        session.createCriteria(Book).list()
     }
 
     @Transactional(readOnly = true)
     List<Book> saveReadOnly() {
-        sessionFactory.currentSession.persist(new Book(title: "the stand"))
-        sessionFactory.currentSession.createCriteria(Book).list()
+        session.persist(new Book(title: "the stand"))
+        session.createCriteria(Book).list()
     }
 
     @Transactional()
     List<Book> saveError() {
-        sessionFactory.currentSession.persist(new Book(title: "the stand"))
+        session.persist(new Book(title: "the stand"))
         throw new Exception("bad things happened")
     }
 
     @Transactional()
     List<Book> saveSuccess() {
-        sessionFactory.currentSession.persist(new Book(title: "the stand"))
-        sessionFactory.currentSession.createCriteria(Book).list()
+        session.persist(new Book(title: "the stand"))
+        session.createCriteria(Book).list()
     }
 
 }

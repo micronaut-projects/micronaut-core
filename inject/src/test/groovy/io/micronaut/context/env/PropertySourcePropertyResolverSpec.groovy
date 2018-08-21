@@ -160,6 +160,12 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
         expect:
         propertyPlaceholderResolver.resolvePlaceholders(template).get() == "Hello bar!"
+        propertyPlaceholderResolver.resolvePropertyNames(template).size() == 1
+        propertyPlaceholderResolver.resolvePropertyNames(template).first().property == 'foo'
+
+        propertyPlaceholderResolver.resolvePropertyNames("Hello \${foo} \${bar:test}!").first().property == 'foo'
+        propertyPlaceholderResolver.resolvePropertyNames("Hello \${foo} \${bar:test}!")[1].property == 'bar'
+        propertyPlaceholderResolver.resolvePropertyNames("Hello \${foo} \${bar:test}!")[1].defaultValue.get() == 'test'
     }
 
     void "test random placeholders for properties"() {

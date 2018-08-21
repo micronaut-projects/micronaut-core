@@ -252,6 +252,21 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      *
      * @param packageName        The package name of the bean
      * @param className          The class name, without the package, of the bean
+     * @param isInterface       Whether the writer is for an interface.
+     * @param annotationMetadata The annotation metadata
+     */
+    public BeanDefinitionWriter(String packageName,
+                                String className,
+                                boolean isInterface,
+                                AnnotationMetadata annotationMetadata) {
+        this(packageName, className, packageName + '.' + className, isInterface, annotationMetadata);
+    }
+
+    /**
+     * Creates a bean definition writer.
+     *
+     * @param packageName        The package name of the bean
+     * @param className          The class name, without the package, of the bean
      * @param providedClassName  The type this bean definition provides, in this case where the bean implements {@link javax.inject.Provider}
      * @param isInterface        Is the type an interface
      * @param annotationMetadata The annotation metadata
@@ -872,6 +887,33 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void visitConfigBuilderMethod(Object type, String methodName, AnnotationMetadata annotationMetadata, ConfigurationMetadataBuilder metadataBuilder) {
+
+        String factoryMethod = annotationMetadata
+            .getValue(
+                ConfigurationBuilder.class,
+                "factoryMethod",
+                String.class)
+            .orElse(null);
+
+        if (StringUtils.isNotEmpty(factoryMethod)) {
+            Type builderType = getTypeReference(type);
+
+            injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
+            injectMethodVisitor.invokeStatic(
+                    builderType,
+                    org.objectweb.asm.commons.Method.getMethod(
+                            builderType.getClassName() + " " + factoryMethod + "()"
+                    )
+            );
+
+            String propertyName = NameUtils.getPropertyNameForGetter(methodName);
+            String setterName = NameUtils.setterNameFor(propertyName);
+
+            injectMethodVisitor.invokeVirtual(beanType, org.objectweb.asm.commons.Method.getMethod(
+                    "void " + setterName + "(" + builderType.getClassName() + ")"
+            ));
+        }
+
         this.currentConfigBuilderState = new ConfigBuilderState(type, methodName, true, annotationMetadata, metadataBuilder);
     }
 

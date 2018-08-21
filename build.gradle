@@ -10,6 +10,8 @@ buildscript {
         classpath 'io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1'
         classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.2'
         classpath "gradle.plugin.io.sdkman:gradle-sdkvendor-plugin:1.0.0"
+        classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
+        classpath "org.codehaus.groovy.modules.http-builder:http-builder:0.7.1"
     }
 }
 
@@ -18,6 +20,7 @@ plugins {
 }
 
 apply plugin: "io.sdkman.vendors"
+apply plugin: 'org.aim42.htmlSanityCheck'
 
 repositories {
     maven { url "https://repo.grails.org/grails/core" }
@@ -110,7 +113,7 @@ ext {
                 name:'neo4j-harness'
             ],
             'neo4j.bolt': [
-                version: '1.5.1',
+                version: '1.6.2',
                 group:'org.neo4j.driver',
                 name:'neo4j-java-driver'
             ],
@@ -214,7 +217,7 @@ ext {
 
 }
 
-subprojects { subproject ->
+subprojects { Project subproject ->
 
     version project.projectVersion
 
@@ -248,11 +251,14 @@ subprojects { subproject ->
     else {
         apply plugin:"groovy"
         apply plugin:"java"
+
+
+
         sourceCompatibility = '1.8'
         targetCompatibility = '1.8'
 //        compileJava.options.compilerArgs.add '-parameters'
 //        compileTestJava.options.compilerArgs.add '-parameters'
-        if(!subproject.name.contains('test-suite')) {
+        if(!subproject.name.contains('test-suite') && !subproject.name.contains('build-projects')) {
             apply from:"${rootProject.rootDir}/gradle/publishing.gradle"
             apply plugin: 'checkstyle'
             
@@ -316,11 +322,19 @@ subprojects { subproject ->
         }
     }
 
+    def isDocumented = subproject.name != 'inject' && subproject.name != 'core' && subproject.name != 'aop' && !subproject.name.contains('asciidoc-config-props')
+
     dependencies {
+        documentation "org.codehaus.groovy:groovy-templates:$groovyVersion"
+        documentation "org.codehaus.groovy:groovy-dateutil:$groovyVersion"
         if (subproject.name != "bom") {
             compile dependencyVersion("slf4j")
         }
 
+
+        if (isDocumented) {
+            compileOnly project(":build-projects:asciidoc-config-props")
+        }
         compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
         testCompile "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
         testCompile dependencyVersion("groovy")
@@ -337,6 +351,19 @@ subprojects { subproject ->
 
         testCompile "org.ow2.asm:asm:$asmVersion"
         testCompile "org.ow2.asm:asm-commons:$asmVersion"
+    }
+
+    task moveConfigProps() {
+        doLast {
+            ant.mkdir(dir:"${rootProject.buildDir}/config-props")
+            ant.move(file: "${subproject.buildDir}/classes/java/main/META-INF/config-properties.adoc", tofile:"${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc", failonerror:false, quiet:true)
+        }
+    }
+
+    jar.dependsOn(moveConfigProps)
+
+    groovydoc {
+        classpath += project.configurations.documentation
     }
 
     task allDeps(type: DependencyReportTask) {}
@@ -424,3 +451,10 @@ sdkman {
     url = "https://github.com/micronaut-projects/micronaut-core/releases/download/v${project.version}/micronaut-${project.version}.zip"
     hashtag = "#micronautfw"
 }
+
+htmlSanityCheck {
+    sourceDir = new File("${rootProject.buildDir}/docs/")
+    sourceDocuments = [ "index.html"]
+
+}
+docs.finalizedBy(htmlSanityCheck)

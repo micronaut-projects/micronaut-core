@@ -82,7 +82,17 @@ task javadoc(type: Javadoc, description: 'Generate javadocs from all child proje
 }
 
 
-task publishGuide(type: grails.doc.gradle.PublishGuide) {
+task mergeConfigProps() {
+    inputs.files( fileTree( "$project.buildDir/config-props" ) ).skipWhenEmpty()
+    outputs.file( "$project.projectDir/src/main/docs/guide/appendix/propertyReference.adoc" )
+    doLast {
+        outputs.files.singleFile.withOutputStream { out ->
+            for ( file in inputs.files ) file.withInputStream { out << it << '\n' }
+        }
+    }
+}
+
+task publishGuide(type: grails.doc.gradle.PublishGuide, dependsOn:mergeConfigProps) {
     group = DOCUMENTATION_GROUP
     description = 'Generate Guide'
     dependsOn copyLocalDocResources
@@ -95,6 +105,7 @@ task publishGuide(type: grails.doc.gradle.PublishGuide) {
     resourcesDir = project.file(docResourcesDir)
     properties = [
             'safe':'UNSAFE',
+            'source-highlighter':'highlightjs',
             'version': project.version,
             'subtitle': project.projectDesc,
             'api': '../api',

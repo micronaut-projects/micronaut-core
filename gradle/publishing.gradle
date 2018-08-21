@@ -11,6 +11,20 @@
  * $ travis encrypt BINTRAY_KEY=...
  *
  */
+
+buildscript {
+    repositories {
+        maven { url "https://repo.grails.org/grails/core" }
+    }
+    dependencies {
+        classpath "org.codehaus.groovy.modules.http-builder:http-builder:0.7.1"
+    }
+}
+
+
+import groovyx.net.http.RESTClient
+import static groovyx.net.http.ContentType.*
+
 apply plugin: 'maven-publish'
 apply plugin: 'com.jfrog.bintray'
 apply plugin: 'com.bmuschko.nexus'
@@ -160,12 +174,16 @@ publishing {
     }
 }
 
-bintray {
-    def u = System.getenv("BINTRAY_USER") ?: project.hasProperty("bintrayUser") ? project.bintrayUser : ''
-    def p = System.getenv("BINTRAY_KEY") ?: project.hasProperty("bintrayKey") ? project.bintrayKey : ''
+def bintrayUser = System.getenv("BINTRAY_USER") ?: project.hasProperty("bintrayUser") ? project.bintrayUser : ''
+def bintrayKey = System.getenv("BINTRAY_KEY") ?: project.hasProperty("bintrayKey") ? project.bintrayKey : ''
+def ossUser = System.getenv("SONATYPE_USERNAME") ?: project.hasProperty("sonatypeOssUsername") ? project.sonatypeOssUsername : ''
+def ossPass = System.getenv("SONATYPE_PASSWORD") ?: project.hasProperty("sonatypeOssPassword") ? project.sonatypeOssPassword : ''
 
-    user = u
-    key = p
+
+bintray {
+
+    user = bintrayUser
+    key = bintrayKey
     publications = ['maven']
     publish = false
     pkg {
@@ -186,12 +204,39 @@ bintray {
             }
             mavenCentralSync {
                 sync = project.hasProperty("mavenCentralSync") ? project.mavenCentralSync.toBoolean() : false
-                def ossUser = System.getenv("SONATYPE_USERNAME") ?: project.hasProperty("sonatypeOssUsername") ? project.sonatypeOssUsername : ''
-                def ossPass = System.getenv("SONATYPE_PASSWORD") ?: project.hasProperty("sonatypeOssPassword") ? project.sonatypeOssPassword : ''
                 user = ossUser
                 password = ossPass
             }
 
+        }
+    }
+}
+
+task synchronizeWithMavenCentral() {
+    description = "Syncs with Maven Central/Sonatype"
+    doLast {
+        println """
+Synchronizing with Maven central. This may take a few minutes ...
+If this fails, log on to http://oss.sonatype.org/ using the centralUser credentials
+and progress through process manually -> Close -> Publish ... under staging repositories
+"""
+        try {
+            def client = new RESTClient('https://api.bintray.com/maven_central_sync/micronaut/core-releases-local/')
+            client.headers['Authorization'] = 'Basic ' + "$bintrayUser:$bintrayKey".getBytes('iso-8859-1').encodeBase64()
+            def body = /{}/
+            def resp = client.post(
+                    path: "$bintray.pkg.name/versions/$projectVersion",
+                    body: body,
+                    requestContentType: JSON
+            )
+            assert resp.status == 200
+            println resp.data.status
+            println resp.data.messages.join('\n')
+        } catch (groovyx.net.http.HttpResponseException e) {
+            println "Error: $e"
+            println "Message: $e.message"
+            println "Body: $e.response.data"
+            throw e
         }
     }
 }
