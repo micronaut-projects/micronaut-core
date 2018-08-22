@@ -65,7 +65,7 @@ class HelloBean {
 }
 ----
 
-WARNING: Groovy automatically imports `groovy.lang.Singleton` which can be confusing as it conflicts with `javax.inject.Singleton`. Make sure you include the `javax.inject.Singleton` import when declaring a singleton bean to avoid a compilation error.
+WARNING: Groovy automatically imports `groovy.lang.Singleton` which can be confusing as it conflicts with `javax.inject.Singleton`. Make sure you use `javax.inject.Singleton` when declaring a Micronaut singleton bean to avoid surprising behavior.
 
 We can also create a client - don't forget Micronaut can act as a client or a server!
 
