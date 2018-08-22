@@ -1,15 +1,15 @@
 dependencies {
     compile project(":configurations:kafka")
-    compile 'org.apache.kafka:kafka-streams:2.0.0'
+    compile "org.apache.kafka:kafka-streams:${kafkaVersion}"
 
     compileOnly project(":inject-java")
 
     testCompile project(":management")
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
-    testCompile 'org.apache.kafka:kafka-clients:2.0.0:test'
-    testCompile 'org.apache.kafka:kafka_2.12:2.0.0'
-    testCompile 'org.apache.kafka:kafka_2.12:2.0.0:test'
+    testCompile "org.apache.kafka:kafka-clients:${kafkaVersion}:test"
+    testCompile "org.apache.kafka:kafka_2.12:${kafkaVersion}"
+    testCompile "org.apache.kafka:kafka_2.12:${kafkaVersion}:test"
 }
 //tasks.withType(Test) {
 //    testLogging {

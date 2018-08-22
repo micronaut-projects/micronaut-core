@@ -15,7 +15,7 @@
  */
 
 /**
- * Configurations classes for configuring Kafka {@link kafka.consumer.Consumer} and {@link org.apache.kafka.clients.producer.Producer} instances.
+ * Configurations classes for configuring Kafka {@link org.apache.kafka.clients.consumer.Consumer} and {@link org.apache.kafka.clients.producer.Producer} instances.
  *
  * @author graemerocher
  * @since 1.0
