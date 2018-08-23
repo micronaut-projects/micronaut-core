@@ -29,6 +29,7 @@ micronaut:
         port: 8080
 ----
 
+TIP: This is also possible to be configured from an environment variable: `MICRONAUT_SERVER_PORT=8080`
 
 In order to create a service that responds to "Hello World" you first need a controller. The following is an example of a controller written in Java and located in `src/main/java/example/helloworld`:
 

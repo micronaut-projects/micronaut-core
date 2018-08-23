@@ -25,7 +25,7 @@ import javax.validation.constraints.NotNull;
 import java.util.Collection;
 
 /**
- * Default implementation of {@link MeterRegistryConfigurer>} that adds the binders and filters
+ * Default implementation of {@link MeterRegistryConfigurer} that adds the binders and filters
  * to the micrometer meter registry.  This is specifically needed for the {@link io.micronaut.configuration.metrics.management.endpoint.MetricsEndpoint}
  *
  * @author Christian Oestreich
