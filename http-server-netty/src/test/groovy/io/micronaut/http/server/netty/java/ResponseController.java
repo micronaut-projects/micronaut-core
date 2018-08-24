@@ -46,6 +46,11 @@ public class ResponseController {
         return HttpResponse.created(new Foo("blah", 10));
     }
 
+    @Get("/created-body-uri")
+    public HttpResponse createdBodyUri() {
+        return HttpResponse.created(new Foo("blah", 10), HttpResponse.uri("http://test.com"));
+    }
+
     @Get("/ok")
     public HttpResponse ok() {
         return HttpResponse.ok();
