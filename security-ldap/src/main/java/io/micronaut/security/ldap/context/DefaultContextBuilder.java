@@ -17,16 +17,16 @@ public class DefaultContextBuilder implements ContextBuilder {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultContextBuilder.class);
 
-    private final LdapConfigurationProperties.ContextProperties contextProperties;
+    private final LdapConfigurationProperties ldap;
 
-    DefaultContextBuilder(LdapConfigurationProperties.ContextProperties contextProperties) {
-        this.contextProperties = contextProperties;
+    DefaultContextBuilder(LdapConfigurationProperties ldap) {
+        this.ldap = ldap;
     }
 
     @Override
     public DirContext buildManager() throws NamingException {
-        return build(contextProperties.getManagerDn(),
-                contextProperties.getManagerPassword(),
+        return build(ldap.getContext().getManagerDn(),
+                ldap.getContext().getManagerPassword(),
                 true);
     }
 
@@ -36,8 +36,8 @@ public class DefaultContextBuilder implements ContextBuilder {
     }
 
     protected DirContext build(String user, String password, boolean pooled) throws NamingException {
-        return build(contextProperties.getFactory().getName(),
-                contextProperties.getServer(),
+        return build(ldap.getContext().getFactory(),
+                ldap.getContext().getServer(),
                 user,
                 password,
                 pooled);

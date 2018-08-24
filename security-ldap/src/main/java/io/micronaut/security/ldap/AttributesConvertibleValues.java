@@ -50,7 +50,22 @@ public class AttributesConvertibleValues implements ConvertibleValues<Object> {
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         try {
-            return conversionService.convert(attributes.get(name.toString()).get(), conversionContext);
+            NamingEnumeration<?> enumeration = attributes.get(name.toString()).getAll();
+            List<Object> results = new ArrayList<>();
+            while (enumeration.hasMore()) {
+                results.add(enumeration.next());
+            }
+            if (results.size() > 0) {
+                Object value;
+                if (results.size() > 1) {
+                    value = results;
+                } else {
+                    value = results.get(0);
+                }
+                return conversionService.convert(value, conversionContext);
+            } else {
+                return Optional.empty();
+            }
         } catch (NamingException e) {
             return Optional.empty();
         }
