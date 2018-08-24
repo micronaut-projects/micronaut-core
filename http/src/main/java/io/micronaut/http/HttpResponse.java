@@ -259,6 +259,20 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
+     * Return an {@link HttpStatus#CREATED} response with a body and the location of the new resource.
+     *
+     * @param body     The response body
+     * @param location The location of the new resource
+     * @param <T>      The body type
+     * @return The created response
+     */
+    static <T> MutableHttpResponse<T> created(T body, URI location) {
+        return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.CREATED)
+            .body(body)
+            .headers((headers) -> headers.location(location));
+    }
+
+    /**
      * Return an {@link HttpStatus#SEE_OTHER} response with the location of the new resource.
      *
      * @param location The location of the new resource
