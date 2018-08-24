@@ -1,0 +1,104 @@
+dn: dc=example,dc=com
+objectclass: domain
+objectclass: top
+
+dn: ou=mathematicians,dc=example,dc=com
+objectclass: groupOfUniqueNames
+ou: mathematicians
+cn: Mathematicians
+uniquemember: uid=riemann,dc=example,dc=com
+uniquemember: uid=gauss,dc=example,dc=com
+uniquemember: uid=euler,dc=example,dc=com
+uniquemember: uid=euclid,dc=example,dc=com
+
+dn: ou=scientists,dc=example,dc=com
+objectclass: groupOfUniqueNames
+ou: scientists
+cn: Scientists
+uniquemember: uid=einstein,dc=example,dc=com
+uniquemember: uid=newton,dc=example,dc=com
+uniquemember: uid=galieleo,dc=example,dc=com
+uniquemember: uid=tesla,dc=example,dc=com
+uniquemember: uid=gauss,dc=example,dc=com
+
+dn: uid=riemann,dc=example,dc=com
+objectclass: organizationalPerson
+objectclass: person
+objectclass: top
+objectclass: inetOrgPerson
+uid: riemann
+sn: riemann
+cn: riemann
+userpassword: password
+
+dn: uid=gauss,dc=example,dc=com
+objectclass: organizationalPerson
+objectclass: person
+objectclass: top
+objectclass: inetOrgPerson
+uid: gauss
+sn: gauss
+cn: gauss
+userpassword: password
+
+dn: uid=euler,dc=example,dc=com
+objectclass: organizationalPerson
+objectclass: person
+objectclass: top
+objectclass: inetOrgPerson
+uid: euler
+sn: euler
+cn: euler
+userpassword: password
+
+dn: uid=euclid,dc=example,dc=com
+objectclass: organizationalPerson
+objectclass: person
+objectclass: top
+objectclass: inetOrgPerson
+uid: euclid
+sn: euclid
+cn: euclid
+userpassword: password
+
+dn: uid=einstein,dc=example,dc=com
+objectclass: organizationalPerson
+objectclass: person
+objectclass: top
+objectclass: inetOrgPerson
+uid: einstein
+sn: einstein
+cn: einstein
+userpassword: password
+
+dn: uid=newton,dc=example,dc=com
+objectclass: organizationalPerson
+objectclass: person
+objectclass: top
+objectclass: inetOrgPerson
+uid: newton
+sn: newton
+cn: newton
+userpassword: password
+
+dn: uid=galieleo,dc=example,dc=com
+objectclass: organizationalPerson
+objectclass: person
+objectclass: top
+objectclass: inetOrgPerson
+uid: galieleo
+sn: galieleo
+cn: galieleo
+userpassword: password
+
+dn: uid=tesla,dc=example,dc=com
+objectclass: organizationalPerson
+objectclass: person
+objectclass: top
+objectclass: inetOrgPerson
+uid: tesla
+sn: tesla
+cn: tesla
+userpassword: password
+
+
