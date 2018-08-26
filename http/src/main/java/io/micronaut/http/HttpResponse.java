@@ -187,7 +187,6 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      * @return The response
      */
     static <T> MutableHttpResponse<T> serverError() {
-
         return HttpResponseFactory.INSTANCE.status(HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
@@ -199,6 +198,20 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpResponse<T> accepted() {
         return HttpResponseFactory.INSTANCE.status(HttpStatus.ACCEPTED);
+    }
+
+    /**
+     * Return an {@link HttpStatus#ACCEPTED} response with an empty body and a {@link HttpHeaders#LOCATION} header
+     *
+     * @param location the location in which the new resource will be available
+     * @param <T>      The response type
+     * @return The response
+     */
+    static <T> MutableHttpResponse<T> accepted(URI location) {
+        return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.ACCEPTED)
+                .headers((headers) ->
+                    headers.location(location)
+                );
     }
 
     /**
