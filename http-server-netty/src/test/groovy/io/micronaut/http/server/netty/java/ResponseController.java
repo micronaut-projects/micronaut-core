@@ -36,6 +36,11 @@ public class ResponseController {
         return HttpResponse.accepted();
     }
 
+    @Get("/accepted-uri")
+    public HttpResponse acceptedUri() {
+        return HttpResponse.accepted(HttpResponse.uri("http://example.com"));
+    }
+
     @Get("/created-uri")
     public HttpResponse createdUri() {
         return HttpResponse.created(HttpResponse.uri("http://test.com"));
