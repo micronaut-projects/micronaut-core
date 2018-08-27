@@ -16,10 +16,9 @@
 
 package io.micronaut.http.server.netty.resources
 
-import io.micronaut.context.exceptions.ConfigurationException
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.DependencyInjectionException
 import io.micronaut.http.HttpRequest
-import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.server.netty.AbstractMicronautSpec
@@ -29,13 +28,9 @@ import java.nio.file.Paths
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
+import java.time.temporal.ChronoUnit
 
-import static io.micronaut.http.HttpHeaders.CACHE_CONTROL
-import static io.micronaut.http.HttpHeaders.CONTENT_LENGTH
-import static io.micronaut.http.HttpHeaders.CONTENT_TYPE
-import static io.micronaut.http.HttpHeaders.DATE
-import static io.micronaut.http.HttpHeaders.EXPIRES
-import static io.micronaut.http.HttpHeaders.LAST_MODIFIED
+import static io.micronaut.http.HttpHeaders.*
 
 class StaticResourceResolutionSpec extends AbstractMicronautSpec {
 
@@ -69,7 +64,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
         response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
         response.header(CACHE_CONTROL) == "private, max-age=60"
-        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(tempFile.lastModified()), ZoneId.of("GMT") )
+        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(tempFile.lastModified()), ZoneId.of("GMT")).truncatedTo(ChronoUnit.SECONDS)
         response.body() == "<html><head></head><body>HTML Page from static file</body></html>"
     }
 
@@ -88,7 +83,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
         response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
         response.header(CACHE_CONTROL) == "private, max-age=60"
-        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(file.lastModified()), ZoneId.of("GMT") )
+        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(file.lastModified()), ZoneId.of("GMT")).truncatedTo(ChronoUnit.SECONDS)
         response.body() == "<html><head></head><body>HTML Page from resources</body></html>"
     }
 
@@ -107,7 +102,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
         response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
         response.header(CACHE_CONTROL) == "private, max-age=60"
-        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(file.lastModified()), ZoneId.of("GMT") )
+        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(file.lastModified()), ZoneId.of("GMT")).truncatedTo(ChronoUnit.SECONDS)
         response.body() == "<html><head></head><body>HTML Page from resources</body></html>"
     }
 
@@ -133,7 +128,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
         response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
         response.header(CACHE_CONTROL) == "private, max-age=60"
-        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(file.lastModified()), ZoneId.of("GMT") )
+        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(file.lastModified()), ZoneId.of("GMT")).truncatedTo(ChronoUnit.SECONDS)
         response.body() == "<html><head></head><body>HTML Page from resources</body></html>"
 
         cleanup:
@@ -162,7 +157,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
         response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
         response.header(CACHE_CONTROL) == "private, max-age=60"
-        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(file.lastModified()), ZoneId.of("GMT") )
+        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(file.lastModified()), ZoneId.of("GMT")).truncatedTo(ChronoUnit.SECONDS)
         response.body() == "<html><head></head><body>HTML Page from resources</body></html>"
 
         cleanup:
@@ -191,7 +186,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
         response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
         response.header(CACHE_CONTROL) == "private, max-age=60"
-        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(file.lastModified()), ZoneId.of("GMT") )
+        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(file.lastModified()), ZoneId.of("GMT")).truncatedTo(ChronoUnit.SECONDS)
         response.body() == "<html><head></head><body>HTML Page from resources/foo</body></html>"
 
         cleanup:
@@ -208,4 +203,5 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         then:
         thrown(DependencyInjectionException)
     }
+
 }
