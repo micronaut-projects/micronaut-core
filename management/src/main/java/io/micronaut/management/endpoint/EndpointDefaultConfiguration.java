@@ -17,6 +17,7 @@
 package io.micronaut.management.endpoint;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.util.StringUtils;
 
 import java.util.Optional;
 
@@ -46,7 +47,7 @@ public class EndpointDefaultConfiguration {
 
     private Boolean enabled;
     private Boolean sensitive;
-    protected String path = DEFAULT_ENDPOINT_BASE_PATH;
+    private String path = DEFAULT_ENDPOINT_BASE_PATH;
 
     /**
      *
@@ -88,4 +89,13 @@ public class EndpointDefaultConfiguration {
         this.sensitive = sensitive;
     }
 
+    /**
+     * The endpoints base path.
+     * @param path The path
+     */
+    public void setPath(String path) {
+        if (StringUtils.isNotEmpty(path)) {
+            this.path = path;
+        }
+    }
 }
