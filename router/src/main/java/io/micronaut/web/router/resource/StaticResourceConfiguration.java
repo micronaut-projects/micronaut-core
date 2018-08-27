@@ -87,6 +87,14 @@ public class StaticResourceConfiguration implements Toggleable {
     }
 
     /**
+     * The static resource mapping.
+     * @return The mapping
+     */
+    public String getMapping() {
+        return mapping;
+    }
+
+    /**
      * Sets whether static resources are enabled.
      *
      * @param enabled True if they are enabled.
