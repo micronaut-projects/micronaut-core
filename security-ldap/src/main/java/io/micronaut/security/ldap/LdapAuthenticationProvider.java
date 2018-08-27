@@ -1,5 +1,7 @@
 package io.micronaut.security.ldap;
 
+import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.security.authentication.*;
 import io.micronaut.security.ldap.context.ContextBuilder;
@@ -17,24 +19,30 @@ import javax.naming.AuthenticationException;
 import javax.naming.NamingException;
 import javax.naming.directory.Attributes;
 import javax.naming.directory.DirContext;
+import java.io.Closeable;
+import java.io.IOException;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
 
-@Singleton
-public class LdapAuthenticationProvider implements AuthenticationProvider {
+@EachBean(LdapConfigurationProperties.class)
+public class LdapAuthenticationProvider implements AuthenticationProvider, Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(LdapAuthenticationProvider.class);
 
+    private final LdapConfigurationProperties configuration;
     private final LdapSearchService ldapSearchService;
     private final ContextBuilder contextBuilder;
     private final ContextAuthenticationMapper contextAuthenticationMapper;
     private final LdapGroupProcessor ldapGroupProcessor;
     private DirContext managerContext;
 
-    public LdapAuthenticationProvider(LdapSearchService ldapSearchService,
+    public LdapAuthenticationProvider(LdapConfigurationProperties configuration,
+                                      LdapSearchService ldapSearchService,
                                       ContextBuilder contextBuilder,
                                       ContextAuthenticationMapper contextAuthenticationMapper,
                                       LdapGroupProcessor ldapGroupProcessor) {
+        this.configuration = configuration;
         this.ldapSearchService = ldapSearchService;
         this.contextBuilder = contextBuilder;
         this.contextAuthenticationMapper = contextAuthenticationMapper;
@@ -46,12 +54,16 @@ public class LdapAuthenticationProvider implements AuthenticationProvider {
         String username = authenticationRequest.getIdentity().toString();
         String password = authenticationRequest.getSecret().toString();
 
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Starting authentication with configuration [{}]", configuration.getName());
+        }
+
         if (managerContext == null) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Attempting to initialize manager context");
             }
             try {
-                this.managerContext = contextBuilder.buildManager();
+                this.managerContext = contextBuilder.build(configuration.getContext().getManagerSettings());
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Manager context initialized successfully");
                 }
@@ -70,18 +82,45 @@ public class LdapAuthenticationProvider implements AuthenticationProvider {
         AuthenticationResponse response = new AuthenticationFailed(AuthenticationFailureReason.USER_NOT_FOUND);
 
         try {
-            Optional<LdapSearchResult> optionalResult = ldapSearchService.searchForUser(managerContext, username, password);
+            Optional<LdapSearchResult> optionalResult = ldapSearchService.searchFirst(managerContext, configuration.getSearch().getSettings(new Object[]{username}));
 
             if (optionalResult.isPresent()) {
+                LdapSearchResult result = optionalResult.get();
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("User found in context [{}]", username);
+                    LOG.debug("User found in context [{}]. Attempting to bind.", result.getDn());
                 }
 
-                LdapSearchResult result = optionalResult.get();
-                Set<String> groups = ldapGroupProcessor.getGroups(managerContext, result);
+                DirContext userContext = null;
+                try {
+                    String dn = result.getDn();
+                    result.setUsername(username);
+                    userContext = contextBuilder.build(configuration.getContext().getSettings(result.getDn(), password));
+                    if (result.getAttributes() == null) {
+                        result.setAttributes(userContext.getAttributes(dn));
+                    }
+                } finally {
+                    contextBuilder.close(userContext);
+                }
+
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Successfully bound user [{}]. Attempting to retrieving groups.", result.getDn());
+                }
+
+                Set<String> groups = Collections.emptySet();
+
+                LdapConfigurationProperties.GroupProperties groupSettings = configuration.getGroup();
+                if (groupSettings.isEnabled()) {
+                    groups = ldapGroupProcessor.process(groupSettings.getAttribute(), result, () -> {
+                        return ldapSearchService.search(managerContext, groupSettings.getSearchSettings(new Object[]{result.getDn()}));
+                    });
+                } else {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Group search is disabled for configuration [{}]", configuration.getName());
+                    }
+                }
 
                 if (LOG.isTraceEnabled()) {
-                    LOG.trace("Attempting to map [{}] with groups {} to an authentication response", username, groups);
+                    LOG.trace("Attempting to map [{}] with groups {} to an authentication response.", username, groups);
                 }
 
                 response = contextAuthenticationMapper.map(result.getAttributes(), username, groups);
@@ -105,8 +144,8 @@ public class LdapAuthenticationProvider implements AuthenticationProvider {
         return Flowable.just(response);
     }
 
-    @PreDestroy
-    void close() {
-
+    @Override
+    public void close() {
+        contextBuilder.close(managerContext);
     }
 }

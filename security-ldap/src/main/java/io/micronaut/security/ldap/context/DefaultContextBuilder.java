@@ -1,7 +1,5 @@
 package io.micronaut.security.ldap.context;
 
-import io.micronaut.security.ldap.LdapAuthenticationProvider;
-import io.micronaut.security.ldap.LdapConfigurationProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -17,33 +15,15 @@ public class DefaultContextBuilder implements ContextBuilder {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultContextBuilder.class);
 
-    private final LdapConfigurationProperties ldap;
-
-    DefaultContextBuilder(LdapConfigurationProperties ldap) {
-        this.ldap = ldap;
+    public DirContext build(ContextSettings contextSettings) throws NamingException {
+        return build(contextSettings.getFactory(),
+                contextSettings.getUrl(),
+                contextSettings.getDn(),
+                contextSettings.getPassword(),
+                contextSettings.getPooled());
     }
 
-    @Override
-    public DirContext buildManager() throws NamingException {
-        return build(ldap.getContext().getManagerDn(),
-                ldap.getContext().getManagerPassword(),
-                true);
-    }
-
-    @Override
-    public DirContext build(String user, String password) throws NamingException {
-        return build(user, password, false);
-    }
-
-    protected DirContext build(String user, String password, boolean pooled) throws NamingException {
-        return build(ldap.getContext().getFactory(),
-                ldap.getContext().getServer(),
-                user,
-                password,
-                pooled);
-    }
-
-    protected DirContext build(String factory, String server, String user, String password, boolean pooled) throws NamingException {
+    public DirContext build(String factory, String server, String user, String password, boolean pooled) throws NamingException {
         Properties props = new Properties();
         props.put(Context.INITIAL_CONTEXT_FACTORY, factory);
         props.put(Context.PROVIDER_URL, server);
@@ -64,7 +44,7 @@ public class DefaultContextBuilder implements ContextBuilder {
                 context.close();
             } catch (Throwable e) {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Exception occurred while closing the JNDI DirContext", e);
+                    LOG.debug("Exception occurred while closing an LDAP context", e);
                 }
             }
         }
