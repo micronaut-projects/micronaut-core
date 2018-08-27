@@ -25,7 +25,10 @@ import io.reactivex.functions.Function;
 import io.reactivex.plugins.RxJavaPlugins;
 
 import javax.annotation.PostConstruct;
+import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * Provides a single point of entry for all instrumentations for RxJava 2.x.
@@ -39,7 +42,7 @@ import javax.inject.Singleton;
 @Internal
 class RxJava2Instrumentation implements Function<Runnable, Runnable> {
 
-    private final RunnableInstrumenter[] instrumenters;
+    private final List<RunnableInstrumenter> instrumenters;
 
     /**
      * Creates a new instance.
@@ -47,6 +50,15 @@ class RxJava2Instrumentation implements Function<Runnable, Runnable> {
      * @param instrumenters The instrumenters for the {@link Runnable} interface
      */
     public RxJava2Instrumentation(RunnableInstrumenter... instrumenters) {
+        this.instrumenters = Arrays.asList(instrumenters);
+    }
+
+    /**
+     * Creates a new instance.
+     *
+     * @param instrumenters The instrumenters for the {@link Runnable} interface
+     */
+    @Inject public RxJava2Instrumentation(List<RunnableInstrumenter> instrumenters) {
         this.instrumenters = instrumenters;
     }
 

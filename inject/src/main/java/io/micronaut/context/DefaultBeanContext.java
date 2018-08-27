@@ -34,6 +34,8 @@ import io.micronaut.core.io.service.StreamSoftServiceLoader;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.core.reflect.ClassLoadingReporter;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -228,6 +230,10 @@ public class DefaultBeanContext implements BeanContext {
 
             terminating.set(false);
             running.set(false);
+
+            for (ClassLoadingReporter classLoadingReporter : ClassUtils.CLASS_LOADING_REPORTERS) {
+                classLoadingReporter.close();
+            }
         }
         return this;
     }
@@ -1189,6 +1195,11 @@ public class DefaultBeanContext implements BeanContext {
      */
     protected void registerConfiguration(BeanConfiguration configuration) {
         beanConfigurations.put(configuration.getName(), configuration);
+        if (ClassUtils.CLASS_LOADING_REPORTERS != Collections.EMPTY_LIST) {
+            for (ClassLoadingReporter reporter : ClassUtils.CLASS_LOADING_REPORTERS) {
+                reporter.reportPresent(configuration.getClass());
+            }
+        }
     }
 
     /**
