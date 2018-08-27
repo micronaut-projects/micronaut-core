@@ -121,7 +121,7 @@ cloud:
     title: Cloud Configuration
     distributedConfiguration: Distributed Configuration
     distributedConfigurationConsul: Consul Support
-#    distributedConfigurationAwsParameterStore: AWS Parameter Store Support
+    distributedConfigurationAwsParameterStore: AWS Parameter Store Support
   serviceDiscovery:
     title: Service Discovery
     serviceDiscoveryConsul: Consul Support
