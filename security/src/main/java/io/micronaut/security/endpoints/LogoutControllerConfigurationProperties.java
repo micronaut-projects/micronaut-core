@@ -43,4 +43,21 @@ public class LogoutControllerConfigurationProperties implements LogoutController
     public String getPath() {
         return this.path;
     }
+
+    /**
+     * Sets whether the logout controller is enabled.
+     *
+     * @param enabled true if it is
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    /**
+     * Sets the path to the logout controller. Defaults to /logout.
+     * @param path The path
+     */
+    public void setPath(String path) {
+        this.path = path;
+    }
 }
