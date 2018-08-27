@@ -17,6 +17,7 @@
 package io.micronaut.security.token.config;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.security.config.SecurityConfigurationProperties;
 
 /**
@@ -30,8 +31,8 @@ public class TokenConfigurationProperties implements TokenConfiguration {
     public static final String PREFIX = SecurityConfigurationProperties.PREFIX + ".token";
 
     private static final String DEFAULT_ROLES_NAME = "roles";
-    protected boolean enabled = true;
-    protected String rolesName = DEFAULT_ROLES_NAME;
+    private boolean enabled = true;
+    private String rolesName = DEFAULT_ROLES_NAME;
 
     @Override
     public boolean isEnabled() {
@@ -46,5 +47,24 @@ public class TokenConfigurationProperties implements TokenConfiguration {
     @Override
     public String getRolesName() {
         return rolesName;
+    }
+
+    /**
+     * Sets whether the configuration is enabled.
+     *
+     * @param enabled True if it is enabled
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    /**
+     * Sets the names of the roles property.
+     * @param rolesName The roles name
+     */
+    public void setRolesName(String rolesName) {
+        if (StringUtils.isNotEmpty(rolesName)) {
+            this.rolesName = rolesName;
+        }
     }
 }

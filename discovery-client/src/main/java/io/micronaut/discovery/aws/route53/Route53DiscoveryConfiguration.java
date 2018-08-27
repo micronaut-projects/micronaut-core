@@ -27,8 +27,10 @@ import io.micronaut.discovery.DiscoveryConfiguration;
  * See https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html for details info
  */
 @Requires(env = Environment.AMAZON_EC2)
-@ConfigurationProperties("aws.route53.discovery")
+@ConfigurationProperties(Route53DiscoveryConfiguration.PREFIX)
 public class Route53DiscoveryConfiguration extends DiscoveryConfiguration {
+
+    public static final String PREFIX = "aws.route53.discovery";
 
     private String awsServiceId;
 
