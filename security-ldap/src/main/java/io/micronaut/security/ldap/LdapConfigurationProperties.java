@@ -2,9 +2,11 @@ package io.micronaut.security.ldap;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.security.config.SecurityConfigurationProperties;
+import io.micronaut.security.ldap.context.ContextPropertiesContextSettings;
+import io.micronaut.security.ldap.context.ContextSettings;
 import io.micronaut.security.ldap.context.SearchSettings;
 
 import javax.inject.Inject;
@@ -18,6 +20,15 @@ public class LdapConfigurationProperties implements Toggleable {
     private ContextProperties context;
     private SearchProperties search;
     private GroupProperties group;
+    private final String name;
+
+    LdapConfigurationProperties(@Parameter String name) {
+        this.name = name;
+    }
+
+    public String getName() {
+        return name;
+    }
 
     @Override
     public boolean isEnabled() {
@@ -42,9 +53,7 @@ public class LdapConfigurationProperties implements Toggleable {
      */
     @Inject
     public void setContext(ContextProperties contextProperties) {
-        if (contextProperties != null) {
-            this.context = contextProperties;
-        }
+        this.context = contextProperties;
     }
 
     /**
@@ -123,6 +132,14 @@ public class LdapConfigurationProperties implements Toggleable {
         public void setFactory(String factory) {
             this.factory = factory;
         }
+
+        public ContextSettings getSettings(String dn, String password) {
+            return new ContextPropertiesContextSettings(this, dn, password);
+        }
+
+        public ContextSettings getManagerSettings() {
+            return new ContextPropertiesContextSettings(this);
+        }
     }
 
     @ConfigurationProperties("search")
@@ -167,7 +184,7 @@ public class LdapConfigurationProperties implements Toggleable {
             this.attributes = attributes;
         }
 
-        public SearchSettings getSearchSettings(Object[] arguments) {
+        public SearchSettings getSettings(Object[] arguments) {
             return new SearchPropertiesSearchSettings(this, arguments);
         }
     }

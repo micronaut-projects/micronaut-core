@@ -7,9 +7,7 @@ import java.util.Optional;
 
 public interface LdapSearchService {
 
-    Optional<LdapSearchResult> searchForUser(DirContext managerContext, String username, String password) throws NamingException;
-
-    List<LdapSearchResult> searchForGroups(DirContext managerContext, String userDn) throws NamingException;
+    Optional<LdapSearchResult> searchFirst(DirContext managerContext, SearchSettings settings) throws NamingException;
 
     List<LdapSearchResult> search(DirContext managerContext, SearchSettings searchSettings) throws NamingException;
 }

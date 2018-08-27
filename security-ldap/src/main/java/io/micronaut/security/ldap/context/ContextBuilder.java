@@ -6,9 +6,9 @@ import javax.naming.directory.DirContext;
 
 public interface ContextBuilder {
 
-    DirContext buildManager() throws NamingException;
+    DirContext build(ContextSettings contextSettings) throws NamingException;
 
-    DirContext build(String user, String password) throws NamingException;
+    DirContext build(String factory, String server, String user, String password, boolean pooled) throws NamingException;
 
     void close(@Nullable DirContext context);
 }
