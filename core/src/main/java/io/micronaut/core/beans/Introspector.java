@@ -73,7 +73,7 @@ public final class Introspector {
     @SuppressWarnings("unchecked")
     public static <T> BeanInfo<T> getBeanInfo(Class<T> beanClass) {
         BeanInfo beanInfo = theCache.get(beanClass);
-        if (beanInfo != null) {
+        if (beanInfo == null) {
             beanInfo = new SimpleBeanInfo(beanClass);
             theCache.put(beanClass, beanInfo);
         }
