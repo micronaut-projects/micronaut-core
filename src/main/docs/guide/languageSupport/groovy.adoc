@@ -43,7 +43,7 @@ $ mn
 | Enter a command name to run. Use TAB for completion:
 mn>
 
-create-bean          create-client        create-controller
+create-bean          create-client        create-controller         create-function
 create-job           help
 
 mn> create-bean helloBean

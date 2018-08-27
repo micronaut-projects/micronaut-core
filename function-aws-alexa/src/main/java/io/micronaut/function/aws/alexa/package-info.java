@@ -13,15 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.function.groovy
 
-import groovy.transform.Field
-
-
-math.multiplier = 2
-
-@Field MathService mathService
-
-int round(float value) {
-    mathService.round(value) // go
-}
+/**
+ * <p>Classes to support exposing {@link io.micronaut.function.FunctionBean} instances for AWS lambda Alexa Skills</p>.
+ *
+ * @author Ryan Vanderwerf
+ * @since 1.0
+ */
+package io.micronaut.function.aws.alexa;
