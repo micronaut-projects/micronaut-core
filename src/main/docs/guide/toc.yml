@@ -127,7 +127,7 @@ cloud:
     serviceDiscoveryConsul: Consul Support
     serviceDiscoveryEureka: Eureka Support
     serviceDiscoveryKubernetes: Kubernetes Support
-#    serviceDiscoveryRoute53: AWS Route 53 Support
+    serviceDiscoveryRoute53: AWS Route 53 Support
     serviceDiscoveryManual: Manual Service Discovery Configuration
   clientSideLoadBalancing:
     title: Client Side Load Balancing
