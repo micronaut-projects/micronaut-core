@@ -14,14 +14,24 @@
  * limitations under the License.
  */
 
-/**
- * This package contains client APIs, service discovery and distributed configuration integration between Micronaut
- * and Consul (https://www.consul.io).
- *
- * @author ryan vanderwerf
- * @since 1.0
- */
-@Configuration
-package io.micronaut.discovery.consul;
+package io.micronaut.discovery.aws.route53;
 
-import io.micronaut.context.annotation.Configuration;
+import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsync;
+import io.micronaut.context.env.Environment;
+
+/**
+ * this allows us to swap out the AWS client impl for a mock/fake one to test.
+ *
+ * @author Ryan
+ * @author graemerocher
+ */
+public interface AWSServiceDiscoveryResolver {
+
+    /**
+     * this resolves the correct bean for the environment.
+     * @param environment running environment
+     * @return AWSServiceDiscoveryAsync impl real or fake
+     */
+    AWSServiceDiscoveryAsync resolve(Environment environment);
+
+}
