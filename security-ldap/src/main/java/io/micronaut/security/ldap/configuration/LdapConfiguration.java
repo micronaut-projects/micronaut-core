@@ -54,7 +54,6 @@ public class LdapConfiguration implements Toggleable {
      *
      * @param contextConfiguration The context configuration
      */
-    @Inject
     public void setContext(ContextConfiguration contextConfiguration) {
         this.context = contextConfiguration;
     }
@@ -71,7 +70,6 @@ public class LdapConfiguration implements Toggleable {
      *
      * @param searchConfiguration The searchForUser configuration
      */
-    @Inject
     public void setSearch(SearchConfiguration searchConfiguration) {
         this.search = searchConfiguration;
     }
@@ -80,7 +78,7 @@ public class LdapConfiguration implements Toggleable {
     /**
      * @return The group configuration
      */
-    public GroupConfiguration getGroup() {
+    public GroupConfiguration getGroups() {
         return group;
     }
 
@@ -89,8 +87,7 @@ public class LdapConfiguration implements Toggleable {
      *
      * @param groupConfiguration The group configuration
      */
-    @Inject
-    public void setGroup(GroupConfiguration groupConfiguration) {
+    public void setGroups(GroupConfiguration groupConfiguration) {
         this.group = groupConfiguration;
     }
 
@@ -106,7 +103,6 @@ public class LdapConfiguration implements Toggleable {
      *
      * @param sslConfiguration The ssl configuration
      */
-    @Inject
     public void setSsl(SslConfiguration sslConfiguration) {
         this.ssl = sslConfiguration;
     }
@@ -276,7 +272,6 @@ public class LdapConfiguration implements Toggleable {
          *
          * @param keyConfiguration The key configuration.
          */
-        @Inject
         public void setKey(DefaultKeyConfiguration keyConfiguration) {
             super.setKey(keyConfiguration);
         }
@@ -286,8 +281,6 @@ public class LdapConfiguration implements Toggleable {
          *
          * @param keyStoreConfiguration The key store configuration
          */
-        @Inject
-        @SuppressWarnings("unused")
         void setKeyStore(DefaultKeyStoreConfiguration keyStoreConfiguration) {
             super.setKeyStore(keyStoreConfiguration);
         }
@@ -297,8 +290,6 @@ public class LdapConfiguration implements Toggleable {
          *
          * @param trustStore The trust store configuration
          */
-        @Inject
-        @SuppressWarnings("unused")
         void setTrustStore(DefaultTrustStoreConfiguration trustStore) {
             super.setTrustStore(trustStore);
         }

@@ -103,7 +103,7 @@ public class LdapAuthenticationProvider implements AuthenticationProvider, Close
 
                 Set<String> groups = Collections.emptySet();
 
-                LdapConfiguration.GroupConfiguration groupSettings = configuration.getGroup();
+                LdapConfiguration.GroupConfiguration groupSettings = configuration.getGroups();
                 if (groupSettings.isEnabled()) {
                     groups = ldapGroupProcessor.process(groupSettings.getAttribute(), result, () -> {
                         return ldapSearchService.search(managerContext, groupSettings.getSearchSettings(new Object[]{result.getDn()}));
