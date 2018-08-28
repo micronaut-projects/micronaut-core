@@ -36,6 +36,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.retry.intercept.RecoveryInterceptor;
 import rx.Observable;
@@ -72,8 +73,8 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
 
     public static final int POSITION = InterceptPhase.RETRY.getPosition() + 10;
 
-    private final Map<Method, HystrixCommand.Setter> setterMap = new ConcurrentHashMap<>();
-    private final Map<Method, HystrixObservableCommand.Setter> observableSetterMap = new ConcurrentHashMap<>();
+    private final Map<ExecutableMethod, HystrixCommand.Setter> setterMap = new ConcurrentHashMap<>();
+    private final Map<ExecutableMethod, HystrixObservableCommand.Setter> observableSetterMap = new ConcurrentHashMap<>();
 
     private final RecoveryInterceptor recoveryInterceptor;
 
@@ -111,7 +112,7 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
 
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
             if (Publishers.isConvertibleToPublisher(javaReturnType) || isFuture) {
-                HystrixObservableCommand.Setter setter = observableSetterMap.computeIfAbsent(context.getTargetMethod(), method ->
+                HystrixObservableCommand.Setter setter = observableSetterMap.computeIfAbsent(context.getExecutableMethod(), method ->
                     buildObservableSetter(hystrixGroup, commandName, settings)
                 );
 
@@ -170,7 +171,7 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
                 }
             } else {
                 String finalCommandName = commandName;
-                HystrixCommand.Setter setter = setterMap.computeIfAbsent(context.getTargetMethod(), method ->
+                HystrixCommand.Setter setter = setterMap.computeIfAbsent(context.getExecutableMethod(), method ->
                     buildSetter(hystrixGroup, finalCommandName, threadPool, settings)
                 );
 
