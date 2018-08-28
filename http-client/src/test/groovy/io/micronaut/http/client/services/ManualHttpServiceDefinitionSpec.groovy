@@ -1,8 +1,10 @@
 package io.micronaut.http.client.services
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.Client
 import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.client.RxHttpClient
@@ -26,9 +28,16 @@ class ManualHttpServiceDefinitionSpec extends Specification {
                 'micronaut.http.services.foo.health-check':true,
                 'micronaut.http.services.foo.health-check-interval':'100ms',
                 'micronaut.http.services.foo.read-timeout':'15s',
-                'micronaut.http.services.foo.pool.enabled':false
+                'micronaut.http.services.foo.pool.enabled':false,
+                'micronaut.http.services.bar.url': firstApp.getURI(),
+                'micronaut.http.services.bar.path': '/manual/http/service',
+                'micronaut.http.services.bar.health-check':true,
+                'micronaut.http.services.bar.health-check-interval':'100ms',
+                'micronaut.http.services.bar.read-timeout':'10s',
+                'micronaut.http.services.bar.pool.enabled':false
         )
-        TestClient tc = clientApp.getBean(TestClient)
+        TestClientFoo tcFoo = clientApp.getBean(TestClientFoo)
+        TestClientBar tcBar = clientApp.getBean(TestClientBar)
 
         when:'the config is retrieved'
         def config = clientApp.getBean(HttpClientConfiguration, Qualifiers.byName("foo"))
@@ -44,7 +53,22 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         then:
         client.configuration == config
         result == 'ok'
-        tc.index() == 'ok'
+        tcFoo.index() == 'ok'
+
+        when:'the config is retrieved'
+        config = clientApp.getBean(HttpClientConfiguration, Qualifiers.byName("bar"))
+
+        then:
+        config.readTimeout.get() == Duration.ofSeconds(10)
+        !config.getConnectionPoolConfiguration().isEnabled()
+
+        when:
+        client = clientApp.getBean(RxHttpClient, Qualifiers.byName("bar"))
+        result = client.retrieve(HttpRequest.POST('/', '')).blockingFirst()
+        then:
+        client.configuration == config
+        result == 'created'
+        tcBar.save() == 'created'
 
         cleanup:
         firstApp.close()
@@ -78,18 +102,29 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         cleanup:
         clientApp.close()
     }
+
     @Client(id = "foo")
-    static interface TestClient {
+    static interface TestClientFoo {
         @Get
         String index()
     }
 
+    @Client(id = "bar")
+    static interface TestClientBar {
+        @Post
+        String save()
+    }
 
     @Controller('/manual/http/service')
     static class TestController {
         @Get
         String index() {
             return "ok"
+        }
+
+        @Post
+        String save() {
+            return "created"
         }
     }
 }
