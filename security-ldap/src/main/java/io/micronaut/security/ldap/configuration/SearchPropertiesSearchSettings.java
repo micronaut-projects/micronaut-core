@@ -1,13 +1,13 @@
-package io.micronaut.security.ldap;
+package io.micronaut.security.ldap.configuration;
 
 import io.micronaut.security.ldap.context.SearchSettings;
 
-public class GroupPropertiesSearchSettings implements SearchSettings {
+public class SearchPropertiesSearchSettings implements SearchSettings {
 
-    private final LdapConfigurationProperties.GroupProperties properties;
+    private final LdapConfiguration.SearchConfiguration properties;
     private final Object[] arguments;
 
-    GroupPropertiesSearchSettings(LdapConfigurationProperties.GroupProperties properties, Object[] arguments) {
+    SearchPropertiesSearchSettings(LdapConfiguration.SearchConfiguration properties, Object[] arguments) {
         this.properties = properties;
         this.arguments = arguments;
     }
@@ -34,6 +34,6 @@ public class GroupPropertiesSearchSettings implements SearchSettings {
 
     @Override
     public String[] getAttributes() {
-        return new String[] { properties.getAttribute() };
+        return properties.getAttributes();
     }
 }

@@ -1,9 +1,8 @@
 package io.micronaut.security.ldap;
 
 import io.micronaut.context.annotation.EachBean;
-import io.micronaut.context.annotation.Parameter;
-import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.security.authentication.*;
+import io.micronaut.security.ldap.configuration.LdapConfiguration;
 import io.micronaut.security.ldap.context.ContextBuilder;
 import io.micronaut.security.ldap.context.LdapSearchResult;
 import io.micronaut.security.ldap.context.LdapSearchService;
@@ -13,31 +12,27 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.PreDestroy;
-import javax.inject.Singleton;
 import javax.naming.AuthenticationException;
 import javax.naming.NamingException;
-import javax.naming.directory.Attributes;
 import javax.naming.directory.DirContext;
 import java.io.Closeable;
-import java.io.IOException;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
 
-@EachBean(LdapConfigurationProperties.class)
+@EachBean(LdapConfiguration.class)
 public class LdapAuthenticationProvider implements AuthenticationProvider, Closeable {
 
     private static final Logger LOG = LoggerFactory.getLogger(LdapAuthenticationProvider.class);
 
-    private final LdapConfigurationProperties configuration;
+    private final LdapConfiguration configuration;
     private final LdapSearchService ldapSearchService;
     private final ContextBuilder contextBuilder;
     private final ContextAuthenticationMapper contextAuthenticationMapper;
     private final LdapGroupProcessor ldapGroupProcessor;
     private DirContext managerContext;
 
-    public LdapAuthenticationProvider(LdapConfigurationProperties configuration,
+    public LdapAuthenticationProvider(LdapConfiguration configuration,
                                       LdapSearchService ldapSearchService,
                                       ContextBuilder contextBuilder,
                                       ContextAuthenticationMapper contextAuthenticationMapper,
@@ -108,7 +103,7 @@ public class LdapAuthenticationProvider implements AuthenticationProvider, Close
 
                 Set<String> groups = Collections.emptySet();
 
-                LdapConfigurationProperties.GroupProperties groupSettings = configuration.getGroup();
+                LdapConfiguration.GroupConfiguration groupSettings = configuration.getGroup();
                 if (groupSettings.isEnabled()) {
                     groups = ldapGroupProcessor.process(groupSettings.getAttribute(), result, () -> {
                         return ldapSearchService.search(managerContext, groupSettings.getSearchSettings(new Object[]{result.getDn()}));
