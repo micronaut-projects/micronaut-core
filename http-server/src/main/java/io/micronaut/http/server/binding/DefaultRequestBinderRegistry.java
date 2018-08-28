@@ -24,6 +24,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
@@ -39,12 +40,10 @@ import io.micronaut.http.server.binding.binders.ParameterAnnotationBinder;
 import io.micronaut.http.server.binding.binders.RequestArgumentBinder;
 import io.micronaut.http.server.binding.binders.TypedRequestArgumentBinder;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Default implementation of the {@link RequestBinderRegistry} interface.
@@ -69,27 +68,37 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
      * @param binders           The request argument binders
      */
     public DefaultRequestBinderRegistry(ConversionService conversionService, RequestArgumentBinder... binders) {
+        this(conversionService, Arrays.asList(binders));
+    }
+
+    /**
+     * @param conversionService The conversion service
+     * @param binders           The request argument binders
+     */
+    @Inject public DefaultRequestBinderRegistry(ConversionService conversionService, List<RequestArgumentBinder> binders) {
         this.conversionService = conversionService;
 
-        for (RequestArgumentBinder binder : binders) {
-            if (binder instanceof AnnotatedRequestArgumentBinder) {
-                AnnotatedRequestArgumentBinder<?, ?> annotatedRequestArgumentBinder = (AnnotatedRequestArgumentBinder) binder;
-                Class<? extends Annotation> annotationType = annotatedRequestArgumentBinder.getAnnotationType();
-                if (binder instanceof TypedRequestArgumentBinder) {
-                    TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
-                    Argument argumentType = typedRequestArgumentBinder.argumentType();
-                    byTypeAndAnnotation.put(new TypeAndAnnotation(argumentType, annotationType), binder);
-                    Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(argumentType.getType());
-                    for (Class<?> itfce : allInterfaces) {
-                        byTypeAndAnnotation.put(new TypeAndAnnotation(Argument.of(itfce), annotationType), binder);
+        if (CollectionUtils.isNotEmpty(binders)) {
+            for (RequestArgumentBinder binder : binders) {
+                if (binder instanceof AnnotatedRequestArgumentBinder) {
+                    AnnotatedRequestArgumentBinder<?, ?> annotatedRequestArgumentBinder = (AnnotatedRequestArgumentBinder) binder;
+                    Class<? extends Annotation> annotationType = annotatedRequestArgumentBinder.getAnnotationType();
+                    if (binder instanceof TypedRequestArgumentBinder) {
+                        TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
+                        Argument argumentType = typedRequestArgumentBinder.argumentType();
+                        byTypeAndAnnotation.put(new TypeAndAnnotation(argumentType, annotationType), binder);
+                        Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(argumentType.getType());
+                        for (Class<?> itfce : allInterfaces) {
+                            byTypeAndAnnotation.put(new TypeAndAnnotation(Argument.of(itfce), annotationType), binder);
+                        }
+                    } else {
+                        byAnnotation.put(annotationType, annotatedRequestArgumentBinder);
                     }
-                } else {
-                    byAnnotation.put(annotationType, annotatedRequestArgumentBinder);
-                }
 
-            } else if (binder instanceof TypedRequestArgumentBinder) {
-                TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
-                byType.put(typedRequestArgumentBinder.argumentType().typeHashCode(), typedRequestArgumentBinder);
+                } else if (binder instanceof TypedRequestArgumentBinder) {
+                    TypedRequestArgumentBinder typedRequestArgumentBinder = (TypedRequestArgumentBinder) binder;
+                    byType.put(typedRequestArgumentBinder.argumentType().typeHashCode(), typedRequestArgumentBinder);
+                }
             }
         }
 

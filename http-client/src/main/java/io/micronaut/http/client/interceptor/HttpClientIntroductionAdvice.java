@@ -140,7 +140,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         for (MutableArgumentValue<?> argumentValue : context.getParameters().values()) {
             if (argumentValue.getValue() == null && !argumentValue.isAnnotationPresent(Nullable.class)) {
                 throw new IllegalArgumentException(
-                    String.format("Null values are not allowed to be passed to client methods (%s). Add @javax.validation.Nullable if that is the desired behavior", context.getTargetMethod().toString())
+                    String.format("Null values are not allowed to be passed to client methods (%s). Add @javax.validation.Nullable if that is the desired behavior", context.getExecutableMethod().toString())
                 );
             }
         }

@@ -25,6 +25,7 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.retry.RetryState;
 import io.micronaut.retry.annotation.CircuitBreaker;
 import io.micronaut.retry.annotation.Retryable;
@@ -35,7 +36,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
-import java.lang.reflect.Method;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Optional;
@@ -56,7 +56,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
     private static final int DEFAULT_CIRCUIT_BREAKER_TIMEOUT_IN_MILLIS = 20;
 
     private final ApplicationEventPublisher eventPublisher;
-    private final Map<Method, CircuitBreakerRetry> circuitContexts = new ConcurrentHashMap<>();
+    private final Map<ExecutableMethod, CircuitBreakerRetry> circuitContexts = new ConcurrentHashMap<>();
 
     /**
      * Construct a default retry method interceptor with the event publisher.
@@ -91,7 +91,7 @@ public class DefaultRetryInterceptor implements MethodInterceptor<Object, Object
                 .getValue(CircuitBreaker.class, "reset", Duration.class)
                 .map(Duration::toMillis).orElse(Duration.ofSeconds(DEFAULT_CIRCUIT_BREAKER_TIMEOUT_IN_MILLIS).toMillis());
             retryState = circuitContexts.computeIfAbsent(
-                context.getTargetMethod(),
+                context.getExecutableMethod(),
                 method -> new CircuitBreakerRetry(timeout, retryStateBuilder, context, eventPublisher)
             );
         } else {

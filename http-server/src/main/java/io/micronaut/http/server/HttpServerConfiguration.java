@@ -47,18 +47,17 @@ public class HttpServerConfiguration {
 
     public static final String PREFIX = "micronaut.server";
 
-    protected int port = -1; // default to random port
-    protected Optional<String> host = Optional.empty();
-    protected Optional<Integer> readTimeout;
-    @ReadableBytes
-    protected long maxRequestSize = 1024 * 1024 * 10; // 10MB
-    protected Duration readIdleTime = Duration.of(60, ChronoUnit.SECONDS);
-    protected Duration writeIdleTime = Duration.of(60, ChronoUnit.SECONDS);
-    protected Duration idleTime = Duration.of(60, ChronoUnit.SECONDS);
-    protected MultipartConfiguration multipart = new MultipartConfiguration();
-    protected CorsConfiguration cors = new CorsConfiguration();
-    protected Optional<String> serverHeader = Optional.empty();
-    protected boolean dateHeader = true;
+    private int port = -1; // default to random port
+    private String host;
+    private Integer readTimeout;
+    private long maxRequestSize = 1024 * 1024 * 10; // 10MB
+    private Duration readIdleTime = Duration.of(60, ChronoUnit.SECONDS);
+    private Duration writeIdleTime = Duration.of(60, ChronoUnit.SECONDS);
+    private Duration idleTime = Duration.of(60, ChronoUnit.SECONDS);
+    private MultipartConfiguration multipart = new MultipartConfiguration();
+    private CorsConfiguration cors = new CorsConfiguration();
+    private String serverHeader;
+    private boolean dateHeader = true;
 
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
@@ -114,14 +113,14 @@ public class HttpServerConfiguration {
      * @return The default host
      */
     public Optional<String> getHost() {
-        return host;
+        return Optional.ofNullable(host);
     }
 
     /**
      * @return The read timeout setting for the server
      */
     public Optional<Integer> getReadTimeout() {
-        return readTimeout;
+        return Optional.ofNullable(readTimeout);
     }
 
     /**
@@ -170,7 +169,7 @@ public class HttpServerConfiguration {
      * @return The optional server header value
      */
     public Optional<String> getServerHeader() {
-        return serverHeader;
+        return Optional.ofNullable(serverHeader);
     }
 
     /**
@@ -181,21 +180,108 @@ public class HttpServerConfiguration {
     }
 
     /**
+     * Sets the port to bind to.
+     * @param port The port
+     */
+    public void setPort(int port) {
+        this.port = port;
+    }
+
+    /**
+     * Sets the host to bind to
+     * @param host The host
+     */
+    public void setHost(String host) {
+        this.host = host;
+    }
+
+    /**
+     * Sets the default read timeout.
+     * @param readTimeout The read timeout
+     */
+    public void setReadTimeout(Integer readTimeout) {
+        this.readTimeout = readTimeout;
+    }
+
+    /**
+     * Sets the name of the server header.
+     * @param serverHeader The server header
+     */
+    public void setServerHeader(String serverHeader) {
+        this.serverHeader = serverHeader;
+    }
+
+    /**
+     * Sets the maximum request size.
+     * @param maxRequestSize The max request size
+     */
+    public void setMaxRequestSize(@ReadableBytes long maxRequestSize) {
+        this.maxRequestSize = maxRequestSize;
+    }
+
+    /**
+     * Sets the amount of time a connection can remain idle without any reads occurring.
+     * @param readIdleTime The read idle time
+     */
+    public void setReadIdleTime(Duration readIdleTime) {
+        this.readIdleTime = readIdleTime;
+    }
+
+    /**
+     * Sets the amount of time a connection can remain idle without any writes occurring.
+     * @param writeIdleTime The write idle time
+     */
+    public void setWriteIdleTime(Duration writeIdleTime) {
+        this.writeIdleTime = writeIdleTime;
+    }
+
+    /**
+     * Sets the idle time of connections for the server.
+     * @param idleTime The idle time
+     */
+    public void setIdleTime(Duration idleTime) {
+        this.idleTime = idleTime;
+    }
+
+    /**
+     * Sets the multipart configuration.
+     * @param multipart The multipart configuration
+     */
+    public void setMultipart(MultipartConfiguration multipart) {
+        this.multipart = multipart;
+    }
+
+    /**
+     * Sets the cors configuration.
+     * @param cors The cors configuration
+     */
+    public void setCors(CorsConfiguration cors) {
+        this.cors = cors;
+    }
+
+    /**
+     * Sets whether a date header should be sent back.
+     * @param dateHeader True if a date header should be sent.
+     */
+    public void setDateHeader(boolean dateHeader) {
+        this.dateHeader = dateHeader;
+    }
+
+    /**
      * Configuration for multipart handling.
      */
     @ConfigurationProperties("multipart")
     public static class MultipartConfiguration implements Toggleable {
-        protected Optional<File> location = Optional.empty();
-        @ReadableBytes
-        protected long maxFileSize = 1024 * 1024; // 1MB
-        protected boolean enabled = true;
-        protected boolean disk = false;
+        private File location;
+        private long maxFileSize = 1024 * 1024; // 1MB
+        private boolean enabled = true;
+        private boolean disk = false;
 
         /**
          * @return The location to store temporary files
          */
         public Optional<File> getLocation() {
-            return location;
+            return Optional.ofNullable(location);
         }
 
         /**
@@ -219,6 +305,38 @@ public class HttpServerConfiguration {
         public boolean isDisk() {
             return disk;
         }
+
+        /**
+         * Sets the location to store files.
+         * @param location The location
+         */
+        public void setLocation(File location) {
+            this.location = location;
+        }
+
+        /**
+         * Sets the max file size.
+         * @param maxFileSize The max file size
+         */
+        public void setMaxFileSize(@ReadableBytes long maxFileSize) {
+            this.maxFileSize = maxFileSize;
+        }
+
+        /**
+         * Sets whether multipart processing is enabled.
+         * @param enabled True if it is enabled
+         */
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        /**
+         * Sets whether to buffer data to disk or not.
+         * @param disk True if data should be written to disk
+         */
+        public void setDisk(boolean disk) {
+            this.disk = disk;
+        }
     }
 
     /**
@@ -227,9 +345,9 @@ public class HttpServerConfiguration {
     @ConfigurationProperties("cors")
     public static class CorsConfiguration implements Toggleable {
 
-        protected boolean enabled = false;
+        private boolean enabled = false;
 
-        protected Map<String, CorsOriginConfiguration> configurations = Collections.emptyMap();
+        private Map<String, CorsOriginConfiguration> configurations = Collections.emptyMap();
 
         private Map<String, CorsOriginConfiguration> defaultConfiguration = new LinkedHashMap<>(1);
 
@@ -252,6 +370,22 @@ public class HttpServerConfiguration {
                 return defaultConfiguration;
             }
             return configurations;
+        }
+
+        /**
+         * Sets whether CORS is enabled.
+         * @param enabled True if CORS is enabled
+         */
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        /**
+         * Sets the CORS configurations.
+         * @param configurations The CORS configurations
+         */
+        public void setConfigurations(Map<String, CorsOriginConfiguration> configurations) {
+            this.configurations = configurations;
         }
     }
 }

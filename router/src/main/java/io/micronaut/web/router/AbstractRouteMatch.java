@@ -31,9 +31,11 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.sse.Event;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -82,12 +84,10 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
         this.acceptedMediaTypes = abstractRoute.getConsumes();
     }
 
-    private String resolveInputName(Argument requiredArgument) {
-        String inputName = requiredArgument.getAnnotationMetadata().getValue(Bindable.class, String.class).orElse(null);
-        if (StringUtils.isEmpty(inputName)) {
-            inputName = requiredArgument.getName();
-        }
-        return inputName;
+    @Nonnull
+    @Override
+    public ExecutableMethod<?, R> getExecutableMethod() {
+        return executableMethod.getExecutableMethod();
     }
 
     @Override
@@ -359,4 +359,12 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
      * @return A RouteMatch
      */
     protected abstract RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments);
+
+    private String resolveInputName(Argument requiredArgument) {
+        String inputName = requiredArgument.getAnnotationMetadata().getValue(Bindable.class, String.class).orElse(null);
+        if (StringUtils.isEmpty(inputName)) {
+            inputName = requiredArgument.getName();
+        }
+        return inputName;
+    }
 }

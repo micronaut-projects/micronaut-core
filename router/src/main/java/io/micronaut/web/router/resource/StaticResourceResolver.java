@@ -45,7 +45,7 @@ public class StaticResourceResolver {
     StaticResourceResolver(StaticResourceConfiguration configuration) {
         this.loaders = configuration.getResourceLoaders();
         this.pathMatcher = PathMatcher.ANT;
-        this.mapping = configuration.mapping;
+        this.mapping = configuration.getMapping();
     }
 
     /**

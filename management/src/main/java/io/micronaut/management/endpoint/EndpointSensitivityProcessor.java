@@ -22,7 +22,6 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 
 import javax.inject.Singleton;
-import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -39,7 +38,7 @@ public class EndpointSensitivityProcessor implements ExecutableMethodProcessor<E
 
     private final EndpointConfiguration[] endpointConfigurations;
     private final EndpointDefaultConfiguration defaultConfiguration;
-    private Map<Method, Boolean> endpointMethods = new HashMap<>();
+    private Map<ExecutableMethod, Boolean> endpointMethods = new HashMap<>();
 
     /**
      * Constructs with the existing and default endpoint configurations used to determine if a given endpoint is
@@ -58,7 +57,7 @@ public class EndpointSensitivityProcessor implements ExecutableMethodProcessor<E
      * @return Returns Map with the key being a method which identifies an {@link Endpoint} and a boolean value being
      * the sensitive configuration for the endpoint.
      */
-    public Map<Method, Boolean> getEndpointMethods() {
+    public Map<ExecutableMethod, Boolean> getEndpointMethods() {
         return endpointMethods;
     }
 
@@ -79,7 +78,7 @@ public class EndpointSensitivityProcessor implements ExecutableMethodProcessor<E
                     .getValue(Endpoint.class, "defaultSensitive", Boolean.class)
                     .orElse(Endpoint.SENSITIVE));
 
-            endpointMethods.put(method.getTargetMethod(), sensitive);
+            endpointMethods.put(method, sensitive);
         });
     }
 }
