@@ -7,15 +7,14 @@ import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED
 
-class SystemMeterRegistryBinderSpec extends Specification {
+class SystemMeterRegistryBinderFactorySpec extends Specification {
 
     def "test getting the beans manually"() {
         when:
-        def binder = new SystemMeterRegistryBinder()
+        def binder = new SystemMeterRegistryBinderFactoryFactory()
 
         then:
         binder.uptimeMetrics()
@@ -28,7 +27,7 @@ class SystemMeterRegistryBinderSpec extends Specification {
         ApplicationContext context = ApplicationContext.run()
 
         then:
-        context.containsBean(SystemMeterRegistryBinder)
+        context.containsBean(SystemMeterRegistryBinderFactoryFactory)
         context.containsBean(UptimeMetrics)
         context.containsBean(ProcessorMetrics)
         context.containsBean(FileDescriptorMetrics)
@@ -43,7 +42,7 @@ class SystemMeterRegistryBinderSpec extends Specification {
         ApplicationContext context = ApplicationContext.run([(cfg): setting])
 
         then:
-        context.findBean(SystemMeterRegistryBinder).isPresent() == binderPresent
+        context.findBean(SystemMeterRegistryBinderFactoryFactory).isPresent() == binderPresent
         if (binderPresent) {
             context.findBean(UptimeMetrics).isPresent() == uptimePresent
             context.findBean(ProcessorMetrics).isPresent() == processorPresent

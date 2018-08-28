@@ -22,6 +22,7 @@ import io.micrometer.core.instrument.Statistic;
 import io.micrometer.core.instrument.Tag;
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry;
 import io.micronaut.configuration.metrics.annotation.RequiresMetrics;
+import io.micronaut.context.ApplicationContext;
 import io.micronaut.core.bind.exceptions.UnsatisfiedArgumentException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.management.endpoint.annotation.Endpoint;
@@ -29,7 +30,18 @@ import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.management.endpoint.annotation.Selector;
 
 import javax.annotation.Nullable;
-import java.util.*;
+import javax.sql.DataSource;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
@@ -54,14 +66,23 @@ public class MetricsEndpoint {
     static final String NAME = "metrics";
 
     private final Collection<MeterRegistry> meterRegistries;
+    @SuppressWarnings("unused")
+    private final Collection<DataSource> dataSources;
 
     /**
      * Constructor for metrics endpoint.
      *
      * @param meterRegistries Meter Registries
+     * @param applicationContext Application Context for looking up beans
      */
-    public MetricsEndpoint(Collection<MeterRegistry> meterRegistries) {
+    public MetricsEndpoint(Collection<MeterRegistry> meterRegistries,
+                           ApplicationContext applicationContext) {
         this.meterRegistries = meterRegistries;
+
+        //Make sure the data sources are loaded
+        this.dataSources = applicationContext.containsBean(DataSource.class) ?
+                applicationContext.getBeansOfType(DataSource.class) : null;
+
     }
 
     /**
@@ -85,7 +106,7 @@ public class MetricsEndpoint {
      * Will return a 404 if the metric is not found.
      *
      * @param name the name of the metric to get the details for
-     * @param tag The tags
+     * @param tag  The tags
      * @return single with metric details response
      */
     @Read
@@ -100,7 +121,7 @@ public class MetricsEndpoint {
      * @return http response with list of metric names
      */
     private MetricNames getListNamesResponse() {
-        Set<String> names = new LinkedHashSet<>();
+        SortedSet<String> names = new TreeSet<>();
         collectNames(names, this.meterRegistries);
         return new MetricNames(names);
     }
@@ -114,7 +135,7 @@ public class MetricsEndpoint {
      * <p>
      * Will return a 404 if the metric is not found.
      *
-     * @param name the name of the meter to get the details for.
+     * @param name     the name of the meter to get the details for.
      * @param tagNames The tags
      * @return single with metric details response
      */
@@ -257,14 +278,14 @@ public class MetricsEndpoint {
      */
     public static final class MetricNames {
 
-        private final Set<String> names;
+        private final SortedSet<String> names;
 
         /**
          * Object to hold metric names.
          *
          * @param names list of names
          */
-        MetricNames(Set<String> names) {
+        MetricNames(SortedSet<String> names) {
             this.names = names;
         }
 
@@ -273,7 +294,7 @@ public class MetricsEndpoint {
          *
          * @return set of names
          */
-        public Set<String> getNames() {
+        public SortedSet<String> getNames() {
             return this.names;
         }
     }

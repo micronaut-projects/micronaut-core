@@ -13,7 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.configuration.jdbc.tomcat;
+
+package io.micronaut.configuration.jdbc.dbcp;
 
 import io.micronaut.spring.tx.annotation.Transactional;
 
@@ -35,7 +36,7 @@ public class BookService {
         this.secondary = secondary;
 
         try (Connection connection = dataSource.getConnection()) {
-            connection.createStatement().execute("CREATE TABLE IF NOT EXISTS  foo(id INTEGER);");
+            connection.createStatement().execute("CREATE TABLE IF NOT EXISTS foo(id INTEGER);");
             connection.createStatement().execute("INSERT INTO foo(id) VALUES (0);");
             connection.commit();
         }

@@ -13,9 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.configuration.jdbc.tomcat
 
-import io.micronaut.configuration.jdbc.tomcat.metadata.TomcatDataSourcePoolMetadata
+package io.micronaut.configuration.jdbc.dbcp
+
+import io.micronaut.configuration.jdbc.dbcp.metadata.DbcpDataSourcePoolMetadata
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
@@ -30,17 +31,18 @@ class DatasourceTransactionManagementSpec extends Specification {
                 'datasources.secondary.defaultAutoCommit': false,
                 'datasources.secondary.enableAutoCommitOnReturn': false
         )
-        TomcatDataSourcePoolMetadata poolMetadata = ctx.getBean(TomcatDataSourcePoolMetadata, Qualifiers.byName("default"))
+        DbcpDataSourcePoolMetadata poolMetadata = ctx.getBean(DbcpDataSourcePoolMetadata, Qualifiers.byName("default"))
+        DbcpDataSourcePoolMetadata poolMetadataSecondary = ctx.getBean(DbcpDataSourcePoolMetadata, Qualifiers.byName("secondary"))
         BookService bookService = ctx.getBean(BookService)
 
         expect:
-        poolMetadata.borrowed == 1
+        poolMetadata
+        poolMetadataSecondary
         bookService.save("one") == "1"
         bookService.save("two") == "2"
         bookService.saveTwo("one") == "1"
         bookService.saveTwo("two") == "2"
         bookService.save("three") == "3"
-        poolMetadata.borrowed > 1
 
         cleanup:
         ctx.close()

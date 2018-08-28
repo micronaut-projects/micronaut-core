@@ -47,7 +47,7 @@ import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory
 @Singleton
 @RequiresMetrics
 @Requires(property = MICRONAUT_METRICS_BINDERS + ".executor.enabled", value = "true", defaultValue = "true")
-public class ExecutorServiceMetricsBinder implements BeanCreatedEventListener<ExecutorService> {
+public class ExecutorServiceMetricsBinderListener implements BeanCreatedEventListener<ExecutorService> {
 
     private final MeterRegistry meterRegistry;
 
@@ -56,7 +56,7 @@ public class ExecutorServiceMetricsBinder implements BeanCreatedEventListener<Ex
      *
      * @param meterRegistry The meter registry
      */
-    public ExecutorServiceMetricsBinder(MeterRegistry meterRegistry) {
+    public ExecutorServiceMetricsBinderListener(MeterRegistry meterRegistry) {
         this.meterRegistry = meterRegistry;
     }
 
@@ -78,7 +78,7 @@ public class ExecutorServiceMetricsBinder implements BeanCreatedEventListener<Ex
         new ExecutorServiceMetrics(unwrapped, beanIdentifier.getName(), tags).bindTo(meterRegistry);
 
         // allow timing
-        final Timer timer = meterRegistry.timer("executor", Tags.concat(tags , "name", beanIdentifier.getName()));
+        final Timer timer = meterRegistry.timer("executor", Tags.concat(tags, "name", beanIdentifier.getName()));
         if (executorService instanceof ScheduledExecutorService) {
             return new InstrumentedScheduledExecutorService() {
 
