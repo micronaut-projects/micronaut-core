@@ -419,13 +419,9 @@ public class RequiresCondition implements Condition {
     }
 
     private void reportMissingClass(ConditionContext context) {
-        if (ClassUtils.CLASS_LOADING_REPORTERS != Collections.EMPTY_LIST) {
-            AnnotationMetadataProvider component = context.getComponent();
-            if (component instanceof BeanDefinitionReference) {
-                for (ClassLoadingReporter reporter : ClassUtils.CLASS_LOADING_REPORTERS) {
-                    reporter.reportMissing(component.getClass().getName());
-                }
-            }
+        AnnotationMetadataProvider component = context.getComponent();
+        if (component instanceof BeanDefinitionReference) {
+            ClassLoadingReporter.reportMissing(component.getClass().getName());
         }
     }
 
