@@ -66,8 +66,7 @@ import java.util.stream.Stream;
  */
 public class DefaultEnvironment extends PropertySourcePropertyResolver implements Environment {
 
-    //private static final String EC2_LINUX_HYPERVISOR_FILE = "/sys/hypervisor/uuid";
-    private static final String EC2_LINUX_HYPERVISOR_FILE = "/tmp/uuid";
+    private static final String EC2_LINUX_HYPERVISOR_FILE = "/sys/hypervisor/uuid";
     private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
     private static final String PROPERTY_SOURCES_KEY = "micronaut.config.files";
     private static final String FILE_SEPARATOR = ",";

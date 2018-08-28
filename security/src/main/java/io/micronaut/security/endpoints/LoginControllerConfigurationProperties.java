@@ -17,6 +17,7 @@
 package io.micronaut.security.endpoints;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.security.config.SecurityConfigurationProperties;
 
 /**
@@ -42,5 +43,23 @@ public class LoginControllerConfigurationProperties implements LoginControllerCo
     @Override
     public String getPath() {
         return this.path;
+    }
+
+    /**
+     * Sets whether the login controller is enabled.
+     * @param enabled True if it is enabled
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    /**
+     * Sets the path to the login controller. Defaults to /login.
+     * @param path The path
+     */
+    public void setPath(String path) {
+        if (StringUtils.isNotEmpty(path)) {
+            this.path = path;
+        }
     }
 }

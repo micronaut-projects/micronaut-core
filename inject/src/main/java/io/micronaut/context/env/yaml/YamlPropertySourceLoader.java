@@ -44,6 +44,11 @@ public class YamlPropertySourceLoader extends AbstractPropertySourceLoader {
 
     @Override
     protected void processInput(String name, InputStream input, Map<String, Object> finalMap) {
+        // workaround for Graal which returns null
+        if (System.getProperty("java.runtime.name") == null) {
+            System.setProperty("java.runtime.name", "Unknown");
+        }
+
         Yaml yaml = new Yaml();
         Iterable<Object> objects = yaml.loadAll(input);
         for (Object object : objects) {

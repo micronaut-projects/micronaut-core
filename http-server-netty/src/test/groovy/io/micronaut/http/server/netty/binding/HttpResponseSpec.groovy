@@ -63,7 +63,9 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         "status"              | HttpStatus.MOVED_PERMANENTLY  | null                       | [connection: 'close']
         "created-body"        | HttpStatus.CREATED            | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
         "created-uri"         | HttpStatus.CREATED            | null                       | [connection: 'close', 'location': 'http://test.com']
+        "created-body-uri"    | HttpStatus.CREATED            | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close', 'location': 'http://test.com']
         "accepted"            | HttpStatus.ACCEPTED           | null                       | [connection: 'close']
+        "accepted-uri"        | HttpStatus.ACCEPTED           | null                       | [connection: 'close', 'location': 'http://example.com']
         "disallow"            | HttpStatus.METHOD_NOT_ALLOWED | null                       | [connection: "close", 'allow': 'DELETE']
 
     }
@@ -96,6 +98,7 @@ class HttpResponseSpec extends AbstractMicronautSpec {
         "created-body"        | HttpStatus.CREATED           | '{"name":"blah","age":10}' | defaultHeaders + ['content-length': '24', 'content-type': 'application/json'] + [connection: 'close']
         "created-uri"         | HttpStatus.CREATED           | null                       | [connection: 'close', 'location': 'http://test.com']
         "accepted"            | HttpStatus.ACCEPTED          | null                       | [connection: 'close']
+        "accepted-uri"        | HttpStatus.ACCEPTED          | null                       | [connection: 'close', 'location': 'http://example.com']
     }
 
     void "test content encoding"() {

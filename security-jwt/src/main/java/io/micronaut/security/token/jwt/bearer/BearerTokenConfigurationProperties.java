@@ -30,9 +30,9 @@ public class BearerTokenConfigurationProperties implements BearerTokenConfigurat
 
     public static final String PREFIX = JwtConfigurationProperties.PREFIX + ".bearer";
 
-    protected boolean enabled = true;
-    protected String headerName = "Authorization";
-    protected String prefix = "Bearer";
+    private boolean enabled = true;
+    private String headerName = "Authorization";
+    private String prefix = "Bearer";
 
     @Override
     public boolean isEnabled() {
@@ -47,5 +47,32 @@ public class BearerTokenConfigurationProperties implements BearerTokenConfigurat
     @Override
     public String getHeaderName() {
         return headerName;
+    }
+
+
+    /**
+     * Set whether to enable basic auth.
+     *
+     * @param enabled True if enabled
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    /**
+     * Sets the header name to use. Defaults to {@link io.micronaut.http.HttpHeaders#AUTHORIZATION}.
+     *
+     * @param headerName The header name to use
+     */
+    public void setHeaderName(String headerName) {
+        this.headerName = headerName;
+    }
+
+    /**
+     * Sets the prefix to use for the auth token. Defaults to "Basic".
+     * @param prefix The prefix to use
+     */
+    public void setPrefix(String prefix) {
+        this.prefix = prefix;
     }
 }

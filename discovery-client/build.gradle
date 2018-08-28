@@ -15,6 +15,8 @@ dependencies {
 // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-servicediscovery
     compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.297'
 
+    // used by AWSParameterStoreConfigClient
+    compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.308'
 
     testCompile project(":configurations:aws-common")
     // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-route53
@@ -25,6 +27,8 @@ dependencies {
     testCompile group: 'com.amazonaws', name: 'jmespath-java', version: '1.11.297'
 // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-servicediscovery
     testCompile group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.297'
+
+    testCompile group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.308'
 
     testRuntime project(":configurations:hibernate-validator")
     testCompile project(":management")
