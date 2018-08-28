@@ -20,6 +20,8 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 
 import java.util.ArrayList;
@@ -41,9 +43,9 @@ public class StaticResourceConfiguration implements Toggleable {
      */
     public static final String PREFIX = "micronaut.router.static.resources";
 
-    protected boolean enabled = false;
-    protected List<String> paths = Collections.emptyList();
-    protected String mapping = "/**";
+    private boolean enabled = false;
+    private List<String> paths = Collections.emptyList();
+    private String mapping = "/**";
 
     private final ResourceResolver resourceResolver;
 
@@ -82,5 +84,43 @@ public class StaticResourceConfiguration implements Toggleable {
             return loaders;
         }
         return Collections.emptyList();
+    }
+
+    /**
+     * The static resource mapping.
+     * @return The mapping
+     */
+    public String getMapping() {
+        return mapping;
+    }
+
+    /**
+     * Sets whether static resources are enabled.
+     *
+     * @param enabled True if they are enabled.
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    /**
+     * Sets the paths to the static resources.
+     * @param paths The paths
+     */
+    public void setPaths(List<String> paths) {
+        if (CollectionUtils.isNotEmpty(paths)) {
+            this.paths = paths;
+        }
+    }
+
+    /**
+     * Sets default mapping.
+     *
+     * @param mapping The mapping
+     */
+    public void setMapping(String mapping) {
+        if (StringUtils.isNotEmpty(mapping)) {
+            this.mapping = mapping;
+        }
     }
 }

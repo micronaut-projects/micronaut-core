@@ -26,6 +26,7 @@ import javax.validation.constraints.Digits;
 @Singleton
 @Validated
 public class Foo {
+
     public String testMe(@Digits(integer = 3, fraction = 2) String number) {
         return '$' + number;
     }

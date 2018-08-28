@@ -52,7 +52,7 @@ public class DuplicateRouteException extends RoutingException {
         message.append(uri).append(": ");
         message.append(uriRoutes
             .stream()
-            .map((uriRouteMatch -> uriRouteMatch.getTargetMethod().toString()))
+            .map((Object::toString))
             .collect(Collectors.joining(", ")));
         return message.toString();
     }

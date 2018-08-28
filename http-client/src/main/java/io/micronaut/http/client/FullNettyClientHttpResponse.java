@@ -150,11 +150,16 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
             return Optional.empty();
         }
 
-        if (type.getType() == ByteBuffer.class) {
+        Class<T> javaType = type.getType();
+        if (javaType == void.class) {
+            return Optional.empty();
+        }
+
+        if (javaType == ByteBuffer.class) {
             return Optional.of((T) byteBufferFactory.wrap(nettyHttpResponse.content()));
         }
 
-        if (type.getType() == ByteBuf.class) {
+        if (javaType == ByteBuf.class) {
             return Optional.of((T) (nettyHttpResponse.content()));
         }
 
@@ -181,7 +186,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
 
         );
         if (LOG.isTraceEnabled() && !result.isPresent()) {
-            LOG.trace("Unable to convert response body to target type {}", type.getType());
+            LOG.trace("Unable to convert response body to target type {}", javaType);
         }
         return result;
     }

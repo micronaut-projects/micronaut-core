@@ -18,7 +18,7 @@
  * This package contains client APIs, service discovery and distributed configuration integration between Micronaut
  * and Consul (https://www.consul.io).
  *
- * @author graemerocher
+ * @author ryan vanderwerf
  * @since 1.0
  */
 @Configuration

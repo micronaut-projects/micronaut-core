@@ -132,6 +132,9 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
             }
 
             ec2InstanceMetadata.metadata = objectMapper.convertValue(ec2InstanceMetadata, Map.class);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("EC2 Metadata found:" + ec2InstanceMetadata.metadata.toString());
+            }
             //TODO make individual calls for building network interfaces.. required recursive http calls for all mac addresses
         } catch (IOException e) {
             LOG.error("Error reading ec2 metadata url", e);
@@ -181,9 +184,15 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
      * @throws IOException Signals that an I/O exception of some sort has occurred
      */
     protected String readEc2MetadataUrl(URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException {
+
         URLConnection urlConnection = url.openConnection();
 
         if (url.getProtocol().equalsIgnoreCase("file")) {
+            if (url.getPath().indexOf(':') != -1) {
+                //rebuild url path because windows can't have paths with colons
+                url = new URL(url.getProtocol(), url.getHost(), url.getFile().replace(':', '_'));
+                urlConnection = url.openConnection();
+            }
             urlConnection.connect();
             try (BufferedReader in = new BufferedReader(
                 new InputStreamReader(urlConnection.getInputStream()))) {

@@ -15,9 +15,11 @@
  */
 package io.micronaut.validation;
 
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
 
+import javax.validation.Valid;
 import javax.validation.constraints.Digits;
 
 /**
@@ -32,5 +34,10 @@ public class ValidatedController {
     @Post("/args")
     public String args(@Digits(integer = 3, fraction = 2) String amount) {
         return "$" + amount;
+    }
+
+    @Post("/pojo")
+    public Pojo pojo(@Body @Valid Pojo pojo) {
+        return pojo;
     }
 }

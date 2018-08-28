@@ -34,10 +34,7 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Writes out {@link io.micronaut.inject.ExecutableMethod} implementations.
@@ -184,10 +181,16 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         constructorWriter.push(methodName);
 
         // 3rd argument the generic return type
-        // Argument.of(genericReturnType, returnTypeGenericTypes)
         if (genericReturnType instanceof Class && ((Class) genericReturnType).isPrimitive()) {
-            constructorWriter.visitInsn(ACONST_NULL);
+            Class javaType = (Class) genericReturnType;
+            String constantName = javaType.getName().toUpperCase(Locale.ENGLISH);
+
+            // refer to constant for primitives
+            Type type = Type.getType(Argument.class);
+            constructorWriter.getStatic(type, constantName, type);
+
         } else {
+            // Argument.of(genericReturnType, returnTypeGenericTypes)
             buildArgumentWithGenerics(
                 constructorWriter,
                 methodName,
