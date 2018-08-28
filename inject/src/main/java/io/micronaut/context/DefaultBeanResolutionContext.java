@@ -26,11 +26,7 @@ import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.MethodInjectionPoint;
 import io.micronaut.inject.ProxyBeanDefinition;
 
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Default implementation of the {@link BeanResolutionContext} interface.
@@ -56,6 +52,17 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
         this.path = new DefaultPath();
     }
 
+    /**
+     * @param context        The bean context
+     * @param rootDefinition The bean root definition
+     * @param path           The path
+     */
+    private DefaultBeanResolutionContext(BeanContext context, BeanDefinition rootDefinition, Path path) {
+        this.context = context;
+        this.rootDefinition = rootDefinition;
+        this.path = path;
+    }
+
     @Override
     public BeanContext getContext() {
         return context;
@@ -78,6 +85,20 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
             return Optional.of((T) value);
         }
         return Optional.empty();
+    }
+
+    /**
+     * Copies the resolution context state to a new instance with
+     * additional arguments that can overwrite existing ones.
+     *
+     * @param arguments The new arguments
+     * @return The new context
+     */
+    public BeanResolutionContext copy(Map<String, Object> arguments) {
+        BeanResolutionContext newContext = new DefaultBeanResolutionContext(context, rootDefinition, path);
+        newContext.putAll(this);
+        newContext.putAll(arguments);
+        return newContext;
     }
 
     /**
