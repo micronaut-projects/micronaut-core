@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.beans
 
+import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 
@@ -42,5 +43,21 @@ abstract class AbstractBean {
         beanDefinition.isAbstract()
         beanDefinition != null
         beanDefinition.injectedFields.size() == 1
+    }
+
+    void "test getBeansOfType filters proxy targets"() {
+        when:
+        def ctx = DefaultBeanContext.run()
+        def targetBean = ctx.getProxyTargetBean(InterceptedBean, null)
+        def bean = ctx.getBean(InterceptedBean)
+
+        then:
+        ctx.getBeansOfType(InterceptedBean).size() == 1
+        targetBean != null
+        bean != null
+        targetBean != bean
+
+        cleanup:
+        ctx.close()
     }
 }
