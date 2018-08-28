@@ -90,7 +90,7 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
      */
     @SuppressWarnings("unused")
     Argument SHORT = Argument.of(short.class);
-    
+
     /**
      * Constant representing zero arguments. Used by generated code, do not remove.
      */
