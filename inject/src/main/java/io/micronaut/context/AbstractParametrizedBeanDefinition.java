@@ -110,7 +110,6 @@ public abstract class AbstractParametrizedBeanDefinition<T> extends AbstractBean
                 path.pop();
             }
         }
-
         return doBuild(resolutionContext, context, definition, requiredArgumentValues);
     }
 
