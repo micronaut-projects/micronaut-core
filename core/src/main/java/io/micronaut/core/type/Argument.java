@@ -80,11 +80,17 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
     Argument BOOLEAN = Argument.of(boolean.class);
 
     /**
-     * Constant char boolean argument. Used by generated code, do not remove.
+     * Constant char argument. Used by generated code, do not remove.
      */
     @SuppressWarnings("unused")
     Argument CHAR = Argument.of(char.class);
 
+    /**
+     * Constant short argument. Used by generated code, do not remove.
+     */
+    @SuppressWarnings("unused")
+    Argument SHORT = Argument.of(short.class);
+    
     /**
      * Constant representing zero arguments. Used by generated code, do not remove.
      */
