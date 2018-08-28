@@ -16,7 +16,7 @@
 
 package io.micronaut.configuration.jdbc.tomcat
 
-
+import io.micronaut.spring.tx.datasource.SpringDataSourceResolver
 import org.apache.tomcat.jdbc.pool.DataSource
 import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy
 import spock.lang.Specification
@@ -26,7 +26,7 @@ class DatasourceFactorySpec extends Specification {
     DatasourceFactory datasourceFactory
 
     def setup() {
-        datasourceFactory = new DatasourceFactory()
+        datasourceFactory = new DatasourceFactory(new SpringDataSourceResolver())
     }
 
     def "create basic datasource"() {
@@ -34,7 +34,7 @@ class DatasourceFactorySpec extends Specification {
         def dataSource = new DataSource(validationQuery: "SELECT 1")
 
         when:
-        def metadata = datasourceFactory.tomcatPoolDataSourceMetadataProvider("test", dataSource)
+        def metadata = datasourceFactory.tomcatPoolDataSourceMetadataProvider(dataSource)
 
         then:
         metadata
@@ -51,7 +51,7 @@ class DatasourceFactorySpec extends Specification {
         def transactionalDataSource = new TransactionAwareDataSourceProxy(targetDataSource: dataSource)
 
         when:
-        def metadata = datasourceFactory.tomcatPoolDataSourceMetadataProvider("test", transactionalDataSource)
+        def metadata = datasourceFactory.tomcatPoolDataSourceMetadataProvider(transactionalDataSource)
 
         then:
         metadata

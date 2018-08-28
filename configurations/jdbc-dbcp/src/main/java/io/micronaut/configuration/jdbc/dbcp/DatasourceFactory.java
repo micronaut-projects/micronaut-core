@@ -19,16 +19,11 @@ package io.micronaut.configuration.jdbc.dbcp;
 import io.micronaut.configuration.jdbc.dbcp.metadata.DbcpDataSourcePoolMetadata;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Parameter;
+import io.micronaut.jdbc.DataSourceResolver;
 import io.micronaut.jdbc.metadata.DataSourcePoolMetadata;
-import io.micronaut.jdbc.metadata.DataSourcePoolMetadataProvider;
 import org.apache.commons.dbcp2.BasicDataSource;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import javax.sql.DataSource;
-import java.lang.reflect.Field;
-import java.util.Optional;
+import javax.annotation.Nullable;
 
 /**
  * Creates a dbcp data source for each configuration bean.
@@ -39,60 +34,31 @@ import java.util.Optional;
 @Factory
 public class DatasourceFactory {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DatasourceFactory.class);
+    private final DataSourceResolver dataSourceResolver;
+
+    /**
+     * Default constructor.
+     * @param dataSourceResolver The data source resolver
+     */
+    public DatasourceFactory(@Nullable DataSourceResolver dataSourceResolver) {
+        this.dataSourceResolver = dataSourceResolver == null ? DataSourceResolver.DEFAULT : dataSourceResolver;
+    }
 
     /**
      * Method to create a metadata object that allows pool value lookup for each datasource object.
      *
-     * @return a {@link DataSourcePoolMetadataProvider}
+     * @param dataSource The actual datasource
+     * @return a {@link io.micronaut.jdbc.metadata.DataSourcePoolMetadataProvider}
      */
     @EachBean(DataSource.class)
     public DataSourcePoolMetadata dbcpDataSourcePoolMetadata(
-            @Parameter String dataSourceName,
             DataSource dataSource) {
         DbcpDataSourcePoolMetadata dbcpDataSourcePoolMetadata = null;
+        DataSource resolved = dataSourceResolver.resolve(dataSource);
 
-        if (dataSource instanceof BasicDataSource) {
-            dbcpDataSourcePoolMetadata = new DbcpDataSourcePoolMetadata((BasicDataSource) dataSource);
-        } else if (isDelegatingDataSource(dataSource)) {
-            dbcpDataSourcePoolMetadata = getDataSource(dataSource).map(DbcpDataSourcePoolMetadata::new).orElse(null);
+        if (resolved instanceof BasicDataSource) {
+            dbcpDataSourcePoolMetadata = new DbcpDataSourcePoolMetadata((BasicDataSource) resolved);
         }
         return dbcpDataSourcePoolMetadata;
-    }
-
-    /**
-     * Retrieve the unwrapped datasource if it has been wrapped in a spring transactional aware datasource.
-     *
-     * @param delegatingDataSource a potentially wrapped datasource
-     * @return the unwrapped datasource or null if not  spring transactional aware datasource
-     */
-    private Optional<BasicDataSource> getDataSource(DataSource delegatingDataSource) {
-        BasicDataSource dataSource = null;
-
-        try {
-            Field targetDataSource = delegatingDataSource.getClass().getSuperclass().getDeclaredField("targetDataSource");
-            targetDataSource.setAccessible(true);
-            dataSource = (BasicDataSource) targetDataSource.get(delegatingDataSource);
-        } catch (NoSuchFieldException | IllegalAccessException | NullPointerException ignore) {
-            LOG.debug("Data source is not of type BasicDataSource or DelegatingDataSource, metrics will not be wired.");
-        }
-
-        return Optional.ofNullable(dataSource);
-    }
-
-    /**
-     * Check for whether the datasource has been wrapped in a spring transactional aware datasource.
-     *
-     * @param dataSource The datasource to check for wrapping
-     * @return boolean if the datasource is wrapped
-     */
-    private boolean isDelegatingDataSource(DataSource dataSource) {
-        boolean isDelegatingDataSource = false;
-        try {
-            isDelegatingDataSource = dataSource.getClass().getSuperclass().getDeclaredField("targetDataSource") != null;
-        } catch (NoSuchFieldException | NullPointerException ignore) {
-            LOG.debug("Data source is not of type BasicDataSource or DelegatingDataSource, metrics will not be wired.");
-        }
-        return isDelegatingDataSource;
     }
 }

@@ -16,6 +16,7 @@
 
 package io.micronaut.configuration.jdbc.dbcp
 
+import io.micronaut.spring.tx.datasource.SpringDataSourceResolver
 import org.apache.commons.dbcp2.BasicDataSource
 import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy
 import spock.lang.Specification
@@ -25,7 +26,7 @@ class DatasourceFactorySpec extends Specification {
     DatasourceFactory datasourceFactory
 
     def setup() {
-        datasourceFactory = new DatasourceFactory()
+        datasourceFactory = new DatasourceFactory(new SpringDataSourceResolver())
     }
 
     def "create basic datasource"() {
@@ -33,7 +34,7 @@ class DatasourceFactorySpec extends Specification {
         def dataSource = new BasicDataSource(validationQuery: "SELECT 1")
 
         when:
-        def metadata = datasourceFactory.dbcpDataSourcePoolMetadata("test", dataSource)
+        def metadata = datasourceFactory.dbcpDataSourcePoolMetadata(dataSource)
 
         then:
         metadata
@@ -50,7 +51,7 @@ class DatasourceFactorySpec extends Specification {
         def transactionalDataSource = new TransactionAwareDataSourceProxy(targetDataSource: dataSource)
 
         when:
-        def metadata = datasourceFactory.dbcpDataSourcePoolMetadata("test", transactionalDataSource)
+        def metadata = datasourceFactory.dbcpDataSourcePoolMetadata(transactionalDataSource)
 
         then:
         metadata
