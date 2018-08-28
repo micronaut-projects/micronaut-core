@@ -23,7 +23,6 @@ import io.micronaut.context.env.DefaultEnvironment;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
@@ -190,22 +189,16 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     }
 
     @Override
-    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(BeanResolutionContext resolutionContext, Class<T> beanType, BeanDefinition<?> filter) {
-        Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(resolutionContext, beanType, filter);
+    protected <T> Collection<BeanDefinition<T>> findBeanCandidates(Class<T> beanType, BeanDefinition<?> filter) {
+        Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(beanType, filter);
         if (!candidates.isEmpty()) {
 
             List<BeanDefinition<T>> transformedCandidates = new ArrayList<>();
             for (BeanDefinition candidate : candidates) {
-                AnnotationValue<EachProperty> eachProperty = null;
                 if (candidate.hasDeclaredStereotype(EachProperty.class)) {
-                    eachProperty = candidate.getAnnotation(EachProperty.class);
-                }
-                if (eachProperty == null && resolutionContext != null) {
-                    eachProperty = resolutionContext.get(EachProperty.class.getName(), AnnotationValue.class).orElse(null);
-                }
-                if (eachProperty != null) {
-                    String property = eachProperty.getRequiredValue(String.class);
-                    String primaryPrefix = eachProperty.get("primary", String.class).orElse(null);
+
+                    String property = candidate.getValue(EachProperty.class, String.class).orElse(null);
+                    String primaryPrefix = candidate.getValue(EachProperty.class, "primary", String.class).orElse(null);
 
                     if (StringUtils.isNotEmpty(property)) {
                         Map entries = getProperty(property, Map.class, Collections.emptyMap());
@@ -215,7 +208,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                                 if (primaryPrefix != null && primaryPrefix.equals(key.toString())) {
                                     delegate.put(BeanDefinitionDelegate.PRIMARY_ATTRIBUTE, true);
                                 }
-                                delegate.put(EachProperty.class.getName(), eachProperty);
+                                delegate.put(EachProperty.class.getName(), delegate.getBeanType());
                                 delegate.put(Named.class.getName(), key.toString());
 
                                 if (delegate.isEnabled(this)) {
@@ -228,14 +221,12 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                     }
                 } else if (candidate.hasDeclaredStereotype(EachBean.class)) {
                     Class dependentType = candidate.getValue(EachBean.class, Class.class).orElse(null);
-
                     if (dependentType == null) {
                         transformedCandidates.add(candidate);
                         continue;
                     }
 
-                    Collection<BeanDefinition> dependentCandidates = findBeanCandidates(resolutionContext, dependentType, null);
-
+                    Collection<BeanDefinition> dependentCandidates = findBeanCandidates(dependentType, null);
                     if (!dependentCandidates.isEmpty()) {
                         for (BeanDefinition dependentCandidate : dependentCandidates) {
 
