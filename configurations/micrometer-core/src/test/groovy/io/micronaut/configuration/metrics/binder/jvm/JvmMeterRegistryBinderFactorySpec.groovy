@@ -8,15 +8,14 @@ import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED
 
-class JvmMeterRegistryBinderSpec extends Specification {
+class JvmMeterRegistryBinderFactorySpec extends Specification {
 
     def "test getting the beans manually"() {
         when:
-        def binder = new JvmMeterRegistryBinder()
+        def binder = new JvmMeterRegistryBinderFactory()
 
         then:
         binder.jvmGcMetrics()
@@ -30,7 +29,7 @@ class JvmMeterRegistryBinderSpec extends Specification {
         ApplicationContext context = ApplicationContext.run()
 
         then:
-        context.containsBean(JvmMeterRegistryBinder)
+        context.containsBean(JvmMeterRegistryBinderFactory)
         context.containsBean(JvmGcMetrics)
         context.containsBean(JvmMemoryMetrics)
         context.containsBean(JvmThreadMetrics)
@@ -46,7 +45,7 @@ class JvmMeterRegistryBinderSpec extends Specification {
         ApplicationContext context = ApplicationContext.run([(cfg): setting])
 
         then:
-        context.findBean(JvmMeterRegistryBinder).isPresent() == setting
+        context.findBean(JvmMeterRegistryBinderFactory).isPresent() == setting
         context.findBean(JvmGcMetrics).isPresent() == setting
         context.findBean(JvmMemoryMetrics).isPresent() == setting
         context.findBean(JvmThreadMetrics).isPresent() == setting
