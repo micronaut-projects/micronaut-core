@@ -1,4 +1,4 @@
-package io.micronaut.security.ldap;
+package io.micronaut.security.ldap.context;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;

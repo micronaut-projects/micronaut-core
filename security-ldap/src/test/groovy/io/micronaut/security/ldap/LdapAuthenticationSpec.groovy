@@ -1,13 +1,16 @@
 package io.micronaut.security.ldap
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.ssl.ClientAuthentication
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.security.authentication.AuthenticationFailed
 import io.micronaut.security.authentication.AuthenticationResponse
 import io.micronaut.security.authentication.UserDetails
+import io.micronaut.security.ldap.configuration.LdapConfiguration
+import spock.lang.Ignore
 
 class LdapAuthenticationSpec extends InMemoryLdapSpec {
-
+    
     void "test authentication and role retrieval with uniquemember"() {
         given:
         def s = createServer("basic.ldif")
@@ -206,5 +209,61 @@ class LdapAuthenticationSpec extends InMemoryLdapSpec {
         ctx.close()
         s.shutDown(true)
         s2.shutDown(true)
+    }
+
+    void "test multiple servers with ssl configuration"() {
+        def ctx = ApplicationContext.run([
+                'micronaut.security.enabled': true,
+                'micronaut.security.ldap.basic.enabled': true,
+                'micronaut.security.ldap.basic.ssl.enabled': false,
+                'micronaut.security.ldap.basic.ssl.build-self-signed': false,
+                'micronaut.security.ldap.basic.ssl.client-authentication': 'WANT',
+                'micronaut.security.ldap.basic.ssl.key.password': 'a',
+                'micronaut.security.ldap.basic.ssl.key.alias': 'b',
+                'micronaut.security.ldap.basic.ssl.key-store.path': 'c',
+                'micronaut.security.ldap.basic.ssl.key-store.password': 'd',
+                'micronaut.security.ldap.basic.ssl.trust-store.path': 'e',
+                'micronaut.security.ldap.basic.ssl.trust-store.password': 'f',
+                'micronaut.security.ldap.member.enabled': true,
+                'micronaut.security.ldap.member.ssl.enabled': true,
+                'micronaut.security.ldap.member.ssl.build-self-signed': true,
+                'micronaut.security.ldap.member.ssl.client-authentication': 'NEED',
+                'micronaut.security.ldap.member.ssl.key.password': 'g',
+                'micronaut.security.ldap.member.ssl.key.alias': 'h',
+                'micronaut.security.ldap.member.ssl.key-store.path': 'i',
+                'micronaut.security.ldap.member.ssl.key-store.password': 'j',
+                'micronaut.security.ldap.member.ssl.trust-store.path': 'k',
+                'micronaut.security.ldap.member.ssl.trust-store.password': 'l',
+        ], "test")
+
+        when:
+        LdapConfiguration config = ctx.getBean(LdapConfiguration, Qualifiers.byName('basic'))
+
+        then:
+        config.enabled
+        !config.getSsl().enabled
+        !config.getSsl().buildSelfSigned()
+        config.getSsl().getClientAuthentication().get() == ClientAuthentication.WANT
+        config.getSsl().getKey().getPassword().get() == 'a'
+        config.getSsl().getKey().getAlias().get() == 'b'
+        config.getSsl().getKeyStore().getPath().get() == 'c'
+        config.getSsl().getKeyStore().getPassword().get() == 'd'
+        config.getSsl().getTrustStore().getPath().get() == 'e'
+        config.getSsl().getTrustStore().getPassword().get() == 'f'
+
+        when:
+        config = ctx.getBean(LdapConfiguration, Qualifiers.byName('member'))
+
+        then:
+        config.enabled
+        config.getSsl().enabled
+        config.getSsl().buildSelfSigned()
+        config.getSsl().getClientAuthentication().get() == ClientAuthentication.NEED
+        config.getSsl().getKey().getPassword().get() == 'g'
+        config.getSsl().getKey().getAlias().get() == 'h'
+        config.getSsl().getKeyStore().getPath().get() == 'i'
+        config.getSsl().getKeyStore().getPassword().get() == 'j'
+        config.getSsl().getTrustStore().getPath().get() == 'k'
+        config.getSsl().getTrustStore().getPassword().get() == 'l'
     }
 }
