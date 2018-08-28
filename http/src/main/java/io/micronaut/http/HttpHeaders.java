@@ -253,6 +253,11 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
     String LAST_MODIFIED = "Last-Modified";
 
     /**
+     * {@code "Link"}
+     */
+    String LINK = "Link";
+
+    /**
      * {@code "Location"}.
      */
     String LOCATION = "Location";
