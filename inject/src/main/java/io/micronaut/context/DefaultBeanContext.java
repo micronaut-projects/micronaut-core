@@ -230,10 +230,7 @@ public class DefaultBeanContext implements BeanContext {
 
             terminating.set(false);
             running.set(false);
-
-            for (ClassLoadingReporter classLoadingReporter : ClassUtils.CLASS_LOADING_REPORTERS) {
-                classLoadingReporter.close();
-            }
+            ClassLoadingReporter.finish();
         }
         return this;
     }
@@ -1196,11 +1193,7 @@ public class DefaultBeanContext implements BeanContext {
      */
     protected void registerConfiguration(BeanConfiguration configuration) {
         beanConfigurations.put(configuration.getName(), configuration);
-        if (ClassUtils.CLASS_LOADING_REPORTERS != Collections.EMPTY_LIST) {
-            for (ClassLoadingReporter reporter : ClassUtils.CLASS_LOADING_REPORTERS) {
-                reporter.reportPresent(configuration.getClass());
-            }
-        }
+        ClassLoadingReporter.reportPresent(configuration.getClass());
     }
 
     /**
