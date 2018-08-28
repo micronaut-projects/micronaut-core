@@ -15,6 +15,7 @@
  */
 package io.micronaut.tracing.jaeger
 
+import io.jaegertracing.internal.JaegerTracer
 import io.micronaut.context.ApplicationContext
 import io.opentracing.Tracer
 import io.opentracing.noop.NoopTracer
@@ -34,7 +35,7 @@ class JaegerTracerFactorySpec extends Specification {
 
         then:
         tracer != null
-        tracer instanceof io.jaegertracing.Tracer
+        tracer instanceof JaegerTracer
 
         cleanup:
         applicationContext.close()

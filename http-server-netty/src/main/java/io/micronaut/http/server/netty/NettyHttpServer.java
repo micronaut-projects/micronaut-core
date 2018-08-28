@@ -76,6 +76,7 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -102,7 +103,7 @@ public class NettyHttpServer implements EmbeddedServer {
 
     private final ExecutorService ioExecutor;
     private final ExecutorSelector executorSelector;
-    private final ChannelOutboundHandler[] outboundHandlers;
+    private final List<ChannelOutboundHandler> outboundHandlers;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final NettyCustomizableResponseTypeHandlerRegistry customizableResponseTypeHandlerRegistry;
     private final NettyHttpServerConfiguration serverConfiguration;
@@ -149,7 +150,7 @@ public class NettyHttpServer implements EmbeddedServer {
         @javax.inject.Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
         ExecutorSelector executorSelector,
         NettyServerSslBuilder nettyServerSslBuilder,
-        ChannelOutboundHandler... outboundHandlers
+        List<ChannelOutboundHandler> outboundHandlers
     ) {
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
         location.ifPresent(dir -> DiskFileUpload.baseDirectory = dir.getAbsolutePath());

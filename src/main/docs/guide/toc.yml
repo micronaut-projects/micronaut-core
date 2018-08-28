@@ -121,13 +121,13 @@ cloud:
     title: Cloud Configuration
     distributedConfiguration: Distributed Configuration
     distributedConfigurationConsul: Consul Support
-#    distributedConfigurationAwsParameterStore: AWS Parameter Store Support
+    distributedConfigurationAwsParameterStore: AWS Parameter Store Support
   serviceDiscovery:
     title: Service Discovery
     serviceDiscoveryConsul: Consul Support
     serviceDiscoveryEureka: Eureka Support
     serviceDiscoveryKubernetes: Kubernetes Support
-#    serviceDiscoveryRoute53: AWS Route 53 Support
+    serviceDiscoveryRoute53: AWS Route 53 Support
     serviceDiscoveryManual: Manual Service Discovery Configuration
   clientSideLoadBalancing:
     title: Client Side Load Balancing

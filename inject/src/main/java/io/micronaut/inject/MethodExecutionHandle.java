@@ -16,6 +16,8 @@
 
 package io.micronaut.inject;
 
+import javax.annotation.Nonnull;
+
 /**
  * Represents an execution handle that invokes a method.
  *
@@ -24,4 +26,11 @@ package io.micronaut.inject;
  * @since 1.0
  */
 public interface MethodExecutionHandle<R> extends ExecutionHandle<R>, MethodReference {
+    /**
+     * The underlying {@link ExecutableMethod} reference.
+     *
+     * @return The underlying method reference.
+     */
+    @Nonnull
+    ExecutableMethod<?, R> getExecutableMethod();
 }

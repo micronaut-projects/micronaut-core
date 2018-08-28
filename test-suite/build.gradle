@@ -8,7 +8,7 @@ dependencies {
     testCompile project(":tracing")
     testCompile project(":management")
 
-    testCompile 'io.jaegertracing:jaeger-core:0.27.0'
+    testCompile dependencyVersion("jaeger")
     testCompile dependencyModuleVersion("groovy", "groovy-json")
     // tag::testcontainers-dependencies[]
     testCompile "org.testcontainers:spock:1.8.0"

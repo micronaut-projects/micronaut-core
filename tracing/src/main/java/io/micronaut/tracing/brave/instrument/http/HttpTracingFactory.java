@@ -86,8 +86,8 @@ public class HttpTracingFactory {
             }
 
             @Override
-            public boolean parseServerAddress(HttpRequest<?> httpRequest, Endpoint.Builder builder) {
-                InetAddress address = httpRequest.getServerAddress().getAddress();
+            public boolean parseServerIpAndPort(HttpRequest<?> request, Endpoint.Builder builder) {
+                InetAddress address = request.getServerAddress().getAddress();
                 return builder.parseIp(address);
             }
 

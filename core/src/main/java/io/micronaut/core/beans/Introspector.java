@@ -16,8 +16,8 @@
 
 package io.micronaut.core.beans;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * An interface that provides basic bean introspection. Designed as a simpler replacement for {@link java.beans.Introspector}.
@@ -28,12 +28,9 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 public final class Introspector {
 
     /* The cache to store Bean Info objects that have been found or created */
-    private static final int DEFAULT_CAPACITY = 128;
 
     @SuppressWarnings({"unchecked", "ConstantName"})
-    private static final Cache<Class<?>, BeanInfo> theCache = Caffeine.newBuilder()
-                                                                      .maximumSize(DEFAULT_CAPACITY)
-                                                                      .build();
+    private static final Map<Class<?>, BeanInfo> theCache = new ConcurrentHashMap<>();
 
     private Introspector() {
         super();
@@ -45,7 +42,7 @@ public final class Introspector {
     public static void flushCaches() {
         // Flush the cache by throwing away the cache HashMap and creating a
         // new empty one
-        theCache.invalidateAll();
+        theCache.clear();
     }
 
     /**
@@ -57,7 +54,7 @@ public final class Introspector {
         if (clazz == null) {
             throw new NullPointerException();
         }
-        theCache.invalidate(clazz);
+        theCache.remove(clazz);
     }
 
     /**
@@ -75,6 +72,11 @@ public final class Introspector {
      */
     @SuppressWarnings("unchecked")
     public static <T> BeanInfo<T> getBeanInfo(Class<T> beanClass) {
-        return theCache.get(beanClass, aClass -> new SimpleBeanInfo(beanClass));
+        BeanInfo beanInfo = theCache.get(beanClass);
+        if (beanInfo == null) {
+            beanInfo = new SimpleBeanInfo(beanClass);
+            theCache.put(beanClass, beanInfo);
+        }
+        return beanInfo;
     }
 }
