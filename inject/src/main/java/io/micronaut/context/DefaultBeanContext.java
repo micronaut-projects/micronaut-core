@@ -2025,6 +2025,12 @@ public class DefaultBeanContext implements BeanContext {
             this.method = method;
         }
 
+        @Nonnull
+        @Override
+        public ExecutableMethod<?, R> getExecutableMethod() {
+            return method;
+        }
+
         @Override
         public Argument[] getArguments() {
             return method.getArguments();
