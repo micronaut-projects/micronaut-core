@@ -89,7 +89,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
 
     @Override
     public boolean isIterable() {
-        return attributes.containsKey(EachProperty.class.getName()) || definition.isIterable();
+        return get(EachProperty.class.getName(), Class.class) != null || definition.isIterable();
     }
 
     @Override
@@ -164,33 +164,37 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
 
     @Override
     public T build(BeanResolutionContext resolutionContext, BeanContext context, BeanDefinition<T> definition) throws BeanInstantiationException {
-
-        resolutionContext = resolutionContext.copy(attributes);
-
-        if (this.definition instanceof ParametrizedBeanFactory) {
-            ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory<T>) this.definition;
-            Argument[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
-            Object named = attributes.get(Named.class.getName());
-            if (named != null) {
-                Map<String, Object> fulfilled = new LinkedHashMap<>();
-                for (Argument argument : requiredArguments) {
-                    Class argumentType = argument.getType();
-                    Optional result = ConversionService.SHARED.convert(named, argumentType);
-                    String argumentName = argument.getName();
-                    if (result.isPresent()) {
-                        fulfilled.put(argumentName, result.get());
-                    } else {
-                        // attempt bean lookup to full argument
-                        Optional bean = context.findBean(argumentType, Qualifiers.byName(named.toString()));
-                        if (bean.isPresent()) {
-                            fulfilled.put(argumentName, bean.get());
+        resolutionContext.putAll(attributes);
+        try {
+            if (this.definition instanceof ParametrizedBeanFactory) {
+                ParametrizedBeanFactory<T> parametrizedBeanFactory = (ParametrizedBeanFactory<T>) this.definition;
+                Argument[] requiredArguments = parametrizedBeanFactory.getRequiredArguments();
+                Object named = attributes.get(Named.class.getName());
+                if (named != null) {
+                    Map<String, Object> fulfilled = new LinkedHashMap<>();
+                    for (Argument argument : requiredArguments) {
+                        Class argumentType = argument.getType();
+                        Optional result = ConversionService.SHARED.convert(named, argumentType);
+                        String argumentName = argument.getName();
+                        if (result.isPresent()) {
+                            fulfilled.put(argumentName, result.get());
+                        } else {
+                            // attempt bean lookup to full argument
+                            Optional bean = context.findBean(argumentType, Qualifiers.byName(named.toString()));
+                            if (bean.isPresent()) {
+                                fulfilled.put(argumentName, bean.get());
+                            }
                         }
                     }
+                    return parametrizedBeanFactory.build(resolutionContext, context, definition, fulfilled);
                 }
-                return parametrizedBeanFactory.build(resolutionContext, context, definition, fulfilled);
+            }
+            return ((BeanFactory<T>) this.definition).build(resolutionContext, context, definition);
+        } finally {
+            for (String key : attributes.keySet()) {
+                resolutionContext.remove(key);
             }
         }
-        return ((BeanFactory<T>) this.definition).build(resolutionContext, context, definition);
     }
 
     @Override
