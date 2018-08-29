@@ -85,6 +85,7 @@ public class DefaultBeanContext implements BeanContext {
     protected final AtomicBoolean terminating = new AtomicBoolean(false);
 
     final Map<BeanKey, BeanRegistration> singletonObjects = new ConcurrentHashMap<>(100);
+    Collection<BeanRegistration<BeanInitializedEventListener>> beanInitializedEventListeners;
 
     private final Collection<BeanDefinitionReference> beanDefinitionsClasses = new ConcurrentLinkedQueue<>();
     private final Map<String, BeanConfiguration> beanConfigurations = new ConcurrentHashMap<>(4);
@@ -99,7 +100,6 @@ public class DefaultBeanContext implements BeanContext {
     private final CustomScopeRegistry customScopeRegistry = new DefaultCustomScopeRegistry(this);
     private final ResourceLoader resourceLoader;
     private Collection<BeanRegistration<BeanCreatedEventListener>> beanCreationEventListeners;
-    Collection<BeanRegistration<BeanInitializedEventListener>> beanInitializedEventListeners;
 
     /**
      * Construct a new bean context using the same classloader that loaded this DefaultBeanContext class.
@@ -969,6 +969,16 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     /**
+     * Initialize the event listeners.
+     */
+    protected void initializeEventListeners() {
+        getBeansOfType(BeanCreatedEventListener.class);
+        this.beanCreationEventListeners = getActiveBeanRegistrations(BeanCreatedEventListener.class);
+        getBeansOfType(BeanInitializedEventListener.class);
+        this.beanInitializedEventListeners = getActiveBeanRegistrations(BeanInitializedEventListener.class);
+    }
+
+    /**
      * Initialize the context with the given {@link io.micronaut.context.annotation.Context} scope beans.
      *
      * @param contextScopeBeans The context scope beans
@@ -1811,10 +1821,7 @@ public class DefaultBeanContext implements BeanContext {
             return false;
         });
 
-        getBeansOfType(BeanCreatedEventListener.class);
-        this.beanCreationEventListeners = getActiveBeanRegistrations(BeanCreatedEventListener.class);
-        getBeansOfType(BeanInitializedEventListener.class);
-        this.beanInitializedEventListeners = getActiveBeanRegistrations(BeanInitializedEventListener.class);
+        initializeEventListeners();
 
         initializeContext(contextScopeBeans, processedBeans);
     }
