@@ -51,12 +51,12 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
     }
 
     @Override
-    public void reportPresent(Class<?> type) {
+    public void onPresent(Class<?> type) {
         classes.add(type.getName());
     }
 
     @Override
-    public void reportMissing(String name) {
+    public void onMissing(String name) {
         classes.remove(name);
     }
 

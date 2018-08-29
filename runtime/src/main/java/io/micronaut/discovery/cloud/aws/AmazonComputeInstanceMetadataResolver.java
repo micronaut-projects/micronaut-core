@@ -133,7 +133,7 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
 
             ec2InstanceMetadata.metadata = objectMapper.convertValue(ec2InstanceMetadata, Map.class);
             if (LOG.isDebugEnabled()) {
-                LOG.debug("EC2 Metadata found:"+ec2InstanceMetadata.metadata.toString());
+                LOG.debug("EC2 Metadata found:" + ec2InstanceMetadata.metadata.toString());
             }
             //TODO make individual calls for building network interfaces.. required recursive http calls for all mac addresses
         } catch (IOException e) {
@@ -190,7 +190,7 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
         if (url.getProtocol().equalsIgnoreCase("file")) {
             if (url.getPath().indexOf(':') != -1) {
                 //rebuild url path because windows can't have paths with colons
-                url = new URL(url.getProtocol(),url.getHost(),url.getFile().replace(':','_'));
+                url = new URL(url.getProtocol(), url.getHost(), url.getFile().replace(':', '_'));
                 urlConnection = url.openConnection();
             }
             urlConnection.connect();

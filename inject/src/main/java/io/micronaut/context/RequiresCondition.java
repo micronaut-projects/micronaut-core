@@ -419,13 +419,9 @@ public class RequiresCondition implements Condition {
     }
 
     private void reportMissingClass(ConditionContext context) {
-        if (ClassUtils.CLASS_LOADING_REPORTERS != Collections.EMPTY_LIST) {
-            AnnotationMetadataProvider component = context.getComponent();
-            if (component instanceof BeanDefinitionReference) {
-                for (ClassLoadingReporter reporter : ClassUtils.CLASS_LOADING_REPORTERS) {
-                    reporter.reportMissing(component.getClass().getName());
-                }
-            }
+        AnnotationMetadataProvider component = context.getComponent();
+        if (component instanceof BeanDefinitionReference) {
+            ClassLoadingReporter.reportMissing(component.getClass().getName());
         }
     }
 
@@ -482,7 +478,7 @@ public class RequiresCondition implements Condition {
 
             for (Class<?> type : missingBeans) {
                 // remove self by passing definition as filter
-                Collection<? extends BeanDefinition<?>> beanDefinitions = new ArrayList<>(beanContext.findBeanCandidates(null, type, bd));
+                Collection<? extends BeanDefinition<?>> beanDefinitions = new ArrayList<>(beanContext.findBeanCandidates(type, bd));
 
                 if (!beanDefinitions.isEmpty()) {
                     // remove abstract beans
