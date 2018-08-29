@@ -453,6 +453,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         }
 
         @Override
+        protected void initializeEventListeners() {
+            // no-op .. Bootstrap context disallows bean event listeners
+        }
+
+        @Override
         protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans) {
             // no-op .. @Context scope beans are not started for bootstrap
         }
