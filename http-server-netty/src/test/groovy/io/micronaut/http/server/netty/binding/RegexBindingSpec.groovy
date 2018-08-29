@@ -24,7 +24,6 @@ class RegexBindingSpec extends AbstractMicronautSpec {
         rxClient.toBlocking().exchange(HttpRequest.GET("/test-binding/regex/yellow"))
 
         then:
-        then:
         def e = thrown(HttpClientResponseException)
         e.response.status == HttpStatus.NOT_FOUND
     }
