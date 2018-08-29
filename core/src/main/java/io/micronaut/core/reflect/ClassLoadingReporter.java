@@ -16,6 +16,12 @@
 
 package io.micronaut.core.reflect;
 
+import org.slf4j.LoggerFactory;
+
+import java.util.Collections;
+
+import static io.micronaut.core.reflect.ClassUtils.CLASS_LOADING_REPORTERS;
+
 /**
  * An interface that can be implemented by classes that wish to listen to the classloading requirements for the an application. The {@link #close()} method will be called when the application terminates.
  *
@@ -29,15 +35,54 @@ public interface ClassLoadingReporter extends AutoCloseable {
      *
      * @param type The type
      */
-    void reportPresent(Class<?> type);
+    void onPresent(Class<?> type);
 
     /**
      * Called when a class is missing.
      *
      * @param name The name of the class
      */
-    void reportMissing(String name);
+    void onMissing(String name);
 
     @Override
     void close();
+
+    /**
+     * Report a class that is present.
+     *
+     * @param type The type
+     */
+    static void reportPresent(Class<?> type) {
+        if (CLASS_LOADING_REPORTERS != Collections.EMPTY_LIST) {
+            for (ClassLoadingReporter reporter : CLASS_LOADING_REPORTERS) {
+                reporter.onPresent(type);
+            }
+        }
+    }
+
+    /**
+     * Report a class that is present.
+     *
+     * @param type The type
+     */
+    static void reportMissing(String type) {
+        if (CLASS_LOADING_REPORTERS != Collections.EMPTY_LIST) {
+            for (ClassLoadingReporter reporter : CLASS_LOADING_REPORTERS) {
+                reporter.onMissing(type);
+            }
+        }
+    }
+
+    /**
+     * Finish reporting classloading.
+     */
+    static void finish() {
+        for (ClassLoadingReporter classLoadingReporter : ClassUtils.CLASS_LOADING_REPORTERS) {
+            try {
+                classLoadingReporter.close();
+            } catch (Throwable e) {
+                LoggerFactory.getLogger(ClassLoadingReporter.class).warn("Error reporting classloading with loader [" + classLoadingReporter + "]: " + e.getMessage(), e);
+            }
+        }
+    }
 }

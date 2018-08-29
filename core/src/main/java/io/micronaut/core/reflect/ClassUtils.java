@@ -31,7 +31,8 @@ public class ClassUtils {
     public static final int EMPTY_OBJECT_ARRAY_HASH_CODE = Arrays.hashCode(ArrayUtils.EMPTY_OBJECT_ARRAY);
     public static final Map<String, Class> COMMON_CLASS_MAP = new HashMap<>();
     public static final String CLASS_EXTENSION = ".class";
-    public static final List<ClassLoadingReporter> CLASS_LOADING_REPORTERS;
+    
+    static final List<ClassLoadingReporter> CLASS_LOADING_REPORTERS;
 
     static {
         COMMON_CLASS_MAP.put(boolean.class.getName(), boolean.class);
@@ -165,19 +166,11 @@ public class ClassUtils {
                 return commonType;
             } else {
                 Class<?> type = Class.forName(name, true, classLoader);
-                if (CLASS_LOADING_REPORTERS != Collections.EMPTY_LIST) {
-                    for (ClassLoadingReporter reporter : CLASS_LOADING_REPORTERS) {
-                        reporter.reportPresent(type);
-                    }
-                }
+                ClassLoadingReporter.reportPresent(type);
                 return Optional.of(type);
             }
         } catch (ClassNotFoundException | NoClassDefFoundError e) {
-            if (CLASS_LOADING_REPORTERS != Collections.EMPTY_LIST) {
-                for (ClassLoadingReporter reporter : CLASS_LOADING_REPORTERS) {
-                    reporter.reportMissing(name);
-                }
-            }
+            ClassLoadingReporter.reportMissing(name);
             return Optional.empty();
         }
     }
