@@ -37,7 +37,7 @@ public class DefaultContextBuilder implements ContextBuilder {
             props.put("com.sun.jndi.ldap.connect.pool", "true");
         }
 
-        if (server.startsWith("ldaps")) {
+        /*if (server.startsWith("ldaps")) {
             props.put( "java.naming.ldap.factory.socket", LdapSslSocketFactory.class.getName());
             LdapSslSocketFactory.configurationProvider.set(sslConfiguration);
         }
@@ -46,7 +46,9 @@ public class DefaultContextBuilder implements ContextBuilder {
             return new InitialDirContext(props);
         } finally {
             LdapSslSocketFactory.configurationProvider.remove();
-        }
+        }*/
+
+        return new InitialDirContext(props);
     }
 
     @Override
