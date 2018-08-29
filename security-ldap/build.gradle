@@ -4,3 +4,7 @@ dependencies {
 
     testCompile "com.unboundid:unboundid-ldapsdk:4.0.7"
 }
+
+test {
+    systemProperty 'javax.net.debug', 'ssl:handshake:verbose'
+}

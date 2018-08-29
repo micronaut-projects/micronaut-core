@@ -107,6 +107,14 @@ public class LdapConfiguration implements Toggleable {
         this.ssl = sslConfiguration;
     }
 
+    public ContextSettings getSettings(String dn, String password) {
+        return new ContextConfigurationContextSettings(this, dn, password);
+    }
+
+    public ContextSettings getManagerSettings() {
+        return new ContextConfigurationContextSettings(this);
+    }
+
     @ConfigurationProperties("context")
     public static class ContextConfiguration {
 
@@ -147,14 +155,6 @@ public class LdapConfiguration implements Toggleable {
 
         public void setFactory(String factory) {
             this.factory = factory;
-        }
-
-        public ContextSettings getSettings(String dn, String password) {
-            return new ContextConfigurationContextSettings(this, dn, password);
-        }
-
-        public ContextSettings getManagerSettings() {
-            return new ContextConfigurationContextSettings(this);
         }
     }
 

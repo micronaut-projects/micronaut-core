@@ -1,5 +1,7 @@
 package io.micronaut.security.ldap.context;
 
+import io.micronaut.http.ssl.SslConfiguration;
+
 public interface ContextSettings {
 
     boolean getPooled();
@@ -7,4 +9,5 @@ public interface ContextSettings {
     String getUrl();
     String getDn();
     String getPassword();
+    SslConfiguration getSslConfiguration();
 }
