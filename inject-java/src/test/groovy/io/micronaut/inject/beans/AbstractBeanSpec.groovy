@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.beans
 
+import io.micronaut.aop.Intercepted
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
@@ -51,11 +52,13 @@ abstract class AbstractBean {
         def targetBean = ctx.getProxyTargetBean(InterceptedBean, null)
         def bean = ctx.getBean(InterceptedBean)
 
+
         then:
+        bean instanceof Intercepted
+        targetBean != bean
         ctx.getBeansOfType(InterceptedBean).size() == 1
         targetBean != null
         bean != null
-        targetBean != bean
 
         cleanup:
         ctx.close()
