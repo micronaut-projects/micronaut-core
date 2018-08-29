@@ -250,10 +250,11 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         UriTemplate rootUri = UriTemplate.of(uriNamingStrategy.resolveUri(bean));
         if (StringUtils.isNotEmpty(value)) {
             boolean isFirstCharSlash = value.charAt(0) == '/';
+            boolean isFirstCharVar = value.charAt(0) == '{';
             if (value.length() == 1 && isFirstCharSlash) {
                 return rootUri.toString();
             } else {
-                return rootUri.nest(isFirstCharSlash ? value : '/' + value).toString();
+                return rootUri.nest(isFirstCharSlash || isFirstCharVar ? value : '/' + value).toString();
             }
         } else {
             return rootUri.nest(uriNamingStrategy.resolveUri(method.getMethodName())).toString();

@@ -80,11 +80,20 @@ public class UriTemplate implements Comparable<UriTemplate> {
         if (templateString == null) {
             throw new IllegalArgumentException("Argument [templateString] should not be null");
         }
-        if (PATTERN_SCHEME.matcher(templateString).matches()) {
-            Matcher matcher = PATTERN_FULL_URI.matcher(templateString);
+
+        String templateAsString = templateString.toString();
+        if (templateAsString.endsWith("/")) {
+            int len = templateAsString.length();
+            if (len > 1) {
+                templateAsString = templateAsString.substring(0, len - 1);
+            }
+        }
+
+        if (PATTERN_SCHEME.matcher(templateAsString).matches()) {
+            Matcher matcher = PATTERN_FULL_URI.matcher(templateAsString);
 
             if (matcher.find()) {
-                this.templateString = templateString.toString();
+                this.templateString = templateAsString;
                 String scheme = matcher.group(2);
                 if (scheme != null) {
                     segments.add((parameters, previousHasContent) -> scheme + "://");
@@ -119,7 +128,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                 throw new IllegalArgumentException("Invalid URI template: " + templateString);
             }
         } else {
-            this.templateString = templateString.toString();
+            this.templateString = templateAsString;
             createParser(this.templateString, parserArguments).parse(segments);
         }
     }
