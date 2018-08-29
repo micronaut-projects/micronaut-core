@@ -1301,7 +1301,7 @@ public class DefaultBeanContext implements BeanContext {
                 for (BeanRegistration<BeanCreatedEventListener> registration : beanCreationEventListeners) {
                     BeanDefinition<BeanCreatedEventListener> definition = registration.getBeanDefinition();
                     List<Argument<?>> typeArguments = definition.getTypeArguments(BeanCreatedEventListener.class);
-                    if (CollectionUtils.isEmpty(typeArguments) || beanDefinition.getBeanType().isAssignableFrom(typeArguments.get(0).getType())) {
+                    if (CollectionUtils.isEmpty(typeArguments) || typeArguments.get(0).getType().isAssignableFrom(beanDefinition.getBeanType())) {
                         BeanCreatedEventListener listener = registration.getBean();
                         bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, bean));
                         if (bean == null) {

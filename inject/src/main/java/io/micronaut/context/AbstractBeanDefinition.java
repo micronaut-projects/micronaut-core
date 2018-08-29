@@ -34,8 +34,6 @@ package io.micronaut.context;
 
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.env.Environment;
-import io.micronaut.context.event.BeanCreatedEvent;
-import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.context.event.BeanInitializedEventListener;
 import io.micronaut.context.event.BeanInitializingEvent;
 import io.micronaut.context.exceptions.BeanContextException;
@@ -612,7 +610,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             for (BeanRegistration<BeanInitializedEventListener> registration : beanInitializedEventListeners) {
                 BeanDefinition<BeanInitializedEventListener> definition = registration.getBeanDefinition();
                 List<Argument<?>> typeArguments = definition.getTypeArguments(BeanInitializedEventListener.class);
-                if (CollectionUtils.isEmpty(typeArguments) || getBeanType().isAssignableFrom(typeArguments.get(0).getType())) {
+                if (CollectionUtils.isEmpty(typeArguments) || typeArguments.get(0).getType().isAssignableFrom(getBeanType())) {
                     BeanInitializedEventListener listener = registration.getBean();
                     bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));
                     if (bean == null) {
