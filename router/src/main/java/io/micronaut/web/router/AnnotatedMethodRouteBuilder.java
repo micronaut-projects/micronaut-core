@@ -249,10 +249,11 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
     private String resolveUri(BeanDefinition bean, String value, ExecutableMethod method, UriNamingStrategy uriNamingStrategy) {
         UriTemplate rootUri = UriTemplate.of(uriNamingStrategy.resolveUri(bean));
         if (StringUtils.isNotEmpty(value)) {
-            if (value.length() == 1 && value.charAt(0) == '/') {
+            boolean isFirstCharSlash = value.charAt(0) == '/';
+            if (value.length() == 1 && isFirstCharSlash) {
                 return rootUri.toString();
             } else {
-                return rootUri.nest(value).toString();
+                return rootUri.nest(isFirstCharSlash ? value : '/' + value).toString();
             }
         } else {
             return rootUri.nest(uriNamingStrategy.resolveUri(method.getMethodName())).toString();
