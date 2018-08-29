@@ -58,7 +58,7 @@ public class LdapAuthenticationProvider implements AuthenticationProvider, Close
                 LOG.debug("Attempting to initialize manager context");
             }
             try {
-                this.managerContext = contextBuilder.build(configuration.getContext().getManagerSettings());
+                this.managerContext = contextBuilder.build(configuration.getManagerSettings());
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Manager context initialized successfully");
                 }
@@ -89,7 +89,7 @@ public class LdapAuthenticationProvider implements AuthenticationProvider, Close
                 try {
                     String dn = result.getDn();
                     result.setUsername(username);
-                    userContext = contextBuilder.build(configuration.getContext().getSettings(result.getDn(), password));
+                    userContext = contextBuilder.build(configuration.getSettings(result.getDn(), password));
                     if (result.getAttributes() == null) {
                         result.setAttributes(userContext.getAttributes(dn));
                     }

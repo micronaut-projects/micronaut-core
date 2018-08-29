@@ -266,4 +266,36 @@ class LdapAuthenticationSpec extends InMemoryLdapSpec {
         config.getSsl().getTrustStore().getPath().get() == 'k'
         config.getSsl().getTrustStore().getPassword().get() == 'l'
     }
+
+    void "test authenticating with SSL"() {
+        given:
+        def s = createServer("basic.ldif", true)
+        s.startListening()
+        def ctx = ApplicationContext.run([
+                'micronaut.security.enabled': true,
+                'micronaut.security.ldap.default.enabled': true,
+                'micronaut.security.ldap.default.context.server': "ldaps://localhost:${s.listenPort}",
+                'micronaut.security.ldap.default.context.managerDn': "cn=admin,dc=example,dc=com",
+                'micronaut.security.ldap.default.context.managerPassword': "password",
+                'micronaut.security.ldap.default.search.base': "dc=example,dc=com",
+                'micronaut.security.ldap.default.groups.enabled': true,
+                'micronaut.security.ldap.default.groups.base': "dc=example,dc=com",
+                'micronaut.security.ldap.default.ssl.key-store.path': 'classpath:keystore.p12',
+                'micronaut.security.ldap.default.ssl.key-store.password': 'foobar',
+                'micronaut.security.ldap.default.ssl.key-store.type': 'PKCS12',
+                'micronaut.security.ldap.default.ssl.ciphers': 'TLS_DH_anon_WITH_AES_128_CBC_SHA',
+                'micronaut.security.ldap.default.ssl.protocol': 'TLS',
+                'micronaut.security.ldap.default.ssl.protocols': 'TLSv1.1',
+        ], "test")
+
+        when:
+        LdapAuthenticationProvider authenticationProvider = ctx.getBean(LdapAuthenticationProvider)
+        AuthenticationResponse response = authenticate(authenticationProvider,"riemann")
+
+        then:
+        response.authenticated
+        ((UserDetails) response).username == "riemann"
+        ((UserDetails) response).roles.size() == 1
+        ((UserDetails) response).roles.contains("Mathematicians")
+    }
 }
