@@ -87,7 +87,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                 this.templateString = templateString.toString();
                 String scheme = matcher.group(2);
                 if (scheme != null) {
-                    segments.add((parameters, previousHasContent) -> scheme + "://");
+                    segments.add((parameters, previousHasContent, anyPreviousHasOperator) -> scheme + "://");
                 }
                 String userInfo = matcher.group(5);
                 String host = matcher.group(6);
@@ -153,10 +153,16 @@ public class UriTemplate implements Comparable<UriTemplate> {
         StringBuilder builder = new StringBuilder();
         if (segments != null) {
             boolean previousHasContent = false;
+            boolean anyPreviousHasOperator = false;
             for (PathSegment segment : segments) {
-                String result = segment.expand(parameters, previousHasContent);
+                String result = segment.expand(parameters, previousHasContent, anyPreviousHasOperator);
                 if (result == null) {
                     break;
+                }
+                if(segment instanceof UriTemplateParser.VariablePathSegment) {
+                    if (result.contains(String.valueOf(((UriTemplateParser.VariablePathSegment) segment).getOperator()))) {
+                        anyPreviousHasOperator = true;
+                    }
                 }
                 previousHasContent = result.length() > 0;
                 builder.append(result);
@@ -337,7 +343,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
          * @param previousHasContent Whether there was previous content
          * @return The expanded string
          */
-        String expand(Map<String, Object> parameters, boolean previousHasContent);
+        String expand(Map<String, Object> parameters, boolean previousHasContent, boolean anyPreviousHasOperator);
     }
 
     /**
@@ -576,7 +582,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                           char modifierChar,
                                           char operator,
                                           String previousDelimiter, boolean isQuerySegment) {
-            segments.add(new VariablePathSegment(isQuerySegment, variable, prefix, delimiter, encode, modifierChar, modifierStr, previousDelimiter, repeatPrefix));
+            segments.add(new VariablePathSegment(isQuerySegment, variable, prefix, delimiter, encode, modifierChar, operator, modifierStr, previousDelimiter, repeatPrefix));
         }
 
         private String escape(String v) {
@@ -631,7 +637,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
             }
 
             @Override
-            public String expand(Map<String, Object> parameters, boolean previousHasContent) {
+            public String expand(Map<String, Object> parameters, boolean previousHasContent, boolean anyPreviousHasOperator) {
                 return value;
             }
 
@@ -676,20 +682,27 @@ public class UriTemplate implements Comparable<UriTemplate> {
             private final String delimiter;
             private final boolean encode;
             private final char modifierChar;
+            private final char operator;
             private final String modifierStr;
             private final String previousDelimiter;
             private final boolean repeatPrefix;
 
-            public VariablePathSegment(boolean isQuerySegment, String variable, String prefix, String delimiter, boolean encode, char modifierChar, String modifierStr, String previousDelimiter, boolean repeatPrefix) {
+
+            public VariablePathSegment(boolean isQuerySegment, String variable, String prefix, String delimiter, boolean encode, char modifierChar, char operator, String modifierStr, String previousDelimiter, boolean repeatPrefix) {
                 this.isQuerySegment = isQuerySegment;
                 this.variable = variable;
                 this.prefix = prefix;
                 this.delimiter = delimiter;
                 this.encode = encode;
                 this.modifierChar = modifierChar;
+                this.operator = operator;
                 this.modifierStr = modifierStr;
                 this.previousDelimiter = previousDelimiter;
                 this.repeatPrefix = repeatPrefix;
+            }
+
+            public char getOperator() {
+                return this.operator;
             }
 
             @Override
@@ -703,7 +716,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
             }
 
             @Override
-            public String expand(Map<String, Object> parameters, boolean previousHasContent) {
+            public String expand(Map<String, Object> parameters, boolean previousHasContent, boolean anyPreviousHasOperator) {
                 Object found = parameters.get(variable);
                 boolean isOptional = found instanceof Optional;
                 if (found != null && !(isOptional && !((Optional) found).isPresent())) {
@@ -711,6 +724,10 @@ public class UriTemplate implements Comparable<UriTemplate> {
                         found = ((Optional) found).get();
                     }
                     String prefixToUse = prefix;
+                    if (operator == '?' && !anyPreviousHasOperator && prefix != null && !prefix.startsWith(String.valueOf(operator))) {
+                        prefixToUse = operator + prefix;
+                    }
+
                     String result;
                     if (found.getClass().isArray()) {
                         found = Arrays.asList((Object[]) found);
