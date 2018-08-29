@@ -6,11 +6,14 @@ import org.springframework.context.ApplicationContext
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.test.context.ContextConfiguration
+import org.springframework.test.context.TestExecutionListeners
+import org.springframework.test.context.support.DependencyInjectionTestExecutionListener
 import spock.lang.Specification
 
 import javax.inject.Singleton
 
 @ContextConfiguration(classes = [ByAnnotationTypeConfig])
+@TestExecutionListeners(value = [DependencyInjectionTestExecutionListener])
 class MicronautBeanProcessorByAnnotationTypeSpec extends Specification {
 
     @Autowired

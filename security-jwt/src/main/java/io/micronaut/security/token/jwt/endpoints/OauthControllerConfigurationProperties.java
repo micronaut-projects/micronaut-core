@@ -17,6 +17,7 @@
 package io.micronaut.security.token.jwt.endpoints;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.security.config.SecurityConfigurationProperties;
 
 /**
@@ -30,8 +31,8 @@ public class OauthControllerConfigurationProperties implements OauthControllerCo
 
     public static final String PREFIX = SecurityConfigurationProperties.PREFIX + ".endpoints.oauth";
 
-    protected boolean enabled = false;
-    protected String path = "/oauth/access_token";
+    private boolean enabled = false;
+    private String path = "/oauth/access_token";
 
     /**
      * @return true if you want to enable the {@link OauthController}
@@ -44,5 +45,25 @@ public class OauthControllerConfigurationProperties implements OauthControllerCo
     @Override
     public String getPath() {
         return this.path;
+    }
+
+    /**
+     * Sets whether the oauth controller is enabled.
+     *
+     * @param enabled True if is enabled
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    /**
+     * Sets the path to map the oauth controller to.
+     *
+     * @param path The path
+     */
+    public void setPath(String path) {
+        if (StringUtils.isNotEmpty(path)) {
+            this.path = path;
+        }
     }
 }

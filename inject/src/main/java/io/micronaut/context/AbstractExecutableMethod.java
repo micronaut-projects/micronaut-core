@@ -194,15 +194,15 @@ public abstract class AbstractExecutableMethod extends AbstractExecutable implem
     /**
      * A {@link ReturnType} implementation.
      */
-    class ReturnTypeImpl implements ReturnType<Object> {
+    class ReturnTypeImpl implements ReturnType {
 
         @SuppressWarnings("unchecked")
         @Override
-        public Class<Object> getType() {
+        public Class<?> getType() {
             if (genericReturnType != null) {
-                return (Class<Object>) genericReturnType.getType();
+                return genericReturnType.getType();
             } else {
-                return (Class<Object>) getTargetMethod().getReturnType();
+                return void.class;
             }
         }
 

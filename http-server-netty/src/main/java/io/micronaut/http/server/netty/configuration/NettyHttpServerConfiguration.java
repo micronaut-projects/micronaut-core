@@ -38,20 +38,17 @@ import java.util.OptionalInt;
 @ConfigurationProperties("netty")
 public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
-    protected Map<ChannelOption, Object> childOptions = Collections.emptyMap();
-    protected Map<ChannelOption, Object> options = Collections.emptyMap();
-    protected Worker worker;
-    protected Parent parent;
-    @ReadableBytes
-    protected int maxInitialLineLength = 4096;
-    @ReadableBytes
-    protected int maxHeaderSize = 8192;
-    @ReadableBytes
-    protected int maxChunkSize = 8192;
-    protected boolean chunkedSupported = true;
-    protected boolean validateHeaders = true;
-    protected int initialBufferSize = 128;
-    protected LogLevel logLevel;
+    private Map<ChannelOption, Object> childOptions = Collections.emptyMap();
+    private Map<ChannelOption, Object> options = Collections.emptyMap();
+    private Worker worker;
+    private Parent parent;
+    private int maxInitialLineLength = 4096;
+    private int maxHeaderSize = 8192;
+    private int maxChunkSize = 8192;
+    private boolean chunkedSupported = true;
+    private boolean validateHeaders = true;
+    private int initialBufferSize = 128;
+    private LogLevel logLevel;
 
     /**
      * Default empty constructor.
@@ -161,6 +158,95 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
+     * Sets the Netty child worker options.
+     *
+     * @param childOptions The options
+     */
+    public void setChildOptions(Map<ChannelOption, Object> childOptions) {
+        this.childOptions = childOptions;
+    }
+
+    /**
+     * Sets the channel options.
+     * @param options The channel options
+     */
+    public void setOptions(Map<ChannelOption, Object> options) {
+        this.options = options;
+    }
+
+    /**
+     * Sets the worker event loop configuration.
+     * @param worker The worker config
+     */
+    public void setWorker(Worker worker) {
+        this.worker = worker;
+    }
+
+    /**
+     * Sets the parent event loop configuration.
+     * @param parent The parent config
+     */
+    public void setParent(Parent parent) {
+        this.parent = parent;
+    }
+
+    /**
+     * Sets the maximum initial line length for the HTTP request.
+     * @param maxInitialLineLength The max length
+     */
+    public void setMaxInitialLineLength(@ReadableBytes int maxInitialLineLength) {
+        this.maxInitialLineLength = maxInitialLineLength;
+    }
+
+    /**
+     * Sets the maximum size of any one header.
+     * @param maxHeaderSize The max header size
+     */
+    public void setMaxHeaderSize(@ReadableBytes int maxHeaderSize) {
+        this.maxHeaderSize = maxHeaderSize;
+    }
+
+    /**
+     * Sets the maximum size of any single request chunk.
+     * @param maxChunkSize The max chunk size
+     */
+    public void setMaxChunkSize(@ReadableBytes int maxChunkSize) {
+        this.maxChunkSize = maxChunkSize;
+    }
+
+    /**
+     * Sets whether chunked transfer encoding is supported.
+     * @param chunkedSupported True if it is supported
+     */
+    public void setChunkedSupported(boolean chunkedSupported) {
+        this.chunkedSupported = chunkedSupported;
+    }
+
+    /**
+     * Sets whether to validate incoming headers.
+     * @param validateHeaders True if headers should be validated.
+     */
+    public void setValidateHeaders(boolean validateHeaders) {
+        this.validateHeaders = validateHeaders;
+    }
+
+    /**
+     * Sets the initial buffer size.
+     * @param initialBufferSize The initial buffer size
+     */
+    public void setInitialBufferSize(int initialBufferSize) {
+        this.initialBufferSize = initialBufferSize;
+    }
+
+    /**
+     * Sets the Netty log level.
+     * @param logLevel The log level
+     */
+    public void setLogLevel(LogLevel logLevel) {
+        this.logLevel = logLevel;
+    }
+
+    /**
      * Configuration for Netty worker.
      */
     @ConfigurationProperties("worker")
@@ -178,9 +264,33 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      * Abstract class for configuring the Netty event loop.
      */
     public abstract static class EventLoopConfig {
-        protected int threads;
-        protected Integer ioRatio;
-        protected String executor;
+        private int threads;
+        private Integer ioRatio;
+        private String executor;
+
+        /**
+         * Sets the number of threads for the event loop group.
+         * @param threads The number of threads
+         */
+        public void setThreads(int threads) {
+            this.threads = threads;
+        }
+
+        /**
+         * Sets the I/O ratio.
+         * @param ioRatio The I/O ratio
+         */
+        public void setIoRatio(Integer ioRatio) {
+            this.ioRatio = ioRatio;
+        }
+
+        /**
+         * Sets the name of the executor.
+         * @param executor The executor
+         */
+        public void setExecutor(String executor) {
+            this.executor = executor;
+        }
 
         /**
          * @return The number of threads to use

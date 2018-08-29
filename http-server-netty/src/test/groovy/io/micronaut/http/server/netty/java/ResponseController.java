@@ -36,6 +36,11 @@ public class ResponseController {
         return HttpResponse.accepted();
     }
 
+    @Get("/accepted-uri")
+    public HttpResponse acceptedUri() {
+        return HttpResponse.accepted(HttpResponse.uri("http://example.com"));
+    }
+
     @Get("/created-uri")
     public HttpResponse createdUri() {
         return HttpResponse.created(HttpResponse.uri("http://test.com"));
@@ -44,6 +49,11 @@ public class ResponseController {
     @Get("/created-body")
     public HttpResponse createdBody() {
         return HttpResponse.created(new Foo("blah", 10));
+    }
+
+    @Get("/created-body-uri")
+    public HttpResponse createdBodyUri() {
+        return HttpResponse.created(new Foo("blah", 10), HttpResponse.uri("http://test.com"));
     }
 
     @Get("/ok")

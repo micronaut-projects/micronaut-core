@@ -15,7 +15,8 @@
  */
 package io.micronaut.tracing.jaeger
 
-import io.jaegertracing.reporters.InMemoryReporter
+import io.jaegertracing.internal.JaegerTracer
+import io.jaegertracing.internal.reporters.InMemoryReporter
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
@@ -47,7 +48,7 @@ class HttpTracingSpec extends Specification {
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
         then:
-        context.containsBean(io.jaegertracing.Tracer)
+        context.containsBean(JaegerTracer)
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange('/traced/hello/John', String)
