@@ -226,7 +226,9 @@ class PropertySourcePropertyResolverSpec extends Specification {
                 'foo.bar': '10',
                 'foo.baz': 20,
                 'bar'    : '${foo:`some:value`}',
-                'baz'    : '${foo:`some:value`:`some:other:value`}'
+                'baz'    : '${foo:`some:value`:`some:other:value`}',
+                'single' : '${foo:some default with `something` in backticks}',
+                'start'  : '${foo:`startswithtick}'
         ]
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
                 PropertySource.of("test", values)
@@ -235,5 +237,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
         expect:
         resolver.getProperty("bar", String).get() == "some:value"
         resolver.getProperty("baz", String).get() == "some:other:value"
+        resolver.getProperty("single", String).get() == "some default with `something` in backticks"
+        resolver.getProperty("start", String).get() == "`startswithtick"
     }
 }
