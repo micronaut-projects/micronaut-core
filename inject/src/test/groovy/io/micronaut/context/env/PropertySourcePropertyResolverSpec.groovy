@@ -94,8 +94,8 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
         where:
         property      | value                                                | key           | type    | expected
-        'my.property' | '/${foo.bar}/stuff'                                  | 'my.property' | String  | '/10/stuff'
         'my.property' | '${not.there:foo.bar:50}'                            | 'my.property' | String  | '10'
+        'my.property' | '/${foo.bar}/stuff'                                  | 'my.property' | String  | '/10/stuff'
         'my.property' | '${not.there:foo.bar:50}'                            | 'my.property' | String  | '10'
         'my.property' | '${not.there:also.not.there:50}'                     | 'my.property' | String  | '50'
         'my.property' | '${not.there:also.not.there:}'                       | 'my.property' | String  | ''
@@ -218,5 +218,26 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
         then:
         thrown(ConfigurationException)
+    }
+
+    void "test escaping the value delimiter"() {
+        given:
+        def values = [
+                'foo.bar': '10',
+                'foo.baz': 20,
+                'bar'    : '${foo:`some:value`}',
+                'baz'    : '${foo:`some:value`:`some:other:value`}',
+                'single' : '${foo:some default with `something` in backticks}',
+                'start'  : '${foo:`startswithtick}'
+        ]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect:
+        resolver.getProperty("bar", String).get() == "some:value"
+        resolver.getProperty("baz", String).get() == "some:other:value"
+        resolver.getProperty("single", String).get() == "some default with `something` in backticks"
+        resolver.getProperty("start", String).get() == "`startswithtick"
     }
 }

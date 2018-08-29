@@ -26,3 +26,5 @@ class HelloController {
 ----
 
 In the above case if `hello.controller.path` is specified in configuration then the controller will be mapped to the path specified otherwise it will be mapped to `/hello`.
+
+NOTE: If the default value contains a colon then you will need to escape the value with back ticks. For example: ``@Value("${hello.url:`http://hello.com`}")``

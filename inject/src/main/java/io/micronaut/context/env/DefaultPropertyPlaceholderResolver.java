@@ -21,6 +21,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
 
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * The default {@link PropertyPlaceholderResolver}.
@@ -39,6 +41,10 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
      * Suffix for placeholder in properties.
      */
     public static final String SUFFIX = "}";
+
+    private static final Pattern ESCAPE_SEQUENCE = Pattern.compile("(.+)?:`([^`]+?)`");
+    private static final Pattern ENVIRONMENT_VAR_SEQUENCE = Pattern.compile("^[\\p{Lu}_]+");
+    private static final char COLON = ':';
 
     private final PropertyResolver environment;
     private final String prefix;
@@ -103,17 +109,27 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
 
     private void resolveExpression(StringBuilder builder, String str, String expr) {
         String defaultValue = null;
-        int j = expr.indexOf(':');
-        if (j > -1) {
-            defaultValue = expr.substring(j + 1);
-            expr = expr.substring(0, j);
+        Matcher matcher = ESCAPE_SEQUENCE.matcher(expr);
+
+        boolean escaped = false;
+        if (matcher.find()) {
+            defaultValue = matcher.group(2);
+            expr = matcher.group(1);
+            escaped = true;
+        } else {
+            int j = expr.indexOf(COLON);
+            if (j > -1) {
+                defaultValue = expr.substring(j + 1);
+                expr = expr.substring(0, j);
+            }
         }
+
         if (environment.containsProperty(expr)) {
             String finalExpr = expr;
             builder.append(environment.getProperty(expr, String.class).orElseThrow(() -> new ConfigurationException("Could not resolve placeholder ${" + finalExpr + "} in value: " + str)));
             return;
         }
-        if (expr.matches("^[\\p{Lu}_]+")) {
+        if (ENVIRONMENT_VAR_SEQUENCE.matcher(expr).matches()) {
             String v = System.getenv(expr);
             if (StringUtils.isNotEmpty(v)) {
                 builder.append(v);
@@ -121,10 +137,10 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             }
         }
         if (defaultValue != null) {
-            if (defaultValue.contains(":")) {
+            if (!escaped && (ESCAPE_SEQUENCE.matcher(defaultValue).find() || defaultValue.indexOf(COLON) > -1)) {
                 StringBuilder resolved = new StringBuilder();
                 resolveExpression(resolved, expr, defaultValue);
-                builder.append(resolved.toString());
+                builder.append(resolved);
             } else {
                 builder.append(defaultValue);
             }
