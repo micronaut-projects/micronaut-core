@@ -40,6 +40,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StreamUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.*;
@@ -60,6 +61,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -96,6 +98,8 @@ public class DefaultBeanContext implements BeanContext {
     private final Set<Class> thisInterfaces = ReflectionUtils.getAllInterfaces(getClass());
     private final CustomScopeRegistry customScopeRegistry = new DefaultCustomScopeRegistry(this);
     private final ResourceLoader resourceLoader;
+    private Collection<BeanRegistration<BeanCreatedEventListener>> beanCreationEventListeners;
+    Collection<BeanRegistration<BeanInitializedEventListener>> beanInitializedEventListeners;
 
     /**
      * Construct a new bean context using the same classloader that loaded this DefaultBeanContext class.
@@ -973,6 +977,8 @@ public class DefaultBeanContext implements BeanContext {
     protected void initializeContext(
             List<BeanDefinitionReference> contextScopeBeans,
             List<BeanDefinitionReference> processedBeans) {
+
+
         for (BeanDefinitionReference contextScopeBean : contextScopeBeans) {
             try {
                 loadContextScopeBean(contextScopeBean);
@@ -1290,14 +1296,17 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         if (!BeanCreatedEventListener.class.isInstance(bean)) {
-
-            Collection<BeanCreatedEventListener> beanCreatedEventListeners = getBeansOfType(resolutionContext, BeanCreatedEventListener.class, Qualifiers.byTypeArguments(beanDefinition.getBeanType()));
-            if (!beanCreatedEventListeners.isEmpty()) {
+            if (CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
                 BeanKey beanKey = new BeanKey(beanDefinition.getBeanType(), qualifier);
-                for (BeanCreatedEventListener listener : beanCreatedEventListeners) {
-                    bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, bean));
-                    if (bean == null) {
-                        throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
+                for (BeanRegistration<BeanCreatedEventListener> registration : beanCreationEventListeners) {
+                    BeanDefinition<BeanCreatedEventListener> definition = registration.getBeanDefinition();
+                    List<Argument<?>> typeArguments = definition.getTypeArguments(BeanCreatedEventListener.class);
+                    if (CollectionUtils.isEmpty(typeArguments) || beanDefinition.getBeanType().isAssignableFrom(typeArguments.get(0).getType())) {
+                        BeanCreatedEventListener listener = registration.getBean();
+                        bean = (T) listener.onCreated(new BeanCreatedEvent(this, beanDefinition, beanKey, bean));
+                        if (bean == null) {
+                            throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
+                        }
                     }
                 }
             }
@@ -1801,6 +1810,11 @@ public class DefaultBeanContext implements BeanContext {
 
             return false;
         });
+
+        getBeansOfType(BeanCreatedEventListener.class);
+        this.beanCreationEventListeners = getActiveBeanRegistrations(BeanCreatedEventListener.class);
+        getBeansOfType(BeanInitializedEventListener.class);
+        this.beanInitializedEventListeners = getActiveBeanRegistrations(BeanInitializedEventListener.class);
 
         initializeContext(contextScopeBeans, processedBeans);
     }

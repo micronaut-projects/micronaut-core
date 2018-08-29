@@ -34,6 +34,8 @@ package io.micronaut.context;
 
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.event.BeanCreatedEvent;
+import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.context.event.BeanInitializedEventListener;
 import io.micronaut.context.event.BeanInitializingEvent;
 import io.micronaut.context.exceptions.BeanContextException;
@@ -605,13 +607,21 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected Object postConstruct(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
         DefaultBeanContext defaultContext = (DefaultBeanContext) context;
-        Collection<BeanInitializedEventListener> initializedEventListeners = defaultContext.getBeansOfType(resolutionContext, BeanInitializedEventListener.class, Qualifiers.byTypeArguments(getBeanType()));
-        for (BeanInitializedEventListener listener : initializedEventListeners) {
-            bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));
-            if (bean == null) {
-                throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
+        Collection<BeanRegistration<BeanInitializedEventListener>> beanInitializedEventListeners = ((DefaultBeanContext) context).beanInitializedEventListeners;
+        if (CollectionUtils.isNotEmpty(beanInitializedEventListeners)) {
+            for (BeanRegistration<BeanInitializedEventListener> registration : beanInitializedEventListeners) {
+                BeanDefinition<BeanInitializedEventListener> definition = registration.getBeanDefinition();
+                List<Argument<?>> typeArguments = definition.getTypeArguments(BeanInitializedEventListener.class);
+                if (CollectionUtils.isEmpty(typeArguments) || getBeanType().isAssignableFrom(typeArguments.get(0).getType())) {
+                    BeanInitializedEventListener listener = registration.getBean();
+                    bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));
+                    if (bean == null) {
+                        throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
+                    }
+                }
             }
         }
+
         for (int i = 0; i < methodInjectionPoints.size(); i++) {
             MethodInjectionPoint methodInjectionPoint = methodInjectionPoints.get(i);
             if (methodInjectionPoint.isPostConstructMethod() && methodInjectionPoint.requiresReflection()) {
