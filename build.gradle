@@ -269,7 +269,7 @@ subprojects { Project subproject ->
         targetCompatibility = '1.8'
 //        compileJava.options.compilerArgs.add '-parameters'
 //        compileTestJava.options.compilerArgs.add '-parameters'
-        if(!subproject.name.contains('test-suite') && !subproject.name.contains('build-projects')) {
+        if(!subproject.name.contains('test-suite') && !subproject.toString().contains('build-projects')) {
             apply from:"${rootProject.rootDir}/gradle/publishing.gradle"
             apply plugin: 'checkstyle'
             
