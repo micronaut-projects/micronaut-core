@@ -293,16 +293,17 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
                 } else if (modifierStr.chars().allMatch(Character::isDigit)) {
                     variableQuantifier = "{1," + modifierStr + "})";
                 } else {
+
                     char lastChar = modifierStr.charAt(modLen - 1);
                     if (lastChar == '*' ||
                         (modLen > 1 && lastChar == '?' && (modifierStr.charAt(modLen - 2) == '*' || modifierStr.charAt(modLen - 2) == '+'))) {
                         operatorQuantifier = "?";
                     }
                     if (operator == '/' || operator == '.') {
-                        variablePattern = "(" + modifierStr + ")";
+                        variablePattern = "(" + ((firstChar == '^') ? modifierStr.substring(1) : modifierStr) + ")";
                     } else {
                         operatorPrefix = "(";
-                        variablePattern = modifierStr + ")";
+                        variablePattern = ((firstChar == '^') ? modifierStr.substring(1) : modifierStr) + ")";
                     }
                     variableQuantifier = "";
                 }
