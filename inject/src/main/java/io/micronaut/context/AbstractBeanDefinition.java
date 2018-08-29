@@ -1666,25 +1666,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             if (byType != null) {
                 qualifier = Qualifiers.byType(byType);
             } else {
-
-                Optional<Map> qualifiers = resolutionContext.get(javax.inject.Qualifier.class.getName(), Map.class);
-                if (qualifiers.isPresent()) {
-                    Map<? extends Argument<?>, Qualifier> argumentMap = (Map<? extends Argument<?>, Qualifier>) qualifiers.get();
-                    for (Map.Entry<? extends Argument<?>, Qualifier> entry: argumentMap.entrySet()) {
-                        if (entry.getKey() == argument) {
-                            qualifier = entry.getValue();
-                            break;
-                        }
-                        // The argument is an inner class of the argument in the map
-                        if (entry.getKey().getType() == argument.getType().getEnclosingClass()) {
-                            qualifier = entry.getValue();
-                            break;
-                        }
-                    }
-                }
+                Optional<Qualifier> optional = resolutionContext.get(javax.inject.Qualifier.class.getName(), Map.class)
+                    .map(map -> (Qualifier) map.get(argument));
+                qualifier = optional.orElse(null);
             }
         }
-
         return qualifier;
     }
 
