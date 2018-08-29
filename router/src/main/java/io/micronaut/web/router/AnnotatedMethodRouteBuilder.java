@@ -251,7 +251,10 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             if (value.length() == 1 && value.charAt(0) == '/') {
                 return rootUri;
             } else {
-                if (value.charAt(0) != '/' && !value.startsWith("{/")) {
+                if (value.charAt(0) == '/' && (value.startsWith("/{/") || value.startsWith("/{?"))) {
+                    value = value.substring(1, value.length());
+                }
+                if (value.charAt(0) != '/' && !value.startsWith("{/") && !value.startsWith("{?")) {
                     return rootUri + "/" + value;
                 } else {
                     return rootUri + value;
