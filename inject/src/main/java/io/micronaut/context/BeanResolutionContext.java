@@ -50,15 +50,6 @@ public interface BeanResolutionContext extends Map<String, Object>, ValueResolve
     Path getPath();
 
     /**
-     * Copies the resolution context state to a new instance with
-     * additional arguments that can overwrite existing ones.
-     *
-     * @param arguments The new arguments
-     * @return The new context
-     */
-    BeanResolutionContext copy(Map<String, Object> arguments);
-
-    /**
      * Represents a path taken to resolve a bean definitions dependencies.
      */
     interface Path extends Deque<Segment> {
