@@ -94,8 +94,8 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
         where:
         property      | value                                                | key           | type    | expected
-        'my.property' | '/${foo.bar}/stuff'                                  | 'my.property' | String  | '/10/stuff'
         'my.property' | '${not.there:foo.bar:50}'                            | 'my.property' | String  | '10'
+        'my.property' | '/${foo.bar}/stuff'                                  | 'my.property' | String  | '/10/stuff'
         'my.property' | '${not.there:foo.bar:50}'                            | 'my.property' | String  | '10'
         'my.property' | '${not.there:also.not.there:50}'                     | 'my.property' | String  | '50'
         'my.property' | '${not.there:also.not.there:}'                       | 'my.property' | String  | ''
@@ -225,8 +225,8 @@ class PropertySourcePropertyResolverSpec extends Specification {
         def values = [
                 'foo.bar': '10',
                 'foo.baz': 20,
-                'bar'    : '${foo:some\\:value}',
-                'baz'    : '${foo:some\\:value:some\\:other\\:value}'
+                'bar'    : '${foo:`some:value`}',
+                'baz'    : '${foo:`some:value`:`some:other:value`}'
         ]
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
                 PropertySource.of("test", values)

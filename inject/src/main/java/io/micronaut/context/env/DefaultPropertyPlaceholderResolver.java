@@ -42,7 +42,10 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
      */
     public static final String SUFFIX = "}";
 
-    private static final Pattern DELIMITER = Pattern.compile("[^\\\\]:");
+    private static final Pattern ESCAPE_SEQUENCE = Pattern.compile("(.+)?:`([^`]+?)`");
+    private static final Pattern ENVIRONMENT_VAR_SEQUENCE = Pattern.compile("^[\\p{Lu}_]+");
+    private static final char COLON = ':';
+
     private final PropertyResolver environment;
     private final String prefix;
 
@@ -106,18 +109,27 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
 
     private void resolveExpression(StringBuilder builder, String str, String expr) {
         String defaultValue = null;
-        Matcher matcher = DELIMITER.matcher(expr);
+        Matcher matcher = ESCAPE_SEQUENCE.matcher(expr);
+
+        boolean escaped = false;
         if (matcher.find()) {
-            int j = matcher.start() + 1;
-            defaultValue = expr.substring(j + 1);
-            expr = expr.substring(0, j);
+            defaultValue = matcher.group(2);
+            expr = matcher.group(1);
+            escaped = true;
+        } else {
+            int j = expr.indexOf(COLON);
+            if (j > -1) {
+                defaultValue = expr.substring(j + 1);
+                expr = expr.substring(0, j);
+            }
         }
+
         if (environment.containsProperty(expr)) {
             String finalExpr = expr;
             builder.append(environment.getProperty(expr, String.class).orElseThrow(() -> new ConfigurationException("Could not resolve placeholder ${" + finalExpr + "} in value: " + str)));
             return;
         }
-        if (expr.matches("^[\\p{Lu}_]+")) {
+        if (ENVIRONMENT_VAR_SEQUENCE.matcher(expr).matches()) {
             String v = System.getenv(expr);
             if (StringUtils.isNotEmpty(v)) {
                 builder.append(v);
@@ -125,16 +137,13 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             }
         }
         if (defaultValue != null) {
-            matcher = DELIMITER.matcher(defaultValue);
-            String value;
-            if (matcher.find()) {
+            if (!escaped && (ESCAPE_SEQUENCE.matcher(defaultValue).find() || defaultValue.indexOf(COLON) > -1)) {
                 StringBuilder resolved = new StringBuilder();
                 resolveExpression(resolved, expr, defaultValue);
-                value = resolved.toString();
+                builder.append(resolved);
             } else {
-                value = defaultValue;
+                builder.append(defaultValue);
             }
-            builder.append(value.replaceAll("\\\\:", ":"));
             return;
         }
         throw new ConfigurationException("Could not resolve placeholder ${" + expr + "} in value: " + str);
