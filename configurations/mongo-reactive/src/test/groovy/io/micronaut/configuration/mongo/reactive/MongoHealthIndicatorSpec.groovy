@@ -9,6 +9,8 @@ import io.micronaut.management.health.indicator.HealthResult
 import io.reactivex.Flowable
 import spock.lang.Specification
 
+import java.util.concurrent.TimeUnit
+
 class MongoHealthIndicatorSpec extends Specification {
 
     void "test mongo health indicator DOWN"() {
@@ -17,6 +19,10 @@ class MongoHealthIndicatorSpec extends Specification {
                 (MongoSettings.MONGODB_URI): "mongodb://localhost:${SocketUtils.findAvailableTcpPort()}",
                 (MongoSettings.EMBEDDED): false
         )
+        try {
+            Flowable.fromPublisher(applicationContext.getBean(com.mongodb.reactivestreams.client.MongoClient).listDatabaseNames()).timeout(2, TimeUnit.SECONDS).blockingFirst()
+        } catch (e) {
+        }
         MongoHealthIndicator healthIndicator = applicationContext.getBean(MongoHealthIndicator)
 
         then:
@@ -31,6 +37,10 @@ class MongoHealthIndicatorSpec extends Specification {
         ApplicationContext applicationContext = ApplicationContext.run(
                 (MongoSettings.MONGODB_URI): "mongodb://localhost:${SocketUtils.findAvailableTcpPort()}"
         )
+        try {
+            Flowable.fromPublisher(applicationContext.getBean(com.mongodb.reactivestreams.client.MongoClient).listDatabaseNames()).timeout(2, TimeUnit.SECONDS).blockingFirst()
+        } catch (e) {
+        }
         MongoHealthIndicator healthIndicator = applicationContext.getBean(MongoHealthIndicator)
 
         def healthResult = Flowable.fromPublisher(healthIndicator.result).blockingFirst()

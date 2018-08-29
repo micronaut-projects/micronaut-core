@@ -45,7 +45,7 @@ public class SessionConfiguration {
      *
      * @param maxActiveSessions The max active sessions
      */
-    protected void setMaxActiveSessions(Integer maxActiveSessions) {
+    public void setMaxActiveSessions(Integer maxActiveSessions) {
         this.maxActiveSessions = maxActiveSessions;
     }
 
@@ -61,7 +61,7 @@ public class SessionConfiguration {
      *
      * @param maxInactiveInterval The max inactive interval
      */
-    protected void setMaxInactiveInterval(Duration maxInactiveInterval) {
+    public void setMaxInactiveInterval(Duration maxInactiveInterval) {
         if (maxInactiveInterval != null) {
             this.maxInactiveInterval = maxInactiveInterval;
         }

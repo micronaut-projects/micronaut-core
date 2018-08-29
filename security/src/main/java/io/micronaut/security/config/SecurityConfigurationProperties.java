@@ -17,6 +17,7 @@
 package io.micronaut.security.config;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.util.CollectionUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,9 +35,9 @@ public class SecurityConfigurationProperties implements SecurityConfiguration {
     public static final String PREFIX = "micronaut.security";
     public static final String ANYWHERE = "0.0.0.0";
 
-    protected boolean enabled = false;
-    protected List<InterceptUrlMapPattern> interceptUrlMap = new ArrayList<>();
-    protected List<String> ipPatterns = Collections.singletonList(ANYWHERE);
+    private boolean enabled = false;
+    private List<InterceptUrlMapPattern> interceptUrlMap = new ArrayList<>();
+    private List<String> ipPatterns = Collections.singletonList(ANYWHERE);
 
     /**
      * enabled getter.
@@ -61,5 +62,34 @@ public class SecurityConfigurationProperties implements SecurityConfiguration {
      */
     public List<String> getIpPatterns() {
         return ipPatterns;
+    }
+
+    /**
+     * Sets whether security is enabled.
+     *
+     * @param enabled True if security is enabled
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    /**
+     * Sets the map that defines the interception patterns.
+     *
+     * @param interceptUrlMap The intercept urls maps
+     */
+    public void setInterceptUrlMap(List<InterceptUrlMapPattern> interceptUrlMap) {
+        if (CollectionUtils.isNotEmpty(interceptUrlMap)) {
+            this.interceptUrlMap = interceptUrlMap;
+        }
+    }
+
+    /**
+     * Sets the allowed IP patterns.
+     *
+     * @param ipPatterns The IP patterns
+     */
+    public void setIpPatterns(List<String> ipPatterns) {
+        this.ipPatterns = ipPatterns;
     }
 }

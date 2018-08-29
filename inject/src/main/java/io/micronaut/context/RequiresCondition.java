@@ -25,6 +25,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -396,6 +397,7 @@ public class RequiresCondition implements Condition {
                     // environment.isPresent(..) caches results, so we use it for efficiency
                     for (String name : names) {
                         if (!environment.isPresent(name)) {
+                            reportMissingClass(context);
                             context.fail("Class [" + name + "] is not present");
                             return false;
                         }
@@ -405,6 +407,7 @@ public class RequiresCondition implements Condition {
                     ClassLoader classLoader = context.getBeanContext().getClassLoader();
                     for (String name : names) {
                         if (!ClassUtils.forName(name, classLoader).isPresent()) {
+                            reportMissingClass(context);
                             context.fail("Class [" + name + "] is not present");
                             return false;
                         }
@@ -413,6 +416,13 @@ public class RequiresCondition implements Condition {
             }
         }
         return true;
+    }
+
+    private void reportMissingClass(ConditionContext context) {
+        AnnotationMetadataProvider component = context.getComponent();
+        if (component instanceof BeanDefinitionReference) {
+            ClassLoadingReporter.reportMissing(component.getClass().getName());
+        }
     }
 
     private boolean matchesPresenceOfEntities(ConditionContext context, AnnotationValue<Requires> annotationValue) {

@@ -53,7 +53,7 @@ public class PicocliRunner {
      * @throws Exception if the ApplicationContext could not be closed
      */
     public static <C extends Callable<T>, T> T call(Class<C> cls, String... args) throws Exception {
-        try (ApplicationContext ctx = ApplicationContext.run(Environment.CLI)) {
+        try (ApplicationContext ctx = ApplicationContext.build(cls, Environment.CLI).build()) {
             return call(cls, ctx, args);
         }
     }
@@ -103,7 +103,7 @@ public class PicocliRunner {
      * @throws Exception if the ApplicationContext could not be closed
      */
     public static <R extends Runnable> void run(Class<R> cls, String... args) throws Exception {
-        try (ApplicationContext ctx = ApplicationContext.run(Environment.CLI)) {
+        try (ApplicationContext ctx = ApplicationContext.build(cls, Environment.CLI).build()) {
             run(cls, ctx, args);
         }
     }

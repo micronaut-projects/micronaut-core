@@ -7,6 +7,7 @@ dependencies {
     compileOnly dependencyModuleVersion("spring", "spring-jdbc")
     compile project(":aop")
 
+    testImplementation project(':runtime')
     testImplementation project(':inject-groovy')
     testImplementation project(':inject-java')
     testImplementation dependencyVersion('spock')

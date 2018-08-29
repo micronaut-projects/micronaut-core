@@ -16,8 +16,13 @@
 
 package io.micronaut.http.server.netty.types;
 
+import io.micronaut.core.util.CollectionUtils;
+
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -30,22 +35,29 @@ import java.util.concurrent.ConcurrentHashMap;
 @Singleton
 public class DefaultCustomizableResponseTypeHandlerRegistry implements NettyCustomizableResponseTypeHandlerRegistry {
 
-    private NettyCustomizableResponseTypeHandler[] handlers;
+    private List<NettyCustomizableResponseTypeHandler> handlers;
     private ConcurrentHashMap<Class<?>, NettyCustomizableResponseTypeHandler> handlerCache = new ConcurrentHashMap<>(5);
 
     /**
      * @param typeHandlers The Netty customizable response type handlers
      */
     public DefaultCustomizableResponseTypeHandlerRegistry(NettyCustomizableResponseTypeHandler... typeHandlers) {
-        this.handlers = typeHandlers;
+        this.handlers = Arrays.asList(typeHandlers);
+    }
+
+
+    /**
+     * @param typeHandlers The Netty customizable response type handlers
+     */
+    @Inject public DefaultCustomizableResponseTypeHandlerRegistry(List<NettyCustomizableResponseTypeHandler> typeHandlers) {
+        this.handlers = CollectionUtils.isNotEmpty(typeHandlers) ? typeHandlers : Collections.emptyList();
     }
 
     @Override
     public Optional<NettyCustomizableResponseTypeHandler> findTypeHandler(Class<?> type) {
         return Optional
             .ofNullable(handlerCache.computeIfAbsent(type, (clazz) ->
-                Arrays
-                    .stream(handlers)
+                handlers.stream()
                     .filter(handler -> handler.supports(clazz))
                     .findFirst()
                     .orElse(null))
