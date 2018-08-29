@@ -605,13 +605,21 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected Object postConstruct(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
         DefaultBeanContext defaultContext = (DefaultBeanContext) context;
-        Collection<BeanInitializedEventListener> initializedEventListeners = defaultContext.getBeansOfType(resolutionContext, BeanInitializedEventListener.class, Qualifiers.byTypeArguments(getBeanType()));
-        for (BeanInitializedEventListener listener : initializedEventListeners) {
-            bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));
-            if (bean == null) {
-                throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
+        Collection<BeanRegistration<BeanInitializedEventListener>> beanInitializedEventListeners = ((DefaultBeanContext) context).beanInitializedEventListeners;
+        if (CollectionUtils.isNotEmpty(beanInitializedEventListeners)) {
+            for (BeanRegistration<BeanInitializedEventListener> registration : beanInitializedEventListeners) {
+                BeanDefinition<BeanInitializedEventListener> definition = registration.getBeanDefinition();
+                List<Argument<?>> typeArguments = definition.getTypeArguments(BeanInitializedEventListener.class);
+                if (CollectionUtils.isEmpty(typeArguments) || typeArguments.get(0).getType().isAssignableFrom(getBeanType())) {
+                    BeanInitializedEventListener listener = registration.getBean();
+                    bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));
+                    if (bean == null) {
+                        throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
+                    }
+                }
             }
         }
+
         for (int i = 0; i < methodInjectionPoints.size(); i++) {
             MethodInjectionPoint methodInjectionPoint = methodInjectionPoints.get(i);
             if (methodInjectionPoint.isPostConstructMethod() && methodInjectionPoint.requiresReflection()) {
