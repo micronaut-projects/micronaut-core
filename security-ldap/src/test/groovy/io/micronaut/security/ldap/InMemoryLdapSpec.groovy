@@ -35,13 +35,8 @@ abstract class InMemoryLdapSpec extends Specification {
             sslConfiguration.setCiphers(["TLS_DH_anon_WITH_AES_128_CBC_SHA"] as String[])
 
             def builder = new SslBuilder<Object>(sslConfiguration, new ResourceResolver()) {
-
                 TrustManagerFactory getTrust() {
                     getTrustManagerFactory()
-                }
-
-                KeyManagerFactory getKey() {
-                    getKeyManagerFactory()
                 }
 
                 @Override
@@ -49,7 +44,7 @@ abstract class InMemoryLdapSpec extends Specification {
                     return null
                 }
             }
-            SSLUtil serverSSLUtil = new SSLUtil(builder.getKey().getKeyManagers(), builder.getTrust().getTrustManagers())
+            SSLUtil serverSSLUtil = new SSLUtil(builder.getTrust().getTrustManagers())
             serverSSLUtil.setDefaultSSLProtocol("TLS")
             config.setListenerConfigs(InMemoryListenerConfig.createLDAPSConfig("LDAPS", 0,
                     serverSSLUtil.createSSLServerSocketFactory()))
