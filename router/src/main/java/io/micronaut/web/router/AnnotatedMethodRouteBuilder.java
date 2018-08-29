@@ -36,6 +36,7 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Put;
 import io.micronaut.http.annotation.Trace;
+import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 
@@ -246,19 +247,17 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
     }
 
     private String resolveUri(BeanDefinition bean, String value, ExecutableMethod method, UriNamingStrategy uriNamingStrategy) {
-        String rootUri = uriNamingStrategy.resolveUri(bean);
+        UriTemplate rootUri = UriTemplate.of(uriNamingStrategy.resolveUri(bean));
         if (StringUtils.isNotEmpty(value)) {
-            if (value.length() == 1 && value.charAt(0) == '/') {
-                return rootUri;
+            boolean isFirstCharSlash = value.charAt(0) == '/';
+            boolean isFirstCharVar = value.charAt(0) == '{';
+            if (value.length() == 1 && isFirstCharSlash) {
+                return rootUri.toString();
             } else {
-                if (value.charAt(0) != '/' && !value.startsWith("{/")) {
-                    return rootUri + "/" + value;
-                } else {
-                    return rootUri + value;
-                }
+                return rootUri.nest(isFirstCharSlash || isFirstCharVar ? value : '/' + value).toString();
             }
         } else {
-            return rootUri + uriNamingStrategy.resolveUri(method.getMethodName());
+            return rootUri.nest(uriNamingStrategy.resolveUri(method.getMethodName())).toString();
         }
     }
 }
