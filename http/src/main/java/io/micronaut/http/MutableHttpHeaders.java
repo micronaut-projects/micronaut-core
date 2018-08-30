@@ -163,7 +163,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
      * @return This HTTP headers
      */
     default MutableHttpHeaders auth(String username, String password) {
-        String token = "Basic " + Base64.getEncoder().encodeToString((username + ":" + password).getBytes(StandardCharsets.ISO_8859_1));
+        String token = HttpHeaders.AUTHORIZATION_PREFIX_BASIC + Base64.getEncoder().encodeToString((username + ":" + password).getBytes(StandardCharsets.ISO_8859_1));
         add(AUTHORIZATION, token);
         return this;
     }
@@ -175,7 +175,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
      * @return This HTTP headers
      */
     default MutableHttpHeaders auth(String userInfo) {
-        String token = "Basic " + Base64.getEncoder().encodeToString((userInfo).getBytes(StandardCharsets.ISO_8859_1));
+        String token = HttpHeaders.AUTHORIZATION_PREFIX_BASIC + Base64.getEncoder().encodeToString((userInfo).getBytes(StandardCharsets.ISO_8859_1));
         add(AUTHORIZATION, token);
         return this;
     }

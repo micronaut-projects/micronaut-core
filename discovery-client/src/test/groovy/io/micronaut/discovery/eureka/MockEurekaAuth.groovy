@@ -41,7 +41,7 @@ class MockEurekaAuth implements HttpServerFilter{
     Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
         def authToken = request.getHeaders().get(HttpHeaders.AUTHORIZATION, String)
         if(authToken.isPresent()) {
-            def token = authToken.get().substring("Basic ".length())
+            def token = authToken.get().substring(HttpHeaders.AUTHORIZATION_PREFIX_BASIC.length())
             def val = new String(Base64.decoder.decode(token))
             if(val.contains(userInfo)) {
                 return chain.proceed(request)
