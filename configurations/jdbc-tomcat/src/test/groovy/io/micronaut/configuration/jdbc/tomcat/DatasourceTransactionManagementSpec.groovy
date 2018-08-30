@@ -13,17 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.configuration.jdbc.tomcat
 
 import io.micronaut.configuration.jdbc.tomcat.metadata.TomcatDataSourcePoolMetadata
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.qualifiers.Qualifiers
-import spock.lang.Ignore
 import spock.lang.Specification
 
 class DatasourceTransactionManagementSpec extends Specification {
 
-    @Ignore
     def "test datasource transaction management"() {
         given:
         ApplicationContext ctx = ApplicationContext.run(

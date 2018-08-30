@@ -30,7 +30,7 @@ public class BookService {
     private final DataSource dataSource;
     private final DataSource secondary;
 
-    public BookService(@Named("default") DataSource dataSource, @Named("secondary") DataSource secondary) throws SQLException {
+    public BookService(DataSource dataSource, @Named("secondary") DataSource secondary) throws SQLException {
         this.dataSource = dataSource;
         this.secondary = secondary;
 
