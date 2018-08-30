@@ -15,7 +15,7 @@ import java.util.concurrent.ExecutorService
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED
 
-class ExecutorServiceMetricsBinderListenerSpec extends Specification {
+class ExecutorServiceMetricsBinderSpec extends Specification {
 
     def "test executor service metrics"() {
         when:
@@ -45,7 +45,7 @@ class ExecutorServiceMetricsBinderListenerSpec extends Specification {
         ApplicationContext context = ApplicationContext.run([(cfg): setting])
 
         then:
-        context.findBean(ExecutorServiceMetricsBinderListener).isPresent() == setting
+        context.findBean(ExecutorServiceMetricsBinder).isPresent() == setting
 
         cleanup:
         context.close()
