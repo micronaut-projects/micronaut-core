@@ -812,6 +812,7 @@ public class DefaultBeanContext implements BeanContext {
             return (Collection<BeanDefinition<?>>) Collections.EMPTY_MAP;
         }
         filterProxiedTypes(candidates, true, true);
+        filterReplacedBeans(candidates);
         return candidates;
     }
 
@@ -1118,44 +1119,7 @@ public class DefaultBeanContext implements BeanContext {
                     .filter(candidate -> candidate.isEnabled(this))
                     .collect(Collectors.toList());
 
-            List<Class> replacedTypes = new ArrayList<>(2);
-            for (BeanDefinition<T> candidate : candidates) {
-                Optional<Class> replacesType = candidate.getAnnotationMetadata().getValue(Replaces.class, Class.class);
-
-                replacesType.ifPresent(aClass -> {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Bean [{}] replaces existing bean of type [{}]", candidate.getBeanType(), aClass);
-                    }
-                    replacedTypes.add(aClass);
-                });
-            }
-            if (!replacedTypes.isEmpty()) {
-                candidates.removeIf(definition -> {
-                            if (definition.hasDeclaredStereotype(Infrastructure.class)) {
-                                return false;
-                            }
-
-                            Class<T> bt = definition.getBeanType();
-                            if (definition.hasStereotype(INTRODUCTION_TYPE)) {
-                                Class<? super T> superclass = bt.getSuperclass();
-                                if (superclass == Object.class) {
-                                    // interface introduction
-                                    return replacedTypes.stream().anyMatch(t -> t.isAssignableFrom(bt));
-                                } else {
-                                    // abstract class introduction
-                                    return replacedTypes.contains(superclass);
-                                }
-
-                            } else if (definition.hasStereotype(AROUND_TYPE)) {
-                                Class<? super T> superclass = bt.getSuperclass();
-                                return replacedTypes.contains(superclass) || replacedTypes.contains(bt);
-                            } else {
-                                return replacedTypes.contains(bt);
-                            }
-
-                        }
-                );
-            }
+            filterReplacedBeans(candidates);
 
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Resolved bean candidates {} for type: {}", candidates, beanType);
@@ -1387,6 +1351,48 @@ public class DefaultBeanContext implements BeanContext {
                     }
                 }))).start();
     }
+
+    private <T> void filterReplacedBeans(Collection<BeanDefinition<T>> candidates) {
+        List<Class> replacedTypes = new ArrayList<>(2);
+        for (BeanDefinition<T> candidate : candidates) {
+            Optional<Class> replacesType = candidate.getAnnotationMetadata().getValue(Replaces.class, Class.class);
+
+            replacesType.ifPresent(aClass -> {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Bean [{}] replaces existing bean of type [{}]", candidate.getBeanType(), aClass);
+                }
+                replacedTypes.add(aClass);
+            });
+        }
+        if (!replacedTypes.isEmpty()) {
+            candidates.removeIf(definition -> {
+                        if (definition.hasDeclaredStereotype(Infrastructure.class)) {
+                            return false;
+                        }
+
+                        Class<T> bt = definition.getBeanType();
+                        if (definition.hasStereotype(INTRODUCTION_TYPE)) {
+                            Class<? super T> superclass = bt.getSuperclass();
+                            if (superclass == Object.class) {
+                                // interface introduction
+                                return replacedTypes.stream().anyMatch(t -> t.isAssignableFrom(bt));
+                            } else {
+                                // abstract class introduction
+                                return replacedTypes.contains(superclass);
+                            }
+
+                        } else if (definition.hasStereotype(AROUND_TYPE)) {
+                            Class<? super T> superclass = bt.getSuperclass();
+                            return replacedTypes.contains(superclass) || replacedTypes.contains(bt);
+                        } else {
+                            return replacedTypes.contains(bt);
+                        }
+
+                    }
+            );
+        }
+    }
+
 
     private <T> void doInject(BeanResolutionContext resolutionContext, T instance, BeanDefinition definition) {
         definition.inject(resolutionContext, this, instance);
