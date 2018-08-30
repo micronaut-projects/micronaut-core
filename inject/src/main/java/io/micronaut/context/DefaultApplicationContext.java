@@ -183,6 +183,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             if (!rce.isRuntimeConfigured()) {
                 initializeTypeConverters(this);
             }
+        } else {
+            initializeTypeConverters(this);
         }
 
         super.initializeContext(contextScopeBeans, processedBeans);
