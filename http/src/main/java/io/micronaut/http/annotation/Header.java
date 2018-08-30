@@ -56,6 +56,7 @@ public @interface Header {
 
     /**
      * @see Bindable#defaultValue()
+     * @return The default value
      */
     @AliasFor(annotation = Bindable.class, member = "defaultValue")
     String defaultValue() default "";
