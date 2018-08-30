@@ -16,6 +16,8 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.discovery.ServiceInstance
+import io.micronaut.discovery.ServiceInstanceList
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -24,29 +26,36 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-/**
- * TODO: Javadoc description
- *
- * @author graemerocher
- * @since 1.0
- */
+import javax.inject.Singleton
+
 class ClientIntroductionAdviceSpec extends Specification {
-
-    @Shared
-    @AutoCleanup
-    ApplicationContext context = ApplicationContext.run()
-
-    @Shared
-    @AutoCleanup
-    EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-
 
     void "test implement HTTP client"() {
         given:
+        ApplicationContext context = ApplicationContext.run()
+        context.getBean(EmbeddedServer).start()
         MyClient myService = context.getBean(MyClient)
 
         expect:
         myService.index() == 'success'
+
+        cleanup:
+        context.close()
+    }
+
+    void "test multiple clients with the same id and different paths"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        ApplicationContext client = ApplicationContext.run()
+        client.registerSingleton(new TestServiceInstanceList(server.getURI()))
+
+        expect:
+        client.getBean(PolicyClient).index() == 'policy'
+        client.getBean(OfferClient).index() == 'offer'
+
+        cleanup:
+        server.close()
+        client.close()
     }
 
     @Controller('/aop')
@@ -54,6 +63,22 @@ class ClientIntroductionAdviceSpec extends Specification {
         @Override
         String index() {
             return "success"
+        }
+    }
+
+    @Controller('/policies')
+    static class PolicyController {
+        @Get
+        String index() {
+            "policy"
+        }
+    }
+
+    @Controller('/offers')
+    static class OfferController {
+        @Get
+        String index() {
+            "offer"
         }
     }
 
@@ -66,4 +91,36 @@ class ClientIntroductionAdviceSpec extends Specification {
     @Client('/aop')
     static interface MyClient extends MyApi {
     }
+
+    @Client(id="test-service", path="/policies")
+    static interface PolicyClient {
+        @Get
+        String index()
+    }
+
+    @Client(id="test-service", path="/offers")
+    static interface OfferClient {
+        @Get
+        String index()
+    }
+
+    class TestServiceInstanceList implements ServiceInstanceList {
+
+        private final URI uri
+
+        TestServiceInstanceList(URI uri) {
+            this.uri = uri
+        }
+
+        @Override
+        String getID() {
+            return "test-service"
+        }
+
+        @Override
+        List<ServiceInstance> getInstances() {
+            [ServiceInstance.of("test-service-1", uri)]
+        }
+    }
+
 }
