@@ -82,4 +82,12 @@ public interface ByteBufferFactory<T, B> {
      * @return The wrapped {@link ByteBuffer}
      */
     ByteBuffer<B> wrap(B existing);
+
+    /**
+     * Wrap an existing buffer.
+     *
+     * @param existing The bytes to wrap
+     * @return The wrapped {@link ByteBuffer}
+     */
+    ByteBuffer<B> wrap(byte[] existing);
 }
