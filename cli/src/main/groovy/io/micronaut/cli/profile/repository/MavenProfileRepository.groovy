@@ -108,10 +108,10 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
 
         try {
             grapeEngine.grab(group: art.groupId,
-                             module: art.artifactId,
-                             version: art.version ?: null)
+                    module: art.artifactId,
+                    version: art.version ?: null)
         } catch (ArtifactNotFoundException | DependencyResolutionFailedException e) {
-
+            MicronautConsole.instance.updateStatus("Profile $art could be resolved remotely. Searching Maven local...")
             def localData = new File(mavenLocal, "/${art.groupId.replace('.', '/')}/$art.artifactId/maven-metadata-local.xml")
             if (localData.exists()) {
                 def currentVersion = parseCurrentVersion(localData)
@@ -183,23 +183,24 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
                 if (Boolean.getBoolean("micronaut.verbose")) {
                     MicronautConsole.instance.warn("Ignoring error: " + e)
                 }
-            }
-
-            def localData = new File(mavenLocal, "/io/micronaut/profiles")
-            if (localData.exists()) {
-                localData.eachDir { File dir ->
-                    if (!dir.name.startsWith('.')) {
-                        def profileData = new File(dir, "/maven-metadata-local.xml")
-                        if (profileData.exists()) {
-                            def currentVersion = parseCurrentVersion(profileData)
-                            def profileFile = new File(dir, "$currentVersion/${dir.name}-${currentVersion}.jar")
-                            if (profileFile.exists()) {
-                                classLoader.addURL(profileFile.toURI().toURL())
+                MicronautConsole.instance.updateStatus("No profiles could be resolved remotely. Searching Maven local...")
+                def localData = new File(mavenLocal, "/io/micronaut/profiles")
+                if (localData.exists()) {
+                    localData.eachDir { File dir ->
+                        if (!dir.name.startsWith('.')) {
+                            def profileData = new File(dir, "/maven-metadata-local.xml")
+                            if (profileData.exists()) {
+                                def currentVersion = parseCurrentVersion(profileData)
+                                def profileFile = new File(dir, "$currentVersion/${dir.name}-${currentVersion}.jar")
+                                if (profileFile.exists()) {
+                                    classLoader.addURL(profileFile.toURI().toURL())
+                                }
                             }
                         }
                     }
                 }
             }
+
 
             processUrls()
             resolved = true
