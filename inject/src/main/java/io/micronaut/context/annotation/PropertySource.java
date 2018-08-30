@@ -34,7 +34,7 @@ import java.lang.annotation.RetentionPolicy;
 public @interface PropertySource {
 
     /**
-     * @return Additional command specific Hystrix properties
+     * @return The {@link Property} instances
      */
     Property[] value();
 }

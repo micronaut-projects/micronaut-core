@@ -320,6 +320,8 @@ class UriTemplateSpec extends Specification {
         'http://example.com/{&list*}'            | [list: ['red', 'green', 'blue']]                   | 'http://example.com/&list=red&list=green&list=blue'
         'http://example.com/{&keys}'             | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | 'http://example.com/&keys=semi,%3B,dot,.,comma,%2C'
         'http://example.com/{&keys*}'            | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | 'http://example.com/&semi=%3B&dot=.&comma=%2C'
+        'http://example.com/foo{?query,number}'  | [query: 'mycelium', number: 100]                   | 'http://example.com/foo?query=mycelium&number=100'
+        'http://example.com/foo{?query,number}'  | [number: 100]                                      | 'http://example.com/foo?number=100'
     }
 
 

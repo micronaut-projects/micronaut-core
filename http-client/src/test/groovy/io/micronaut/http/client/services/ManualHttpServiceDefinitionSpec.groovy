@@ -16,9 +16,11 @@ import java.time.Duration
 
 class ManualHttpServiceDefinitionSpec extends Specification {
 
+
     void "test that manually defining an HTTP client creates a client bean"() {
         given:
         EmbeddedServer firstApp = ApplicationContext.run(EmbeddedServer)
+
 
         ApplicationContext clientApp = ApplicationContext.run(
                 'micronaut.http.services.foo.url': firstApp.getURI(),
@@ -63,7 +65,6 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         when:
         client = clientApp.getBean(RxHttpClient, Qualifiers.byName("bar"))
         result = client.retrieve(HttpRequest.POST('/', '')).blockingFirst()
-
         then:
         client.configuration == config
         result == 'created'
