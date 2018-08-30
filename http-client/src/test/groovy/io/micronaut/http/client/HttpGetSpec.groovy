@@ -339,6 +339,27 @@ class HttpGetSpec extends Specification {
         backing.stop()
     }
 
+    void "test that Optional.empty() should return 404"() {
+        given:
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
+
+        when:
+        def flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/get/empty")
+        ))
+
+        HttpResponse<Optional<String>> response = flowable.blockingFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.message == "Page Not Found"
+        e.status == HttpStatus.NOT_FOUND
+
+        cleanup:
+        client.stop()
+        client.close()
+    }
+
     @Controller("/get")
     static class GetController {
 
@@ -370,6 +391,11 @@ class HttpGetSpec extends Specification {
         @Get("/queryParam")
         String queryParam(@QueryValue String foo) {
             return foo
+        }
+
+        @Get("/empty")
+        Optional<String> empty() {
+            return Optional.empty()
         }
     }
 
