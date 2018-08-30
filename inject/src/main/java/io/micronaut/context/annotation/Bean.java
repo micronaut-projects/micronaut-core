@@ -26,6 +26,17 @@ import java.lang.annotation.Target;
 /**
  * <p>Annotation used to configure a bean. Typically used in conjunction with {@link Factory}.</p>
  *
+ * <pre class="code">
+ * &#064;Factory
+ * public class MyFactory {
+ *
+ *     &#064;Bean
+ *     public MyBean myBean() {
+ *         // create the bean
+ *     }
+ * }</pre>
+ *
+ * @see Factory
  * @author Graeme Rocher
  * @since 1.0
  */

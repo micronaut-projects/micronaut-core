@@ -22,6 +22,7 @@ import io.micrometer.core.instrument.Tags;
 import io.micrometer.core.instrument.Timer;
 import io.micrometer.core.instrument.binder.jvm.ExecutorServiceMetrics;
 import io.micronaut.configuration.metrics.annotation.RequiresMetrics;
+import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
@@ -47,21 +48,21 @@ import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory
 @Singleton
 @RequiresMetrics
 @Requires(property = MICRONAUT_METRICS_BINDERS + ".executor.enabled", value = "true", defaultValue = "true")
-public class ExecutorServiceMetricsBinderListener implements BeanCreatedEventListener<ExecutorService> {
+public class ExecutorServiceMetricsBinder implements BeanCreatedEventListener<ExecutorService> {
 
-    private final MeterRegistry meterRegistry;
+    private final BeanContext beanContext;
 
     /**
-     * Constructs the default instance.
-     *
-     * @param meterRegistry The meter registry
+     * Default constructor.
+     * @param beanContext The bean context
      */
-    public ExecutorServiceMetricsBinderListener(MeterRegistry meterRegistry) {
-        this.meterRegistry = meterRegistry;
+    public ExecutorServiceMetricsBinder(BeanContext beanContext) {
+        this.beanContext = beanContext;
     }
 
     @Override
     public ExecutorService onCreated(BeanCreatedEvent<ExecutorService> event) {
+        MeterRegistry meterRegistry = beanContext.getBean(MeterRegistry.class);
         ExecutorService executorService = event.getBean();
         BeanIdentifier beanIdentifier = event.getBeanIdentifier();
 
@@ -78,7 +79,7 @@ public class ExecutorServiceMetricsBinderListener implements BeanCreatedEventLis
         new ExecutorServiceMetrics(unwrapped, beanIdentifier.getName(), tags).bindTo(meterRegistry);
 
         // allow timing
-        final Timer timer = meterRegistry.timer("executor", Tags.concat(tags, "name", beanIdentifier.getName()));
+        final Timer timer = meterRegistry.timer("executor", Tags.concat(tags , "name", beanIdentifier.getName()));
         if (executorService instanceof ScheduledExecutorService) {
             return new InstrumentedScheduledExecutorService() {
 

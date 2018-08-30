@@ -605,13 +605,21 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @Internal
     protected Object postConstruct(BeanResolutionContext resolutionContext, BeanContext context, Object bean) {
         DefaultBeanContext defaultContext = (DefaultBeanContext) context;
-        Collection<BeanInitializedEventListener> initializedEventListeners = defaultContext.getBeansOfType(resolutionContext, BeanInitializedEventListener.class, Qualifiers.byTypeArguments(getBeanType()));
-        for (BeanInitializedEventListener listener : initializedEventListeners) {
-            bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));
-            if (bean == null) {
-                throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
+        Collection<BeanRegistration<BeanInitializedEventListener>> beanInitializedEventListeners = ((DefaultBeanContext) context).beanInitializedEventListeners;
+        if (CollectionUtils.isNotEmpty(beanInitializedEventListeners)) {
+            for (BeanRegistration<BeanInitializedEventListener> registration : beanInitializedEventListeners) {
+                BeanDefinition<BeanInitializedEventListener> definition = registration.getBeanDefinition();
+                List<Argument<?>> typeArguments = definition.getTypeArguments(BeanInitializedEventListener.class);
+                if (CollectionUtils.isEmpty(typeArguments) || typeArguments.get(0).getType().isAssignableFrom(getBeanType())) {
+                    BeanInitializedEventListener listener = registration.getBean();
+                    bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));
+                    if (bean == null) {
+                        throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
+                    }
+                }
             }
         }
+
         for (int i = 0; i < methodInjectionPoints.size(); i++) {
             MethodInjectionPoint methodInjectionPoint = methodInjectionPoints.get(i);
             if (methodInjectionPoint.isPostConstructMethod() && methodInjectionPoint.requiresReflection()) {
@@ -1666,25 +1674,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             if (byType != null) {
                 qualifier = Qualifiers.byType(byType);
             } else {
-
-                Optional<Map> qualifiers = resolutionContext.get(javax.inject.Qualifier.class.getName(), Map.class);
-                if (qualifiers.isPresent()) {
-                    Map<? extends Argument<?>, Qualifier> argumentMap = (Map<? extends Argument<?>, Qualifier>) qualifiers.get();
-                    for (Map.Entry<? extends Argument<?>, Qualifier> entry: argumentMap.entrySet()) {
-                        if (entry.getKey() == argument) {
-                            qualifier = entry.getValue();
-                            break;
-                        }
-                        // The argument is an inner class of the argument in the map
-                        if (entry.getKey().getType() == argument.getType().getEnclosingClass()) {
-                            qualifier = entry.getValue();
-                            break;
-                        }
-                    }
-                }
+                Optional<Qualifier> optional = resolutionContext.get(javax.inject.Qualifier.class.getName(), Map.class)
+                    .map(map -> (Qualifier) map.get(argument));
+                qualifier = optional.orElse(null);
             }
         }
-
         return qualifier;
     }
 

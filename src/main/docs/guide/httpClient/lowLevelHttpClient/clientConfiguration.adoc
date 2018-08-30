@@ -33,6 +33,8 @@ micronaut:
 
 <1> The read timeout is applied to the `foo` client.
 
+WARN: This client configuration can be used in conjunction with the `@Client` annotation, either by injecting an `HttpClient` directly or use on a client interface. In any case, all other attributes on the annotation *will be ignored* other than the service id.
+
 Then simply inject the named client configuration:
 
 .Injecting an HTTP client

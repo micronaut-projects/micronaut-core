@@ -102,4 +102,9 @@ public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocato
     public ByteBuffer<ByteBuf> wrap(ByteBuf existing) {
         return new NettyByteBuffer(existing);
     }
+
+    @Override
+    public ByteBuffer<ByteBuf> wrap(byte[] existing) {
+        return new NettyByteBuffer(Unpooled.wrappedBuffer(existing));
+    }
 }
