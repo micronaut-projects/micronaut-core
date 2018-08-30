@@ -250,6 +250,7 @@ security:
       claimsGeneration: Claims Generation
       render:
         title: Token Render
+      tokenPropagation: Token Propagation
   endpoints:
     title: Built-In Security Controllers
     login: Login Controller
