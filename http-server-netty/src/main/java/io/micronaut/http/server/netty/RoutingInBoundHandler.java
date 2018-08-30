@@ -1178,7 +1178,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     return;
                 }
 
-                if (result == null) {
+                if (result == null || (result instanceof Optional && !((Optional) result).isPresent())) {
                     // empty flowable
                     emitter.onComplete();
                 } else {
