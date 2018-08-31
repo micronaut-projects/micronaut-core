@@ -182,6 +182,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
         propertySources.put(propertySource.getName(), propertySource);
         if (isRunning() && !reading.get()) {
+            resetCaches();
             processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
         }
         return this;
