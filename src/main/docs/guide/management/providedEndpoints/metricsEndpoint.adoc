@@ -228,6 +228,7 @@ If enabled, be default the path `/**` will be intercepted.  If you wish to chang
 |=======
 |*Name*
 | http.server.requests
+| http.client.requests
 |=======
 
 ===== System Metrics
