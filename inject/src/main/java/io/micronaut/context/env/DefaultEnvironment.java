@@ -259,6 +259,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             for (int i = 0; i < catalog.length; i++) {
                 catalog[i] = null;
             }
+            resetCaches();
         }
         return this;
     }
