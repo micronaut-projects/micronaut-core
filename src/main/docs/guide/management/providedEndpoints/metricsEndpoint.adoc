@@ -155,6 +155,7 @@ If enabled, be default the path `/**` will be intercepted.  If you wish to chang
 |=======
 |*Name*
 | http.server.requests
+| http.client.requests
 |=======
 
 ===== System Metrics
@@ -213,6 +214,22 @@ The logging metrics bindings will provide logging metrics if using Logback.
 |*Name*
 | logback.events
 |=======
+
+===== Hibernate Metrics
+
+You can enable metrics for Hibernate by setting the `hibernate.generate_statistics` property to `true` in configuration. For example for the default entity manager:
+
+Enabling Hibernate Metrics
+[source,yaml]
+----
+jpa:
+    default:
+        properties:
+            hibernate:
+                generate_statistics: true
+----
+
+Micrometer will automatically expose Hibernate statistics. See the source code for https://github.com/micrometer-metrics/micrometer/blob/8b5a2cfd0c8fcc121cb936bb40a04f45571ce073/micrometer-core/src/main/java/io/micrometer/core/instrument/binder/jpa/HibernateMetrics.java#L79[HibernateMetrics] for the available metrics.
 
 == Adding Custom Metrics
 

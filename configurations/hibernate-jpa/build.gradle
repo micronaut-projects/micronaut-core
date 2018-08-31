@@ -9,9 +9,11 @@ dependencies {
     compile project(":configurations:hibernate-validator")
     compileOnly project(":inject-java")
     compileOnly project(":management")
+    compileOnly project(":configurations:micrometer-core")
 
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
     testRuntime project(":configurations:jdbc-tomcat")
     testRuntime 'com.h2database:h2:1.4.196'
+    testCompile project(":configurations:micrometer-core")
 }
