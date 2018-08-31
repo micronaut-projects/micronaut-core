@@ -67,7 +67,7 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
         if (!ClassUtils.isPresent(NETTY_TYPE, GraalClassLoadingReporter.class.getClassLoader())) {
             classes.remove(NETTY_TYPE);
         }
-        
+
         List<Map> json = classes.stream().map(s -> {
             if (s.equals(NETTY_TYPE)) {
                 return CollectionUtils.mapOf(
