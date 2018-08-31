@@ -163,6 +163,15 @@ class JpaSetupSpec extends Specification {
         then:
         books.size() == 1
     }
+
+    void "test inject java persistence context"() {
+        given:
+        JavaBookService bookService = applicationContext.getBean(JavaBookService)
+
+        expect:
+        bookService.testFieldInject()
+        bookService.testMethodInject()
+    }
 }
 
 @Entity
