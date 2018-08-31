@@ -1,6 +1,6 @@
 dependencies {
     compile project(":configurations:kafka")
-    compile "org.apache.kafka:kafka-streams:${kafkaVersion}"
+    compile dependencyModuleVersion("kafka", "kafka-streams")
 
     compileOnly project(":inject-java")
 

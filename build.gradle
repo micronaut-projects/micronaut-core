@@ -77,30 +77,17 @@ ext {
                     group:'com.google.code.findbugs',
                     name:'jsr305'
             ],
-            'micrometer.core'    : [
-                    version: micrometerVersion,
-                    group  : 'io.micrometer',
-                    name   : 'micrometer-core'
+            kafka: [
+                    version:kafkaVersion,
+                    group:'org.apache.kafka',
+                    name:'kafka-clients',
+                    modules: ['kafka_2.12', 'kafka-streams']
             ],
-            'micrometer.atlas'   : [
+            'micrometer'    : [
                     version: micrometerVersion,
                     group  : 'io.micrometer',
-                    name   : 'micrometer-registry-atlas'
-            ],
-            'micrometer.graphite': [
-                    version: micrometerVersion,
-                    group  : 'io.micrometer',
-                    name   : 'micrometer-registry-graphite'
-            ],
-            'micrometer.prometheus'   : [
-                    version: micrometerVersion,
-                    group  : 'io.micrometer',
-                    name   : 'micrometer-registry-prometheus'
-            ],
-            'micrometer.statsd'  : [
-                    version: micrometerVersion,
-                    group  : 'io.micrometer',
-                    name   : 'micrometer-registry-statsd'
+                    name   : 'micrometer-core',
+                    modules :['micrometer-registry-atlas', 'micrometer-registry-graphite', 'micrometer-registry-prometheus', 'micrometer-registry-statsd']
             ],
             'mongo' : [
                     version: mongoVersion,

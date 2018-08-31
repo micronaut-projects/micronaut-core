@@ -1,9 +1,12 @@
+apply plugin: 'com.github.johnrengelman.plugin-shadow'
+
 dependencies {
+    shadowCompile dependencyVersion("micrometer")
+    compile dependencyVersion("micrometer")
     compileOnly project(":inject-java")
     compileOnly project(":management")
     compileOnly project(":jdbc")
 
-    compile "io.micrometer:micrometer-core:$micrometerVersion"
 
     testCompile project(":management")
     testCompile project(":http-client")
@@ -11,4 +14,41 @@ dependencies {
     testCompile project(":http-server-netty")
     testCompile project(":jdbc")
     testCompile dependencyModuleVersion("groovy", "groovy-json")
+}
+shadowJar {
+    dependencies {
+        for(dep in project.configurations.shadowCompile.dependencies) {
+            if(dep instanceof ProjectDependency) {
+                exclude(project(":$dep.name"))
+            }
+            else if(dep instanceof ExternalDependency) {
+                exclude(dependency("$dep.group:$dep.name:.*"))
+            }
+        }
+        exclude(project(":core"))
+        exclude(project(":http"))
+        exclude(project(":inject"))
+        exclude(project(":aop"))
+
+        exclude(dependency(dependencyVersion("snakeyaml")))
+        exclude(dependency("com.fasterxml.*:.*:.*"))
+        exclude(dependency("javax.validation:.*:.*"))
+        exclude(dependency("io.reactivex.rxjava2:.*:.*"))
+        exclude(dependency(dependencyVersion("slf4j")))
+        exclude(dependency(dependencyVersion("snakeyaml")))
+        exclude(dependency(group: 'javax.inject', name: 'javax.inject', version: '1'))
+        exclude(dependency('org.ow2.asm:.*:.*'))
+        exclude(dependency('org.hdrhistogram:.*:.*'))
+        exclude(dependency('org.latencyutils:.*:.*'))
+        exclude(dependency('org.reactivestreams:.*:.*'))
+        exclude(dependency('com.google.code.findbugs:.*:.*'))
+        exclude(dependency('com.github.ben-manes.caffeine:.*:.*'))
+    }
+
+    relocate "org.objectweb.asm", "io.micronaut.asm"
+    relocate "com.github.benmanes.caffeine", "io.micronaut.caffeine"
+
+}
+tasks.withType(com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation) { t ->
+    t.enabled = false
 }
