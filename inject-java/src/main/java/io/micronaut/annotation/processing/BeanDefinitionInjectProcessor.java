@@ -1211,7 +1211,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             boolean isInjected = fieldAnnotationMetadata.hasStereotype(Inject.class);
             boolean isValue = !isInjected &&
-                    (fieldAnnotationMetadata.hasStereotype(Value.class)); // || isConfigurationPropertiesType);
+                    (fieldAnnotationMetadata.hasStereotype(Value.class) || fieldAnnotationMetadata.hasStereotype(Property.class));
 
             if (isInjected || isValue) {
                 Name fieldName = variable.getSimpleName();
