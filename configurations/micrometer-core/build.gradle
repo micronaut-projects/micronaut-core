@@ -2,7 +2,7 @@ dependencies {
     compileOnly project(":inject-java")
     compileOnly project(":management")
 
-    compile "io.micrometer:micrometer-core:$micrometerVersion"
+    compile dependencyVersion("micrometer")
 
     testCompile project(":management")
     testCompile project(":http-client")
