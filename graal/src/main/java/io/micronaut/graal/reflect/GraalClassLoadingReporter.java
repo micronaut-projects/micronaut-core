@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.reflect.ClassLoadingReporter;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.hateos.JsonError;
@@ -62,6 +63,11 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
 
     @Override
     public void close() {
+
+        if (!ClassUtils.isPresent(NETTY_TYPE, GraalClassLoadingReporter.class.getClassLoader())) {
+            classes.remove(NETTY_TYPE);
+        }
+        
         List<Map> json = classes.stream().map(s -> {
             if (s.equals(NETTY_TYPE)) {
                 return CollectionUtils.mapOf(
