@@ -122,4 +122,20 @@ class ThymeleafViewRendererSpec extends Specification {
         and:
         e.status == HttpStatus.NOT_FOUND
     }
+
+    def "invoking /views/nullbody renders view even if the response body is null"() {
+        when:
+        HttpResponse<String> rsp = client.toBlocking().exchange('/views/nullbody', String)
+
+        then:
+        noExceptionThrown()
+        rsp.status() == HttpStatus.OK
+
+        when:
+        String body = rsp.body()
+
+        then:
+        body
+        rsp.body().contains("<h1>You are not logged in</h1>")
+    }
 }

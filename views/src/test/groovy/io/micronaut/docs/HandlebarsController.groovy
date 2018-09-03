@@ -40,4 +40,10 @@ public class HandlebarsController {
     HttpResponse<Person> bogus() {
         HttpResponse.ok(new Person(loggedIn: true, username: 'sdelamo'))
     }
+
+    @View("/home")
+    @Get("/nullbody")
+    HttpResponse nullBody() {
+        HttpResponse.ok()
+    }
 }
