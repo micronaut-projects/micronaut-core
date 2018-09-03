@@ -18,6 +18,7 @@ package io.micronaut.views;
 
 import io.micronaut.core.io.Writable;
 
+import javax.annotation.Nullable;
 import java.io.File;
 
 /**
@@ -42,7 +43,7 @@ public interface ViewsRenderer {
      * @param data     response body to render it with a view
      * @return A writable where the view will be written to.
      */
-    Writable render(String viewName, Object data);
+    Writable render(String viewName, @Nullable Object data);
 
     /**
      * @param viewName view name to be render
