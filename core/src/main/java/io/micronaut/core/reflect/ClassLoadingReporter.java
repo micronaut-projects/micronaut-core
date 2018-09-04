@@ -16,6 +16,7 @@
 
 package io.micronaut.core.reflect;
 
+import io.micronaut.core.util.Toggleable;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
@@ -28,7 +29,7 @@ import static io.micronaut.core.reflect.ClassUtils.CLASS_LOADING_REPORTERS;
  * @author graemerocher
  * @since 1.0
  */
-public interface ClassLoadingReporter extends AutoCloseable {
+public interface ClassLoadingReporter extends AutoCloseable, Toggleable {
 
     /**
      * Called when a class is present.
@@ -36,6 +37,13 @@ public interface ClassLoadingReporter extends AutoCloseable {
      * @param type The type
      */
     void onPresent(Class<?> type);
+
+    /**
+     * Called when a bean is present. Essentially the same as {@link #onPresent(Class)} but listeners may want to treat POJO beans differently.
+     *
+     * @param type The type
+     */
+    void onBeanPresent(Class<?> type);
 
     /**
      * Called when a class is missing.
@@ -56,6 +64,18 @@ public interface ClassLoadingReporter extends AutoCloseable {
         if (CLASS_LOADING_REPORTERS != Collections.EMPTY_LIST) {
             for (ClassLoadingReporter reporter : CLASS_LOADING_REPORTERS) {
                 reporter.onPresent(type);
+            }
+        }
+    }
+    /**
+     * Report a class that is present.
+     *
+     * @param type The type
+     */
+    static void reportBeanPresent(Class<?> type) {
+        if (CLASS_LOADING_REPORTERS != Collections.EMPTY_LIST) {
+            for (ClassLoadingReporter reporter : CLASS_LOADING_REPORTERS) {
+                reporter.onBeanPresent(type);
             }
         }
     }
