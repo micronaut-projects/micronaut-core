@@ -25,6 +25,7 @@ import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.io.Writable;
+import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.exception.InvocationException;
 import io.micronaut.core.type.Argument;
@@ -82,6 +83,8 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
 
         LocalFunctionRegistry localFunctionRegistry = applicationContext.getBean(LocalFunctionRegistry.class);
         ExecutableMethod<Object, Object> method = resolveFunction(localFunctionRegistry, functionName);
+        Class<?> returnJavaType = method.getReturnType().getType();
+        ClassLoadingReporter.reportBeanPresent(returnJavaType);
 
         Argument[] requiredArguments = method.getArguments();
         int argCount = requiredArguments.length;
@@ -122,7 +125,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
                     throw new InvocationException("Function [" + functionName + "] cannot be made executable.");
             }
             if (result != null) {
-                encode(env, localFunctionRegistry, method.getReturnType().getType(), result, output);
+                encode(env, localFunctionRegistry, returnJavaType, result, output);
             }
         } finally {
             try {
@@ -184,6 +187,8 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
         Argument<?> arg,
         InputStream input) {
         Class<?> argType = arg.getType();
+        ClassLoadingReporter.reportBeanPresent(argType);
+
         if (ClassUtils.isJavaLangType(argType)) {
             Object converted = doConvertInput(conversionService, arg, input);
             if (converted != null) {
