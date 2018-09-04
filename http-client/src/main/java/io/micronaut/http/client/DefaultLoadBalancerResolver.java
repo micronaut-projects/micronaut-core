@@ -19,19 +19,18 @@ package io.micronaut.http.client;
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.ServiceInstanceList;
 import io.micronaut.http.client.loadbalance.DiscoveryClientLoadBalancerFactory;
 import io.micronaut.http.client.loadbalance.ServiceInstanceListLoadBalancerFactory;
 import io.micronaut.runtime.server.EmbeddedServer;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * <p>Abstraction over {@link LoadBalancer} lookup. The strategy is as follows:</p>
@@ -60,9 +59,21 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
     public DefaultLoadBalancerResolver(
         BeanContext beanContext,
         ServiceInstanceList... serviceInstanceLists) {
+        this(beanContext, Arrays.asList(serviceInstanceLists));
+    }
+
+    /**
+     * The default server loadbalance resolver.
+     *
+     * @param beanContext          The bean context
+     * @param serviceInstanceLists Any other providers
+     */
+    @Inject public DefaultLoadBalancerResolver(
+            BeanContext beanContext,
+            List<ServiceInstanceList> serviceInstanceLists) {
         this.beanContext = beanContext;
-        if (ArrayUtils.isNotEmpty(serviceInstanceLists)) {
-            this.serviceInstanceLists = new HashMap<>(serviceInstanceLists.length);
+        if (CollectionUtils.isNotEmpty(serviceInstanceLists)) {
+            this.serviceInstanceLists = new HashMap<>(serviceInstanceLists.size());
             for (ServiceInstanceList provider : serviceInstanceLists) {
                 this.serviceInstanceLists.put(provider.getID(), provider);
             }
