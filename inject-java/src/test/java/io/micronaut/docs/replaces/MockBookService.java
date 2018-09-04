@@ -31,7 +31,6 @@ import java.util.Map;
  */
 // tag::class[]
 @Replaces(JdbcBookService.class) // <1>
-@Requires(env = Environment.TEST) // <2>
 @Singleton
 public class MockBookService implements BookService {
 
