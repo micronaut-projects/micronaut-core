@@ -26,6 +26,7 @@ import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.ResourceLoader;
@@ -1353,46 +1354,71 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     private <T> void filterReplacedBeans(Collection<BeanDefinition<T>> candidates) {
-        List<Class> replacedTypes = new ArrayList<>(2);
-        for (BeanDefinition<T> candidate : candidates) {
-            Optional<Class> replacesType = candidate.getAnnotationMetadata().getValue(Replaces.class, Class.class);
+        List<AnnotationValue<Replaces>> replacedTypes = new ArrayList<>(2);
 
-            replacesType.ifPresent(aClass -> {
+        for (BeanDefinition<T> candidate : candidates) {
+            Optional<AnnotationValue<Replaces>> replaces = candidate.findAnnotation(Replaces.class);
+
+            replaces.ifPresent(r -> {
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Bean [{}] replaces existing bean of type [{}]", candidate.getBeanType(), aClass);
+                    Optional<Class> type = r.getValue(Class.class);
+                    Optional<Class> factory = r.get("factory", Class.class);
+                    if (factory.isPresent()) {
+                        LOG.debug("Bean [{}] replaces existing bean of type [{}] in factory type [{}]", candidate.getBeanType(), type.orElse(null), factory.get());
+                    } else {
+                        LOG.debug("Bean [{}] replaces existing bean of type [{}]", candidate.getBeanType(), type.orElse(null));
+                    }
                 }
-                replacedTypes.add(aClass);
+                replacedTypes.add(r);
             });
         }
         if (!replacedTypes.isEmpty()) {
+
             candidates.removeIf(definition -> {
-                        if (definition.hasDeclaredStereotype(Infrastructure.class)) {
+                if (definition.hasDeclaredStereotype(Infrastructure.class)) {
+                    return false;
+                }
+
+                Class<?> declaringType = definition.getDeclaringType();
+                Function<Class, Boolean> comparisonFunction = typeMatches(definition);
+
+                return replacedTypes.stream().anyMatch(r -> {
+                    Optional<Class> factory = r.get("factory", Class.class);
+                    Optional<Class> beanType = r.getValue(Class.class);
+                    if (factory.isPresent()) {
+                        if (factory.get() == declaringType) {
+                            return !beanType.isPresent() || comparisonFunction.apply(beanType.get());
+                        } else {
                             return false;
                         }
-
-                        Class<T> bt = definition.getBeanType();
-                        if (definition.hasStereotype(INTRODUCTION_TYPE)) {
-                            Class<? super T> superclass = bt.getSuperclass();
-                            if (superclass == Object.class) {
-                                // interface introduction
-                                return replacedTypes.stream().anyMatch(t -> t.isAssignableFrom(bt));
-                            } else {
-                                // abstract class introduction
-                                return replacedTypes.contains(superclass);
-                            }
-
-                        } else if (definition.hasStereotype(AROUND_TYPE)) {
-                            Class<? super T> superclass = bt.getSuperclass();
-                            return replacedTypes.contains(superclass) || replacedTypes.contains(bt);
-                        } else {
-                            return replacedTypes.contains(bt);
-                        }
-
+                    } else {
+                        return beanType.map(comparisonFunction).orElse(false);
                     }
-            );
+                });
+            });
         }
     }
 
+    private <T> Function<Class, Boolean> typeMatches(BeanDefinition<T> definition) {
+        Class<T> bt = definition.getBeanType();
+
+        if (definition.hasStereotype(INTRODUCTION_TYPE)) {
+            Class<? super T> superclass = bt.getSuperclass();
+            if (superclass == Object.class) {
+                // interface introduction
+                return (clazz) -> clazz.isAssignableFrom(bt);
+            } else {
+                // abstract class introduction
+                return (clazz) -> clazz == superclass;
+            }
+        }
+        if (definition.hasStereotype(AROUND_TYPE)) {
+            Class<? super T> superclass = bt.getSuperclass();
+            return (clazz) -> clazz == superclass || clazz == bt;
+        }
+
+        return (clazz) -> clazz == bt;
+    }
 
     private <T> void doInject(BeanResolutionContext resolutionContext, T instance, BeanDefinition definition) {
         definition.inject(resolutionContext, this, instance);
@@ -2322,6 +2348,11 @@ public class DefaultBeanContext implements BeanContext {
         @Override
         public Class getBeanType() {
             return singletonClass;
+        }
+
+        @Override
+        public Class<?> getDeclaringType() {
+            return null;
         }
 
         @Override
