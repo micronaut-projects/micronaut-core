@@ -3,6 +3,7 @@ dependencies {
     compile project(":http-netty")
 
     compileOnly project(":inject-java")
+    compileOnly project(":websocket")
 
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
