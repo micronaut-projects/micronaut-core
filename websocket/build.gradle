@@ -1,0 +1,9 @@
+dependencies {
+    compile project(":http")
+    compile project(":inject")
+
+    compile dependencyVersion("rxjava2")
+    compileOnly project(":inject-java")
+
+    testCompile project(":inject-groovy")
+}
