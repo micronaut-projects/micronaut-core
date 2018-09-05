@@ -114,7 +114,14 @@ task mergeConfigProps() {
     doLast {
         outputs.files.singleFile.withOutputStream { out ->
             List<File> files = new ArrayList<>(inputs.files.files).sort { File f -> f.name }
-            for ( file in files ) file.withInputStream { out << it << '\n' }
+            for ( file in files ) {
+                String header = "=== " + file.name.replace('.adoc', '').split('-').collect { token ->
+                    "${token.charAt(0).toString().toUpperCase()}${token.substring(1)}"
+                }.join(' ')
+                file.withInputStream {
+                    out << header << '\n' << it << '\n'
+                }
+            }
         }
     }
     mustRunAfter 'replaceAtLink'
