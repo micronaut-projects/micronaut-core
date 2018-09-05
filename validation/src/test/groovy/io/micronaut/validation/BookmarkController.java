@@ -24,7 +24,7 @@ public class BookmarkController {
     }
 
     @Get("/bookmarks/list{?offset,max,sort,order}")
-    public HttpStatus list(@Valid @Nullable @QueryValue PaginationCommand paginationCommand) {
+    public HttpStatus list(@Valid @Nullable @QueryValue(all = true) PaginationCommand paginationCommand) {
         return HttpStatus.OK;
     }
 

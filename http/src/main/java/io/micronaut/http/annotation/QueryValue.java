@@ -52,4 +52,13 @@ public @interface QueryValue {
      */
     @AliasFor(annotation = Bindable.class, member = "defaultValue")
     String defaultValue() default "";
+
+
+    /**
+     * The flag to determine whether to bind all
+     * query parameters to the command object.
+     *
+     * @return True if we need to bind all query parameter
+     */
+    boolean all() default false;
 }
