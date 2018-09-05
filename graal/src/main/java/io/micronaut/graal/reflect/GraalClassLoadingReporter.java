@@ -44,12 +44,14 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
     private static final String NETTY_TYPE = "io.netty.channel.socket.nio.NioServerSocketChannel";
     private final Set<String> classes = new ConcurrentSkipListSet<>();
     private final Set<String> beans = new ConcurrentSkipListSet<>();
+    private final Set<String> arrays = new ConcurrentSkipListSet<>();
 
     /**
      * Default constructor.
      */
     public GraalClassLoadingReporter() {
         classes.add(NETTY_TYPE);
+        arrays.add("io.micronaut.http.MediaType[]");
     }
 
     @Override
@@ -126,6 +128,13 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
                 }
             }).collect(Collectors.toList());
 
+            for (String array : arrays) {
+                json.add(CollectionUtils.mapOf(
+                    "name", "[L" + array.substring(0, array.length() - 2) + ";",
+                    "allDeclaredConstructors", true
+                ));
+            }
+
             beans.addAll(Arrays.asList(JsonError.class.getName(), "io.micronaut.http.hateos.DefaultLink"));
 
             for (String bean : beans) {
@@ -145,8 +154,6 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
                     "name", "com.fasterxml.jackson.datatype.jsr310.JSR310Module",
                     "allDeclaredConstructors", true
             ));
-
-
 
 
             ObjectMapper mapper = new ObjectMapper();
