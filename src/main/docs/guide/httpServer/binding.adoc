@@ -4,6 +4,19 @@ The examples in the previous section demonstrates how Micronaut allows you to bi
 
 You can customize the name of the variable bound with the link:{api}/io/micronaut/http/annotation/QueryValue.html[@QueryValue] annotation which accepts a value which is the name of the URI variable or request parameter to bind from.
 
+Also, in order to bind all request URI variables or request parameters to a command object, you can set the flag `(all = true)` in `QueryValue` as:
+
+.Binding Request parameters to POJO
+[source,java]
+----
+include::{testsuite}/server/binding/BookmarkController.java[tags=imports, indent=0]
+
+include::{testsuite}/server/binding/BookmarkController[tags=class, indent=0]
+
+include::{testsuite}/server/binding/BookmarkController[tags=listBooks, indent=0]
+----
+
+
 In addition, there are other annotations within the link:{api}/io/micronaut/http/annotation/package-summary.html[io.micronaut.http.annotation] package to bind from different sources.
 
 The following table summarizes the annotations, their purpose and provides an example:
@@ -27,7 +40,7 @@ The following table summarizes the annotations, their purpose and provides an ex
 
 |link:{api}/io/micronaut/http/annotation/QueryValue.html[@QueryValue]
 |Bindings from a request URI variable or request parameter
-|`@QueryValue String myParam`
+|`@QueryValue String myParam` or `QueryValue(all = true) Pojo pojo`
 |===
 
 When a value is not specified to any binding annotation then the parameter name is used. In other words the following two methods are equivalent and both bind from a cookie called `myCookie`:
