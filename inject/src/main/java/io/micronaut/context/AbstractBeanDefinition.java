@@ -308,8 +308,8 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     }
 
     @Override
-    public Class<?> getDeclaringType() {
-        return declaringType;
+    public Optional<Class<?>> getDeclaringType() {
+        return Optional.ofNullable(declaringType);
     }
 
     @Override
