@@ -209,6 +209,7 @@ languageSupport:
   graal:
     title: Micronaut for GraalVM
     graalServices: Microservices as GraalVM native images
+    graalFAQ: GraalVM and Micronaut FAQ
 management:
   title: Management & Monitoring
   buildingEndpoints:
