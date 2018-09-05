@@ -61,6 +61,7 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
 
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
         boolean hasAnnotation = annotationMetadata.hasAnnotation(QueryValue.class);
+        boolean bindAll = annotationMetadata.isTrue(QueryValue.class, "all");
         String parameterName = annotationMetadata.getValue(QueryValue.class, String.class).orElse(argument.getName());
 
         BindingResult<T> result;
@@ -68,7 +69,11 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
         // attempt to bind from request parameters. This avoids allowing the request URI to
         // be manipulated to override POST or JSON variables
         if (hasAnnotation || !permitsRequestBody) {
-            result = doBind(context, parameters, parameterName);
+            if (bindAll) {
+                result = doConvert(parameters.asMap(), context);
+            } else {
+                result = doBind(context, parameters, parameterName);
+            }
         } else {
             //noinspection unchecked
             result = BindingResult.EMPTY;
