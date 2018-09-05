@@ -61,12 +61,30 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
             return false;
         } else {
             String f = System.getProperty(REFLECTION_JSON_FILE);
-            File file = new File(StringUtils.isNotEmpty(f) ? f : "./reflect.json");
-            boolean enabled = !file.exists();
-            if (enabled) {
-                System.out.println("Graal Class Loading Analysis Enabled.");
+            if (StringUtils.isNotEmpty(f)) {
+                File file = new File(f);
+                boolean enabled = !file.exists();
+                if (enabled) {
+                    System.out.println("Graal Class Loading Analysis Enabled.");
+                }
+                return enabled;
+            } else {
+                File parent = new File("build");
+                if (!parent.exists() || !parent.isDirectory()) {
+                    parent = new File("target");
+                }
+
+                if (!parent.exists() || !parent.isDirectory()) {
+                    return false;
+                } else {
+                    File file = new File(parent, "reflect.json");
+                    boolean enabled = !file.exists();
+                    if (enabled) {
+                        System.out.println("Graal Class Loading Analysis Enabled.");
+                    }
+                    return enabled;
+                }
             }
-            return enabled;
         }
     }
 
@@ -92,7 +110,21 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
     @Override
     public void close() {
         String f = System.getProperty(REFLECTION_JSON_FILE);
-        File file = new File(StringUtils.isNotEmpty(f) ? f : "./reflect.json");
+        File file;
+        if (StringUtils.isNotEmpty(f)) {
+            file = new File(f);
+        } else {
+            File parent = new File("build");
+            if (!parent.exists() || !parent.isDirectory()) {
+                parent = new File("target");
+            }
+
+            if (!parent.exists() || !parent.isDirectory()) {
+                return;
+            } else {
+                file = new File(parent, "reflect.json");
+            }
+        }
 
         if (!file.exists()) {
             ClassLoader cls = GraalClassLoadingReporter.class.getClassLoader();
