@@ -1379,14 +1379,14 @@ public class DefaultBeanContext implements BeanContext {
                     return false;
                 }
 
-                Class<?> declaringType = definition.getDeclaringType();
+                Optional<Class<?>> declaringType = definition.getDeclaringType();
                 Function<Class, Boolean> comparisonFunction = typeMatches(definition);
 
                 return replacedTypes.stream().anyMatch(r -> {
                     Optional<Class> factory = r.get("factory", Class.class);
                     Optional<Class> beanType = r.getValue(Class.class);
-                    if (factory.isPresent()) {
-                        if (factory.get() == declaringType) {
+                    if (factory.isPresent() && declaringType.isPresent()) {
+                        if (factory.get() == declaringType.get()) {
                             return !beanType.isPresent() || comparisonFunction.apply(beanType.get());
                         } else {
                             return false;
@@ -2351,8 +2351,8 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         @Override
-        public Class<?> getDeclaringType() {
-            return null;
+        public Optional<Class<?>> getDeclaringType() {
+            return Optional.empty();
         }
 
         @Override

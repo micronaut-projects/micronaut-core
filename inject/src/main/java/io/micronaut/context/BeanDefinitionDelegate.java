@@ -103,7 +103,7 @@ class BeanDefinitionDelegate<T> extends AbstractBeanContextConditional implement
     }
 
     @Override
-    public Class<?> getDeclaringType() {
+    public Optional<Class<?>> getDeclaringType() {
         return definition.getDeclaringType();
     }
 
