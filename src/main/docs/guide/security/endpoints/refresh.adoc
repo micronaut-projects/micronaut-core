@@ -3,15 +3,7 @@ NOTE: This controller can only be enabled if you are using JWT authentication.
 By default, issued access tokens expire after a period of time, and they are paired with refresh tokens. To
 ease the refresh, you can enable link:{api}/io/micronaut/security/token/jwt/endpoints/OauthController.html[OauthController], with configuration property:
 
-|===
-
-| Configuration Property | Default Value | Possible Values
-
-| `micronaut.security.endpoints.oauth.enabled` | false | `true` or `false`
-| `micronaut.security.endpoints.oauth.path` | `/oauth/access_token` | default path for `POST` requests.
-
-
-|===
+include::{includedir}configurationProperties/io.micronaut.security.token.jwt.endpoints.OauthControllerConfigurationProperties.adoc[]
 
 The controller exposes an endpoint as defined by https://tools.ietf.org/html/rfc6749#section-6[section 6 of the OAuth 2.0 spec] - Refreshing an Access Token.
 
