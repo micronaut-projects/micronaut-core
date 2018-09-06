@@ -34,7 +34,13 @@ public class BasicAuthTokenReaderConfigurationProperties implements BasicAuthTok
 
     public static final String PREFIX = TokenConfigurationProperties.PREFIX + ".basicAuth";
 
-    private boolean enabled = true;
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = true;
+
+    private boolean enabled = DEFAULT_ENABLED;
     private String headerName = HttpHeaders.AUTHORIZATION;
     private String prefix = HttpHeaderAuthorization.AUTHORIZATION_PREFIX_BASIC;
 
@@ -54,7 +60,7 @@ public class BasicAuthTokenReaderConfigurationProperties implements BasicAuthTok
     }
 
     /**
-     * Set whether to enable basic auth.
+     * Enables {@link io.micronaut.security.token.basicauth.BasicAuthTokenReader}. Default value {@value #DEFAULT_ENABLED}.
      *
      * @param enabled True if enabled
      */
@@ -63,7 +69,7 @@ public class BasicAuthTokenReaderConfigurationProperties implements BasicAuthTok
     }
 
     /**
-     * Sets the header name to use. Defaults to {@link io.micronaut.http.HttpHeaders#AUTHORIZATION}.
+     * Http Header name. Default value {@value io.micronaut.http.HttpHeaders#AUTHORIZATION}.
      *
      * @param headerName The header name to use
      */
@@ -72,7 +78,7 @@ public class BasicAuthTokenReaderConfigurationProperties implements BasicAuthTok
     }
 
     /**
-     * Sets the prefix to use for the auth token. Default value {@value io.micronaut.http.HttpHeaderAuthorization#AUTHORIZATION_PREFIX_BASIC}.
+     * Http Header value prefix. Default value {@value io.micronaut.http.HttpHeaderAuthorization#AUTHORIZATION_PREFIX_BASIC}.
      * @param prefix The prefix to use
      */
     public void setPrefix(String prefix) {
