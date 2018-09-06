@@ -35,7 +35,13 @@ public class SecurityConfigurationProperties implements SecurityConfiguration {
     public static final String PREFIX = "micronaut.security";
     public static final String ANYWHERE = "0.0.0.0";
 
-    private boolean enabled = false;
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = false;
+
+    private boolean enabled = DEFAULT_ENABLED;
     private List<InterceptUrlMapPattern> interceptUrlMap = new ArrayList<>();
     private List<String> ipPatterns = Collections.singletonList(ANYWHERE);
 
@@ -65,7 +71,7 @@ public class SecurityConfigurationProperties implements SecurityConfiguration {
     }
 
     /**
-     * Sets whether security is enabled.
+     * If Security is enabled. Default value {@value #DEFAULT_ENABLED}
      *
      * @param enabled True if security is enabled
      */
@@ -74,7 +80,7 @@ public class SecurityConfigurationProperties implements SecurityConfiguration {
     }
 
     /**
-     * Sets the map that defines the interception patterns.
+     * Map that defines the interception patterns.
      *
      * @param interceptUrlMap The intercept urls maps
      */
@@ -85,7 +91,7 @@ public class SecurityConfigurationProperties implements SecurityConfiguration {
     }
 
     /**
-     * Sets the allowed IP patterns.
+     * Allowed IP patterns. Default value ([{@value #ANYWHERE}])
      *
      * @param ipPatterns The IP patterns
      */

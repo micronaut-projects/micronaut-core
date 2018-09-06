@@ -18,6 +18,7 @@ package io.micronaut.security.token.jwt.bearer;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.http.HttpHeaderAuthorization;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.security.token.jwt.config.JwtConfigurationProperties;
 
 /**
@@ -31,8 +32,10 @@ public class BearerTokenConfigurationProperties implements BearerTokenConfigurat
 
     public static final String PREFIX = JwtConfigurationProperties.PREFIX + ".bearer";
 
-    private boolean enabled = true;
-    private String headerName = "Authorization";
+    public static final boolean DEFAULT_ENABLED = true;
+
+    private boolean enabled = DEFAULT_ENABLED;
+    private String headerName = HttpHeaders.AUTHORIZATION;
     private String prefix = HttpHeaderAuthorization.AUTHORIZATION_PREFIX_BEARER;
 
     @Override
@@ -52,7 +55,7 @@ public class BearerTokenConfigurationProperties implements BearerTokenConfigurat
 
 
     /**
-     * Set whether to enable basic auth.
+     * Set whether to enable basic auth. Default value {@value #DEFAULT_ENABLED}
      *
      * @param enabled True if enabled
      */
@@ -61,7 +64,7 @@ public class BearerTokenConfigurationProperties implements BearerTokenConfigurat
     }
 
     /**
-     * Sets the header name to use. Defaults to {@link io.micronaut.http.HttpHeaders#AUTHORIZATION}.
+     * Sets the header name to use. Default value {@value io.micronaut.http.HttpHeaders#AUTHORIZATION}.
      *
      * @param headerName The header name to use
      */
