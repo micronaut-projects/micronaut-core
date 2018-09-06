@@ -32,7 +32,7 @@ import javax.sql.DataSource;
  */
 @Factory
 @Requires(classes = HibernateTransactionManager.class)
-@Replaces(DataSourceTransactionManagerFactory.class)
+@Replaces(factory = DataSourceTransactionManagerFactory.class)
 public class HibernateTransactionManagerFactory {
 
     /**
