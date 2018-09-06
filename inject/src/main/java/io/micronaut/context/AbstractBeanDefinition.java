@@ -308,6 +308,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     }
 
     @Override
+    public Optional<Class<?>> getDeclaringType() {
+        return Optional.ofNullable(declaringType);
+    }
+
+    @Override
     public ConstructorInjectionPoint<T> getConstructor() {
         return constructor;
     }
