@@ -79,7 +79,8 @@ public interface MutableHttpMessage<B> extends HttpMessage<B> {
         sb.append(":");
         sb.append(password);
         final StringBuilder value = new StringBuilder();
-        value.append(HttpHeaders.AUTHORIZATION_PREFIX_BASIC);
+        value.append(HttpHeaderAuthorization.AUTHORIZATION_PREFIX_BASIC);
+        value.append(" ");
         value.append(new String(Base64.getEncoder().encode(sb.toString().getBytes())));
         header(HttpHeaders.AUTHORIZATION, value.toString());
         return this;
@@ -87,7 +88,8 @@ public interface MutableHttpMessage<B> extends HttpMessage<B> {
 
     default MutableHttpMessage<B> bearerAuth(CharSequence token) {
         final StringBuilder sb = new StringBuilder();
-        sb.append(HttpHeaders.AUTHORIZATION_PREFIX_BEARER);
+        sb.append(HttpHeaderAuthorization.AUTHORIZATION_PREFIX_BEARER);
+        sb.append(" ");
         sb.append(token);
         header(HttpHeaders.AUTHORIZATION, sb.toString());
         return this;
