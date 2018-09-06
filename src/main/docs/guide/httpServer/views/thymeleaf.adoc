@@ -9,7 +9,10 @@ runtime "org.thymeleaf:thymeleaf:3.0.9.RELEASE"
 ----
 
 Thymeleaf integration instantiates a `ClassLoaderTemplateResolver`.
-The properties used can be customized by overriding the values of api:io.micronaut.views.ThymeleafConfigurationProperties[].
+
+The properties used can be customized by overriding the values of:
+
+include::{includedir}configurationProperties/io.micronaut.views.thymeleaf.ThymeleafViewsRendererConfigurationProperties.adoc[]
 
 The example shown in the <<views, Views>> section, could be rendered with the following Thymeleaf template:
 

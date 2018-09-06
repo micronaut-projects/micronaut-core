@@ -25,18 +25,6 @@ which attempts to validate them.
 
 The following configuration properties are available to customize basic authentication behaviour:
 
-|===
-
-| Configuration Property | Default Value | Description
-
-| `micronaut.security.token.basicAuth.enabled` | `true` | link:{api}/io/micronaut/security/token/basicauth/BasicAuthTokenReader.html[BasicAuthTokenReader] is disabled by default
-
-| `micronaut.security.token.basicAuth.headerName` | `Authorization` | Header name
-
-| `micronaut.security.token.basicAuth.prefix` | `Basic` | e.g. `Basic dXNlcjp1c2Vy`
-
-|===
-
-See the javadoc for api:security.token.basicauth.BasicAuthTokenReaderConfigurationProperties[] for more information.
+include::{includedir}configurationProperties/io.micronaut.security.token.basicauth.BasicAuthTokenReaderConfigurationProperties.adoc[]
 
 TIP: Read the http://guides.micronaut.io/micronaut-security-basicauth/guide/index.html[Basic Authentication Micronaut Guide] to learn more.

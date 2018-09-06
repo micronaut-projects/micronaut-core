@@ -1,13 +1,6 @@
 You can enable `LogoutController` with configuration property:
 
-|===
-
-| Configuration Property | Default Value | Possible Values
-
-| `micronaut.security.endpoints.logout.enabled` | false | `true` or `false`
-| `micronaut.security.endpoints.logout.path` | `/logout` | default path for `POST` requests.
-
-|===
+include::{includedir}configurationProperties/io.micronaut.security.endpoints.LogoutControllerConfigurationProperties.adoc[]
 
 Each bean of type link:{api}/io/micronaut/security/handlers/LogoutHandler.html[LogoutHandler] gets invoked.
 

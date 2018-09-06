@@ -149,6 +149,7 @@ task publishGuide(type: grails.doc.gradle.PublishGuide) {
             'api': '../api',
             'sourceDir':rootProject.projectDir.absolutePath,
             'sourcedir':rootProject.projectDir.absolutePath,
+            'includedir': "${rootProject.projectDir.absolutePath}/src/main/docs/generated/",
             'javaee': 'https://docs.oracle.com/javaee/8/api/',
             'javase': 'https://docs.oracle.com/javase/8/docs/api/',
             'groovyapi': 'http://docs.groovy-lang.org/latest/html/gapi/',
@@ -175,6 +176,7 @@ task publishGuide(type: grails.doc.gradle.PublishGuide) {
 publishGuide.dependsOn mergeConfigProps
 publishGuide.dependsOn copyConfigurationReference
 
+publishGuide.mustRunAfter javadoc
 task docs(dependsOn:[javadoc, publishGuide]) {
     group = DOCUMENTATION_GROUP
 }
