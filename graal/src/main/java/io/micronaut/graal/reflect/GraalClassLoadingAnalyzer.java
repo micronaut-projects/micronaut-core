@@ -17,6 +17,7 @@
 package io.micronaut.graal.reflect;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.runtime.server.EmbeddedServer;
 
@@ -42,7 +43,10 @@ public final class GraalClassLoadingAnalyzer {
 
         try {
             ApplicationContext applicationContext = ApplicationContext.run();
+            // following beans may impact classloading, so load them.
             applicationContext.findBean(EmbeddedServer.class);
+            applicationContext.getBeansOfType(ExecutableMethodProcessor.class);
+            // finish up
             applicationContext.stop();
         } catch (Throwable e) {
             System.err.println("An error occurred analyzing class requirements: " + e.getMessage());

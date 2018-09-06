@@ -18,6 +18,7 @@ package io.micronaut.function;
 
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodec;
@@ -189,18 +190,34 @@ public class DefaultLocalFunctionRegistry implements ExecutableMethodProcessor<F
     }
 
     private void registerSupplier(ExecutableMethod<?, ?> method, String functionId) {
+        ClassLoadingReporter.reportBeanPresent(method.getReturnType().getType());
+
         suppliers.put(functionId, method);
     }
 
     private void registerBiFunction(ExecutableMethod<?, ?> method, String functionId) {
+        ClassLoadingReporter.reportBeanPresent(method.getReturnType().getType());
+        for (Class argumentType : method.getArgumentTypes()) {
+            ClassLoadingReporter.reportBeanPresent(argumentType);
+        }
+
         biFunctions.put(functionId, method);
     }
 
     private void registerConsumer(ExecutableMethod<?, ?> method, String functionId) {
+        for (Class argumentType : method.getArgumentTypes()) {
+            ClassLoadingReporter.reportBeanPresent(argumentType);
+        }
+
         consumers.put(functionId, method);
     }
 
     private void registerFunction(ExecutableMethod<?, ?> method, String functionId) {
+        ClassLoadingReporter.reportBeanPresent(method.getReturnType().getType());
+        for (Class argumentType : method.getArgumentTypes()) {
+            ClassLoadingReporter.reportBeanPresent(argumentType);
+        }
+
         functions.put(functionId, method);
     }
 }
