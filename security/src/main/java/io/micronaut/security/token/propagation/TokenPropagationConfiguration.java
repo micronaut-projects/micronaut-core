@@ -36,4 +36,10 @@ public interface TokenPropagationConfiguration extends Toggleable {
      * @return a regular expression to match the uri.
      */
     String getUriRegex();
+
+    /**
+     *
+     * @return Path to be matched by Token Propagation Filter.
+     */
+    String getPath();
 }

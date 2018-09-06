@@ -36,11 +36,19 @@ public class TokenPropagationConfigurationProperties implements TokenPropagation
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_ENABLED = false;
 
+    /**
+     * The default path.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_PATH = "/**";
+
     private boolean enabled = DEFAULT_ENABLED;
 
     private String servicesRegex;
 
     private String uriRegex;
+
+    private String path = DEFAULT_PATH;
 
     /**
      * @return a regular expression to match the service.
@@ -86,5 +94,23 @@ public class TokenPropagationConfigurationProperties implements TokenPropagation
      */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+
+    /**
+     * Configures {@link io.micronaut.security.token.propagation.TokenPropagationHttpClientFilter} path. Default value {@value #DEFAULT_PATH}
+     * @param path Path to be matched by Token Propagation Filter.
+     */
+    public void setPath(String path) {
+        this.path = path;
+    }
+
+    /**
+     *
+     * @return Path to be matched by Token Propagation Filter.
+     */
+    @Override
+    public String getPath() {
+        return this.path;
     }
 }
