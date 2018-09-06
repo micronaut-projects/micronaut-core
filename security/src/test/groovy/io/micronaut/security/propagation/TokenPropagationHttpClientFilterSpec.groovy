@@ -59,7 +59,7 @@ class TokenPropagationHttpClientFilterSpec extends Specification {
         TokenPropagationHttpClientFilter clientFilter = new TokenPropagationHttpClientFilter(null,
                 new TokenPropagationConfiguration() {
                     @Override
-                    String getServiceIdRegex() {
+                    String getServicesRegex() {
                         return serviceIdRegex
                     }
 

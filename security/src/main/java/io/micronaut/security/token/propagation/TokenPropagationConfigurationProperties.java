@@ -20,7 +20,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.security.token.config.TokenConfigurationProperties;
 
 /**
- * JWT propagation Configuration Properties.
+ * Token Propagation Configuration Properties.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -30,33 +30,37 @@ public class TokenPropagationConfigurationProperties implements TokenPropagation
 
     public static final String PREFIX = TokenConfigurationProperties.PREFIX + ".propagation";
 
-    private boolean enabled = false;
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = false;
 
-    private String serviceIdRegex;
+    private boolean enabled = DEFAULT_ENABLED;
+
+    private String servicesRegex;
 
     private String uriRegex;
 
-
     /**
-     * @return a regular expresion to validate the service id against e.g. http://(guides|docs)\.micronaut\.io
+     * @return a regular expression to match the service.
      */
     @Override
-    public String getServiceIdRegex() {
-        return this.serviceIdRegex;
+    public String getServicesRegex() {
+        return this.servicesRegex;
     }
 
     /**
-     * setter.
-     * @param serviceIdRegex serviceId regular expression
+     * a regular expression to match the service. e.g. guides|docs
+     * @param servicesRegex serviceId regular expression
      */
-    public void setServiceIdRegex(String serviceIdRegex) {
-        this.serviceIdRegex = serviceIdRegex;
+    public void setServicesRegex(String servicesRegex) {
+        this.servicesRegex = servicesRegex;
     }
-
 
     /**
      *
-     * @return a regular expression to validate the target request uri against.
+     * @return a regular expression to match the uri.
      */
     @Override
     public String getUriRegex() {
@@ -64,7 +68,7 @@ public class TokenPropagationConfigurationProperties implements TokenPropagation
     }
 
     /**
-     * setter.
+     * a regular expression to match the uri.
      * @param uriRegex uri regular expression
      */
     public void setUriRegex(String uriRegex) {
@@ -77,7 +81,7 @@ public class TokenPropagationConfigurationProperties implements TokenPropagation
     }
 
     /**
-     * setter.
+     * Enables {@link io.micronaut.security.token.propagation.TokenPropagationHttpClientFilter}. Default value {@value #DEFAULT_ENABLED}
      * @param enabled enabled flag
      */
     public void setEnabled(boolean enabled) {

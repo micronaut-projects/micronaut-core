@@ -64,8 +64,8 @@ public class TokenPropagationHttpClientFilter implements HttpClientFilter  {
      */
     public boolean shouldProcessRequest(Optional<String> serviceId, String uri) {
 
-        if (tokenPropagationConfiguration.getServiceIdRegex() != null && serviceId.isPresent()) {
-            Pattern pattern = Pattern.compile(tokenPropagationConfiguration.getServiceIdRegex());
+        if (tokenPropagationConfiguration.getServicesRegex() != null && serviceId.isPresent()) {
+            Pattern pattern = Pattern.compile(tokenPropagationConfiguration.getServicesRegex());
             if (pattern.matcher(serviceId.get()).matches()) {
                 return true;
             }

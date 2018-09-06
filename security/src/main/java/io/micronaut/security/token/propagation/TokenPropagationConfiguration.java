@@ -19,7 +19,7 @@ package io.micronaut.security.token.propagation;
 import io.micronaut.core.util.Toggleable;
 
 /**
- * JWT propagation Configuration.
+ * Token propagation Configuration.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -27,13 +27,13 @@ import io.micronaut.core.util.Toggleable;
 public interface TokenPropagationConfiguration extends Toggleable {
 
     /**
-     * @return a regular expresion to validate the service id against e.g. http://(guides|docs)\.micronaut\.io
+     * @return a regular expression to match the service.
      */
-    String getServiceIdRegex();
+    String getServicesRegex();
 
     /**
      *
-     * @return a regular expression to validate the target request uri against.
+     * @return a regular expression to match the uri.
      */
     String getUriRegex();
 }

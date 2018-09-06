@@ -31,9 +31,15 @@ import io.micronaut.security.token.config.TokenConfigurationProperties;
 public class HttpHeaderTokenWriterConfigurationProperties implements HttpHeaderTokenWriterConfiguration {
     public static final String PREFIX = TokenConfigurationProperties.PREFIX + ".writer.header";
 
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = true;
+
     private String prefix = HttpHeaderAuthorization.AUTHORIZATION_PREFIX_BEARER;
     private String headerName = HttpHeaders.AUTHORIZATION;
-    private boolean enabled = true;
+    private boolean enabled = DEFAULT_ENABLED;
 
     @Override
     public boolean isEnabled() {
@@ -41,7 +47,7 @@ public class HttpHeaderTokenWriterConfigurationProperties implements HttpHeaderT
     }
 
     /**
-     * setter.
+     * Enable {@link io.micronaut.security.token.writer.HttpHeaderTokenWriter}. Default value {@value #DEFAULT_ENABLED}
      * @param enabled enabled flag
      */
     public void setEnabled(boolean enabled) {
@@ -49,7 +55,7 @@ public class HttpHeaderTokenWriterConfigurationProperties implements HttpHeaderT
     }
 
     /**
-     * setter.
+     * Value prefix for Http Header. Default value {@value io.micronaut.http.HttpHeaderAuthorization#AUTHORIZATION_PREFIX_BEARER}
      * @param prefix preffix before the header value
      */
     public void setPrefix(String prefix) {
@@ -66,7 +72,7 @@ public class HttpHeaderTokenWriterConfigurationProperties implements HttpHeaderT
     }
 
     /**
-     * setter.
+     * Http Header to be used to propagate the token. Default value {@value io.micronaut.http.HttpHeaders#AUTHORIZATION}
      * @param headerName HTTP header name
      */
     public void setHeaderName(String headerName) {
