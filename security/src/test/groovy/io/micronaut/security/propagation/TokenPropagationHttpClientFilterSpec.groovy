@@ -56,18 +56,11 @@ class TokenPropagationHttpClientFilterSpec extends Specification {
                                      String uriRegex,
                                      String description) {
         when:
-        TokenPropagationHttpClientFilter clientFilter = new TokenPropagationHttpClientFilter(null,
-                new TokenPropagationConfiguration() {
-                    @Override
-                    String getServicesRegex() {
-                        return serviceIdRegex
-                    }
-
-                    @Override
-                    String getUriRegex() {
-                        return uriRegex
-                    }
-                })
+        def configuration = Stub(TokenPropagationConfiguration) {
+            getServicesRegex() >> serviceIdRegex
+            getUriRegex() >> uriRegex
+        }
+        TokenPropagationHttpClientFilter clientFilter = new TokenPropagationHttpClientFilter(null, configuration)
 
         then:
         clientFilter.shouldProcessRequest(Optional.of(serviceId), uri) == expected

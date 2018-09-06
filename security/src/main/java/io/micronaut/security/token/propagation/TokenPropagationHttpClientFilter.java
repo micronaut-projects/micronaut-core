@@ -38,7 +38,7 @@ import static io.micronaut.security.filters.SecurityFilter.TOKEN;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Filter("/**")
+@Filter("${" + TokenPropagationConfigurationProperties.PREFIX + ".path:/**}")
 @Requires(beans = {TokenWriter.class, TokenPropagationConfiguration.class})
 @Requires(property = TokenPropagationConfigurationProperties.PREFIX + ".enabled")
 public class TokenPropagationHttpClientFilter implements HttpClientFilter  {
