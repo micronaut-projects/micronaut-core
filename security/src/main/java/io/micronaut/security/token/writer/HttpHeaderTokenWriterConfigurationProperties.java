@@ -17,6 +17,7 @@
 package io.micronaut.security.token.writer;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.http.HttpHeaderAuthorization;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.security.token.config.TokenConfigurationProperties;
 
@@ -30,7 +31,7 @@ import io.micronaut.security.token.config.TokenConfigurationProperties;
 public class HttpHeaderTokenWriterConfigurationProperties implements HttpHeaderTokenWriterConfiguration {
     public static final String PREFIX = TokenConfigurationProperties.PREFIX + ".writer.header";
 
-    private String prefix = HttpHeaders.AUTHORIZATION_PREFIX_BEARER;
+    private String prefix = HttpHeaderAuthorization.AUTHORIZATION_PREFIX_BEARER;
     private String headerName = HttpHeaders.AUTHORIZATION;
     private boolean enabled = true;
 

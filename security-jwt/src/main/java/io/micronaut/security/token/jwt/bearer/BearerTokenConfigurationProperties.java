@@ -17,6 +17,7 @@
 package io.micronaut.security.token.jwt.bearer;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.http.HttpHeaderAuthorization;
 import io.micronaut.security.token.jwt.config.JwtConfigurationProperties;
 
 /**
@@ -32,7 +33,7 @@ public class BearerTokenConfigurationProperties implements BearerTokenConfigurat
 
     private boolean enabled = true;
     private String headerName = "Authorization";
-    private String prefix = "Bearer";
+    private String prefix = HttpHeaderAuthorization.AUTHORIZATION_PREFIX_BEARER;
 
     @Override
     public boolean isEnabled() {
@@ -69,7 +70,7 @@ public class BearerTokenConfigurationProperties implements BearerTokenConfigurat
     }
 
     /**
-     * Sets the prefix to use for the auth token. Defaults to "Basic".
+     * Sets the prefix to use for the auth token. Default value {@value io.micronaut.http.HttpHeaderAuthorization#AUTHORIZATION_PREFIX_BEARER}
      * @param prefix The prefix to use
      */
     public void setPrefix(String prefix) {

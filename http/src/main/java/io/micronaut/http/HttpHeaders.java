@@ -122,16 +122,6 @@ public interface HttpHeaders extends ConvertibleMultiValues<String> {
     String AUTHORIZATION = "Authorization";
 
     /**
-     * {@code "Bearer "}.
-     */
-    String AUTHORIZATION_PREFIX_BEARER = "Bearer ";
-
-    /**
-     * {@code "Basic "}.
-     */
-    String AUTHORIZATION_PREFIX_BASIC = "Basic ";
-
-    /**
      * {@code "Authorization"}.
      */
     String AUTHORIZATION_INFO = "Authorization-Info";
