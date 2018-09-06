@@ -5,12 +5,14 @@ dependencies {
     compile dependencyVersion("micrometer")
     compileOnly project(":inject-java")
     compileOnly project(":management")
+    compileOnly project(":jdbc")
 
 
     testCompile project(":management")
     testCompile project(":http-client")
     testCompile project(":inject-groovy")
     testCompile project(":http-server-netty")
+    testCompile project(":jdbc")
     testCompile dependencyModuleVersion("groovy", "groovy-json")
 }
 shadowJar {

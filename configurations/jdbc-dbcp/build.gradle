@@ -6,4 +6,12 @@ dependencies {
     compile 'org.apache.commons:commons-dbcp2:2.1.1'
 
     testCompile "com.h2database:h2:1.4.196"
+
+    testCompile project(":spring")
+    testCompile project(":inject-java")
+    testCompile project(":http-server-netty")
+    testCompile project(":http-client")
+    testCompile project(":management")
+    testCompile project(":configurations:micrometer-core")
+    testCompile dependencyModuleVersion("spring", "spring-jdbc")
 }

@@ -22,8 +22,8 @@ class ExecutorServiceMetricsBinderSpec extends Specification {
         ApplicationContext context = ApplicationContext.run()
         ExecutorService executorService = context.getBean(ExecutorService, Qualifiers.byName(TaskExecutors.IO))
 
-        executorService.submit({->} as Runnable)
-        executorService.submit({->} as Runnable)
+        executorService.submit({ -> } as Runnable)
+        executorService.submit({ -> } as Runnable)
 
         MeterRegistry registry = context.getBean(MeterRegistry)
         RequiredSearch search = registry.get("executor.pool.size")
@@ -51,9 +51,9 @@ class ExecutorServiceMetricsBinderSpec extends Specification {
         context.close()
 
         where:
-        cfg                                       | setting
-        MICRONAUT_METRICS_ENABLED                 | true
-        MICRONAUT_METRICS_ENABLED                 | false
+        cfg                                             | setting
+        MICRONAUT_METRICS_ENABLED                       | true
+        MICRONAUT_METRICS_ENABLED                       | false
         MICRONAUT_METRICS_BINDERS + ".executor.enabled" | true
         MICRONAUT_METRICS_BINDERS + ".executor.enabled" | false
     }
