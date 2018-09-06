@@ -18,10 +18,20 @@ Although Micronaut Dependency Injection does not use reflection, Micronaut does 
 [source,bash]
 ----
 $ ./gradlew assemble
-$ java -jar build/libs/hello-world-0.1-all.jar
+$ java -cp build/libs/hello-world-0.1-all.jar io.micronaut.graal.reflect.GraalClassLoadingAnalyzer
 ----
 
-Once the application is running you can simply stop the application and a `build/reflect.json` file will be generated containing the classes that were dynamically loaded by the application when started up. See https://github.com/oracle/graal/blob/master/substratevm/REFLECTION.md[GraalVM documentation] for information on the JSON format.
+The `GraalClassLoadingAnalyzer` will write out a `reflect.json` file computing the classloading requirements of the application.
+
+The default is to write this file to the `build` directory for Gradle and the `target` directory for Maven. You can alter the destination by specifying an argument:
+
+.Writing `reflect.json` to a custom location
+[source,bash]
+----
+$ java -cp build/libs/hello-world-0.1-all.jar io.micronaut.graal.reflect.GraalClassLoadingAnalyzer somelocation/myreflect.json
+----
+
+The generated `reflect.json` file contains the classes that were dynamically loaded by the application when started up. See https://github.com/oracle/graal/blob/master/substratevm/REFLECTION.md[GraalVM documentation] for information on the JSON format.
 
 TIP: If you wish you can use this file as a template and copy it to the source tree, making modifications as necessary and then altering the `build-native-image.sh` template to point to the new location.
 
