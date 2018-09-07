@@ -1,0 +1,41 @@
+==== How does Micronaut manage to run on GraalVM?
+
+Micronaut features a Dependency Injection and Aspect-Oriented Programming runtime that uses no reflection. This makes it easier for Micronaut applications to run on GraalVM since there are https://github.com/oracle/graal/blob/master/substratevm/LIMITATIONS.md[limitations] particularly around https://github.com/oracle/graal/blob/master/substratevm/REFLECTION.md[reflection] on SubstrateVM.
+
+==== What about Third-Party Libraries?
+
+Micronaut cannot guarantee that third-party libraries work on GraalVM SubstrateVM, that is down to each individual library to implement support.
+
+==== I Get a "Class XXX is instantiated reflectively..." Exception. What do I do?
+
+If you get an error such as:
+
+----
+Class myclass.Foo[] is instantiated reflectively but was never registered. Register the class by using org.graalvm.nativeimage.RuntimeReflection
+----
+
+You may need to manually tweak the generated `reflect.json` file. For regular classes you need to add an entry into the array:
+
+[source,json]
+----
+[
+    {
+        "name" : "myclass.Foo",
+        "allDeclaredConstructors" : true
+    },
+    ...
+]
+----
+
+For arrays this needs to use the Java JVM internal array representation. For example:
+
+[source,json]
+----
+[
+    {
+        "name" : "[Lmyclass.Foo;",
+        "allDeclaredConstructors" : true
+    },
+    ...
+]
+----

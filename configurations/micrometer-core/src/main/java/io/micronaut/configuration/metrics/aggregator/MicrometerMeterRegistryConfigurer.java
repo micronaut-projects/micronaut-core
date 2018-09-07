@@ -84,9 +84,9 @@ public class MicrometerMeterRegistryConfigurer implements MeterRegistryConfigure
     /**
      * Add binders to the meter registry.  There are default binders available.
      * <p>
-     * {@link io.micronaut.configuration.metrics.binder.jvm.JvmMeterRegistryBinder}
-     * {@link io.micronaut.configuration.metrics.binder.logging.LogbackMeterRegistryBinder}
-     * {@link io.micronaut.configuration.metrics.binder.system.SystemMeterRegistryBinder}
+     * {@link io.micronaut.configuration.metrics.binder.jvm.JvmMeterRegistryBinderFactory}
+     * {@link io.micronaut.configuration.metrics.binder.logging.LogbackMeterRegistryBinderFactory}
+     * {@link io.micronaut.configuration.metrics.binder.system.SystemMeterRegistryBinderFactoryFactory}
      *
      * @param meterRegistry the meter registry
      */
