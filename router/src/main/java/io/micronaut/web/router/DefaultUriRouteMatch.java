@@ -138,6 +138,11 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
     }
 
     @Override
+    public Map<String, Character> getVariablesModifier() {
+        return matchInfo.getVariablesModifier();
+    }
+
+    @Override
     public UriRoute getRoute() {
         return (UriRoute) abstractRoute;
     }
