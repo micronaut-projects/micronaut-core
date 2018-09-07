@@ -11,7 +11,7 @@ import javax.annotation.Nullable
 
 @Requires(env = Environment.TEST)
 @Requires(property = SecurityUtilsSpec.SPEC_NAME_PROPERTY, value = 'SecurityUtilsSpec')
-@Controller("/securityutils")
+@Controller(SecurityUtilsSpec.controllerPath)
 class SecurityUtilsController {
 
     @Produces(MediaType.TEXT_PLAIN)
