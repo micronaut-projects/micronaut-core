@@ -48,10 +48,10 @@ public class SecuredInterceptor implements MethodInterceptor<Object, Object> {
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         if (context.hasDeclaredAnnotation(Secured.class)) {
-            String[] roles = context.getValue(Secured.class, String[].class).orElse(null);
             if (context.findAnnotation(Controller.class).isPresent()) {
                 return context.proceed();
             }
+            String[] roles = context.getValue(Secured.class, String[].class).orElse(null);
             ProceedResult result = proceedResult(roles, SecurityUtils::isAuthenticated, SecurityUtils::hasRole);
             switch (result) {
                 case FORBIDDEN:
@@ -65,13 +65,23 @@ public class SecuredInterceptor implements MethodInterceptor<Object, Object> {
                 case UNAUTHORIZED:
                     throw new NotAuthenticatedException("Authentication not found");
                 case PROCEED:
+                default:
                     return context.proceed();
             }
         }
         return context.proceed();
     }
 
-    public static ProceedResult proceedResult(String[] roles, AuthenticationChecker authenticationChecker, RoleChecker roleChecker) {
+    /**
+     *
+     * @param roles List of roles present in {@link io.micronaut.security.Secured} annotation.
+     * @param authenticationChecker Implementation of {@link io.micronaut.security.SecuredInterceptor.AuthenticationChecker}
+     * @param roleChecker Implementation of {@link io.micronaut.security.SecuredInterceptor.RoleChecker}
+     * @return Returns an enum indicating whether the flow should proceed or an exception should be raised.
+     */
+    public static ProceedResult proceedResult(String[] roles,
+                                              AuthenticationChecker authenticationChecker,
+                                              RoleChecker roleChecker) {
         if (roles != null && roles.length == 1) {
             if (roles[0].equals(SecurityRule.IS_ANONYMOUS)) {
                 return ProceedResult.PROCEED;
@@ -82,31 +92,45 @@ public class SecuredInterceptor implements MethodInterceptor<Object, Object> {
             return ProceedResult.UNAUTHORIZED;
         }
 
-        if (roles!=null) {
+        if (roles != null) {
             if (Arrays.stream(roles).anyMatch(role -> role.equals(SecurityRule.IS_AUTHENTICATED) || roleChecker.hasRole(role))) {
                 return ProceedResult.PROCEED;
             }
 
             return ProceedResult.FORBIDDEN;
-
         }
         return ProceedResult.PROCEED;
     }
 
-
+    /**
+     * Different results of processing {@link io.micronaut.security.Secured} annotation.
+     */
     protected enum ProceedResult {
         PROCEED,
         UNAUTHORIZED,
         FORBIDDEN
     }
 
+    /**
+     * Defines an interface to check whether a user has a role or not.
+     */
     protected  interface RoleChecker {
+        /**
+         *
+         * @param role User role
+         * @return true if the user has the role
+         */
         boolean hasRole(String role);
     }
 
+    /**
+     *  Defines an interface to check whether a user is authenticated or no.
+     */
     protected  interface AuthenticationChecker {
+        /**
+         *
+         * @return if the user is authenticated.
+         */
         boolean isAuthenticated();
     }
 }
-
-
