@@ -1,0 +1,72 @@
+To get started creating a Microservice that can be compiled into a native image use the `graal-native-image` feature when creating the application:
+
+.Creating a Graal Native Microservice
+[source,bash]
+----
+$ mn create-app hello-world --features graal-native-image
+----
+
+The `graal-native-image` feature adds 3 important items:
+
+1. A `MicronautSubstitutions.java` file needed to recompute Netty and Caffeine's use of `Unsafe`.
+2. The `svm` and `graal` dependencies to your `build.gradle` (or `pom.xml` if `--build maven` is used).
+3. A `build-native-image.sh` bash script which can be used as a template to construct the native image.
+
+Although Micronaut Dependency Injection does not use reflection, Micronaut does heavily rely on dynamic class loading. GraalVM needs to know ahead of time all the classes that are to be dynamically loaded. So before you can build a native image Micronaut needs to compute your application's classloading requirements. This can be done by simply running your application:
+
+.Computing Class Loading Requirements
+[source,bash]
+----
+$ ./gradlew assemble
+$ java -cp build/libs/hello-world-0.1-all.jar io.micronaut.graal.reflect.GraalClassLoadingAnalyzer
+----
+
+The `GraalClassLoadingAnalyzer` will write out a `reflect.json` file computing the classloading requirements of the application.
+
+The default is to write this file to the `build` directory for Gradle and the `target` directory for Maven. You can alter the destination by specifying an argument:
+
+.Writing `reflect.json` to a custom location
+[source,bash]
+----
+$ java -cp build/libs/hello-world-0.1-all.jar io.micronaut.graal.reflect.GraalClassLoadingAnalyzer somelocation/myreflect.json
+----
+
+The generated `reflect.json` file contains the classes that were dynamically loaded by the application when started up. See https://github.com/oracle/graal/blob/master/substratevm/REFLECTION.md[GraalVM documentation] for information on the JSON format.
+
+TIP: If you wish you can use this file as a template and copy it to the source tree, making modifications as necessary and then altering the `build-native-image.sh` template to point to the new location.
+
+Once the `reflect.json` file is ready you can run the `build-native-image.sh` script. The script runs the following `native-image` command:
+
+.The `native-image` command
+[source,bash]
+----
+native-image --class-path target/hello-world-0.1.jar \ # <1>
+			 -H:ReflectionConfigurationFiles=target/reflect.json \ # <2>
+			 -H:EnableURLProtocols=http \ # <3>
+			 -H:IncludeResources="logback.xml|application.yml|META-INF/services/*.*" \ # <4>
+			 -H:Name=hello-world \ # <5>
+			 -H:Class=hello.world.Application \ # <6>
+			 -H:+ReportUnsupportedElementsAtRuntime \ # <7>
+			 --delay-class-initialization-to-runtime=io.netty.handler.codec.http.HttpObjectEncoder # <8>
+----
+
+<1> The `class-path` argument is used to refer to the Micronaut shaded JAR
+<2> The `-H:ReflectionConfigurationFiles` points GraalVM to the `reflect.json` file needed to run the application
+<3> Micronaut uses the JVM's default URL connection classes. The `-H:EnableURLProtocols` allows using them in GraalVM `nativeimage`.
+<4> The `-H:IncludeResources` argument specifies a regex to dictate which static resources should be included in the image.
+<5> The `-H:Name` argument specifies the name of the native image to be built
+<5> The `-H:Class` argument specifies the Java main class that is the entry point of the application.
+<6> The `-H:+ReportUnsupportedElementsAtRuntime` tells GraalVM to report any `ClassNotFoundException` errors at runtime instead of at build time.
+<7> The `--delay-class-initialization-to-runtime` specifies which classes static initializers should be delayed until runtime. GraalVM by default runs static initializers at build time. That is undesirable is certain cases (particularly with Netty).
+
+
+Once the image has been built you can run the application using the native image name:
+
+.Running the Native Application
+[source,bash]
+----
+$ ./hello-world
+15:15:15.153 [main] INFO  io.micronaut.runtime.Micronaut - Startup completed in 14ms. Server Running: http://localhost:8080
+----
+
+As you can see the advantage of having a native image is startup completes in milliseconds and memory consumption does not include the overhead of the JVM (a native Micronaut application runs with just 20mb of memory).

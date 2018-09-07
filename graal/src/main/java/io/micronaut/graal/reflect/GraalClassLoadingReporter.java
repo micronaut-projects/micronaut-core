@@ -40,7 +40,14 @@ import java.util.stream.Collectors;
  */
 @Experimental
 public class GraalClassLoadingReporter implements ClassLoadingReporter {
-    private static final String REFLECTION_JSON_FILE = "graal.reflection.json";
+    /**
+     * System property that indicates the location of the reflection JSON file.
+     */
+    public static final String REFLECTION_JSON_FILE = "graal.reflection.json";
+    /**
+     * System property that indicates whether class analysis is is enabled.
+     */
+    public static final String GRAAL_CLASS_ANALYSIS = "graal.class.analysis";
     private static final String NETTY_TYPE = "io.netty.channel.socket.nio.NioServerSocketChannel";
     private final Set<String> classes = new ConcurrentSkipListSet<>();
     private final Set<String> beans = new ConcurrentSkipListSet<>();
@@ -57,7 +64,7 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
     @Override
     public boolean isEnabled() {
         String property = System.getProperty("java.vm.name");
-        if (property == null || !property.contains("GraalVM")) {
+        if (!Boolean.getBoolean(GRAAL_CLASS_ANALYSIS) || property == null || !property.contains("GraalVM")) {
             return false;
         } else {
             String f = System.getProperty(REFLECTION_JSON_FILE);
@@ -191,6 +198,7 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
             ObjectMapper mapper = new ObjectMapper();
             ObjectWriter writer = mapper.writer(new DefaultPrettyPrinter());
             try {
+                System.out.println("Writing reflect.json file to destination: " + file);
                 writer.writeValue(file, json);
             } catch (IOException e) {
                 System.err.println("Could not write Graal reflect.json: " + e.getMessage());

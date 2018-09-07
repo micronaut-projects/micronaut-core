@@ -29,6 +29,7 @@ class GradleBuildTokens extends BuildTokens {
 
     static final SCOPE_MAP = [
             compile: 'implementation',
+            runtime: 'runtimeOnly',
             testCompile: 'testImplementation',
     ]
 
