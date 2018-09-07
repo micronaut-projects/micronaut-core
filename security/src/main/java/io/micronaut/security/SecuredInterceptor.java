@@ -30,7 +30,7 @@ import java.util.Optional;
 /**
  * Interceptor implementation for the {@link io.micronaut.security.Secured} annotation.
  *
- * If {@link io.micronaut.security.Secured} annotation is present in a class annoated with {@link io.micronaut.http.annotation.Controller}, the interceptor does nothing because it is handled by {@link io.micronaut.security.rules.SecuredAnnotationRule}.
+ * If {@link io.micronaut.security.Secured} annotation is present in a class annotated with {@link io.micronaut.http.annotation.Controller}, the interceptor does nothing because it is handled by {@link io.micronaut.security.rules.SecuredAnnotationRule}.
  *
  * @author Sergio del Amo
  * @since 1.0
