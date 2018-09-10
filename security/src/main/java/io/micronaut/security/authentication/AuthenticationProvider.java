@@ -28,8 +28,11 @@ import org.reactivestreams.Publisher;
 public interface AuthenticationProvider {
 
     /**
-     * @param authenticationRequest The request
-     * @return A publisher that emits a single response
+     * Authenticates a user with the given request. If a successful authentication is
+     * returned, the object must be an instance of {@link UserDetails}.
+     *
+     * @param authenticationRequest The request to authenticate
+     * @return A publisher that emits 0 or 1 responses
      */
     Publisher<AuthenticationResponse> authenticate(AuthenticationRequest authenticationRequest);
 }
