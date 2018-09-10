@@ -143,6 +143,8 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     String HEROKU = "heroku";
 
     /**
+     * Should respect the order as provided
+     *
      * @return The active environment names
      */
     Set<String> getActiveNames();
