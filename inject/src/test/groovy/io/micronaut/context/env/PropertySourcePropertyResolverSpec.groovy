@@ -31,7 +31,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
 
     @Rule
-    public final EnvironmentVariables environmentVariables = new EnvironmentVariables()
+    private final EnvironmentVariables environmentVariables = new EnvironmentVariables()
 
     @Unroll
     void "test property resolution rules for key #key"() {
