@@ -469,7 +469,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private void visitIntroductionAdviceInterface(TypeElement classElement, AnnotationMetadata typeAnnotationMetadata, AopProxyWriter aopProxyWriter) {
             classElement.asType().accept(new PublicAbstractMethodVisitor<Object, AopProxyWriter>(classElement, modelUtils, elementUtils) {
                 @Override
-                protected void accept(DeclaredType type, ExecutableElement method, AopProxyWriter aopProxyWriter) {
+                protected void accept(DeclaredType type, Element element, AopProxyWriter aopProxyWriter) {
+                    ExecutableElement method = (ExecutableElement) element;
                     Map<String, Object> boundTypes = genericUtils.resolveBoundTypes(type);
                     ExecutableElementParamInfo params = populateParameterData(method);
                     Object owningType = modelUtils.resolveTypeReference(method.getEnclosingElement());
@@ -681,7 +682,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 returnType.accept(new PublicMethodVisitor<Object, AopProxyWriter>() {
                     @Override
-                    protected void accept(DeclaredType type, ExecutableElement method, AopProxyWriter aopProxyWriter) {
+                    protected void accept(DeclaredType type, Element element, AopProxyWriter aopProxyWriter) {
+                        ExecutableElement method = (ExecutableElement) element;
                         ExecutableElementParamInfo params = populateParameterData(method);
                         Object owningType = modelUtils.resolveTypeReference(method.getEnclosingElement());
                         if (owningType == null) {
@@ -740,7 +742,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 returnType.accept(new PublicMethodVisitor<Object, BeanDefinitionWriter>() {
                     @Override
-                    protected void accept(DeclaredType type, ExecutableElement method, BeanDefinitionWriter beanWriter) {
+                    protected void accept(DeclaredType type, Element element, BeanDefinitionWriter beanWriter) {
+                        ExecutableElement method = (ExecutableElement) element;
                         ExecutableElementParamInfo params = populateParameterData(method);
                         Object owningType = modelUtils.resolveTypeReference(method.getEnclosingElement());
                         if (owningType == null) {
@@ -931,12 +934,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             boolean first = true;
 
                             @Override
-                            protected void accept(DeclaredType type, ExecutableElement targetMethod, AopProxyWriter aopProxyWriter) {
+                            protected void accept(DeclaredType type, Element element, AopProxyWriter aopProxyWriter) {
                                 if (!first) {
                                     error(method, "Interface to adapt [" + typeToImplement + "] is not a SAM type. More than one abstract method declared.");
                                     return;
                                 }
                                 first = false;
+                                ExecutableElement targetMethod = (ExecutableElement) element;
                                 List<? extends VariableElement> targetParameters = targetMethod.getParameters();
                                 List<? extends VariableElement> sourceParameters = method.getParameters();
 
@@ -1381,7 +1385,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             PublicMethodVisitor visitor = new PublicMethodVisitor() {
                 @Override
-                protected void accept(DeclaredType type, ExecutableElement method, Object o) {
+                protected void accept(DeclaredType type, Element element, Object o) {
+                    ExecutableElement method = (ExecutableElement) element;
                     List<? extends VariableElement> params = method.getParameters();
                     String methodName = method.getSimpleName().toString();
                     String prefix = getMethodPrefix(prefixes, methodName);
@@ -1432,14 +1437,19 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 @SuppressWarnings("MagicNumber")
                 @Override
-                protected boolean isAcceptable(ExecutableElement executableElement) {
+                protected boolean isAcceptable(Element element) {
                     // ignore deprecated methods
-                    if (annotationUtils.hasStereotype(executableElement, Deprecated.class)) {
+                    if (annotationUtils.hasStereotype(element, Deprecated.class)) {
                         return false;
                     }
-                    Set<Modifier> modifiers = executableElement.getModifiers();
-                    int paramCount = executableElement.getParameters().size();
-                    return modifiers.contains(Modifier.PUBLIC) && ((paramCount > 0 && paramCount < 3) || allowZeroArgs && paramCount == 0) && isPrefixedWith(executableElement, prefixes);
+                    Set<Modifier> modifiers = element.getModifiers();
+                    if (element.getKind() == ElementKind.METHOD) {
+                        ExecutableElement method = (ExecutableElement) element;
+                        int paramCount = method.getParameters().size();
+                        return modifiers.contains(Modifier.PUBLIC) && ((paramCount > 0 && paramCount < 3) || allowZeroArgs && paramCount == 0) && isPrefixedWith(method, prefixes);
+                    } else {
+                        return false;
+                    }
                 }
 
                 private boolean isPrefixedWith(Element enclosedElement, List<String> prefixes) {
