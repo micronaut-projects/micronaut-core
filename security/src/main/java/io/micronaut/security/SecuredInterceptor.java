@@ -23,7 +23,6 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.security.exceptions.MissingRoleException;
 import io.micronaut.security.exceptions.NotAuthenticatedException;
 import io.micronaut.security.rules.SecurityRule;
-import io.micronaut.security.utils.DefaultSecurityService;
 import io.micronaut.security.utils.SecurityService;
 
 import java.util.Arrays;

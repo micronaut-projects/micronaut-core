@@ -19,7 +19,6 @@ package io.micronaut.security.authentication;
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import java.io.Serializable;
-import java.util.Objects;
 
 /**
  *
@@ -104,7 +103,9 @@ public class UsernamePasswordCredentials implements Serializable, Authentication
 
         UsernamePasswordCredentials that = (UsernamePasswordCredentials) o;
 
-        if (username != null ? !username.equals(that.username) : that.username != null) return false;
+        if (username != null ? !username.equals(that.username) : that.username != null) {
+            return false;
+        }
         return password != null ? password.equals(that.password) : that.password == null;
     }
 
