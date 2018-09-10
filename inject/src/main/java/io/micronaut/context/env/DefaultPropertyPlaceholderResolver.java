@@ -43,7 +43,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     public static final String SUFFIX = "}";
 
     private static final Pattern ESCAPE_SEQUENCE = Pattern.compile("(.+)?:`([^`]+?)`");
-    private static final Pattern ENVIRONMENT_VAR_SEQUENCE = Pattern.compile("^[\\p{Lu}_]+");
+    private static final Pattern ENVIRONMENT_VAR_SEQUENCE = Pattern.compile("^[\\p{Lu}_{0-9}]+");
     private static final char COLON = ':';
 
     private final PropertyResolver environment;

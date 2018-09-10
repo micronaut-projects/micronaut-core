@@ -18,6 +18,8 @@ package io.micronaut.context.env
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.value.MapPropertyResolver
 import io.micronaut.core.value.PropertyResolver
+import org.junit.Rule
+import org.junit.contrib.java.lang.system.EnvironmentVariables
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -27,6 +29,9 @@ import spock.lang.Unroll
  */
 class PropertySourcePropertyResolverSpec extends Specification {
 
+
+    @Rule
+    public final EnvironmentVariables environmentVariables = new EnvironmentVariables()
 
     @Unroll
     void "test property resolution rules for key #key"() {
@@ -84,6 +89,8 @@ class PropertySourcePropertyResolverSpec extends Specification {
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
                 PropertySource.of("test", [(property): value] + values)
         )
+        environmentVariables["FOO_BAR"] = "foo bar"
+        environmentVariables["FOO_BAR_1"] = "foo bar 1"
 
         expect:
 
@@ -99,14 +106,15 @@ class PropertySourcePropertyResolverSpec extends Specification {
         'my.property' | '${not.there:foo.bar:50}'                            | 'my.property' | String  | '10'
         'my.property' | '${not.there:also.not.there:50}'                     | 'my.property' | String  | '50'
         'my.property' | '${not.there:also.not.there:}'                       | 'my.property' | String  | ''
-        'my.property' | '${not.there:USER:50}'                               | 'my.property' | String  | System.getenv('USER')
+        'my.property' | '${not.there:FOO_BAR:50}'                            | 'my.property' | String  | 'foo bar'
         'my.property' | '${foo.bar} + ${not.there:50} + ${foo.bar}'          | 'my.property' | String  | '10 + 50 + 10'
         'my.property' | '${foo.bar}'                                         | 'my.property' | String  | '10'
         'my.property' | '${not.there:50}'                                    | 'my.property' | String  | '50'
         'my.property' | '${foo.bar} + ${foo.bar}'                            | 'my.property' | String  | '10 + 10'
         'my.property' | '${foo.bar[0]}'                                      | 'my.property' | List    | ['10']
         'my.property' | '${foo.bar[0]}'                                      | 'my.property' | Integer | 10
-        'my.property' | '${USER}'                                            | 'my.property' | String  | System.getenv('USER')
+        'my.property' | '${FOO_BAR}'                                         | 'my.property' | String  | 'foo bar'
+        'my.property' | '${FOO_BAR_1}'                                       | 'my.property' | String  | 'foo bar 1'
         'my.property' | 'bolt://${NEO4J_HOST:localhost}:${NEO4J_PORT:32781}' | 'my.property' | String  | 'bolt://localhost:32781'
         'my.property' | '${bar}'                                             | 'my.property' | Integer | 30
     }
