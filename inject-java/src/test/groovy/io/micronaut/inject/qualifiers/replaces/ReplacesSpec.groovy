@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.qualifiers.replaces
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import spock.lang.Specification
@@ -36,5 +37,65 @@ class ReplacesSpec extends Specification {
         !b.all.any() { it instanceof A1 }
         b.all.any() { it instanceof A2 }
         b.a instanceof A2
+    }
+
+    void "test that introduction advice can be replaced"() {
+        given:
+        def ctx = ApplicationContext.run()
+
+        when:
+        IntroductionOperations ops = ctx.getBean(IntroductionOperations)
+
+        then:
+        ops instanceof IntroductionReplacement
+        ctx.getBeansOfType(IntroductionOperations).size() == 1
+
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "test that classes with around advice can be replaced"() {
+        given:
+        def ctx = ApplicationContext.run()
+
+        when:
+        AroundOps ops = ctx.getBean(AroundOps)
+
+        then:
+        ops instanceof AroundReplacement
+        ctx.getBeansOfType(AroundOps).size() == 1
+        ctx.getBeansOfType(AroundOps).iterator().next()  == ops
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "test replacing an entire factory"() {
+        given:
+        def ctx = ApplicationContext.run()
+
+        when:
+        C c = ctx.getBean(C)
+
+        then:
+        c instanceof C2
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "test replacing a factory method"() {
+        given:
+        def ctx = ApplicationContext.run()
+
+        when:
+        D d = ctx.getBean(D)
+
+        then:
+        d instanceof D2
+
+        cleanup:
+        ctx.close()
     }
 }

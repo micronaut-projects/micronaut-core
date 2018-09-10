@@ -20,6 +20,7 @@ import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -36,6 +37,7 @@ import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Put;
 import io.micronaut.http.annotation.Trace;
+import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 
@@ -239,6 +241,10 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         actionAnn.ifPresent(annotationClass -> {
                 BiConsumer<BeanDefinition, ExecutableMethod> handler = httpMethodsHandlers.get(annotationClass);
                 if (handler != null) {
+                    ClassLoadingReporter.reportBeanPresent(method.getReturnType().getType());
+                    for (Class argumentType : method.getArgumentTypes()) {
+                        ClassLoadingReporter.reportBeanPresent(argumentType);
+                    }
                     handler.accept(beanDefinition, method);
                 }
             }
@@ -246,19 +252,17 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
     }
 
     private String resolveUri(BeanDefinition bean, String value, ExecutableMethod method, UriNamingStrategy uriNamingStrategy) {
-        String rootUri = uriNamingStrategy.resolveUri(bean);
+        UriTemplate rootUri = UriTemplate.of(uriNamingStrategy.resolveUri(bean));
         if (StringUtils.isNotEmpty(value)) {
-            if (value.length() == 1 && value.charAt(0) == '/') {
-                return rootUri;
+            boolean isFirstCharSlash = value.charAt(0) == '/';
+            boolean isFirstCharVar = value.charAt(0) == '{';
+            if (value.length() == 1 && isFirstCharSlash) {
+                return rootUri.toString();
             } else {
-                if (value.charAt(0) != '/' && !value.startsWith("{/")) {
-                    return rootUri + "/" + value;
-                } else {
-                    return rootUri + value;
-                }
+                return rootUri.nest(isFirstCharSlash || isFirstCharVar ? value : '/' + value).toString();
             }
         } else {
-            return rootUri + uriNamingStrategy.resolveUri(method.getMethodName());
+            return rootUri.nest(uriNamingStrategy.resolveUri(method.getMethodName())).toString();
         }
     }
 }

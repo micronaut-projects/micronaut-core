@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-package io.micronaut.configuration.metrics.binder.system;
+package io.micronaut.configuration.metrics.binder.jvm;
 
-import io.micrometer.core.instrument.binder.system.FileDescriptorMetrics;
-import io.micrometer.core.instrument.binder.system.ProcessorMetrics;
-import io.micrometer.core.instrument.binder.system.UptimeMetrics;
+import io.micrometer.core.instrument.binder.jvm.ClassLoaderMetrics;
+import io.micrometer.core.instrument.binder.jvm.JvmGcMetrics;
+import io.micrometer.core.instrument.binder.jvm.JvmMemoryMetrics;
+import io.micrometer.core.instrument.binder.jvm.JvmThreadMetrics;
 import io.micronaut.configuration.metrics.annotation.RequiresMetrics;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
@@ -30,52 +31,61 @@ import javax.inject.Singleton;
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS;
 
 /**
- * Binder factory that will create the system metrics beans.
+ * Binder factory that will create the jvm metrics beans.
  *
  * @author Christian Oestreich
  * @since 1.0
  */
 @Factory
 @RequiresMetrics
-public class SystemMeterRegistryBinder {
+@Requires(property = MICRONAUT_METRICS_BINDERS + ".jvm.enabled", value = "true", defaultValue = "true")
+public class JvmMeterRegistryBinderFactory {
 
     /**
-     * Uptime metrics bean.
+     * JVM GC metrics bean.
      *
-     * @return uptimeMetrics bean
+     * @return jvmGcMetrics
      */
     @Bean
-    @Singleton
     @Primary
-    @Requires(property = MICRONAUT_METRICS_BINDERS + ".uptime.enabled", value = "true", defaultValue = "true")
-    public UptimeMetrics uptimeMetrics() {
-        return new UptimeMetrics();
+    @Singleton
+    public JvmGcMetrics jvmGcMetrics() {
+        return new JvmGcMetrics();
     }
 
     /**
-     * Processor metrics bean.
+     * JVM Memory metrics bean.
      *
-     * @return processorMetrics bean
+     * @return jvmMemoryMetrics
      */
     @Bean
-    @Singleton
     @Primary
-    @Requires(property = MICRONAUT_METRICS_BINDERS + ".processor.enabled", value = "true", defaultValue = "true")
-    public ProcessorMetrics processorMetrics() {
-        return new ProcessorMetrics();
+    @Singleton
+    public JvmMemoryMetrics jvmMemoryMetrics() {
+        return new JvmMemoryMetrics();
     }
 
     /**
-     * Files metrics bean.
+     * JVM Thread metrics bean.
      *
-     * @return fileDescriptorMetrics bean
+     * @return jvmThreadMetrics
      */
     @Bean
-    @Singleton
     @Primary
-    @Requires(property = MICRONAUT_METRICS_BINDERS + ".files.enabled", value = "true", defaultValue = "true")
-    public FileDescriptorMetrics fileDescriptorMetrics() {
-        return new FileDescriptorMetrics();
+    @Singleton
+    public JvmThreadMetrics jvmThreadMetrics() {
+        return new JvmThreadMetrics();
     }
 
+    /**
+     * JVM Class loader metrics bean.
+     *
+     * @return classLoaderMetrics
+     */
+    @Bean
+    @Primary
+    @Singleton
+    public ClassLoaderMetrics classLoaderMetrics() {
+        return new ClassLoaderMetrics();
+    }
 }

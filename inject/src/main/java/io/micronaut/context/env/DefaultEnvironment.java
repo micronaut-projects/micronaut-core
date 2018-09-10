@@ -182,6 +182,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     public DefaultEnvironment addPropertySource(PropertySource propertySource) {
         propertySources.put(propertySource.getName(), propertySource);
         if (isRunning() && !reading.get()) {
+            resetCaches();
             processPropertySource(propertySource, PropertySource.PropertyConvention.JAVA_PROPERTIES);
         }
         return this;
@@ -259,6 +260,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             for (int i = 0; i < catalog.length; i++) {
                 catalog[i] = null;
             }
+            resetCaches();
         }
         return this;
     }

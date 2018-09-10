@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
@@ -162,6 +163,11 @@ public class AnnotatedFunctionRouteBuilder
                     LOG.debug("Created Route to Function: {}", route);
                 }
 
+                ClassLoadingReporter.reportBeanPresent(method.getReturnType().getType());
+                for (Class argumentType : method.getArgumentTypes()) {
+                    ClassLoadingReporter.reportBeanPresent(argumentType);
+                }
+                
                 String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
                 availableFunctions.put(functionName, URI.create(functionPath));
 

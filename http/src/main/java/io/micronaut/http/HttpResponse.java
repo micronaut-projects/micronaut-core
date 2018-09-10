@@ -201,7 +201,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#ACCEPTED} response with an empty body and a {@link HttpHeaders#LOCATION} header
+     * Return an {@link HttpStatus#ACCEPTED} response with an empty body and a {@link HttpHeaders#LOCATION} header.
      *
      * @param location the location in which the new resource will be available
      * @param <T>      The response type
