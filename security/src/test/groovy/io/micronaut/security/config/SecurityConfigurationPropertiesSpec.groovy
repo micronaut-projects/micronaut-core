@@ -16,6 +16,7 @@
 package io.micronaut.security.config
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.http.HttpMethod
@@ -48,7 +49,7 @@ class SecurityConfigurationPropertiesSpec extends Specification {
                 "micronaut.security.enabled": true,
                 "micronaut.security.interceptUrlMap": [
                         [httpMethod: 'FOO', pattern: '/health', access: ['isAnonymous()']]
-                ]], "test")
+                ]], Environment.TEST)
 
         when:
         ctx.getBean(SecurityConfigurationProperties)
@@ -67,7 +68,7 @@ class SecurityConfigurationPropertiesSpec extends Specification {
                 "micronaut.security.enabled": true,
                 "micronaut.security.interceptUrlMap": [
                         [httpMethod: 'POST', access: ['isAnonymous()']]
-                ]], "test")
+                ]], Environment.TEST)
 
         when:
         ctx.getBean(SecurityConfigurationProperties)
@@ -89,7 +90,7 @@ class SecurityConfigurationPropertiesSpec extends Specification {
                         [pattern: '/health', access: 'isAnonymous()'],
                         [httpMethod: 'POST', pattern: '/health', access: ['isAnonymous()']],
                         [httpMethod: 'post', pattern: '/health', access: ['isAnonymous()']]
-                ]], "test")
+                ]], Environment.TEST)
 
         when:
         SecurityConfigurationProperties config = ctx.getBean(SecurityConfigurationProperties)

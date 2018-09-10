@@ -1,6 +1,7 @@
 package io.micronaut.management.endpoint
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
@@ -18,7 +19,7 @@ class EndpointsBasePathSpec extends Specification {
                     'spec.name': getClass().simpleName,
                     'endpoints.all.path': '/admin',
                     'endpoints.all.enabled': true
-            ], "test")
+            ], Environment.TEST)
 
     @AutoCleanup
     @Shared

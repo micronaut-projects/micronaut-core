@@ -16,6 +16,7 @@
 package io.micronaut.security.rules.ipPatterns
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
@@ -32,7 +33,7 @@ class IpAuthorizationRejectedSpec extends Specification {
             'micronaut.security.enabled': true,
             'micronaut.security.ipPatterns': ['10.10.0.48', '127.0.0.*']
 
-    ], "test")
+    ], Environment.TEST)
 
     @Shared
     @AutoCleanup
