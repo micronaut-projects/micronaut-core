@@ -58,7 +58,7 @@ public interface LdapGroupProcessor {
      * Transform the group into the format required.
      *
      * @param group The group to process
-     * @return The modified group
+     * @return An optional modified group
      */
     default Optional<String> processGroup(String group) {
         return Optional.of(group);

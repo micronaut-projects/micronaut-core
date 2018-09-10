@@ -1,0 +1,1 @@
+The LDAP authentication in Micronaut supports configuration of one or more LDAP servers to authenticate with. Each server has it's own settings and can be enabled or disabled.

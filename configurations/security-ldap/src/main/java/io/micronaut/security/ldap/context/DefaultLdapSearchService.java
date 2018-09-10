@@ -52,6 +52,17 @@ public class DefaultLdapSearchService implements LdapSearchService {
             ctrls.setSearchScope(SearchControls.SUBTREE_SCOPE);
         }
         NamingEnumeration<SearchResult> results = managerContext.search(settings.getBase(), settings.getFilter(), settings.getArguments(), ctrls);
+        return createResults(results);
+    }
+
+    /**
+     * Builds {@link LdapSearchResult} from the LDAP results.
+     *
+     * @param results The LDAP results
+     * @return The list of {@link LdapSearchResult}
+     * @throws NamingException If an error occurs
+     */
+    protected  List<LdapSearchResult> createResults(NamingEnumeration<SearchResult> results) throws NamingException {
         List<LdapSearchResult> searchResults = new ArrayList<>();
         while (results.hasMore()) {
             SearchResult result = results.next();
