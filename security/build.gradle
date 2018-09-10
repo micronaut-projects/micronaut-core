@@ -8,8 +8,7 @@ dependencies {
     compile project(":management")
     compile project(":http")
 
-    compileOnly 'javax.annotation:jsr250-api:1.0'
-    testCompileOnly 'javax.annotation:jsr250-api:1.0'
+    compile 'javax.annotation:jsr250-api:1.0'
     
     compile project(":http-server")
     testCompile project(":http-client")
