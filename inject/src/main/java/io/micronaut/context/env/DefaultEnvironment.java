@@ -123,8 +123,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @SuppressWarnings("MagicNumber")
     public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... names) {
         super(conversionService);
-        Set<String> specifiedNames = new HashSet<>(3);
-        specifiedNames.addAll(CollectionUtils.setOf(names));
+        Set<String> specifiedNames = new LinkedHashSet<>(3);
+        specifiedNames.addAll(Arrays.asList(names));
 
         if (!specifiedNames.contains(Environment.FUNCTION) && shouldDeduceEnvironments()) {
             EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage();
