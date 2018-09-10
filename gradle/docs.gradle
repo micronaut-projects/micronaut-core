@@ -87,7 +87,8 @@ task mergeConfigProps() {
     outputs.file( "$project.projectDir/src/main/docs/guide/appendix/propertyReference.adoc" )
     doLast {
         outputs.files.singleFile.withOutputStream { out ->
-            for ( file in inputs.files ) file.withInputStream { out << it << '\n' }
+            List<File> files = new ArrayList<>(inputs.files.files).sort { File f -> f.name }
+            for ( file in files ) file.withInputStream { out << it << '\n' }
         }
     }
 }

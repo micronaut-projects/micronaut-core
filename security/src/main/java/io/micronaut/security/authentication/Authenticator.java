@@ -56,7 +56,9 @@ public class Authenticator {
         if (this.authenticationProviders == null) {
             return Flowable.empty();
         }
-        System.out.println(authenticationProviders.stream().map(AuthenticationProvider::getClass).map(Class::getName).collect(Collectors.joining()));
+        if (LOG.isDebugEnabled()) {
+            LOG.debug(authenticationProviders.stream().map(AuthenticationProvider::getClass).map(Class::getName).collect(Collectors.joining()));
+        }
         Iterator<AuthenticationProvider> providerIterator = authenticationProviders.iterator();
         if (providerIterator.hasNext()) {
             Flowable<AuthenticationProvider> providerFlowable = Flowable.just(providerIterator.next());

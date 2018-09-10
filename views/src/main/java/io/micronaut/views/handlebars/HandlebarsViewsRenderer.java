@@ -27,6 +27,8 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.views.ViewsConfiguration;
 import io.micronaut.views.ViewsRenderer;
 import io.micronaut.views.exceptions.ViewRenderingException;
+
+import javax.annotation.Nullable;
 import javax.inject.Singleton;
 
 /**
@@ -65,7 +67,7 @@ public class HandlebarsViewsRenderer implements ViewsRenderer {
     }
 
     @Override
-    public Writable render(String viewName, Object data) {
+    public Writable render(String viewName, @Nullable Object data) {
         return (writer) -> {
             String location = viewLocation(viewName);
             try {

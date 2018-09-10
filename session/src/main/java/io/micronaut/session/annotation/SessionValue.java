@@ -43,4 +43,10 @@ public @interface SessionValue {
      */
     @AliasFor(annotation = Bindable.class, member = "value")
     String value() default "";
+
+    /**
+     * @see Bindable#defaultValue()
+     */
+    @AliasFor(annotation = Bindable.class, member = "defaultValue")
+    String defaultValue() default "";
 }

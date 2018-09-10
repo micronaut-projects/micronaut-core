@@ -70,6 +70,11 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
     Class<T> getBeanType();
 
     /**
+     * @return The type that declares this definition, null if not applicable.
+     */
+    Optional<Class<?>> getDeclaringType();
+
+    /**
      * The single concrete constructor that is an injection point for creating the bean.
      *
      * @return The constructor injection point

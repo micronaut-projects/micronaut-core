@@ -28,6 +28,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.beans.BeanMap;
+import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
@@ -137,14 +138,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 new IllegalStateException("Client advice called from type that is not annotated with @Client: " + context)
         );
 
-        for (MutableArgumentValue<?> argumentValue : context.getParameters().values()) {
-            if (argumentValue.getValue() == null && !argumentValue.isAnnotationPresent(Nullable.class)) {
-                throw new IllegalArgumentException(
-                    String.format("Null values are not allowed to be passed to client methods (%s). Add @javax.validation.Nullable if that is the desired behavior", context.getExecutableMethod().toString())
-                );
-            }
-        }
-
         HttpClient httpClient = getClient(context, clientAnnotation);
         Optional<Class<? extends Annotation>> httpMethodMapping = context.getAnnotationTypeByStereotype(HttpMethodMapping.class);
         if (context.hasStereotype(HttpMethodMapping.class) && httpClient != null) {
@@ -193,8 +186,21 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             for (Argument argument : arguments) {
                 String argumentName = argument.getName();
                 AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+                MutableArgumentValue<?> value = parameters.get(argumentName);
+                Object definedValue = value.getValue();
+
+                if (definedValue == null) {
+                    definedValue = argument.getAnnotationMetadata().getValue(Bindable.class, "defaultValue", String.class).orElse(null);
+                }
+
+                if (definedValue == null && !argument.isAnnotationPresent(Nullable.class)) {
+                    throw new IllegalArgumentException(
+                            String.format("Null values are not allowed to be passed to client methods (%s). Add @javax.validation.Nullable if that is the desired behavior", context.getExecutableMethod().toString())
+                    );
+                }
+
                 if (argument.isAnnotationPresent(Body.class)) {
-                    body = parameters.get(argumentName).getValue();
+                    body = definedValue;
                     break;
                 } else if (annotationMetadata.isAnnotationPresent(Header.class)) {
 
@@ -202,25 +208,22 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     if (StringUtils.isEmpty(headerName)) {
                         headerName = NameUtils.hyphenate(argumentName);
                     }
-                    MutableArgumentValue<?> value = parameters.get(argumentName);
                     String finalHeaderName = headerName;
-                    ConversionService.SHARED.convert(value.getValue(), String.class)
+                    ConversionService.SHARED.convert(definedValue, String.class)
                         .ifPresent(o -> headers.put(finalHeaderName, o));
                 } else if (annotationMetadata.isAnnotationPresent(CookieValue.class)) {
-                    Object cookieValue = parameters.get(argumentName).getValue();
                     String cookieName = annotationMetadata.getValue(CookieValue.class, String.class).orElse(null);
                     if (StringUtils.isEmpty(cookieName)) {
                         cookieName = argumentName;
                     }
                     String finalCookieName = cookieName;
 
-                    ConversionService.SHARED.convert(cookieValue, String.class)
+                    ConversionService.SHARED.convert(definedValue, String.class)
                         .ifPresent(o -> cookies.add(new NettyCookie(finalCookieName, o)));
 
                 } else if (annotationMetadata.isAnnotationPresent(QueryValue.class)) {
                     String parameterName = annotationMetadata.getValue(QueryValue.class, String.class).orElse(null);
-                    MutableArgumentValue<?> value = parameters.get(argumentName);
-                    ConversionService.SHARED.convert(value.getValue(), String.class).ifPresent(o -> {
+                    ConversionService.SHARED.convert(definedValue, String.class).ifPresent(o -> {
                         if (!StringUtils.isEmpty(parameterName)) {
                             paramMap.put(parameterName, o);
                             queryParams.put(parameterName, o);
@@ -492,8 +495,13 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         if (StringUtils.isEmpty(clientId)) {
             return null;
         }
+        String path = clientAnn.get("path", String.class).orElse(null);
+        String clientKey = clientId;
+        if (StringUtils.isNotEmpty(path)) {
+            clientKey = clientKey + path;
+        }
 
-        return clients.computeIfAbsent(clientId, integer -> {
+        return clients.computeIfAbsent(clientKey, integer -> {
             HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(clientId)).orElse(null);
             if (null != clientBean) {
                 return clientBean;
@@ -505,7 +513,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 );
 
             String contextPath = null;
-            String path = clientAnn.get("path", String.class).orElse(null);
             if (StringUtils.isNotEmpty(path)) {
                 contextPath = path;
             } else if (StringUtils.isNotEmpty(clientId) && clientId.startsWith("/")) {
