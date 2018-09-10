@@ -9,7 +9,7 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-class SecurityUtilsSpec extends Specification {
+class SecurityServiceSpec extends Specification {
 
     static final SPEC_NAME_PROPERTY = 'spec.name'
     static  final String controllerPath = "/securityutils"
@@ -17,7 +17,7 @@ class SecurityUtilsSpec extends Specification {
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-            (SPEC_NAME_PROPERTY): SecurityUtilsSpec.class.simpleName,
+            (SPEC_NAME_PROPERTY): SecurityServiceSpec.class.simpleName,
             'micronaut.security.enabled': true,
     ], Environment.TEST)
 

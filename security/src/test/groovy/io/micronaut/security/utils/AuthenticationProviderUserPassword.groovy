@@ -13,7 +13,7 @@ import javax.inject.Singleton
 
 @Singleton
 @Requires(env = Environment.TEST)
-@Requires(property = SecurityUtilsSpec.SPEC_NAME_PROPERTY, value = 'SecurityUtilsSpec')
+@Requires(property = SecurityServiceSpec.SPEC_NAME_PROPERTY, value = 'SecurityServiceSpec')
 class AuthenticationProviderUserPassword implements AuthenticationProvider {
 
     @Override

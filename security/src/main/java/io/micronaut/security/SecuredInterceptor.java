@@ -23,7 +23,9 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.security.exceptions.MissingRoleException;
 import io.micronaut.security.exceptions.NotAuthenticatedException;
 import io.micronaut.security.rules.SecurityRule;
-import io.micronaut.security.utils.SecurityUtils;
+import io.micronaut.security.utils.DefaultSecurityService;
+import io.micronaut.security.utils.SecurityService;
+
 import java.util.Arrays;
 import java.util.Optional;
 
@@ -38,6 +40,16 @@ import java.util.Optional;
 @Singleton
 public class SecuredInterceptor implements MethodInterceptor<Object, Object> {
 
+    protected final SecurityService securityService;
+
+    /**
+     *
+     * @param securityService Bean with security utility methods.
+     */
+    public SecuredInterceptor(SecurityService securityService) {
+        this.securityService = securityService;
+    }
+
     /**
      *
      * @param context The context
@@ -45,14 +57,14 @@ public class SecuredInterceptor implements MethodInterceptor<Object, Object> {
      * @throws MissingRoleException when the user does not have any of the required roles
      * @throws NotAuthenticatedException when the user is not authenticated and @Secured values require authentication
      */
-    @Override
+                       @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         if (context.hasDeclaredAnnotation(Secured.class)) {
             if (context.findAnnotation(Controller.class).isPresent()) {
                 return context.proceed();
             }
             String[] roles = context.getValue(Secured.class, String[].class).orElse(null);
-            ProceedResult result = proceedResult(roles, SecurityUtils::isAuthenticated, SecurityUtils::hasRole);
+            ProceedResult result = proceedResult(roles, securityService::isAuthenticated, securityService::hasRole);
             switch (result) {
                 case FORBIDDEN:
                     StringBuilder sb = new StringBuilder();

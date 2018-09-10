@@ -20,23 +20,26 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.filters.SecurityFilter;
 
+import javax.inject.Singleton;
 import java.security.Principal;
 import java.util.Optional;
 import java.util.List;
 
 /**
- * SecurityUtils.
+ * DefaultSecurityService.
  *
  * @author Sergio del Amo
  * @since 1.0
  */
-public class SecurityUtils {
+@Singleton
+public class DefaultSecurityService implements SecurityService {
     /**
      * Get the username of the current user.
      *
      * @return the username of the current user
      */
-    public static Optional<String> username() {
+    @Override
+    public Optional<String> username() {
         return getAuthentication().map(Principal::getName);
     }
 
@@ -45,7 +48,8 @@ public class SecurityUtils {
      *
      * @return the {@link io.micronaut.security.authentication.Authentication} of the current user
      */
-    public static Optional<Authentication> getAuthentication() {
+    @Override
+    public Optional<Authentication> getAuthentication() {
         return ServerRequestContext.currentRequest().flatMap(request -> request.getAttribute(SecurityFilter.AUTHENTICATION, Authentication.class));
     }
 
@@ -55,7 +59,8 @@ public class SecurityUtils {
      *
      * @return true if the user is authenticated, false otherwise
      */
-    public static boolean isAuthenticated() {
+    @Override
+    public boolean isAuthenticated() {
         return getAuthentication().isPresent();
     }
 
@@ -65,7 +70,8 @@ public class SecurityUtils {
      * @param role the role to check
      * @return true if the current user has the role, false otherwise
      */
-    public static boolean hasRole(String role) {
+    @Override
+    public boolean hasRole(String role) {
         return hasRole(role, "roles");
     }
 
@@ -73,10 +79,11 @@ public class SecurityUtils {
      * If the current user has a specific role.
      *
      * @param role the authority to check
-     * @param  rolesKey The key to be used in the authentications attributes. E.g. "roles".
+     * @param  rolesKey The map key to be used in the authentications attributes. E.g. "roles".
      * @return true if the current user has the authority, false otherwise
      */
-    public static boolean hasRole(String role, String rolesKey) {
+    @Override
+    public boolean hasRole(String role, String rolesKey) {
         if (role == null || rolesKey == null) {
             return false;
         }

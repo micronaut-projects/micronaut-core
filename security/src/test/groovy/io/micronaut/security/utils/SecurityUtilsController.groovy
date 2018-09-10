@@ -10,22 +10,28 @@ import io.micronaut.security.Secured
 import javax.annotation.Nullable
 
 @Requires(env = Environment.TEST)
-@Requires(property = SecurityUtilsSpec.SPEC_NAME_PROPERTY, value = 'SecurityUtilsSpec')
-@Controller(SecurityUtilsSpec.controllerPath)
+@Requires(property = SecurityServiceSpec.SPEC_NAME_PROPERTY, value = 'SecurityServiceSpec')
+@Controller(SecurityServiceSpec.controllerPath)
 class SecurityUtilsController {
+
+    private final SecurityService securityService
+
+    SecurityUtilsController(SecurityService securityService) {
+        this.securityService = securityService
+    }
 
     @Produces(MediaType.TEXT_PLAIN)
     @Secured("isAnonymous()")
     @Get("/authenticated")
     boolean authenticated() {
-        SecurityUtils.isAuthenticated()
+        securityService.isAuthenticated()
     }
 
     @Produces(MediaType.TEXT_PLAIN)
     @Secured("isAnonymous()")
     @Get("/currentuser")
     String currentuser() {
-        Optional<String> str = SecurityUtils.username()
+        Optional<String> str = securityService.username()
         str.map { m -> m}.orElse("Anonymous")
     }
 
@@ -33,6 +39,6 @@ class SecurityUtilsController {
     @Secured("isAnonymous()")
     @Get("/roles{?role}")
     Boolean roles(@Nullable String role) {
-        SecurityUtils.hasRole(role)
+        securityService.hasRole(role)
     }
 }
