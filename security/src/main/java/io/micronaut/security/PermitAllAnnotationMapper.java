@@ -38,7 +38,7 @@ public class PermitAllAnnotationMapper implements AnnotationMapper<PermitAll> {
 
     @Override
     public List<AnnotationValue<?>> map(AnnotationValue<PermitAll> annotation) {
-        List<AnnotationValue<?>> annotationValues = new ArrayList<>(3);
+        List<AnnotationValue<?>> annotationValues = new ArrayList<>(1);
         annotationValues.add(
                 AnnotationValue.builder(Secured.class)
                                 .value(SecurityRule.IS_ANONYMOUS)

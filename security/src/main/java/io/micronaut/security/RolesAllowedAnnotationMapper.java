@@ -38,7 +38,7 @@ public class RolesAllowedAnnotationMapper implements AnnotationMapper<RolesAllow
     public List<AnnotationValue<?>> map(AnnotationValue<RolesAllowed> annotation) {
         String[] values = annotation.get("value", String[].class).orElse(new String[0]);
 
-        List<AnnotationValue<?>> annotationValues = new ArrayList<>(3);
+        List<AnnotationValue<?>> annotationValues = new ArrayList<>(1);
         annotationValues.add(
                 AnnotationValue.builder(Secured.class)
                                 .values(values)
