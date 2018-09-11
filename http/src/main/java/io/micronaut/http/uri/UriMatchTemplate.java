@@ -194,6 +194,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         /**
          * @param uri       The URI
          * @param variables The variables
+         * @param variableModifiers The variable modifiers
          */
         protected DefaultUriMatchInfo(String uri, Map<String, Object> variables, Map<String, Character> variableModifiers) {
             this.uri = uri;
@@ -212,8 +213,9 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         }
 
         @Override
-        public Map<String, Character> getVariableModifiers() {
-            return variableModifiers;
+        public boolean isExploded(String variable) {
+            Character c = variableModifiers.get(variable);
+            return c != null && c == '*';
         }
 
         @Override
