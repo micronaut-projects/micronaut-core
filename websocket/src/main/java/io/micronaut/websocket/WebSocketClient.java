@@ -19,6 +19,7 @@ package io.micronaut.websocket;
 import io.micronaut.websocket.annotation.ClientWebSocket;
 import org.reactivestreams.Publisher;
 import java.net.URI;
+import java.util.Map;
 
 
 /**
@@ -40,6 +41,20 @@ public interface WebSocketClient extends AutoCloseable {
     <T extends AutoCloseable> Publisher<T> connect(
             Class<T> clientEndpointType,
             URI uri
+    );
+
+    /**
+     * Connect the given client endpoint type. Unlike {@link #connect(Class, URI)} this method will the value declared within the {@link ClientWebSocket} as the URI
+     * and expand the URI with the given parameters.
+     *
+     * @param clientEndpointType The endpoint type. Should be a class annotated with {@link ClientWebSocket}
+     * @param parameters The URI parameters for the endpoint
+     * @param <T> The generic type
+     * @return A {@link Publisher} that emits the {@link ClientWebSocket} instance
+     */
+    <T extends AutoCloseable> Publisher<T> connect(
+            Class<T> clientEndpointType,
+            Map<String, Object> parameters
     );
 
     @Override

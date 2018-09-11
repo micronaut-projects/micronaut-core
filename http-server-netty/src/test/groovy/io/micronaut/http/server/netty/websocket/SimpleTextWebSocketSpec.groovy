@@ -23,7 +23,7 @@ class SimpleTextWebSocketSpec extends Specification {
         fred.session != null
         fred.session.id != null
 
-        ChatClientWebSocket bob = wsClient.connect(ChatClientWebSocket, "/chat/stuff/bob").blockingFirst()
+        ChatClientWebSocket bob = wsClient.connect(ChatClientWebSocket, [topic:"stuff",username:"bob"]).blockingFirst()
 
         then:"A session is established"
         fred.session != null
@@ -57,6 +57,19 @@ class SimpleTextWebSocketSpec extends Specification {
             bob.replies.contains("[fred] Hello bob!")
             bob.replies.size() == 1
         }
+        fred.sendAsync("foo").get() == 'foo'
+        fred.sendRx("bar").blockingGet() == 'bar'
+
+        when:
+        bob.close()
+        fred.close()
+
+        then:
+        conditions.eventually {
+            !bob.session.isOpen()
+            !fred.session.isOpen()
+        }
+
         cleanup:
         wsClient.close()
         embeddedServer.close()
