@@ -16,7 +16,7 @@
 
 package io.micronaut.websocket;
 
-import org.reactivestreams.Publisher;
+import io.reactivex.Flowable;
 
 import java.net.URI;
 
@@ -33,5 +33,10 @@ public interface RxWebSocketClient extends WebSocketClient {
      * {@inheritDoc}
      */
     @Override
-    Publisher<? extends RxWebSocketSession> connect(Class<?> clientEndpointType, URI uri);
+    <T extends AutoCloseable> Flowable<T> connect(Class<T> clientEndpointType, URI uri);
+
+    @Override
+    default <T extends AutoCloseable> Flowable<T> connect(Class<T> clientEndpointType, String uri) {
+        return (Flowable<T>) WebSocketClient.super.connect(clientEndpointType, uri);
+    }
 }

@@ -14,16 +14,28 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.server.binding;
-
-import io.micronaut.core.bind.ArgumentBinderRegistry;
-import io.micronaut.http.HttpRequest;
+package io.micronaut.websocket.exceptions;
 
 /**
- * A {@link ArgumentBinderRegistry} where the source of binding is a {@link HttpRequest}.
+ * Exceptions related to {@link io.micronaut.websocket.WebSocketSession} interaction.
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-public interface RequestBinderRegistry extends ArgumentBinderRegistry<HttpRequest<?>> {
+public class WebSocketSessionException extends WebSocketException {
+
+    /**
+     * @param message The message
+     */
+    public WebSocketSessionException(String message) {
+        super(message);
+    }
+
+    /**
+     * @param message The message
+     * @param cause The cause
+     */
+    public WebSocketSessionException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

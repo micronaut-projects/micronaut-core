@@ -20,6 +20,9 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 
+import java.util.Collections;
+import java.util.List;
+
 /**
  * A bound {@link Executable} is an executable who argument values have been pre-bound to
  * values using a {@link ArgumentBinderRegistry}.
@@ -45,9 +48,25 @@ public interface BoundExecutable<T, R> extends Executable<T, R> {
      */
     R invoke(T instance);
 
+    /**
+     * That arguments that will be used to invoke the method.
+     *
+     * @return The arguments
+     */
+    Object[] getBoundArguments();
+
+    /**
+     * If the executable can only be partially bound then this method will return the arguments that have not been bound.
+     *
+     * @return The unbound arguments
+     */
+    default List<Argument<?>> getUnboundArguments() {
+        return Collections.emptyList();
+    }
+
     @Override
     default R invoke(T instance, Object... arguments) {
-        return invoke(instance);
+        return getTarget().invoke(instance, arguments);
     }
 
     @Override

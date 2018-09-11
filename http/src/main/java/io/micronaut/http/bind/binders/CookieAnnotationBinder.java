@@ -14,51 +14,51 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.server.binding.binders;
+package io.micronaut.http.bind.binders;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.ConvertibleMultiValues;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.annotation.Header;
+import io.micronaut.http.annotation.CookieValue;
 
 /**
- * An {@link io.micronaut.core.bind.annotation.AnnotatedArgumentBinder} implementation that uses the {@link Header}
- * annotation to trigger binding from an HTTP header.
+ * An {@link io.micronaut.core.bind.annotation.AnnotatedArgumentBinder} implementation that uses the {@link CookieValue}
+ * annotation to trigger binding from an HTTP {@link io.micronaut.http.cookie.Cookie}.
  *
  * @param <T> A type
  * @author Graeme Rocher
- * @see io.micronaut.http.HttpHeaders
  * @since 1.0
  */
-public class HeaderAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<Header, T, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<Header, T> {
+public class CookieAnnotationBinder<T> extends AbstractAnnotatedArgumentBinder<CookieValue, T, HttpRequest<?>> implements AnnotatedRequestArgumentBinder<CookieValue, T> {
 
     /**
      * @param conversionService The conversion service
      */
-    public HeaderAnnotationBinder(ConversionService<?> conversionService) {
+    public CookieAnnotationBinder(ConversionService<?> conversionService) {
         super(conversionService);
     }
 
     @Override
+    public Class<CookieValue> getAnnotationType() {
+        return CookieValue.class;
+    }
+
+    @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> argument, HttpRequest<?> source) {
-        ConvertibleMultiValues<String> parameters = source.getHeaders();
+        ConvertibleValues<io.micronaut.http.cookie.Cookie> parameters = source.getCookies();
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-        String parameterName = annotationMetadata.getValue(Header.class, String.class).orElse(argument.getArgument().getName());
+        String parameterName = annotationMetadata.getValue(CookieValue.class, String.class)
+                                                 .orElse(argument.getArgument().getName());
         return doBind(argument, parameters, parameterName);
     }
 
     @Override
-    public Class<Header> getAnnotationType() {
-        return Header.class;
-    }
-
-    @Override
     protected String getFallbackFormat(Argument argument) {
-        return NameUtils.hyphenate(NameUtils.capitalize(argument.getName()), false);
+        return NameUtils.hyphenate(argument.getName());
     }
 }

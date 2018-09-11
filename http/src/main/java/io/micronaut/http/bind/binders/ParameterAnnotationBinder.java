@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.server.binding.binders;
+package io.micronaut.http.bind.binders;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder;

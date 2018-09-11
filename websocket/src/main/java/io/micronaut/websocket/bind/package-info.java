@@ -14,24 +14,10 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.server.binding.binders;
-
-import io.micronaut.http.annotation.Body;
-
 /**
- * A binder that binds from a parsed request body.
- *
- * @param <T> A type
- * @author Graeme Rocher
- * @since 1.0
+ * Package containing binding related classes. This package is regarded internal.
  */
-public interface BodyArgumentBinder<T> extends AnnotatedRequestArgumentBinder<Body, T> {
+@Internal
+package io.micronaut.websocket.bind;
 
-    /**
-     * @return The required annotation type
-     */
-    @Override
-    default Class<Body> getAnnotationType() {
-        return Body.class;
-    }
-}
+import io.micronaut.core.annotation.Internal;

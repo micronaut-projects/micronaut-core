@@ -16,9 +16,10 @@
 
 package io.micronaut.websocket;
 
+import io.micronaut.websocket.annotation.ClientWebSocket;
 import org.reactivestreams.Publisher;
-
 import java.net.URI;
+
 
 /**
  * Interface that provides a way to connect a client over WebSocket.
@@ -26,17 +27,36 @@ import java.net.URI;
  * @author graemerocher
  * @since 1.0
  */
-public interface WebSocketClient {
+public interface WebSocketClient extends AutoCloseable {
 
     /**
      * Connect the given client endpoint type to the URI over WebSocket.
      *
-     * @param clientEndpointType The endpoint type. Should be a class annotated with {@link io.micronaut.websocket.annotation.ClientEndpoint}
-     * @param uri The URI or the WebSocket
-     * @return A {@link Publisher} that emits the {@link WebSocketSession} on successful connect
+     * @param clientEndpointType The endpoint type. Should be a class annotated with {@link ClientWebSocket}
+     * @param uri The URI to connect over
+     * @param <T> The generic type
+     * @return A {@link Publisher} that emits the {@link ClientWebSocket} instance
      */
-    Publisher<? extends WebSocketSession> connect(
-            Class<?> clientEndpointType,
+    <T extends AutoCloseable> Publisher<T> connect(
+            Class<T> clientEndpointType,
             URI uri
     );
+
+    @Override
+    void close();
+
+    /**
+     * Connect the given client endpoint type to the URI over WebSocket.
+     *
+     * @param clientEndpointType The endpoint type. Should be a class annotated with {@link ClientWebSocket}
+     * @param uri The URI to connect over
+     * @param <T> The generic type
+     * @return A {@link Publisher} that emits the {@link ClientWebSocket} instance
+     */
+    default <T extends AutoCloseable> Publisher<T> connect(
+            Class<T> clientEndpointType,
+            String uri
+    ) {
+        return connect(clientEndpointType, URI.create(uri));
+    }
 }

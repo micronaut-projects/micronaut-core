@@ -14,14 +14,24 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.server.binding.binders;
+package io.micronaut.websocket.exceptions;
 
 /**
- * A marker interface for argument binders that are non-blocking.
- *
- * @param <T> A type
- * @author Graeme Rocher
- * @since 1.0
+ * Exceptions specific to the WebSocket client.
  */
-public interface NonBlockingBodyArgumentBinder<T> extends BodyArgumentBinder<T>, TypedRequestArgumentBinder<T> {
+public class WebSocketClientException extends WebSocketException {
+    /**
+     * @param message The message
+     */
+    public WebSocketClientException(String message) {
+        super(message);
+    }
+
+    /**
+     * @param message The message
+     * @param cause The cause
+     */
+    public WebSocketClientException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

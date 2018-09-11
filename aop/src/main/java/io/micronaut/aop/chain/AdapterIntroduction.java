@@ -39,7 +39,7 @@ import static io.micronaut.aop.Adapter.InternalAttributes.ADAPTED_QUALIFIER;
 @Internal
 final class AdapterIntroduction implements MethodInterceptor<Object, Object> {
 
-    private final ExecutionHandle<Object> executionHandle;
+    private final ExecutionHandle<?, ?> executionHandle;
 
     /**
      * Default constructor.
@@ -48,7 +48,7 @@ final class AdapterIntroduction implements MethodInterceptor<Object, Object> {
      * @param method The target method
      */
     AdapterIntroduction(BeanContext beanContext, ExecutableMethod<?, ?> method) {
-        Class beanType = method.getValue(Adapter.class, ADAPTED_BEAN, Class.class).orElse(null);
+        Class<?> beanType = method.getValue(Adapter.class, ADAPTED_BEAN, Class.class).orElse(null);
         String beanMethod  = method.getValue(Adapter.class, ADAPTED_METHOD, String.class).orElse(null);
         String beanQualifier  = method.getValue(Adapter.class, ADAPTED_QUALIFIER, String.class).orElse(null);
 

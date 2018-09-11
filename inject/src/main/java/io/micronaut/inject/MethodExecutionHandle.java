@@ -21,11 +21,12 @@ import javax.annotation.Nonnull;
 /**
  * Represents an execution handle that invokes a method.
  *
+ * @param <T> The target type
  * @param <R> The result type
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MethodExecutionHandle<R> extends ExecutionHandle<R>, MethodReference {
+public interface MethodExecutionHandle<T, R> extends ExecutionHandle<T, R>, MethodReference {
     /**
      * The underlying {@link ExecutableMethod} reference.
      *

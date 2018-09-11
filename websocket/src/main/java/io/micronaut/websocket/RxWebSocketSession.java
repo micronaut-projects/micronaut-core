@@ -44,5 +44,5 @@ public interface RxWebSocketSession extends WebSocketSession {
      * @return The {@link Flowable}
      */
     @Override
-    <T> Flowable<T> broadcast(T message);
+    <T> Flowable<T> send(T message);
 }

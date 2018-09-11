@@ -16,14 +16,17 @@
 
 package io.micronaut.http.client;
 
+import io.micronaut.context.BeanContext;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.ssl.ClientSslConfiguration;
 import io.micronaut.http.ssl.SslConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.channel.ChannelOption;
 
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import java.net.Proxy;
 import java.net.SocketAddress;
 import java.nio.charset.Charset;

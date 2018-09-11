@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.server.binding;
+package io.micronaut.http.bind;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -32,13 +32,13 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
-import io.micronaut.http.server.binding.binders.AnnotatedRequestArgumentBinder;
-import io.micronaut.http.server.binding.binders.CookieAnnotationBinder;
-import io.micronaut.http.server.binding.binders.DefaultBodyAnnotationBinder;
-import io.micronaut.http.server.binding.binders.HeaderAnnotationBinder;
-import io.micronaut.http.server.binding.binders.ParameterAnnotationBinder;
-import io.micronaut.http.server.binding.binders.RequestArgumentBinder;
-import io.micronaut.http.server.binding.binders.TypedRequestArgumentBinder;
+import io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder;
+import io.micronaut.http.bind.binders.CookieAnnotationBinder;
+import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
+import io.micronaut.http.bind.binders.HeaderAnnotationBinder;
+import io.micronaut.http.bind.binders.ParameterAnnotationBinder;
+import io.micronaut.http.bind.binders.RequestArgumentBinder;
+import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
