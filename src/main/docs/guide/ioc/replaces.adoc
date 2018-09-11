@@ -1,6 +1,6 @@
 One significant difference between Micronaut's Dependency Injection system and Spring is the way beans can be replaced.
 
-In a Spring application, beans have names and can effectively be overriden simply by creating a bean with the same name, regardless of the type of the bean. Spring also has the notion of bean registration order, hence in Spring Boot you have `@AutoConfigureBefore` and `@AutoConfigureAfter` the control how beans override each other.
+In a Spring application, beans have names and can effectively be overridden simply by creating a bean with the same name, regardless of the type of the bean. Spring also has the notion of bean registration order, hence in Spring Boot you have `@AutoConfigureBefore` and `@AutoConfigureAfter` the control how beans override each other.
 
 This strategy leads to difficult to debug problems, for example:
 
@@ -29,4 +29,34 @@ include::{testsjava}/replaces/MockBookService.java[tags=class, indent=0]
 ----
 
 <1> The `MockBookService` declares that it replaces `JdbcBookService`
-<2> But only for for the `test` environment
+
+The `@Replaces` annotation also supports a `factory` argument. That argument allows the replacement of factory beans in their entirety or specific types created by the factory.
+
+For example, it may be desired to replace all or part of the given factory class:
+
+.BookFactory.java
+[source,java]
+----
+include::{testsjava}/replaces/BookFactory.java[tags=class, indent=0]
+----
+
+WARNING: To replace a factory in its entirety, it is necessary that your factory methods match the return types of all of the methods in the replaced factory.
+
+In this example, the `BookFactory#textBook()` will *not* be replaced because this factory does not have a factory method that returns a TextBook.
+
+.CustomBookFactory.java
+[source,java]
+----
+include::{testsjava}/replaces/CustomBookFactory.java[tags=class, indent=0]
+----
+
+It may be the case that you don't wish for the factory methods to be replaced, except for a select few. For that use case, you can apply the `@Replaces` annotation on the method and denote the factory that it should apply to.
+
+.TextBookFactory.java
+[source,java]
+----
+include::{testsjava}/replaces/TextBookFactory.java[tags=class, indent=0]
+----
+
+The `BookFactory#novel()` method will not be replaced because the TextBook class is defined in the annotation.
+

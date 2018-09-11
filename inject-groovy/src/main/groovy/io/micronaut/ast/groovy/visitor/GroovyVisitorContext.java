@@ -58,6 +58,10 @@ public class GroovyVisitorContext implements VisitorContext {
 
     }
 
+    SourceUnit getSourceUnit() {
+        return sourceUnit;
+    }
+
     private SyntaxErrorMessage buildErrorMessage(String message, Element element) {
         ASTNode expr = (ASTNode) element.getNativeType();
         return new SyntaxErrorMessage(

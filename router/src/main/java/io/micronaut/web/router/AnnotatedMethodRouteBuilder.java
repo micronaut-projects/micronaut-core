@@ -20,6 +20,7 @@ import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
@@ -240,6 +241,10 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         actionAnn.ifPresent(annotationClass -> {
                 BiConsumer<BeanDefinition, ExecutableMethod> handler = httpMethodsHandlers.get(annotationClass);
                 if (handler != null) {
+                    ClassLoadingReporter.reportBeanPresent(method.getReturnType().getType());
+                    for (Class argumentType : method.getArgumentTypes()) {
+                        ClassLoadingReporter.reportBeanPresent(argumentType);
+                    }
                     handler.accept(beanDefinition, method);
                 }
             }

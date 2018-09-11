@@ -16,8 +16,10 @@
 
 package io.micronaut.views.velocity;
 
+import javax.annotation.Nullable;
 import javax.inject.Singleton;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Properties;
 
@@ -66,7 +68,7 @@ public class VelocityViewsRenderer implements ViewsRenderer {
     }
 
     @Override
-    public Writable render(String view, Object data) {
+    public Writable render(String view, @Nullable Object data) {
         return (writer) -> {
             Map<String, Object> context = context(data);
             final VelocityContext velocityContext = new VelocityContext(context);
@@ -96,7 +98,10 @@ public class VelocityViewsRenderer implements ViewsRenderer {
         return new VelocityEngine(p);
     }
 
-    private Map<String, Object> context(Object data) {
+    private Map<String, Object> context(@Nullable Object data) {
+        if (data == null) {
+            return new HashMap<>();
+        }
         if (data instanceof Map) {
             return (Map<String, Object>) data;
         }

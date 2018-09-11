@@ -16,8 +16,12 @@
 
 package io.micronaut.configuration.jdbc.tomcat;
 
+import javax.annotation.Nullable;
+import io.micronaut.configuration.jdbc.tomcat.metadata.TomcatDataSourcePoolMetadata;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.jdbc.DataSourceResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -30,6 +34,7 @@ import java.util.List;
  * Creates a tomcat data source for each configuration bean.
  *
  * @author James Kleeh
+ * @author Christian Oestreich
  * @since 1.0
  */
 @Factory
@@ -37,6 +42,16 @@ public class DatasourceFactory implements AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(DatasourceFactory.class);
     private List<org.apache.tomcat.jdbc.pool.DataSource> dataSources = new ArrayList<>(2);
+
+    private final DataSourceResolver dataSourceResolver;
+
+    /**
+     * Default constructor.
+     * @param dataSourceResolver The data source resolver
+     */
+    public DatasourceFactory(@Nullable DataSourceResolver dataSourceResolver) {
+        this.dataSourceResolver = dataSourceResolver == null ? DataSourceResolver.DEFAULT : dataSourceResolver;
+    }
 
     /**
      * @param datasourceConfiguration A {@link DatasourceConfiguration}
@@ -48,6 +63,28 @@ public class DatasourceFactory implements AutoCloseable {
         dataSources.add(ds);
         return ds;
     }
+
+    /**
+     * Method to create a metadata object that allows pool value lookup for each datasource object.
+     *
+     * @param dataSource     The datasource
+     * @return a {@link TomcatDataSourcePoolMetadata}
+     */
+    @EachBean(DataSource.class)
+    @Requires(beans = {DatasourceConfiguration.class})
+    public TomcatDataSourcePoolMetadata tomcatPoolDataSourceMetadataProvider(
+            DataSource dataSource) {
+
+        TomcatDataSourcePoolMetadata dataSourcePoolMetadata = null;
+
+        DataSource resolved = dataSourceResolver.resolve(dataSource);
+
+        if (resolved instanceof org.apache.tomcat.jdbc.pool.DataSource) {
+            dataSourcePoolMetadata = new TomcatDataSourcePoolMetadata((org.apache.tomcat.jdbc.pool.DataSource) resolved);
+        }
+        return dataSourcePoolMetadata;
+    }
+
 
     @Override
     @PreDestroy

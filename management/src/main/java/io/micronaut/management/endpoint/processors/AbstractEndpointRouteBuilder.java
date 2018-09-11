@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.BeanDefinition;
@@ -98,7 +99,13 @@ abstract class AbstractEndpointRouteBuilder extends DefaultRouteBuilder implemen
         Class<?> declaringType = method.getDeclaringType();
         if (method.hasStereotype(getSupportedAnnotation())) {
             Optional<String> endPointId = resolveActiveEndPointId(declaringType);
-            endPointId.ifPresent(id -> registerRoute(method, id));
+            endPointId.ifPresent(id -> {
+                ClassLoadingReporter.reportBeanPresent(method.getReturnType().getType());
+                for (Class argumentType : method.getArgumentTypes()) {
+                    ClassLoadingReporter.reportBeanPresent(argumentType);
+                }
+                registerRoute(method, id);
+            });
         }
     }
 
