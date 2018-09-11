@@ -16,12 +16,21 @@
 
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.annotation.processing.SuperclassAwareTypeVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.visitor.ClassElement;
+import io.micronaut.inject.visitor.Element;
+import io.micronaut.inject.visitor.VisitorContext;
 
+import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Types;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * A class element returning data from a {@link TypeElement}.
@@ -60,5 +69,31 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
             return types.isAssignable(thisType, thatType);
         }
         return false;
+    }
+
+    @Override
+    public List<Element> getElements(VisitorContext visitorContext) {
+        List<Element> elements = new ArrayList<>();
+        JavaVisitorContext ctx = (JavaVisitorContext) visitorContext;
+
+        classElement.asType().accept(new SuperclassAwareTypeVisitor<Object, Object>() {
+            @Override
+            protected boolean isAcceptable(javax.lang.model.element.Element element) {
+                return true;
+            }
+
+            @Override
+            protected void accept(DeclaredType type, javax.lang.model.element.Element element, Object o) {
+                AnnotationMetadata metadata = ctx.getAnnotationUtils().getAnnotationMetadata(element);
+                if (element.getKind() == ElementKind.FIELD) {
+                    elements.add(new JavaFieldElement((VariableElement) element, metadata));
+                }
+                if (element.getKind() == ElementKind.METHOD) {
+                    elements.add(new JavaMethodElement((ExecutableElement) element, metadata, ctx));
+                }
+            }
+        }, null);
+
+        return elements;
     }
 }
