@@ -178,7 +178,7 @@ public interface MutableHttpHeaders extends HttpHeaders {
      */
     default MutableHttpHeaders auth(String userInfo) {
         StringBuilder sb = new StringBuilder();
-        sb.append(HttpHeaderAuthorization.AUTHORIZATION_PREFIX_BASIC);
+        sb.append(HttpHeaderValues.AUTHORIZATION_PREFIX_BASIC);
         sb.append(" ");
         sb.append(Base64.getEncoder().encodeToString((userInfo).getBytes(StandardCharsets.ISO_8859_1)));
         String token = sb.toString();
