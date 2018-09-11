@@ -15,6 +15,7 @@
  */
 package io.micronaut.discovery.eureka
 
+import io.micronaut.context.env.Environment
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.discovery.CompositeDiscoveryClient
@@ -37,12 +38,17 @@ import javax.validation.ConstraintViolationException
 @Stepwise
 class EurekaClientSpec extends Specification {
 
-    @AutoCleanup @Shared EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
-            [(EurekaConfiguration.HOST): System.getenv('EUREKA_HOST'),
-             (EurekaConfiguration.PORT): System.getenv('EUREKA_PORT'),
-             "micronaut.caches.discoveryClient.enabled": false,
-             'eureka.client.readTimeout': '5s']
-    )
+    Map<String, Object> embeddedSeverConfiguration = [
+            (EurekaConfiguration.HOST): System.getenv('EUREKA_HOST'),
+            (EurekaConfiguration.PORT): System.getenv('EUREKA_PORT'),
+            "micronaut.caches.discoveryClient.enabled": false,
+            'eureka.client.readTimeout': '5s'
+    ]
+
+    @AutoCleanup
+    @Shared
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,embeddedSeverConfiguration, Environment.TEST)
+
     @Shared EurekaClient client = embeddedServer.applicationContext.getBean(EurekaClient)
     @Shared DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient)
 
