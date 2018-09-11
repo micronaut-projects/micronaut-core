@@ -29,17 +29,16 @@ import io.micronaut.http.netty.websocket.AbstractNettyWebSocketHandler;
 import io.micronaut.http.netty.websocket.NettyRxWebSocketSession;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.UriRouteMatch;
+import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.RxWebSocketSession;
 import io.micronaut.websocket.context.WebSocketBean;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.group.ChannelGroup;
-import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.ssl.SslHandler;
-import io.netty.util.concurrent.GlobalEventExecutor;
 import io.reactivex.Flowable;
 import io.reactivex.schedulers.Schedulers;
 import org.reactivestreams.Publisher;
@@ -68,12 +67,12 @@ public class NettyWebSocketServerHandler extends AbstractNettyWebSocketHandler {
      */
     public static final String ID = "websocket-handler";
 
-    private static final ChannelGroup WEB_SOCKET_SESSIONS = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
     private final WebSocketServerHandshaker handshaker;
 
 
     /**
      * Default constructor.
+     * @param webSocketSessions The web socket sessions
      *  @param handshaker     The handshaker
      * @param request        The request used to create the websocket
      * @param routeMatch     The route match
@@ -83,6 +82,7 @@ public class NettyWebSocketServerHandler extends AbstractNettyWebSocketHandler {
      * @param ctx            The channel handler context
      */
     NettyWebSocketServerHandler(
+            ChannelGroup webSocketSessions,
             WebSocketServerHandshaker handshaker,
             HttpRequest<?> request,
             UriRouteMatch<Object, Object> routeMatch,
@@ -97,7 +97,8 @@ public class NettyWebSocketServerHandler extends AbstractNettyWebSocketHandler {
                 webSocketBean,
                 request,
                 routeMatch.getVariables(),
-                handshaker.version());
+                handshaker.version(),
+                webSocketSessions);
 
 
         request.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
@@ -115,8 +116,8 @@ public class NettyWebSocketServerHandler extends AbstractNettyWebSocketHandler {
     protected NettyRxWebSocketSession createWebSocketSession(ChannelHandlerContext ctx) {
         String id = originatingRequest.getHeaders().get(HttpHeaderNames.SEC_WEBSOCKET_KEY);
         final Channel channel = ctx.channel();
-        WEB_SOCKET_SESSIONS.add(channel);
-        return new NettyRxWebSocketSession(
+
+        NettyRxWebSocketSession session = new NettyRxWebSocketSession(
                 id,
                 channel,
                 originatingRequest,
@@ -134,13 +135,19 @@ public class NettyWebSocketServerHandler extends AbstractNettyWebSocketHandler {
 
             @Override
             public Set<? extends RxWebSocketSession> getOpenSessions() {
-                return WEB_SOCKET_SESSIONS.stream().flatMap((Function<Channel, Stream<RxWebSocketSession>>) channel1 -> {
+                return webSocketSessions.stream().flatMap((Function<Channel, Stream<RxWebSocketSession>>) channel1 -> {
                     NettyRxWebSocketSession s = channel1.attr(NettyRxWebSocketSession.WEB_SOCKET_SESSION_KEY).get();
                     if (s != null && s.isOpen()) {
                         return Stream.of(s);
                     }
                     return Stream.empty();
                 }).collect(Collectors.toSet());
+            }
+
+            @Override
+            public void close(CloseReason closeReason) {
+                super.close(closeReason);
+                webSocketSessions.remove(ctx.channel());
             }
 
             @Override
@@ -153,6 +160,9 @@ public class NettyWebSocketServerHandler extends AbstractNettyWebSocketHandler {
                 return uriVars;
             }
         };
+
+        webSocketSessions.add(channel);
+        return session;
     }
 
     @Override
@@ -190,7 +200,7 @@ public class NettyWebSocketServerHandler extends AbstractNettyWebSocketHandler {
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        WEB_SOCKET_SESSIONS.remove(ctx.channel());
+        webSocketSessions.remove(ctx.channel());
         super.handlerRemoved(ctx);
     }
 

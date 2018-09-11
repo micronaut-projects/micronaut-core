@@ -37,6 +37,7 @@ public abstract class PojoChatClientWebSocket implements AutoCloseable {
     @OnMessage
     public void onMessage(
             Message message) {
+        System.out.println("Client received message = " + message);
         replies.add(message);
     }
 

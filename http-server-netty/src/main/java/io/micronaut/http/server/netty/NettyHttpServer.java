@@ -57,6 +57,8 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPipeline;
+import io.netty.channel.group.ChannelGroup;
+import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpServerCodec;
@@ -67,6 +69,7 @@ import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.concurrent.Future;
+import io.netty.util.concurrent.GlobalEventExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -130,6 +133,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final ApplicationContext applicationContext;
     private final SslContext sslContext;
     private final AtomicBoolean running = new AtomicBoolean(false);
+    private final ChannelGroup webSocketSessions = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
     private NioEventLoopGroup workerGroup;
     private NioEventLoopGroup parentGroup;
     private EmbeddedServerInstance serviceInstance;
@@ -249,6 +253,7 @@ public class NettyHttpServer implements EmbeddedServer {
                         ));
                         pipeline.addLast(HttpResponseEncoder.ID, new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration));
                         pipeline.addLast(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
+                                webSocketSessions,
                                 router,
                                 requestArgumentSatisfier.getBinderRegistry(),
                                 webSocketBeanRegistry,
@@ -287,6 +292,7 @@ public class NettyHttpServer implements EmbeddedServer {
                             .addListener(this::logShutdownErrorIfNecessary);
                     parentGroup.shutdownGracefully()
                             .addListener(this::logShutdownErrorIfNecessary);
+                    webSocketSessions.close();
                     applicationContext.publishEvent(new ServerShutdownEvent(this));
                     if (serviceInstance != null) {
                         applicationContext.publishEvent(new ServiceShutdownEvent(serviceInstance));

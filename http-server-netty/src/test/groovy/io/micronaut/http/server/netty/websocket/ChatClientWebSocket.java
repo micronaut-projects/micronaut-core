@@ -23,6 +23,7 @@ public abstract class ChatClientWebSocket implements AutoCloseable {
         this.topic = topic;
         this.username = username;
         this.session = session;
+        System.out.println("Client session opened for username = " + username);
     }
 
     public String getTopic() {
@@ -44,6 +45,7 @@ public abstract class ChatClientWebSocket implements AutoCloseable {
     @OnMessage
     public void onMessage(
             String message) {
+        System.out.println("Client received message = " + message);
         replies.add(message);
     }
 
