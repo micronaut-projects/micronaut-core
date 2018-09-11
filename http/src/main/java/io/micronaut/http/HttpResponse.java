@@ -136,7 +136,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#BAD_REQUEST} response with an empty body.
+     * Return an {@link HttpStatus#BAD_REQUEST} response with a body.
      *
      * @param body The response body
      * @param <T>  The body type
@@ -188,6 +188,17 @@ public interface HttpResponse<B> extends HttpMessage<B> {
      */
     static <T> MutableHttpResponse<T> serverError() {
         return HttpResponseFactory.INSTANCE.status(HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    /**
+     * Return an {@link HttpStatus#INTERNAL_SERVER_ERROR} response with a body.
+     *
+     * @param body The response body
+     * @param <T> The response type
+     * @return The response
+     */
+    static <T> MutableHttpResponse<T> serverError(T body) {
+        return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
     }
 
     /**
