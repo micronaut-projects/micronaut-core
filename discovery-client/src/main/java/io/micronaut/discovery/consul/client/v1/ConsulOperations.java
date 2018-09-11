@@ -44,7 +44,7 @@ public interface ConsulOperations {
      * @param value The value as a String
      * @return A {@link Publisher} that emits a boolean if the operation succeeded
      */
-    @Put(uri = "/kv/{+key}", consumes = MediaType.TEXT_PLAIN)
+    @Put(value = "/kv/{+key}", consumes = MediaType.TEXT_PLAIN)
     @Produces(value = MediaType.TEXT_PLAIN, single = true)
     Publisher<Boolean> putValue(String key, @Body String value);
 

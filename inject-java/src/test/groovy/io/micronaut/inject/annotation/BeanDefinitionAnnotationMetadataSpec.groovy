@@ -51,10 +51,10 @@ class Test {
 ''')
         expect:
         definition != null
-        definition.getAnnotation(TestCachePuts.class).value()[0].value() == (['test'] as String[])
-        definition.getAnnotation(TestCachePuts.class).value()[0].cacheNames() == (['test'] as String[])
-        definition.getAnnotation(TestCachePuts.class).value()[1].value() == (['blah'] as String[])
-        definition.getAnnotation(TestCachePuts.class).value()[1].cacheNames() == (['blah'] as String[])
+        definition.synthesize(TestCachePuts.class).value()[0].value() == (['test'] as String[])
+        definition.synthesize(TestCachePuts.class).value()[0].cacheNames() == (['test'] as String[])
+        definition.synthesize(TestCachePuts.class).value()[1].value() == (['blah'] as String[])
+        definition.synthesize(TestCachePuts.class).value()[1].cacheNames() == (['blah'] as String[])
     }
 
     void "test alias for existing member values"() {
@@ -73,8 +73,8 @@ class Test {
 ''')
         expect:
         definition != null
-        definition.getAnnotation(TestCachePut.class).value() == (['test'] as String[])
-        definition.getAnnotation(TestCachePut.class).cacheNames() == (['test'] as String[])
+        definition.synthesize(TestCachePut.class).value() == (['test'] as String[])
+        definition.synthesize(TestCachePut.class).cacheNames() == (['test'] as String[])
     }
 
     void "test repeated annotation values"() {
@@ -95,10 +95,10 @@ class Test {
 ''')
         expect:
         definition != null
-        definition.getAnnotation(Requirements.class).value()[0].property() == 'foo'
-        definition.getAnnotation(Requirements.class).value()[0].value() == 'bar'
-        definition.getAnnotation(Requirements.class).value()[1].property() == 'baz'
-        definition.getAnnotation(Requirements.class).value()[1].value() == 'stuff'
+        definition.synthesize(Requirements.class).value()[0].property() == 'foo'
+        definition.synthesize(Requirements.class).value()[0].value() == 'bar'
+        definition.synthesize(Requirements.class).value()[1].property() == 'baz'
+        definition.synthesize(Requirements.class).value()[1].value() == 'stuff'
     }
 
     void "test basic method annotation metadata"() {

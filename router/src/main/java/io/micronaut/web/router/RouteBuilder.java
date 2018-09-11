@@ -27,7 +27,9 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.ProxyBeanDefinition;
 
+import javax.annotation.Nullable;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -327,6 +329,20 @@ public interface RouteBuilder {
      * <p>
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
+     * @param beanDefinition The bean definition
+     * @param uri    The URI
+     * @param method The method
+     * @return The route
+     */
+    default UriRoute GET(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
+        return GET(uri, beanDefinition.getBeanType(), method.getMethodName(), method.getArgumentTypes());
+    }
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     * <p>
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
      * @param uri            The URI
      * @param target         The target
      * @param method         The method
@@ -416,6 +432,21 @@ public interface RouteBuilder {
      */
     default UriRoute POST(String uri, ExecutableMethod<?, ?> method) {
         return POST(uri, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
+    }
+
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     * <p>
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param beanDefinition The bean definition
+     * @param uri    The URI
+     * @param method The method
+     * @return The route
+     */
+    default UriRoute POST(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
+        return POST(uri, beanDefinition.getBeanType(), method.getMethodName(), method.getArgumentTypes());
     }
 
     /**
@@ -518,6 +549,20 @@ public interface RouteBuilder {
      * <p>
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
+     * @param beanDefinition The bean definition
+     * @param uri    The URI
+     * @param method The method
+     * @return The route
+     */
+    default UriRoute PUT(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
+        return PUT(uri, beanDefinition.getBeanType(), method.getMethodName(), method.getArgumentTypes());
+    }
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     * <p>
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
      * @param uri            The URI
      * @param target         The target
      * @param method         The method
@@ -606,6 +651,20 @@ public interface RouteBuilder {
      */
     default UriRoute PATCH(String uri, ExecutableMethod<?, ?> method) {
         return PATCH(uri, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
+    }
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     * <p>
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param beanDefinition The bean definition
+     * @param uri    The URI
+     * @param method The method
+     * @return The route
+     */
+    default UriRoute PATCH(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
+        return PATCH(uri, beanDefinition.getBeanType(), method.getMethodName(), method.getArgumentTypes());
     }
 
     /**
@@ -708,6 +767,20 @@ public interface RouteBuilder {
      * <p>
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
+     * @param beanDefinition The bean definition
+     * @param uri    The URI
+     * @param method The method
+     * @return The route
+     */
+    default UriRoute DELETE(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
+        return DELETE(uri, beanDefinition.getBeanType(), method.getMethodName(), method.getArgumentTypes());
+    }
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     * <p>
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
      * @param uri            The URI
      * @param target         The target
      * @param method         The method
@@ -796,6 +869,20 @@ public interface RouteBuilder {
      */
     default UriRoute OPTIONS(String uri, ExecutableMethod<?, ?> method) {
         return OPTIONS(uri, method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes());
+    }
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     * <p>
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
+     * @param beanDefinition The bean definition
+     * @param uri    The URI
+     * @param method The method
+     * @return The route
+     */
+    default UriRoute OPTIONS(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
+        return OPTIONS(uri, beanDefinition.getBeanType(), method.getMethodName(), method.getArgumentTypes());
     }
 
     /**
@@ -898,6 +985,20 @@ public interface RouteBuilder {
      * <p>
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
+     * @param beanDefinition The bean definition
+     * @param uri    The URI
+     * @param method The method
+     * @return The route
+     */
+    default UriRoute HEAD(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
+        return HEAD(uri, beanDefinition.getBeanType(), method.getMethodName(), method.getArgumentTypes());
+    }
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     * <p>
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
      * @param uri            The URI
      * @param target         The target
      * @param method         The method
@@ -993,6 +1094,20 @@ public interface RouteBuilder {
      * <p>
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
+     * @param beanDefinition The bean definition
+     * @param uri    The URI
+     * @param method The method
+     * @return The route
+     */
+    default UriRoute TRACE(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
+        return TRACE(uri, beanDefinition.getBeanType(), method.getMethodName(), method.getArgumentTypes());
+    }
+
+    /**
+     * <p>Route the specified URI template to the specified target.</p>
+     * <p>
+     * <p>The number of variables in the template should match the number of method arguments</p>
+     *
      * @param uri            The URI
      * @param target         The target
      * @param method         The method
@@ -1035,18 +1150,9 @@ public interface RouteBuilder {
          */
         default String resolveUri(Class<?> type) {
             Controller annotation = type.getAnnotation(Controller.class);
-            String uri = annotation != null ? annotation.value() : null;
+            String uri = normalizeUri(annotation != null ? annotation.value() : null);
             if (uri != null) {
-                int len = uri.length();
-                if (len == 1 && uri.charAt(0) == '/') {
-                    return "";
-                }
-                if (len > 0 && uri.charAt(uri.length() - 1) == '/') {
-                    return uri.substring(0, uri.length() - 1);
-                }
-                if (len > 0) {
-                    return uri;
-                }
+                return uri;
             }
             return '/' + TypeConvention.CONTROLLER.asPropertyName(type);
         }
@@ -1058,21 +1164,19 @@ public interface RouteBuilder {
          * @return The URI to use
          */
         default String resolveUri(BeanDefinition<?> beanDefinition) {
-            Controller annotation = beanDefinition.getAnnotation(Controller.class);
-            String uri = annotation != null ? annotation.value() : null;
+            String uri = beanDefinition.getValue(Controller.class, String.class).orElse(null);
+            uri = normalizeUri(uri);
             if (uri != null) {
-                int len = uri.length();
-                if (len == 1 && uri.charAt(0) == '/') {
-                    return "";
-                }
-                if (len > 0 && uri.charAt(uri.length() - 1) == '/') {
-                    return uri.substring(0, uri.length() - 1);
-                }
-                if (len > 0) {
-                    return uri;
-                }
+                return uri;
             }
-            return '/' + TypeConvention.CONTROLLER.asPropertyName(beanDefinition.getBeanType());
+            Class<?> beanType;
+            if (beanDefinition instanceof ProxyBeanDefinition) {
+                ProxyBeanDefinition pbd = (ProxyBeanDefinition) beanDefinition;
+                beanType = pbd.getTargetType();
+            } else {
+                beanType = beanDefinition.getBeanType();
+            }
+            return '/' + TypeConvention.CONTROLLER.asPropertyName(beanType);
         }
 
         /**
@@ -1100,6 +1204,28 @@ public interface RouteBuilder {
          */
         default String resolveUri(Class type, PropertyConvention id) {
             return resolveUri(type) + "/{" + id.lowerCaseName() + "}";
+        }
+
+        /**
+         * Normalizes a URI, ensuring the first character starts with a /.
+         *
+         * @param uri The URI
+         * @return The normalized URI or null
+         */
+        default String normalizeUri(@Nullable String uri) {
+            if (uri != null) {
+                int len = uri.length();
+                if (len == 1 && uri.charAt(0) == '/') {
+                    return "";
+                }
+                if (len > 0 && uri.charAt(uri.length() - 1) == '/') {
+                    return uri.substring(0, uri.length() - 1);
+                }
+                if (len > 0) {
+                    return uri;
+                }
+            }
+            return null;
         }
     }
 }

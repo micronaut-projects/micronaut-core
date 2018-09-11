@@ -1,0 +1,5 @@
+In certain cases you may which to create applications standalone command-line (CLI) applications that interact with your Microservice infrastructure.
+
+Examples of applications like this include scheduled tasks, batch applications and general command line applications.
+
+In this case having a robust way to parse command line options and positional parameters is important.

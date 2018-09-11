@@ -35,5 +35,10 @@ public @interface Replaces {
     /**
      * @return The bean type that this bean replaces
      */
-    Class value();
+    Class value() default void.class;
+
+    /**
+     * @return The declaring bean type
+     */
+    Class factory() default void.class;
 }

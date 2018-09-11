@@ -19,9 +19,9 @@ package io.micronaut.management.endpoint.health;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.management.endpoint.Endpoint;
+import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.EndpointConfiguration;
-import io.micronaut.management.endpoint.Read;
+import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.management.health.aggregator.HealthAggregator;
 import io.micronaut.management.health.indicator.HealthIndicator;
 import io.micronaut.management.health.indicator.HealthResult;
@@ -144,7 +144,7 @@ public class HealthEndpoint {
     }
 
     /**
-     * Configuration related to handling of the {@link io.micronaut.health.HealthStatus}
+     * Configuration related to handling of the {@link io.micronaut.health.HealthStatus}.
      *
      * @author graemerocher
      * @since 1.0
@@ -163,14 +163,14 @@ public class HealthEndpoint {
         }
 
         /**
-         * @return How {@link io.micronaut.health.HealthStatus} map to {@link HttpStatus} codes
+         * @return How {@link io.micronaut.health.HealthStatus} map to {@link HttpStatus} codes.
          */
         public Map<String, HttpStatus> getHttpMapping() {
             return httpMapping;
         }
 
         /**
-         * Set how {@link io.micronaut.health.HealthStatus} map to {@link HttpStatus} codes
+         * Set how {@link io.micronaut.health.HealthStatus} map to {@link HttpStatus} codes.
          *
          * @param httpMapping The http mappings
          */

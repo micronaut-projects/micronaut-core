@@ -18,6 +18,7 @@ package io.micronaut.http.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.core.bind.annotation.Bindable;
 
 import java.lang.annotation.*;
@@ -43,12 +44,21 @@ public @interface Header {
      * If used as a bound parameter, this is the header name. If used on a class level this is value and not the header name.
      * @return The name of the header, otherwise it is inferred from the parameter name
      */
+    @AliasFor(annotation = Bindable.class, member = "value")
     String value() default "";
 
     /**
      * If used on a class level with @Headers this is the header name and value is the value.
      * @return name of header when using with @Headers
      */
+    @AliasFor(annotation = Bindable.class, member = "value")
     String name() default "";
+
+    /**
+     * @see Bindable#defaultValue()
+     * @return The default value
+     */
+    @AliasFor(annotation = Bindable.class, member = "defaultValue")
+    String defaultValue() default "";
 
 }

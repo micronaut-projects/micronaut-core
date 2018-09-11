@@ -16,6 +16,7 @@
 
 package io.micronaut.http.server.binding.binders;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.bind.annotation.AbstractAnnotatedArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -23,10 +24,11 @@ import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.QueryValue;
+import io.micronaut.web.router.UriRouteMatch;
 
 import java.util.Optional;
 
@@ -59,14 +61,18 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
         HttpMethod httpMethod = source.getMethod();
         boolean permitsRequestBody = HttpMethod.permitsRequestBody(httpMethod);
 
-        QueryValue annotation = argument.getAnnotation(QueryValue.class);
-        boolean hasAnnotation = annotation != null;
-        String parameterName = argument.getName();
-        if (hasAnnotation) {
-            String value = annotation.value();
-            if (StringUtils.isNotEmpty(value)) {
-                parameterName = value;
-            }
+        AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+        boolean hasAnnotation = annotationMetadata.hasAnnotation(QueryValue.class);
+        boolean bindAll = false;
+        String parameterName = annotationMetadata.getValue(QueryValue.class, String.class).orElse(argument.getName());
+
+        // If we need to bind all request params to command object
+        // checks if the variable is defined with modifier char *
+        // eg. ?pojo*
+        Optional route = source.getAttribute(HttpAttributes.ROUTE_MATCH);
+        if (route.isPresent()) {
+            UriRouteMatch routeMatch = (UriRouteMatch) route.get();
+            bindAll = routeMatch.isExploded(parameterName);
         }
 
         BindingResult<T> result;
@@ -74,7 +80,11 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
         // attempt to bind from request parameters. This avoids allowing the request URI to
         // be manipulated to override POST or JSON variables
         if (hasAnnotation || !permitsRequestBody) {
-            result = doBind(context, parameters, parameterName);
+            if (bindAll) {
+                result = doConvert(parameters.asMap(), context);
+            } else {
+                result = doBind(context, parameters, parameterName);
+            }
         } else {
             //noinspection unchecked
             result = BindingResult.EMPTY;

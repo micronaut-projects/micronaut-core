@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
+import io.micronaut.http.annotation.QueryValue
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
@@ -182,6 +183,38 @@ class HttpPostSpec extends Specification {
         book == toSend
     }
 
+    void "test simple post request with a queryValue "() {
+        given:
+        def toSend = new Book(title: "The Stand",pages: 1000)
+        when:
+        BlockingHttpClient blockingHttpClient = client.toBlocking()
+        Book book = blockingHttpClient.retrieve(
+                HttpRequest.POST("/post/query?title=The%20Stand", toSend)
+                        .accept(MediaType.APPLICATION_JSON_TYPE)
+                        .header("X-My-Header", "Foo"),
+
+                Book
+        )
+
+        then:
+        book == toSend
+    }
+
+    void "test simple post request with a queryValue and no body"() {
+        when:
+        BlockingHttpClient blockingHttpClient = client.toBlocking()
+        Book book = blockingHttpClient.retrieve(
+                HttpRequest.POST("/post/queryNoBody?title=The%20Stand", "")
+                        .accept(MediaType.APPLICATION_JSON_TYPE)
+                        .header("X-My-Header", "Foo"),
+
+                Book
+        )
+
+        then:
+        book.pages == 0
+        book.title == "The Stand"
+    }
 
     @Controller('/post')
     static class PostController {
@@ -193,6 +226,17 @@ class HttpPostSpec extends Specification {
             assert accept == MediaType.APPLICATION_JSON
             assert custom == 'Foo'
             return book
+        }
+
+        @Post('/query')
+        Book simple(@Body Book book, @QueryValue String title) {
+            assert title == book.title
+            return book
+        }
+
+        @Post('/queryNoBody')
+        Book simple(@QueryValue("title") String title) {
+            return new Book(title: title, pages: 0)
         }
 
         @Post('/title/{title}')
@@ -214,6 +258,7 @@ class HttpPostSpec extends Specification {
             return book
         }
     }
+
     @EqualsAndHashCode
     static class Book {
         String title

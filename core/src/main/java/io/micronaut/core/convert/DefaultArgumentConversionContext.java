@@ -19,7 +19,6 @@ package io.micronaut.core.convert;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 
-import java.lang.reflect.AnnotatedElement;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -62,11 +61,6 @@ class DefaultArgumentConversionContext<T> implements ArgumentConversionContext<T
     @Override
     public Map<String, Argument<?>> getTypeVariables() {
         return argument.getTypeVariables();
-    }
-
-    @Override
-    public AnnotatedElement[] getAnnotatedElements() {
-        return new AnnotatedElement[]{argument};
     }
 
     @Override

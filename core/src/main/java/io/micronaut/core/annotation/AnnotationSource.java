@@ -16,180 +16,213 @@
 
 package io.micronaut.core.annotation;
 
+import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedElement;
-import java.util.*;
+import java.lang.reflect.Array;
+import java.util.Optional;
 
 /**
- * <p>
- * An abstract interface around an source of {@link Annotation} instances. Since bean definition instances
- * can read annotations from many potential sources (factory beans, factory methods, method level, class level etc.). This
- * abstraction allows a simplified view for annotation discovery.
- * </p>
- * <p>
- * <p>Generally annotation sources are prioritized in the following order:</p>
- * <p>
- * <ol>
- *     <li>Method Level</li>
- *     <li>Class Level</li>
- *     <li>Factory Method</li>
- *     <li>Factory Class</li>
- * </ol>
- * <p>
- * <p>The {@link #findAnnotation(Class)} method will return this first discovered annotation whilst traversing the above list.</p>
+ * <p>A source of annotations. This API provides an alternative to Java's {@link java.lang.reflect.AnnotatedElement} that uses the compile time produced data
+ *  from Micronaut. This is the parent interface of the {@link AnnotationMetadata} which provides event more methods to read annotations values and compute {@link java.lang.annotation.Repeatable} annotations.</p>
  *
+ *  <p>Note that this interface also includes methods such as {@link #synthesize(Class)} that allows materializing an instance of an annotation by producing a runtime proxy. These methods are a last resort if no other option is possible and should generally be avoided as they require the use of runtime reflection and proxying which hurts performance and memory consumption.</p>
+ *
+ * @see AnnotationMetadata
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface AnnotationSource extends AnnotatedElement {
+public interface AnnotationSource {
+
     /**
      * An empty annotation source.
      */
-    AnnotationSource EMPTY = () -> AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
-    /**
-     * <p>The annotated elements that this {@link AnnotationSource} is able to resolve annotations from</p>.
-     *
-     * @return An array of {@link AnnotatedElement} instances
-     */
-    AnnotatedElement[] getAnnotatedElements();
+    AnnotationSource EMPTY = new AnnotationSource() {
+    };
 
     /**
-     * Find an annotation by type from the {@link #getAnnotatedElements()} of this class.
-     *
-     * @param type The type
-     * @param <A>  The generic type
-     * @return An {@link Optional} of the type
-     */
-    default <A extends Annotation> Optional<A> findAnnotation(Class<A> type) {
-        AnnotationMetadata annotationMetadata = null;
-        if (this instanceof AnnotationMetadataProvider) {
-            annotationMetadata = ((AnnotationMetadataProvider) this).getAnnotationMetadata();
-        } else if (this instanceof AnnotationMetadata) {
-            annotationMetadata = (AnnotationMetadata) this;
-        }
-
-        if (annotationMetadata != null && annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
-            return Optional.ofNullable(annotationMetadata.getAnnotation(type));
-        } else {
-            AnnotatedElement[] elements = getAnnotatedElements();
-            for (AnnotatedElement element : elements) {
-                Optional<A> optional = AnnotationUtil.findAnnotation(element, type);
-                if (optional.isPresent()) {
-                    return optional;
-                }
-            }
-            return Optional.empty();
-        }
-    }
-
-    /**
-     * Find the first annotation for the given stereotype on the method.
-     *
-     * @param stereotype The method
-     * @return The stereotype
-     */
-    default Optional<Annotation> findAnnotationWithStereoType(Class<? extends Annotation> stereotype) {
-        AnnotationMetadata annotationMetadata = null;
-        if (this instanceof AnnotationMetadataProvider) {
-            annotationMetadata = ((AnnotationMetadataProvider) this).getAnnotationMetadata();
-        } else if (this instanceof AnnotationMetadata) {
-            annotationMetadata = (AnnotationMetadata) this;
-        }
-
-        if (annotationMetadata != null && annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
-            Optional<Class<? extends Annotation>> type = annotationMetadata.getAnnotationTypeByStereotype(stereotype);
-            return type.map(this::getAnnotation);
-        } else {
-            // slow path
-            AnnotatedElement[] candidates = getAnnotatedElements();
-            for (AnnotatedElement candidate : candidates) {
-                Optional<? extends Annotation> opt = AnnotationUtil.findAnnotationWithStereoType(candidate, stereotype);
-                if (opt.isPresent()) {
-                    return (Optional<Annotation>) opt;
-                }
-            }
-            return Optional.empty();
-        }
-    }
-
-    /**
-     * Get a concrete annotation for the given annotation type searching all of the {@link #getAnnotatedElements()}.
+     * Synthesizes a new annotation from the metadata for the given annotation type. This method works
+     * by creating a runtime proxy of the annotation interface and should be avoided in favour of
+     * direct use of the annotation metadata and only used for unique cases that require integrating third party libraries.
      *
      * @param annotationClass The annotation class
      * @param <T>             The annotation generic type
      * @return The annotation or null if it doesn't exist
-     * @see #findAnnotation(Class)
      */
-    @Override
-    default <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-        AnnotationMetadata annotationMetadata = null;
-        if (this instanceof AnnotationMetadataProvider) {
-            annotationMetadata = ((AnnotationMetadataProvider) this).getAnnotationMetadata();
-        } else if (this instanceof AnnotationMetadata) {
-            annotationMetadata = (AnnotationMetadata) this;
-        }
-
-        if (annotationMetadata != null && annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
-            return annotationMetadata.getAnnotation(annotationClass);
-        } else {
-            // slow path
-            for (AnnotatedElement annotatedElement : getAnnotatedElements()) {
-                try {
-                    T annotation = annotatedElement.getAnnotation(annotationClass);
-                    if (annotation != null) {
-                        return annotation;
-                    }
-                } catch (ArrayStoreException | TypeNotPresentException e) {
-                    // ignore, annotation that references a class not on the classpath
-                }
-            }
-            return null;
-        }
-
+    default <T extends Annotation> T synthesize(Class<T> annotationClass) {
+        return null;
     }
 
     /**
-     * @return A merged view of all of the annotations from {@link  #getAnnotatedElements()}
+     * Synthesizes a new annotation from the metadata for the given annotation type. This method works
+     * by creating a runtime proxy of the annotation interface and should be avoided in favour of
+     * direct use of the annotation metadata and only used for unique cases that require integrating third party libraries.
+     * <p>
+     * This method ignores inherited annotations. (Returns null if no
+     * annotations are directly present on this element.)
+     *
+     * @param annotationClass The annotation class
+     * @param <T>             The annotation generic type
+     * @return The annotation or null if it doesn't exist
      */
-    @Override
-    default Annotation[] getAnnotations() {
-        AnnotationMetadata annotationMetadata = null;
-        if (this instanceof AnnotationMetadataProvider) {
-            annotationMetadata = ((AnnotationMetadataProvider) this).getAnnotationMetadata();
-        } else if (this instanceof AnnotationMetadata) {
-            annotationMetadata = (AnnotationMetadata) this;
-        }
-
-        if (annotationMetadata != null && annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
-            return annotationMetadata.getAnnotations();
-        } else {
-            AnnotatedElement[] elements = getAnnotatedElements();
-            return Arrays.stream(elements)
-                    .flatMap(element -> Arrays.stream(element.getAnnotations()))
-                    .toArray(Annotation[]::new);
-        }
+    default <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass) {
+        return null;
     }
 
     /**
-     * @return A merged view of all of the declared annotations from {@link  #getAnnotatedElements()}
+     * Synthesizes a new annotations from the metadata. This method works
+     * by creating a runtime proxy of the annotation interface and should be avoided in favour of
+     * direct use of the annotation metadata and only used for unique cases that require integrating third party libraries.
+     *
+     * @return All the annotations
      */
-    @Override
-    default Annotation[] getDeclaredAnnotations() {
-        AnnotationMetadata annotationMetadata = null;
-        if (this instanceof AnnotationMetadataProvider) {
-            annotationMetadata = ((AnnotationMetadataProvider) this).getAnnotationMetadata();
-        } else if (this instanceof AnnotationMetadata) {
-            annotationMetadata = (AnnotationMetadata) this;
-        }
-
-        if (annotationMetadata != null && annotationMetadata != AnnotationMetadata.EMPTY_METADATA) {
-            return annotationMetadata.getDeclaredAnnotations();
-        } else {
-            AnnotatedElement[] elements = getAnnotatedElements();
-            return Arrays.stream(elements)
-                    .flatMap(element -> Arrays.stream(element.getDeclaredAnnotations()))
-                    .toArray(Annotation[]::new);
-        }
+    default Annotation[] synthesizeAll() {
+        return AnnotationUtil.ZERO_ANNOTATIONS;
     }
 
+    /**
+     * Synthesizes a new annotations from the metadata. This method works
+     * by creating a runtime proxy of the annotation interface and should be avoided in favour of
+     * direct use of the annotation metadata and only used for unique cases that require integrating third party libraries.
+     *
+     * @return All declared annotations
+     */
+    default Annotation[] synthesizeDeclared() {
+        return AnnotationUtil.ZERO_ANNOTATIONS;
+    }
+
+    /**
+     * Synthesizes a new annotations from the metadata for the given type. This method works
+     * by creating a runtime proxy of the annotation interface and should be avoided in favour of
+     * direct use of the annotation metadata and only used for unique cases that require integrating third party libraries.
+     *
+     * @param annotationClass The annotation type
+     * @param <T> The annotation generic type
+     * @return All annotations by the given type
+     */
+    @SuppressWarnings("unchecked")
+    default <T extends Annotation> T[] synthesizeAnnotationsByType(Class<T> annotationClass) {
+        return (T[]) Array.newInstance(annotationClass, 0);
+    }
+
+    /**
+     * Synthesizes a new annotations from the metadata for the given type. This method works
+     * by creating a runtime proxy of the annotation interface and should be avoided in favour of
+     * direct use of the annotation metadata and only used for unique cases that require integrating third party libraries.
+     *
+     * @param annotationClass The annotation type
+     * @param <T> The annotation generic type
+     * @return Declared annotations by the given type
+     */
+    @SuppressWarnings("unchecked")
+    default <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(Class<T> annotationClass) {
+        return (T[]) Array.newInstance(annotationClass, 0);
+    }
+
+    /**
+     * Find an {@link AnnotationValue} for the given annotation name.
+     *
+     * @param annotation The annotation name
+     * @param <T> The annotation type
+     * @return A {@link AnnotationValue} instance
+     */
+    default <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
+        return Optional.empty();
+    }
+
+    /**
+     * Find an {@link AnnotationValue} for the given annotation type.
+     *
+     * @param annotation The annotation
+     * @param <T> The annotation type
+     * @return A {@link AnnotationValue} instance
+     */
+    default <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(Class<T> annotation) {
+        return Optional.empty();
+    }
+
+    /**
+     * Get all of the values for the given annotation that are directly declared on the annotated element.
+     *
+     * @param annotation The annotation name
+     * @param <T> The annotation type
+     * @return A {@link AnnotationValue} instance
+     */
+    default <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(String annotation) {
+        return Optional.empty();
+    }
+
+    /**
+     * Get all of the values for the given annotation that are directly declared on the annotated element.
+     *
+     * @param annotation The annotation name
+     * @param <T> The annotation type
+     * @return A {@link AnnotationValue} instance
+     */
+    default <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(Class<T> annotation) {
+        return Optional.empty();
+    }
+
+    /**
+     * Find an {@link AnnotationValue} for the given annotation name.
+     *
+     * @param annotation The annotation name
+     * @param <T> The annotation type
+     * @return A {@link AnnotationValue} instance or null
+     */
+    default @Nullable <T extends Annotation> AnnotationValue<T> getAnnotation(String annotation) {
+        return this.<T>findAnnotation(annotation).orElse(null);
+    }
+
+    /**
+     * Find an {@link AnnotationValue} for the given annotation name.
+     *
+     * @param annotation The annotation name
+     * @param <T> The annotation type
+     * @return A {@link AnnotationValue} instance or null
+     */
+    default @Nullable <T extends Annotation> AnnotationValue<T> getAnnotation(Class<T> annotation) {
+        return this.findAnnotation(annotation).orElse(null);
+    }
+
+    /**
+     * Get all of the values for the given annotation that are directly declared on the annotated element.
+     *
+     * @param annotation The annotation name
+     * @param <T> The annotation type
+     * @return A {@link AnnotationValue} instance
+     */
+    default @Nullable <T extends Annotation> AnnotationValue<T> getDeclaredAnnotation(String annotation) {
+        return this.<T>findDeclaredAnnotation(annotation).orElse(null);
+    }
+
+    /**
+     * Find an {@link AnnotationValue} for the given annotation name.
+     *
+     * @param annotation The annotation name
+     * @param <T> The annotation type
+     * @return A {@link AnnotationValue} instance or null
+     */
+    default @Nullable <T extends Annotation> AnnotationValue<T> getDeclaredAnnotation(Class<T> annotation) {
+        return this.findDeclaredAnnotation(annotation).orElse(null);
+    }
+
+    /**
+     * Return whether an annotation is present.
+     *
+     * @param annotationClass The annotation class
+     * @return True if it is
+     */
+    default boolean isAnnotationPresent(Class<? extends Annotation> annotationClass) {
+        return false;
+    }
+
+    /**
+     * Variation of {@link #isAnnotationPresent(Class)} for declared annotations.
+     *
+     * @param annotationClass The annotation class
+     * @return True if it is
+     */
+    default boolean isDeclaredAnnotationPresent(Class<? extends Annotation> annotationClass) {
+        return false;
+    }
 }

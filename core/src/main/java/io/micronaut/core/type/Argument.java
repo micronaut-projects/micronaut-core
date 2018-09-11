@@ -18,19 +18,13 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import io.micronaut.core.annotation.AnnotationSource;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 
 import javax.annotation.Nullable;
-import java.lang.annotation.Annotation;
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.TypeVariable;
+import java.lang.reflect.*;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -41,16 +35,72 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Named, AnnotationMetadataProvider {
+public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMetadataProvider {
 
     /**
-     * Constant representing zero arguments.
+     * Constant for int argument. Used by generated code, do not remove.
      */
+    @SuppressWarnings("unused")
+    Argument INT = Argument.of(int.class);
+
+    /**
+     * Constant for long argument. Used by generated code, do not remove.
+     */
+    @SuppressWarnings("unused")
+    Argument LONG = Argument.of(long.class);
+
+    /**
+     * Constant for float argument. Used by generated code, do not remove.
+     */
+    @SuppressWarnings("unused")
+    Argument FLOAT = Argument.of(float.class);
+
+    /**
+     * Constant for double argument. Used by generated code, do not remove.
+     */
+    @SuppressWarnings("unused")
+    Argument DOUBLE = Argument.of(double.class);
+
+    /**
+     * Constant for void argument. Used by generated code, do not remove.
+     */
+    @SuppressWarnings("unused")
+    Argument VOID = Argument.of(void.class);
+
+    /**
+     * Constant for byte argument. Used by generated code, do not remove.
+     */
+    @SuppressWarnings("unused")
+    Argument BYTE = Argument.of(byte.class);
+
+    /**
+     * Constant for boolean argument. Used by generated code, do not remove.
+     */
+    @SuppressWarnings("unused")
+    Argument BOOLEAN = Argument.of(boolean.class);
+
+    /**
+     * Constant char argument. Used by generated code, do not remove.
+     */
+    @SuppressWarnings("unused")
+    Argument CHAR = Argument.of(char.class);
+
+    /**
+     * Constant short argument. Used by generated code, do not remove.
+     */
+    @SuppressWarnings("unused")
+    Argument SHORT = Argument.of(short.class);
+
+    /**
+     * Constant representing zero arguments. Used by generated code, do not remove.
+     */
+    @SuppressWarnings("unused")
     Argument[] ZERO_ARGUMENTS = new Argument[0];
 
     /**
-     * Default Object argument.
+     * Default Object argument. Used by generated code, do not remove.
      */
+    @SuppressWarnings("unused")
     Argument<Object> OBJECT_ARGUMENT = of(Object.class);
 
     /**
@@ -62,11 +112,6 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * @return The type of the argument
      */
     Class<T> getType();
-
-    /**
-     * @return The qualifier or null if there is none
-     */
-    Annotation getQualifier();
 
     /**
      * Whether the types are equivalent. The regular {@link Object#equals(Object)} implementation includes the argument
@@ -84,6 +129,35 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
      * @return The type hash code
      */
     int typeHashCode();
+
+    /**
+     * Returns the string representation of the argument type, including generics.
+     *
+     * @param simple If true, output the simple name of types
+     * @return The type string representation
+     */
+    default String getTypeString(boolean simple) {
+        Class<T> type = getType();
+        StringBuilder returnType = new StringBuilder(simple ? type.getSimpleName() : type.getName());
+        Map<String, Argument<?>> generics = getTypeVariables();
+        if (!generics.isEmpty()) {
+            returnType
+                    .append("<")
+                    .append(generics.values()
+                            .stream()
+                            .map(arg -> arg.getTypeString(simple))
+                            .collect(Collectors.joining(", ")))
+                    .append(">");
+        }
+        return returnType.toString();
+    }
+
+    /**
+     * @return Whether the argument has any type variables
+     */
+    default boolean hasTypeVariables() {
+        return !getTypeVariables().isEmpty();
+    }
 
     /**
      * Convert an argument array to a class array.
@@ -120,22 +194,6 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
             }
         }
         return baseString.toString();
-    }
-
-    /**
-     * Creates a new argument for the given type, name and qualifier.
-     *
-     * @param type      The type
-     * @param name      The name
-     * @param qualifier The qualifier
-     * @param <T>       The generic type
-     * @return The argument instance
-     */
-    static <T> Argument<T> of(
-        Class<T> type,
-        String name,
-        Annotation qualifier) {
-        return new DefaultArgument<>(type, name, qualifier);
     }
 
     /**
@@ -238,168 +296,4 @@ public interface Argument<T> extends AnnotationSource, TypeVariableResolver, Nam
         }
     }
 
-    /**
-     * Create a new argument for the given method.
-     *
-     * @param method         The method
-     * @param name           The argument name
-     * @param index          The argument index
-     * @param qualifierType  The qualifier type
-     * @param typeParameters The generic type parameters
-     * @return The argument instance
-     */
-    @SuppressWarnings("unchecked")
-    static Argument of(
-        Method method,
-        String name,
-        int index,
-        @Nullable Class qualifierType,
-        @Nullable Argument... typeParameters) {
-        Class type = method.getParameterTypes()[index];
-
-        Annotation[] annotations = method.getParameterAnnotations()[index];
-        Annotation annotation = (Annotation) AnnotationUtil.findAnnotation(annotations, qualifierType).orElse(null);
-        return new DefaultArgument(
-            type,
-            name,
-            annotation,
-            annotations,
-            typeParameters
-        );
-    }
-
-    /**
-     * Create a new argument for the given constructor.
-     *
-     * @param constructor    The method
-     * @param name           The argument name
-     * @param index          The argument index
-     * @param qualifierType  The qualifier type
-     * @param typeParameters The generic type parameters
-     * @return The argument instance
-     */
-    @SuppressWarnings("unchecked")
-    static Argument of(
-        Constructor constructor,
-        String name,
-        int index,
-        @Nullable Class qualifierType,
-        @Nullable Argument... typeParameters) {
-        Class type = constructor.getParameterTypes()[index];
-
-        Annotation[] annotations = constructor.getParameterAnnotations()[index];
-        Annotation annotation = (Annotation) AnnotationUtil.findAnnotation(annotations, qualifierType).orElse(null);
-        return new DefaultArgument(
-            type,
-            name,
-            annotation,
-            annotations,
-            typeParameters
-        );
-    }
-
-    /**
-     * Create a new argument for the given field.
-     *
-     * @param field          The field
-     * @param name           The argument name
-     * @param qualifierType  The qualifier type
-     * @param typeParameters The generic type parameters
-     * @return The argument instance
-     */
-    @SuppressWarnings("unchecked")
-    static Argument of(
-        Field field,
-        String name,
-        @Nullable Class qualifierType,
-        @Nullable Argument... typeParameters) {
-        Class type = field.getType();
-        Annotation[] annotations = field.getAnnotations();
-        Annotation annotation = (Annotation) AnnotationUtil.findAnnotation(annotations, qualifierType).orElse(null);
-        return new DefaultArgument(
-            type,
-            name,
-            annotation,
-            annotations,
-            typeParameters
-        );
-    }
-
-    /**
-     * Create a new argument for the given field.
-     *
-     * @param field          The field
-     * @param qualifierType  The qualifier type
-     * @param typeParameters The generic type parameters
-     * @return The argument instance
-     */
-    @SuppressWarnings("unchecked")
-    static Argument of(
-        Field field,
-        @Nullable Class qualifierType,
-        @Nullable Argument... typeParameters) {
-        Class type = field.getType();
-        Annotation[] annotations = field.getAnnotations();
-        Annotation annotation = (Annotation) AnnotationUtil.findAnnotation(annotations, qualifierType).orElse(null);
-        return new DefaultArgument(
-            type,
-            field.getName(),
-            annotation,
-            annotations,
-            typeParameters
-        );
-    }
-
-    /**
-     * Create a new argument for the given field.
-     *
-     * @param field          The field
-     * @param typeParameters The generic type parameters
-     * @return The argument instance
-     */
-    @SuppressWarnings("unchecked")
-    static Argument of(
-        Field field,
-        @Nullable Argument... typeParameters) {
-        Class type = field.getType();
-        Annotation[] annotations = field.getAnnotations();
-        return new DefaultArgument(
-            type,
-            field.getName(),
-            null,
-            annotations,
-            typeParameters
-        );
-    }
-
-
-
-    /**
-     * Returns the string representation of the argument type, including generics.
-     *
-     * @param simple If true, output the simple name of types
-     * @return The type string representation
-     */
-    default String getTypeString(boolean simple) {
-        Class<T> type = getType();
-        StringBuilder returnType = new StringBuilder(simple ? type.getSimpleName() : type.getName());
-        Map<String, Argument<?>> generics = getTypeVariables();
-        if (!generics.isEmpty()) {
-            returnType
-                .append("<")
-                .append(generics.values()
-                    .stream()
-                    .map(arg -> arg.getTypeString(simple))
-                    .collect(Collectors.joining(", ")))
-                .append(">");
-        }
-        return returnType.toString();
-    }
-
-    /**
-     * @return Whether the argument has any type variables
-     */
-    default boolean hasTypeVariables() {
-        return !getTypeVariables().isEmpty();
-    }
 }

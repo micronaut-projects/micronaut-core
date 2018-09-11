@@ -1,49 +1,183 @@
-Apart from https://github.com/micronaut-projects/micronaut-core/milestone/3?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features.
+Apart from https://github.com/micronaut-projects/micronaut-core/milestone/4?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features.
 
-=== Improved Metrics Support
+=== Documentation Improvements
 
-Metrics support has been improved with support for metrics for:
+The documentation you are reading has been improved with a always present Table of Contents and styling improvements including code highlighting with http://highlightjs.org[Highlight.js].
 
-* Micronaut Thread Pools
-* Kafka Metrics
+=== Bean Generics Computed at Compile Time
 
-=== Apache Kafka Support
+Generic information for beans is now calculated at compile time, improving performance and allowing more uses cases.
 
-Micronaut can now be used to build Message-Driven Microservices with Apache Kafka.
+For example it is now possible to define converters, serverless functions etc. as Java lambdas because the generic information is computed from the method signature:
 
-The new ann:configuration.kafka.annotation.KafkaClient[] annotation supports declarative, compile-time creation of Kafka `Producer` instances.
-
-Whilst the ann:configuration.kafka.annotation.KafkaListener[] annotation supports defining Kafka consumers.
-
-See the <<kafka, Kafka>> section of the documentation for more information.
-
-The Micronaut CLI now includes a Kafka *feature*, which adds the necessary dependency and config to use Kafka within your project. In addition, the CLI also includes a Kafka *profile*, which can be used to create messaging services without the need for an HTTP server. See the <<kafkaCli, Kafka>> section for more information.
-
-=== Annotation Metadata Processing Support Improved
-
-All annotation metadata in Micronaut is produced as compile time, resulting in significant improvements to startup time and memory consumption over traditional frameworks.
-
-This support has been enhanced to better support repeated annotations such that repeated annotations are normalized at compile time, avoiding the need to process them and compensate for the difference between a single annotation definition and multiple.
-
-The api:core.annotation.AnnotationMetadata[] interface now includes methods such as `getAnnotationValuesByType` and `getDeclaredAnnotationValuesByType` that allow the retrieval of the repeated annotation values that are computed at compile time.
-
-=== Reactive Postgres Driver Support
-
-Support has been added for the https://github.com/reactiverse/reactive-pg-client[Postgres Reactive Client] project allowing building non-blocking, reactive applications with Postgres SQL and Micronaut. See the documentation on <<postgresSupport, Postgres Reactive Client Support>> for more information.
-
-=== CLI Improvements
-
-Thanks to a contribution from https://github.com/remkop[Remko Popma] the CLI has been re-written on top of https://github.com/remkop/picocli[PicoCLI] resulting in improvements to documentation, TAB completion and code maintainability.
-
-=== Spring Transaction Management for SQL
-
-Regular JDBC support now optionally supports transaction management via Spring's transaction manager with the addition of the following dependencies to your classpath:
-
-.build.gradle
-[source,groovy]
+.Functions as Java Lambdas
+[source,java]
 ----
-dependencies {
-    compile "io.micronaut:spring"
-    runtime "org.springframework:spring-jdbc"
+@Factory
+public class FunctionFactory {
+
+    @FunctionBean("round")
+    Function<Double, Long> round() {
+        return (doub) -> Math.round(doub.doubleValue());
+    }
 }
 ----
+
+The api:inject.BeanDefinition[] interface features a new `getTypeArguments(..)` method that can be used to retrieve the generic types of any bean without using reflection and having to deal with type erasure.
+
+=== New @Adapter AOP Advice
+
+Micronaut's AOP API has been extended introducing a new ann:aop.Adapter[] annotation that allows any method to be adapted to a new SAM (single abstract method) type at compile time that is automatically registered as a bean.
+
+For example:
+
+.Using the `@Adapter` annotation
+[source,java]
+----
+import io.micronaut.aop.*;
+import io.micronaut.context.event.*;
+
+@javax.inject.Singleton
+class MyBean{
+
+    @Adapter(ApplicationEventListener.class)
+    void onStartup(StartupEvent event) {
+        // startup logic
+    }
+}
+----
+
+The above example will create a new bean at compile time that implements the api:context.event.ApplicationEventListener[] interface and delegates to the `onStartup` method of `MyBean`. Micronaut will automatically align the generic type arguments (if the SAM type features any) and will also perform checks at compile time to verify the method is a valid candidate, failing compilation if it isn't.
+
+For more information see the section on <<adapterAdvice, Adapter Advice>> in the documentation.
+
+=== Improved Events API
+
+The ann:aop.Adapter[] annotation can be used as an annotation stereotype (meta annotation), and in fact is already used that way - the new ann:runtime.event.annotation.EventListener[] annotation allows more elegant definition of application event listeners:
+
+.Using the `@EventListener` annotation
+[source,java]
+----
+import io.micronaut.aop.*;
+import io.micronaut.context.event.*;
+import io.micronaut.runtime.event.annotation.EventListener;
+
+@javax.inject.Singleton
+class MyBean{
+
+    @EventListener // <1>
+    void onStartup(StartupEvent event) {
+        // startup logic
+    }
+}
+----
+
+<1> Simply define the `@EventListener` annotation on any method to create a new listener
+
+In addition the ann:scheduling.annotation.Async[] annotation can be used to make any ann:runtime.event.annotation.EventListener[] asynchronous:
+
+[source,java]
+----
+@EventListener // <1>
+@Async // <2>
+void onStartup(StartupEvent event) {
+    // startup logic
+}
+----
+
+<1> An `@EventListener` is defined
+<2> The `@Async` annotation tells Micronaut to run the operation asynchronously (by default on the `scheduled` executor)
+
+For more information, see the section on <<contextEvents, Application Context Events>>.
+
+=== Support for @PersistenceContext in JPA
+
+The JPA support in Micronaut has been improved with support for the `@PersistenceContext` annotation to inject an `EntityManager` (or Hibernate `Session`):
+
+.Using `@PersistenceContext`
+----
+@PersistenceContext
+EntityManager entityManager;
+
+@PersistenceContext(name = "other")
+EntityManager otherManager;
+----
+
+Micronaut will inject a compile time scoped proxy that retrieves the `EntityManager` associated with the current transaction when using ann:spring.tx.annotation.Transactional[].
+
+
+=== Manual Service Discovery Configuration
+
+If you do not wish to use a service discovery server like Consul or Eureka and instead prefer environment variables or DNS you can manually configure service discovery in `application.yml`:
+
+.Manually configuring services
+[source,yaml]
+----
+micronaut:
+    http:
+        services:
+            foo:
+                urls:
+                    - http://foo1
+                    - http://foo2
+
+----
+
+With the above configuration you can inject a <<httpClient, HTTP Client>> using the ann:http.client.Client[] annotation and the service name `foo`. For example: `@Client("foo")` and Micronaut will automatically load balance between the configured servers.
+
+TIP: You can override this configuration in production by specifying an environment variable such as `MICRONAUT_HTTP_SERVICES_FOO_URLS=http://prod1,http://prod2`
+
+For more information see the section on <<serviceDiscoveryManual, Manual Service Discovery>> configuration.
+
+=== Support for HTTP Client Connection Pooling
+
+For clients that need to deal with high volumes of requests you can now enable connection pooling:
+
+.Enabling Connection Pooling for a Client
+[source,yaml]
+----
+micronaut:
+    http:
+        services:
+            foo:
+                pool:
+                    enabled: true # <1>
+                    max-connections: 50 # <2>
+
+----
+
+The above configuration will enable connection pooling for the service named `foo`.
+
+For more information see the section on <<clientConfiguration, HTTP Client>> configuration.
+
+
+=== Metrics for HTTP Client Requests
+
+The <<metricsEndpoint, Metrics>> support via Micrometer has been enhanced to support Metrics for client requests.
+
+=== Initial Support for Server Side View Rendering
+
+Support for rendering views on the server-side has been added using the <<views, Views Module>>. Initially Thymeleaf, Velocity and Handlebars are supported with more implementations planned for the future.
+
+See the section on <<views, Server Side View Rendering>> for more information.
+
+=== Improved Support for Command Line Applications
+
+The command line application support in Micronaut has been improved with a new `create-cli-app` command that generates a project with an example command, and sets the main class of the application to this command.
+For details, see the <<picocliGenerateProject, create-cli-app command>> section of the user guide.
+
+=== Dependency Upgrades
+
+The following dependency upgrades occurred in this release:
+
+- Netty 4.1.28
+- RxJava 2.2.0
+- Groovy 2.5.1
+- Caffeine 2.6.2
+- ASM 6.2.1
+- Mongo Java Driver 3.8.0
+- Neo4j Bolt Driver 1.6.2
+- Kafka 2.0.0
+- Hibernate Core 5.3.4
+- Micrometer 1.0.6
+- Spring 5.0.8

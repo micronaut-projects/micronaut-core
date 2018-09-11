@@ -19,8 +19,6 @@ package io.micronaut.http.client.exceptions;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.hateos.JsonError;
-import io.micronaut.http.hateos.VndError;
 
 import java.util.Optional;
 
@@ -32,16 +30,14 @@ import java.util.Optional;
  */
 public class HttpClientResponseException extends HttpClientException {
     private final HttpResponse<?> response;
-    private boolean jsonType = true;
+    private final HttpClientErrorDecoder errorDecoder;
 
     /**
      * @param message  The message
      * @param response The Http response
      */
     public HttpClientResponseException(String message, HttpResponse<?> response) {
-        super(message);
-        this.response = response;
-        initResponse(response);
+        this(message, null, response);
     }
 
     /**
@@ -50,17 +46,29 @@ public class HttpClientResponseException extends HttpClientException {
      * @param response The Http response
      */
     public HttpClientResponseException(String message, Throwable cause, HttpResponse<?> response) {
+        this(message, cause, response, HttpClientErrorDecoder.DEFAULT);
+    }
+
+    /**
+     * @param message  The message
+     * @param cause    The throwable
+     * @param response The Http response
+     * @param errorDecoder The error decoder
+     */
+    public HttpClientResponseException(String message, Throwable cause, HttpResponse<?> response, HttpClientErrorDecoder errorDecoder) {
         super(message, cause);
+        this.errorDecoder = errorDecoder;
         this.response = response;
         initResponse(response);
     }
 
     @Override
     public String getMessage() {
-        if (jsonType) {
-            return getResponse().getBody(JsonError.class).map(JsonError::getMessage).orElse(super.getMessage());
+        Optional<Class<?>> errorType = Optional.ofNullable(getErrorType(response));
+        if (errorType.isPresent()) {
+            return getResponse().getBody(errorType.get()).flatMap(errorDecoder::getMessage).orElse(super.getMessage());
         } else {
-            return getResponse().getBody(String.class).orElse(super.getMessage());
+            return super.getMessage();
         }
     }
 
@@ -80,16 +88,21 @@ public class HttpClientResponseException extends HttpClientException {
 
     @SuppressWarnings("MagicNumber")
     private void initResponse(HttpResponse<?> response) {
-        Optional<MediaType> contentType = response.getContentType();
-        if (contentType.isPresent() && response.getStatus().getCode() > 399) {
-            if (contentType.get().equals(MediaType.APPLICATION_JSON_TYPE)) {
-                response.getBody(JsonError.class);
-            } else if (contentType.get().equals(MediaType.APPLICATION_VND_ERROR_TYPE)) {
-                response.getBody(VndError.class);
-            } else {
-                jsonType = false;
-                response.getBody(String.class);
-            }
+        Class<?> errorType = getErrorType(response);
+        if (errorType != null) {
+            response.getBody(errorType);
+        } else {
+            response.getBody(String.class);
         }
+    }
+
+    private Class<?> getErrorType(HttpResponse<?> response) {
+        Optional<MediaType> contentType = response.getContentType();
+        Class<?> errorType = null;
+        if (contentType.isPresent() && response.getStatus().getCode() > 399) {
+            MediaType mediaType = contentType.get();
+            errorType = errorDecoder.getErrorType(mediaType);
+        }
+        return errorType;
     }
 }

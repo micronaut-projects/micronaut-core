@@ -43,6 +43,7 @@ public @interface MapFormat {
      */
     StringConvention keyFormat() default StringConvention.RAW;
 
+
     /**
      * Specifies the type of the map that should be injected.
      */

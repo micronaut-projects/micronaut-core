@@ -82,7 +82,18 @@ task javadoc(type: Javadoc, description: 'Generate javadocs from all child proje
 }
 
 
-task publishGuide(type: grails.doc.gradle.PublishGuide) {
+task mergeConfigProps() {
+    inputs.files( fileTree( "$project.buildDir/config-props" ) ).skipWhenEmpty()
+    outputs.file( "$project.projectDir/src/main/docs/guide/appendix/propertyReference.adoc" )
+    doLast {
+        outputs.files.singleFile.withOutputStream { out ->
+            List<File> files = new ArrayList<>(inputs.files.files).sort { File f -> f.name }
+            for ( file in files ) file.withInputStream { out << it << '\n' }
+        }
+    }
+}
+
+task publishGuide(type: grails.doc.gradle.PublishGuide, dependsOn:mergeConfigProps) {
     group = DOCUMENTATION_GROUP
     description = 'Generate Guide'
     dependsOn copyLocalDocResources
@@ -95,6 +106,7 @@ task publishGuide(type: grails.doc.gradle.PublishGuide) {
     resourcesDir = project.file(docResourcesDir)
     properties = [
             'safe':'UNSAFE',
+            'source-highlighter':'highlightjs',
             'version': project.version,
             'subtitle': project.projectDesc,
             'api': '../api',
@@ -105,7 +117,8 @@ task publishGuide(type: grails.doc.gradle.PublishGuide) {
             'groovyapi': 'http://docs.groovy-lang.org/latest/html/gapi/',
             'grailsapi': 'http://docs.grails.org/latest/api/',
             'gormapi': 'http://gorm.grails.org/latest/api/',
-            'springapi': 'https://docs.spring.io/spring/docs/current/javadoc-api/'
+            'springapi': 'https://docs.spring.io/spring/docs/current/javadoc-api/',
+            'kafka-version': rootProject.properties['kafkaVersion']
     ]
     doLast {
         ant.move(file:"${project.buildDir}/docs/guide/single.html",

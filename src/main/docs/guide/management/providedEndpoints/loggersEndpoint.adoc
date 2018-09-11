@@ -1,0 +1,125 @@
+
+The loggers endpoint returns information about the available loggers in the application and
+permits configuring the their log level.
+
+To get a collection of all loggers by name with their configured and effective log levels,
+send a GET request to /loggers. This will also provide a list of the available log levels.
+
+[source,bash]
+----
+$ curl http://localhost:8080/loggers
+
+{
+    "levels": [
+        "ALL", "TRACE", "DEBUG", "INFO", "WARN", "ERROR", "OFF", "NOT_SPECIFIED"
+    ],
+    "loggers": {
+        "ROOT": {
+            "configuredLevel": "INFO",
+            "effectiveLevel": "INFO"
+        },
+        "io": {
+            "configuredLevel": "NOT_SPECIFIED",
+            "effectiveLevel": "INFO"
+        },
+        "io.micronaut": {
+            "configuredLevel": "NOT_SPECIFIED",
+            "effectiveLevel": "INFO"
+        },
+        // etc...
+    }
+}
+----
+
+To get the log levels of a particular logger, include the logger name in your GET request. For
+example, to access the log levels of the logger 'io.micronaut.http':
+
+[source,bash]
+----
+$ curl http://localhost:8080/loggers/io.micronaut.http
+
+{
+    "configuredLevel": "NOT_SPECIFIED",
+    "effectiveLevel": "INFO"
+}
+----
+
+If the named logger does not exist, it will be created with an unspecified (i.e. `NOT_SPECIFIED`)
+configured log level. (It's effective log level will usually be that of the root logger.)
+
+To update the log level of a single logger, send a POST request to the named logger URL and include
+a body providing the log level to configure.
+
+
+[source,bash]
+----
+$ curl -i -X POST
+       -H "Content-Type: application/json" \
+       -d '{ "configuredLevel": "ERROR" }' \
+       http://localhost:8080/loggers/ROOT
+
+HTTP/1.1 200 OK
+
+$ curl http://localhost:8080/loggers/ROOT
+
+{
+    "configuredLevel": "ERROR",
+    "effectiveLevel": "ERROR"
+}
+
+----
+
+
+== Configuration
+
+To configure the loggers endpoint, supply configuration through `endpoints.loggers`.
+
+.Loggers Endpoint Configuration Example
+[source,yaml]
+----
+endpoints:
+    loggers:
+        enabled: Boolean
+        sensitive: Boolean
+        id: String
+----
+
+== Customization
+
+The loggers endpoint is composed of two customizable parts: a loggers manager and a logging system.
+
+The loggers manager
+(link:{api}/io/micronaut/management/endpoint/loggers/LoggersManager.html[LoggersManager])
+is responsible for returning a Publisher that will return data collected and transformed for the response,
+and it is also responsible for updating a logger with a new log level.
+
+To override the default behavior for the loggers manager, either extend the default implementation
+(link:{api}/io/micronaut/management/endpoint/loggers/impl/DefaultLoggersManager.html[DefaultLoggersManager])
+or implement the link:{api}/io/micronaut/management/endpoint/loggers/LoggersManager.html[LoggersManager]
+interface directly. To ensure your implementation is used instead of the default, add the
+link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the
+value being the default implementation.
+
+The logging system
+(link:{api}/io/micronaut/management/endpoint/loggers/LoggingSystem.html[LoggingSystem])
+is responsible for processing requests from the loggers manager against a particular logging
+library (e.g. logback, log4j, etc.)
+
+The current default implementation for the logging system is
+link:{api}/io/micronaut/management/endpoint/loggers/impl/LogbackLoggingSystem.html[LogbackLoggingSystem],
+which works with the https://logback.qos.ch/[logback] logging framework. Additional logging systems will
+be implemented in future revisions of Micronaut. For custom logging system behavior, implement
+the link:{api}/io/micronaut/management/endpoint/loggers/LoggingSystem.html[LoggingSystem] interface directly.
+To ensure your implementation is used instead of the default, add the
+link:{api}/io/micronaut/context/annotation/Replaces.html[@Replaces] annotation to your class with the
+value being the default implementation.
+
+[source,java]
+----
+@Singleton
+@Replaces(LogbackLoggingSystem.class)
+public class CustomLoggingSystem implements LoggingSystem {
+    // ...
+}
+----
+

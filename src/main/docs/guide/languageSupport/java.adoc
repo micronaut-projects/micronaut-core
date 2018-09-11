@@ -58,17 +58,13 @@ Or when using Maven:
 NOTE: In both cases (Gradle and Maven) the Micronaut processor should be configured after the Lombok processor, reversing the order of the declared dependencies will not work.
 
 
-== IDE Considerations
+== Configuring an IDE
 
-You can use any IDE to develop Micronaut, if you depend on your configured build tool (Gradle or Maven) to build the application.
+You can use any IDE to develop Micronaut applications, if you depend on your configured build tool (Gradle or Maven) to build the application.
 
-However, if you wish to run tests within the IDE that is currently only possible with http://jetbrains.com/idea[IntelliJ IDEA].
+However, if you wish to run tests within the IDE that is currently possible with http://jetbrains.com/idea[IntelliJ IDEA] or Eclipse 4.9 M2 or above.
 
-For IntelliJ IDEA if you plan to use the IntelliJ compiler then you should enable annotation processing under the "Build, Execution, Deployment -> Compiler -> Annotation Processors" by ticking the "Enable annotation processing" checkbox:
-
-image::intellij-annotation-processors.png[Intellij Settings,1024,768]
-
-As of this writing, Eclipse has https://bugs.eclipse.org/bugs/show_bug.cgi?id=534501[incomplete support] for Java annotation processors, hence you will have to delegate to BuildShip or M2Eclipse for building and running tests.
+See the section on <<ideSetup, IDE Setup>> in the Quick start for more information on how to configure IntelliJ or Eclipse.
 
 == Retaining Parameter Names
 

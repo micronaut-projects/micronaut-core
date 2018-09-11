@@ -70,7 +70,15 @@ public class PropertyResolverAdapter implements PropertyResolver {
         return propertyResolver.getProperty(NameUtils.hyphenate(key), targetType, defaultValue);
     }
 
-    @Override
+    /**
+     * Return the property value converted to a class loaded by
+     * the current thread context class loader.
+     *
+     * @param key The property key
+     * @param targetType The class
+     * @param <T> The class type
+     * @return The class value
+     */
     @Deprecated
     public <T> Class<T> getPropertyAsClass(String key, Class<T> targetType) {
         Optional<String> property = propertyResolver.getProperty(NameUtils.hyphenate(key), String.class);

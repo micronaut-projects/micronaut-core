@@ -1,6 +1,7 @@
 package io.micronaut.docs.writable
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
@@ -17,4 +18,14 @@ class WritableSpec extends Specification {
         expect:
         client.toBlocking().retrieve('/template/welcome') == 'Dear Fred Flintstone. Nice to meet you.'
     }
+
+    void "test the correct headers are applied"() {
+        when:
+        HttpResponse response = client.toBlocking().exchange('/template/welcome', String)
+
+        then:
+        response.getHeaders().contains("Date")
+        response.getHeaders().contains("Content-Length")
+    }
+
 }

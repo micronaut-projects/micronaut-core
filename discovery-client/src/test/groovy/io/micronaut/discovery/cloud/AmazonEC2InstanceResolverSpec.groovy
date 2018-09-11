@@ -26,7 +26,6 @@ import spock.lang.Specification
 import java.nio.file.Path
 import java.nio.file.Paths
 
-@Ignore
 class AmazonEC2InstanceResolverSpec extends Specification {
 
     void "test building ec2 metadata"() {

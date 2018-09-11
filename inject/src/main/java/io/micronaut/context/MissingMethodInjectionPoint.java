@@ -16,14 +16,12 @@
 
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.MethodInjectionPoint;
 
-import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 
@@ -84,11 +82,6 @@ class MissingMethodInjectionPoint implements MethodInjectionPoint {
     public Object invoke(Object instance, Object... args) {
         Class[] types = Arrays.stream(argTypes).map(Argument::getType).toArray(Class[]::new);
         throw ReflectionUtils.newNoSuchMethodError(declaringType, methodName, types);
-    }
-
-    @Override
-    public AnnotatedElement[] getAnnotatedElements() {
-        return AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
     }
 
     @Override

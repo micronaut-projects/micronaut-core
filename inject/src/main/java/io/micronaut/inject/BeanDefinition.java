@@ -21,10 +21,14 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.type.Argument;
 
+import javax.annotation.Nonnull;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -64,6 +68,11 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      */
     @Override
     Class<T> getBeanType();
+
+    /**
+     * @return The type that declares this definition, null if not applicable.
+     */
+    Optional<Class<?>> getDeclaringType();
 
     /**
      * The single concrete constructor that is an injection point for creating the bean.
@@ -153,6 +162,46 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
      */
     Collection<ExecutableMethod<T, ?>> getExecutableMethods();
 
+    /**
+     * Whether this bean definition represents a proxy.
+     *
+     * @return True if it represents a proxy
+     */
+    default boolean isProxy() {
+        return this instanceof ProxyBeanDefinition;
+    }
+
+    /**
+     * If the bean itself declares any type arguments this method will return the classes that represent those types.
+     *
+     * @return The type arguments
+     */
+    default @Nonnull List<Argument<?>> getTypeArguments() {
+        return getTypeArguments(getBeanType());
+    }
+
+    /**
+     * Return the type arguments for the given interface or super type for this bean.
+     *
+     * @param type The super class or interface type
+     * @return The type arguments
+     */
+    default @Nonnull List<Argument<?>> getTypeArguments(Class<?> type) {
+        if (type == null) {
+            return Collections.emptyList();
+        }
+        return getTypeArguments(type.getName());
+    }
+
+    /**
+     * Return the type arguments for the given interface or super type for this bean.
+     *
+     * @param type The super class or interface type
+     * @return The type arguments
+     */
+    default @Nonnull List<Argument<?>> getTypeArguments(String type) {
+        return Collections.emptyList();
+    }
 
     /**
      * Finds a single {@link ExecutableMethod} for the given name and argument types.

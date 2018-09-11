@@ -1,3 +1,5 @@
+=== Global Configuration for All Clients
+
 The default HTTP client configuration is a <<configurationProperties, Configuration Properties>> called api:http.client.DefaultHttpClientConfiguration[] that allows configuring the default behaviour for all HTTP clients. For example, in `application.yml`:
 
 .Altering default HTTP client configuration
@@ -6,33 +8,61 @@ The default HTTP client configuration is a <<configurationProperties, Configurat
 micronaut:
     http:
         client:
-            readTimeout: 5s
+            read-timeout: 5s
 ----
 
 The above example sets of `readTimeout` property of the api:http.client.HttpClientConfiguration[] class.
 
-If you wish to have a separate configuration per client then there are a couple of options. An option that fits nicely with <<serviceDiscovery, Service Discovery>> is to define a named bean that is a subclass of api:http.client.HttpClientConfiguration[].
+=== Client Specific Configuration
 
-For example given an injected client for a service called `hello` using `@Client`:
+If you wish to have a separate configuration per client then there a couple of options. You can configure <<serviceDiscoveryManual, Service Discovery>> manually in `application.yml` and apply per-client configuration:
+
+.Manually configuring HTTP services
+[source,yaml]
+----
+micronaut:
+    http:
+        services:
+            foo:
+                urls:
+                    - http://foo1
+                    - http://foo2
+                read-timeout: 5s # <1>
+
+----
+
+<1> The read timeout is applied to the `foo` client.
+
+WARN: This client configuration can be used in conjunction with the `@Client` annotation, either by injecting an `HttpClient` directly or use on a client interface. In any case, all other attributes on the annotation *will be ignored* other than the service id.
+
+Then simply inject the named client configuration:
 
 .Injecting an HTTP client
 [source,java]
 ----
-@Client("hello") @Inject RxHttpClient httpClient;
+@Client("foo") @Inject RxHttpClient httpClient;
 ----
 
-To configure the property of the HTTP client you can define the following bean:
+You can also simply define a bean that extends from api:http.client.HttpClientConfiguration[] and ensuring that the `javax.inject.Named` annotation is used to name it appropriately:
 
 .Defining an HTTP client configuration bean
 [source,java]
 ----
-@Named("hello")
+@Named("twitter")
 @Singleton
-class HelloConfiguration extends HttpClientConfiguration {
-   public HelloConfiguration(ApplicationConfiguration applicationConfiguration) {
+class TwitterHttpClientConfiguration extends HttpClientConfiguration {
+   public TwitterHttpClientConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
     }
 }
+----
+
+This configuration will then be picked up if you inject a service called `twitter` using `@Client` using <<serviceDiscovery, Service Discovery>>:
+
+.Injecting an HTTP client
+[source,java]
+----
+@Client("twitter") @Inject RxHttpClient httpClient;
 ----
 
 Alternatively if you are not using service discovery then you can use the `configuration` member of `@Client` to refer to a specific type:
@@ -46,3 +76,27 @@ Alternatively if you are not using service discovery then you can use the `confi
 RxHttpClient httpClient;
 ----
 
+=== Using HTTP Client Connection Pooling
+
+If you have a client that needs to handle a significant number of requests then you can benefit from enabling HTTP client connection pooling. The following configuration will enable pooling for the `foo` client:
+
+.Manually configuring HTTP services
+[source,yaml]
+----
+micronaut:
+    http:
+        services:
+            foo:
+                urls:
+                    - http://foo1
+                    - http://foo2
+                pool:
+                    enabled: true # <1>
+                    max-connections: 50 # <2>
+
+----
+
+<1> Enables the pool
+<2> Sets the maximum number of connections in the pool
+
+See the API for link:{api}/io/micronaut/http/client/HttpClientConfiguration.ConnectionPoolConfiguration.html[ConnectionPoolConfiguration] for details on available options to configure the pool.

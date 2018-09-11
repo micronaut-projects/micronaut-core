@@ -32,10 +32,12 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Blocking;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.*;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
@@ -137,11 +139,11 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
 
-        Topic[] topicAnnotations = method.getDeclaredAnnotationsByType(Topic.class);
-        KafkaListener consumerAnnotation = method.getAnnotation(KafkaListener.class);
+        Topic[] topicAnnotations = method.synthesizeDeclaredAnnotationsByType(Topic.class);
+        AnnotationValue<KafkaListener> consumerAnnotation = method.getAnnotation(KafkaListener.class);
 
         if (ArrayUtils.isEmpty(topicAnnotations)) {
-            topicAnnotations = beanDefinition.getAnnotationsByType(Topic.class);
+            topicAnnotations = beanDefinition.synthesizeAnnotationsByType(Topic.class);
         }
 
         if (consumerAnnotation != null && ArrayUtils.isNotEmpty(topicAnnotations)) {
@@ -161,20 +163,21 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
             Optional<Argument> consumerArg = Arrays.stream(method.getArguments()).filter(arg -> Consumer.class.isAssignableFrom(arg.getType())).findFirst();
             Optional<Argument> ackArg = Arrays.stream(method.getArguments()).filter(arg -> Acknowledgement.class.isAssignableFrom(arg.getType())).findFirst();
 
-            String groupId = consumerAnnotation.groupId();
+            String groupId = consumerAnnotation.get("groupId", String.class).orElse(null);
 
+            Class<?> beanType = beanDefinition.getBeanType();
             if (StringUtils.isEmpty(groupId)) {
-                groupId = applicationConfiguration.getName().orElse(beanDefinition.getBeanType().getName());
+                groupId = applicationConfiguration.getName().orElse(beanType.getName());
             }
 
-            String clientId = consumerAnnotation.clientId();
+            String clientId = consumerAnnotation.get("clientId", String.class).orElse(null);
 
             if (StringUtils.isEmpty(clientId)) {
-                clientId = applicationConfiguration.getName().orElse(null);
+                clientId = applicationConfiguration.getName().map(s -> s + '-' + NameUtils.hyphenate(beanType.getSimpleName())).orElse(null);
             }
 
-            OffsetStrategy offsetStrategy = consumerAnnotation.offsetStrategy();
-            int consumerThreads = consumerAnnotation.threads();
+            OffsetStrategy offsetStrategy = consumerAnnotation.getRequiredValue("offsetStrategy", OffsetStrategy.class);
+            int consumerThreads = consumerAnnotation.getRequiredValue("threads", Integer.class);
 
             AbstractKafkaConsumerConfiguration consumerConfigurationDefaults = beanContext.findBean(AbstractKafkaConsumerConfiguration.class, Qualifiers.byName(groupId))
                     .orElse(defaultConsumerConfiguration);
@@ -184,7 +187,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
             Properties properties = consumerConfiguration.getConfig();
 
-            if (consumerAnnotation.offsetReset() == OffsetReset.EARLIEST) {
+            if (consumerAnnotation.getRequiredValue("offsetReset", OffsetReset.class) == OffsetReset.EARLIEST) {
                 properties.putIfAbsent(
                         ConsumerConfig.AUTO_OFFSET_RESET_CONFIG,
                         OffsetReset.EARLIEST.name().toLowerCase()
@@ -219,11 +222,15 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                 properties.put(ConsumerConfig.CLIENT_ID_CONFIG, clientId);
             }
 
-            Property[] additionalProperties = consumerAnnotation.properties();
+            List<AnnotationValue<Property>> additionalProperties = consumerAnnotation.getAnnotations("properties", Property.class);
 
-            if (ArrayUtils.isNotEmpty(additionalProperties)) {
-                for (Property property : additionalProperties) {
-                    properties.put(property.name(), property.value());
+            if (!additionalProperties.isEmpty()) {
+                for (AnnotationValue<Property> property : additionalProperties) {
+                    String v = property.getValue(String.class).orElse(null);
+                    String n = property.get("name", String.class).orElse(null);
+                    if (StringUtils.isNotEmpty(n) && StringUtils.isNotEmpty(v)) {
+                        properties.put(n, v);
+                    }
                 }
             }
 
@@ -247,8 +254,13 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
 
             for (int i = 0; i < consumerThreads; i++) {
+                if (clientId != null && consumerThreads > 1) {
+                    // unique client id per consumer thread
+                    properties.put(ConsumerConfig.CLIENT_ID_CONFIG, clientId + "-" + i);
+                }
+
                 KafkaConsumer kafkaConsumer = beanContext.createBean(KafkaConsumer.class, consumerConfiguration);
-                Object consumerBean = beanContext.getBean(beanDefinition.getBeanType());
+                Object consumerBean = beanContext.getBean(beanType);
 
                 if (consumerBean instanceof KafkaConsumerAware) {
                     //noinspection unchecked
@@ -514,7 +526,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
     @SuppressWarnings({"SubscriberImplementation", "unchecked"})
     private void handleResultFlowable(
-            KafkaListener kafkaListener,
+            AnnotationValue<KafkaListener> kafkaListener,
             Object consumerBean,
             ExecutableMethod<?, ?> method,
             KafkaConsumer kafkaConsumer,
@@ -529,7 +541,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                         Object value = o;
 
                         if (value != null) {
-                            String groupId = kafkaListener.groupId();
+                            String groupId = kafkaListener.get("groupId", String.class).orElse(null);
                             KafkaProducer kafkaProducer = producerRegistry.getProducer(
                                     StringUtils.isNotEmpty(groupId) ? groupId : null,
                                     Argument.of((Class) (key != null ? key.getClass() : byte[].class)),
@@ -572,7 +584,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
                             consumerRecord
                     ));
 
-                    if (kafkaListener.redelivery()) {
+                    if (kafkaListener.getRequiredValue("redelivery", Boolean.class)) {
                         if (LOG.isDebugEnabled()) {
                             LOG.debug("Attempting redelivery of record [{}] following error", consumerRecord);
                         }
@@ -582,7 +594,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
 
                         if (key != null && value != null) {
-                            String groupId = kafkaListener.groupId();
+                            String groupId = kafkaListener.get("groupId", String.class).orElse(null);
                             KafkaProducer kafkaProducer = producerRegistry.getProducer(
                                     StringUtils.isNotEmpty(groupId) ? groupId : null,
                                     Argument.of(key.getClass()),
@@ -657,7 +669,7 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
         if (!properties.containsKey(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG)) {
             if (!consumerConfiguration.getKeyDeserializer().isPresent()) {
                 Optional<Argument> keyArgument = Arrays.stream(method.getArguments())
-                        .filter(arg -> arg.getAnnotation(KafkaKey.class) != null).findFirst();
+                        .filter(arg -> arg.isAnnotationPresent(KafkaKey.class)).findFirst();
 
                 if (keyArgument.isPresent()) {
                     consumerConfiguration.setKeyDeserializer(

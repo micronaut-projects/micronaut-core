@@ -23,6 +23,7 @@ import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 
 import javax.inject.Singleton;
+import java.util.List;
 
 /**
  * A bean for the default {@link MediaTypeCodecRegistry} used by the server.
@@ -40,7 +41,7 @@ public class MediaTypeCodecRegistryFactory {
     @Singleton
     @Primary
     @Bean
-    MediaTypeCodecRegistry mediaTypeCodecRegistry(MediaTypeCodec... codecs) {
+    MediaTypeCodecRegistry mediaTypeCodecRegistry(List<MediaTypeCodec> codecs) {
         return MediaTypeCodecRegistry.of(codecs);
     }
 }

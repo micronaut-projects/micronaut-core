@@ -21,7 +21,6 @@ import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.server.HttpServerConfiguration;
@@ -62,12 +61,8 @@ public class OptionalSessionValueArgumentBinder implements TypedRequestArgumentB
             return ArgumentBinder.BindingResult.UNSATISFIED;
         }
 
-        SessionValue annotation = context.getAnnotation(SessionValue.class);
         Argument<Optional> argument = context.getArgument();
-        String name = annotation != null ? annotation.value() : argument.getName();
-        if (StringUtils.isEmpty(name)) {
-            name = argument.getName();
-        }
+        String name = context.getAnnotationMetadata().getValue(SessionValue.class, String.class).orElse(argument.getName());
         Optional<Session> existing = attrs.get(HttpSessionFilter.SESSION_ATTRIBUTE, Session.class);
         if (existing.isPresent()) {
             String finalName = name;

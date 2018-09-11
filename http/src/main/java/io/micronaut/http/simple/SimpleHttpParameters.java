@@ -20,34 +20,38 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.ConvertibleMultiValuesMap;
-import io.micronaut.http.HttpParameters;
+import io.micronaut.http.MutableHttpParameters;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
- * Simple implementation of {@link HttpParameters}.
+ * Simple implementation of {@link MutableHttpParameters}.
  *
  * @author Graeme Rocher
  * @author Vladimir Orany
  *
  * @since 1.0
  */
-public class SimpleHttpParameters implements HttpParameters {
+public class SimpleHttpParameters implements MutableHttpParameters {
 
-    private final LinkedHashMap<CharSequence, List<String>> valuesMap;
+    private final Map<CharSequence, List<String>> valuesMap;
     private final ConvertibleMultiValues<String> values;
+
+    /**
+     * @param values The parameter values
+     * @param conversionService The conversion service
+     */
+    public SimpleHttpParameters(Map<CharSequence, List<String>> values, ConversionService conversionService) {
+        this.valuesMap = values;
+        this.values = new ConvertibleMultiValuesMap<>(this.valuesMap, conversionService);
+    }
 
     /**
      * @param conversionService The conversion service
      */
     public SimpleHttpParameters(ConversionService conversionService) {
-        this.valuesMap = new LinkedHashMap<>();
-        this.values = new ConvertibleMultiValuesMap<>(this.valuesMap, conversionService);
+        this(new LinkedHashMap<>(), conversionService);
     }
 
     @Override
@@ -75,23 +79,9 @@ public class SimpleHttpParameters implements HttpParameters {
         return values.get(name, conversionContext);
     }
 
-    /**
-     * Put new http parameter.
-     * @param name      the name of the parameter
-     * @param value     the value of the parameter
-     * @return the previous value of the parameter
-     */
-    public List<String> put(String name, String value) {
-        return valuesMap.put(name, Collections.singletonList(value));
-    }
-
-    /**
-     * Put new http parameter.
-     * @param name      the name of the parameter
-     * @param values    the values of the parameter
-     * @return the previous value of the parameter
-     */
-    public List<String> put(String name, List<String> values) {
-        return valuesMap.put(name, values);
+    @Override
+    public MutableHttpParameters add(CharSequence name, List<CharSequence> values) {
+        valuesMap.put(name, values.stream().map(v -> v == null ? null : v.toString()).collect(Collectors.toList()));
+        return this;
     }
 }

@@ -16,7 +16,6 @@
 
 package io.micronaut.annotation.processing.visitor;
 
-import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.annotation.processing.GenericUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -42,7 +41,6 @@ import java.util.List;
 public class LoadedVisitor {
 
     private final TypeElementVisitor visitor;
-    private final AnnotationUtils annotationUtils;
     private final String classAnnotation;
     private final String elementAnnotation;
     private final JavaVisitorContext visitorContext;
@@ -52,16 +50,13 @@ public class LoadedVisitor {
      * @param visitorContext        The visitor context
      * @param genericUtils          The generic utils
      * @param processingEnvironment The {@link ProcessEnvironment}
-     * @param annotationUtils       The annotation utils
      */
     public LoadedVisitor(TypeElementVisitor visitor,
                          JavaVisitorContext visitorContext,
                          GenericUtils genericUtils,
-                         ProcessingEnvironment processingEnvironment,
-                         AnnotationUtils annotationUtils) {
+                         ProcessingEnvironment processingEnvironment) {
         this.visitorContext = visitorContext;
         this.visitor = visitor;
-        this.annotationUtils = annotationUtils;
         TypeElement typeElement = processingEnvironment.getElementUtils().getTypeElement(visitor.getClass().getName());
         List<? extends TypeMirror> generics = genericUtils.interfaceGenericTypesFor(typeElement, TypeElementVisitor.class.getName());
         classAnnotation = generics.get(0).toString();
@@ -83,7 +78,7 @@ public class LoadedVisitor {
         if (classAnnotation.equals("java.lang.Object")) {
             return true;
         }
-        AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(typeElement);
+        AnnotationMetadata annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement);
         return annotationMetadata.hasAnnotation(classAnnotation);
     }
 
@@ -106,11 +101,27 @@ public class LoadedVisitor {
      */
     public void visit(Element element, AnnotationMetadata annotationMetadata) {
         if (element instanceof VariableElement) {
-            visitor.visitField(new JavaFieldElement((VariableElement) element, annotationMetadata), visitorContext);
+            visitor.visitField(
+                    new JavaFieldElement(
+                            (VariableElement) element,
+                            annotationMetadata),
+                    visitorContext
+            );
         } else if (element instanceof ExecutableElement) {
-            visitor.visitMethod(new JavaMethodElement((ExecutableElement) element, annotationMetadata), visitorContext);
+            visitor.visitMethod(
+                    new JavaMethodElement(
+                        (ExecutableElement) element,
+                        annotationMetadata, visitorContext),
+                    visitorContext
+            );
         } else if (element instanceof TypeElement) {
-            visitor.visitClass(new JavaClassElement((TypeElement) element, annotationMetadata), visitorContext);
+            visitor.visitClass(
+                    new JavaClassElement(
+                            (TypeElement) element,
+                            annotationMetadata,
+                            visitorContext),
+                    visitorContext
+            );
         }
     }
 }

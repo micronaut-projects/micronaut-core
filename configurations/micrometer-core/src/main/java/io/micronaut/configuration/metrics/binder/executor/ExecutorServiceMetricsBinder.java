@@ -29,6 +29,7 @@ import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.scheduling.instrument.InstrumentedExecutorService;
 import io.micronaut.scheduling.instrument.InstrumentedScheduledExecutorService;
 
+import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.util.Collections;
 import java.util.List;
@@ -49,19 +50,20 @@ import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory
 @Requires(property = MICRONAUT_METRICS_BINDERS + ".executor.enabled", value = "true", defaultValue = "true")
 public class ExecutorServiceMetricsBinder implements BeanCreatedEventListener<ExecutorService> {
 
-    private final MeterRegistry meterRegistry;
+    private final Provider<MeterRegistry> meterRegistryProvider;
 
     /**
-     * Constructs the default instance.
+     * Default constructor.
      *
-     * @param meterRegistry The meter registry
+     * @param meterRegistryProvider The meter registry provider
      */
-    public ExecutorServiceMetricsBinder(MeterRegistry meterRegistry) {
-        this.meterRegistry = meterRegistry;
+    public ExecutorServiceMetricsBinder(Provider<MeterRegistry> meterRegistryProvider) {
+        this.meterRegistryProvider = meterRegistryProvider;
     }
 
     @Override
     public ExecutorService onCreated(BeanCreatedEvent<ExecutorService> event) {
+        MeterRegistry meterRegistry = meterRegistryProvider.get();
         ExecutorService executorService = event.getBean();
         BeanIdentifier beanIdentifier = event.getBeanIdentifier();
 

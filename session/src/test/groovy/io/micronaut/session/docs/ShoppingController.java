@@ -30,7 +30,7 @@ import javax.validation.constraints.NotBlank;
  * @since 1.0
  */
 // tag::class[]
-@Controller
+@Controller("/shopping")
 public class ShoppingController {
     private static final String ATTR_CART = "cart"; // <1>
 // end::class[]

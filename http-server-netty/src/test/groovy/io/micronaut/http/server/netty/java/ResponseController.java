@@ -26,42 +26,52 @@ import io.micronaut.http.annotation.Get;
 @Controller("/java/response")
 public class ResponseController {
 
-    @Get
+    @Get("/disallow")
     public HttpResponse disallow() {
         return HttpResponse.notAllowed(HttpMethod.DELETE);
     }
 
-    @Get
+    @Get("/accepted")
     public HttpResponse accepted() {
         return HttpResponse.accepted();
     }
 
-    @Get
+    @Get("/accepted-uri")
+    public HttpResponse acceptedUri() {
+        return HttpResponse.accepted(HttpResponse.uri("http://example.com"));
+    }
+
+    @Get("/created-uri")
     public HttpResponse createdUri() {
         return HttpResponse.created(HttpResponse.uri("http://test.com"));
     }
 
-    @Get
+    @Get("/created-body")
     public HttpResponse createdBody() {
         return HttpResponse.created(new Foo("blah", 10));
     }
 
-    @Get
+    @Get("/created-body-uri")
+    public HttpResponse createdBodyUri() {
+        return HttpResponse.created(new Foo("blah", 10), HttpResponse.uri("http://test.com"));
+    }
+
+    @Get("/ok")
     public HttpResponse ok() {
         return HttpResponse.ok();
     }
 
-    @Get(produces = MediaType.TEXT_PLAIN)
+    @Get(value = "/ok-with-body", produces = MediaType.TEXT_PLAIN)
     public HttpResponse okWithBody() {
         return HttpResponse.ok("some text");
     }
 
-    @Get(produces = MediaType.TEXT_PLAIN)
+    @Get(value = "/error-with-body", produces = MediaType.TEXT_PLAIN)
     public HttpResponse errorWithBody() {
         return HttpResponse.serverError().body("some text");
     }
 
-    @Get
+    @Get("/ok-with-body-object")
     public HttpResponse<Foo> okWithBodyObject() {
         return HttpResponse.ok(new Foo("blah", 10))
                            .headers((headers)->
@@ -69,12 +79,12 @@ public class ResponseController {
                            );
     }
 
-    @Get
+    @Get("/status")
     public HttpMessage status() {
         return HttpResponse.status(HttpStatus.MOVED_PERMANENTLY);
     }
 
-    @Get
+    @Get("/custom-headers")
     public HttpResponse customHeaders() {
        return HttpResponse.ok("abc").contentType("text/plain").contentLength(7);
     }

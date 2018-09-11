@@ -289,6 +289,14 @@ class HttpGetSpec extends Specification {
         helper.queryParam() == "a!b"
     }
 
+    void "test query parameter with @Client interface"() {
+        given:
+        MyGetClient client = embeddedServer.applicationContext.getBean(MyGetClient)
+
+        expect:
+        client.queryParam('{"service":["test"]}') == '{"service":["test"]}'
+    }
+
     void "test body availability"() {
         given:
         RxHttpClient client = RxHttpClient.create(embeddedServer.getURL())
@@ -331,10 +339,31 @@ class HttpGetSpec extends Specification {
         backing.stop()
     }
 
+    void "test that Optional.empty() should return 404"() {
+        given:
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
+
+        when:
+        def flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/get/empty")
+        ))
+
+        HttpResponse<Optional<String>> response = flowable.blockingFirst()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.message == "Page Not Found"
+        e.status == HttpStatus.NOT_FOUND
+
+        cleanup:
+        client.stop()
+        client.close()
+    }
+
     @Controller("/get")
     static class GetController {
 
-        @Get(uri = "/simple", produces = MediaType.TEXT_PLAIN)
+        @Get(value = "/simple", produces = MediaType.TEXT_PLAIN)
         String simple() {
             return "success"
         }
@@ -349,7 +378,7 @@ class HttpGetSpec extends Specification {
             return [ new Book(title: "The Stand") ]
         }
 
-        @Get(uri = "/error", produces = MediaType.TEXT_PLAIN)
+        @Get(value = "/error", produces = MediaType.TEXT_PLAIN)
         HttpResponse error() {
             return HttpResponse.serverError().body("Server error")
         }
@@ -363,6 +392,11 @@ class HttpGetSpec extends Specification {
         String queryParam(@QueryValue String foo) {
             return foo
         }
+
+        @Get("/empty")
+        Optional<String> empty() {
+            return Optional.empty()
+        }
     }
 
     static class Book {
@@ -371,6 +405,27 @@ class HttpGetSpec extends Specification {
 
     static class Error {
         String message
+    }
+
+    @Client("/get")
+    static interface MyGetClient {
+        @Get(value = "/simple", produces = MediaType.TEXT_PLAIN)
+        String simple()
+
+        @Get("/pojo")
+        Book pojo()
+
+        @Get("/pojoList")
+        List<Book> pojoList()
+
+        @Get(value = "/error", produces = MediaType.TEXT_PLAIN)
+        HttpResponse error()
+
+        @Get("/jsonError")
+        HttpResponse jsonError()
+
+        @Get("/queryParam")
+        String queryParam(@QueryValue String foo)
     }
 
     @javax.inject.Singleton

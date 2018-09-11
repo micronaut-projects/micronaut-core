@@ -17,8 +17,8 @@
 package io.micronaut.management.endpoint.stop;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.management.endpoint.Endpoint;
-import io.micronaut.management.endpoint.Write;
+import io.micronaut.management.endpoint.annotation.Endpoint;
+import io.micronaut.management.endpoint.annotation.Write;
 
 import java.util.LinkedHashMap;
 import java.util.Map;

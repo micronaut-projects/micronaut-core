@@ -21,7 +21,9 @@ import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.reflect.ClassUtils;
 
 import javax.inject.Singleton;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Converts a String to a class.
@@ -33,6 +35,8 @@ import java.util.Optional;
 public class StringToClassConverter implements TypeConverter<CharSequence, Class> {
 
     private final ClassLoader classLoader;
+    private final Map<String, Optional<Class>> classCache = new ConcurrentHashMap<>();
+
 
     /**
      * @param classLoader The class loader
@@ -43,6 +47,6 @@ public class StringToClassConverter implements TypeConverter<CharSequence, Class
 
     @Override
     public Optional<Class> convert(CharSequence object, Class<Class> targetType, ConversionContext context) {
-        return ClassUtils.forName(object.toString(), classLoader);
+        return classCache.computeIfAbsent(object.toString(), s -> ClassUtils.forName(s, classLoader));
     }
 }

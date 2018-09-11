@@ -28,8 +28,20 @@ import io.micronaut.security.config.SecurityConfigurationProperties;
 public class LogoutControllerConfigurationProperties implements LogoutControllerConfiguration {
     public static final String PREFIX = SecurityConfigurationProperties.PREFIX + ".endpoints.logout";
 
-    private boolean enabled = false;
-    private String path = "/logout";
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = false;
+
+    /**
+     * The default path.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_PATH = "/logout";
+
+    private boolean enabled = DEFAULT_ENABLED;
+    private String path = DEFAULT_PATH;
 
     /**
      * @return true if you want to enable the {@link LogoutController}
@@ -42,5 +54,22 @@ public class LogoutControllerConfigurationProperties implements LogoutController
     @Override
     public String getPath() {
         return this.path;
+    }
+
+    /**
+     * Enables {@link io.micronaut.security.endpoints.LogoutController}. Default value {@value #DEFAULT_ENABLED}.
+     *
+     * @param enabled true if it is
+     */
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    /**
+     * Path to the {@link io.micronaut.security.endpoints.LogoutController}. Default value {@value #DEFAULT_PATH}.
+     * @param path The path
+     */
+    public void setPath(String path) {
+        this.path = path;
     }
 }

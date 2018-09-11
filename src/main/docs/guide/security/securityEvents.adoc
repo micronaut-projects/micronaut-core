@@ -1,4 +1,5 @@
 Micronaut security classes generate several link:{api}/io/micronaut/context/event/ApplicationEvent.html[ApplicationEvent]s which you can subscribe to.
+
 |===
 
 | Event Name | Description
@@ -17,5 +18,4 @@ Micronaut security classes generate several link:{api}/io/micronaut/context/even
 
 |===
 
-
-
+To learn how to listen for events, see the <<contextEvents, Context Events>> section of the documentation.

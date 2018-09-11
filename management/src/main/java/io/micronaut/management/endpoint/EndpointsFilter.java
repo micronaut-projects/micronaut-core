@@ -25,6 +25,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.RouteMatchUtils;
@@ -34,17 +35,19 @@ import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.Optional;
 
+import static io.micronaut.management.endpoint.EndpointDefaultConfiguration.PATH;
+
 /**
- * Returns 401 for {@link Endpoint} requests which have sensitive true. Disabled if micronaut.security is enabled.
+ * Returns 401 for {@link io.micronaut.management.endpoint.annotation.Endpoint} requests which have sensitive true. Disabled if micronaut.security is enabled.
  *
  * @author Sergio del Amo
  * @since 1.0
  */
 @Requires(property = "micronaut.security.enabled", notEquals = "true")
-@Filter("/**")
+@Filter("${" + PATH + ":/}**")
 public class EndpointsFilter extends OncePerRequestHttpServerFilter {
 
-    protected final Map<Method, Boolean> endpointMethods;
+    private final Map<ExecutableMethod, Boolean> endpointMethods;
 
     /**
      * Constructor.
@@ -65,7 +68,7 @@ public class EndpointsFilter extends OncePerRequestHttpServerFilter {
     protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
         Optional<RouteMatch> routeMatch = RouteMatchUtils.findRouteMatchAtRequest(request);
         if (routeMatch.isPresent() && routeMatch.get() instanceof MethodBasedRouteMatch) {
-            Method method = ((MethodBasedRouteMatch) routeMatch.get()).getTargetMethod();
+            ExecutableMethod method = ((MethodBasedRouteMatch) routeMatch.get()).getExecutableMethod();
             if (endpointMethods.containsKey(method)) {
                 if (endpointMethods.get(method)) {
                     return Publishers.just(HttpResponse.status(HttpStatus.UNAUTHORIZED));

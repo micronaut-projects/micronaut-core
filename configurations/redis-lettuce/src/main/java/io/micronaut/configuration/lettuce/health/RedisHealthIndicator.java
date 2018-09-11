@@ -70,7 +70,7 @@ public class RedisHealthIndicator implements HealthIndicator {
 
     @Override
     public Publisher<HealthResult> getResult() {
-        Collection<BeanRegistration<RedisClient>> registrations = beanContext.getBeanRegistrations(RedisClient.class);
+        Collection<BeanRegistration<RedisClient>> registrations = beanContext.getActiveBeanRegistrations(RedisClient.class);
         Flux<BeanRegistration<RedisClient>> redisClients = Flux.fromIterable(registrations);
 
         Flux<HealthResult> healthResultFlux = redisClients.flatMap(client -> {

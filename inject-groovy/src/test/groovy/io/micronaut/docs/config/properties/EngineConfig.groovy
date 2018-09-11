@@ -16,6 +16,7 @@
 package io.micronaut.docs.config.properties
 
 import io.micronaut.context.annotation.ConfigurationProperties
+import io.micronaut.core.convert.format.MapFormat
 
 // tag::imports[]
 import org.hibernate.validator.constraints.NotBlank
@@ -43,5 +44,6 @@ class EngineConfig {
     static class CrankShaft { // <4>
         Optional<Double> rodLength = Optional.empty() // <5>
     }
+
 }
 // end::class[]

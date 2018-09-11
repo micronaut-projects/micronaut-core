@@ -175,13 +175,13 @@ class RxJavaCrudSpec extends Specification {
         @Get("/res/{id}")
         Single<HttpResponse<Book>> getResponse(Long id)
 
-        @Get('/')
+        @Get
         Single<List<Book>> list()
 
         @Delete("/{id}")
         Maybe<Book> delete(Long id)
 
-        @Post('/')
+        @Post
         Single<Book> save(String title)
 
         @Patch("/{id}")

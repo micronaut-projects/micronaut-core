@@ -19,6 +19,7 @@ package io.micronaut.configuration.lettuce.session;
 import io.micronaut.configuration.lettuce.RedisSetting;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.serialize.ObjectSerializer;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.session.http.HttpSessionConfiguration;
 
@@ -36,15 +37,15 @@ import java.util.Optional;
 @ConfigurationProperties(RedisSetting.PREFIX)
 public class RedisHttpSessionConfiguration extends HttpSessionConfiguration implements Toggleable {
 
-    protected String namespace = "micronaut:session:";
-    protected String serverName;
-    protected String sessionCreatedTopic = namespace + "event:session-created";
-    protected String activeSessionsKey = namespace + "active-sessions";
-    protected Class<ObjectSerializer> valueSerializer;
-    protected Charset charset = StandardCharsets.UTF_8;
-    protected boolean enableKeyspaceEvents = true;
-    protected WriteMode writeMode = WriteMode.BATCH;
-    protected Duration expiredSessionCheck = Duration.ofMinutes(1);
+    private String namespace = "micronaut:session:";
+    private String serverName;
+    private String sessionCreatedTopic = namespace + "event:session-created";
+    private String activeSessionsKey = namespace + "active-sessions";
+    private Class<ObjectSerializer> valueSerializer;
+    private Charset charset = StandardCharsets.UTF_8;
+    private boolean enableKeyspaceEvents = true;
+    private WriteMode writeMode = WriteMode.BATCH;
+    private Duration expiredSessionCheck = Duration.ofMinutes(1);
 
     /**
      * @return The key prefix to use for reading and writing sessions
@@ -107,6 +108,87 @@ public class RedisHttpSessionConfiguration extends HttpSessionConfiguration impl
      */
     public Duration getExpiredSessionCheck() {
         return expiredSessionCheck;
+    }
+
+    /**
+     * Sets the namespace to use.
+     *
+     * @param namespace The namespace
+     */
+    public void setNamespace(String namespace) {
+        if (StringUtils.isNotEmpty(namespace)) {
+            this.namespace = namespace;
+        }
+    }
+
+    /**
+     * Sets the server name.
+     *
+     * @param serverName The server name
+     */
+    public void setServerName(String serverName) {
+        this.serverName = serverName;
+    }
+
+    /**
+     * Sets the topic to publish session created events to.
+     *
+     * @param sessionCreatedTopic The session created topic
+     */
+    public void setSessionCreatedTopic(String sessionCreatedTopic) {
+        this.sessionCreatedTopic = sessionCreatedTopic;
+    }
+
+    /**
+     * Sets the key to store active sessions in.
+     * @param activeSessionsKey The active session key
+     */
+    public void setActiveSessionsKey(String activeSessionsKey) {
+        this.activeSessionsKey = activeSessionsKey;
+    }
+
+    /**
+     * Sets the default value serializer to use.
+     *
+     * @param valueSerializer The value serializer
+     */
+    public void setValueSerializer(Class<ObjectSerializer> valueSerializer) {
+        this.valueSerializer = valueSerializer;
+    }
+
+    /**
+     * Sets the charset to use to serialize values.
+     *
+     * @param charset The default charset
+     */
+    public void setCharset(Charset charset) {
+        this.charset = charset;
+    }
+
+    /**
+     * Sets whether keyspace events should be enabled at startup.
+     * @param enableKeyspaceEvents True if keyspace event should be enabled
+     */
+    public void setEnableKeyspaceEvents(boolean enableKeyspaceEvents) {
+        this.enableKeyspaceEvents = enableKeyspaceEvents;
+    }
+
+    /**
+     * Sets the write mode to use.
+     *
+     * @param writeMode The write mode
+     */
+    public void setWriteMode(WriteMode writeMode) {
+        this.writeMode = writeMode;
+    }
+
+    /**
+     * Sets the duration to check for expired sessions.
+     *
+     * @param expiredSessionCheck The expired session check
+     */
+    public void setExpiredSessionCheck(Duration expiredSessionCheck) {
+        this.expiredSessionCheck = expiredSessionCheck;
     }
 
     /**

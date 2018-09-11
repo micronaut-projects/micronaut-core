@@ -26,6 +26,7 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.LifeCycle;
 import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.scope.CustomScope;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinition;
@@ -95,10 +96,8 @@ public class KafkaClientScope implements CustomScope<KafkaClient>, LifeCycle<Kaf
                 new IllegalStateException("@KafkaClient used in invalid location")
         );
         Argument argument = segment.getArgument();
-        KafkaClient annotation = argument.getAnnotation(KafkaClient.class);
-        if (annotation == null) {
-            throw new DependencyInjectionException(resolutionContext, argument, "KafkaClientScope called for injection point that is not annotated with @KafkaClient");
-        }
+        AnnotationValue<KafkaClient> annotation = argument.findAnnotation(KafkaClient.class)
+                                                          .orElseThrow(() -> new DependencyInjectionException(resolutionContext, argument, "KafkaClientScope called for injection point that is not annotated with @KafkaClient"));
         if (!Producer.class.isAssignableFrom(argument.getType())) {
             throw new DependencyInjectionException(resolutionContext, argument, "@KafkaClient used on type that is not a " + Producer.class.getName());
         }
@@ -114,7 +113,7 @@ public class KafkaClientScope implements CustomScope<KafkaClient>, LifeCycle<Kaf
 
         }
 
-        String id = annotation.id();
+        String id = annotation.getValue(String.class).orElse(null);
         Argument<?> keyArgument = k.get();
         Argument<?> valueArgument = v.get();
         return getKafkaProducer(id, keyArgument, valueArgument);

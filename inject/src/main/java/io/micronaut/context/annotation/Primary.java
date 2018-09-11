@@ -26,6 +26,8 @@ import java.lang.annotation.Retention;
  * <p>A {@link Qualifier} that indicates that this bean is the primary bean that should be selected in the case of
  * multiple possible interface implementations.</p>
  *
+ * <p>Note that if multiple primary beans are found then a {@link io.micronaut.context.exceptions.NonUniqueBeanException} can still occur.</p>
+ *
  * @author Graeme Rocher
  * @see Qualifier @Qualifier
  */

@@ -18,8 +18,8 @@ package io.micronaut.management.endpoint.refresh;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventPublisher;
-import io.micronaut.management.endpoint.Endpoint;
-import io.micronaut.management.endpoint.Write;
+import io.micronaut.management.endpoint.annotation.Endpoint;
+import io.micronaut.management.endpoint.annotation.Write;
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent;
 
 import javax.annotation.Nullable;

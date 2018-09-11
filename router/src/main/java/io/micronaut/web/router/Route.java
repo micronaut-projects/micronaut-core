@@ -16,6 +16,7 @@
 
 package io.micronaut.web.router;
 
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 
@@ -84,6 +85,14 @@ public interface Route {
      * @return This route
      */
     Route body(String argument);
+
+    /**
+     * The name of the argument to the route that is the request body.
+     *
+     * @param argument The argument
+     * @return This route
+     */
+    Route body(Argument<?> argument);
 
     /**
      * The media types able to produced by this route.

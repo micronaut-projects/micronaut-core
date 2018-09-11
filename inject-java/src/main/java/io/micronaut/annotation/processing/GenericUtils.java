@@ -109,9 +109,12 @@ public class GenericUtils {
     public List<? extends TypeMirror> interfaceGenericTypesFor(TypeElement element, String interfaceName) {
         for (TypeMirror tm : element.getInterfaces()) {
             DeclaredType declaredType = (DeclaredType) tm;
-            TypeElement interfaceType = elementUtils.getTypeElement(typeUtils.erasure(declaredType).toString());
-            if (interfaceName.equals(interfaceType.getQualifiedName().toString())) {
-                return declaredType.getTypeArguments();
+            Element declaredElement = declaredType.asElement();
+            if (declaredElement instanceof TypeElement) {
+               TypeElement te = (TypeElement) declaredElement;
+                if (interfaceName.equals(te.getQualifiedName().toString())) {
+                    return declaredType.getTypeArguments();
+                }
             }
         }
         return Collections.emptyList();

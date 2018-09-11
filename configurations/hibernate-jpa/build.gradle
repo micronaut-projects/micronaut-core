@@ -1,5 +1,5 @@
 dependencies {
-    compile 'org.hibernate:hibernate-core:5.3.0.Final'
+    compile 'org.hibernate:hibernate-core:5.3.4.Final'
 
     compile project(":aop")
     compile project(":jdbc")
@@ -9,8 +9,11 @@ dependencies {
     compile project(":configurations:hibernate-validator")
     compileOnly project(":inject-java")
     compileOnly project(":management")
+    compileOnly project(":configurations:micrometer-core")
 
     testCompile project(":inject-groovy")
+    testCompile project(":inject-java")
     testRuntime project(":configurations:jdbc-tomcat")
     testRuntime 'com.h2database:h2:1.4.196'
+    testCompile project(":configurations:micrometer-core")
 }

@@ -17,7 +17,7 @@
 package io.micronaut.docs.server.endpoints
 
 //tag::endpointImport[]
-import io.micronaut.management.endpoint.Endpoint
+import io.micronaut.management.endpoint.annotation.Endpoint
 //end::endpointImport[]
 
 //tag::mediaTypeImport[]
@@ -25,14 +25,14 @@ import io.micronaut.http.MediaType
 //end::mediaTypeImport[]
 
 //tag::writeImport[]
-import io.micronaut.management.endpoint.Write
+import io.micronaut.management.endpoint.annotation.Write
 //end::writeImport[]
 
 //tag::deleteImport[]
-import io.micronaut.management.endpoint.Delete
+import io.micronaut.management.endpoint.annotation.Delete
 //end::deleteImport[]
 
-import io.micronaut.management.endpoint.Read
+import io.micronaut.management.endpoint.annotation.Read
 
 import javax.annotation.PostConstruct
 

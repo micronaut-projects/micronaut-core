@@ -16,11 +16,7 @@
 
 package io.micronaut.aop.chain;
 
-import io.micronaut.aop.Around;
-import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.Introduced;
-import io.micronaut.aop.Introduction;
-import io.micronaut.aop.InvocationContext;
+import io.micronaut.aop.*;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanContext;
@@ -193,7 +189,12 @@ public class InterceptorChain<B, R> implements InvocationContext<B, R> {
         Interceptor[] aroundInterceptors = resolveAroundInterceptors(beanContext, method, interceptors);
         Interceptor[] introductionInterceptors = resolveInterceptorsInternal(method, Introduction.class, interceptors);
         if (introductionInterceptors.length == 0) {
-            throw new IllegalStateException("At least one @Introduction method interceptor required, but missing. Check if your @Introduction stereotype annotation is marked with @Retention(RUNTIME) and @Type(..) with the interceptor type. Otherwise do not load @Introduction beans if their interceptor definitions are missing!");
+            if (method.hasStereotype(Adapter.class)) {
+                introductionInterceptors = new Interceptor[] { new AdapterIntroduction(beanContext, method) };
+            } else {
+                throw new IllegalStateException("At least one @Introduction method interceptor required, but missing. Check if your @Introduction stereotype annotation is marked with @Retention(RUNTIME) and @Type(..) with the interceptor type. Otherwise do not load @Introduction beans if their interceptor definitions are missing!");
+
+            }
         }
         return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
     }

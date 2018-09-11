@@ -15,6 +15,10 @@
  */
 package io.micronaut.configuration.hibernate.jpa
 
+import io.micrometer.core.instrument.Counter
+import io.micrometer.core.instrument.FunctionCounter
+import io.micrometer.core.instrument.MeterRegistry
+import io.micronaut.configuration.hibernate.jpa.scope.CurrentSession
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanContextException
 import io.micronaut.core.util.CollectionUtils
@@ -25,6 +29,7 @@ import io.micronaut.inject.ExecutableMethod
 import io.micronaut.spring.tx.annotation.BindableRuleBasedTransactionAttribute
 import io.micronaut.spring.tx.annotation.TransactionInterceptor
 import io.micronaut.spring.tx.annotation.Transactional
+import org.hibernate.Session
 import org.hibernate.SessionFactory
 import org.springframework.transaction.TransactionDefinition
 import org.springframework.transaction.annotation.Isolation
@@ -51,7 +56,9 @@ class JpaSetupSpec extends Specification {
 
     @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.run(
             'datasources.default.name':'mydb',
-            'jpa.default.properties.hibernate.hbm2ddl.auto':'create-drop'
+            'jpa.default.properties.hibernate.hbm2ddl.auto':'create-drop',
+            'jpa.default.properties.hibernate.generate_statistics':true,
+            'micronaut.metrics.binders.hibernate.tags.some':'bar'
     )
 
     void "test configure @Transactional attribute"() {
@@ -62,7 +69,7 @@ class JpaSetupSpec extends Specification {
 
         when:
         BindableRuleBasedTransactionAttribute attribute = interceptor.resolveTransactionAttribute(
-                method.getTargetMethod(),
+                method,
                 method.getAnnotationMetadata(),
                 "test"
         )
@@ -97,6 +104,7 @@ class JpaSetupSpec extends Specification {
 
         then:
         thrown(ConstraintViolationException)
+
     }
 
     void "test setup entity manager save entity"() {
@@ -115,6 +123,13 @@ class JpaSetupSpec extends Specification {
 
         then:
         em.createQuery("select book from Book book").resultList.size() == 1
+
+        when:
+        MeterRegistry meterRegistry = applicationContext.getBean(MeterRegistry)
+        FunctionCounter c = meterRegistry.get("hibernate.query.executions").tag("entityManagerFactory", "Primary").functionCounter()
+
+        then:
+        c.count() > 0
 
         cleanup:
         tx.rollback()
@@ -148,6 +163,15 @@ class JpaSetupSpec extends Specification {
         then:
         books.size() == 1
     }
+
+    void "test inject java persistence context"() {
+        given:
+        JavaBookService bookService = applicationContext.getBean(JavaBookService)
+
+        expect:
+        bookService.testFieldInject()
+        bookService.testMethodInject()
+    }
 }
 
 @Entity
@@ -165,7 +189,8 @@ class Book {
 class BookService {
 
     @Inject
-    SessionFactory sessionFactory
+    @CurrentSession
+    Session session
 
     @Transactional(
             readOnly = true,
@@ -182,25 +207,25 @@ class BookService {
 
     @Transactional(readOnly = true)
     List<Book> listBooks() {
-        sessionFactory.currentSession.createCriteria(Book).list()
+        session.createCriteria(Book).list()
     }
 
     @Transactional(readOnly = true)
     List<Book> saveReadOnly() {
-        sessionFactory.currentSession.persist(new Book(title: "the stand"))
-        sessionFactory.currentSession.createCriteria(Book).list()
+        session.persist(new Book(title: "the stand"))
+        session.createCriteria(Book).list()
     }
 
     @Transactional()
     List<Book> saveError() {
-        sessionFactory.currentSession.persist(new Book(title: "the stand"))
+        session.persist(new Book(title: "the stand"))
         throw new Exception("bad things happened")
     }
 
     @Transactional()
     List<Book> saveSuccess() {
-        sessionFactory.currentSession.persist(new Book(title: "the stand"))
-        sessionFactory.currentSession.createCriteria(Book).list()
+        session.persist(new Book(title: "the stand"))
+        session.createCriteria(Book).list()
     }
 
 }

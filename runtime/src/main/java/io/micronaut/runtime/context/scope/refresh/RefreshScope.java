@@ -16,6 +16,7 @@
 
 package io.micronaut.runtime.context.scope.refresh;
 
+import io.micronaut.aop.InterceptedProxy;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
@@ -130,6 +131,9 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
 
     @Override
     public <T> Optional<BeanRegistration<T>> findBeanRegistration(T bean) {
+        if (bean instanceof InterceptedProxy) {
+            bean = ((InterceptedProxy<T>) bean).interceptedTarget();
+        }
         for (BeanRegistration beanRegistration : refreshableBeans.values()) {
             if (beanRegistration.getBean() == bean) {
                 return Optional.of(beanRegistration);
@@ -152,10 +156,10 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
 
     private void refreshSubsetOfConfigurationProperties(Set<String> keySet) {
         Collection<BeanRegistration<?>> registrations =
-            beanContext.getBeanRegistrations(Qualifiers.byStereotype(ConfigurationProperties.class));
+            beanContext.getActiveBeanRegistrations(Qualifiers.byStereotype(ConfigurationProperties.class));
         for (BeanRegistration<?> registration : registrations) {
             BeanDefinition<?> definition = registration.getBeanDefinition();
-            Optional<String> value = definition.getValue(ConfigurationReader.class, String.class);
+            Optional<String> value = definition.getValue(ConfigurationReader.class, "prefix", String.class);
             if (value.isPresent()) {
                 String configPrefix = value.get();
                 if (keySet.stream().anyMatch(key -> key.startsWith(configPrefix))) {
@@ -167,7 +171,7 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
 
     private void refreshAllConfigurationProperties() {
         Collection<BeanRegistration<?>> registrations =
-            beanContext.getBeanRegistrations(Qualifiers.byStereotype(ConfigurationProperties.class));
+            beanContext.getActiveBeanRegistrations(Qualifiers.byStereotype(ConfigurationProperties.class));
         for (BeanRegistration<?> registration : registrations) {
             beanContext.refreshBean(registration.getIdentifier());
         }

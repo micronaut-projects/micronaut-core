@@ -19,8 +19,12 @@ package io.micronaut.inject.annotation;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Aliases;
 import io.micronaut.context.annotation.DefaultScope;
+import io.micronaut.core.annotation.AnnotationMapper;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.io.service.ServiceDefinition;
+import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.OptionalValues;
 
@@ -37,6 +41,22 @@ import java.util.*;
  * @since 1.0
  */
 public abstract class AbstractAnnotationMetadataBuilder<T, A> {
+
+    private Map<String, List<AnnotationMapper>> annotationMapperMap = new HashMap<>();
+
+    /**
+     * Default constructor.
+     */
+    protected AbstractAnnotationMetadataBuilder() {
+        SoftServiceLoader<AnnotationMapper> serviceLoader = SoftServiceLoader.load(AnnotationMapper.class, getClass().getClassLoader());
+        for (ServiceDefinition<AnnotationMapper> definition : serviceLoader) {
+            if (definition.isPresent()) {
+                AnnotationMapper mapper = definition.load();
+                Class annotationType = mapper.annotationType();
+                annotationMapperMap.computeIfAbsent(annotationType.getName(), s -> new ArrayList<>()).add(mapper);
+            }
+        }
+    }
 
     /**
      * Build the meta data for the given element. If the element is a method the class metadata will be included.
@@ -127,6 +147,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     protected abstract Object readAnnotationValue(String memberName, Object annotationValue);
 
+
+    /**
+     * Read the raw default annotation values from the given annotation.
+     *
+     * @param annotationMirror The annotation
+     * @return The values
+     */
+    protected abstract Map<? extends T, ?> readAnnotationDefaultValues(A annotationMirror);
+
     /**
      * Read the raw annotation values from the given annotation.
      *
@@ -164,11 +193,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @param annotationMirror The annotation
      * @return The annotation value
      */
-    protected AnnotationValue readNestedAnnotationValue(A annotationMirror) {
-        AnnotationValue av;
+    protected io.micronaut.core.annotation.AnnotationValue readNestedAnnotationValue(A annotationMirror) {
+        io.micronaut.core.annotation.AnnotationValue av;
         Map<? extends T, ?> annotationValues = readAnnotationRawValues(annotationMirror);
         if (annotationValues.isEmpty()) {
-            av = new AnnotationValue(getAnnotationTypeName(annotationMirror));
+            av = new io.micronaut.core.annotation.AnnotationValue(getAnnotationTypeName(annotationMirror));
         } else {
 
             Map<CharSequence, Object> resolvedValues = new LinkedHashMap<>();
@@ -185,11 +214,19 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 String memberName = getAnnotationMemberName(member);
                 readAnnotationRawValues(memberName, annotationValue, resolvedValues);
             }
-            av = new AnnotationValue(getAnnotationTypeName(annotationMirror), resolvedValues);
+            av = new io.micronaut.core.annotation.AnnotationValue(getAnnotationTypeName(annotationMirror), resolvedValues);
         }
 
         return av;
     }
+
+    /**
+     * Return a mirror for the given annotation.
+     *
+     * @param annotationName The annotation name
+     * @return An optional mirror
+     */
+    protected abstract Optional<T> getAnnotationMirror(String annotationName);
 
     /**
      * Populate the annotation data for the given annotation.
@@ -204,13 +241,29 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         DefaultAnnotationMetadata metadata,
         boolean isDeclared) {
         String annotationName = getAnnotationTypeName(annotationMirror);
+
+        Map<? extends T, ?> elementDefaultValues = readAnnotationDefaultValues(annotationMirror);
+        if (elementDefaultValues != null) {
+            Map<CharSequence, Object> defaultValues = new LinkedHashMap<>();
+            for (Map.Entry<? extends T, ?> entry : elementDefaultValues.entrySet()) {
+                T member = entry.getKey();
+                String memberName = getAnnotationMemberName(member);
+                if (!defaultValues.containsKey(memberName)) {
+                    Object annotationValue = entry.getValue();
+                    readAnnotationRawValues(memberName, annotationValue, defaultValues);
+                }
+            }
+            metadata.addDefaultAnnotationValues(annotationName, defaultValues);
+        }
+
         List<String> parentAnnotations = new ArrayList<>();
         parentAnnotations.add(annotationName);
         Map<? extends T, ?> elementValues = readAnnotationRawValues(annotationMirror);
+        Map<CharSequence, Object> annotationValues;
         if (CollectionUtils.isEmpty(elementValues)) {
-            return Collections.emptyMap();
+            annotationValues = Collections.emptyMap();
         } else {
-            Map<CharSequence, Object> annotationValues = new LinkedHashMap<>();
+            annotationValues = new LinkedHashMap<>();
             for (Map.Entry<? extends T, ?> entry : elementValues.entrySet()) {
                 T member = entry.getKey();
 
@@ -223,9 +276,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
                 if (aliases.isPresent()) {
                     Object value = aliases.get();
-                    if (value instanceof AnnotationValue[]) {
-                        AnnotationValue[] values = (AnnotationValue[]) value;
-                        for (AnnotationValue av : values) {
+                    if (value instanceof io.micronaut.core.annotation.AnnotationValue[]) {
+                        io.micronaut.core.annotation.AnnotationValue[] values = (io.micronaut.core.annotation.AnnotationValue[]) value;
+                        for (io.micronaut.core.annotation.AnnotationValue av : values) {
                             OptionalValues<Object> aliasForValues = OptionalValues.of(Object.class, av.getValues());
                             processAnnotationAlias(
                                     metadata,
@@ -244,8 +297,43 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     readAnnotationRawValues(getAnnotationMemberName(member), annotationValue, annotationValues);
                 }
             }
-            return annotationValues;
         }
+        List<AnnotationMapper> mappers = annotationMapperMap.get(annotationName);
+        if (mappers != null) {
+            AnnotationValue<?> annotationValue = new AnnotationValue(annotationName, annotationValues);
+            for (AnnotationMapper mapper : mappers) {
+                List mapped = mapper.map(annotationValue);
+                if (mapped != null) {
+                    for (Object o : mapped) {
+                        if (o instanceof AnnotationValue) {
+                            AnnotationValue av = (AnnotationValue) o;
+                            String mappedAnnotationName = av.getAnnotationName();
+
+                            if (isDeclared) {
+                                metadata.addDeclaredAnnotation(
+                                        mappedAnnotationName,
+                                        av.getValues()
+                                );
+                            } else {
+                                metadata.addAnnotation(
+                                        mappedAnnotationName,
+                                        av.getValues()
+                                );
+                            }
+                            Optional<T> mappedMirror = getAnnotationMirror(mappedAnnotationName);
+                            mappedMirror.ifPresent(annMirror -> processAnnotationStereotype(
+                                    new ArrayList<>(),
+                                    annMirror,
+                                    mappedAnnotationName,
+                                    metadata,
+                                    isDeclared
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        return annotationValues;
     }
 
     private void processAnnotationAlias(
@@ -264,6 +352,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 String aliasedMemberName = aliasMember.get().toString();
                 Object v = readAnnotationValue(aliasedMemberName, annotationValue);
                 if (v != null) {
+                    Optional<T> annotationMirror = getAnnotationMirror(aliasedAnnotationName);
+
                     if (isDeclared) {
                         metadata.addDeclaredStereotype(
                                 parentAnnotations,
@@ -277,6 +367,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                 Collections.singletonMap(aliasedMemberName, v)
                         );
                     }
+
+                    annotationMirror.ifPresent(annMirror -> processAnnotationStereotype(
+                            parentAnnotations,
+                            annMirror,
+                            aliasedAnnotationName,
+                            metadata,
+                            isDeclared
+                    ));
                 }
             }
         } else if (aliasMember.isPresent()) {
@@ -314,7 +412,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 String repeatableName = getRepeatableName(annotationMirror);
 
                 if (repeatableName != null) {
-                    AnnotationValue av = new AnnotationValue(annotationName, annotationValues);
+                    io.micronaut.core.annotation.AnnotationValue av = new io.micronaut.core.annotation.AnnotationValue(annotationName, annotationValues);
                     if (isDeclared) {
                         annotationMetadata.addDeclaredRepeatable(repeatableName, av);
                     } else {
@@ -329,16 +427,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
             }
             for (A annotationMirror : annotationHierarchy) {
-                String parentAnnotationName = getAnnotationTypeName(annotationMirror);
-                T annotationType = getTypeForAnnotation(annotationMirror);
-                List<String> parentAnnotations = new ArrayList<>();
-                parentAnnotations.add(parentAnnotationName);
-                buildStereotypeHierarchy(
-                    parentAnnotations,
-                    annotationType,
-                    annotationMetadata,
-                    isDeclared
-                );
+                processAnnotationStereotype(annotationMirror, annotationMetadata, isDeclared);
             }
 
         }
@@ -370,7 +459,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     String repeatableName = getRepeatableName(annotationMirror);
 
                     if (repeatableName != null) {
-                        AnnotationValue av = new AnnotationValue(annotationName, data);
+                        io.micronaut.core.annotation.AnnotationValue av = new io.micronaut.core.annotation.AnnotationValue(annotationName, data);
                         if (isDeclared) {
                             metadata.addDeclaredRepeatableStereotype(parents, repeatableName, av);
                         } else {
@@ -387,12 +476,33 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             }
             // now add meta annotations
             for (A annotationMirror : topLevel) {
-                T typeForAnnotation = getTypeForAnnotation(annotationMirror);
-                String annotationTypeName = getAnnotationTypeName(annotationMirror);
-                List<String> stereoTypeParents = new ArrayList<>(parents);
-                stereoTypeParents.add(annotationTypeName);
-                buildStereotypeHierarchy(stereoTypeParents, typeForAnnotation, metadata, isDeclared);
+                processAnnotationStereotype(parents, annotationMirror, metadata, isDeclared);
             }
         }
+    }
+
+    private void processAnnotationStereotype(A annotationMirror, DefaultAnnotationMetadata annotationMetadata, boolean isDeclared) {
+        String parentAnnotationName = getAnnotationTypeName(annotationMirror);
+        T annotationType = getTypeForAnnotation(annotationMirror);
+        List<String> parentAnnotations = new ArrayList<>();
+        parentAnnotations.add(parentAnnotationName);
+        buildStereotypeHierarchy(
+                parentAnnotations,
+                annotationType,
+                annotationMetadata,
+                isDeclared
+        );
+    }
+
+    private void processAnnotationStereotype(List<String> parents, A annotationMirror, DefaultAnnotationMetadata metadata, boolean isDeclared) {
+        T typeForAnnotation = getTypeForAnnotation(annotationMirror);
+        String annotationTypeName = getAnnotationTypeName(annotationMirror);
+        processAnnotationStereotype(parents, typeForAnnotation, annotationTypeName, metadata, isDeclared);
+    }
+
+    private void processAnnotationStereotype(List<String> parents, T annotationType, String annotationTypeName, DefaultAnnotationMetadata metadata, boolean isDeclared) {
+        List<String> stereoTypeParents = new ArrayList<>(parents);
+        stereoTypeParents.add(annotationTypeName);
+        buildStereotypeHierarchy(stereoTypeParents, annotationType, metadata, isDeclared);
     }
 }

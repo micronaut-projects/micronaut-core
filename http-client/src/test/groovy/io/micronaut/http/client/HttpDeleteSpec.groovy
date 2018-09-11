@@ -75,12 +75,12 @@ class HttpDeleteSpec extends Specification {
     @Controller("/delete")
     static class DeleteController {
 
-        @Delete(uri = "/simple")
+        @Delete("/simple")
         HttpResponse simple() {
             HttpResponse.noContent()
         }
 
-        @Delete(uri = "/body", consumes = MediaType.TEXT_PLAIN, produces = MediaType.TEXT_PLAIN)
+        @Delete(value = "/body", consumes = MediaType.TEXT_PLAIN, produces = MediaType.TEXT_PLAIN)
         HttpResponse simple(@Body String content) {
 
             HttpResponse.accepted()

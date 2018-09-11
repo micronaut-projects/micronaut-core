@@ -5,8 +5,10 @@ dependencies {
     compile project(":inject")
     compileOnly project(":inject-java")
     compileOnly dependencyModuleVersion("spring", "spring-jdbc")
+    compileOnly project(":jdbc")
     compile project(":aop")
 
+    testImplementation project(':runtime')
     testImplementation project(':inject-groovy')
     testImplementation project(':inject-java')
     testImplementation dependencyVersion('spock')

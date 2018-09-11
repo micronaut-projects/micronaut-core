@@ -19,6 +19,7 @@ import groovy.transform.CompileStatic
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.control.Janitor
 import org.codehaus.groovy.control.SourceUnit
+import org.codehaus.groovy.control.messages.SimpleMessage
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage
 import org.codehaus.groovy.syntax.SyntaxException
 
@@ -46,10 +47,18 @@ $sample""")
     }
 
     static void error(SourceUnit sourceUnit, ASTNode expr, String errorMessage) {
-        sourceUnit.getErrorCollector().addErrorAndContinue(new SyntaxErrorMessage(
-            new SyntaxException(errorMessage + '\n', expr.getLineNumber(), expr.getColumnNumber(),
-                                expr.getLastLineNumber(), expr.getLastColumnNumber()),
-            sourceUnit)
-        )
+        if (expr == null) {
+            error(sourceUnit, errorMessage)
+        } else {
+            sourceUnit.getErrorCollector().addErrorAndContinue(new SyntaxErrorMessage(
+                    new SyntaxException(errorMessage + '\n', expr.getLineNumber(), expr.getColumnNumber(),
+                            expr.getLastLineNumber(), expr.getLastColumnNumber()),
+                    sourceUnit)
+            )
+        }
+    }
+
+    static void error(SourceUnit sourceUnit, String errorMessage) {
+        sourceUnit.getErrorCollector().addErrorAndContinue(new SimpleMessage(errorMessage, sourceUnit))
     }
 }

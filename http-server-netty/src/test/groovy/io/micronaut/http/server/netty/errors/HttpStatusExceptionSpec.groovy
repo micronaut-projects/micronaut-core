@@ -69,7 +69,7 @@ class HttpStatusExceptionSpec extends AbstractMicronautSpec {
     @Controller('/errors')
     static class BookController {
 
-        @Get('/')
+        @Get
         String serverError() {
             throw new HttpStatusException(HttpStatus.UNPROCESSABLE_ENTITY, 'The error message')
         }

@@ -16,6 +16,8 @@
 
 package io.micronaut.inject.visitor;
 
+import java.util.List;
+
 /**
  * Stores data about an element that references a class.
  *
@@ -23,4 +25,28 @@ package io.micronaut.inject.visitor;
  * @since 1.0
  */
 public interface ClassElement extends Element {
+
+    /**
+     * Tests whether one type is assignable to another.
+     *
+     * @param type The type to check
+     * @return {@code true} if and only if the this type is assignable to the second
+     */
+    boolean isAssignable(String type);
+
+    /**
+     * Tests whether one type is assignable to another.
+     *
+     * @param type The type to check
+     * @return {@code true} if and only if the this type is assignable to the second
+     */
+    default boolean isAssignable(Class<?> type) {
+        return isAssignable(type.getName());
+    }
+
+    /**
+     * @param visitorContext The visitor context.
+     * @return The elements contained in this class element
+     */
+    List<Element> getElements(VisitorContext visitorContext);
 }

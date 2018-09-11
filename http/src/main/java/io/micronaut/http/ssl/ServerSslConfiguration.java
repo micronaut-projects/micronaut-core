@@ -66,7 +66,7 @@ public class ServerSslConfiguration extends SslConfiguration {
     @Inject
     void setKey(@Nullable DefaultKeyConfiguration keyConfiguration) {
         if (keyConfiguration != null) {
-            this.key = keyConfiguration;
+            super.setKey(keyConfiguration);
         }
     }
 
@@ -79,7 +79,7 @@ public class ServerSslConfiguration extends SslConfiguration {
     @SuppressWarnings("unused")
     void setKeyStore(@Nullable DefaultKeyStoreConfiguration keyStoreConfiguration) {
         if (keyStoreConfiguration != null) {
-            this.keyStore = keyStoreConfiguration;
+            super.setKeyStore(keyStoreConfiguration);
         }
     }
 
@@ -92,7 +92,7 @@ public class ServerSslConfiguration extends SslConfiguration {
     @SuppressWarnings("unused")
     void setTrustStore(@Nullable DefaultTrustStoreConfiguration trustStore) {
         if (trustStore != null) {
-            this.trustStore = trustStore;
+            super.setTrustStore(trustStore);
         }
     }
 
