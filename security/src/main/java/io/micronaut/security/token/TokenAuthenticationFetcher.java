@@ -33,6 +33,8 @@ import java.util.Collection;
 import java.util.Iterator;
 import java.util.Optional;
 
+import static io.micronaut.security.filters.SecurityFilter.TOKEN;
+
 /**
  * Attempts to retrieve a token form the {@link HttpRequest} and if existing validated.
  * It uses the list of {@link TokenReader} and {@link TokenValidator} registered in the ApplicationContext.
@@ -93,7 +95,7 @@ public class TokenAuthenticationFetcher implements AuthenticationFetcher {
         } else {
             Iterator<TokenValidator> tokenValidatorIterator = tokenValidators.iterator();
             String tokenString = token.get();
-            return attemptTokenValidation(tokenValidatorIterator, tokenString);
+            return attemptTokenValidation(request, tokenValidatorIterator, tokenString);
         }
     }
 
@@ -102,16 +104,17 @@ public class TokenAuthenticationFetcher implements AuthenticationFetcher {
         return ORDER;
     }
 
-    private Flowable<Authentication> attemptTokenValidation(Iterator<TokenValidator> tokenValidatorIterator, String tokenString) {
+    private Flowable<Authentication> attemptTokenValidation(HttpRequest<?> request, Iterator<TokenValidator> tokenValidatorIterator, String tokenString) {
         if (tokenValidatorIterator.hasNext()) {
             TokenValidator tokenValidator = tokenValidatorIterator.next();
             return Flowable.just(tokenString).switchMap(tokenValue ->
                 Flowable.fromPublisher(tokenValidator.validateToken(tokenValue)).map(authentication -> {
+                    request.setAttribute(TOKEN, tokenValue);
                     eventPublisher.publishEvent(new TokenValidatedEvent(tokenValue));
                     return authentication;
                 })
             ).switchIfEmpty(attemptTokenValidation(
-                tokenValidatorIterator, tokenString
+                    request, tokenValidatorIterator, tokenString
             ));
         }
         return Flowable.empty();

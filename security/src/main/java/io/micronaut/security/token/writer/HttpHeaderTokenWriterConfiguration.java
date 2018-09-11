@@ -14,33 +14,27 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.uri;
+package io.micronaut.security.token.writer;
 
-import java.util.Map;
+import io.micronaut.core.util.Toggleable;
 
 /**
- * The result of a call to {@link UriMatchTemplate#match(java.net.URI)}.
+ *  HTTP Token Writer Configuration.
  *
- * @author Graeme Rocher
+ * @author Sergio del Amo
  * @since 1.0
  */
-public interface UriMatchInfo {
+interface HttpHeaderTokenWriterConfiguration extends Toggleable {
 
     /**
-     * @return The matched URI
-     */
-    String getUri();
-
-    /**
-     * @return The variable values following a successful match
-     */
-    Map<String, Object> getVariables();
-
-    /**
-     * Checks whether the given variable is exploded (using the * modifier). See https://tools.ietf.org/html/rfc6570#section-3.
      *
-     * @param variable The name of the variable
-     * @return True if is exploded
+     * @return a Prefix before the token in the header value. E.g. Bearer
      */
-    boolean isExploded(String variable);
+    String getPrefix();
+
+    /**
+     *
+     * @return an HTTP Header name. e.g. Authorization
+     */
+    String getHeaderName();
 }

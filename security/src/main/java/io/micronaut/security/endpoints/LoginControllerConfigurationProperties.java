@@ -29,8 +29,20 @@ import io.micronaut.security.config.SecurityConfigurationProperties;
 public class LoginControllerConfigurationProperties implements LoginControllerConfiguration {
     public static final String PREFIX = SecurityConfigurationProperties.PREFIX + ".endpoints.login";
 
-    private boolean enabled = false;
-    private String path = "/login";
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = false;
+
+    /**
+     * The default path.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_PATH = "/login";
+
+    private boolean enabled = DEFAULT_ENABLED;
+    private String path = DEFAULT_PATH;
 
     /**
      * @return true if you want to enable the {@link LoginController}
@@ -46,7 +58,7 @@ public class LoginControllerConfigurationProperties implements LoginControllerCo
     }
 
     /**
-     * Sets whether the login controller is enabled.
+     * Enables {@link io.micronaut.security.endpoints.LoginController}. Default value {@value #DEFAULT_ENABLED}
      * @param enabled True if it is enabled
      */
     public void setEnabled(boolean enabled) {
@@ -54,7 +66,7 @@ public class LoginControllerConfigurationProperties implements LoginControllerCo
     }
 
     /**
-     * Sets the path to the login controller. Defaults to /login.
+     * Path to the {@link io.micronaut.security.endpoints.LoginController}. Default value {@value #DEFAULT_PATH}
      * @param path The path
      */
     public void setPath(String path) {

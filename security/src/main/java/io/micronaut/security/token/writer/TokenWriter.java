@@ -14,33 +14,23 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.uri;
+package io.micronaut.security.token.writer;
 
-import java.util.Map;
+import io.micronaut.http.MutableHttpRequest;
 
 /**
- * The result of a call to {@link UriMatchTemplate#match(java.net.URI)}.
+ *  Responsible for writing the token in the request.
  *
- * @author Graeme Rocher
+ * @author Sergio del Amo
  * @since 1.0
  */
-public interface UriMatchInfo {
+public interface TokenWriter {
 
     /**
-     * @return The matched URI
+     * Writes the token to the request.
+     * @param request The {@link MutableHttpRequest} instance
+     * @param token A token ( e.g. JWT token, basic auth token...)
      */
-    String getUri();
+    void writeToken(MutableHttpRequest<?> request, String token);
 
-    /**
-     * @return The variable values following a successful match
-     */
-    Map<String, Object> getVariables();
-
-    /**
-     * Checks whether the given variable is exploded (using the * modifier). See https://tools.ietf.org/html/rfc6570#section-3.
-     *
-     * @param variable The name of the variable
-     * @return True if is exploded
-     */
-    boolean isExploded(String variable);
 }

@@ -89,6 +89,11 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
     }
 
     @Override
+    default MutableHttpRequest<B> bearerAuth(CharSequence token) {
+        return (MutableHttpRequest<B>) MutableHttpMessage.super.bearerAuth(token);
+    }
+
+    @Override
     default MutableHttpRequest<B> headers(Map<CharSequence, CharSequence> namesAndValues) {
         return (MutableHttpRequest<B>) MutableHttpMessage.super.headers(namesAndValues);
     }

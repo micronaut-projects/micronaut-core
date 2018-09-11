@@ -14,33 +14,23 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.uri;
-
-import java.util.Map;
+package io.micronaut.http;
 
 /**
- * The result of a call to {@link UriMatchTemplate#match(java.net.URI)}.
+ * Interface for common HTTP header values.
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-public interface UriMatchInfo {
+public interface HttpHeaderValues {
 
     /**
-     * @return The matched URI
+     * {@code "Bearer "}.
      */
-    String getUri();
+    String AUTHORIZATION_PREFIX_BEARER = "Bearer";
 
     /**
-     * @return The variable values following a successful match
+     * {@code "Basic "}.
      */
-    Map<String, Object> getVariables();
-
-    /**
-     * Checks whether the given variable is exploded (using the * modifier). See https://tools.ietf.org/html/rfc6570#section-3.
-     *
-     * @param variable The name of the variable
-     * @return True if is exploded
-     */
-    boolean isExploded(String variable);
+    String AUTHORIZATION_PREFIX_BASIC = "Basic";
 }
