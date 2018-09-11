@@ -138,8 +138,8 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
     }
 
     @Override
-    public Map<String, Character> getVariableModifiers() {
-        return matchInfo.getVariableModifiers();
+    public boolean isExploded(String variable) {
+        return matchInfo.isExploded(variable);
     }
 
     @Override

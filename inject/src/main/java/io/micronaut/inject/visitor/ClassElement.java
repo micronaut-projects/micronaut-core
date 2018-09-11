@@ -45,6 +45,7 @@ public interface ClassElement extends Element {
     }
 
     /**
+     * @param visitorContext The visitor context.
      * @return The elements contained in this class element
      */
     List<Element> getElements(VisitorContext visitorContext);
