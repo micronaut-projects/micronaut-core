@@ -21,6 +21,8 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Produces;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.exceptions.WebSocketClientException;
 
@@ -61,6 +63,7 @@ public class ClientWebSocketInterceptor implements MethodInterceptor<Object, Obj
         } else {
             String methodName = context.getMethodName();
             if (methodName.startsWith("send")) {
+                MediaType mediaType = context.getValue(Produces.class, MediaType.class).orElse(MediaType.APPLICATION_JSON_TYPE);
                 validateSession();
                 Class<?> javaReturnType = context.getReturnType().getType();
                 if (void.class == javaReturnType) {
@@ -73,11 +76,11 @@ public class ClientWebSocketInterceptor implements MethodInterceptor<Object, Obj
                             if (v == null) {
                                 throw new IllegalArgumentException("Parameter cannot be null");
                             }
-                            webSocketSession.sendSync(v);
+                            webSocketSession.sendSync(v, mediaType);
                             return null;
                         default:
                             Map<String, Object> map = context.getParameterValueMap();
-                            webSocketSession.sendSync(map);
+                            webSocketSession.sendSync(map, mediaType);
                             break;
                     }
                 } else if (Future.class.isAssignableFrom(javaReturnType)) {
@@ -90,10 +93,10 @@ public class ClientWebSocketInterceptor implements MethodInterceptor<Object, Obj
                             if (v == null) {
                                 throw new IllegalArgumentException("Parameter cannot be null");
                             }
-                            return webSocketSession.sendAsync(v);
+                            return webSocketSession.sendAsync(v, mediaType);
                         default:
                             Map<String, Object> map = context.getParameterValueMap();
-                            return webSocketSession.sendAsync(map);
+                            return webSocketSession.sendAsync(map, mediaType);
                     }
                 } else if (Publishers.isConvertibleToPublisher(javaReturnType)) {
                     Object[] parameterValues = context.getParameterValues();
@@ -105,10 +108,10 @@ public class ClientWebSocketInterceptor implements MethodInterceptor<Object, Obj
                             if (v == null) {
                                 throw new IllegalArgumentException("Parameter cannot be null");
                             }
-                            return Publishers.convertPublisher(webSocketSession.send(v), javaReturnType );
+                            return Publishers.convertPublisher(webSocketSession.send(v, mediaType), javaReturnType);
                         default:
                             Map<String, Object> map = context.getParameterValueMap();
-                            return Publishers.convertPublisher(webSocketSession.send(map), javaReturnType );
+                            return Publishers.convertPublisher(webSocketSession.send(map, mediaType), javaReturnType);
                     }
                 }
             }

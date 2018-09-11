@@ -55,7 +55,6 @@ import java.util.concurrent.CompletableFuture;
  */
 @Internal
 public class NettyRxWebSocketSession extends MutableConvertibleValuesMap<Object> implements RxWebSocketSession {
-
     /**
      * The WebSocket session is stored within a Channel attribute using the given key.
      */
@@ -129,31 +128,22 @@ public class NettyRxWebSocketSession extends MutableConvertibleValuesMap<Object>
     }
 
     @Override
-    public <T> CompletableFuture<T> sendAsync(T message) {
+    public <T> CompletableFuture<T> sendAsync(T message, MediaType mediaType) {
         if (isOpen()) {
-            CompletableFuture<T> future = new CompletableFuture<>();
-            WebSocketFrame frame = encodeMessage(message);
-            channel.writeAndFlush(frame).addListener(f -> {
-                if (f.isSuccess()) {
-                    future.complete(message);
-                } else {
-                    future.completeExceptionally(f.cause());
-                }
-            });
-            return future;
-        } else {
-            throw new WebSocketSessionException("Session closed");
-        }
-    }
+            if (message != null) {
+                CompletableFuture<T> future = new CompletableFuture<>();
 
-    @Override
-    public void sendSync(Object message) {
-        if (isOpen() && message != null) {
-            try {
-                WebSocketFrame frame = encodeMessage(message);
-                channel.writeAndFlush(frame).sync();
-            } catch (InterruptedException e) {
-                throw new WebSocketSessionException("Send interrupt: " + e.getMessage(), e);
+                WebSocketFrame frame = encodeMessage(message, mediaType);
+                channel.writeAndFlush(frame).addListener(f -> {
+                    if (f.isSuccess()) {
+                        future.complete(message);
+                    } else {
+                        future.completeExceptionally(f.cause());
+                    }
+                });
+                return future;
+            } else {
+                return CompletableFuture.completedFuture(null);
             }
         } else {
             throw new WebSocketSessionException("Session closed");
@@ -161,19 +151,43 @@ public class NettyRxWebSocketSession extends MutableConvertibleValuesMap<Object>
     }
 
     @Override
-    public <T> Flowable<T> send(T message) {
+    public void sendSync(Object message, MediaType mediaType) {
+        if (isOpen()) {
+            if (message != null) {
+                try {
+                    WebSocketFrame frame = encodeMessage(message, mediaType);
+                    channel.writeAndFlush(frame).sync();
+                } catch (InterruptedException e) {
+                    throw new WebSocketSessionException("Send interrupt: " + e.getMessage(), e);
+                }
+            }
+        } else {
+            throw new WebSocketSessionException("Session closed");
+        }
+    }
+
+    @Override
+    public <T> Flowable<T> send(T message, MediaType mediaType) {
+        if (message == null) {
+            return Flowable.empty();
+        }
 
         return Flowable.create(emitter -> {
-            WebSocketFrame frame = encodeMessage(message);
-            ChannelFuture channelFuture = channel.writeAndFlush(frame);
-            channelFuture.addListener(future -> {
-                if (future.isSuccess()) {
-                    emitter.onNext(message);
-                    emitter.onComplete();
-                } else {
-                    emitter.onError(future.cause());
-                }
-            });
+            if (!isOpen()) {
+                emitter.onError(new WebSocketSessionException("Session closed"));
+            } else {
+                WebSocketFrame frame = encodeMessage(message, mediaType);
+
+                ChannelFuture channelFuture = channel.writeAndFlush(frame);
+                channelFuture.addListener(future -> {
+                    if (future.isSuccess()) {
+                        emitter.onNext(message);
+                        emitter.onComplete();
+                    } else {
+                        emitter.onError(future.cause());
+                    }
+                });
+            }
         }, BackpressureStrategy.ERROR);
     }
 
@@ -184,11 +198,13 @@ public class NettyRxWebSocketSession extends MutableConvertibleValuesMap<Object>
 
     @Override
     public void close(CloseReason closeReason) {
-        channel.writeAndFlush(new CloseWebSocketFrame(closeReason.getCode(), closeReason.getReason()))
-                .addListener(future -> channel.close());
+        if (channel.isOpen()) {
+            channel.writeAndFlush(new CloseWebSocketFrame(closeReason.getCode(), closeReason.getReason()))
+                    .addListener(future -> channel.close());
+        }
     }
 
-    private WebSocketFrame encodeMessage(Object message) {
+    private WebSocketFrame encodeMessage(Object message, MediaType mediaType) {
         if (ClassUtils.isJavaLangType(message.getClass())) {
             String s = message.toString();
             return new TextWebSocketFrame(s);
@@ -199,7 +215,7 @@ public class NettyRxWebSocketSession extends MutableConvertibleValuesMap<Object>
         } else if (message instanceof ByteBuffer) {
             return new BinaryWebSocketFrame(Unpooled.wrappedBuffer((ByteBuffer) message));
         } else {
-            Optional<MediaTypeCodec> codec = codecRegistry.findCodec(MediaType.APPLICATION_JSON_TYPE);
+            Optional<MediaTypeCodec> codec = codecRegistry.findCodec(mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
             if (codec.isPresent()) {
                 io.micronaut.core.io.buffer.ByteBuffer encoded = codec.get().encode(message, new NettyByteBufferFactory(channel.alloc()));
                 return new TextWebSocketFrame((ByteBuf) encoded.asNativeBuffer());

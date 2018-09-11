@@ -16,6 +16,7 @@
 
 package io.micronaut.websocket;
 
+import io.micronaut.http.MediaType;
 import io.reactivex.Flowable;
 
 import java.util.Set;
@@ -40,9 +41,10 @@ public interface RxWebSocketSession extends WebSocketSession {
      * Broadcast a message and return a {@link Flowable}.
      *
      * @param message The message
+     * @param mediaType The media type
      * @param <T> The message generic type
      * @return The {@link Flowable}
      */
     @Override
-    <T> Flowable<T> send(T message);
+    <T> Flowable<T> send(T message, MediaType mediaType);
 }

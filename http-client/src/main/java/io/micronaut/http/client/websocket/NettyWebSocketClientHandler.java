@@ -155,8 +155,8 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 try {
                     emitter.onError(new WebSocketClientException("WebSocket @OnMessage method " + targetBean.getClass().getSimpleName() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 message parameter, but found 2 possible candidates: " + unboundArguments));
                 } finally {
-                    if (session.isOpen()) {
-                        session.close(CloseReason.INTERNAL_ERROR);
+                    if (getSession().isOpen()) {
+                        getSession().close(CloseReason.INTERNAL_ERROR);
                     }
                 }
                 return;
@@ -187,8 +187,8 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                     }
                 } catch (Throwable e) {
                     emitter.onError(new WebSocketClientException("Error opening WebSocket client session: " + e.getMessage(), e));
-                    if (session.isOpen()) {
-                        session.close(CloseReason.INTERNAL_ERROR);
+                    if (getSession().isOpen()) {
+                        getSession().close(CloseReason.INTERNAL_ERROR);
                     }
                 }
             }
