@@ -18,7 +18,7 @@ package io.micronaut.security.token.basicauth;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.HttpHeaderAuthorization;
+import io.micronaut.http.HttpHeaderValues;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.security.token.config.TokenConfigurationProperties;
 
@@ -42,7 +42,7 @@ public class BasicAuthTokenReaderConfigurationProperties implements BasicAuthTok
 
     private boolean enabled = DEFAULT_ENABLED;
     private String headerName = HttpHeaders.AUTHORIZATION;
-    private String prefix = HttpHeaderAuthorization.AUTHORIZATION_PREFIX_BASIC;
+    private String prefix = HttpHeaderValues.AUTHORIZATION_PREFIX_BASIC;
 
     @Override
     public boolean isEnabled() {
@@ -78,7 +78,7 @@ public class BasicAuthTokenReaderConfigurationProperties implements BasicAuthTok
     }
 
     /**
-     * Http Header value prefix. Default value {@value io.micronaut.http.HttpHeaderAuthorization#AUTHORIZATION_PREFIX_BASIC}.
+     * Http Header value prefix. Default value {@value HttpHeaderValues#AUTHORIZATION_PREFIX_BASIC}.
      * @param prefix The prefix to use
      */
     public void setPrefix(String prefix) {

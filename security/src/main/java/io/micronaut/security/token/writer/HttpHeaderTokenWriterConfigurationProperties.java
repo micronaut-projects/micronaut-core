@@ -17,7 +17,7 @@
 package io.micronaut.security.token.writer;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.http.HttpHeaderAuthorization;
+import io.micronaut.http.HttpHeaderValues;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.security.token.config.TokenConfigurationProperties;
 
@@ -37,7 +37,7 @@ public class HttpHeaderTokenWriterConfigurationProperties implements HttpHeaderT
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_ENABLED = true;
 
-    private String prefix = HttpHeaderAuthorization.AUTHORIZATION_PREFIX_BEARER;
+    private String prefix = HttpHeaderValues.AUTHORIZATION_PREFIX_BEARER;
     private String headerName = HttpHeaders.AUTHORIZATION;
     private boolean enabled = DEFAULT_ENABLED;
 
@@ -55,7 +55,7 @@ public class HttpHeaderTokenWriterConfigurationProperties implements HttpHeaderT
     }
 
     /**
-     * Value prefix for Http Header. Default value {@value io.micronaut.http.HttpHeaderAuthorization#AUTHORIZATION_PREFIX_BEARER}
+     * Value prefix for Http Header. Default value {@value HttpHeaderValues#AUTHORIZATION_PREFIX_BEARER}
      * @param prefix preffix before the header value
      */
     public void setPrefix(String prefix) {
