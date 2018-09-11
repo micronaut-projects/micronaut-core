@@ -38,6 +38,16 @@ public class UnsatisfiedArgumentException extends RuntimeException {
     }
 
     /**
+     * @param argument The {@link Argument}
+     * @param message The message
+     */
+    public UnsatisfiedArgumentException(Argument<?> argument, String message) {
+        super("Argument [" + argument + "] not satisfied: " + message);
+        this.argument = argument;
+
+    }
+
+    /**
      * @return The argument that could not be bound.
      */
     public Argument<?> getArgument() {

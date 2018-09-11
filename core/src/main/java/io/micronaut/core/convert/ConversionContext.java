@@ -16,15 +16,13 @@
 
 package io.micronaut.core.convert;
 
-import io.micronaut.core.annotation.AnnotationSource;
-import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.TypeVariableResolver;
 import io.micronaut.core.util.ArrayUtils;
 
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedElement;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
@@ -38,7 +36,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface ConversionContext extends AnnotationSource, TypeVariableResolver, ErrorsContext {
+public interface ConversionContext extends AnnotationMetadataProvider, TypeVariableResolver, ErrorsContext {
 
     /**
      * The default conversion context.
@@ -72,11 +70,6 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
         return StandardCharsets.UTF_8;
     }
 
-    @Override
-    default AnnotatedElement[] getAnnotatedElements() {
-        return AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
-    }
-
     /**
      * Augment this context with data for the given argument.
      *
@@ -91,22 +84,22 @@ public interface ConversionContext extends AnnotationSource, TypeVariableResolve
         ConversionContext thisContext = this;
         return new DefaultArgumentConversionContext(argument, thisContext.getLocale(), thisContext.getCharset()) {
             @Override
-            public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
-                T annotation = childContext.getAnnotation(annotationClass);
+            public <T extends Annotation> T synthesize(Class<T> annotationClass) {
+                T annotation = childContext.synthesize(annotationClass);
                 if (annotation == null) {
-                    return thisContext.getAnnotation(annotationClass);
+                    return thisContext.synthesize(annotationClass);
                 }
                 return annotation;
             }
 
             @Override
-            public Annotation[] getAnnotations() {
-                return ArrayUtils.concat(childContext.getAnnotations(), thisContext.getAnnotations());
+            public Annotation[] synthesizeAll() {
+                return ArrayUtils.concat(childContext.synthesizeAll(), thisContext.synthesizeAll());
             }
 
             @Override
-            public Annotation[] getDeclaredAnnotations() {
-                return ArrayUtils.concat(childContext.getDeclaredAnnotations(), thisContext.getDeclaredAnnotations());
+            public Annotation[] synthesizeDeclared() {
+                return ArrayUtils.concat(childContext.synthesizeDeclared(), thisContext.synthesizeDeclared());
             }
 
             @Override

@@ -33,6 +33,8 @@ public interface BeanType<T> extends AnnotationMetadataProvider, BeanContextCond
     boolean isPrimary();
 
     /**
+     * Returns the bean type.
+     *
      * @return The underlying bean type
      */
     Class<T> getBeanType();

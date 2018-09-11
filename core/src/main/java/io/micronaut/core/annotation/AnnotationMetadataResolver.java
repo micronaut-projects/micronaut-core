@@ -17,7 +17,6 @@
 package io.micronaut.core.annotation;
 
 import javax.annotation.Nonnull;
-import java.lang.reflect.AnnotatedElement;
 
 /**
  * An interface for types capable of resolving {@link AnnotationMetadata}.
@@ -34,19 +33,6 @@ public interface AnnotationMetadataResolver {
     };
 
     /**
-     * Resolve the {@link AnnotationSource} for the given type.
-     *
-     * @param type The type
-     * @return The {@link AnnotationSource}
-     */
-    default @Nonnull AnnotatedElement resolveElement(Class<?> type) {
-        if (type == null) {
-            return AnnotationSource.EMPTY;
-        }
-        return type;
-    }
-
-    /**
      * Resolve the {@link AnnotationMetadata} for the given type.
      *
      * @param type The type
@@ -54,16 +40,6 @@ public interface AnnotationMetadataResolver {
      */
     default @Nonnull AnnotationMetadata resolveMetadata(Class<?> type) {
         return AnnotationMetadata.EMPTY_METADATA;
-    }
-
-    /**
-     * Resolve the {@link AnnotationSource} for the given object.
-     *
-     * @param object The object
-     * @return The {@link AnnotationSource}
-     */
-    default @Nonnull AnnotatedElement resolveElement(Object object) {
-        return resolveElement(object != null ? object.getClass() : null);
     }
 
     /**

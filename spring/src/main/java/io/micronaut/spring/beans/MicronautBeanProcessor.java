@@ -69,34 +69,36 @@ public class MicronautBeanProcessor implements BeanFactoryPostProcessor, Disposa
     public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
         if (environment != null) {
             micronautContext = new DefaultApplicationContext(environment.getActiveProfiles()) {
+                DefaultEnvironment env = new DefaultEnvironment(environment.getActiveProfiles()) {
+                    @Override
+                    public io.micronaut.context.env.Environment start() {
+                        return this;
+                    }
+
+                    @Override
+                    public io.micronaut.context.env.Environment stop() {
+                        return this;
+                    }
+
+                    @Override
+                    public boolean containsProperty(@Nullable String name) {
+                        return environment.containsProperty(name);
+                    }
+
+                    @Override
+                    public boolean containsProperties(@Nullable String name) {
+                        return environment.containsProperty(name);
+                    }
+
+                    @Override
+                    public <T> Optional<T> getProperty(@Nullable String name, ArgumentConversionContext<T> conversionContext) {
+                        return Optional.ofNullable(environment.getProperty(name, conversionContext.getArgument().getType()));
+                    }
+                };
+
                 @Override
                 public io.micronaut.context.env.Environment getEnvironment() {
-                    return new DefaultEnvironment(environment.getActiveProfiles()) {
-                        @Override
-                        public io.micronaut.context.env.Environment start() {
-                            return this;
-                        }
-
-                        @Override
-                        public io.micronaut.context.env.Environment stop() {
-                            return this;
-                        }
-
-                        @Override
-                        public boolean containsProperty(@Nullable String name) {
-                            return environment.containsProperty(name);
-                        }
-
-                        @Override
-                        public boolean containsProperties(@Nullable String name) {
-                            return environment.containsProperty(name);
-                        }
-
-                        @Override
-                        public <T> Optional<T> getProperty(@Nullable String name, ArgumentConversionContext<T> conversionContext) {
-                            return Optional.ofNullable(environment.getProperty(name, conversionContext.getArgument().getType()));
-                        }
-                    };
+                    return env;
                 }
             };
         } else {

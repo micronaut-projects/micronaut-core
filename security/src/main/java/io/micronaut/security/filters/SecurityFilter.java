@@ -55,6 +55,11 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
      */
     public static final CharSequence AUTHENTICATION = "micronaut.AUTHENTICATION";
 
+    /**
+     * The attribute used to store a valid token in the request.
+     */
+    public static final CharSequence TOKEN = "micronaut.TOKEN";
+
     private static final Logger LOG = LoggerFactory.getLogger(SecurityFilter.class);
 
     /**
@@ -79,7 +84,7 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
         this.securityRules = securityRules;
         this.authenticationFetchers = authenticationFetchers;
         this.rejectionHandler = rejectionHandler;
-        this.order = securityFilterOrderProvider != null ? securityFilterOrderProvider.getSecurityFilterOrder() : 0;
+        this.order = securityFilterOrderProvider != null ? securityFilterOrderProvider.getOrder() : 0;
     }
 
     @Override

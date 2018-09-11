@@ -21,15 +21,19 @@ import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionSystemException;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.interceptor.TransactionAttribute;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.inject.Singleton;
-import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -42,7 +46,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @Singleton
 public class TransactionInterceptor implements MethodInterceptor<Object, Object> {
 
-    private final Map<Method, TransactionAttribute> transactionDefinitionMap = new ConcurrentHashMap<>();
+    private final Map<ExecutableMethod, TransactionAttribute> transactionDefinitionMap = new ConcurrentHashMap<>();
     private final Map<String, PlatformTransactionManager> transactionManagerMap = new ConcurrentHashMap<>();
     private final BeanLocator beanLocator;
 
@@ -64,7 +68,7 @@ public class TransactionInterceptor implements MethodInterceptor<Object, Object>
 
             String finalTransactionManagerName = transactionManagerName;
             TransactionAttribute transactionDefinition = resolveTransactionAttribute(
-                context.getTargetMethod(),
+                context.getExecutableMethod(),
                 context,
                 finalTransactionManagerName
             );
@@ -87,18 +91,25 @@ public class TransactionInterceptor implements MethodInterceptor<Object, Object>
      * @return The {@link TransactionAttribute}
      */
     protected TransactionAttribute resolveTransactionAttribute(
-        Method targetMethod,
-        AnnotationMetadata annotationMetadata,
-        String transactionManagerName) {
+            ExecutableMethod<Object, Object> targetMethod,
+            AnnotationMetadata annotationMetadata,
+            String transactionManagerName) {
         return transactionDefinitionMap.computeIfAbsent(targetMethod, method -> {
-            Transactional annotation = annotationMetadata.getAnnotation(Transactional.class);
+            AnnotationValue<Transactional> annotation = annotationMetadata.getAnnotation(Transactional.class);
+
+            if (annotation == null) {
+                throw new IllegalStateException("No declared @Transactional annotation present");
+            }
+
             BindableRuleBasedTransactionAttribute attribute = new BindableRuleBasedTransactionAttribute();
-            attribute.setReadOnly(annotation.readOnly());
-            attribute.setTimeout(annotation.timeout());
-            attribute.setRollbackFor(annotation.rollbackFor());
-            attribute.setNoRollbackFor(annotation.noRollbackFor());
-            attribute.setPropagationBehavior(annotation.propagation().value());
-            attribute.setIsolationLevel(annotation.isolation().value());
+            attribute.setReadOnly(annotation.getRequiredValue("readOnly", Boolean.class));
+            attribute.setTimeout(annotation.getRequiredValue("timeout", Integer.class));
+            //noinspection unchecked
+            attribute.setRollbackFor(annotation.get("rollbackFor", Class[].class).orElse(ReflectionUtils.EMPTY_CLASS_ARRAY));
+            //noinspection unchecked
+            attribute.setNoRollbackFor(annotation.get("noRollbackFor", Class[].class).orElse(ReflectionUtils.EMPTY_CLASS_ARRAY));
+            attribute.setPropagationBehavior(annotation.getRequiredValue("propagation", Propagation.class).value());
+            attribute.setIsolationLevel(annotation.getRequiredValue("isolation", Isolation.class).value());
             attribute.setQualifier(transactionManagerName);
             return attribute;
         });

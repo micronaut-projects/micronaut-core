@@ -1,0 +1,17 @@
+Micronaut includes api:views.handlebars.HandlebarsViewsRenderer[] which uses
+the http://jknack.github.io/handlebars.java/[Handlebars.java] project.
+
+In addition to the <<views, Views>> dependency, add the following dependency on your classpath. For example, in `build.gradle`
+
+[source, groovy]
+----
+runtime "com.github.jknack:handlebars:4.1.0"
+----
+
+The example shown in the <<views, Views>> section, could be rendered with the following Handlebars template:
+
+[source,html]
+.src/main/resources/views/home.hbs
+----
+include::{testsviews}/../../../../resources/views/home.hbs[]
+----

@@ -108,6 +108,19 @@ public interface BeanDefinitionRegistry {
     <T> Collection<BeanDefinition<T>> getBeanDefinitions(Class<T> beanType);
 
     /**
+     * Obtain a {@link BeanDefinition} for the given type.
+     *
+     * @param beanType The type
+     * @param qualifier The qualifier
+     * @param <T>      The concrete type
+     * @return An {@link Optional} of the bean definition
+     * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
+     *                                                                for the given type
+     */
+    <T> Collection<BeanDefinition<T>> getBeanDefinitions(Class<T> beanType, Qualifier<T> qualifier);
+
+
+    /**
      * Get all of the {@link BeanDefinition} for the given qualifier.
      *
      * @param qualifier The qualifer
@@ -128,10 +141,19 @@ public interface BeanDefinitionRegistry {
      * @param qualifier The qualifier
      * @return The beans
      */
-    Collection<BeanRegistration<?>> getBeanRegistrations(Qualifier<?> qualifier);
+    Collection<BeanRegistration<?>> getActiveBeanRegistrations(Qualifier<?> qualifier);
 
     /**
      * Find active {@link javax.inject.Singleton} beans for the given bean type.
+     *
+     * @param beanType The bean type
+     * @param <T>      The concrete type
+     * @return The beans
+     */
+    <T> Collection<BeanRegistration<T>> getActiveBeanRegistrations(Class<T> beanType);
+
+    /**
+     * Find and if necessary initialize {@link javax.inject.Singleton} beans for the given bean type, returning all the active registrations.
      *
      * @param beanType The bean type
      * @param <T>      The concrete type

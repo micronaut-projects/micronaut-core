@@ -17,7 +17,6 @@
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.util.ArrayUtils;
-
 import javax.annotation.Nullable;
 import java.util.*;
 
@@ -32,6 +31,8 @@ public class ClassUtils {
     public static final int EMPTY_OBJECT_ARRAY_HASH_CODE = Arrays.hashCode(ArrayUtils.EMPTY_OBJECT_ARRAY);
     public static final Map<String, Class> COMMON_CLASS_MAP = new HashMap<>();
     public static final String CLASS_EXTENSION = ".class";
+    
+    static final List<ClassLoadingReporter> CLASS_LOADING_REPORTERS;
 
     static {
         COMMON_CLASS_MAP.put(boolean.class.getName(), boolean.class);
@@ -61,6 +62,20 @@ public class ClassUtils {
         COMMON_CLASS_MAP.put(Float.class.getName(), Float.class);
         COMMON_CLASS_MAP.put(Character.class.getName(), Character.class);
         COMMON_CLASS_MAP.put(String.class.getName(), String.class);
+
+        List<ClassLoadingReporter> reporterList = new ArrayList<>();
+        try {
+            ServiceLoader<ClassLoadingReporter> reporters = ServiceLoader.load(ClassLoadingReporter.class);
+            for (ClassLoadingReporter reporter : reporters) {
+                if (reporter.isEnabled()) {
+                    reporterList.add(reporter);
+                }
+            }
+        } catch (Throwable e) {
+            reporterList = Collections.emptyList();
+        }
+
+        CLASS_LOADING_REPORTERS = reporterList;
     }
 
     /**
@@ -151,9 +166,12 @@ public class ClassUtils {
             if (commonType.isPresent()) {
                 return commonType;
             } else {
-                return Optional.of(Class.forName(name, true, classLoader));
+                Class<?> type = Class.forName(name, true, classLoader);
+                ClassLoadingReporter.reportPresent(type);
+                return Optional.of(type);
             }
         } catch (ClassNotFoundException | NoClassDefFoundError e) {
+            ClassLoadingReporter.reportMissing(name);
             return Optional.empty();
         }
     }

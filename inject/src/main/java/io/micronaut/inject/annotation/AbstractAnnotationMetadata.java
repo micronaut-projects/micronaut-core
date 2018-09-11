@@ -18,6 +18,7 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.reflect.ClassUtils;
@@ -64,14 +65,14 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+    public <T extends Annotation> T synthesize(Class<T> annotationClass) {
         if (annotationClass == null || annotationMap == null) {
             return null;
         }
         if (hasAnnotation(annotationClass) || hasStereotype(annotationClass)) {
             String annotationName = annotationClass.getName().intern();
             return (T) annotationMap.computeIfAbsent(annotationName, s -> {
-                ConvertibleValues<Object> annotationValues = getValues(annotationClass);
+                ConvertibleValues<Object> annotationValues = findAnnotation(annotationClass).map(AnnotationValue::getConvertibleValues).orElse(ConvertibleValues.empty());
                 return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValues);
 
             });
@@ -81,14 +82,14 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T extends Annotation> T getDeclaredAnnotation(Class<T> annotationClass) {
+    public <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass) {
         if (annotationClass == null || declaredAnnotationMap == null) {
             return null;
         }
         String annotationName = annotationClass.getName().intern();
         if (hasAnnotation(annotationName) || hasStereotype(annotationName)) {
             return (T) declaredAnnotationMap.computeIfAbsent(annotationName, s -> {
-                ConvertibleValues<Object> annotationValues = getValues(annotationClass);
+                ConvertibleValues<Object> annotationValues = findAnnotation(annotationClass).map(AnnotationValue::getConvertibleValues).orElse(ConvertibleValues.empty());
                 return AnnotationMetadataSupport.buildAnnotation(annotationClass, annotationValues);
 
             });
@@ -97,7 +98,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public Annotation[] getAnnotations() {
+    public Annotation[] synthesizeAll() {
         if (annotationMap == null) {
             return AnnotationUtil.ZERO_ANNOTATIONS;
         }
@@ -115,7 +116,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public Annotation[] getDeclaredAnnotations() {
+    public Annotation[] synthesizeDeclared() {
         if (declaredAnnotationMap == null) {
             return AnnotationUtil.ZERO_ANNOTATIONS;
         }
@@ -132,43 +133,25 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
         return annotations;
     }
 
-    private Annotation[] initializeAnnotations(Set<String> names) {
-        if (CollectionUtils.isNotEmpty(names)) {
-            List<Annotation> annotations = new ArrayList<>();
-            for (String name : names) {
-                Optional<Class> loaded = ClassUtils.forName(name, getClass().getClassLoader());
-                loaded.ifPresent(aClass -> {
-                    Annotation ann = getAnnotation(aClass);
-                    if (ann != null) {
-                        annotations.add(ann);
-                    }
-                });
-            }
-            return annotations.toArray(new Annotation[annotations.size()]);
-        }
-
-        return AnnotationUtil.ZERO_ANNOTATIONS;
-    }
-
     /**
      * Adds any annotation values found in the values map to the results.
      *
      * @param results The results
      * @param values The values
      */
-    protected final void addAnnotationValuesFromData(List<ConvertibleValues<Object>> results, Map<CharSequence, Object> values) {
+    protected final void addAnnotationValuesFromData(List results, Map<CharSequence, Object> values) {
         if (values != null) {
             Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
-            if (v instanceof AnnotationValue[]) {
-                AnnotationValue[] avs = (AnnotationValue[]) v;
-                for (AnnotationValue av : avs) {
-                    addValuesToResults(results, av.getConvertibleValues());
+            if (v instanceof io.micronaut.core.annotation.AnnotationValue[]) {
+                io.micronaut.core.annotation.AnnotationValue[] avs = (io.micronaut.core.annotation.AnnotationValue[]) v;
+                for (io.micronaut.core.annotation.AnnotationValue av : avs) {
+                    addValuesToResults(results, av);
                 }
             } else if (v instanceof Collection) {
                 Collection c = (Collection) v;
                 for (Object o : c) {
-                    if (o instanceof AnnotationValue) {
-                        addValuesToResults(results, ((AnnotationValue) o).getConvertibleValues());
+                    if (o instanceof io.micronaut.core.annotation.AnnotationValue) {
+                        addValuesToResults(results, ((io.micronaut.core.annotation.AnnotationValue) o));
                     }
                 }
             }
@@ -181,7 +164,25 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
      * @param results The results
      * @param values The values
      */
-    protected void addValuesToResults(List<ConvertibleValues<Object>> results, ConvertibleValues<Object> values) {
+    protected void addValuesToResults(List<io.micronaut.core.annotation.AnnotationValue> results, io.micronaut.core.annotation.AnnotationValue values) {
         results.add(values);
+    }
+
+    private Annotation[] initializeAnnotations(Set<String> names) {
+        if (CollectionUtils.isNotEmpty(names)) {
+            List<Annotation> annotations = new ArrayList<>();
+            for (String name : names) {
+                Optional<Class> loaded = ClassUtils.forName(name, getClass().getClassLoader());
+                loaded.ifPresent(aClass -> {
+                    Annotation ann = synthesize(aClass);
+                    if (ann != null) {
+                        annotations.add(ann);
+                    }
+                });
+            }
+            return annotations.toArray(new Annotation[annotations.size()]);
+        }
+
+        return AnnotationUtil.ZERO_ANNOTATIONS;
     }
 }

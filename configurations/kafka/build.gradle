@@ -1,12 +1,12 @@
 dependencies {
     compile project(":messaging")
-    compile 'org.apache.kafka:kafka-clients:1.1.0'
+    compile dependencyVersion("kafka")
 
     compileOnly project(":management")
     compileOnly project(":configurations:micrometer-core")
-    compileOnly 'org.apache.kafka:kafka_2.12:1.1.0'
-    compileOnly 'org.apache.kafka:kafka-clients:1.1.0:test'
-    compileOnly 'org.apache.kafka:kafka_2.12:1.1.0:test'
+    compileOnly "org.apache.kafka:kafka_2.12:${kafkaVersion}"
+    compileOnly "org.apache.kafka:kafka-clients:${kafkaVersion}:test"
+    compileOnly "org.apache.kafka:kafka_2.12:${kafkaVersion}:test"
 
     compileOnly project(":inject-java")
 
@@ -15,9 +15,9 @@ dependencies {
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
     testCompile project(":configurations:micrometer-core")
-    testCompile 'org.apache.kafka:kafka-clients:1.1.0:test'
-    testCompile 'org.apache.kafka:kafka_2.12:1.1.0'
-    testCompile 'org.apache.kafka:kafka_2.12:1.1.0:test'
+    testCompile "org.apache.kafka:kafka-clients:${kafkaVersion}:test"
+    testCompile "org.apache.kafka:kafka_2.12:${kafkaVersion}"
+    testCompile "org.apache.kafka:kafka_2.12:${kafkaVersion}:test"
 }
 //tasks.withType(Test) {
 //    testLogging {

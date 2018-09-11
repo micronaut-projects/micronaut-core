@@ -70,7 +70,7 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
 
         Object body;
         if (len == 1) {
-            Optional<Argument> bodyArg = Arrays.stream(context.getArguments()).filter(arg -> arg.getAnnotation(Body.class) != null).findFirst();
+            Optional<Argument> bodyArg = Arrays.stream(context.getArguments()).filter(arg -> arg.isAnnotationPresent(Body.class)).findFirst();
             if (bodyArg.isPresent()) {
                 body = parameterValueMap.get(bodyArg.get().getName());
             } else {
@@ -90,7 +90,11 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
         if (Publishers.isConvertibleToPublisher(javaReturnType)) {
             Maybe flowable = functionDefinition.firstElement().flatMap(def -> {
                 FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
-                return (Maybe) functionInvoker.invoke(def, body, Argument.of(Maybe.class, returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT)));
+                return (Maybe) functionInvoker.invoke(
+                        def,
+                        body,
+                        Argument.of(Maybe.class, returnType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT))
+                );
             });
             flowable = flowable.switchIfEmpty(Maybe.error(new FunctionNotFoundException(functionName)));
             return ConversionService.SHARED.convert(flowable, returnType.asArgument()).orElseThrow(() -> new FunctionExecutionException("Unsupported reactive type: " + returnType.getType()));

@@ -17,16 +17,14 @@
 package io.micronaut.security.rules;
 
 import io.micronaut.http.HttpRequest;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.EndpointSensitivityProcessor;
-import io.micronaut.management.endpoint.health.HealthEndpoint;
-import io.micronaut.management.endpoint.processors.ReadEndpointRouteBuilder;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;
 
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
-import java.lang.reflect.Method;
-import java.util.*;
+import java.util.Map;
 
 /**
  * Finds any sensitive endpoints and processes requests that match their
@@ -48,7 +46,7 @@ public class SensitiveEndpointRule implements SecurityRule {
      * A map where the key represents the method of an endpoint
      * and the value represents the endpoints sensitivity.
      */
-    protected final Map<Method, Boolean> endpointMethods;
+    protected final Map<ExecutableMethod, Boolean> endpointMethods;
 
     /**
      * Constructs the rule with the existing and default endpoint
@@ -64,7 +62,7 @@ public class SensitiveEndpointRule implements SecurityRule {
     @Override
     public SecurityRuleResult check(HttpRequest request, @Nullable RouteMatch routeMatch, @Nullable Map<String, Object> claims) {
         if (routeMatch instanceof MethodBasedRouteMatch) {
-            Method method = ((MethodBasedRouteMatch) routeMatch).getTargetMethod();
+            ExecutableMethod method = ((MethodBasedRouteMatch) routeMatch).getExecutableMethod();
 
             if (endpointMethods.containsKey(method)) {
                 Boolean sensitive = endpointMethods.get(method);

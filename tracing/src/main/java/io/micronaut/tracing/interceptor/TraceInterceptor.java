@@ -20,6 +20,7 @@ import io.micronaut.aop.InterceptPhase;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.MutableArgumentValue;
@@ -82,7 +83,7 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
     @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         boolean isContinue = context.hasAnnotation(ContinueSpan.class);
-        NewSpan newSpan = context.getAnnotation(NewSpan.class);
+        AnnotationValue<NewSpan> newSpan = context.getAnnotation(NewSpan.class);
         boolean isNew = newSpan != null;
         if (!isContinue && !isNew) {
             return context.proceed();
@@ -126,7 +127,7 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
             }
         } else {
             // must be new
-            String operationName = newSpan.value();
+            String operationName = newSpan.getValue(String.class).orElse(null);
             Optional<String> hystrixCommand = context.getValue(HYSTRIX_ANNOTATION, String.class);
             if (StringUtils.isEmpty(operationName)) {
                 // try hystrix command name
@@ -230,13 +231,10 @@ public class TraceInterceptor implements MethodInterceptor<Object, Object> {
 
     private void tagArguments(Span span, MethodInvocationContext<Object, Object> context) {
         for (MutableArgumentValue<?> argumentValue : context.getParameters().values()) {
-            SpanTag spanTag = argumentValue.getAnnotation(SpanTag.class);
+            AnnotationValue<SpanTag> spanTag = argumentValue.getAnnotation(SpanTag.class);
             Object v = argumentValue.getValue();
             if (spanTag != null && v != null) {
-                String tagName = spanTag.value();
-                if (StringUtils.isEmpty(tagName)) {
-                    tagName = argumentValue.getName();
-                }
+                String tagName = spanTag.getValue(String.class).orElse(argumentValue.getName());
                 span.setTag(tagName, v.toString());
             }
         }

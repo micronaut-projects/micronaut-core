@@ -18,6 +18,7 @@ package io.micronaut.http.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.core.bind.annotation.Bindable;
 
 import java.lang.annotation.Documented;
@@ -42,5 +43,13 @@ public @interface QueryValue {
     /**
      * @return The name of the parameter
      */
+    @AliasFor(annotation = Bindable.class, member = "value")
     String value() default "";
+
+    /**
+     * @see Bindable#defaultValue()
+     * @return The default value
+     */
+    @AliasFor(annotation = Bindable.class, member = "defaultValue")
+    String defaultValue() default "";
 }

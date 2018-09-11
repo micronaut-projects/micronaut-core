@@ -24,8 +24,6 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.runtime.context.scope.Refreshable;
 
-import javax.inject.Singleton;
-
 /**
  * Factory for the default {@link MongoClient}. Creates the injectable {@link Primary} bean
  *

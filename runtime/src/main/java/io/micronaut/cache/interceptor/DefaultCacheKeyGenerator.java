@@ -16,9 +16,8 @@
 
 package io.micronaut.cache.interceptor;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.util.ArrayUtils;
-
-import java.lang.reflect.AnnotatedElement;
 
 /**
  * <p>A default implementation of the {@link CacheKeyGenerator} interface that uses the parameters of the method only.</p>
@@ -33,7 +32,7 @@ import java.lang.reflect.AnnotatedElement;
 public class DefaultCacheKeyGenerator implements CacheKeyGenerator {
 
     @Override
-    public Object generateKey(AnnotatedElement annotatedElement, Object... params) {
+    public Object generateKey(AnnotationMetadata annotationMetadata, Object... params) {
         if (ArrayUtils.isEmpty(params)) {
             return ParametersKey.ZERO_ARG_KEY;
         }

@@ -56,7 +56,7 @@ class MyBean {
         then:"the default scope is singleton"
         beanDefinition.executableMethods.size() == 3
         beanDefinition.executableMethods[0].methodName == 'methodOne'
-        beanDefinition.executableMethods[0].getArguments()[0].getAnnotation(Named).value() == 'foo'
+        beanDefinition.executableMethods[0].getArguments()[0].synthesize(Named).value() == 'foo'
     }
 
     void "test executable metadata"() {

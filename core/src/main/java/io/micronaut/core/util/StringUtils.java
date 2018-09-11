@@ -18,7 +18,6 @@ package io.micronaut.core.util;
 
 import javax.annotation.Nullable;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 /**
@@ -45,7 +44,6 @@ public final class StringUtils {
 
     private static final Pattern DIGIT_PATTERN = Pattern.compile("\\d+");
 
-    private static final Map<Integer, List<String>> INTERN_SET_POOL = new ConcurrentHashMap<>();
 
     /**
      * Return whether the given string is empty.
@@ -98,18 +96,15 @@ public final class StringUtils {
         if (objects == null || objects.length == 0) {
             return Collections.emptyList();
         }
-        Integer hash = Arrays.hashCode(objects);
-        return INTERN_SET_POOL.computeIfAbsent(hash, integer -> {
-            List<String> strings = new ArrayList<>(objects.length);
-            for (Object object : objects) {
-                strings.add(object.toString().intern());
-            }
-            return Collections.unmodifiableList(strings);
-        });
+        List<String> strings = new ArrayList<>(objects.length);
+        for (Object object : objects) {
+            strings.add(object.toString().intern());
+        }
+        return Collections.unmodifiableList(strings);
     }
 
     /**
-     * Converts the given objects into a set of interned strings. See {@link String#intern()}.
+     * Converts the given objects into a map of interned strings. See {@link String#intern()}.
      *
      * @param values The objects
      * @return An unmodifiable set of strings
@@ -128,7 +123,9 @@ public final class StringUtils {
         Map<String, Object> answer = new HashMap<>(len / 2);
         int i = 0;
         while (i < values.length - 1) {
-            answer.put(values[i++].toString().intern(), values[i++]);
+            String key = values[i++].toString().intern();
+            Object val = values[i++];
+            answer.put(key, val);
         }
         return answer;
     }

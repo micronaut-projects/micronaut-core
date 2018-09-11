@@ -22,6 +22,7 @@ import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.http.client.interceptor.HttpClientIntroductionAdvice;
+import io.micronaut.http.hateos.JsonError;
 import io.micronaut.retry.annotation.Recoverable;
 
 import javax.inject.Scope;
@@ -48,7 +49,7 @@ public @interface Client {
      * @return The URL or service ID of the remote service
      */
     @AliasFor(member = "id")
-    String[] value() default "";
+    String value() default "";
 
     /**
      * @return The ID of the client
@@ -63,6 +64,10 @@ public @interface Client {
      */
     String path() default "";
 
+    /**
+     * @return The type used to decode errors
+     */
+    Class<?> errorType() default JsonError.class;
     /**
      * @return The http client configuration bean to use
      */

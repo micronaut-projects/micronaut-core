@@ -16,10 +16,14 @@
 
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.annotation.processing.AnnotationUtils;
+import io.micronaut.annotation.processing.ModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.Element;
+import javax.lang.model.util.Elements;
+import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 
 /**
@@ -31,12 +35,28 @@ import javax.tools.Diagnostic;
 public class JavaVisitorContext implements VisitorContext {
 
     private final Messager messager;
+    private final Elements elements;
+    private final AnnotationUtils annotationUtils;
+    private final Types types;
+
+
+
+    private final ModelUtils modelUtils;
 
     /**
-     * @param messager The {@link Messager}
+     * The default constructor.
+     *
+     * @param messager The messager
+     * @param elements The elements
+     * @param annotationUtils The annotation utils
+     * @param types Type types
      */
-    public JavaVisitorContext(Messager messager) {
+    public JavaVisitorContext(Messager messager, Elements elements, AnnotationUtils annotationUtils, Types types, ModelUtils modelUtils) {
         this.messager = messager;
+        this.elements = elements;
+        this.annotationUtils = annotationUtils;
+        this.types = types;
+        this.modelUtils = modelUtils;
     }
 
     @Override
@@ -49,5 +69,50 @@ public class JavaVisitorContext implements VisitorContext {
     public void warn(String message, io.micronaut.inject.visitor.Element element) {
         Element el = (Element) element.getNativeType();
         messager.printMessage(Diagnostic.Kind.WARNING, message, el);
+    }
+
+    /**
+     * The messager.
+     *
+     * @return The messager
+     */
+    public Messager getMessager() {
+        return messager;
+    }
+
+    /**
+     * The model utils.
+     *
+     * @return The model utils
+     */
+    public ModelUtils getModelUtils() {
+        return modelUtils;
+    }
+
+    /**
+     * The elements.
+     *
+     * @return The elements
+     */
+    public Elements getElements() {
+        return elements;
+    }
+
+    /**
+     * The annotation utils.
+     *
+     * @return The annotation utils
+     */
+    public AnnotationUtils getAnnotationUtils() {
+        return annotationUtils;
+    }
+
+    /**
+     * The types.
+     *
+     * @return The types
+     */
+    public Types getTypes() {
+        return types;
     }
 }

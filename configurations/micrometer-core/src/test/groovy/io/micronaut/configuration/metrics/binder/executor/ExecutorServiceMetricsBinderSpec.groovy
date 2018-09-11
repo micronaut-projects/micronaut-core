@@ -8,6 +8,7 @@ import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.scheduling.TaskExecutors
 import spock.lang.Specification
 import spock.lang.Unroll
+import spock.util.concurrent.PollingConditions
 
 import java.util.concurrent.ExecutorService
 
@@ -21,8 +22,8 @@ class ExecutorServiceMetricsBinderSpec extends Specification {
         ApplicationContext context = ApplicationContext.run()
         ExecutorService executorService = context.getBean(ExecutorService, Qualifiers.byName(TaskExecutors.IO))
 
-        executorService.submit({->} as Runnable)
-        executorService.submit({->} as Runnable)
+        executorService.submit({ -> } as Runnable)
+        executorService.submit({ -> } as Runnable)
 
         MeterRegistry registry = context.getBean(MeterRegistry)
         RequiredSearch search = registry.get("executor.pool.size")
@@ -30,8 +31,12 @@ class ExecutorServiceMetricsBinderSpec extends Specification {
 
         Gauge g = search.gauge()
 
-        then:
-        g.value() == 2
+        PollingConditions conditions = new PollingConditions(timeout: 3, delay: 0.1)
+
+        then:"The pool size was expanded to handle the 2 runnables"
+        conditions.eventually {
+            g.value() > 0
+        }
     }
 
     @Unroll
@@ -46,9 +51,9 @@ class ExecutorServiceMetricsBinderSpec extends Specification {
         context.close()
 
         where:
-        cfg                                       | setting
-        MICRONAUT_METRICS_ENABLED                 | true
-        MICRONAUT_METRICS_ENABLED                 | false
+        cfg                                             | setting
+        MICRONAUT_METRICS_ENABLED                       | true
+        MICRONAUT_METRICS_ENABLED                       | false
         MICRONAUT_METRICS_BINDERS + ".executor.enabled" | true
         MICRONAUT_METRICS_BINDERS + ".executor.enabled" | false
     }

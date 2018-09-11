@@ -16,26 +16,15 @@
 
 package io.micronaut.core.annotation;
 
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.util.StringUtils;
 
-import javax.annotation.Nullable;
-import java.lang.annotation.Annotation;
-import java.lang.annotation.Documented;
-import java.lang.annotation.Inherited;
-import java.lang.annotation.Repeatable;
-import java.lang.annotation.Retention;
-import java.lang.annotation.Target;
+import java.lang.annotation.*;
 import java.lang.reflect.AnnotatedElement;
-import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Utility methods for annotations.
+ * Internal utility methods for annotations. For Internal and framework use only. Do not use in application code.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -71,6 +60,7 @@ public class AnnotationUtil {
      * Constant indicating an zero annotation.
      */
     public static final AnnotatedElement[] ZERO_ANNOTATED_ELEMENTS = new AnnotatedElement[0];
+
     /**
      * An empty re-usable element.
      */
@@ -91,193 +81,136 @@ public class AnnotationUtil {
         }
     };
 
-    /**
-     * Find the value of the annotation dynamically.
-     *
-     * @param annotation   The annotation
-     * @param requiredType The required requiredType
-     * @param attribute    The attribute
-     * @param <T>          The value requiredType
-     * @return An {@link Optional} of the value if it is present
-     */
-    public static <T> Optional<T> findValueOfType(Annotation annotation, Class<T> requiredType, String attribute) {
-        Class<? extends Annotation> annotationType = annotation.annotationType();
-        Optional<Method> method = ReflectionUtils.getDeclaredMethod(annotationType, attribute);
-        return method.flatMap(m -> ConversionService.SHARED.convert(ReflectionUtils.invokeMethod(annotation, m), requiredType));
-    }
+    private static final Map<Integer, List<String>> INTERN_LIST_POOL = new ConcurrentHashMap<>();
+    private static final Map<String, Map<String, Object>> INTERN_MAP_POOL = new ConcurrentHashMap<>();
 
     /**
-     * Find the value of the annotation dynamically.
+     * Converts the given objects into a set of interned strings contained within an internal pool of lists. See {@link String#intern()}.
      *
-     * @param annotation   The annotation
-     * @param requiredType The required requiredType
-     * @param <T>          The value requiredType
-     * @return An {@link Optional} of the value if it is present
-     */
-    public static <T> Optional<T> findValueOfType(Annotation annotation, Class<T> requiredType) {
-        return findValueOfType(annotation, requiredType, "value");
-    }
-
-    /**
-     * Finds an annotation on the given class for the given stereotype.
+     * <p>This method serves the purpose of reducing memory footprint by pooling common lists of annotations in compiled {@link AnnotationMetadata}</p>
      *
-     * @param element    The element
-     * @param stereotype The stereotype
-     * @return The annotation
+     * @param objects The objects
+     * @return A unmodifiable, pooled set of strings
      */
-    public static Optional<Annotation> findAnnotationWithStereoType(AnnotatedElement element, Class stereotype) {
-        String stereotypeName = stereotype.getName();
-        return findAnnotationWithStereoType(element, stereotypeName);
-    }
-
-    /**
-     * Finds an annotation on the given class for the given stereotype.
-     *
-     * @param element        The element
-     * @param stereotypeName The stereotype
-     * @return The annotation
-     */
-    public static Optional<Annotation> findAnnotationWithStereoType(AnnotatedElement element, String stereotypeName) {
-        if (element instanceof Class) {
-            return findAnnotationWithStereoType(element, stereotypeName);
-        } else {
-            Annotation[] annotations = element.getAnnotations();
-            return findAnnotationWithStereoType(stereotypeName, annotations);
+    @SuppressWarnings({"unused", "unchecked"})
+    public static List<String> internListOf(Object... objects) {
+        if (objects == null || objects.length == 0) {
+            return Collections.EMPTY_LIST;
         }
+
+        Integer hash = Arrays.hashCode(objects);
+        return INTERN_LIST_POOL.computeIfAbsent(hash, integer -> StringUtils.internListOf(objects));
     }
 
-    /**
-     * Finds an annotation on the given method for the given type. The result of this method is cached.
-     * This method should not be used in runtime code that is executed repeatedly. Consumers of this method should be aware
-     * that code that utilizes the method should be executed once upon startup.
-     *
-     * @param method         The method
-     * @param annotationType The type
-     * @param <T>            The annotation generic type
-     * @return The annotation
-     */
-    public static <T extends Annotation> Optional<T> findAnnotation(Method method, @Nullable Class<T> annotationType) {
-        if (annotationType == null || method == null) {
-            return Optional.empty();
-        }
-        return findAnnotations(method, annotationType).stream().findFirst();
-    }
 
     /**
-     * Finds an annotation on the given class for the given type. The result of this method is cached.
-     * This method should not be used in runtime code that is executed repeatedly. Consumers of this method should be aware
-     * that code that utilizes the method should be executed once upon startup.
+     * Converts the given objects into a map of interned strings where the keys and values are alternating entries in the passed array. See {@link String#intern()}.
      *
-     * @param type           The type to search
-     * @param annotationType The annotation type
-     * @param <T>            The annotation generic type
-     * @return The annotation
+     * <p>The values stored at even number positions will be converted to strings and interned.</p>
+     *
+     * @param values The objects
+     * @return An unmodifiable set of strings
+     * @see io.micronaut.core.util.CollectionUtils#mapOf(Object...)
      */
-    public static <T extends Annotation> Optional<T> findAnnotation(@Nullable Class type, @Nullable Class<T> annotationType) {
-        if (annotationType == null || type == null) {
-            return Optional.empty();
+    @SuppressWarnings("unused")
+    public static Map<String, Object> internMapOf(Object... values) {
+        if (values == null || values.length == 0) {
+            return Collections.emptyMap();
         }
-        return findAnnotations(type, annotationType).stream().findFirst();
-    }
+        int len = values.length;
+        if (len % 2 != 0) {
+            throw new IllegalArgumentException("Number of arguments should be an even number representing the keys and values");
+        }
 
-    /**
-     * Finds an annotation on the given class for the given element. The result of this method is cached.
-     * This method should not be used in runtime code that is executed repeatedly. Consumers of this method should be aware
-     * that code that utilizes the method should be executed once upon startup.
-     *
-     * @param element The element
-     * @param type    The the annotation type
-     * @param <T>     The annotation generic type
-     * @return The annotation
-     */
-    public static <T extends Annotation> Optional<T> findAnnotation(AnnotatedElement element, @Nullable Class<T> type) {
-        if (type == null || element == null) {
-            return Optional.empty();
-        }
-        if (element instanceof Method) {
-            return findAnnotation((Method) element, type);
-        } else if (element instanceof Class) {
-            return findAnnotation((Class) element, type);
-        } else {
-            return Optional.ofNullable(element.getAnnotation(type));
-        }
-    }
-
-    /**
-     * Finds an annotation on the given class for the given element. The result of this method is cached.
-     * This method should not be used in runtime code that is executed repeatedly. Consumers of this method should be aware
-     * that code that utilizes the method should be executed once upon startup.
-     *
-     * @param element The element
-     * @param type    The the annotation type
-     * @param <T>     The annotation generic type
-     * @return The annotation
-     */
-    public static <T extends Annotation> Collection<T> findAnnotations(AnnotatedElement element, @Nullable Class<T> type) {
-        if (type == null || element == null) {
-            return Collections.emptyList();
-        }
-        if (element instanceof Method) {
-            return findAnnotations((Method) element, type);
-        } else if (element instanceof Class) {
-            return findAnnotations((Class) element, type);
-        } else {
-            return Arrays.asList(element.getAnnotationsByType(type));
-        }
-    }
-
-    /**
-     * Finds an annotation on the given class for the given type.
-     *
-     * @param annotations The annotations
-     * @param type        The annotation type
-     * @param <T>         The annotation generic type
-     * @return The annotation
-     */
-    public static <T extends Annotation> Optional<T> findAnnotation(Annotation[] annotations, @Nullable Class<T> type) {
-        if (type == null) {
-            return Optional.empty();
-        }
-        return (Optional<T>) Arrays.stream(annotations)
-            .filter(ann -> ann.annotationType() == type)
-            .findFirst();
-    }
-
-    /**
-     * Finds an annotation on the given class for the given stereotype.
-     *
-     * @param stereotype  The stereotype
-     * @param annotations The annotations to search
-     * @param <T>         The annotation generic type
-     * @return The annotation
-     */
-    public static <T extends Annotation> Optional<T> findAnnotationWithStereoType(Class stereotype, Annotation... annotations) {
-        String stereotypeName = stereotype.getName();
-        return findAnnotationWithStereoType(stereotypeName, annotations);
-    }
-
-    /**
-     * Finds an annotation on the given class for the given stereotype.
-     *
-     * @param stereotypeName The stereotype
-     * @param annotations    The annotations to search
-     * @param <T>            The annotation generic type
-     * @return The annotation
-     */
-    public static <T extends Annotation> Optional<T> findAnnotationWithStereoType(String stereotypeName, Annotation... annotations) {
-        for (Annotation ann : annotations) {
-            if (stereotypeName.equals(ann.annotationType().getName())) {
-                return Optional.of((T) ann);
-            } else if (isNotInternalAnnotation(ann)) {
-                if (findAnnotationWithStereoType(stereotypeName, ann.annotationType().getAnnotations()).isPresent()) {
-                    return Optional.of((T) ann);
-                }
+        // if the length is 2 then only a single annotation is defined, so tried use internal pool
+        if (len == 2) {
+            Object value = values[1];
+            if (value == Collections.EMPTY_MAP) {
+                String key = values[0].toString().intern();
+                return INTERN_MAP_POOL.computeIfAbsent(key, s ->
+                        Collections.singletonMap(s, Collections.EMPTY_MAP)
+                );
+            } else {
+                return StringUtils.internMapOf(values);
             }
+
+        } else {
+            return StringUtils.internMapOf(values);
         }
-        return Optional.empty();
     }
 
-    private static boolean isNotInternalAnnotation(Annotation ann) {
-        return !INTERNAL_ANNOTATION_NAMES.contains(ann.annotationType().getName());
+    /**
+     * Calculates the hash code of annotation values.
+     *
+     * @param values The map to calculate values' hash code
+     * @return The hash code
+     */
+    @SuppressWarnings("MagicNumber")
+    public static int calculateHashCode(Map<? extends CharSequence, Object> values) {
+        int hashCode = 0;
+
+        for (Map.Entry<? extends CharSequence, Object> member : values.entrySet()) {
+            Object value = member.getValue();
+
+            int nameHashCode = member.getKey().hashCode();
+
+            int valueHashCode =
+                !value.getClass().isArray() ? value.hashCode() :
+                    value.getClass() == boolean[].class ? Arrays.hashCode((boolean[]) value) :
+                        value.getClass() == byte[].class ? Arrays.hashCode((byte[]) value) :
+                            value.getClass() == char[].class ? Arrays.hashCode((char[]) value) :
+                                value.getClass() == double[].class ? Arrays.hashCode((double[]) value) :
+                                    value.getClass() == float[].class ? Arrays.hashCode((float[]) value) :
+                                        value.getClass() == int[].class ? Arrays.hashCode((int[]) value) :
+                                            value.getClass() == long[].class ? Arrays.hashCode(
+                                                (long[]) value
+                                            ) :
+                                                value.getClass() == short[].class ? Arrays
+                                                    .hashCode((short[]) value) :
+                                                    Arrays.hashCode((Object[]) value);
+
+            hashCode += 127 * nameHashCode ^ valueHashCode;
+        }
+
+        return hashCode;
+    }
+
+    /**
+     * Computes whether 2 annotation values are equal.
+     *
+     * @param o1 One object
+     * @param o2 Another object
+     * @return Whether both objects are equal
+     */
+    public static boolean areEqual(Object o1, Object o2) {
+        return
+            !o1.getClass().isArray() ? o1.equals(o2) :
+                o1.getClass() == boolean[].class ? Arrays.equals((boolean[]) o1, (boolean[]) o2) :
+                    o1.getClass() == byte[].class ? Arrays.equals((byte[]) o1, (byte[]) o2) :
+                        o1.getClass() == char[].class ? Arrays.equals((char[]) o1, (char[]) o2) :
+                            o1.getClass() == double[].class ? Arrays.equals(
+                                (double[]) o1,
+                                (double[]) o2
+                            ) :
+                                o1.getClass() == float[].class ? Arrays.equals(
+                                    (float[]) o1,
+                                    (float[]) o2
+                                ) :
+                                    o1.getClass() == int[].class ? Arrays.equals(
+                                        (int[]) o1,
+                                        (int[]) o2
+                                    ) :
+                                        o1.getClass() == long[].class ? Arrays.equals(
+                                            (long[]) o1,
+                                            (long[]) o2
+                                        ) :
+                                            o1.getClass() == short[].class ? Arrays.equals(
+                                                (short[]) o1,
+                                                (short[]) o2
+                                            ) :
+                                                Arrays.equals(
+                                                    (Object[]) o1,
+                                                    (Object[]) o2
+                                                );
     }
 }

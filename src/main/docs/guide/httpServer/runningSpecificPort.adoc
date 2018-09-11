@@ -6,3 +6,12 @@ micronaut:
   server:
     port: 8080
 ----
+
+To run in a random port: 
+
+[source, yaml]
+----
+micronaut:
+  server:
+    port: -1
+----

@@ -17,6 +17,7 @@
 package io.micronaut.function.executor;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.Qualifier;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -24,6 +25,7 @@ import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.io.Writable;
+import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.exception.InvocationException;
 import io.micronaut.core.type.Argument;
@@ -32,13 +34,16 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -78,34 +83,57 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
 
         LocalFunctionRegistry localFunctionRegistry = applicationContext.getBean(LocalFunctionRegistry.class);
         ExecutableMethod<Object, Object> method = resolveFunction(localFunctionRegistry, functionName);
+        Class<?> returnJavaType = method.getReturnType().getType();
+        ClassLoadingReporter.reportBeanPresent(returnJavaType);
 
         Argument[] requiredArguments = method.getArguments();
         int argCount = requiredArguments.length;
         Object result;
-        Object bean = applicationContext.getBean(method.getDeclaringType());
+        Qualifier<Object> qualifier = Qualifiers.byName(functionName);
+        Class<Object> functionType = method.getDeclaringType();
+        BeanDefinition<Object> beanDefinition = applicationContext.getBeanDefinition(functionType, qualifier);
+        Object bean = applicationContext.getBean(functionType, qualifier);
+        List<Argument<?>> typeArguments = beanDefinition.getTypeArguments();
 
-        switch (argCount) {
-            case 0:
-                result = method.invoke(bean);
-                break;
-            case 1:
+        try {
+            switch (argCount) {
+                case 0:
+                    result = method.invoke(bean);
+                    break;
+                case 1:
 
-                Argument arg = requiredArguments[0];
-                Object value = decodeInputArgument(env, localFunctionRegistry, arg, input);
-                result = method.invoke(bean, value);
-                break;
-            case 2:
-                Argument firstArgument = requiredArguments[0];
-                Argument secondArgument = requiredArguments[1];
-                Object first = decodeInputArgument(env, localFunctionRegistry, firstArgument, input);
-                Object second = decodeContext(env, secondArgument, context);
-                result = method.invoke(bean, first, second);
-                break;
-            default:
-                throw new InvocationException("Function [" + functionName + "] cannot be made executable.");
-        }
-        if (result != null) {
-            encode(env, localFunctionRegistry, method.getReturnType().getType(), result, output);
+                    Argument arg = requiredArguments[0];
+                    if (!typeArguments.isEmpty()) {
+                        arg = Argument.of(typeArguments.get(0).getType(), arg.getName());
+                    }
+                    Object value = decodeInputArgument(env, localFunctionRegistry, arg, input);
+                    result = method.invoke(bean, value);
+                    break;
+                case 2:
+                    Argument firstArgument = requiredArguments[0];
+                    Argument secondArgument = requiredArguments[1];
+
+                    if (!typeArguments.isEmpty()) {
+                        firstArgument = Argument.of(typeArguments.get(0).getType(), firstArgument.getName());
+                    }
+
+                    Object first = decodeInputArgument(env, localFunctionRegistry, firstArgument, input);
+                    Object second = decodeContext(env, secondArgument, context);
+                    result = method.invoke(bean, first, second);
+                    break;
+                default:
+                    throw new InvocationException("Function [" + functionName + "] cannot be made executable.");
+            }
+            if (result != null) {
+                encode(env, localFunctionRegistry, returnJavaType, result, output);
+            }
+        } finally {
+            try {
+                applicationContext.close();
+            } catch (Exception e) {
+                // ignore
+            }
+
         }
     }
 
@@ -129,7 +157,7 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
                 output.write((byte[]) result);
             } else {
                 byte[] bytes = environment
-                    .convert(result, byte[].class)
+                    .convert(result.toString(), byte[].class)
                     .orElseThrow(() -> new InvocationException("Unable to convert result [" + result + "] for output stream"));
                 output.write(bytes);
             }
@@ -159,6 +187,8 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
         Argument<?> arg,
         InputStream input) {
         Class<?> argType = arg.getType();
+        ClassLoadingReporter.reportBeanPresent(argType);
+
         if (ClassUtils.isJavaLangType(argType)) {
             Object converted = doConvertInput(conversionService, arg, input);
             if (converted != null) {

@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.util.CollectionUtils;
 
 import java.util.Collections;
 import java.util.Locale;
@@ -38,16 +39,16 @@ import java.util.TimeZone;
 @ConfigurationProperties("jackson")
 public class JacksonConfiguration {
 
-    protected String dateFormat;
-    protected Locale locale;
-    protected TimeZone timeZone;
-    protected int arraySizeThreshold = 100;
-    protected Map<SerializationFeature, Boolean> serialization = Collections.emptyMap();
-    protected Map<DeserializationFeature, Boolean> deserialization = Collections.emptyMap();
-    protected Map<MapperFeature, Boolean> mapper = Collections.emptyMap();
-    protected Map<JsonParser.Feature, Boolean> parser = Collections.emptyMap();
-    protected Map<JsonGenerator.Feature, Boolean> generator = Collections.emptyMap();
-    protected JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_EMPTY;
+    private String dateFormat;
+    private Locale locale;
+    private TimeZone timeZone;
+    private int arraySizeThreshold = 100;
+    private Map<SerializationFeature, Boolean> serialization = Collections.emptyMap();
+    private Map<DeserializationFeature, Boolean> deserialization = Collections.emptyMap();
+    private Map<MapperFeature, Boolean> mapper = Collections.emptyMap();
+    private Map<JsonParser.Feature, Boolean> parser = Collections.emptyMap();
+    private Map<JsonGenerator.Feature, Boolean> generator = Collections.emptyMap();
+    private JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_EMPTY;
 
     /**
      * @return The default serialization inclusion settings
@@ -117,5 +118,98 @@ public class JacksonConfiguration {
      */
     public int getArraySizeThreshold() {
         return arraySizeThreshold;
+    }
+
+    /**
+     * Sets the default date format to use.
+     * @param dateFormat The date format
+     */
+    public void setDateFormat(String dateFormat) {
+        this.dateFormat = dateFormat;
+    }
+
+    /**
+     * Sets the locale to use.
+     * @param locale The locale
+     */
+    public void setLocale(Locale locale) {
+        this.locale = locale;
+    }
+
+    /**
+     * Sets the timezone to use.
+     * @param timeZone The timezone
+     */
+    public void setTimeZone(TimeZone timeZone) {
+        this.timeZone = timeZone;
+    }
+
+    /**
+     * Sets the array size threshold for data binding.
+     * @param arraySizeThreshold The array size threshold
+     */
+    public void setArraySizeThreshold(int arraySizeThreshold) {
+        this.arraySizeThreshold = arraySizeThreshold;
+    }
+
+    /**
+     * Sets the serialization features to use.
+     * @param serialization The serialization features.
+     */
+    public void setSerialization(Map<SerializationFeature, Boolean> serialization) {
+        if (CollectionUtils.isNotEmpty(serialization)) {
+            this.serialization = serialization;
+        }
+    }
+
+    /**
+     * Sets the deserialization features to use.
+     * @param deserialization The deserialiation features.
+     */
+    public void setDeserialization(Map<DeserializationFeature, Boolean> deserialization) {
+        if (CollectionUtils.isNotEmpty(deserialization)) {
+            this.deserialization = deserialization;
+        }
+    }
+
+    /**
+     * Sets the object mapper features to use.
+     * @param mapper The object mapper features
+     */
+    public void setMapper(Map<MapperFeature, Boolean> mapper) {
+        if (CollectionUtils.isNotEmpty(mapper)) {
+            this.mapper = mapper;
+        }
+    }
+
+    /**
+     * Sets the parser features to use.
+     * @param parser The parser features
+     */
+    public void setParser(Map<JsonParser.Feature, Boolean> parser) {
+        if (CollectionUtils.isNotEmpty(parser)) {
+            this.parser = parser;
+        }
+    }
+
+    /**
+     * Sets the generator features to use.
+     * @param generator The generator features
+     */
+    public void setGenerator(Map<JsonGenerator.Feature, Boolean> generator) {
+        if (CollectionUtils.isNotEmpty(generator)) {
+            this.generator = generator;
+        }
+    }
+
+    /**
+     * Sets the serialization inclusion mode.
+     *
+     * @param serializationInclusion The serialization inclusion mode
+     */
+    public void setSerializationInclusion(JsonInclude.Include serializationInclusion) {
+        if (serializationInclusion != null) {
+            this.serializationInclusion = serializationInclusion;
+        }
     }
 }

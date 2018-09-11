@@ -1,5 +1,6 @@
 Clone the repository:
 
+[source,bash]
 ----
 > git clone https://github.com/micronaut-projects/micronaut-core.git
 ----
@@ -7,6 +8,7 @@ Clone the repository:
 
 `cd` into the `micronaut-core` directory and run the following command:
 
+[source,bash]
 ----
 > ./gradlew cli:fatJar
 ----
@@ -16,7 +18,7 @@ This will create the farJar for CLI.
 In your shell profile (`~/.bash_profile` if you are using the Bash shell), export the `MICRONAUT_HOME` directory and add the CLI path to your `PATH`:
 
 .bash_profile/.bashrc
-[source,sh]
+[source,bash]
 ----
 export MICRONAUT_HOME=~/path/to/micronaut-core
 export PATH="$PATH:$MICRONAUT_HOME/cli/build/bin"
@@ -24,12 +26,14 @@ export PATH="$PATH:$MICRONAUT_HOME/cli/build/bin"
 
 Reload your terminal or `source` your shell profile with `source`:
 
+[source,bash]
 ----
 > source ~/.bash_profile
 ----
 
 You should now be able to run the Micronaut CLI.
 
+[source,bash]
 ----
 > mn
 | Starting interactive mode...

@@ -21,6 +21,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Executable;
 
+import javax.inject.Named;
 import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -45,12 +46,14 @@ public @interface FunctionBean {
      * @return An optional ID of the function which may or may not be used depending on the target platform
      */
     @AliasFor(member = "name")
+    @AliasFor(annotation = Named.class, member = "value")
     String value() default "";
 
     /**
      * @return An optional ID of the function which may or may not be used depending on the target platform
      */
     @AliasFor(member = "value")
+    @AliasFor(annotation = Named.class, member = "value")
     String name() default "";
 
     /**

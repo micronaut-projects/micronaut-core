@@ -33,4 +33,17 @@ import java.lang.annotation.Target;
 @Retention(RUNTIME)
 @Target({ElementType.ANNOTATION_TYPE})
 public @interface Bindable {
+
+    /**
+     * @return The name of the bindable source
+     */
+    String value() default "";
+
+    /**
+     * The default value to use if no bindable value is present.
+     *
+     * @return The default value
+     */
+    String defaultValue() default "";
+
 }

@@ -17,13 +17,15 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.writer.AbstractClassFileWriter;
 import io.micronaut.inject.writer.ClassGenerationException;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import org.objectweb.asm.ClassWriter;
+import org.objectweb.asm.Label;
+import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 
@@ -44,25 +46,37 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     private static final Type TYPE_DEFAULT_ANNOTATION_METADATA = Type.getType(DefaultAnnotationMetadata.class);
     private static final org.objectweb.asm.commons.Method METHOD_MAP_OF = org.objectweb.asm.commons.Method.getMethod(
         ReflectionUtils.getRequiredInternalMethod(
-            StringUtils.class,
+            AnnotationUtil.class,
             "internMapOf",
             Object[].class
         )
     );
 
-    private static final org.objectweb.asm.commons.Method METHOD_EMPTY_MAP = org.objectweb.asm.commons.Method.getMethod(
-        ReflectionUtils.getRequiredInternalMethod(
-            Collections.class,
-            "emptyMap"
-        )
-    );
     private static final org.objectweb.asm.commons.Method METHOD_LIST_OF = org.objectweb.asm.commons.Method.getMethod(
         ReflectionUtils.getRequiredInternalMethod(
-            StringUtils.class,
+            AnnotationUtil.class,
             "internListOf",
             Object[].class
         )
     );
+
+    private static final org.objectweb.asm.commons.Method METHOD_ARE_DEFAULTS_REGISTERED = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(
+                    DefaultAnnotationMetadata.class,
+                    "areAnnotationDefaultsRegistered",
+                    String.class
+            )
+    );
+
+    private static final org.objectweb.asm.commons.Method METHOD_REGISTER_ANNOTATION_DEFAULTS = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(
+                    DefaultAnnotationMetadata.class,
+                    "registerAnnotationDefaults",
+                    String.class,
+                    Map.class
+            )
+    );
+
     private static final org.objectweb.asm.commons.Method CONSTRUCTOR_ANNOTATION_METADATA = org.objectweb.asm.commons.Method.getMethod(
         ReflectionUtils.getRequiredInternalConstructor(
             DefaultAnnotationMetadata.class,
@@ -76,18 +90,21 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
 
     private static final org.objectweb.asm.commons.Method CONSTRUCTOR_ANNOTATION_VALUE = org.objectweb.asm.commons.Method.getMethod(
         ReflectionUtils.getRequiredInternalConstructor(
-            AnnotationValue.class,
+            io.micronaut.core.annotation.AnnotationValue.class,
             String.class
         )
     );
 
     private static final org.objectweb.asm.commons.Method CONSTRUCTOR_ANNOTATION_VALUE_AND_MAP = org.objectweb.asm.commons.Method.getMethod(
         ReflectionUtils.getRequiredInternalConstructor(
-            AnnotationValue.class,
+            io.micronaut.core.annotation.AnnotationValue.class,
             String.class,
             Map.class
         )
     );
+
+    private static final Type EMPTY_MAP_TYPE = Type.getType(Map.class);
+    private static final String EMPTY_MAP = "EMPTY_MAP";
 
     private final String className;
     private final DefaultAnnotationMetadata annotationMetadata;
@@ -175,7 +192,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             );
         }
         // invoke the AbstractBeanDefinition.createMap method
-        generatorAdapter.invokeStatic(Type.getType(StringUtils.class), METHOD_MAP_OF);
+        generatorAdapter.invokeStatic(Type.getType(AnnotationUtil.class), METHOD_MAP_OF);
     }
 
     private static void instantiateInternal(GeneratorAdapter generatorAdapter, DefaultAnnotationMetadata annotationMetadata, boolean isNew) {
@@ -196,11 +213,13 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         // 5th argument: annotations by stereotype
         pushCreateAnnotationsByStereotypeData(generatorAdapter, annotationMetadata.annotationsByStereotype);
 
+        // invoke the constructor
         generatorAdapter.invokeConstructor(TYPE_DEFAULT_ANNOTATION_METADATA, CONSTRUCTOR_ANNOTATION_METADATA);
+
     }
 
     private ClassWriter generateClassBytes() {
-        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        ClassWriter classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         startClass(classWriter, getInternalName(className), TYPE_DEFAULT_ANNOTATION_METADATA);
 
         GeneratorAdapter constructor = startConstructor(classWriter);
@@ -210,6 +229,34 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         constructor.visitInsn(RETURN);
         constructor.visitMaxs(1, 1);
         constructor.visitEnd();
+
+        Map<String, Map<CharSequence, Object>> annotationDefaultValues = annotationMetadata.annotationDefaultValues;
+        if (annotationDefaultValues != null) {
+
+            MethodVisitor si = classWriter.visitMethod(ACC_STATIC, "<clinit>", "()V", null, null);
+            GeneratorAdapter staticInit = new GeneratorAdapter(si, ACC_STATIC, "<clinit>", "()V");
+
+            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationDefaultValues.entrySet()) {
+                String annotationName = entry.getKey();
+
+                Label falseCondition = new Label();
+
+                staticInit.push(annotationName);
+                staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_ARE_DEFAULTS_REGISTERED);
+                staticInit.push(true);
+                staticInit.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.EQ, falseCondition);
+                staticInit.visitLabel(new Label());
+
+                staticInit.push(annotationName);
+                pushAnnotationAttributes(staticInit, entry.getValue());
+                staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_ANNOTATION_DEFAULTS);
+                staticInit.visitLabel(falseCondition);
+            }
+            staticInit.visitInsn(RETURN);
+
+            staticInit.visitMaxs(1, 1);
+            staticInit.visitEnd();
+        }
         return classWriter;
     }
 
@@ -226,7 +273,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 // use the property type as the value
             }
             // invoke the AbstractBeanDefinition.createMap method
-            methodVisitor.invokeStatic(Type.getType(StringUtils.class), METHOD_LIST_OF);
+            methodVisitor.invokeStatic(Type.getType(AnnotationUtil.class), METHOD_LIST_OF);
         } else {
             methodVisitor.visitInsn(ACONST_NULL);
         }
@@ -249,7 +296,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 );
             }
             // invoke the AbstractBeanDefinition.createMap method
-            methodVisitor.invokeStatic(Type.getType(StringUtils.class), METHOD_MAP_OF);
+            methodVisitor.invokeStatic(Type.getType(AnnotationUtil.class), METHOD_MAP_OF);
         } else {
             methodVisitor.visitInsn(ACONST_NULL);
         }
@@ -270,7 +317,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 Map<CharSequence, Object> attributes = entry.getValue();
                 if (attributes.isEmpty()) {
                     pushStoreInArray(methodVisitor, i++, totalSize, () ->
-                        methodVisitor.invokeStatic(Type.getType(Collections.class), METHOD_EMPTY_MAP)
+                        methodVisitor.getStatic(Type.getType(Collections.class), EMPTY_MAP, EMPTY_MAP_TYPE)
                     );
                 } else {
                     pushStoreInArray(methodVisitor, i++, totalSize, () ->
@@ -279,7 +326,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 }
             }
             // invoke the StringUtils.mapOf method
-            methodVisitor.invokeStatic(Type.getType(StringUtils.class), METHOD_MAP_OF);
+            methodVisitor.invokeStatic(Type.getType(AnnotationUtil.class), METHOD_MAP_OF);
         } else {
             methodVisitor.visitInsn(ACONST_NULL);
         }
@@ -337,11 +384,11 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         } else if (value instanceof Number) {
             methodVisitor.push(((Number) value).intValue());
             pushBoxPrimitiveIfNecessary(ReflectionUtils.getPrimitiveType(value.getClass()), methodVisitor);
-        } else if (value instanceof AnnotationValue) {
-            AnnotationValue data = (AnnotationValue) value;
+        } else if (value instanceof io.micronaut.core.annotation.AnnotationValue) {
+            io.micronaut.core.annotation.AnnotationValue data = (io.micronaut.core.annotation.AnnotationValue) value;
             String annotationName = data.getAnnotationName();
             Map<CharSequence, Object> values = data.getValues();
-            Type annotationValueType = Type.getType(AnnotationValue.class);
+            Type annotationValueType = Type.getType(io.micronaut.core.annotation.AnnotationValue.class);
             methodVisitor.newInstance(annotationValueType);
             methodVisitor.dup();
             methodVisitor.push(annotationName);

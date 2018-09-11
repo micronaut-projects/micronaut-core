@@ -90,4 +90,9 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.visitor
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }
+
+    @Override
+    public String toString() {
+        return element.toString();
+    }
 }

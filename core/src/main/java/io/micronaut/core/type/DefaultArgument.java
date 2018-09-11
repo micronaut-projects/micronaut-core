@@ -17,16 +17,9 @@
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 
-import java.lang.annotation.Annotation;
-import java.lang.reflect.AnnotatedElement;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Represents an argument to a constructor or method.
@@ -40,41 +33,10 @@ class DefaultArgument<T> implements Argument<T> {
 
     private final Class<T> type;
     private final String name;
-    private final AnnotatedElement annotatedElement;
     private final Map<String, Argument<?>> typeParameters;
     private final Argument[] typeParameterArray;
-    private Annotation qualifier;
+    private final AnnotationMetadata annotationMetadata;
 
-    /**
-     * @param type         The type
-     * @param name         The name
-     * @param qualifier    The qualifier
-     * @param annotations  The annotations
-     * @param genericTypes The generic types
-     */
-    DefaultArgument(Class<T> type, String name, Annotation qualifier, Annotation[] annotations, Argument... genericTypes) {
-        this.type = type;
-        this.name = name;
-        this.annotatedElement = createInternalElement(annotations);
-        this.qualifier = qualifier;
-        this.typeParameters = initializeTypeParameters(genericTypes);
-        this.typeParameterArray = genericTypes;
-    }
-
-    /**
-     * @param type         The type
-     * @param name         The name
-     * @param qualifier    The qualifier
-     * @param genericTypes The generic types
-     */
-    DefaultArgument(Class<T> type, String name, Annotation qualifier, Argument... genericTypes) {
-        this.type = type;
-        this.name = name;
-        this.annotatedElement = AnnotationUtil.EMPTY_ANNOTATED_ELEMENT;
-        this.qualifier = qualifier;
-        this.typeParameters = initializeTypeParameters(genericTypes);
-        this.typeParameterArray = genericTypes;
-    }
 
     /**
      * @param type               The type
@@ -85,22 +47,14 @@ class DefaultArgument<T> implements Argument<T> {
     DefaultArgument(Class<T> type, String name, AnnotationMetadata annotationMetadata, Argument... genericTypes) {
         this.type = type;
         this.name = name;
-        this.annotatedElement = annotationMetadata != null ? annotationMetadata : AnnotationUtil.EMPTY_ANNOTATED_ELEMENT;
-        if (annotationMetadata != null) {
-            this.qualifier = annotationMetadata.getAnnotationTypeByStereotype("javax.inject.Qualifier")
-                .map(annotationMetadata::getAnnotation)
-                .orElse(null);
-        }
+        this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
         this.typeParameters = initializeTypeParameters(genericTypes);
         this.typeParameterArray = genericTypes;
     }
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        if (annotatedElement instanceof AnnotationMetadata) {
-            return (AnnotationMetadata) annotatedElement;
-        }
-        return AnnotationMetadata.EMPTY_METADATA;
+        return annotationMetadata;
     }
 
     @Override
@@ -124,25 +78,6 @@ class DefaultArgument<T> implements Argument<T> {
     @Override
     public Class<T> getType() {
         return type;
-    }
-
-    @Override
-    public Annotation getQualifier() {
-        if (this.qualifier != null) {
-            return this.qualifier;
-        } else {
-
-            AnnotationMetadata annotationMetadata = getAnnotationMetadata();
-            this.qualifier = annotationMetadata.getAnnotationTypeByStereotype("javax.inject.Qualifier")
-                                               .map(annotationMetadata::getAnnotation)
-                                               .orElse(null);
-            return qualifier;
-        }
-    }
-
-    @Override
-    public AnnotatedElement[] getAnnotatedElements() {
-        return new AnnotatedElement[]{annotatedElement};
     }
 
     @Override
@@ -204,22 +139,4 @@ class DefaultArgument<T> implements Argument<T> {
         return typeParameters;
     }
 
-    private AnnotatedElement createInternalElement(Annotation[] annotations) {
-        return new AnnotatedElement() {
-            @Override
-            public <A extends Annotation> A getAnnotation(Class<A> annotationClass) {
-                return AnnotationUtil.findAnnotation(annotations, annotationClass).orElse(null);
-            }
-
-            @Override
-            public Annotation[] getAnnotations() {
-                return annotations;
-            }
-
-            @Override
-            public Annotation[] getDeclaredAnnotations() {
-                return annotations;
-            }
-        };
-    }
 }

@@ -21,10 +21,7 @@ import io.micronaut.context.AbstractParametrizedBeanDefinition;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanContext;
-import io.micronaut.context.annotation.ConfigurationBuilder;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Parameter;
-import io.micronaut.context.annotation.Value;
+import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -130,6 +127,13 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         )
     );
 
+    private static final org.objectweb.asm.commons.Method METHOD_MAP_OF = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(
+                    CollectionUtils.class,
+                    "mapOf",
+                    Object[].class
+            )
+    );
     private static final Method POST_CONSTRUCT_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "postConstruct", BeanResolutionContext.class, BeanContext.class, Object.class);
 
     private static final Method INJECT_BEAN_METHOD = ReflectionUtils.getRequiredInternalMethod(AbstractBeanDefinition.class, "injectBean", BeanResolutionContext.class, BeanContext.class, Object.class);
@@ -225,6 +229,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     private ConfigBuilderState currentConfigBuilderState;
     private int optionalInstanceIndex;
     private boolean preprocessMethods = false;
+    private Map<String, Map<String, Object>> typeArguments;
 
     /**
      * Creates a bean definition writer.
@@ -237,6 +242,21 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                 String className,
                                 AnnotationMetadata annotationMetadata) {
         this(packageName, className, packageName + '.' + className, false, annotationMetadata);
+    }
+
+    /**
+     * Creates a bean definition writer.
+     *
+     * @param packageName        The package name of the bean
+     * @param className          The class name, without the package, of the bean
+     * @param isInterface       Whether the writer is for an interface.
+     * @param annotationMetadata The annotation metadata
+     */
+    public BeanDefinitionWriter(String packageName,
+                                String className,
+                                boolean isInterface,
+                                AnnotationMetadata annotationMetadata) {
+        this(packageName, className, packageName + '.' + className, isInterface, annotationMetadata);
     }
 
     /**
@@ -478,6 +498,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         finalizeInjectMethod();
         finalizeBuildMethod();
         finalizeAnnotationMetadata();
+        finalizeTypeArguments();
 
         if (preprocessMethods) {
             GeneratorAdapter requiresMethodProcessing = startPublicMethod(classWriter, "requiresMethodProcessing", boolean.class.getName());
@@ -507,8 +528,34 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             preDestroyMethodVisitor.visitMaxs(DEFAULT_MAX_STACK, preDestroyMethodLocalCount);
         }
 
+
+
         classWriter.visitEnd();
         this.beanFinalized = true;
+    }
+
+    private void finalizeTypeArguments() {
+        if (CollectionUtils.isNotEmpty(typeArguments)) {
+            GeneratorAdapter visitor = startPublicMethodZeroArgs(classWriter, Map.class, "getTypeArgumentsMap");
+            int totalSize = typeArguments.size() * 2;
+            // start a new array
+            pushNewArray(visitor, Object.class, totalSize);
+            int i = 0;
+            for (Map.Entry<String, Map<String, Object>> entry : typeArguments.entrySet()) {
+                // use the property name as the key
+                String typeName = entry.getKey();
+                pushStoreStringInArray(visitor, i++, totalSize, typeName);
+                // use the property type as the value
+                pushStoreInArray(visitor, i++, totalSize, () -> {
+                    buildTypeArguments(visitor, entry.getValue());
+                });
+            }
+            // invoke the AbstractBeanDefinition.createMap method
+            visitor.invokeStatic(Type.getType(CollectionUtils.class), METHOD_MAP_OF);
+            visitor.returnValue();
+            visitor.visitMaxs(1, 1);
+            visitor.visitEnd();
+        }
     }
 
     private void finalizeAnnotationMetadata() {
@@ -837,6 +884,33 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     @Override
     public void visitConfigBuilderMethod(Object type, String methodName, AnnotationMetadata annotationMetadata, ConfigurationMetadataBuilder metadataBuilder) {
+
+        String factoryMethod = annotationMetadata
+            .getValue(
+                ConfigurationBuilder.class,
+                "factoryMethod",
+                String.class)
+            .orElse(null);
+
+        if (StringUtils.isNotEmpty(factoryMethod)) {
+            Type builderType = getTypeReference(type);
+
+            injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
+            injectMethodVisitor.invokeStatic(
+                    builderType,
+                    org.objectweb.asm.commons.Method.getMethod(
+                            builderType.getClassName() + " " + factoryMethod + "()"
+                    )
+            );
+
+            String propertyName = NameUtils.getPropertyNameForGetter(methodName);
+            String setterName = NameUtils.setterNameFor(propertyName);
+
+            injectMethodVisitor.invokeVirtual(beanType, org.objectweb.asm.commons.Method.getMethod(
+                    "void " + setterName + "(" + builderType.getClassName() + ")"
+            ));
+        }
+
         this.currentConfigBuilderState = new ConfigBuilderState(type, methodName, true, annotationMetadata, metadataBuilder);
     }
 
@@ -861,7 +935,16 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
         String methodName,
         Object paramType,
         Map<String, Object> generics) {
-        visitConfigBuilderMethodInternal(prefix, configurationPrefix, returnType, methodName, paramType, generics, false);
+
+        visitConfigBuilderMethodInternal(
+                prefix,
+                configurationPrefix,
+                returnType,
+                methodName,
+                paramType,
+                generics,
+                false
+        );
     }
 
     @Override
@@ -872,6 +955,11 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
     @Override
     public void setRequiresMethodProcessing(boolean shouldPreProcess) {
         this.preprocessMethods = shouldPreProcess;
+    }
+
+    @Override
+    public void visitTypeArguments(Map<String, Map<String, Object>> typeArguments) {
+        this.typeArguments = typeArguments;
     }
 
     @Override
@@ -1390,7 +1478,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     injectMethodVisitor.push(i);
                     // invoke getBeanForField
 
-                    Method methodToInvoke = argMetadata.hasDeclaredStereotype(Value.class) ? GET_VALUE_FOR_METHOD_ARGUMENT : GET_BEAN_FOR_METHOD_ARGUMENT;
+                    Method methodToInvoke = argMetadata.hasDeclaredStereotype(Value.class) || argMetadata.hasDeclaredStereotype(Property.class) ? GET_VALUE_FOR_METHOD_ARGUMENT : GET_BEAN_FOR_METHOD_ARGUMENT;
                     pushInvokeMethodOnSuperClass(injectMethodVisitor, methodToInvoke);
                     // cast the return value to the correct type
                     pushCastToType(injectMethodVisitor, entry.getValue());
@@ -1783,7 +1871,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private boolean isValueType(AnnotationMetadata annotationMetadata) {
         if (annotationMetadata != null) {
-            return annotationMetadata.hasDeclaredStereotype(Value.class);
+            return annotationMetadata.hasDeclaredStereotype(Value.class) || annotationMetadata.hasDeclaredStereotype(Property.class);
         }
         return false;
     }

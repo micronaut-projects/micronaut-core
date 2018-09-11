@@ -37,5 +37,6 @@ dependencies {
     compileOnly dependencyVersion("validation")
 
     testCompile dependencyVersion("validation")
+    testCompile "com.github.stefanbirkner:system-rules:$systemRulesVersion"
 
 }

@@ -30,8 +30,8 @@ class Test {
 ''')
 
         when:
-        SomeOther someOther= definition.getAnnotation(SomeOther)
-        OneRequires oneRequires = definition.getAnnotation(OneRequires)
+        SomeOther someOther= definition.synthesize(SomeOther)
+        OneRequires oneRequires = definition.synthesize(OneRequires)
 
         then:
         oneRequires.properties().size() == 1
@@ -61,7 +61,7 @@ class Test {
 ''')
         when:
         List<ConvertibleValues> requirements = definition.getAnnotationValuesByType(Requires.class)
-        Requires[] requires = definition.getAnnotationsByType(Requires)
+        Requires[] requires = definition.synthesizeAnnotationsByType(Requires)
 
         then:
         definition.getAnnotationMetadata().hasAnnotation(Requires.class)
@@ -89,7 +89,7 @@ class Test {
 ''')
         when:
         List<ConvertibleValues> requirements = definition.getAnnotationValuesByType(Requires.class)
-        Requires[] requires = definition.getAnnotationsByType(Requires)
+        Requires[] requires = definition.synthesizeAnnotationsByType(Requires)
 
         then:
         definition.getAnnotationMetadata().hasAnnotation(Requires.class)
@@ -117,7 +117,7 @@ class Test {
 ''')
         when:
         List<ConvertibleValues> requirements = definition.getAnnotationValuesByType(Requires.class)
-        Requires[] requires = definition.getAnnotationsByType(Requires)
+        Requires[] requires = definition.synthesizeAnnotationsByType(Requires)
 
         then:
         definition.getAnnotationMetadata().hasStereotype(Requires.class)
@@ -147,7 +147,7 @@ class Test {
 ''')
         when:
         List<ConvertibleValues> requirements = definition.getAnnotationValuesByType(Requires.class)
-        Requires[] requires = definition.getAnnotationsByType(Requires)
+        Requires[] requires = definition.synthesizeAnnotationsByType(Requires)
 
         then:
         definition.getAnnotationMetadata().hasStereotype(Requires.class)
@@ -179,7 +179,7 @@ class Test {
 ''')
         when:
         List<ConvertibleValues> requirements = definition.getAnnotationValuesByType(Requires.class)
-        Requires[] requires = definition.getAnnotationsByType(Requires)
+        Requires[] requires = definition.synthesizeAnnotationsByType(Requires)
 
         then:
         definition.getAnnotationMetadata().hasAnnotation(Requires.class)
@@ -207,7 +207,7 @@ class Test {
 ''')
         when:
         List<ConvertibleValues> requirements = definition.getAnnotationValuesByType(Requires.class)
-        Requires[] requires = definition.getAnnotationsByType(Requires)
+        Requires[] requires = definition.synthesizeAnnotationsByType(Requires)
 
         then:
         definition.getAnnotationMetadata().hasAnnotation(Requires.class)
@@ -235,7 +235,7 @@ class Test {
 ''')
         when:
         List<ConvertibleValues> requirements = definition.getAnnotationValuesByType(Requires.class)
-        Requires[] requires = definition.getAnnotationsByType(Requires)
+        Requires[] requires = definition.synthesizeAnnotationsByType(Requires)
 
         then:
         requirements != null
@@ -262,7 +262,7 @@ class Test {
 ''')
         when:
         List<ConvertibleValues> requirements = definition.getAnnotationValuesByType(Requires.class)
-        Requires[] requires = definition.getAnnotationsByType(Requires)
+        Requires[] requires = definition.synthesizeAnnotationsByType(Requires)
 
         then:
         requirements != null
@@ -287,7 +287,7 @@ class Test {
 ''')
         when:
         List<ConvertibleValues> requirements = definition.getAnnotationValuesByType(Requires.class)
-        Requires[] requires = definition.getAnnotationsByType(Requires)
+        Requires[] requires = definition.synthesizeAnnotationsByType(Requires)
 
         then:
         requirements != null

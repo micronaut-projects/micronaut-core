@@ -75,14 +75,14 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         e.response.status == HttpStatus.BAD_REQUEST
 
     }
-    @Controller(consumes = MediaType.APPLICATION_FORM_URLENCODED)
+    @Controller(value = '/form', consumes = MediaType.APPLICATION_FORM_URLENCODED)
     static class FormController {
-        @Post
+        @Post('/simple')
         String simple(String name, Integer age) {
             "name: $name, age: $age"
         }
 
-        @Post
+        @Post('/pojo')
         String pojo(@Body Person person) {
             "name: $person.name, age: $person.age"
         }

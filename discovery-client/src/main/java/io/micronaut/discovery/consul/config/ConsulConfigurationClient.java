@@ -24,7 +24,6 @@ import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.env.PropertySourceLoader;
 import io.micronaut.context.env.yaml.YamlPropertySourceLoader;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.config.ConfigDiscoveryConfiguration;
@@ -161,7 +160,7 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                                 String fileName = key.substring(pathPrefix.length());
                                 int i = fileName.lastIndexOf('.');
                                 if (i > -1) {
-                                    String ext = fileName.substring(i + 1, fileName.length());
+                                    String ext = fileName.substring(i + 1);
                                     fileName = fileName.substring(0, i);
                                     PropertySourceLoader propertySourceLoader = resolveLoader(ext);
                                     if (propertySourceLoader != null) {
@@ -286,9 +285,7 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                     return new PropertiesPropertySourceLoader();
                 case "yml":
                 case "yaml":
-                    if (ClassUtils.isPresent("org.yaml.snakeyaml.Yaml", YamlPropertySourceLoader.class.getClassLoader())) {
-                        return new YamlPropertySourceLoader();
-                    }
+                    return new YamlPropertySourceLoader();
                 default:
                     // no-op
             }

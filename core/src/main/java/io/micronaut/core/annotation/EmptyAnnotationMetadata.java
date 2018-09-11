@@ -16,7 +16,6 @@
 
 package io.micronaut.core.annotation;
 
-import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.value.OptionalValues;
 
 import java.lang.annotation.Annotation;
@@ -73,13 +72,13 @@ class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public ConvertibleValues<Object> getValues(String annotation) {
-        return ConvertibleValues.empty();
+    public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
+        return Optional.empty();
     }
 
     @Override
-    public ConvertibleValues<Object> getDeclaredValues(String annotation) {
-        return ConvertibleValues.empty();
+    public <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(String annotation) {
+        return Optional.empty();
     }
 
     @Override
@@ -93,27 +92,27 @@ class EmptyAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public List<ConvertibleValues<Object>> getAnnotationValuesByType(Class<? extends Annotation> annotationType) {
+    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(Class<T> annotationType) {
         return Collections.emptyList();
     }
 
     @Override
-    public List<ConvertibleValues<Object>> getDeclaredAnnotationValuesByType(Class<? extends Annotation> annotationType) {
+    public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(Class<T> annotationType) {
         return Collections.emptyList();
     }
 
     @Override
-    public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
+    public <T extends Annotation> T synthesize(Class<T> annotationClass) {
         return null;
     }
 
     @Override
-    public Annotation[] getAnnotations() {
+    public Annotation[] synthesizeAll() {
         return AnnotationUtil.ZERO_ANNOTATIONS;
     }
 
     @Override
-    public Annotation[] getDeclaredAnnotations() {
+    public Annotation[] synthesizeDeclared() {
         return AnnotationUtil.ZERO_ANNOTATIONS;
     }
 }

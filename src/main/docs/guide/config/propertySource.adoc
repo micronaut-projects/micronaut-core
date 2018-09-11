@@ -8,7 +8,7 @@ include::{testsjava}/env/EnvironmentTest.java[tags=envProps, indent=0]
 
 The link:{api}/io/micronaut/context/env/PropertySource.html[PropertySource.of] method can be used to create a `ProperySource` from a map of values.
 
-Alternatively one can register a link:{api}/io/micronaut/context/env/PropertySourceLoader.html[PropertySourceLoader] by creating a `META-INF/services/io.micronaut.context.env.PropertySourceLoader` containg a reference to the class name of the `PropertySourceLoader`.
+Alternatively one can register a link:{api}/io/micronaut/context/env/PropertySourceLoader.html[PropertySourceLoader] by creating a `META-INF/services/io.micronaut.context.env.PropertySourceLoader` containing a reference to the class name of the `PropertySourceLoader`.
 
 Micronaut by default contains `PropertySourceLoader` implementations that load properties from the given locations and priority:
 
@@ -20,4 +20,46 @@ Micronaut by default contains `PropertySourceLoader` implementations that load p
 * Enviroment-specific properties from `application-{environment}.{extension}` (Either `.properties`, `.json`, `.yml` or `.groovy` property formats supported)
 * Application-specific properties from `application.{extension}` (Either `.properties`, `.json`, `.yml` or `.groovy` property formats supported)
 
+TIP: To use custom properties from local files, you can either call your application with `-Dmicronaut.config.files=myfile.yml` or set the environment variable `MICRONAUT_CONFIG_FILES=myfile.yml`. The value can be a comma-separated list.
 
+.Special Properties
+
+You can use `random` values by using the following properties.  These can be used in configuration files as variables like the following.
+
+[source,yaml]
+----
+micronaut:
+  application:
+    name: myapplication
+    instance:
+      id: ${random.shortuuid}
+----
+
+.Random Values
+|===
+|Property |Value
+
+|random.port
+|An available random port number
+
+|random.int
+|Random int
+
+|random.integer
+|Random int
+
+|random.long
+|Random long
+
+|random.float
+|Random float
+
+|random.shortuuid
+|Random UUID of only 10 chars in length (Note: As this isn't full UUID, collision COULD occur)
+
+|random.uuid
+|Random UUID with dashes
+
+|random.uuid2
+|Random UUID without dashes
+|===

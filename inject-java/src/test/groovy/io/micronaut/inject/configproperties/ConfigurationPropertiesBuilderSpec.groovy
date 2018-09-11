@@ -159,6 +159,7 @@ class Test {
 package test;
 
 import io.micronaut.context.annotation.*;
+import java.lang.Deprecated;
 
 @ConfigurationProperties("test")
 class MyProperties {
@@ -176,6 +177,7 @@ class Test {
     
     public void setFoo(String s) { this.foo = s;}
     public void setBar(int s) {this.bar = s;}
+    @Deprecated
     public void setBaz(Long s) {this.baz = s;}
     
     public String getFoo() { return this.foo; }
@@ -203,7 +205,7 @@ class Test {
         then:
         test.foo == 'good'
         test.bar == 10
-        test.baz == 20
+        test.baz == null //deprecated properties not settable
     }
 
     void "test different inject types for config properties"() {
@@ -341,5 +343,41 @@ class Neo4jProperties {
 
         then:
         config.idleTimeBeforeConnectionTest() == 6000
+    }
+
+    void "test using a builder that is marked final"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.Neo4jProperties', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import org.neo4j.driver.v1.*;
+
+@ConfigurationProperties("neo4j.test")
+class Neo4jProperties {
+    
+    @ConfigurationBuilder(
+        prefixes="with", 
+        allowZeroArgs=true
+    )
+    public final Config.ConfigBuilder options = Config.build();
+        
+}
+''')
+        BeanFactory factory = beanDefinition
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'neo4j.test.connectionLivenessCheckTimeout': '17s'
+        )
+        def bean = factory.build(applicationContext, beanDefinition)
+
+        then:
+        bean != null
+        bean.options != null
+
+        when:
+        Config config = bean.options.toConfig()
+
+        then:
+        config.idleTimeBeforeConnectionTest() == 17000
     }
 }

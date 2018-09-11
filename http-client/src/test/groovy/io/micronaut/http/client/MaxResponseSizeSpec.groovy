@@ -58,7 +58,7 @@ class MaxResponseSizeSpec extends Specification {
     @Controller("/max")
     static class GetController {
 
-        @Get(uri = "/", produces = MediaType.TEXT_PLAIN)
+        @Get(value = "/", produces = MediaType.TEXT_PLAIN)
         String index() {
             return ("success" * 1000)
         }

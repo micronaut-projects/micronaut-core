@@ -72,6 +72,36 @@ class ValidatedSpec extends Specification {
 
     }
 
+    def "test validated controller validates @Valid classes"() {
+        given:
+        ApplicationContext context = ApplicationContext.run([
+                'spec.name': getClass().simpleName
+        ])
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange(
+                HttpRequest.POST("/validated/pojo", '{"email":"abc"}')
+                        .contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE),
+                String
+        )
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.response.code() == HttpStatus.BAD_REQUEST.code
+
+        when:
+        def result = new JsonSlurper().parseText((String) e.response.getBody().get())
+
+        then:
+        result.message == 'pojo.email: Email should be valid'
+
+        cleanup:
+        server.close()
+    }
+
     def "test validated controller args"() {
         given:
         ApplicationContext context = ApplicationContext.run([

@@ -42,7 +42,7 @@ class AstGenericUtils {
         if (!classNode.isPrimaryClassNode()) {
             if (hasGenericTypes) {
                 GenericsType[] redirectTypes = classNode.redirect().getGenericsTypes()
-                Map<String, ClassNode> ret = new HashMap<String, ClassNode>()
+                Map<String, ClassNode> ret = new LinkedHashMap<String, ClassNode>()
                 populateGenericsSpec(redirectTypes, existingGenericTypes, ret)
                 return ret
             } else {

@@ -17,11 +17,12 @@
 package io.micronaut.management.endpoint;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.core.util.StringUtils;
 
 import java.util.Optional;
 
 /**
- * The default {@link Endpoint} configuration.
+ * The default {@link io.micronaut.management.endpoint.annotation.Endpoint} configuration.
  *
  * @author James Kleeh
  * @since 1.0
@@ -35,13 +36,18 @@ public class EndpointDefaultConfiguration {
     public static final String PREFIX = "endpoints.all";
 
     /**
-     * The default base path
+     * The path for endpoints settings.
+     */
+    public static final String PATH = "endpoints.all.path";
+
+    /**
+     * The default base path.
      */
     public static final String DEFAULT_ENDPOINT_BASE_PATH = "/";
 
-    protected Optional<Boolean> enabled = Optional.empty();
-    protected Optional<Boolean> sensitive = Optional.empty();
-    protected String path = DEFAULT_ENDPOINT_BASE_PATH;
+    private Boolean enabled;
+    private Boolean sensitive;
+    private String path = DEFAULT_ENDPOINT_BASE_PATH;
 
     /**
      *
@@ -55,14 +61,41 @@ public class EndpointDefaultConfiguration {
      * @return Whether the endpoint is enabled
      */
     public Optional<Boolean> isEnabled() {
-        return enabled;
+        return Optional.ofNullable(enabled);
     }
 
     /**
      * @return Does the endpoint expose sensitive information
      */
     public Optional<Boolean> isSensitive() {
-        return sensitive;
+        return Optional.ofNullable(sensitive);
     }
 
+    /**
+     * Sets whether the endpoint is enabled.
+     *
+     * @param enabled True it is enabled, null for the default behaviour
+     */
+    public void setEnabled(Boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    /**
+     * Sets whether the endpoint is sensitive.
+     *
+     * @param sensitive True it is sensitive, null for the default behaviour
+     */
+    public void setSensitive(Boolean sensitive) {
+        this.sensitive = sensitive;
+    }
+
+    /**
+     * The endpoints base path.
+     * @param path The path
+     */
+    public void setPath(String path) {
+        if (StringUtils.isNotEmpty(path)) {
+            this.path = path;
+        }
+    }
 }

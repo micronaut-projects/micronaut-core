@@ -7,6 +7,9 @@
     <link rel="stylesheet" href="${resourcesPath}/css/main.css" type="text/css" media="screen, print" title="Style" charset="utf-8" />
     <link rel="stylesheet" href="${resourcesPath}/css/custom.css" type="text/css" media="screen, print" title="Style" charset="utf-8" />
     <link rel="stylesheet" href="${resourcesPath}/css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8" />
+    <link rel="stylesheet" href="${resourcesPath}/css/highlight/agate.css">
+    <script src="${resourcesPath}/js/highlight.pack.js"></script>
+    <script>hljs.initHighlightingOnLoad();</script>
     <script src="${resourcesPath}/js/docs.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/1.5.13/clipboard.min.js"></script>
     <script type="text/javascript">
@@ -16,115 +19,100 @@
             document.body.className = classes.join(" ");
         }
     </script>
-    <style type="text/css">
-        @media screen and (min-width: 961px) {
-            #main > div:nth-child(-n+${(toc.children.size() + toc.children.sum { it.children.size() } + toc.children*.children.sum { it.children.size() })/2}) {
-                max-width: 62%;
-            }
-        }
-    </style>
 
 </head>
 
-<body class="body" onload="addJsClass();">
-<div id="navigation">
-    <div class="navTitle">
-        <span id="logo"><a href="http://micronaut.io" title="Go to Micronaut Website"><img src="${resourcesPath}/img/micronaut-logo-white.svg" alt="Micronaut"/></a></span>
+<body class="body" onload="addJsClass();" onhashchange="highlightMenu()">
+
+<div id="table-of-content-nav-link" class="desktop">
+    <a title="Collapse/Open Table of contents" title="Hide Table of Contents" href="javascript:hideTableOfContents();" class="button">[ + ]</a>
+</div>
+
+<div id="main">
+    <div id="navigation">
+        <div class="navTitle">
+            <span id="logo"><a href="http://micronaut.io" title="Go to Micronaut Website"><img src="${resourcesPath}/img/micronaut-logo-white.svg" alt="Micronaut"/></a></span>
+        </div>
+        <div class="navLinks">
+            <ul>
+                    <li>
+                        <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)" class="desktop">
+                            <a href="${path}/guide/index.html" class="button">Table of contents</a>
+                            <div id="nav-summary-childs" style="display:none;">
+                                <%
+                                toc.children.eachWithIndex { ch, i ->
+                                if (single) {
+                                %>
+                                <div class="toc-item" style="margin-left:0"><a href="#${ ch.name.encodeAsUrlFragment().encodeAsHtml() }"><strong>${i + 1}</strong><span>${ch.title?.encodeAsHtml()}</span></a></div>
+                                <%
+                                }
+                                else {
+                                %>
+                                <div class="toc-item" style="margin-left:0"><a href="${path}/guide/${ch.name.encodeAsUrlPath().encodeAsHtml()}.html"><strong>${i + 1}</strong><span>${ch.title?.encodeAsHtml()}</span></a></div>
+                                <%
+                                }
+                                }
+                                %>
+                            </div>
+                        </div>
+                    </li>
+
+                <li id="table-of-content-nav-link-mobile" class="mobile">
+                    <a title="Scroll to Table of contents" href="javascript:scrollToTop();" class="button">Toc</a>
+                </li>
+                <li class="desktop">
+                    <a title="Go to API documentation" href="${path}/api/index.html" class="button">API Reference</a>
+                </li>
+                <li class="mobile">
+                    <a title="Go to API documentation" href="${path}/api/index.html" class="button">API</a>
+                </li>
+            </ul>
+
+        </div>
     </div>
-    <div class="navLinks">
-        <ul>
-            <li>
-                <div id="nav-summary" onmouseover="toggleNavSummary(false)" onmouseout="toggleNavSummary(true)">
-                    <a href="${path}/guide/index.html" class="button">Table of contents</a>
-                    <div id="nav-summary-childs" style="display:none;">
-                        <%
-                        toc.children.eachWithIndex { ch, i ->
-                        if (single) {
-                        %>
-                        <div class="toc-item" style="margin-left:0"><a href="#${ ch.name.encodeAsUrlFragment().encodeAsHtml() }"><strong>${i + 1}</strong><span>${ch.title?.encodeAsHtml()}</span></a></div>
-                        <%
-                        }
-                        else {
-                        %>
-                        <div class="toc-item" style="margin-left:0"><a href="${path}/guide/${ch.name.encodeAsUrlPath().encodeAsHtml()}.html"><strong>${i + 1}</strong><span>${ch.title?.encodeAsHtml()}</span></a></div>
-                        <%
-                        }
-                        }
-                        %>
-                    </div>
-                </div>
-            </li>
-            <li>
-                <a href="${path}/api/index.html" class="button">API Reference</a>
-            </li>
-        </ul>
+    <% if(toc){ %>
+    <div id="table-of-content">
+        <div class="toc-content">
 
+        <h2>Table of Contents</h2>
+        <%
+        sectionWriter = { lvl, section, topSection, prefix ->
+        if (single) {
+        %>
+        <div class="toc-item" style="margin-left:${lvl * 10}px" id="toc-item-${ section.name.encodeAsUrlFragment().encodeAsHtml() }"><a href="#${ section.name.encodeAsUrlFragment().encodeAsHtml() }"><strong>$prefix</strong><span>${section.title?.encodeAsHtml()}</span></a></div>
+        <%
+        }
+        else {
+        %>
+        <div class="toc-item" style="margin-left:${lvl * 10}px"><a href="${path}/guide/${topSection.name.encodeAsUrlPath().encodeAsHtml()}.html${ lvl == 0 ? '' : '#' + section.name.encodeAsUrlFragment().encodeAsHtml() }"><strong>$prefix</strong><span>${section.title?.encodeAsHtml()}</span></a></div>
+        <%
+        }
+
+        lvl++
+        section.children.eachWithIndex { s, j ->
+        sectionWriter.call(lvl, s, topSection, prefix + '.' + (j + 1))
+        }
+        }
+
+        toc.children.eachWithIndex { topSection, i ->
+        sectionWriter.call(0, topSection, topSection, i + 1)
+        }
+        %>
+        </div>
+    </div>
+    <% } %>
+    <div class="docs-content">
+    <div class="project">
+        <h1>${title.encodeAsHtml()}</h1>
+        <p></p>
+        <p>${subtitle?.encodeAsHtml()}</p>
+        <p><strong>Version:</strong> ${version}</p>
+    </div>
+    ${content}
     </div>
 </div>
-
-
-<% if(toc){ %>
-<div id="table-of-content" class="desktop">
-    <h2><abbr title="Table of Contents">ToC</abbr></h2>
-    <%
-    sectionWriter = { lvl, section, topSection, prefix ->
-    if (single) {
-    %>
-    <div class="toc-item" style="margin-left:${lvl * 10}px"><a href="#${ section.name.encodeAsUrlFragment().encodeAsHtml() }"><strong>$prefix</strong><span>${section.title?.encodeAsHtml()}</span></a></div>
-    <%
-    }
-    else {
-    %>
-    <div class="toc-item" style="margin-left:${lvl * 10}px"><a href="${path}/guide/${topSection.name.encodeAsUrlPath().encodeAsHtml()}.html${ lvl == 0 ? '' : '#' + section.name.encodeAsUrlFragment().encodeAsHtml() }"><strong>$prefix</strong><span>${section.title?.encodeAsHtml()}</span></a></div>
-    <%
-    }
-
-    lvl++
-    section.children.eachWithIndex { s, j ->
-    sectionWriter.call(lvl, s, topSection, prefix + '.' + (j + 1))
-    }
-    }
-
-    toc.children.eachWithIndex { topSection, i ->
-    sectionWriter.call(0, topSection, topSection, i + 1)
-    }
-    %>
-    <div style="clear:both" ></div>
-</div>
-<% } %>
-            <div id="main" class="corner-all">
-                <div class="project">
-                    <h1>${title.encodeAsHtml()}</h1>
-                    <p></p>
-                    <p>${subtitle?.encodeAsHtml()}</p>
-                    <p><strong>Version:</strong> ${version}</p>
-                </div>
-                ${content}
-            </div>
-
-
-<div id="footer">
-    ${copyright}
-    ${footer}
-</div>
-
 
 <script type="text/javascript">
-    var prevScrollpos = window.pageYOffset;
-    window.onscroll = function() {
-        var currentScrollPos = window.pageYOffset;
-        var show = false;
-        if ((prevScrollpos > currentScrollPos) || (currentScrollPos < 5)) {
-            show = true;
-        }
-        if (show) {
-            document.getElementById("navigation").style.top = "0";
-        } else {
-            document.getElementById("navigation").style.top = "-76px";
-        }
-        prevScrollpos = currentScrollPos;
-    }
-
     function wrapElementsInLinks(x) {
         var i;
         for (i = 0; i < x.length; i++) {
@@ -134,13 +122,68 @@
                 link.setAttribute('href', 'index.html#'+x[i].id);
                 x[i].parentNode.insertBefore(link, x[i]);
                 x[i].remove();
-                console.log("Id: " + x[i].id);
             }
         }
     }
     wrapElementsInLinks(document.querySelectorAll("h1"));
     wrapElementsInLinks(document.querySelectorAll("h2"));
     wrapElementsInLinks(document.querySelectorAll("h3"));
+
+    var tocId = "table-of-content";
+    var tocLink = "table-of-content-nav-link";
+    var mainId = "main";
+    function hideTableOfContents() {
+        document.getElementById(tocId).style.display = "none";
+        document.getElementById(mainId).style.paddingLeft = "0";
+        var aEl = document.getElementById(tocLink).getElementsByTagName("a")[0];
+        replaceLink(aEl, "javascript:showTableOfContents();", "[ - ]", 'Show Table of Contents');
+        goToLocation();
+    }
+
+    function goToLocation() {
+        if(location.hash != '') {
+            window.location = location;
+        }
+    }
+
+    function replaceLink(anchorElement, href, text, titleAttr) {
+        anchorElement.setAttribute("href", href);
+        anchorElement.setAttribute("title", titleAttr);
+        anchorElement.innerText = text;
+    }
+
+    function showTableOfContents() {
+        document.getElementById(tocId).style.display = "block";
+        document.getElementById(mainId).style.paddingLeft = "25em";
+        var aEl = document.getElementById(tocLink).getElementsByTagName("a")[0];
+        replaceLink(aEl, "javascript:hideTableOfContents();", "[ + ]", 'Hide Table of Contents');
+        goToLocation();
+    }
+
+    function scrollToTop() {
+        document.getElementById(tocId).style.display = "block";
+        document.body.scrollTop = 0; // For Safari
+        document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
+    }
+
+    function highlightMenu() {
+        var cssClass = 'toc-item-highlighted';
+        var els = document.getElementsByClassName(cssClass);
+        for (var x = 0; x < els.length; x++) {
+            els[x].classList.remove(cssClass);
+        }
+        console.log("highlighting hash" + location.hash);
+        if(location.hash != '') {
+            var elId = "toc-item-"+location.hash.replace('#', '');
+            if(document.getElementById(elId)) {
+                document.getElementById(elId).getElementsByTagName('a')[0].classList.add(cssClass);
+                document.getElementById(elId).scrollIntoView(true);
+            }
+        }
+    }
+
+    goToLocation();
+    highlightMenu();
 
 </script>
 </body>

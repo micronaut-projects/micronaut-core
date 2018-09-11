@@ -22,7 +22,7 @@ import io.micronaut.context.annotation.Parameter;
 import java.util.Optional;
 
 /**
- * An {@link Endpoint} configuration.
+ * An {@link io.micronaut.management.endpoint.annotation.Endpoint} configuration.
  *
  * @author Graeme Rocher
  * @since 1.0
@@ -35,14 +35,14 @@ public class EndpointConfiguration {
      */
     public static final String PREFIX = "endpoints";
 
-    protected Optional<Boolean> enabled = Optional.empty();
-    protected Optional<Boolean> sensitive = Optional.empty();
+    private Boolean enabled;
+    private Boolean sensitive;
 
     private final String id;
     private EndpointDefaultConfiguration defaultConfiguration;
 
     /**
-     * @param id The id
+     * @param id The id of the endpoint
      * @param defaultConfiguration The default endpoint configuration
      */
     public EndpointConfiguration(@Parameter String id, EndpointDefaultConfiguration defaultConfiguration) {
@@ -52,29 +52,47 @@ public class EndpointConfiguration {
 
     /**
      * @return The ID of the endpoint
-     * @see Endpoint#value()
+     * @see io.micronaut.management.endpoint.annotation.Endpoint#value()
      */
     public String getId() {
         return id;
     }
 
     /**
-     * @return Is the endpoint enabled. If not present, use the value of {@link Endpoint#defaultEnabled()}
+     * @return Is the endpoint enabled. If not present, use the value of {@link io.micronaut.management.endpoint.annotation.Endpoint#defaultEnabled()}
      */
     public Optional<Boolean> isEnabled() {
-        if (enabled.isPresent()) {
-            return enabled;
+        if (enabled != null) {
+            return Optional.of(enabled);
         }
         return defaultConfiguration.isEnabled();
     }
 
     /**
-     * @return Does the endpoint expose sensitive information. If not present, use the value of {@link Endpoint#defaultSensitive()}
+     * @return Does the endpoint expose sensitive information. If not present, use the value of {@link io.micronaut.management.endpoint.annotation.Endpoint#defaultSensitive()}
      */
     public Optional<Boolean> isSensitive() {
-        if (sensitive.isPresent()) {
-            return sensitive;
+        if (sensitive != null) {
+            return Optional.of(sensitive);
         }
         return defaultConfiguration.isSensitive();
+    }
+
+    /**
+     * Sets whether the endpoint is enabled.
+     *
+     * @param enabled True it is enabled, null for the default behaviour
+     */
+    public void setEnabled(Boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    /**
+     * Sets whether the endpoint is sensitive.
+     *
+     * @param sensitive True it is sensitive, null for the default behaviour
+     */
+    public void setSensitive(Boolean sensitive) {
+        this.sensitive = sensitive;
     }
 }

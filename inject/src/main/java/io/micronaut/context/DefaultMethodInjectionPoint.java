@@ -18,7 +18,6 @@ package io.micronaut.context;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -30,7 +29,6 @@ import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import javax.annotation.Nullable;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
-import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Objects;
@@ -46,7 +44,6 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentCo
 
     private final BeanDefinition declaringBean;
     private final AnnotationMetadata annotationMetadata;
-    private final AnnotatedElement[] annotatedElements;
     private final Class<?> declaringType;
     private final String methodName;
     private final Class[] argTypes;
@@ -91,13 +88,6 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentCo
         this.argTypes = Argument.toClassArray(arguments);
         this.declaringBean = declaringBean;
         this.annotationMetadata = initAnnotationMetadata(annotationMetadata);
-        if (this.annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
-            this.annotatedElements = AnnotationUtil.ZERO_ANNOTATED_ELEMENTS;
-        } else {
-            this.annotatedElements = new AnnotatedElement[]{
-                annotationMetadata
-            };
-        }
     }
 
     @Override
@@ -132,11 +122,6 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentCo
     public Object invoke(Object instance, Object... args) {
         Method targetMethod = getMethod();
         return ReflectionUtils.invokeMethod(instance, targetMethod, args);
-    }
-
-    @Override
-    public AnnotatedElement[] getAnnotatedElements() {
-        return annotatedElements;
     }
 
     @Override

@@ -1,0 +1,24 @@
+Micronaut milestone and stable releases are distributed to https://bintray.com/micronaut[Bintray].
+
+The following snippet shows how to use Micronaut `BUILD-SNAPSHOT` with Gradle:
+
+[source, groovy]
+----
+ext {
+  micronautVersion = '1.0.0.BUILD-SNAPSHOT'
+}
+repositories {
+  mavenLocal()
+  mavenCentral()
+  jcenter() <1>
+  maven { url "https://oss.sonatype.org/content/repositories/snapshots/" } // <2>
+}
+dependencyManagement {
+  imports {
+      mavenBom "io.micronaut:bom:$micronautVersion"
+  }
+}
+----
+
+<1> Micronaut releases are available on jcenter
+<2> Micronaut snapshots are available on sonatype

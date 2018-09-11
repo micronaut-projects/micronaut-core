@@ -32,7 +32,7 @@ class EngineImpl implements Engine {
 
     @Override
     int getCylinders() {
-        return config.cylinders
+        config.cylinders
     }
 
     String start() { // <2>

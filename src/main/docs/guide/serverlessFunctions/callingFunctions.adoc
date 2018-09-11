@@ -83,7 +83,7 @@ aws:
             hello:
                 functionName: hello-world
                 qualifer: foo
-    region: us-east-1
+        region: us-east-1
 ----
 
 In the above case a function named `hello` is mapped to the remote lambda function called `hello-world`. You can define multiple named functions under the `aws.lambda.functions` configuration. Each is configured by api:function.client.aws.AWSInvokeRequestDefinition[] that allows setting any property on the underlying `com.amazonaws.services.lambda.model.InvokeRequest`.

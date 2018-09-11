@@ -15,14 +15,66 @@ Here are the steps:
 you are using
 2. Create a service with DNS Records with AWS-CLI command
 3. Add health checks or custom health checks (optional)
-4. Add Service ID to your applications configuration file
+4. Add Service ID to your application configuration file like so:
 
+.Sample application.yml
+[source,yaml]
+----
+aws:
+    route53:
+        registration
+            enabled: true
+            aws-service-id: srv-978fs98fsdf
+            namespace: micronaut.io
+micronaut:
+    application:
+        name: something
+----
+
+5. Make sure you have the following dependencies included in your build file:
+
+.Sample build.gradle
+[source,groovy]
+----
+compile "io.micronaut:discovery-client"
+compile "io.micronaut.configuration:aws-common"
+compile group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.297'
+compile group: 'com.amazonaws', name: 'aws-java-sdk-core', version: '1.11.297'
+compile group: 'com.amazonaws', name: 'jmespath-java', version: '1.11.297'
+compile group: 'com.amazonaws', name: 'aws-java-sdk-servicediscovery', version: '1.11.297'
+----
+
+
+6. On the client side, you will need the same dependencies and less configuration options:
+
+.Sample application.yml
+[source,groovy]
+----
+aws:
+    route53:
+        discovery:
+            client:
+                enabled: true
+                aws-service-id: srv-978fs98fsdf
+                namespace-id: micronaut.io
+----
+
+You can then use the api:discovery.DiscoveryClient[] API to find other services registered via Route 53. For example:
+
+.Sample code for client
+[source,java]
+----
+DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient);
+List<String> serviceIds = Flowable.fromPublisher(discoveryClient.getServiceIds()).blockingFirst();
+List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances(serviceIds.get(0))).blockingFirst();
+----
 
 ==== Creating the Namespace
 
 
-Namespaces is similar to a regular Route53 hosted zone, and they appear in the Route53 console but it doesn't support
-working with them. You must use the AWS-CLI at this time for any Service Discovery functionality.
+Namespaces are similar to a regular Route53 hosted zone, and they appear in the Route53 console but the console doesn't support
+ modifying them. You must use the AWS-CLI at this time for any Service Discovery functionality.
+
 First decide if you are creating a public facing namespace or a private one, as the commands are different:
 
 
@@ -37,7 +89,7 @@ $ aws servicediscovery create-private-dns-namespace --name micronaut.internal.io
 ----
 
 
-When you run this you will get an operation ID. You can check the status with the get-operation CLI command:
+When you run this you will get an operation ID. You can check the status with the `get-operation` CLI command:
 
 .Get Operation Results
 [source,bash]
@@ -45,10 +97,9 @@ When you run this you will get an operation ID. You can check the status with th
 $ aws servicediscovery get-operation --operation-id asdffasdfsda
 ----
 
-
-This will tell you the ID of the namespace. Write that down, you'll need it for the next steps. If you get an error it will say way. For the same, I use the domain name I'm using for the service discovery records for the name (dns records next).
 You can use this command to get the status of any call you make that returns an operation id.
 
+The result of the command will tell you the ID of the namespace. Write that down, you'll need it for the next steps. If you get an error it will say what the error was.
 
 ==== Creating the Service & DNS Records
 
@@ -59,8 +110,6 @@ Next step is creating the Service and DNS records.
 ----
 $ aws create-service --name yourservicename --create-request-id somenumber --description someservicedescrption --dns-config NamespaceId=yournamespaceid,RoutingPolicy=WEIGHTED,DnsRecords=[{Type=A,TTL=1000},{Type=A,TTL=1000}]
 ----
-
-
 
 The `DnsRecord` type can be `A`(ipv4),`AAAA`(ipv6),`SRV`, or `CNAME`. `RoutingPolicy` can be `WEIGHTED` or `MULTIVALUE`. Keep in mind `CNAME` must use weighted routing type, `SRV` must have a valid port configured.
 
@@ -87,24 +136,32 @@ You will get a service ID and an ARN back from this command if successful. Write
 
 ==== Auto Naming Registration
 
-You will need to add the configuration to make your applications register with Route 53 Autodiscovery:
+You will need to add the configuration to make your applications register with Route 53 Auto-discovery:
 
 .Registration Properties
-[source,groovy]
+[source,yaml]
 ----
-aws.route53.registration.enabled=true
-aws.route53.registration.aws-service-id=<enter the service id you got after creation on aws cli>
-aws.route53.discovery.namespace-id=<namespaceId>
+aws:
+    route53:
+        registration:
+            enabled: true
+            aws-service-id=<enter the service id you got after creation on aws cli>
+        discovery:
+            namespace-id=<enter the namespace id you got after creating the namespace>
 ----
 
 ==== Discovery Client Configuration
 
 
 .Discovery Properties
-[source,groovy]
+[source,yaml]
 ----
-aws.route53.discovery.client.enabled=true
-aws.route53.discovery.client.aws-service-id=serviceid
+aws:
+    route53:
+        discovery:
+            client
+                enabled: true
+                aws-service-id: <enter the service id you got after creation on aws cli>
 ----
 
 You can also call the following methods by getting the bean "Route53AutoNamingClient":

@@ -32,7 +32,6 @@ import java.util.function.Function;
  */
 public class InstantiationUtils {
 
-    private static final Logger LOG = LoggerFactory.getLogger(InstantiationUtils.class);
 
     /**
      * Try to instantiate the given class.
@@ -46,8 +45,9 @@ public class InstantiationUtils {
             return ClassUtils.forName(name, classLoader)
                 .map((Function<Class, Optional>) InstantiationUtils::tryInstantiate);
         } catch (Throwable e) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Tried, but could not instantiate type: " + name, e);
+            Logger log = LoggerFactory.getLogger(InstantiationUtils.class);
+            if (log.isDebugEnabled()) {
+                log.debug("Tried, but could not instantiate type: " + name, e);
             }
             return Optional.empty();
         }
@@ -73,8 +73,9 @@ public class InstantiationUtils {
                 defaultConstructor.setAccessible(true);
                 return tryInstantiate(defaultConstructor);
             } catch (Throwable e1) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Tried, but could not instantiate type: " + type, e);
+                Logger log = LoggerFactory.getLogger(InstantiationUtils.class);
+                if (log.isDebugEnabled()) {
+                    log.debug("Tried, but could not instantiate type: " + type, e);
                 }
                 return Optional.empty();
             }
@@ -93,8 +94,9 @@ public class InstantiationUtils {
         try {
             return Optional.of(type.newInstance(args));
         } catch (Throwable e) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Tried, but could not instantiate type: " + type, e);
+            Logger log = LoggerFactory.getLogger(InstantiationUtils.class);
+            if (log.isDebugEnabled()) {
+                log.debug("Tried, but could not instantiate type: " + type, e);
             }
             return Optional.empty();
         }

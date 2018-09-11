@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadataResolver;
 import io.micronaut.discovery.metadata.ServiceInstanceMetadataContributor;
@@ -29,6 +30,7 @@ import io.micronaut.runtime.server.EmbeddedServerInstance;
 import javax.annotation.Nullable;
 import java.net.URI;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -45,7 +47,7 @@ class NettyEmbeddedServerInstance implements EmbeddedServerInstance {
     private final NettyHttpServer nettyHttpServer;
     private final Environment environment;
     private final ComputeInstanceMetadataResolver computeInstanceMetadataResolver;
-    private final ServiceInstanceMetadataContributor[] metadataContributors;
+    private final List<ServiceInstanceMetadataContributor> metadataContributors;
 
     private ConvertibleValues<String> instanceMetadata;
 
@@ -61,7 +63,7 @@ class NettyEmbeddedServerInstance implements EmbeddedServerInstance {
         @Parameter NettyHttpServer nettyHttpServer,
         Environment environment,
         @Nullable ComputeInstanceMetadataResolver computeInstanceMetadataResolver,
-        ServiceInstanceMetadataContributor... metadataContributors) {
+        List<ServiceInstanceMetadataContributor> metadataContributors) {
 
         this.id = id;
         this.nettyHttpServer = nettyHttpServer;
@@ -95,8 +97,10 @@ class NettyEmbeddedServerInstance implements EmbeddedServerInstance {
                     cloudMetadata = resolved.get().getMetadata();
                 }
             }
-            for (ServiceInstanceMetadataContributor metadataContributor : metadataContributors) {
-                metadataContributor.contribute(this, cloudMetadata);
+            if (CollectionUtils.isNotEmpty(metadataContributors)) {
+                for (ServiceInstanceMetadataContributor metadataContributor : metadataContributors) {
+                    metadataContributor.contribute(this, cloudMetadata);
+                }
             }
             Map<String, String> metadata = nettyHttpServer.getServerConfiguration()
                 .getApplicationConfiguration()

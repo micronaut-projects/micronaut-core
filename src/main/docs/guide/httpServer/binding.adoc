@@ -4,6 +4,19 @@ The examples in the previous section demonstrates how Micronaut allows you to bi
 
 You can customize the name of the variable bound with the link:{api}/io/micronaut/http/annotation/QueryValue.html[@QueryValue] annotation which accepts a value which is the name of the URI variable or request parameter to bind from.
 
+Also, in order to bind all request URI variables or request parameters to a command object, you can define URI route variable as `?pojo*`. For example:
+
+.Binding Request parameters to POJO
+[source,java]
+----
+include::{testsuite}/server/binding/BookmarkController.java[tags=imports, indent=0]
+
+include::{testsuite}/server/binding/BookmarkController.java[tags=class, indent=0]
+
+include::{testsuite}/server/binding/BookmarkController.java[tags=listBooks, indent=0]
+----
+
+
 In addition, there are other annotations within the link:{api}/io/micronaut/http/annotation/package-summary.html[io.micronaut.http.annotation] package to bind from different sources.
 
 The following table summarizes the annotations, their purpose and provides an example:

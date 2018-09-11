@@ -17,6 +17,7 @@
 package io.micronaut.configuration.kafka.streams;
 
 import io.micronaut.configuration.kafka.config.KafkaDefaultConfiguration;
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -37,7 +38,8 @@ import java.util.Properties;
 @Singleton
 @Requires(beans = KafkaDefaultConfiguration.class)
 @Named("default")
-public class DefaultKafkaStreamsConfiguration<K, V> extends AbtractKafkaStreamsConfiguration<K, V> {
+@Primary
+public class DefaultKafkaStreamsConfiguration<K, V> extends AbstractKafkaStreamsConfiguration<K, V> {
     /**
      * Construct a new {@link KafkaStreamsConfiguration} for the given defaults.
      *

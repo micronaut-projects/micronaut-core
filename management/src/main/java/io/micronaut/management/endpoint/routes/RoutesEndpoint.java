@@ -16,8 +16,8 @@
 
 package io.micronaut.management.endpoint.routes;
 
-import io.micronaut.management.endpoint.Endpoint;
-import io.micronaut.management.endpoint.Read;
+import io.micronaut.management.endpoint.annotation.Endpoint;
+import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.web.router.Router;
 import io.reactivex.Single;
 

@@ -71,6 +71,7 @@ import static picocli.CommandLine.Model.CommandSpec.create
         "Micronaut CLI command line interface for generating projects and services.",
         "Commonly used commands are:",
         "  @|bold create-app|@ @|yellow NAME|@",
+        "  @|bold create-cli-app|@ @|yellow NAME|@",
         "  @|bold create-federation|@ @|yellow NAME|@ @|yellow --services|@ @|yellow,italic SERVICE_NAME[,SERVICE_NAME]...|@",
         "  @|bold create-function|@ @|yellow NAME|@"],
     synopsisHeading = "@|bold,underline Usage:|@ ",
@@ -81,7 +82,8 @@ class MicronautCli {
     public static final String DEFAULT_PROFILE_NAME = ProfileRepository.DEFAULT_PROFILE_NAME
     private static final int KEYPRESS_CTRL_C = 3
     private static final int KEYPRESS_ESC = 27
-    private static final String USAGE_MESSAGE = "create-app [NAME]"
+    private static final String APP_USAGE_MESSAGE = "create-app [NAME]"
+    private static final String CLI_APP_USAGE_MESSAGE = "create-cli-app [NAME]"
     private static final String FEDERATION_USAGE_MESSAGE = "create-federation [NAME] --services SERVICE_NAME[,SERVICE_NAME]..."
     private static final String FUNCTION_USAGE_MESSAGE = "create-function [NAME]"
 
@@ -200,7 +202,7 @@ class MicronautCli {
     }
 
     private int getBaseUsage() {
-        System.out.println "Usage: \n\t $USAGE_MESSAGE \n\t $FEDERATION_USAGE_MESSAGE \n\t $FUNCTION_USAGE_MESSAGE  \n\n"
+        System.out.println "Usage: \n\t $APP_USAGE_MESSAGE \n\t $CLI_APP_USAGE_MESSAGE \\n\\t $FEDERATION_USAGE_MESSAGE \n\t $FUNCTION_USAGE_MESSAGE  \n\n"
         this.execute "list-profiles"
         System.out.println "\nType 'mn help' or 'mn -h' for more information."
 
@@ -251,6 +253,9 @@ class MicronautCli {
             // we already called initializeApplication() when creating the parser
             if (parseResult.hasSubcommand()) {
                 return handleCommand(parseResult) ? 0 : 1
+            } else if (parseResult.unmatched()) {
+                MicronautConsole.instance.error("The command '${parseResult.unmatched().get(0)}' was not found. Some commands like 'create-app' are only available outside of a project.")
+                return 1
             } else {
                 handleInteractiveMode()
             }

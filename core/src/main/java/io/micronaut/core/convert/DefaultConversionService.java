@@ -18,6 +18,7 @@ package io.micronaut.core.convert;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.format.FormattingTypeConverter;
 import io.micronaut.core.convert.format.ReadableBytesTypeConverter;
@@ -109,11 +110,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             return Optional.of((T) object);
         }
 
-        Optional<? extends Class<? extends Annotation>> formattingAnn = Optional.empty();
-
-        if (context instanceof ArgumentConversionContext) {
-            formattingAnn = ((ArgumentConversionContext) context).getAnnotationMetadata().getAnnotationTypeByStereotype(Format.class);
-        }
+        Optional<? extends Class<? extends Annotation>> formattingAnn = context.getAnnotationMetadata().getAnnotationTypeByStereotype(Format.class);
         Class<? extends Annotation> formattingAnnotation = formattingAnn.orElse(null);
         ConvertiblePair pair = new ConvertiblePair(sourceType, targetType, formattingAnnotation);
         TypeConverter typeConverter = converterCache.getIfPresent(pair);
@@ -735,8 +732,8 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     }
 
     private SimpleDateFormat resolveFormat(ConversionContext context) {
-        Format ann = context.getAnnotation(Format.class);
-        Optional<String> format = ann != null ? Optional.of(ann.value()) : Optional.empty();
+        AnnotationMetadata annotationMetadata = context.getAnnotationMetadata();
+        Optional<String> format = annotationMetadata.getValue(Format.class, String.class);
         return format
             .map((pattern) -> new SimpleDateFormat(pattern, context.getLocale()))
             .orElse(new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", context.getLocale()));

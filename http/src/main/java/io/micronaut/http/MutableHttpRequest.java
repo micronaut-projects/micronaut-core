@@ -56,6 +56,9 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
     @Override
     MutableHttpHeaders getHeaders();
 
+    @Override
+    MutableHttpParameters getParameters();
+
     /**
      * Sets the acceptable {@link MediaType} instances via the {@link HttpHeaders#ACCEPT} header.
      *
@@ -83,6 +86,11 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
     @Override
     default MutableHttpRequest<B> basicAuth(CharSequence username, CharSequence password) {
         return (MutableHttpRequest<B>) MutableHttpMessage.super.basicAuth(username, password);
+    }
+
+    @Override
+    default MutableHttpRequest<B> bearerAuth(CharSequence token) {
+        return (MutableHttpRequest<B>) MutableHttpMessage.super.bearerAuth(token);
     }
 
     @Override

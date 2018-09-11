@@ -47,5 +47,6 @@ public @interface Parameter {
      *
      * @return An optional name of the parameter.
      */
+    @AliasFor(annotation = Bindable.class, member = "value")
     String value() default "";
 }

@@ -44,4 +44,9 @@ class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
     public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
         return candidates.filter(candidate -> candidate.getAnnotationMetadata().hasStereotype(stereotype));
     }
+
+    @Override
+    public String toString() {
+        return "@" + stereotype.getSimpleName();
+    }
 }
