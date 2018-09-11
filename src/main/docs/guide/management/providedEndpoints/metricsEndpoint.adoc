@@ -1,6 +1,79 @@
 The metrics endpoint returns information about the "metrics" of the application.
 
-To execute the metrics endpoint, send a GET request to /metrics.  This will return a list of the metrics registered with the `MeterRegistry` bean.
+To execute the metrics endpoint, send a GET request to `/metrics`.  This will return a list of the metric names registered with the `MeterRegistry` bean.
+
+You can get specific metrics by using `/metrics/[name]` such as `/metrics/jvm.memory.used`.  This would return something like:
+
+.Sample Metric Detail Json
+```json
+{
+  "name": "jvm.memory.used",
+  "measurements": [
+    {
+      "statistic": "VALUE",
+      "value": 1.45397552E8
+    }
+  ],
+  "availableTags": [
+    {
+      "tag": "area",
+      "values": [
+        "heap",
+        "nonheap"
+      ]
+    },
+    {
+      "tag": "id",
+      "values": [
+        "Compressed Class Space",
+        "PS Survivor Space",
+        "PS Old Gen",
+        "Metaspace",
+        "PS Eden Space",
+        "Code Cache"
+      ]
+    }
+  ]
+}
+```
+
+You can further limit the metric by using a tag like `/metrics/jvm.memory.used?tag=id:PS%20Old%20Gen`.
+
+.Sample Metric Detail Json
+```json
+{
+  "name": "jvm.memory.used",
+  "measurements": [
+    {
+      "statistic": "VALUE",
+      "value": 1.1434488E7
+    }
+  ],
+  "availableTags": [
+    {
+      "tag": "area",
+      "values": [
+        "heap"
+      ]
+    }
+  ]
+}
+```
+
+You may even use multiple/nested tags like `/metrics/jvm.memory.used?tag=id:PS%20Old%20Gen&tag=area:heap`.
+
+.Sample Metric Detail Json
+```json
+{
+  "name": "jvm.memory.used",
+  "measurements": [
+    {
+      "statistic": "VALUE",
+      "value": 1.1434488E7
+    }
+  ]
+}
+```
 
 == Configuration
 
@@ -155,6 +228,7 @@ If enabled, be default the path `/**` will be intercepted.  If you wish to chang
 |=======
 |*Name*
 | http.server.requests
+| http.client.requests
 |=======
 
 ===== System Metrics
@@ -212,6 +286,58 @@ The logging metrics bindings will provide logging metrics if using Logback.
 |=======
 |*Name*
 | logback.events
+|=======
+
+===== Hibernate Metrics
+
+You can enable metrics for Hibernate by setting the `hibernate.generate_statistics` property to `true` in configuration. For example for the default entity manager:
+
+Enabling Hibernate Metrics
+[source,yaml]
+----
+jpa:
+    default:
+        properties:
+            hibernate:
+                generate_statistics: true
+----
+
+Micrometer will automatically expose Hibernate statistics. See the source code for https://github.com/micrometer-metrics/micrometer/blob/8b5a2cfd0c8fcc121cb936bb40a04f45571ce073/micrometer-core/src/main/java/io/micrometer/core/instrument/binder/jpa/HibernateMetrics.java#L79[HibernateMetrics] for the available metrics.
+
+===== DataSource Metrics
+
+The data source metrics bindings will provide data source pool metrics.
+
+*Control Property*: `micronaut.metrics.binders.jdbc.enabled`
+
+NOTE: There is a different set of pool metric names for HikariCP and other pool providers.
+
+If you are using `io.micronaut.configuration:jdbc-hikari` you will get additional pool metrics as HikariCP has built in support for meter registries.
+
+.HikariCP Metrics Provided
+|=======
+|*Name*
+| hikaricp.connections.idle
+| hikaricp.connections.pending
+| hikaricp.connections
+| hikaricp.connections.active
+| hikaricp.connections.creation
+| hikaricp.connections.max
+| hikaricp.connections.min
+| hikaricp.connections.usage
+| hikaricp.connections.timeout
+| hikaricp.connections.acquire
+|=======
+
+If you are using `io.micronaut.configuration:jdbc-tomcat` or `io.micronaut.configuration:jdbc-dbcp` you will get the following metrics
+
+.Generic Pool Metrics provided
+|=======
+|*Name*
+| jdbc.connections.usage
+| jdbc.connections.active
+| jdbc.connections.max
+| jdbc.connections.min
 |=======
 
 == Adding Custom Metrics

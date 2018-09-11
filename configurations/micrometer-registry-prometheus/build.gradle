@@ -3,7 +3,7 @@ dependencies {
 
     compile project(":configurations:micrometer-core")
 
-    compile "io.micrometer:micrometer-registry-prometheus:$micrometerVersion"
+    compile dependencyModuleVersion("micrometer", "micrometer-registry-prometheus")
 
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")

@@ -38,7 +38,7 @@ import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory
 @Requires(classes = LoggerFactory.class)
 @RequiresMetrics
 @Requires(property = MICRONAUT_METRICS_BINDERS + ".logback.enabled", value = "true", defaultValue = "true")
-public class LogbackMeterRegistryBinder {
+public class LogbackMeterRegistryBinderFactory {
 
     /**
      * Logback metrics bean.

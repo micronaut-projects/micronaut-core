@@ -32,6 +32,15 @@ EntityManager otherManager;
 
 Micronaut will inject a compile time scoped proxy that retrieves the `EntityManager` associated with the current transaction when using ann:spring.tx.annotation.Transactional[] (see "Using Spring Transaction Management" below).
 
+Note the examples above use field injection, the `@PersistenceContext` annotation does not support declaration on a parameter of a constructor or method argument. Therefore if you wish to instead use constructor or method injection you must use the ann:configuration.hibernate.jpa.scope.CurrentSession[] instead:
+
+.Using `@CurrentSession` for constructor injection
+----
+MyService(@CurrentSession EntityManager entityManager) {
+     this.entityManager = entityManager;
+}
+----
+
 
 ==== Customizing Hibernate / JPA Configuration
 

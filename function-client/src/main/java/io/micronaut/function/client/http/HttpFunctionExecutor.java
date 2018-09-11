@@ -19,6 +19,7 @@ package io.micronaut.function.client.http;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.function.client.FunctionDefinition;
 import io.micronaut.function.client.FunctionInvoker;
@@ -26,6 +27,8 @@ import io.micronaut.function.client.FunctionInvokerChooser;
 import io.micronaut.function.client.exceptions.FunctionExecutionException;
 import io.micronaut.function.client.exceptions.FunctionNotFoundException;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.client.DefaultHttpClient;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.LoadBalancer;
@@ -99,10 +102,21 @@ public class HttpFunctionExecutor<I, O> implements FunctionInvoker<I, O>, Closea
             } else {
                 request = HttpRequest.POST(uri.toString(), input);
             }
-            if (Publishers.isConvertibleToPublisher(outputType.getType())) {
+
+            if (input != null && ClassUtils.isJavaLangType(input.getClass())) {
+                ((MutableHttpRequest) request).contentType(MediaType.TEXT_PLAIN_TYPE);
+            }
+
+            Class<O> outputJavaType = outputType.getType();
+
+            if (ClassUtils.isJavaLangType(outputJavaType)) {
+                ((MutableHttpRequest) request).accept(MediaType.TEXT_PLAIN_TYPE);
+            }
+
+            if (Publishers.isConvertibleToPublisher(outputJavaType)) {
                 Publisher publisher = httpClient.retrieve(request, outputType.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT));
                 return ConversionService.SHARED.convert(publisher, outputType).orElseThrow(() ->
-                    new FunctionExecutionException("Unsupported Reactive type: " + outputType.getType())
+                    new FunctionExecutionException("Unsupported Reactive type: " + outputJavaType)
                 );
             } else {
                 return (O) httpClient.toBlocking().retrieve(request, outputType);

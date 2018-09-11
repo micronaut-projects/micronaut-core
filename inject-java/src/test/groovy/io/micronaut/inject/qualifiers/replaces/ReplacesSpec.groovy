@@ -70,4 +70,32 @@ class ReplacesSpec extends Specification {
         cleanup:
         ctx.close()
     }
+
+    void "test replacing an entire factory"() {
+        given:
+        def ctx = ApplicationContext.run()
+
+        when:
+        C c = ctx.getBean(C)
+
+        then:
+        c instanceof C2
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "test replacing a factory method"() {
+        given:
+        def ctx = ApplicationContext.run()
+
+        when:
+        D d = ctx.getBean(D)
+
+        then:
+        d instanceof D2
+
+        cleanup:
+        ctx.close()
+    }
 }

@@ -15,6 +15,9 @@
  */
 package io.micronaut.configuration.hibernate.jpa
 
+import io.micrometer.core.instrument.Counter
+import io.micrometer.core.instrument.FunctionCounter
+import io.micrometer.core.instrument.MeterRegistry
 import io.micronaut.configuration.hibernate.jpa.scope.CurrentSession
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanContextException
@@ -53,7 +56,9 @@ class JpaSetupSpec extends Specification {
 
     @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.run(
             'datasources.default.name':'mydb',
-            'jpa.default.properties.hibernate.hbm2ddl.auto':'create-drop'
+            'jpa.default.properties.hibernate.hbm2ddl.auto':'create-drop',
+            'jpa.default.properties.hibernate.generate_statistics':true,
+            'micronaut.metrics.binders.hibernate.tags.some':'bar'
     )
 
     void "test configure @Transactional attribute"() {
@@ -99,6 +104,7 @@ class JpaSetupSpec extends Specification {
 
         then:
         thrown(ConstraintViolationException)
+
     }
 
     void "test setup entity manager save entity"() {
@@ -117,6 +123,13 @@ class JpaSetupSpec extends Specification {
 
         then:
         em.createQuery("select book from Book book").resultList.size() == 1
+
+        when:
+        MeterRegistry meterRegistry = applicationContext.getBean(MeterRegistry)
+        FunctionCounter c = meterRegistry.get("hibernate.query.executions").tag("entityManagerFactory", "Primary").functionCounter()
+
+        then:
+        c.count() > 0
 
         cleanup:
         tx.rollback()
@@ -149,6 +162,15 @@ class JpaSetupSpec extends Specification {
 
         then:
         books.size() == 1
+    }
+
+    void "test inject java persistence context"() {
+        given:
+        JavaBookService bookService = applicationContext.getBean(JavaBookService)
+
+        expect:
+        bookService.testFieldInject()
+        bookService.testMethodInject()
     }
 }
 

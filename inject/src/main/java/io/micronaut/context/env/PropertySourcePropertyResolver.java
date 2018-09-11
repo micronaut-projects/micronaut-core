@@ -69,6 +69,8 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     @SuppressWarnings("MagicNumber")
     protected final Map<String, Object>[] catalog = new Map[57];
     private final Random random = new Random();
+    private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
+    private final Map<String, Optional<?>> resolvedValueCache = new ConcurrentHashMap<>(20);
 
     /**
      * Creates a new, initially empty, {@link PropertySourcePropertyResolver} for the given {@link ConversionService}.
@@ -134,14 +136,18 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         if (StringUtils.isEmpty(name)) {
             return false;
         } else {
-
-            Map<String, Object> entries = resolveEntriesForKey(name, false);
-            if (entries == null) {
-                return false;
-            } else {
-                name = trimIndex(name);
-                return entries.containsKey(name) || entries.containsKey(normalizeName(name));
+            Boolean result = containsCache.get(name);
+            if (result == null) {
+                Map<String, Object> entries = resolveEntriesForKey(name, false);
+                if (entries == null) {
+                    result = false;
+                } else {
+                    name = trimIndex(name);
+                    result = entries.containsKey(name) || entries.containsKey(normalizeName(name));
+                }
+                containsCache.put(name, result);
             }
+            return result;
         }
     }
 
@@ -172,67 +178,81 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         if (StringUtils.isEmpty(name)) {
             return Optional.empty();
         } else {
-
-            Map<String, Object> entries = resolveEntriesForKey(name, false);
-            if (entries != null) {
-                Object value = entries.get(name);
-                if (value == null) {
-                    value = entries.get(normalizeName(name));
-                }
-                if (value == null) {
-                    int i = name.indexOf('[');
-                    if (i > -1 && name.endsWith("]")) {
-                        String newKey = name.substring(0, i);
-                        value = entries.get(newKey);
-                        if (value != null) {
-                            String index = name.substring(i + 1, name.length() - 1);
-                            if (StringUtils.isNotEmpty(index)) {
-                                if (value instanceof List) {
-                                    try {
-                                        value = ((List) value).get(Integer.valueOf(index));
-                                    } catch (NumberFormatException e) {
-                                        // ignore
-                                    }
-                                } else if (value instanceof Map) {
-                                    try {
-                                        value = ((Map) value).get(index);
-                                    } catch (NumberFormatException e) {
-                                        // ignore
+            Class<T> requiredType = conversionContext.getArgument().getType();
+            boolean cacheableType = requiredType == Boolean.class || requiredType == String.class;
+            if (cacheableType && resolvedValueCache.containsKey(name)) {
+                return (Optional<T>) resolvedValueCache.get(name);
+            } else {
+                Map<String, Object> entries = resolveEntriesForKey(name, false);
+                if (entries != null) {
+                    Object value = entries.get(name);
+                    if (value == null) {
+                        value = entries.get(normalizeName(name));
+                    }
+                    if (value == null) {
+                        int i = name.indexOf('[');
+                        if (i > -1 && name.endsWith("]")) {
+                            String newKey = name.substring(0, i);
+                            value = entries.get(newKey);
+                            if (value != null) {
+                                String index = name.substring(i + 1, name.length() - 1);
+                                if (StringUtils.isNotEmpty(index)) {
+                                    if (value instanceof List) {
+                                        try {
+                                            value = ((List) value).get(Integer.valueOf(index));
+                                        } catch (NumberFormatException e) {
+                                            // ignore
+                                        }
+                                    } else if (value instanceof Map) {
+                                        try {
+                                            value = ((Map) value).get(index);
+                                        } catch (NumberFormatException e) {
+                                            // ignore
+                                        }
                                     }
                                 }
-                            }
-                        } else {
-                            String index = name.substring(i + 1, name.length() - 1);
-                            if (StringUtils.isNotEmpty(index)) {
-                                String subKey = newKey + '.' + index;
-                                value = entries.get(subKey);
+                            } else {
+                                String index = name.substring(i + 1, name.length() - 1);
+                                if (StringUtils.isNotEmpty(index)) {
+                                    String subKey = newKey + '.' + index;
+                                    value = entries.get(subKey);
+                                }
                             }
                         }
                     }
-                }
-                Class<T> requiredType = conversionContext.getArgument().getType();
-                if (value != null) {
-                    value = resolvePlaceHoldersIfNecessary(value);
-                    Optional<T> converted = conversionService.convert(value, conversionContext);
-                    if (LOG.isTraceEnabled()) {
-                        if (converted.isPresent()) {
-                            LOG.trace("Resolved value [{}] for property: {}", converted.get(), name);
-                        } else {
-                            LOG.trace("Resolved value [{}] cannot be converted to type [{}] for property: {}", value, conversionContext.getArgument(), name);
+
+                    if (value != null) {
+                        value = resolvePlaceHoldersIfNecessary(value);
+                        Optional<T> converted = conversionService.convert(value, conversionContext);
+                        if (LOG.isTraceEnabled()) {
+                            if (converted.isPresent()) {
+                                LOG.trace("Resolved value [{}] for property: {}", converted.get(), name);
+                            } else {
+                                LOG.trace("Resolved value [{}] cannot be converted to type [{}] for property: {}", value, conversionContext.getArgument(), name);
+                            }
                         }
+
+                        if (cacheableType) {
+                            resolvedValueCache.put(name, converted);
+                        }
+                        return converted;
+                    } else if (cacheableType) {
+                        Optional<?> e = Optional.empty();
+                        resolvedValueCache.put(name, e);
+                        return (Optional<T>) e;
+                    } else if (Properties.class.isAssignableFrom(requiredType)) {
+                        Properties properties = resolveSubProperties(name, entries, conversionContext);
+                        return Optional.of((T) properties);
+                    } else if (Map.class.isAssignableFrom(requiredType)) {
+                        Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
+                        return conversionService.convert(subMap, requiredType, conversionContext);
+                    } else if (PropertyResolver.class.isAssignableFrom(requiredType)) {
+                        Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
+                        return Optional.of((T) new MapPropertyResolver(subMap, conversionService));
                     }
-                    return converted;
-                } else if (Properties.class.isAssignableFrom(requiredType)) {
-                    Properties properties = resolveSubProperties(name, entries, conversionContext);
-                    return Optional.of((T) properties);
-                } else if (Map.class.isAssignableFrom(requiredType)) {
-                    Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
-                    return conversionService.convert(subMap, requiredType, conversionContext);
-                } else if (PropertyResolver.class.isAssignableFrom(requiredType)) {
-                    Map<String, Object> subMap = resolveSubMap(name, entries, conversionContext);
-                    return Optional.of((T) new MapPropertyResolver(subMap, conversionService));
                 }
             }
+
         }
         if (LOG.isTraceEnabled()) {
             LOG.trace("No value found for property: {}", name);
@@ -490,6 +510,14 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
             }
         }
         return entries;
+    }
+
+    /**
+     * Subclasses can override to reset caches.
+     */
+    protected void resetCaches() {
+        containsCache.clear();
+        resolvedValueCache.clear();
     }
 
     private String normalizeName(String name) {

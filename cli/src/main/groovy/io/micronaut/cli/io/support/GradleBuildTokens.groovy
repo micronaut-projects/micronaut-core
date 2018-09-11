@@ -27,6 +27,12 @@ import org.eclipse.aether.graph.Dependency
  */
 class GradleBuildTokens extends BuildTokens {
 
+    static final SCOPE_MAP = [
+            compile: 'implementation',
+            runtime: 'runtimeOnly',
+            testCompile: 'testImplementation',
+    ]
+
     Map getTokens(Profile profile, List<Feature> features) {
         Map tokens = [:]
 
@@ -52,8 +58,10 @@ class GradleBuildTokens extends BuildTokens {
         dependencies = dependencies.unique()
 
         dependencies = dependencies.sort({ Dependency dep -> dep.scope }).collect() { Dependency dep ->
+            String scope = SCOPE_MAP.get(dep.scope)
+            if (scope == null) scope = dep.scope
             String artifactStr = resolveArtifactString(dep, 4)
-            "    ${dep.scope}${artifactStr}".toString()
+            "    ${scope}${artifactStr}".toString()
         }.unique().join(ln)
 
         def buildPlugins = profile.buildPlugins.collect() { String name ->

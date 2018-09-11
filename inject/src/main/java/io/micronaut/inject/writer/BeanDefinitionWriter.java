@@ -21,10 +21,7 @@ import io.micronaut.context.AbstractParametrizedBeanDefinition;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanContext;
-import io.micronaut.context.annotation.ConfigurationBuilder;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Parameter;
-import io.micronaut.context.annotation.Value;
+import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -1481,7 +1478,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     injectMethodVisitor.push(i);
                     // invoke getBeanForField
 
-                    Method methodToInvoke = argMetadata.hasDeclaredStereotype(Value.class) ? GET_VALUE_FOR_METHOD_ARGUMENT : GET_BEAN_FOR_METHOD_ARGUMENT;
+                    Method methodToInvoke = argMetadata.hasDeclaredStereotype(Value.class) || argMetadata.hasDeclaredStereotype(Property.class) ? GET_VALUE_FOR_METHOD_ARGUMENT : GET_BEAN_FOR_METHOD_ARGUMENT;
                     pushInvokeMethodOnSuperClass(injectMethodVisitor, methodToInvoke);
                     // cast the return value to the correct type
                     pushCastToType(injectMethodVisitor, entry.getValue());
@@ -1874,7 +1871,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
     private boolean isValueType(AnnotationMetadata annotationMetadata) {
         if (annotationMetadata != null) {
-            return annotationMetadata.hasDeclaredStereotype(Value.class);
+            return annotationMetadata.hasDeclaredStereotype(Value.class) || annotationMetadata.hasDeclaredStereotype(Property.class);
         }
         return false;
     }

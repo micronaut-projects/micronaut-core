@@ -16,9 +16,7 @@
 
 package io.micronaut.annotation.processing;
 
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.Modifier;
-import javax.lang.model.element.TypeElement;
+import javax.lang.model.element.*;
 import javax.lang.model.util.Elements;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -55,22 +53,27 @@ public abstract class PublicAbstractMethodVisitor<R, P> extends PublicMethodVisi
     }
 
     @Override
-    protected boolean isAcceptable(ExecutableElement executableElement) {
-        Set<Modifier> modifiers = executableElement.getModifiers();
-        String methodName = executableElement.getSimpleName().toString();
-        boolean acceptable = modelUtils.isAbstract(executableElement) && !modifiers.contains(Modifier.FINAL) && !modifiers.contains(Modifier.STATIC);
-        boolean isDeclared = executableElement.getEnclosingElement().equals(classElement);
-        if (acceptable && !isDeclared && declaredMethods.containsKey(methodName)) {
-            // check method is not overridden already
-            for (ExecutableElement element : declaredMethods.get(methodName)) {
-                if (elementUtils.overrides(element, executableElement, classElement)) {
-                    return false;
+    protected boolean isAcceptable(Element element) {
+        if (element.getKind() == ElementKind.METHOD) {
+            ExecutableElement executableElement = (ExecutableElement) element;
+            Set<Modifier> modifiers = executableElement.getModifiers();
+            String methodName = executableElement.getSimpleName().toString();
+            boolean acceptable = modelUtils.isAbstract(executableElement) && !modifiers.contains(Modifier.FINAL) && !modifiers.contains(Modifier.STATIC);
+            boolean isDeclared = executableElement.getEnclosingElement().equals(classElement);
+            if (acceptable && !isDeclared && declaredMethods.containsKey(methodName)) {
+                // check method is not overridden already
+                for (ExecutableElement ex : declaredMethods.get(methodName)) {
+                    if (elementUtils.overrides(ex, executableElement, classElement)) {
+                        return false;
+                    }
                 }
+            } else if (!acceptable && !modelUtils.isStatic(executableElement)) {
+                List<ExecutableElement> declaredMethodList = declaredMethods.computeIfAbsent(methodName, s -> new ArrayList<>());
+                declaredMethodList.add(executableElement);
             }
-        } else if (!acceptable && !modelUtils.isStatic(executableElement)) {
-            List<ExecutableElement> declaredMethodList = declaredMethods.computeIfAbsent(methodName, s -> new ArrayList<>());
-            declaredMethodList.add(executableElement);
+            return acceptable;
+        } else {
+            return false;
         }
-        return acceptable;
     }
 }
