@@ -173,6 +173,29 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param annotationMetadataResolver The annotation metadata resolver
      * @param filters                    The filters to use
      */
+    public DefaultHttpClient(@Parameter LoadBalancer loadBalancer,
+                             @Parameter HttpClientConfiguration configuration,
+                             @Parameter @Nullable String contextPath,
+                             @Named(NettyThreadFactory.NAME) @Nullable ThreadFactory threadFactory,
+                             NettyClientSslBuilder nettyClientSslBuilder,
+                             MediaTypeCodecRegistry codecRegistry,
+                             @Nullable AnnotationMetadataResolver annotationMetadataResolver,
+                             HttpClientFilter... filters) {
+        this(loadBalancer, configuration, contextPath, threadFactory, nettyClientSslBuilder, codecRegistry, annotationMetadataResolver, Arrays.asList(filters));
+    }
+
+    /**
+     * Construct a client for the given arguments.
+     *
+     * @param loadBalancer               The {@link LoadBalancer} to use for selecting servers
+     * @param configuration              The {@link HttpClientConfiguration} object
+     * @param contextPath                The base URI to prepend to request uris
+     * @param threadFactory              The thread factory to use for client threads
+     * @param nettyClientSslBuilder      The SSL builder
+     * @param codecRegistry              The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
+     * @param annotationMetadataResolver The annotation metadata resolver
+     * @param filters                    The filters to use
+     */
     @Inject
     public DefaultHttpClient(@Parameter LoadBalancer loadBalancer,
                              @Parameter HttpClientConfiguration configuration,
@@ -254,29 +277,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         this.mediaTypeCodecRegistry = codecRegistry;
         this.filters = filters;
         this.annotationMetadataResolver = annotationMetadataResolver != null ? annotationMetadataResolver : AnnotationMetadataResolver.DEFAULT;
-    }
-
-    /**
-     * Construct a client for the given arguments.
-     *
-     * @param loadBalancer               The {@link LoadBalancer} to use for selecting servers
-     * @param configuration              The {@link HttpClientConfiguration} object
-     * @param contextPath                The base URI to prepend to request uris
-     * @param threadFactory              The thread factory to use for client threads
-     * @param nettyClientSslBuilder      The SSL builder
-     * @param codecRegistry              The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
-     * @param annotationMetadataResolver The annotation metadata resolver
-     * @param filters                    The filters to use
-     */
-    public DefaultHttpClient(@Parameter LoadBalancer loadBalancer,
-                             @Parameter HttpClientConfiguration configuration,
-                             @Parameter @Nullable String contextPath,
-                             @Named(NettyThreadFactory.NAME) @Nullable ThreadFactory threadFactory,
-                             NettyClientSslBuilder nettyClientSslBuilder,
-                             MediaTypeCodecRegistry codecRegistry,
-                             @Nullable AnnotationMetadataResolver annotationMetadataResolver,
-                             HttpClientFilter... filters) {
-        this(loadBalancer, configuration, contextPath, threadFactory, nettyClientSslBuilder, codecRegistry, annotationMetadataResolver, Arrays.asList(filters));
     }
 
     /**

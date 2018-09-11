@@ -60,7 +60,7 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @Internal
-class ModelUtils {
+public class ModelUtils {
 
     private final Elements elementUtils;
     private final Types typeUtils;

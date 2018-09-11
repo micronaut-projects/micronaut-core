@@ -40,20 +40,74 @@ import java.util.stream.Collectors;
  */
 @Experimental
 public class GraalClassLoadingReporter implements ClassLoadingReporter {
-    private static final String REFLECTION_JSON_FILE = "graal.reflection.json";
+    /**
+     * System property that indicates the location of the reflection JSON file.
+     */
+    public static final String REFLECTION_JSON_FILE = "graalvm.reflection.json";
+    /**
+     * System property that indicates whether class analysis is is enabled.
+     */
+    public static final String GRAAL_CLASS_ANALYSIS = "graalvm.class.analysis";
+
     private static final String NETTY_TYPE = "io.netty.channel.socket.nio.NioServerSocketChannel";
     private final Set<String> classes = new ConcurrentSkipListSet<>();
+    private final Set<String> beans = new ConcurrentSkipListSet<>();
+    private final Set<String> arrays = new ConcurrentSkipListSet<>();
 
     /**
      * Default constructor.
      */
     public GraalClassLoadingReporter() {
         classes.add(NETTY_TYPE);
+        arrays.add("io.micronaut.http.MediaType[]");
+    }
+
+    @Override
+    public boolean isEnabled() {
+        String property = System.getProperty("java.vm.name");
+        if (!Boolean.getBoolean(GRAAL_CLASS_ANALYSIS) || property == null || !property.contains("GraalVM")) {
+            return false;
+        } else {
+            String f = System.getProperty(REFLECTION_JSON_FILE);
+            if (StringUtils.isNotEmpty(f)) {
+                File file = new File(f);
+                boolean enabled = !file.exists();
+                if (enabled) {
+                    System.out.println("Graal Class Loading Analysis Enabled.");
+                }
+                return enabled;
+            } else {
+                File parent = new File("build");
+                if (!parent.exists() || !parent.isDirectory()) {
+                    parent = new File("target");
+                }
+
+                if (!parent.exists() || !parent.isDirectory()) {
+                    return false;
+                } else {
+                    File file = new File(parent, "reflect.json");
+                    boolean enabled = !file.exists();
+                    if (enabled) {
+                        System.out.println("Graal Class Loading Analysis Enabled.");
+                    }
+                    return enabled;
+                }
+            }
+        }
     }
 
     @Override
     public void onPresent(Class<?> type) {
-        classes.add(type.getName());
+        if (isValidType(type)) {
+            classes.add(type.getName());
+        }
+    }
+
+    @Override
+    public void onBeanPresent(Class<?> type) {
+        if (isValidType(type)) {
+            beans.add(type.getName());
+        }
     }
 
     @Override
@@ -63,58 +117,97 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
 
     @Override
     public void close() {
+        String f = System.getProperty(REFLECTION_JSON_FILE);
+        File file;
+        if (StringUtils.isNotEmpty(f)) {
+            file = new File(f);
+        } else {
+            File parent = new File("build");
+            if (!parent.exists() || !parent.isDirectory()) {
+                parent = new File("target");
+            }
 
-        if (!ClassUtils.isPresent(NETTY_TYPE, GraalClassLoadingReporter.class.getClassLoader())) {
-            classes.remove(NETTY_TYPE);
+            if (!parent.exists() || !parent.isDirectory()) {
+                return;
+            } else {
+                file = new File(parent, "reflect.json");
+            }
         }
 
-        List<Map> json = classes.stream().map(s -> {
-            if (s.equals(NETTY_TYPE)) {
-                return CollectionUtils.mapOf(
-                        "name", NETTY_TYPE,
-                        "methods", Arrays.asList(
-                                CollectionUtils.mapOf(
-                                        "name", "<init>",
-                                        "parameterTypes", Collections.emptyList()
-                                )
-                        )
-                );
-            } else {
-                return CollectionUtils.mapOf(
-                        "name", s,
-                        "allDeclaredConstructors", true
-                );
-            }
-        }).collect(Collectors.toList());
+        if (!file.exists()) {
+            ClassLoader cls = GraalClassLoadingReporter.class.getClassLoader();
 
-        List<String> beans = Arrays.asList(JsonError.class.getName(), "io.micronaut.http.hateos.DefaultLink");
-        for (String bean : beans) {
+            if (!ClassUtils.isPresent(NETTY_TYPE, cls)) {
+                classes.remove(NETTY_TYPE);
+            }
+
+            if (ClassUtils.isPresent("io.netty.channel.socket.nio.NioSocketChannel", cls)) {
+                classes.add("io.netty.channel.socket.nio.NioSocketChannel");
+            }
+
+            if (ClassUtils.isPresent("sun.security.ssl.SSLContextImpl$TLSContext", cls)) {
+                classes.add("sun.security.ssl.SSLContextImpl$TLSContext");
+            }
+
+            List<Map> json = classes.stream().map(s -> {
+                if (s.equals(NETTY_TYPE)) {
+                    return CollectionUtils.mapOf(
+                            "name", NETTY_TYPE,
+                            "methods", Arrays.asList(
+                                    CollectionUtils.mapOf(
+                                            "name", "<init>",
+                                            "parameterTypes", Collections.emptyList()
+                                    )
+                            )
+                    );
+                } else {
+                    return CollectionUtils.mapOf(
+                            "name", s,
+                            "allDeclaredConstructors", true
+                    );
+                }
+            }).collect(Collectors.toList());
+
+            for (String array : arrays) {
+                json.add(CollectionUtils.mapOf(
+                    "name", "[L" + array.substring(0, array.length() - 2) + ";",
+                    "allDeclaredConstructors", true
+                ));
+            }
+
+            beans.addAll(Arrays.asList(JsonError.class.getName(), "io.micronaut.http.hateos.DefaultLink"));
+
+            for (String bean : beans) {
+                json.add(CollectionUtils.mapOf(
+                        "name", bean,
+                        "allPublicMethods", true,
+                        "allDeclaredConstructors", true
+                ));
+            }
+
             json.add(CollectionUtils.mapOf(
-                    "name", bean,
-                    "allPublicMethods", true,
+                    "name", "com.fasterxml.jackson.datatype.jdk8.Jdk8Module",
                     "allDeclaredConstructors", true
             ));
+
+            json.add(CollectionUtils.mapOf(
+                    "name", "com.fasterxml.jackson.datatype.jsr310.JSR310Module",
+                    "allDeclaredConstructors", true
+            ));
+
+
+            ObjectMapper mapper = new ObjectMapper();
+            ObjectWriter writer = mapper.writer(new DefaultPrettyPrinter());
+            try {
+                System.out.println("Writing reflect.json file to destination: " + file);
+                writer.writeValue(file, json);
+            } catch (IOException e) {
+                System.err.println("Could not write Graal reflect.json: " + e.getMessage());
+            }
         }
+    }
 
-        json.add(CollectionUtils.mapOf(
-                "name", "com.fasterxml.jackson.datatype.jdk8.Jdk8Module",
-                "allDeclaredConstructors", true
-        ));
-
-        json.add(CollectionUtils.mapOf(
-                "name", "com.fasterxml.jackson.datatype.jsr310.JSR310Module",
-                "allDeclaredConstructors", true
-        ));
-
-        String f = System.getProperty(REFLECTION_JSON_FILE);
-        File file = new File(StringUtils.isNotEmpty(f) ? f : "./reflect.json");
-
-        ObjectMapper mapper = new ObjectMapper();
-        ObjectWriter writer = mapper.writer(new DefaultPrettyPrinter());
-        try {
-            writer.writeValue(file, json);
-        } catch (IOException e) {
-            System.err.println("Could not write Graal reflect.json: " + e.getMessage());
-        }
+    private boolean isValidType(Class<?> type) {
+        return type != null && !type.isPrimitive() && type != void.class;
     }
 }
