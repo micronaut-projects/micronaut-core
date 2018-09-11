@@ -39,6 +39,7 @@ import io.micronaut.websocket.bind.WebSocketStateBinderRegistry;
 import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.exceptions.WebSocketClientException;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
+import io.micronaut.websocket.interceptor.WebSocketSessionAware;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPromise;
@@ -134,6 +135,12 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
 
             this.clientSession = createWebSocketSession(ctx);
 
+            T targetBean = webSocketBean.getTarget();
+
+            if (targetBean instanceof WebSocketSessionAware) {
+                ((WebSocketSessionAware) targetBean).setWebSocketSession(clientSession);
+            }
+
             WebSocketState webSocketState = new WebSocketState(clientSession, originatingRequest);
 
             ExecutableBinder<WebSocketState> binder = new DefaultExecutableBinder<>();
@@ -146,7 +153,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 this.clientBodyArgument = null;
 
                 try {
-                    emitter.onError(new WebSocketClientException("WebSocket @OnMessage method " + webSocketBean.getTarget() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 message parameter, but found 2 possible candidates: " + unboundArguments));
+                    emitter.onError(new WebSocketClientException("WebSocket @OnMessage method " + targetBean.getClass().getSimpleName() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 message parameter, but found 2 possible candidates: " + unboundArguments));
                 } finally {
                     if (session.isOpen()) {
                         session.close(CloseReason.INTERNAL_ERROR);
@@ -170,12 +177,12 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                                 (o) -> { },
                                 (error) -> emitter.onError(new WebSocketSessionException("Error opening WebSocket client session: " + error.getMessage(), error)),
                                 () -> {
-                                    emitter.onNext(webSocketBean.getTarget());
+                                    emitter.onNext(targetBean);
                                     emitter.onComplete();
                                 }
                         );
                     } else {
-                        emitter.onNext(webSocketBean.getTarget());
+                        emitter.onNext(targetBean);
                         emitter.onComplete();
                     }
                 } catch (Throwable e) {

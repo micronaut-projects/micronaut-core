@@ -17,8 +17,8 @@
 package io.micronaut.websocket;
 
 import io.reactivex.Flowable;
-
 import java.net.URI;
+import java.util.Map;
 
 /**
  * Specialization of the {@link WebSocketClient} interface for RxJava.
@@ -34,6 +34,12 @@ public interface RxWebSocketClient extends WebSocketClient {
      */
     @Override
     <T extends AutoCloseable> Flowable<T> connect(Class<T> clientEndpointType, URI uri);
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    <T extends AutoCloseable> Flowable<T> connect(Class<T> clientEndpointType, Map<String, Object> parameters);
 
     @Override
     default <T extends AutoCloseable> Flowable<T> connect(Class<T> clientEndpointType, String uri) {

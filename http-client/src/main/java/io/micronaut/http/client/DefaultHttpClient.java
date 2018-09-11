@@ -57,12 +57,14 @@ import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.micronaut.http.sse.Event;
 import io.micronaut.http.ssl.ClientSslConfiguration;
+import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.jackson.ObjectMapperFactory;
 import io.micronaut.jackson.codec.JsonMediaTypeCodec;
 import io.micronaut.jackson.codec.JsonStreamMediaTypeCodec;
 import io.micronaut.jackson.parser.JacksonProcessor;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.websocket.RxWebSocketClient;
+import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
@@ -668,7 +670,20 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         MutableHttpRequest<Object> request = io.micronaut.http.HttpRequest.GET(uri);
         Publisher<URI> uriPublisher = resolveRequestURI(request);
         return Flowable.fromPublisher(uriPublisher)
-                .switchMap((resolvedURI) -> connectWebSocket(resolvedURI, request, clientEndpointType));
+                .switchMap((resolvedURI) -> connectWebSocket(resolvedURI, request, clientEndpointType, null));
+
+    }
+
+    @Override
+    public <T extends AutoCloseable> Flowable<T> connect(Class<T> clientEndpointType, Map<String, Object> parameters) {
+        WebSocketBean<T> webSocketBean = webSocketRegistry.getWebSocket(clientEndpointType);
+        String uri = webSocketBean.getBeanDefinition().getValue(ClientWebSocket.class, String.class).orElse("/ws");
+        uri = UriTemplate.of(uri).expand(parameters);
+        MutableHttpRequest<Object> request = io.micronaut.http.HttpRequest.GET(uri);
+        Publisher<URI> uriPublisher = resolveRequestURI(request);
+
+        return Flowable.fromPublisher(uriPublisher)
+                .switchMap((resolvedURI) -> connectWebSocket(resolvedURI, request, clientEndpointType, webSocketBean));
 
     }
 
@@ -690,12 +705,16 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         }
     }
 
-    private <T> Flowable<T> connectWebSocket(URI uri, MutableHttpRequest<Object> request, Class<T> clientEndpointType) {
+    private <T> Flowable<T> connectWebSocket(URI uri, MutableHttpRequest<Object> request, Class<T> clientEndpointType, WebSocketBean<T> webSocketBean) {
         Bootstrap bootstrap = this.bootstrap.clone();
+        if (webSocketBean == null) {
+            webSocketBean = webSocketRegistry.getWebSocket(clientEndpointType);
+        }
+
+        WebSocketBean<T> finalWebSocketBean = webSocketBean;
         return Flowable.create(emitter -> {
 
             // TODO: allow version / frame size customization
-            WebSocketBean<T> webSocketBean = webSocketRegistry.getWebSocket(clientEndpointType);
             SslContext sslContext = buildSslContext(uri);
             WebSocketVersion protocolVersion = WebSocketVersion.V13;
             int maxFramePayloadLength = 1280000;
@@ -717,7 +736,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
                         webSocketHandler = new NettyWebSocketClientHandler<>(
                                 request,
-                                webSocketBean,
+                                finalWebSocketBean,
                                 WebSocketClientHandshakerFactory.newHandshaker(
                                         webSocketURL, protocolVersion, null, false, EmptyHttpHeaders.INSTANCE, maxFramePayloadLength),
                                 requestBinderRegistry,

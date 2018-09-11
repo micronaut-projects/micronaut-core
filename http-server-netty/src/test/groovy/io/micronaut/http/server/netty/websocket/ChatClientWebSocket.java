@@ -4,12 +4,14 @@ import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.ClientWebSocket;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
+import io.reactivex.Single;
 
 import java.util.Collection;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Future;
 
 @ClientWebSocket("/chat/{topic}/{username}")
-public class ChatClientWebSocket implements AutoCloseable {
+public abstract class ChatClientWebSocket implements AutoCloseable {
 
     private WebSocketSession session;
     private String topic;
@@ -45,12 +47,10 @@ public class ChatClientWebSocket implements AutoCloseable {
         replies.add(message);
     }
 
-    public void send(String message) {
-        session.sendSync(message);
-    }
+    public abstract void send(String message);
 
-    @Override
-    public void close() {
-        session.close();
-    }
+    public abstract Future<String> sendAsync(String message);
+
+    public abstract Single<String> sendRx(String message);
+
 }
