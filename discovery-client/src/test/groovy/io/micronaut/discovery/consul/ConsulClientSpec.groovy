@@ -35,7 +35,7 @@ import spock.lang.Stepwise
  * @author graemerocher
  * @since 1.0
  */
-@IgnoreIf({ !System.getenv('CONSUL_HOST') && !System.getenv('CONSUL_PORT')})
+@IgnoreIf({ !env['CONSUL_HOST'] && !env['CONSUL_PORT'] })
 @Stepwise
 class ConsulClientSpec extends Specification {
 
