@@ -16,6 +16,9 @@ public class ReactivePojoChatServerWebSocket {
 
     @OnOpen
     public Publisher<Message> onOpen(String topic, String username, WebSocketSession session) {
+        System.out.println("Server session opened for username = " + username);
+        System.out.println("Server openSessions = " + session.getOpenSessions());
+
         String text = "[" + username + "] Joined!";
         return buildMessagePublisher(topic, session, text);
     }
@@ -27,6 +30,7 @@ public class ReactivePojoChatServerWebSocket {
             Message message,
             WebSocketSession session) {
 
+        System.out.println("Server received message = " + message);
         String text = "[" + username + "] " + message.getText();
         return buildMessagePublisher(topic, session, text);
     }
@@ -36,6 +40,9 @@ public class ReactivePojoChatServerWebSocket {
             String topic,
             String username,
             WebSocketSession session) {
+        System.out.println("Server session closing for username = " + username);
+        System.out.println("Server openSessions = " + session.getOpenSessions());
+
         String text = "[" + username + "] Disconnected!";
         return buildMessagePublisher(topic, session, text);
     }
@@ -47,6 +54,7 @@ public class ReactivePojoChatServerWebSocket {
                 .map((s) -> {
                     Message newMessage = new Message();
                     newMessage.setText(text);
+                    System.out.println("Sending back new Message = " + newMessage);
                     return s.send(newMessage);
                 }).collect(Collectors.toSet());
 

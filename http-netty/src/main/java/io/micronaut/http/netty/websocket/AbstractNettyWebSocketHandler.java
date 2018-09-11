@@ -40,6 +40,7 @@ import io.micronaut.websocket.bind.WebSocketStateBinderRegistry;
 import io.micronaut.websocket.context.WebSocketBean;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.group.ChannelGroup;
 import io.netty.handler.codec.http.websocketx.*;
 import io.reactivex.Flowable;
 import io.reactivex.functions.BiConsumer;
@@ -75,7 +76,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     protected final NettyRxWebSocketSession session;
     protected final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected final WebSocketVersion webSocketVersion;
-
+    protected final ChannelGroup webSocketSessions;
     private final Argument<?> bodyArgument;
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
@@ -88,6 +89,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param request The originating request
      * @param uriVariables The URI variables
      * @param version The websocket version being used
+     * @param webSocketSessions The web socket sessions if they are supported (like on the server), null otherwise
      */
     protected AbstractNettyWebSocketHandler(
             ChannelHandlerContext ctx,
@@ -96,7 +98,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             WebSocketBean<?> webSocketBean,
             HttpRequest<?> request,
             Map<String, Object> uriVariables,
-            WebSocketVersion version) {
+            WebSocketVersion version,
+            ChannelGroup webSocketSessions) {
+        this.webSocketSessions = webSocketSessions;
         this.webSocketBinder = new WebSocketStateBinderRegistry(binderRegistry);
         this.uriVariables = uriVariables;
         this.webSocketBean = webSocketBean;

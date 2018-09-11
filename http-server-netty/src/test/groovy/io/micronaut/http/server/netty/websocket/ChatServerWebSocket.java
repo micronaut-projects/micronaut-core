@@ -14,9 +14,13 @@ public class ChatServerWebSocket {
     @OnOpen
     public void onOpen(String topic, String username, WebSocketSession session) {
         Set<? extends WebSocketSession> openSessions = session.getOpenSessions();
+        System.out.println("Server session opened for username = " + username);
+        System.out.println("Server openSessions = " + openSessions);
         for (WebSocketSession openSession : openSessions) {
             if(isValid(topic, session, openSession)) {
-                openSession.sendSync("[" + username + "] Joined!" );
+                String msg = "[" + username + "] Joined!";
+                System.out.println("Server sending msg = " + msg);
+                openSession.sendSync(msg);
             }
         }
     }
@@ -29,9 +33,13 @@ public class ChatServerWebSocket {
             WebSocketSession session) {
 
         Set<? extends WebSocketSession> openSessions = session.getOpenSessions();
+        System.out.println("Server received message = " + message);
+        System.out.println("Server openSessions = " + openSessions);
         for (WebSocketSession openSession : openSessions) {
             if(isValid(topic, session, openSession)) {
-                openSession.sendSync("[" + username + "] " + message );
+                String msg = "[" + username + "] " + message;
+                System.out.println("Server sending msg = " + msg);
+                openSession.sendSync(msg);
             }
         }
     }
@@ -42,9 +50,12 @@ public class ChatServerWebSocket {
             String username,
             WebSocketSession session) {
         Set<? extends WebSocketSession> openSessions = session.getOpenSessions();
+        System.out.println("Server session closing for username = " + username);
         for (WebSocketSession openSession : openSessions) {
             if(isValid(topic, session, openSession)) {
-                openSession.sendSync("[" + username + "] Disconnected!" );
+                String msg = "[" + username + "] Disconnected!";
+                System.out.println("Server sending msg = " + msg);
+                openSession.sendSync(msg);
             }
         }
     }

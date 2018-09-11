@@ -204,6 +204,11 @@ public class NettyRxWebSocketSession extends MutableConvertibleValuesMap<Object>
         }
     }
 
+    @Override
+    public String toString() {
+        return "WebSocket Session: " + getId();
+    }
+
     private WebSocketFrame encodeMessage(Object message, MediaType mediaType) {
         if (ClassUtils.isJavaLangType(message.getClass())) {
             String s = message.toString();

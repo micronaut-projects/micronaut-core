@@ -18,12 +18,13 @@ class SimpleTextWebSocketSpec extends Specification {
         when: "a websocket connection is established"
         RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURI())
         ChatClientWebSocket fred = wsClient.connect(ChatClientWebSocket, "/chat/stuff/fred").blockingFirst()
+        ChatClientWebSocket bob = wsClient.connect(ChatClientWebSocket, [topic:"stuff",username:"bob"]).blockingFirst()
 
         then:"The connection is valid"
         fred.session != null
         fred.session.id != null
 
-        ChatClientWebSocket bob = wsClient.connect(ChatClientWebSocket, [topic:"stuff",username:"bob"]).blockingFirst()
+
 
         then:"A session is established"
         fred.session != null

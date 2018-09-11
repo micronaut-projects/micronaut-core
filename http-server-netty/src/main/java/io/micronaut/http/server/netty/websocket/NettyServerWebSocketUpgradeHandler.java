@@ -34,6 +34,7 @@ import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.channel.*;
+import io.netty.channel.group.ChannelGroup;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
@@ -76,20 +77,23 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     private final RequestBinderRegistry binderRegistry;
     private final WebSocketBeanRegistry webSocketBeanRegistry;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
+    private final ChannelGroup webSocketSessions;
     private WebSocketServerHandshaker handshaker;
 
     /**
      * Default constructor.
+     * @param webSocketSessions The websocket sessions for the server
      * @param router The router
      * @param binderRegistry the request binder registry
      * @param webSocketBeanRegistry The web socket bean registyr
      * @param mediaTypeCodecRegistry The codec registry
      */
-    public NettyServerWebSocketUpgradeHandler(Router router, RequestBinderRegistry binderRegistry, WebSocketBeanRegistry webSocketBeanRegistry, MediaTypeCodecRegistry mediaTypeCodecRegistry) {
+    public NettyServerWebSocketUpgradeHandler(ChannelGroup webSocketSessions, Router router, RequestBinderRegistry binderRegistry, WebSocketBeanRegistry webSocketBeanRegistry, MediaTypeCodecRegistry mediaTypeCodecRegistry) {
         this.router = router;
         this.binderRegistry = binderRegistry;
         this.webSocketBeanRegistry = webSocketBeanRegistry;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
+        this.webSocketSessions = webSocketSessions;
     }
 
     @Override
@@ -158,6 +162,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
                             try {
                                 // re-configure the pipeline
                                 NettyWebSocketServerHandler webSocketHandler = new NettyWebSocketServerHandler(
+                                        webSocketSessions,
                                         handshaker,
                                         msg,
                                         rm,
