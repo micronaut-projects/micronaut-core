@@ -19,6 +19,7 @@ package io.micronaut.websocket;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.http.MediaType;
 import org.reactivestreams.Publisher;
 
 import java.net.URI;
@@ -80,10 +81,40 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
      * Broadcast the given message to the remote peer.
      *
      * @param message The message
+     * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
      * @param <T> The message type
      * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
      */
-    <T> Publisher<T> send(T message);
+    <T> Publisher<T> send(T message, MediaType mediaType);
+
+    /**
+     * Broadcast the given message to the remote peer asynchronously.
+     *
+     * @param message The message
+     *  @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
+     * @param <T> The message type
+     * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
+     */
+    <T> CompletableFuture<T> sendAsync(T message, MediaType mediaType);
+
+    /**
+     * Broadcast the given message to the remote peer synchronously.
+     *
+     * @param message The message
+     * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
+     */
+    void sendSync(Object message, MediaType mediaType);
+
+    /**
+     * Broadcast the given message to the remote peer.
+     *
+     * @param message The message
+     * @param <T> The message type
+     * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
+     */
+    default <T> Publisher<T> send(T message) {
+        return send(message, MediaType.APPLICATION_JSON_TYPE);
+    }
 
     /**
      * Broadcast the given message to the remote peer asynchronously.
@@ -92,14 +123,18 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
      * @param <T> The message type
      * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
      */
-    <T> CompletableFuture<T> sendAsync(T message);
+    default <T> CompletableFuture<T> sendAsync(T message) {
+        return sendAsync(message, MediaType.APPLICATION_JSON_TYPE);
+    }
 
     /**
      * Broadcast the given message to the remote peer synchronously.
      *
      * @param message The message
      */
-    void sendSync(Object message);
+    default void sendSync(Object message) {
+        sendSync(message, MediaType.APPLICATION_JSON_TYPE);
+    }
 
     /**
      * The subprotocol if one is used.
