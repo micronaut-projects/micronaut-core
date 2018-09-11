@@ -28,7 +28,7 @@ import spock.lang.Specification
  * @author graemerocher
  * @since 1.0
  */
-@IgnoreIf({ !System.getenv('CONSUL_HOST') && !System.getenv('CONSUL_PORT') })
+@IgnoreIf({ !env['CONSUL_HOST'] && !env['CONSUL_PORT'] })
 class ConsulHealthStatusSpec extends Specification {
 
     void "test the consul service's health status is correct"() {

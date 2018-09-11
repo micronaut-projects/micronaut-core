@@ -27,7 +27,7 @@ import spock.util.concurrent.PollingConditions
  * @author graemerocher
  * @since 1.0
  */
-@IgnoreIf({ !System.getenv('EUREKA_HOST') && !System.getenv('EUREKA_PORT')})
+@IgnoreIf({ !env['EUREKA_HOST'] && !env['EUREKA_PORT'] })
 class EurekaAutoRegistrationSpec extends Specification{
 
 
