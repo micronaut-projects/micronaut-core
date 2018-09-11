@@ -17,6 +17,7 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.AnnotationUtils;
+import io.micronaut.annotation.processing.ModelUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import javax.annotation.processing.Messager;
@@ -38,6 +39,10 @@ public class JavaVisitorContext implements VisitorContext {
     private final AnnotationUtils annotationUtils;
     private final Types types;
 
+
+
+    private final ModelUtils modelUtils;
+
     /**
      * The default constructor.
      *
@@ -46,11 +51,12 @@ public class JavaVisitorContext implements VisitorContext {
      * @param annotationUtils The annotation utils
      * @param types Type types
      */
-    public JavaVisitorContext(Messager messager, Elements elements, AnnotationUtils annotationUtils, Types types) {
+    public JavaVisitorContext(Messager messager, Elements elements, AnnotationUtils annotationUtils, Types types, ModelUtils modelUtils) {
         this.messager = messager;
         this.elements = elements;
         this.annotationUtils = annotationUtils;
         this.types = types;
+        this.modelUtils = modelUtils;
     }
 
     @Override
@@ -72,6 +78,15 @@ public class JavaVisitorContext implements VisitorContext {
      */
     public Messager getMessager() {
         return messager;
+    }
+
+    /**
+     * The model utils.
+     *
+     * @return The model utils
+     */
+    public ModelUtils getModelUtils() {
+        return modelUtils;
     }
 
     /**
