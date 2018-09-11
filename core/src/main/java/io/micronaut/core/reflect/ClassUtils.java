@@ -67,10 +67,11 @@ public class ClassUtils {
         try {
             ServiceLoader<ClassLoadingReporter> reporters = ServiceLoader.load(ClassLoadingReporter.class);
             for (ClassLoadingReporter reporter : reporters) {
-                reporterList.add(reporter);
+                if (reporter.isEnabled()) {
+                    reporterList.add(reporter);
+                }
             }
-
-        } catch (Exception e) {
+        } catch (Throwable e) {
             reporterList = Collections.emptyList();
         }
 

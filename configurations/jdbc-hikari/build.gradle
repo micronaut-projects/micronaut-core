@@ -1,9 +1,17 @@
 dependencies {
     compile project(":jdbc")
     compile project(":inject")
+    compile "com.zaxxer:HikariCP:2.7.9"
+
+    compileOnly project(":configurations:micrometer-core")
     compileOnly project(":inject-java")
 
-    compile "com.zaxxer:HikariCP:2.7.3"
-
     testCompile "com.h2database:h2:1.4.196"
+    testCompile project(":spring")
+    testCompile project(":inject-java")
+    testCompile project(":http-server-netty")
+    testCompile project(":http-client")
+    testCompile project(":management")
+    testCompile project(":configurations:micrometer-core")
+    testCompile dependencyModuleVersion("spring", "spring-jdbc")
 }

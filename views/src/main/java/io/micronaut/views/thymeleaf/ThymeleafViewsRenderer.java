@@ -32,7 +32,9 @@ import org.thymeleaf.context.IContext;
 import org.thymeleaf.exceptions.TemplateEngineException;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
+import javax.annotation.Nullable;
 import javax.inject.Singleton;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
@@ -71,7 +73,7 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
     }
 
     @Override
-    public Writable render(String viewName, Object data) {
+    public Writable render(String viewName, @Nullable Object data) {
         return (writer) -> {
             final IContext context = new Context(Locale.US, variables(data));
             try {
@@ -113,7 +115,10 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
         return templateResolver;
     }
 
-    private Map<String, Object> variables(Object data) {
+    private Map<String, Object> variables(@Nullable Object data) {
+        if (data == null) {
+            return new HashMap<>();
+        }
         if (data instanceof Map) {
             return (Map<String, Object>) data;
         } else {

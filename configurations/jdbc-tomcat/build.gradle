@@ -1,12 +1,16 @@
 dependencies {
     compile project(":jdbc")
     compile project(":inject")
-    compileOnly project(":inject-java")
     compile "org.apache.tomcat:tomcat-jdbc:9.0.1"
+    compileOnly project(":inject-java")
 
     testCompile "com.h2database:h2:1.4.196"
 
     testCompile project(":spring")
     testCompile project(":inject-java")
+    testCompile project(":http-server-netty")
+    testCompile project(":http-client")
+    testCompile project(":management")
+    testCompile project(":configurations:micrometer-core")
     testCompile dependencyModuleVersion("spring", "spring-jdbc")
 }

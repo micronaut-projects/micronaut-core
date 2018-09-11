@@ -19,6 +19,7 @@ package io.micronaut.configuration.hibernate.jpa;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.core.convert.format.MapFormat;
+import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.util.ArrayUtils;
 import org.hibernate.boot.registry.BootstrapServiceRegistry;
 import org.hibernate.boot.registry.BootstrapServiceRegistryBuilder;
@@ -100,7 +101,7 @@ public class JpaConfiguration {
      * @param jpaProperties The JPA properties
      */
     public final void setProperties(
-        @MapFormat(transformation = MapFormat.MapTransformation.FLAT)
+        @MapFormat(transformation = MapFormat.MapTransformation.FLAT, keyFormat = StringConvention.UNDER_SCORE_SEPARATED_LOWER_CASE)
             Map<String, Object> jpaProperties) {
         this.jpaProperties = jpaProperties;
     }

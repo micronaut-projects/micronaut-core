@@ -5,15 +5,14 @@ import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_BINDERS
 import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory.MICRONAUT_METRICS_ENABLED
 
-class LogbackMeterRegistryBinderSpec extends Specification {
+class LogbackMeterRegistryBinderFactorySpec extends Specification {
 
     def "test getting the beans manually"() {
         when:
-        def binder = new LogbackMeterRegistryBinder()
+        def binder = new LogbackMeterRegistryBinderFactory()
 
         then:
         binder.logbackMetrics()
@@ -24,7 +23,7 @@ class LogbackMeterRegistryBinderSpec extends Specification {
         ApplicationContext context = ApplicationContext.run()
 
         then:
-        context.containsBean(LogbackMeterRegistryBinder)
+        context.containsBean(LogbackMeterRegistryBinderFactory)
         context.containsBean(LogbackMetrics)
 
         cleanup:
@@ -37,7 +36,7 @@ class LogbackMeterRegistryBinderSpec extends Specification {
         ApplicationContext context = ApplicationContext.run([(cfg): setting])
 
         then:
-        context.findBean(LogbackMeterRegistryBinder).isPresent() == setting
+        context.findBean(LogbackMeterRegistryBinderFactory).isPresent() == setting
         context.findBean(LogbackMetrics).isPresent() == setting
 
         cleanup:

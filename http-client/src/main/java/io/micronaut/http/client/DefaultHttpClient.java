@@ -33,10 +33,7 @@ import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.PathMatcher;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.util.Toggleable;
+import io.micronaut.core.util.*;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
@@ -147,11 +144,34 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
     private final AnnotationMetadataResolver annotationMetadataResolver;
     private final ThreadFactory threadFactory;
 
-    private final HttpClientFilter[] filters;
+    private final List<HttpClientFilter> filters;
     private final Charset defaultCharset;
     private final ChannelPoolMap<RequestKey, ChannelPool> poolMap;
 
     private Set<String> clientIdentifiers = Collections.emptySet();
+
+    /**
+     * Construct a client for the given arguments.
+     *
+     * @param loadBalancer               The {@link LoadBalancer} to use for selecting servers
+     * @param configuration              The {@link HttpClientConfiguration} object
+     * @param contextPath                The base URI to prepend to request uris
+     * @param threadFactory              The thread factory to use for client threads
+     * @param nettyClientSslBuilder      The SSL builder
+     * @param codecRegistry              The {@link MediaTypeCodecRegistry} to use for encoding and decoding objects
+     * @param annotationMetadataResolver The annotation metadata resolver
+     * @param filters                    The filters to use
+     */
+    public DefaultHttpClient(@Parameter LoadBalancer loadBalancer,
+                             @Parameter HttpClientConfiguration configuration,
+                             @Parameter @Nullable String contextPath,
+                             @Named(NettyThreadFactory.NAME) @Nullable ThreadFactory threadFactory,
+                             NettyClientSslBuilder nettyClientSslBuilder,
+                             MediaTypeCodecRegistry codecRegistry,
+                             @Nullable AnnotationMetadataResolver annotationMetadataResolver,
+                             HttpClientFilter... filters) {
+        this(loadBalancer, configuration, contextPath, threadFactory, nettyClientSslBuilder, codecRegistry, annotationMetadataResolver, Arrays.asList(filters));
+    }
 
     /**
      * Construct a client for the given arguments.
@@ -173,7 +193,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
                              NettyClientSslBuilder nettyClientSslBuilder,
                              MediaTypeCodecRegistry codecRegistry,
                              @Nullable AnnotationMetadataResolver annotationMetadataResolver,
-                             HttpClientFilter... filters) {
+                             List<HttpClientFilter> filters) {
 
         this.loadBalancer = loadBalancer;
         this.defaultCharset = configuration.getDefaultCharset();
@@ -1147,7 +1167,7 @@ public class DefaultHttpClient implements RxHttpClient, RxStreamingHttpClient, R
             URI requestURI,
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
             Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher) {
-        if (filters.length > 0) {
+        if (CollectionUtils.isNotEmpty(filters)) {
             List<HttpClientFilter> httpClientFilters = resolveFilters(request, requestURI);
             OrderUtil.reverseSort(httpClientFilters);
             httpClientFilters.add((req, chain) -> responsePublisher);

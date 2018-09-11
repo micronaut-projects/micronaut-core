@@ -1,6 +1,6 @@
 dependencies {
     compile project(":messaging")
-    compile "org.apache.kafka:kafka-clients:${kafkaVersion}"
+    compile dependencyVersion("kafka")
 
     compileOnly project(":management")
     compileOnly project(":configurations:micrometer-core")

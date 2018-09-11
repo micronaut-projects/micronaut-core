@@ -18,6 +18,7 @@ package io.micronaut.function;
 
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodec;
@@ -28,11 +29,7 @@ import io.micronaut.inject.ExecutableMethod;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.net.URI;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -57,8 +54,16 @@ public class DefaultLocalFunctionRegistry implements ExecutableMethodProcessor<F
      * Constructor.
      * @param decoders decoders
      */
-    @Inject
     public DefaultLocalFunctionRegistry(MediaTypeCodec... decoders) {
+        this.decoderRegistry = MediaTypeCodecRegistry.of(decoders);
+    }
+
+    /**
+     * Constructor.
+     * @param decoders decoders
+     */
+    @Inject
+    public DefaultLocalFunctionRegistry(List<MediaTypeCodec> decoders) {
         this.decoderRegistry = MediaTypeCodecRegistry.of(decoders);
     }
 
@@ -185,18 +190,34 @@ public class DefaultLocalFunctionRegistry implements ExecutableMethodProcessor<F
     }
 
     private void registerSupplier(ExecutableMethod<?, ?> method, String functionId) {
+        ClassLoadingReporter.reportBeanPresent(method.getReturnType().getType());
+
         suppliers.put(functionId, method);
     }
 
     private void registerBiFunction(ExecutableMethod<?, ?> method, String functionId) {
+        ClassLoadingReporter.reportBeanPresent(method.getReturnType().getType());
+        for (Class argumentType : method.getArgumentTypes()) {
+            ClassLoadingReporter.reportBeanPresent(argumentType);
+        }
+
         biFunctions.put(functionId, method);
     }
 
     private void registerConsumer(ExecutableMethod<?, ?> method, String functionId) {
+        for (Class argumentType : method.getArgumentTypes()) {
+            ClassLoadingReporter.reportBeanPresent(argumentType);
+        }
+
         consumers.put(functionId, method);
     }
 
     private void registerFunction(ExecutableMethod<?, ?> method, String functionId) {
+        ClassLoadingReporter.reportBeanPresent(method.getReturnType().getType());
+        for (Class argumentType : method.getArgumentTypes()) {
+            ClassLoadingReporter.reportBeanPresent(argumentType);
+        }
+
         functions.put(functionId, method);
     }
 }
