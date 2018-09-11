@@ -92,9 +92,9 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
             .orElseThrow(() -> new FallbackException("Unsupported Reactive type: " + result));
 
         recoveryFlowable = recoveryFlowable.onErrorResumeNext(throwable -> {
-            Optional<MethodExecutionHandle<Object>> fallbackMethod = findFallbackMethod(context);
+            Optional<? extends MethodExecutionHandle<?, Object>> fallbackMethod = findFallbackMethod(context);
             if (fallbackMethod.isPresent()) {
-                MethodExecutionHandle<Object> fallbackHandle = fallbackMethod.get();
+                MethodExecutionHandle<?, Object> fallbackHandle = fallbackMethod.get();
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Type [{}] resolved fallback: {}", context.getTarget().getClass(), fallbackHandle);
                 }
@@ -126,10 +126,10 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
      * @param context The context
      * @return The fallback method if it is present
      */
-    public Optional<MethodExecutionHandle<Object>> findFallbackMethod(MethodInvocationContext<Object, Object> context) {
+    public Optional<? extends MethodExecutionHandle<?, Object>> findFallbackMethod(MethodInvocationContext<Object, Object> context) {
         Class<?> declaringType = context.getTarget().getClass();
-        Optional<MethodExecutionHandle<Object>> result = beanContext
-            .findExecutionHandle(declaringType, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
+        Optional<? extends MethodExecutionHandle<?, Object>> result = beanContext
+                .findExecutionHandle(declaringType, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
         if (!result.isPresent()) {
             Set<Class> allInterfaces = ReflectionUtils.getAllInterfaces(declaringType);
             for (Class i : allInterfaces) {
@@ -150,9 +150,9 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
             if (throwable == null) {
                 newFuture.complete(o);
             } else {
-                Optional<MethodExecutionHandle<Object>> fallbackMethod = findFallbackMethod(context);
+                Optional<? extends MethodExecutionHandle<?, Object>> fallbackMethod = findFallbackMethod(context);
                 if (fallbackMethod.isPresent()) {
-                    MethodExecutionHandle<Object> fallbackHandle = fallbackMethod.get();
+                    MethodExecutionHandle<?, Object> fallbackHandle = fallbackMethod.get();
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Type [{}] resolved fallback: {}", context.getTarget().getClass(), fallbackHandle);
                     }
@@ -207,9 +207,9 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
             }
         }
 
-        Optional<MethodExecutionHandle<Object>> fallback = findFallbackMethod(context);
+        Optional<? extends MethodExecutionHandle<?, Object>> fallback = findFallbackMethod(context);
         if (fallback.isPresent()) {
-            MethodExecutionHandle<Object> fallbackMethod = fallback.get();
+            MethodExecutionHandle<?, Object> fallbackMethod = fallback.get();
             try {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Type [{}] resolved fallback: {}", context.getTarget().getClass().getName(), fallbackMethod);

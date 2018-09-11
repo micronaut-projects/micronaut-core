@@ -34,8 +34,10 @@ import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
+import io.micronaut.http.server.netty.encoders.HttpResponseEncoder;
 import io.micronaut.http.server.netty.ssl.NettyServerSslBuilder;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
+import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
 import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -47,6 +49,7 @@ import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.resource.StaticResourceResolver;
+import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
@@ -122,6 +125,7 @@ public class NettyHttpServer implements EmbeddedServer {
     private final RequestArgumentSatisfier requestArgumentSatisfier;
     private final BeanLocator beanLocator;
     private final ThreadFactory threadFactory;
+    private final WebSocketBeanRegistry webSocketBeanRegistry;
     private volatile int serverPort;
     private final ApplicationContext applicationContext;
     private final SslContext sslContext;
@@ -180,6 +184,7 @@ public class NettyHttpServer implements EmbeddedServer {
         this.staticResourceResolver = resourceResolver;
         this.sslContext = nettyServerSslBuilder.build().orElse(null);
         this.threadFactory = threadFactory;
+        this.webSocketBeanRegistry = WebSocketBeanRegistry.forServer(applicationContext);
     }
 
     /**
@@ -232,6 +237,7 @@ public class NettyHttpServer implements EmbeddedServer {
                                 serverConfiguration.isValidateHeaders(),
                                 serverConfiguration.getInitialBufferSize()
                         ));
+
                         pipeline.addLast(new FlowControlHandler());
                         pipeline.addLast(HTTP_KEEP_ALIVE_HANDLER, new HttpServerKeepAliveHandler());
                         pipeline.addLast(HTTP_COMPRESSOR, new SmartHttpContentCompressor());
@@ -240,6 +246,13 @@ public class NettyHttpServer implements EmbeddedServer {
                                 NettyHttpServer.this,
                                 environment,
                                 serverConfiguration
+                        ));
+                        pipeline.addLast(HttpResponseEncoder.ID, new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration));
+                        pipeline.addLast(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
+                                router,
+                                requestArgumentSatisfier.getBinderRegistry(),
+                                webSocketBeanRegistry,
+                                mediaTypeCodecRegistry
                         ));
                         pipeline.addLast(MICRONAUT_HANDLER, new RoutingInBoundHandler(
                             beanLocator,

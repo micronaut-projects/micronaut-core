@@ -14,17 +14,28 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.server.binding.binders;
-
-import io.micronaut.core.bind.TypeArgumentBinder;
-import io.micronaut.http.HttpRequest;
+package io.micronaut.websocket.exceptions;
 
 /**
- * A {@link TypeArgumentBinder} that binds from an {@link HttpRequest}.
+ * General parent exception for all WebSocket related exceptions.
  *
- * @param <T> A type
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-public interface TypedRequestArgumentBinder<T> extends RequestArgumentBinder<T>, TypeArgumentBinder<T, HttpRequest<?>> {
+public class WebSocketException extends RuntimeException {
+
+    /**
+     * @param message The message
+     */
+    public WebSocketException(String message) {
+        super(message);
+    }
+
+    /**
+     * @param message The message
+     * @param cause The cause
+     */
+    public WebSocketException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }

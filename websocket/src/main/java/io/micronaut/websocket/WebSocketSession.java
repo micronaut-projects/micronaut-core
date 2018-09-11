@@ -17,6 +17,7 @@
 package io.micronaut.websocket;
 
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
+import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import org.reactivestreams.Publisher;
 
@@ -24,6 +25,7 @@ import java.net.URI;
 import java.security.Principal;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Represents an open WebSocket connection. Based largely on {@code javax.websocket} and likely to be able to implement the spec in the future.
@@ -75,13 +77,29 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
     String getProtocolVersion();
 
     /**
-     * Broadcase the given message to the remote peer.
+     * Broadcast the given message to the remote peer.
      *
      * @param message The message
      * @param <T> The message type
      * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
      */
-    <T> Publisher<T> broadcast(T message);
+    <T> Publisher<T> send(T message);
+
+    /**
+     * Broadcast the given message to the remote peer asynchronously.
+     *
+     * @param message The message
+     * @param <T> The message type
+     * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
+     */
+    <T> CompletableFuture<T> sendAsync(T message);
+
+    /**
+     * Broadcast the given message to the remote peer synchronously.
+     *
+     * @param message The message
+     */
+    void sendSync(Object message);
 
     /**
      * The subprotocol if one is used.
@@ -101,6 +119,15 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
     }
 
     /**
+     * Any matching URI path variables.
+     *
+     * @return The path variables
+     */
+    default ConvertibleValues<Object> getUriVariables() {
+        return ConvertibleValues.empty();
+    }
+
+    /**
      * The user {@link Principal} used to create the session.
      *
      * @return The {@link Principal}
@@ -111,4 +138,11 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
 
     @Override
     void close();
+
+    /**
+     * Close the session with the given event.
+     *
+     * @param closeReason The close event
+     */
+    void close(CloseReason closeReason);
 }

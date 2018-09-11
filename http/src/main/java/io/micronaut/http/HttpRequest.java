@@ -119,12 +119,6 @@ public interface HttpRequest<B> extends HttpMessage<B> {
             .map(Locale::forLanguageTag);
     }
 
-    /**
-     * @return The request character encoding. Defaults to {@link StandardCharsets#UTF_8}
-     */
-    default Charset getCharacterEncoding() {
-        return HttpUtil.resolveCharset(this).orElse(StandardCharsets.UTF_8);
-    }
 
     /**
      * Return a {@link MutableHttpRequest} for a {@link HttpMethod#GET} request for the given URI.

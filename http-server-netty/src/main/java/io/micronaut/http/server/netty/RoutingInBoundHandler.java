@@ -36,6 +36,7 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
@@ -224,6 +225,16 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 // handle error with a method that is global with bad request
                 errorRoute = router.route(HttpStatus.BAD_REQUEST).orElse(null);
             }
+        } else if (cause instanceof HttpStatusException) {
+            HttpStatusException statusException = (HttpStatusException) cause;
+            if (declaringType != null) {
+                // handle error with a method that is non global with bad request
+                errorRoute = router.route(declaringType, statusException.getStatus()).orElse(null);
+            }
+            if (errorRoute == null) {
+                // handle error with a method that is global with bad request
+                errorRoute = router.route(statusException.getStatus()).orElse(null);
+            }
         }
 
         // any another other exception may arise. handle these with non global exception marked method or a global exception marked method.
@@ -247,7 +258,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             try {
                 Object result = errorRoute.execute();
                 io.micronaut.http.MutableHttpResponse<?> response = errorResultToResponse(result);
-                MethodBasedRouteMatch<?> methodBasedRoute = (MethodBasedRouteMatch) errorRoute;
+                MethodBasedRouteMatch<?, ?> methodBasedRoute = (MethodBasedRouteMatch) errorRoute;
                 AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(nettyHttpRequest);
                 Flowable<MutableHttpResponse<?>> routePublisher = buildRoutePublisher(
                         methodBasedRoute.getDeclaringType(),
@@ -339,9 +350,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             );
             return;
         }
-        Optional<UriRouteMatch<Object>> routeMatch = Optional.empty();
+        Optional<UriRouteMatch<Object, Object>> routeMatch = Optional.empty();
 
-        List<UriRouteMatch<Object>> uriRoutes = router
+        List<UriRouteMatch<Object, Object>> uriRoutes = router
             .find(httpMethod, requestPath)
             .filter((match) -> match.test(request))
             .collect(StreamUtils.minAll(
@@ -351,7 +362,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (uriRoutes.size() > 1) {
             throw new DuplicateRouteException(requestPath, uriRoutes);
         } else if (uriRoutes.size() == 1) {
-            UriRouteMatch<Object> establishedRoute = uriRoutes.get(0);
+            UriRouteMatch<Object, Object> establishedRoute = uriRoutes.get(0);
             request.setAttribute(HttpAttributes.ROUTE, establishedRoute.getRoute());
             request.setAttribute(HttpAttributes.ROUTE_MATCH, establishedRoute);
             request.setAttribute(HttpAttributes.URI_TEMPLATE, establishedRoute.getRoute().getUriMatchTemplate().toString());
@@ -1100,10 +1111,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (nativeBuffer instanceof ByteBuf) {
                 byteBuf = (ByteBuf) nativeBuffer;
             } else {
-                byteBuf = Unpooled.copiedBuffer(byteBuffer.asNioBuffer());
+                byteBuf = Unpooled.wrappedBuffer(byteBuffer.asNioBuffer());
             }
         } else if (body instanceof byte[]) {
-            byteBuf = Unpooled.copiedBuffer((byte[]) body);
+            byteBuf = Unpooled.wrappedBuffer((byte[]) body);
 
         } else if (body instanceof Writable) {
             byteBuf = context.alloc().ioBuffer(128);

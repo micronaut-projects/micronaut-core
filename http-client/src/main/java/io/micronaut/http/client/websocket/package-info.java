@@ -15,9 +15,9 @@
  */
 
 /**
- * HTTP server request binding annotation for various request types.
+ * Contains classes specific to WebSocket handling in the client.
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.binding.binders;
+package io.micronaut.http.client.websocket;

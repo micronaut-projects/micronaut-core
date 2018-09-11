@@ -6,7 +6,7 @@ dependencies {
     compile dependencyModuleVersion("netty", "netty-handler-proxy")
 
     compileOnly dependencyVersion("reactor")
-    compileOnly project(":websocket")
+    compile project(":websocket")
 
     testCompile project(":inject-groovy")
     testCompile project(":validation")

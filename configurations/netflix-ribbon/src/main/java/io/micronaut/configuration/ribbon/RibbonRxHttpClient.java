@@ -20,6 +20,7 @@ import com.netflix.client.config.IClientConfig;
 import com.netflix.loadbalancer.reactive.ExecutionListener;
 import com.netflix.loadbalancer.reactive.LoadBalancerCommand;
 import hu.akarnokd.rxjava.interop.RxJavaInterop;
+import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Prototype;
@@ -29,6 +30,7 @@ import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.DefaultHttpClient;
@@ -46,6 +48,7 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import java.net.URI;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.ThreadFactory;
@@ -79,16 +82,15 @@ public class RibbonRxHttpClient extends DefaultHttpClient {
      */
     @Inject
     public RibbonRxHttpClient(
-        @Parameter LoadBalancer loadBalancer,
-        @Parameter HttpClientConfiguration configuration,
-        @Parameter @Nullable String contextPath,
-        @Named(NettyThreadFactory.NAME) @Nullable ThreadFactory threadFactory,
-        NettyClientSslBuilder nettyClientSslBuilder,
-        MediaTypeCodecRegistry codecRegistry,
-        RibbonExecutionListenerAdapter[] executionListeners,
-        @Nullable AnnotationMetadataResolver annotationMetadataResolver,
-        HttpClientFilter... filters) {
-
+            LoadBalancer loadBalancer,
+            HttpClientConfiguration configuration,
+            @Nullable String contextPath,
+            @Nullable ThreadFactory threadFactory,
+            NettyClientSslBuilder nettyClientSslBuilder,
+            MediaTypeCodecRegistry codecRegistry,
+            @Nullable AnnotationMetadataResolver annotationMetadataResolver,
+            List<HttpClientFilter> filters,
+            List<RibbonExecutionListenerAdapter> executionListeners) {
         super(
                 loadBalancer,
                 configuration,
@@ -98,12 +100,18 @@ public class RibbonRxHttpClient extends DefaultHttpClient {
                 codecRegistry,
                 annotationMetadataResolver,
                 filters);
-        this.executionListeners = Arrays.asList(executionListeners);
+        this.executionListeners = CollectionUtils.isEmpty(executionListeners) ? Collections.emptyList() : executionListeners;
         if (loadBalancer instanceof RibbonLoadBalancer) {
             this.loadBalancer = (RibbonLoadBalancer) loadBalancer;
         } else {
             this.loadBalancer = null;
         }
+    }
+
+    @Override
+    @Inject
+    protected void configure(BeanContext beanContext) {
+        super.configure(beanContext);
     }
 
     /**

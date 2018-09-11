@@ -14,17 +14,24 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.server.binding.binders;
+package io.micronaut.http.bind.binders;
 
-import io.micronaut.core.bind.ArgumentBinder;
-import io.micronaut.http.HttpRequest;
+import io.micronaut.http.annotation.Body;
 
 /**
- * A binder that binds from an {@link HttpRequest}.
+ * A binder that binds from a parsed request body.
  *
  * @param <T> A type
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface RequestArgumentBinder<T> extends ArgumentBinder<T, HttpRequest<?>> {
+public interface BodyArgumentBinder<T> extends AnnotatedRequestArgumentBinder<Body, T> {
+
+    /**
+     * @return The required annotation type
+     */
+    @Override
+    default Class<Body> getAnnotationType() {
+        return Body.class;
+    }
 }
