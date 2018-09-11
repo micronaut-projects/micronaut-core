@@ -72,7 +72,7 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
         Optional route = source.getAttribute(HttpAttributes.ROUTE_MATCH);
         if (route.isPresent()) {
             UriRouteMatch routeMatch = (UriRouteMatch) route.get();
-            Character modifierChar = routeMatch.getVariablesModifier().get(parameterName);
+            Character modifierChar = routeMatch.getVariableModifiers().get(parameterName);
             bindAll = (modifierChar != null && modifierChar == '*');
         }
 

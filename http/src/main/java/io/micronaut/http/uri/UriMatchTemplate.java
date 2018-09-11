@@ -31,7 +31,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
 
     protected static final String VARIABLE_MATCH_PATTERN = "([^\\/\\?#&;\\+]";
     protected StringBuilder pattern;
-    protected Map<String, Character> variablesModifier;
+    protected Map<String, Character> variableModifiers;
     private final Pattern matchPattern;
     private final String[] variables;
     private final boolean isRoot;
@@ -55,7 +55,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         super(templateString, parserArguments);
 
         this.matchPattern = Pattern.compile(pattern.toString());
-        this.variables = variablesModifier.keySet().toArray(new String[0]);
+        this.variables = variableModifiers.keySet().toArray(new String[0]);
         String tmpl = templateString.toString();
         int len = tmpl.length();
         this.isRoot = len == 0 || (len == 1 && tmpl.charAt(0) == '/');
@@ -67,14 +67,14 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      * @param templateString    The template
      * @param segments          The list of segments
      * @param matchPattern      The match pattern
-     * @param variablesModifier The modifier char for each variable in route
+     * @param variableModifiers The modifier char for each variable in route
      * @param variables         The variables
      */
-    protected UriMatchTemplate(CharSequence templateString, List<PathSegment> segments, Pattern matchPattern, Map<String, Character> variablesModifier, String... variables) {
+    protected UriMatchTemplate(CharSequence templateString, List<PathSegment> segments, Pattern matchPattern, Map<String, Character> variableModifiers, String... variables) {
         super(templateString.toString(), segments);
         this.matchPattern = matchPattern;
         this.variables = variables;
-        this.variablesModifier = variablesModifier;
+        this.variableModifiers = variableModifiers;
         String tmpl = templateString.toString();
         int len = tmpl.length();
         this.isRoot = len == 0 || (len == 1 && tmpl.charAt(0) == '/');
@@ -85,11 +85,11 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
      * @param newSegments       The list of new segments
      * @param newPattern        The list of new patters
      * @param variables         The variables
-     * @param variablesModifier The modifier char for each variable in route
+     * @param variableModifiers The modifier char for each variable in route
      * @return An instance of {@link UriMatchTemplate}
      */
-    protected UriMatchTemplate newUriMatchTemplate(CharSequence uriTemplate, List<PathSegment> newSegments, Pattern newPattern, String[] variables, Map<String, Character> variablesModifier) {
-        return new UriMatchTemplate(uriTemplate, newSegments, newPattern, variablesModifier, variables);
+    protected UriMatchTemplate newUriMatchTemplate(CharSequence uriTemplate, List<PathSegment> newSegments, Pattern newPattern, String[] variables, Map<String, Character> variableModifiers) {
+        return new UriMatchTemplate(uriTemplate, newSegments, newPattern, variableModifiers, variables);
     }
 
     /**
@@ -139,7 +139,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
                     String value = matcher.group(index);
                     variableMap.put(variable, value);
                 }
-                return Optional.of(new DefaultUriMatchInfo(uri, variableMap, variablesModifier));
+                return Optional.of(new DefaultUriMatchInfo(uri, variableMap, variableModifiers));
             }
         }
         return Optional.empty();
@@ -165,11 +165,11 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         Pattern newPattern = Pattern.compile(this.matchPattern.toString() + pattern.toString());
         List<String> newList = new ArrayList<>();
         newList.addAll(Arrays.asList(variables));
-        newList.addAll(variablesModifier.keySet());
-        Map<String, Character> newMap = new LinkedHashMap<>(variablesModifier.size());
-        newMap.putAll(variablesModifier);
+        newList.addAll(variableModifiers.keySet());
+        Map<String, Character> newMap = new LinkedHashMap<>(variableModifiers.size());
+        newMap.putAll(variableModifiers);
         pattern = null;
-        variablesModifier = null;
+        variableModifiers = null;
         String[] variables = newList.toArray(new String[newList.size()]);
         return newUriMatchTemplate(uriTemplate, newSegments, newPattern, variables, newMap);
     }
@@ -177,7 +177,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
     @Override
     protected UriTemplateParser createParser(String templateString, Object... parserArguments) {
         this.pattern = new StringBuilder();
-        this.variablesModifier = new LinkedHashMap<>();
+        this.variableModifiers = new LinkedHashMap<>();
         return new UriMatchTemplateParser(templateString, this);
 
     }
@@ -189,7 +189,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
 
         private final String uri;
         private final Map<String, Object> variables;
-        private final Map<String, Character> variablesModifier;
+        private final Map<String, Character> variableModifiers;
 
         /**
          * @param uri       The URI
@@ -198,7 +198,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         protected DefaultUriMatchInfo(String uri, Map<String, Object> variables, Map<String, Character> variableModifiers) {
             this.uri = uri;
             this.variables = variables;
-            this.variablesModifier = variableModifiers;
+            this.variableModifiers = variableModifiers;
         }
 
         @Override
@@ -212,8 +212,8 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         }
 
         @Override
-        public Map<String, Character> getVariablesModifier() {
-            return variablesModifier;
+        public Map<String, Character> getVariableModifiers() {
+            return variableModifiers;
         }
 
         @Override
@@ -283,7 +283,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
                                           char modifierChar,
                                           char operator,
                                           String previousDelimiter, boolean isQuerySegment) {
-            matchTemplate.variablesModifier.put(variable, modifierChar);
+            matchTemplate.variableModifiers.put(variable, modifierChar);
             StringBuilder pattern = matchTemplate.pattern;
             int modLen = modifierStr.length();
             boolean hasModifier = modifierChar == ':' && modLen > 0;

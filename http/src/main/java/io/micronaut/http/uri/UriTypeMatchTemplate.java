@@ -77,14 +77,14 @@ public class UriTypeMatchTemplate extends UriMatchTemplate {
     @Override
     protected UriTemplateParser createParser(String templateString, Object... parserArguments) {
         this.pattern = new StringBuilder();
-        this.variablesModifier = new LinkedHashMap<>();
+        this.variableModifiers = new LinkedHashMap<>();
         this.variableTypes = parserArguments != null && parserArguments.length > 0 ? (Class[]) parserArguments[0] : new Class[0];
         return new TypedUriMatchTemplateParser(templateString, this);
     }
 
     @Override
-    protected UriMatchTemplate newUriMatchTemplate(CharSequence uriTemplate, List<PathSegment> newSegments, Pattern newPattern, String[] variables, Map<String, Character> variablesModifier) {
-        return new UriTypeMatchTemplate(uriTemplate, newSegments, newPattern, variableTypes, variablesModifier, variables);
+    protected UriMatchTemplate newUriMatchTemplate(CharSequence uriTemplate, List<PathSegment> newSegments, Pattern newPattern, String[] variables, Map<String, Character> variableModifiers) {
+        return new UriTypeMatchTemplate(uriTemplate, newSegments, newPattern, variableTypes, variableModifiers, variables);
     }
 
     /**
