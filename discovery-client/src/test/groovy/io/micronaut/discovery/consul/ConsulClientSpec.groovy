@@ -75,7 +75,6 @@ class ConsulClientSpec extends Specification {
         def entry = new CatalogEntry("test-node", InetAddress.getByName(url.host))
         boolean result = Flowable.fromPublisher(client.register(entry)).blockingFirst()
 
-
         then:
         result
         
@@ -104,9 +103,6 @@ class ConsulClientSpec extends Specification {
                             .address(embeddedServer.getHost())
                             .port(embeddedServer.getPort())
         Flowable.fromPublisher(client.register(entry)).blockingFirst()
-
-
-
         Map<String, ServiceEntry> entries = Flowable.fromPublisher(client.getServices()).blockingFirst()
 
         then:
@@ -136,8 +132,6 @@ class ConsulClientSpec extends Specification {
                 .check(check)
                 .id('xxxxxxxx')
         Flowable.fromPublisher(client.register(entry)).blockingFirst()
-
-
 
         then:
         entry.checks.size() == 1

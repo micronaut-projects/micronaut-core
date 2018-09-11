@@ -36,9 +36,7 @@ import javax.validation.ConstraintViolationException
 @Stepwise
 class EurekaMockAutoRegistrationSpec extends Specification {
 
-
     void "test that an application can be registered and de-registered with Eureka"() {
-
         given:
         EmbeddedServer eurekaServer = ApplicationContext.run(EmbeddedServer, [
                 'jackson.serialization.WRAP_ROOT_VALUE': true,
@@ -72,8 +70,6 @@ class EurekaMockAutoRegistrationSpec extends Specification {
             instanceInfo.status == InstanceInfo.Status.UP
         }
 
-
-
         when: "The application is stopped"
         application?.stop()
 
@@ -91,7 +87,6 @@ class EurekaMockAutoRegistrationSpec extends Specification {
         cleanup:
         eurekaServer?.stop()
     }
-
 
     @Unroll
     void "test that an application can be registered and de-registered with Eureka with metadata"() {
@@ -141,6 +136,5 @@ class EurekaMockAutoRegistrationSpec extends Specification {
         'myService' | [homePageUrl:'http://home', statusPageUrl:'http://status', healthCheckUrl:'http://health', secureHealthCheckUrl:'http://securehealth']
         'myService' | ['metadata':[foo:'bar']]
         'myService' | [port:9999, securePort:9998]
-
     }
 }

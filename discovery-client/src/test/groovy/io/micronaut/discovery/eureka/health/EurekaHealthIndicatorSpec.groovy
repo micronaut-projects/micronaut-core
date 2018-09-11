@@ -47,7 +47,6 @@ class EurekaHealthIndicatorSpec extends Specification {
         then:
         healthResult.status == HealthStatus.UP
 
-
         cleanup:
         eurekaServer?.stop()
     }
