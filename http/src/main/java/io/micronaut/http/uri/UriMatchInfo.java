@@ -40,5 +40,5 @@ public interface UriMatchInfo {
     /**
      * @return The modifier char for variables
      */
-    Map<String, Character> getVariablesModifier();
+    Map<String, Character> getVariableModifiers();
 }
