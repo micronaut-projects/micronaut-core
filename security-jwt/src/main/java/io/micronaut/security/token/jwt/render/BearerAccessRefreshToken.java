@@ -17,6 +17,7 @@
 package io.micronaut.security.token.jwt.render;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.http.HttpHeaderValues;
 
 import java.util.Collection;
 import java.util.List;
@@ -35,7 +36,7 @@ public class BearerAccessRefreshToken extends AccessRefreshToken {
     private Integer expiresIn;
 
     @JsonProperty("token_type")
-    private String tokenType = "Bearer";
+    private String tokenType = HttpHeaderValues.AUTHORIZATION_PREFIX_BEARER;
 
     /**
      * Necessary for JSON serialization.

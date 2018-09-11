@@ -30,8 +30,19 @@ public class TokenConfigurationProperties implements TokenConfiguration {
 
     public static final String PREFIX = SecurityConfigurationProperties.PREFIX + ".token";
 
-    private static final String DEFAULT_ROLES_NAME = "roles";
-    private boolean enabled = true;
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = true;
+
+    /**
+     * The default roles name.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_ROLES_NAME = "roles";
+
+    private boolean enabled = DEFAULT_ENABLED;
     private String rolesName = DEFAULT_ROLES_NAME;
 
     @Override
@@ -50,7 +61,7 @@ public class TokenConfigurationProperties implements TokenConfiguration {
     }
 
     /**
-     * Sets whether the configuration is enabled.
+     * Sets whether the configuration is enabled. Default value {@value #DEFAULT_ENABLED}.
      *
      * @param enabled True if it is enabled
      */
@@ -59,7 +70,7 @@ public class TokenConfigurationProperties implements TokenConfiguration {
     }
 
     /**
-     * Sets the names of the roles property.
+     * Name of the roles property. Default value {@value #DEFAULT_ROLES_NAME}.
      * @param rolesName The roles name
      */
     public void setRolesName(String rolesName) {

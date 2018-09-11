@@ -30,7 +30,7 @@ import org.reactivestreams.Publisher
  */
 @Filter('/eureka/**')
 @Requires(property = 'test.eureka.userinfo')
-class MockEurekaAuth implements HttpServerFilter{
+class MockEurekaAuth implements HttpServerFilter {
     final String userInfo
 
     MockEurekaAuth(@Value('${test.eureka.userinfo}') String userInfo) {
@@ -39,14 +39,14 @@ class MockEurekaAuth implements HttpServerFilter{
 
     @Override
     Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-        def authToken = request.getHeaders().get(HttpHeaders.AUTHORIZATION, String)
+        Optional<String> authToken = request.getHeaders().get(HttpHeaders.AUTHORIZATION, String)
         if(authToken.isPresent()) {
-            def token = authToken.get().substring("Basic ".length())
-            def val = new String(Base64.decoder.decode(token))
+            String token = authToken.get().substring(HttpHeaderValues.AUTHORIZATION_PREFIX_BASIC.length())
+            String val = new String(token.decodeBase64())
             if(val.contains(userInfo)) {
                 return chain.proceed(request)
             }
         }
-        return Publishers.just(HttpResponse.status(HttpStatus.FORBIDDEN))
+        Publishers.just(HttpResponse.status(HttpStatus.FORBIDDEN))
     }
 }
