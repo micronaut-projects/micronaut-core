@@ -16,6 +16,8 @@
 
 package io.micronaut.inject.visitor;
 
+import java.util.List;
+
 /**
  * Stores data about an element that references a class.
  *
@@ -41,4 +43,9 @@ public interface ClassElement extends Element {
     default boolean isAssignable(Class<?> type) {
         return isAssignable(type.getName());
     }
+
+    /**
+     * @return The elements contained in this class element
+     */
+    List<Element> getElements(VisitorContext visitorContext);
 }
