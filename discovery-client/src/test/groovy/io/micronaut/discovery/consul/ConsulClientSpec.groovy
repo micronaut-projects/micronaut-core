@@ -15,6 +15,7 @@
  */
 package io.micronaut.discovery.consul
 
+import io.micronaut.context.env.Environment
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.discovery.CompositeDiscoveryClient
@@ -39,12 +40,18 @@ import spock.lang.Stepwise
 @Stepwise
 class ConsulClientSpec extends Specification {
 
-    @AutoCleanup @Shared EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
-            ['consul.client.host': System.getenv('CONSUL_HOST'),
+    @Shared
+    Map<String, Object> embeddedServerConfig = [
+            'consul.client.host': System.getenv('CONSUL_HOST'),
             'consul.client.port': System.getenv('CONSUL_PORT'),
-             "micronaut.caches.discoveryClient.enabled": false,
-            'consul.client.readTimeout': '5s']
-    )
+            "micronaut.caches.discoveryClient.enabled": false,
+            'consul.client.readTimeout': '5s'
+    ] as Map<String, Object>
+
+    @AutoCleanup
+    @Shared
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, embeddedServerConfig, Environment.TEST)
+
     @Shared ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
     @Shared DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient)
 

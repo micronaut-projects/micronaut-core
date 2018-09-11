@@ -40,10 +40,9 @@ class ConsulAutoRegistrationSpec extends Specification {
                  'consul.client.host'              : System.getenv('CONSUL_HOST'),
                  'consul.client.port'              : System.getenv('CONSUL_PORT')])
         ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
-        DiscoveryClient discoveryClient = ApplicationContext.run(
-                DiscoveryClient,
-                ['consul.client.host': System.getenv('CONSUL_HOST'),
-                 'consul.client.port'              : System.getenv('CONSUL_PORT'), "micronaut.caches.discoveryClient.enabled": false])
+        Map discoveryClientMap = ['consul.client.host': System.getenv('CONSUL_HOST'),
+                                  'consul.client.port'              : System.getenv('CONSUL_PORT'), "micronaut.caches.discoveryClient.enabled": false]
+        DiscoveryClient discoveryClient = ApplicationContext.build(discoveryClientMap).run(DiscoveryClient)
 
         PollingConditions conditions = new PollingConditions(timeout: 3)
 
@@ -74,11 +73,9 @@ class ConsulAutoRegistrationSpec extends Specification {
                  'consul.client.host'                   : System.getenv('CONSUL_HOST'),
                  'consul.client.port'                   : System.getenv('CONSUL_PORT')])
         ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
-        DiscoveryClient discoveryClient = ApplicationContext.run(
-                DiscoveryClient,
-                ['consul.client.host': System.getenv('CONSUL_HOST'),
-                 'consul.client.port'              : System.getenv('CONSUL_PORT'), "micronaut.caches.discoveryClient.enabled": false])
-
+        Map discoveryClientMap = ['consul.client.host': System.getenv('CONSUL_HOST'),
+                                  'consul.client.port'              : System.getenv('CONSUL_PORT'), "micronaut.caches.discoveryClient.enabled": false]
+        DiscoveryClient discoveryClient = ApplicationContext.build(discoveryClientMap).run(DiscoveryClient)
 
         PollingConditions conditions = new PollingConditions(timeout: 3)
 
@@ -111,16 +108,19 @@ class ConsulAutoRegistrationSpec extends Specification {
                  'consul.client.port'              : System.getenv('CONSUL_PORT')])
 
         // a client with tags specified
-        DiscoveryClient discoveryClient = ApplicationContext.run(DiscoveryClient, ['consul.client.host': System.getenv('CONSUL_HOST'),
-                                                                                   'consul.client.port': System.getenv('CONSUL_PORT'),
-                                                                                   "micronaut.caches.discoveryClient.enabled": false,
-                                                                                   'consul.client.discovery.tags.myService':'foo' ])
+        Map discoveryClientConfig = ['consul.client.host': System.getenv('CONSUL_HOST'),
+         'consul.client.port': System.getenv('CONSUL_PORT'),
+         "micronaut.caches.discoveryClient.enabled": false,
+         'consul.client.discovery.tags.myService':'foo' ]
+        DiscoveryClient discoveryClient = ApplicationContext.build(discoveryClientConfig).run(DiscoveryClient)
 
 
-        DiscoveryClient anotherClient = ApplicationContext.run(DiscoveryClient, ['consul.client.host': System.getenv('CONSUL_HOST'),
-                                                                                   'consul.client.port': System.getenv('CONSUL_PORT'),
-                                                                                    "micronaut.caches.discoveryClient.enabled": false,
-                                                                                   'consul.client.discovery.tags.myService':['someother'] ])
+        Map anotherClientConfig = ['consul.client.host': System.getenv('CONSUL_HOST'),
+                                   'consul.client.port': System.getenv('CONSUL_PORT'),
+                                   "micronaut.caches.discoveryClient.enabled": false,
+                                   'consul.client.discovery.tags.myService':['someother'] ]
+
+        DiscoveryClient anotherClient = ApplicationContext.build(anotherClientConfig).run(DiscoveryClient)
         PollingConditions conditions = new PollingConditions(timeout: 3)
 
         then: "the server is registered with Consul"
