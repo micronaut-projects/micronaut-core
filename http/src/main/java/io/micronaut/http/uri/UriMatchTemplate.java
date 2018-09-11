@@ -55,7 +55,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         super(templateString, parserArguments);
 
         this.matchPattern = Pattern.compile(pattern.toString());
-        this.variables = variableModifiers.keySet().toArray(new String[0]);
+        this.variables = variableModifiers.keySet().toArray(new String[variableModifiers.keySet().size()]);
         String tmpl = templateString.toString();
         int len = tmpl.length();
         this.isRoot = len == 0 || (len == 1 && tmpl.charAt(0) == '/');
