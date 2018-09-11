@@ -35,4 +35,12 @@ public interface UriMatchInfo {
      * @return The variable values following a successful match
      */
     Map<String, Object> getVariables();
+
+    /**
+     * Checks whether the given variable is exploded (using the * modifier). See https://tools.ietf.org/html/rfc6570#section-3.
+     *
+     * @param variable The name of the variable
+     * @return True if is exploded
+     */
+    boolean isExploded(String variable);
 }

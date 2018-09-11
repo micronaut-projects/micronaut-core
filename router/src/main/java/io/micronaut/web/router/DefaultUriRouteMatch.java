@@ -138,6 +138,11 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
     }
 
     @Override
+    public boolean isExploded(String variable) {
+        return matchInfo.isExploded(variable);
+    }
+
+    @Override
     public UriRoute getRoute() {
         return (UriRoute) abstractRoute;
     }
