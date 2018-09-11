@@ -59,8 +59,5 @@ class ConsulHealthStatusSpec extends Specification {
 
         cleanup:
         application?.stop()
-
-
-
     }
 }

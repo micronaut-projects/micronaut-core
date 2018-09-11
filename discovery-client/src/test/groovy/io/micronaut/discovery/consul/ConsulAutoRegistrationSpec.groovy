@@ -101,7 +101,6 @@ class ConsulAutoRegistrationSpec extends Specification {
         }
     }
 
-
     void 'test that a service can be registered with tags and queried with tags'() {
         when: "A new server is bootstrapped"
         String serviceId = 'myService'
