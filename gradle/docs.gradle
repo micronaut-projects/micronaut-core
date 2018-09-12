@@ -81,6 +81,32 @@ task javadoc(type: Javadoc, description: 'Generate javadocs from all child proje
     }
 }
 
+task replaceAtLink {
+    inputs.files( fileTree( "$project.buildDir/config-props" ) ).skipWhenEmpty()
+
+    doLast {
+        List<File> files = new ArrayList<>(inputs.files.files).sort { File f -> f.name }
+        def atLinkReplacer = { String str ->
+            String newLine = str.substring(0, str.indexOf('{@link io.micronaut.'))
+            String sub = "api:"+str.substring(str.indexOf('{@link io.micronaut.') + '{@link io.micronaut.'.length())
+            newLine += sub.substring(0, sub.indexOf('}')) + '[]'
+            newLine += sub.substring(sub.indexOf('}') + '}'.length())
+            newLine
+        }
+        for ( file in files ) {
+            List<String> lines = file.readLines()
+            List<String> outputLines = []
+            for (String line : lines) {
+                String proccessedLine = line
+                while (proccessedLine.contains('{@link io.micronaut.')) {
+                    proccessedLine = atLinkReplacer(proccessedLine)
+                }
+                outputLines << proccessedLine
+            }
+            file.text = outputLines.join('\n')
+        }
+    }
+}
 
 task mergeConfigProps() {
     inputs.files( fileTree( "$project.buildDir/config-props" ) ).skipWhenEmpty()
@@ -91,9 +117,10 @@ task mergeConfigProps() {
             for ( file in files ) file.withInputStream { out << it << '\n' }
         }
     }
+    mustRunAfter 'replaceAtLink'
 }
 
-task publishGuide(type: grails.doc.gradle.PublishGuide, dependsOn:mergeConfigProps) {
+task publishGuide(type: grails.doc.gradle.PublishGuide) {
     group = DOCUMENTATION_GROUP
     description = 'Generate Guide'
     dependsOn copyLocalDocResources
@@ -135,6 +162,8 @@ task publishGuide(type: grails.doc.gradle.PublishGuide, dependsOn:mergeConfigPro
 '''
     }
 }
+publishGuide.dependsOn mergeConfigProps
+publishGuide.dependsOn replaceAtLink
 
 task docs(dependsOn:[javadoc, publishGuide]) {
     group = DOCUMENTATION_GROUP
