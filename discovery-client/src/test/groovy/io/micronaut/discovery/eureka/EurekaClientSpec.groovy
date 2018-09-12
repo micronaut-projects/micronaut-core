@@ -25,7 +25,11 @@ import io.micronaut.discovery.eureka.client.v2.EurekaClient
 import io.micronaut.discovery.eureka.client.v2.InstanceInfo
 import io.micronaut.http.HttpStatus
 import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.*
+import spock.lang.Specification
+import spock.lang.IgnoreIf
+import spock.lang.Stepwise
+import spock.lang.Shared
+import spock.lang.AutoCleanup
 import spock.util.concurrent.PollingConditions
 
 import javax.validation.ConstraintViolationException
@@ -108,6 +112,5 @@ class EurekaClientSpec extends Specification {
 
         then:
         status == HttpStatus.OK
-
     }
 }
