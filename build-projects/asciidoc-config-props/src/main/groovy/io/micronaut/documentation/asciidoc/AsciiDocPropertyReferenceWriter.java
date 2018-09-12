@@ -70,6 +70,7 @@ public class AsciiDocPropertyReferenceWriter implements ConfigurationMetadataWri
                         if (cm == null || cm == EMPTY) continue;
 
                         if (entry.getValue() != null) {
+                            writeFragmentLink(w, cm.getType());
                             w.newLine();
                             w.append(".Configuration Properties for api:").append(cm.getType()).append("[]");
                             w.newLine();
@@ -120,17 +121,24 @@ public class AsciiDocPropertyReferenceWriter implements ConfigurationMetadataWri
                     }
                 }
             }
-
-
         }
-
-
     }
 
+    private void writeFragmentLink(BufferedWriter w, String type) throws IOException {
+        w.newLine();
+        w.append("++++");
+        w.newLine();
+        w.append("<a id=\"");
+        w.append(type);
+        w.append("\" href=\"#");
+        w.append(type);
+        w.append("\">&#128279;</a>");
+        w.newLine();
+        w.append("++++");
+    }
 
     private <T> Predicate<T> distinctByKey(
             Function<? super T, ?> ke) {
-
         Map<Object, Boolean> seen = new ConcurrentHashMap<>();
         return t -> seen.putIfAbsent(ke.apply(t), Boolean.TRUE) == null;
     }
