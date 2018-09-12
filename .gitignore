@@ -17,3 +17,4 @@ bin/
 */test/
 */META-INF/
 src/main/docs/generated/*.adoc
+src/main/docs/generated/configurationProperties/*.adoc

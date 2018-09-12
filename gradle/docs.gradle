@@ -81,32 +81,6 @@ task javadoc(type: Javadoc, description: 'Generate javadocs from all child proje
     }
 }
 
-task replaceAtLink {
-    inputs.files( fileTree( "$project.buildDir/config-props" ) ).skipWhenEmpty()
-
-    doLast {
-        List<File> files = new ArrayList<>(inputs.files.files).sort { File f -> f.name }
-        def atLinkReplacer = { String str ->
-            String newLine = str.substring(0, str.indexOf('{@link io.micronaut.'))
-            String sub = "api:"+str.substring(str.indexOf('{@link io.micronaut.') + '{@link io.micronaut.'.length())
-            newLine += sub.substring(0, sub.indexOf('}')) + '[]'
-            newLine += sub.substring(sub.indexOf('}') + '}'.length())
-            newLine
-        }
-        for ( file in files ) {
-            List<String> lines = file.readLines()
-            List<String> outputLines = []
-            for (String line : lines) {
-                String proccessedLine = line
-                while (proccessedLine.contains('{@link io.micronaut.')) {
-                    proccessedLine = atLinkReplacer(proccessedLine)
-                }
-                outputLines << proccessedLine
-            }
-            file.text = outputLines.join('\n')
-        }
-    }
-}
 
 task copyConfigurationReference(type: Copy) {
     ext {
@@ -152,7 +126,6 @@ task mergeConfigProps() {
             }
         }
     }
-    mustRunAfter 'replaceAtLink'
 }
 copyConfigurationReference.mustRunAfter mergeConfigProps
 copyConfigurationReference.finalizedBy cleanupGuideFiles
@@ -200,7 +173,6 @@ task publishGuide(type: grails.doc.gradle.PublishGuide) {
     }
 }
 publishGuide.dependsOn mergeConfigProps
-publishGuide.dependsOn replaceAtLink
 publishGuide.dependsOn copyConfigurationReference
 
 task docs(dependsOn:[javadoc, publishGuide]) {

@@ -403,13 +403,73 @@ subprojects { Project subproject ->
     }
 
     task moveConfigProps() {
+        group 'documentation'
         doLast {
             ant.mkdir(dir:"${rootProject.buildDir}/config-props")
             ant.move(file: "${subproject.buildDir}/classes/java/main/META-INF/config-properties.adoc", tofile:"${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc", failonerror:false, quiet:true)
         }
     }
 
-    jar.dependsOn(moveConfigProps)
+    task replaceAtLink(dependsOn: moveConfigProps) {
+        doLast {
+            File file = new File("${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc")
+            if ( file.exists()) {
+                def atLinkReplacer = { String str ->
+                    String newLine = str.substring(0, str.indexOf('{@link io.micronaut.'))
+                    String sub = "api:"+str.substring(str.indexOf('{@link io.micronaut.') + '{@link io.micronaut.'.length())
+                    newLine += sub.substring(0, sub.indexOf('}')) + '[]'
+                    newLine += sub.substring(sub.indexOf('}') + '}'.length())
+                    newLine
+                }
+
+                List<String> lines = file.readLines()
+                List<String> outputLines = []
+                for (String line : lines) {
+                    String proccessedLine = line
+                    while (proccessedLine.contains('{@link io.micronaut.')) {
+                        proccessedLine = atLinkReplacer(proccessedLine)
+                    }
+                    outputLines << proccessedLine
+                }
+                file.text = outputLines.join('\n')
+            }
+        }
+    }
+
+    task processConfigProps(dependsOn: replaceAtLink) {
+        group 'documentation'
+        ext {
+            individualConfigPropsFolder = 'src/main/docs/generated/configurationProperties'
+        }
+        doLast {
+            def f = new File("${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc")
+            if (f.exists()) {
+                def lines = f.readLines()
+                def separator = "<<<"
+                List<String> accumulator = []
+                String configurationPropertyName = ''
+                for (String line : lines) {
+
+                    if (line.startsWith('<a id="')) {
+                        String sub = line.substring(line.indexOf('id="') + 'id="'.length())
+                        sub = sub.substring(0, sub.indexOf('"'))
+                        configurationPropertyName = sub
+                    }
+                    if (line == separator) {
+                        File outputfile = new File("${rootProject.projectDir}/${individualConfigPropsFolder}/${configurationPropertyName}.adoc")
+                        outputfile.createNewFile()
+                        outputfile.text = accumulator.join('\n')
+                        accumulator = []
+                        configurationPropertyName = null
+                    } else {
+                        accumulator << line
+                    }
+                }
+            }
+        }
+    }
+
+    jar.dependsOn(processConfigProps)
 
     groovydoc {
         classpath += project.configurations.documentation
