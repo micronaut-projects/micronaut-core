@@ -62,7 +62,6 @@ class NettyHttpServerConfigurationSpec extends Specification {
         then:
         server != null
 
-
         cleanup:
         beanContext.close()
     }

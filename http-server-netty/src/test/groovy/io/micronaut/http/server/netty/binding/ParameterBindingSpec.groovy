@@ -34,10 +34,8 @@ import javax.annotation.Nullable
  */
 class ParameterBindingSpec extends AbstractMicronautSpec {
 
-
     @Unroll
     void "test bind HTTP parameters for URI #httpMethod #uri"() {
-
         given:
         def req = httpMethod == HttpMethod.GET ? HttpRequest.GET(uri) : HttpRequest.POST(uri, '{}')
         def exchange = rxClient.exchange(req, String)
@@ -51,8 +49,6 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         expect:
         body == result
         status == httpStatus
-
-
 
         where:
         httpMethod      | uri                                             | result                      | httpStatus
@@ -83,7 +79,6 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         HttpMethod.GET  | '/parameter/query?name=Fr%20ed'                 | "Parameter Value: Fr ed"    | HttpStatus.OK
         HttpMethod.GET  | '/parameter/queryName/Fr%20ed'                  | "Parameter Value: Fr ed"    | HttpStatus.OK
         HttpMethod.POST | '/parameter/query?name=Fr%20ed'                 | "Parameter Value: Fr ed"    | HttpStatus.OK
-
     }
 
     @Controller(value = "/parameter", produces = MediaType.TEXT_PLAIN)

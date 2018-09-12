@@ -52,7 +52,6 @@ class JsonStreamSpec extends Specification {
     @Controller("/json/stream")
     static class StreamController {
 
-
         @Get(produces = MediaType.APPLICATION_JSON_STREAM)
         Flowable<Book> stream() {
             return Flowable.just(new Book(title: "The Stand"), new Book(title: "The Shining"))

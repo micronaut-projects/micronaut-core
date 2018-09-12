@@ -36,7 +36,6 @@ public class FirstFilter implements HttpFilter {
         return TestSecurityFilter.POSITION - 100;
     }
 
-
     @Override
     public Publisher<? extends HttpResponse<?>> doFilter(HttpRequest<?> request, FilterChain chain) {
         request.getAttributes().put("first", true);

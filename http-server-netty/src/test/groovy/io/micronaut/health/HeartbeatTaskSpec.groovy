@@ -48,7 +48,6 @@ class HeartbeatTaskSpec extends Specification {
         embeddedServer.stop()
     }
 
-
     @Singleton
     static class HeartbeatListener implements ApplicationEventListener<HeartbeatEvent> {
         private HeartbeatEvent event

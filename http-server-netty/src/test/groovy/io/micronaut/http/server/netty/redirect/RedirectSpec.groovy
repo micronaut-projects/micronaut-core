@@ -37,7 +37,6 @@ class RedirectSpec extends Specification {
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
     @Shared @AutoCleanup RxHttpClient httpClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL(), new DefaultHttpClientConfiguration(followRedirects: false))
 
-
     void 'test permanent redirect'() {
         when:
         HttpResponse response = httpClient.toBlocking().exchange('/redirect/permanent')
