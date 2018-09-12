@@ -184,7 +184,7 @@ class NettyHttpServerSpec extends Specification {
         embeddedServer?.close()
     }
 
-    @Controller
+    @Controller("/person")
     static class PersonController {
 
         @Get('/{name}')
