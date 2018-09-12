@@ -16,6 +16,7 @@
 package io.micronaut.security.authorization
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -33,7 +34,7 @@ class AuthorizationWithoutInterceptUrlMapSpec extends Specification  {
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'authorization',
             'micronaut.security.enabled': true,
-    ], "test")
+    ], Environment.TEST)
 
     @Shared @AutoCleanup RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
