@@ -38,16 +38,52 @@ import java.util.OptionalInt;
 @ConfigurationProperties("netty")
 public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
+    /**
+     * The default max initial line length.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_MAXINITIALLINELENGTH = 4096;
+
+    /**
+     * The default max header size.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_MAXHEADERSIZE = 8192;
+
+    /**
+     * The default max chunk size.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_MAXCHUNKSIZE = 8192;
+
+    /**
+     * The default chunk supported value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_CHUNKSUPPORTED = true;
+
+    /**
+     * The default validate headers value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_VALIDATEHEADERS = true;
+
+    /**
+     * The default initial buffer size value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_INITIALBUFFERSIZE = 128;
+
     private Map<ChannelOption, Object> childOptions = Collections.emptyMap();
     private Map<ChannelOption, Object> options = Collections.emptyMap();
     private Worker worker;
     private Parent parent;
-    private int maxInitialLineLength = 4096;
-    private int maxHeaderSize = 8192;
-    private int maxChunkSize = 8192;
-    private boolean chunkedSupported = true;
-    private boolean validateHeaders = true;
-    private int initialBufferSize = 128;
+    private int maxInitialLineLength = DEFAULT_MAXINITIALLINELENGTH;
+    private int maxHeaderSize = DEFAULT_MAXHEADERSIZE;
+    private int maxChunkSize = DEFAULT_MAXCHUNKSIZE;
+    private boolean chunkedSupported = DEFAULT_CHUNKSUPPORTED;
+    private boolean validateHeaders = DEFAULT_VALIDATEHEADERS;
+    private int initialBufferSize = DEFAULT_INITIALBUFFERSIZE;
     private LogLevel logLevel;
 
     /**
@@ -191,7 +227,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * Sets the maximum initial line length for the HTTP request.
+     * Sets the maximum initial line length for the HTTP request. Default value ({@value #DEFAULT_MAXINITIALLINELENGTH}).
      * @param maxInitialLineLength The max length
      */
     public void setMaxInitialLineLength(@ReadableBytes int maxInitialLineLength) {
@@ -199,7 +235,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * Sets the maximum size of any one header.
+     * Sets the maximum size of any one header. Default value ({@value #DEFAULT_MAXHEADERSIZE}).
      * @param maxHeaderSize The max header size
      */
     public void setMaxHeaderSize(@ReadableBytes int maxHeaderSize) {
@@ -207,7 +243,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * Sets the maximum size of any single request chunk.
+     * Sets the maximum size of any single request chunk. Default value ({@value #DEFAULT_MAXCHUNKSIZE}).
      * @param maxChunkSize The max chunk size
      */
     public void setMaxChunkSize(@ReadableBytes int maxChunkSize) {
@@ -215,7 +251,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * Sets whether chunked transfer encoding is supported.
+     * Sets whether chunked transfer encoding is supported. Default value ({@value #DEFAULT_CHUNKSUPPORTED}).
      * @param chunkedSupported True if it is supported
      */
     public void setChunkedSupported(boolean chunkedSupported) {
@@ -223,7 +259,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * Sets whether to validate incoming headers.
+     * Sets whether to validate incoming headers. Default value ({@value #DEFAULT_VALIDATEHEADERS}).
      * @param validateHeaders True if headers should be validated.
      */
     public void setValidateHeaders(boolean validateHeaders) {
@@ -231,7 +267,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * Sets the initial buffer size.
+     * Sets the initial buffer size. Default value ({@value #DEFAULT_INITIALBUFFERSIZE}).
      * @param initialBufferSize The initial buffer size
      */
     public void setInitialBufferSize(int initialBufferSize) {

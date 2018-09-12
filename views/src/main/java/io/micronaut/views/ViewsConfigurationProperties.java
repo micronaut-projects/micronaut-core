@@ -39,7 +39,13 @@ public class ViewsConfigurationProperties implements ViewsConfiguration {
      */
     public static final String DEFAULT_FOLDER = "views";
 
-    private boolean enabled = true;
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = true;
+
+    private boolean enabled = DEFAULT_ENABLED;
 
     private String folder = DEFAULT_FOLDER;
 
@@ -62,7 +68,7 @@ public class ViewsConfigurationProperties implements ViewsConfiguration {
     }
 
     /**
-     * Whether view rendering is enabled.
+     * Whether view rendering is enabled. Default value ({@value #DEFAULT_ENABLED}).
      *
      * @param enabled True if view rendering is enabled
      */
@@ -82,7 +88,7 @@ public class ViewsConfigurationProperties implements ViewsConfiguration {
     }
 
     /**
-     * The folder to look for views.
+     * The folder to look for views. Default value ({@value #DEFAULT_FOLDER}).
      *
      * @param folder The folder
      */

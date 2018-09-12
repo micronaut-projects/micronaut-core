@@ -59,7 +59,7 @@ public class TokenPropagationConfigurationProperties implements TokenPropagation
     }
 
     /**
-     * a regular expression to match the service. e.g. guides|docs
+     * a regular expression to match the service id.
      * @param servicesRegex serviceId regular expression
      */
     public void setServicesRegex(String servicesRegex) {
