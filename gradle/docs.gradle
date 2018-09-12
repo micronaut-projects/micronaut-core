@@ -108,9 +108,37 @@ task replaceAtLink {
     }
 }
 
+task copyConfigurationReference(type: Copy) {
+    ext {
+        destinationFileName = "configurationreference.html"
+    }
+    group = DOCUMENTATION_GROUP
+    from "${rootProject.projectDir}/src/main/docs/resources/style/page.html"
+    into "${rootProject.buildDir}/docs/guide/"
+    filter(org.apache.tools.ant.filters.ReplaceTokens, tokens: [
+            projectVersion: projectVersion,
+            pagetitle: 'Configuration Reference | Micronaut',
+            docscontent: org.asciidoctor.Asciidoctor.Factory.create().render(new File("${project.projectDir}/src/main/docs/generated/propertyReference.adoc").exists() ? new File("${project.projectDir}/src/main/docs/generated/propertyReference.adoc").text : '', [:] as Map<String, Object>)])
+    rename { String fileName ->
+        fileName.replace("page.html", destinationFileName)
+    }
+}
+
+task cleanupGuideFiles(type: Delete) {
+    group = DOCUMENTATION_GROUP
+    delete fileTree("${rootProject.buildDir}/docs/guide") {
+        include '*.html'
+        exclude 'index.html'
+        exclude copyConfigurationReference.destinationFileName
+    }
+    delete fileTree("${rootProject.buildDir}/docs/guide/pages") {
+        include '*.html'
+    }
+}
+
 task mergeConfigProps() {
     inputs.files( fileTree( "$project.buildDir/config-props" ) ).skipWhenEmpty()
-    outputs.file( "$project.projectDir/src/main/docs/guide/appendix/propertyReference.adoc" )
+    outputs.file( "${project.projectDir}/src/main/docs/generated/propertyReference.adoc" )
     doLast {
         outputs.files.singleFile.withOutputStream { out ->
             List<File> files = new ArrayList<>(inputs.files.files).sort { File f -> f.name }
@@ -126,6 +154,8 @@ task mergeConfigProps() {
     }
     mustRunAfter 'replaceAtLink'
 }
+copyConfigurationReference.mustRunAfter mergeConfigProps
+copyConfigurationReference.finalizedBy cleanupGuideFiles
 
 task publishGuide(type: grails.doc.gradle.PublishGuide) {
     group = DOCUMENTATION_GROUP
@@ -171,6 +201,7 @@ task publishGuide(type: grails.doc.gradle.PublishGuide) {
 }
 publishGuide.dependsOn mergeConfigProps
 publishGuide.dependsOn replaceAtLink
+publishGuide.dependsOn copyConfigurationReference
 
 task docs(dependsOn:[javadoc, publishGuide]) {
     group = DOCUMENTATION_GROUP

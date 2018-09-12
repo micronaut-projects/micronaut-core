@@ -1,0 +1,1 @@
+Folder where the generated @ConfigurationProperties table will be placed. 
