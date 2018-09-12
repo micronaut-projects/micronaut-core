@@ -221,11 +221,11 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
     }
 
     private WebSocketFrame encodeMessage(Object message, MediaType mediaType) {
-        if (ClassUtils.isJavaLangType(message.getClass())) {
+        if (message instanceof byte[]) {
+            return new BinaryWebSocketFrame(Unpooled.wrappedBuffer((byte[]) message));
+        } else if (ClassUtils.isJavaLangType(message.getClass())) {
             String s = message.toString();
             return new TextWebSocketFrame(s);
-        } else if (message instanceof byte[]) {
-            return new BinaryWebSocketFrame(Unpooled.wrappedBuffer((byte[]) message));
         } else if (message instanceof ByteBuf) {
             return new BinaryWebSocketFrame((ByteBuf) message);
         } else if (message instanceof ByteBuffer) {
