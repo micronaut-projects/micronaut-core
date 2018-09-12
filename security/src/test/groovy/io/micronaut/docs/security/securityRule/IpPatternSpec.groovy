@@ -16,6 +16,7 @@
 package io.micronaut.docs.security.securityRule
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.docs.YamlAsciidocTagCleaner
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.RxHttpClient
@@ -55,7 +56,7 @@ micronaut:
 
     @Shared
     @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, config as Map<String, Object>, "test")
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, config as Map<String, Object>, Environment.TEST)
 
     @Shared
     @AutoCleanup

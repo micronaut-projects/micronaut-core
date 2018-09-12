@@ -1,6 +1,7 @@
 package io.micronaut.security.corspreflightrequest
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -19,7 +20,7 @@ class CorsPreflightRequestSpec extends Specification {
             'spec.name': 'corspreflightrequest',
             'micronaut.server.cors.enabled': true,
             'micronaut.security.enabled': true,
-    ], "test")
+    ], Environment.TEST)
 
     @AutoCleanup
     @Shared

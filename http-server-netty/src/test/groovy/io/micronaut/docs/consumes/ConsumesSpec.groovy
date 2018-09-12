@@ -16,6 +16,7 @@
 package io.micronaut.docs.consumes
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.client.RxHttpClient
@@ -31,7 +32,7 @@ class ConsumesSpec extends Specification {
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name':'consumesspec'
-    ], "test")
+    ], Environment.TEST)
 
     @AutoCleanup
     @Shared

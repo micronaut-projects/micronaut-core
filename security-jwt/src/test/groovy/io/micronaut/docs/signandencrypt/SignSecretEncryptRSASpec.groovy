@@ -18,6 +18,7 @@ package io.micronaut.docs.signandencrypt
 import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTParser
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.docs.YamlAsciidocTagCleaner
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
@@ -87,7 +88,7 @@ micronaut:
             'endpoints.beans.enabled': true,
             'endpoints.beans.sensitive': true,
             'pem.path': pemFile.absolutePath,
-    ] << flatten(configMap), "test")
+    ] << flatten(configMap), Environment.TEST)
 
     @Shared
     @AutoCleanup

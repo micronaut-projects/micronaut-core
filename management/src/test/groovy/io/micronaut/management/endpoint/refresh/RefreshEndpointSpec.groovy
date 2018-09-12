@@ -18,6 +18,7 @@ package io.micronaut.management.endpoint.refresh
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.context.annotation.Value
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
@@ -37,7 +38,7 @@ class RefreshEndpointSpec extends Specification {
     void "test refresh endpoint"() {
         given:
         System.setProperty("foo.bar", "test")
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.refresh.sensitive': false], "test")
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.refresh.sensitive': false], Environment.TEST)
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
@@ -77,7 +78,7 @@ class RefreshEndpointSpec extends Specification {
     void "test refresh endpoint with all parameter"() {
         given:
         System.setProperty("foo.bar", "test")
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.refresh.sensitive': false], "test")
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.refresh.sensitive': false], Environment.TEST)
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
