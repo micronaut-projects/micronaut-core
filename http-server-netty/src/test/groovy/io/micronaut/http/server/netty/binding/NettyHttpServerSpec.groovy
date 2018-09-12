@@ -52,6 +52,9 @@ class NettyHttpServerSpec extends Specification {
 
         cleanup:
         applicationContext?.stop()
+        applicationContext?.close()
+        embeddedServer?.stop()
+        embeddedServer?.close()
     }
 
     void "test run Micronaut server on same port as another server"() {
@@ -80,6 +83,7 @@ class NettyHttpServerSpec extends Specification {
 
         cleanup:
         embeddedServer?.stop()
+        embeddedServer?.close()
     }
 
     void "test Micronaut server running again"() {
@@ -95,6 +99,10 @@ class NettyHttpServerSpec extends Specification {
 
         cleanup:
         applicationContext?.stop()
+        applicationContext?.close()
+
+        embeddedServer?.stop()
+        embeddedServer?.close()
     }
 
     void "test Micronaut server on different port"() {
@@ -111,6 +119,10 @@ class NettyHttpServerSpec extends Specification {
 
         cleanup:
         applicationContext?.stop()
+        applicationContext?.close()
+
+        embeddedServer?.stop()
+        embeddedServer?.close()
     }
 
     void "test bind method argument from request parameter"() {
@@ -127,6 +139,10 @@ class NettyHttpServerSpec extends Specification {
 
         cleanup:
         applicationContext?.stop()
+        applicationContext?.close()
+
+        embeddedServer?.stop()
+        embeddedServer?.close()
     }
 
     void "test bind method argument from request parameter when parameter missing"() {
@@ -144,6 +160,10 @@ class NettyHttpServerSpec extends Specification {
 
         cleanup:
         applicationContext?.stop()
+        applicationContext?.close()
+
+        embeddedServer?.stop()
+        embeddedServer?.close()
     }
 
     void "test allowed methods handling"() {
@@ -159,8 +179,14 @@ class NettyHttpServerSpec extends Specification {
         def e = thrown(HttpClientResponseException)
         e.response.code() == HttpStatus.METHOD_NOT_ALLOWED.code
         e.response.header(HttpHeaders.ALLOW) == 'PUT'
-    }
 
+        cleanup:
+        applicationContext?.stop()
+        applicationContext?.close()
+
+        embeddedServer?.stop()
+        embeddedServer?.close()
+    }
 
     @Controller
     static class PersonController {

@@ -139,6 +139,8 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
         cleanup:
         ctx.stop()
+        server.stop()
+        server.close()
     }
 
     void "test default server header"() {
@@ -155,6 +157,8 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
         cleanup:
         ctx.stop()
+        server.stop()
+        server.close()
     }
 
     void "test default date header"() {
@@ -171,6 +175,8 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
         cleanup:
         ctx.stop()
+        server.stop()
+        server.close()
     }
 
     void "test date header turned off"() {
@@ -187,6 +193,8 @@ class HttpResponseSpec extends AbstractMicronautSpec {
 
         cleanup:
         ctx.stop()
+        server.stop()
+        server.close()
     }
 
     @Controller('/test-header')
