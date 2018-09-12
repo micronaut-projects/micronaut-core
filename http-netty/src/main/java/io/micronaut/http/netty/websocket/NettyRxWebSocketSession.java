@@ -50,6 +50,7 @@ import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 
 /**
  * Implementation of the {@link RxWebSocketSession} interface for Netty and RxJava.
@@ -149,7 +150,7 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
                     if (f.isSuccess()) {
                         future.complete(message);
                     } else {
-                        future.completeExceptionally(f.cause());
+                        future.completeExceptionally(new WebSocketSessionException("Send Failure: " + f.cause().getMessage(), f.cause()));
                     }
                 });
                 return future;
@@ -167,9 +168,11 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
             if (message != null) {
                 try {
                     WebSocketFrame frame = encodeMessage(message, mediaType);
-                    channel.writeAndFlush(frame).sync();
+                    channel.writeAndFlush(frame).sync().get();
                 } catch (InterruptedException e) {
                     throw new WebSocketSessionException("Send interrupt: " + e.getMessage(), e);
+                } catch (ExecutionException e) {
+                    throw new WebSocketSessionException("Send Failure: " + e.getMessage(), e);
                 }
             }
         } else {
@@ -195,7 +198,7 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
                         emitter.onNext(message);
                         emitter.onComplete();
                     } else {
-                        emitter.onError(future.cause());
+                        emitter.onError(new WebSocketSessionException("Send Failure: " + future.cause().getMessage(), future.cause()));
                     }
                 });
             }
