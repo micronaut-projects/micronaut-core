@@ -47,17 +47,53 @@ public class HttpServerConfiguration {
 
     public static final String PREFIX = "micronaut.server";
 
-    private int port = -1; // default to random port
+    /**
+     * The default value random port
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_RANDOM_PORT = -1;
+
+    /**
+     * The default max request size
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final long DEFAULT_MAX_REQUEST_SIZE = 1024 * 1024 * 10; // 10MB
+
+    /**
+     * The default read idle time
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final long DEFAULT_READIDLETIME_SECONDS = 60;
+
+    /**
+     * The default write idle time
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final long DEFAULT_WRITEIDLETIME_SECONDS = 60;
+
+    /**
+     * The default date header
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_DATEHEADER = true;
+
+    /**
+     * The default idle time
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final long DEFAULT_IDLETIME_SECONDS = 60;
+
+    private int port = DEFAULT_RANDOM_PORT; // default to random port
     private String host;
     private Integer readTimeout;
-    private long maxRequestSize = 1024 * 1024 * 10; // 10MB
-    private Duration readIdleTime = Duration.of(60, ChronoUnit.SECONDS);
-    private Duration writeIdleTime = Duration.of(60, ChronoUnit.SECONDS);
-    private Duration idleTime = Duration.of(60, ChronoUnit.SECONDS);
+    private long maxRequestSize = DEFAULT_MAX_REQUEST_SIZE;
+    private Duration readIdleTime = Duration.of(DEFAULT_READIDLETIME_SECONDS, ChronoUnit.SECONDS);
+    private Duration writeIdleTime = Duration.of(DEFAULT_WRITEIDLETIME_SECONDS, ChronoUnit.SECONDS);
+    private Duration idleTime = Duration.of(DEFAULT_IDLETIME_SECONDS, ChronoUnit.SECONDS);
     private MultipartConfiguration multipart = new MultipartConfiguration();
     private CorsConfiguration cors = new CorsConfiguration();
     private String serverHeader;
-    private boolean dateHeader = true;
+    private boolean dateHeader = DEFAULT_DATEHEADER;
 
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
@@ -180,7 +216,7 @@ public class HttpServerConfiguration {
     }
 
     /**
-     * Sets the port to bind to.
+     * Sets the port to bind to. Default value ({@value #DEFAULT_RANDOM_PORT})
      * @param port The port
      */
     public void setPort(int port) {
@@ -212,7 +248,7 @@ public class HttpServerConfiguration {
     }
 
     /**
-     * Sets the maximum request size.
+     * Sets the maximum request size. Default value ({@value #DEFAULT_MAX_REQUEST_SIZE} => // 10MB)
      * @param maxRequestSize The max request size
      */
     public void setMaxRequestSize(@ReadableBytes long maxRequestSize) {
@@ -220,7 +256,7 @@ public class HttpServerConfiguration {
     }
 
     /**
-     * Sets the amount of time a connection can remain idle without any reads occurring.
+     * Sets the amount of time a connection can remain idle without any reads occurring. Default value ({@value #DEFAULT_READIDLETIME_SECONDS} seconds).
      * @param readIdleTime The read idle time
      */
     public void setReadIdleTime(Duration readIdleTime) {
@@ -228,7 +264,7 @@ public class HttpServerConfiguration {
     }
 
     /**
-     * Sets the amount of time a connection can remain idle without any writes occurring.
+     * Sets the amount of time a connection can remain idle without any writes occurring. Default value ({@value #DEFAULT_WRITEIDLETIME_SECONDS} seconds).
      * @param writeIdleTime The write idle time
      */
     public void setWriteIdleTime(Duration writeIdleTime) {
@@ -236,7 +272,7 @@ public class HttpServerConfiguration {
     }
 
     /**
-     * Sets the idle time of connections for the server.
+     * Sets the idle time of connections for the server. Default value ({@value #DEFAULT_IDLETIME_SECONDS} seconds).
      * @param idleTime The idle time
      */
     public void setIdleTime(Duration idleTime) {
@@ -260,7 +296,7 @@ public class HttpServerConfiguration {
     }
 
     /**
-     * Sets whether a date header should be sent back.
+     * Sets whether a date header should be sent back. Default value ({@value #DEFAULT_DATEHEADER}).
      * @param dateHeader True if a date header should be sent.
      */
     public void setDateHeader(boolean dateHeader) {
@@ -272,10 +308,30 @@ public class HttpServerConfiguration {
      */
     @ConfigurationProperties("multipart")
     public static class MultipartConfiguration implements Toggleable {
+
+        /**
+         * The default enable value.
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final boolean DEFAULT_ENABLED = false;
+
+        /**
+         * The default max file size
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final long DEFAULT_MAX_FILE_SIZE = 1024 * 1024; // 1MB
+
+        /**
+         * The default disk value.
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final boolean DEFAULT_DISK = false;
+
+
         private File location;
-        private long maxFileSize = 1024 * 1024; // 1MB
-        private boolean enabled = true;
-        private boolean disk = false;
+        private long maxFileSize = DEFAULT_MAX_FILE_SIZE;
+        private boolean enabled = DEFAULT_ENABLED;
+        private boolean disk = DEFAULT_DISK;
 
         /**
          * @return The location to store temporary files
@@ -315,7 +371,7 @@ public class HttpServerConfiguration {
         }
 
         /**
-         * Sets the max file size.
+         * Sets the max file size. Default value ({@value #DEFAULT_MAX_FILE_SIZE} => 1MB).
          * @param maxFileSize The max file size
          */
         public void setMaxFileSize(@ReadableBytes long maxFileSize) {
@@ -323,7 +379,7 @@ public class HttpServerConfiguration {
         }
 
         /**
-         * Sets whether multipart processing is enabled.
+         * Sets whether multipart processing is enabled. Default value ({@value #DEFAULT_ENABLED}).
          * @param enabled True if it is enabled
          */
         public void setEnabled(boolean enabled) {
@@ -331,7 +387,7 @@ public class HttpServerConfiguration {
         }
 
         /**
-         * Sets whether to buffer data to disk or not.
+         * Sets whether to buffer data to disk or not. Default value ({@value #DEFAULT_DISK}).
          * @param disk True if data should be written to disk
          */
         public void setDisk(boolean disk) {
@@ -345,7 +401,9 @@ public class HttpServerConfiguration {
     @ConfigurationProperties("cors")
     public static class CorsConfiguration implements Toggleable {
 
-        private boolean enabled = false;
+        public static final boolean DEFAULT_ENABLED = false;
+
+        private boolean enabled = DEFAULT_ENABLED;
 
         private Map<String, CorsOriginConfiguration> configurations = Collections.emptyMap();
 
@@ -373,7 +431,7 @@ public class HttpServerConfiguration {
         }
 
         /**
-         * Sets whether CORS is enabled.
+         * Sets whether CORS is enabled. Default value ({@value #DEFAULT_ENABLED})
          * @param enabled True if CORS is enabled
          */
         public void setEnabled(boolean enabled) {

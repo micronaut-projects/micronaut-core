@@ -33,12 +33,20 @@ public class CodecConfiguration {
 
     public static final String PREFIX = "micronaut.codec";
 
-    protected List<MediaType> additionalTypes = Collections.emptyList();
+    private List<MediaType> additionalTypes = Collections.emptyList();
 
     /**
      * @return Media types in addition to the default that the codec should process
      */
     public List<MediaType> getAdditionalTypes() {
         return additionalTypes;
+    }
+
+    /**
+     * Default value (Empty list).
+     * @param additionalTypes additional types
+     */
+    public void setAdditionalTypes(List<MediaType> additionalTypes) {
+        this.additionalTypes = additionalTypes;
     }
 }

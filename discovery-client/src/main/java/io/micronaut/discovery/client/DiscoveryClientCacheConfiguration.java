@@ -48,7 +48,13 @@ public class DiscoveryClientCacheConfiguration extends CacheConfiguration implem
      */
     public static final String SETTING_ENABLED = CacheConfiguration.PREFIX + ".discovery-client.enabled";
 
-    private boolean enabled = true;
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = true;
+
+    private boolean enabled = DEFAULT_ENABLED;
 
     /**
      * @param applicationConfiguration The application configuration
@@ -62,6 +68,7 @@ public class DiscoveryClientCacheConfiguration extends CacheConfiguration implem
     }
 
     /**
+     * Default value ({@value #DEFAULT_ENABLED}).
      * @return Whether the discovery client is enabled
      */
     @Override

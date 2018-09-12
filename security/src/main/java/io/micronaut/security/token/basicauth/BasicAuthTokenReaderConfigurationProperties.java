@@ -78,7 +78,7 @@ public class BasicAuthTokenReaderConfigurationProperties implements BasicAuthTok
     }
 
     /**
-     * Http Header value prefix. Default value {@value HttpHeaderValues#AUTHORIZATION_PREFIX_BASIC}.
+     * Http Header value prefix. Default value {@value io.micronaut.http.HttpHeaderValues#AUTHORIZATION_PREFIX_BASIC}.
      * @param prefix The prefix to use
      */
     public void setPrefix(String prefix) {

@@ -44,7 +44,17 @@ import java.util.Optional;
  */
 @ConfigurationProperties(Neo4jBoltSettings.PREFIX)
 public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
-    private static final int RETRY_COUNT_INIT = 3;
+    /**
+     * The default retry count value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_RETRYCOUNT = 3;
+
+    /**
+     * The default retry delay value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_RETRYDELAY_SECONDS = 1;
 
     @ConfigurationBuilder(prefixes = "with", allowZeroArgs = true)
     protected Config.ConfigBuilder config = Config.build();
@@ -53,8 +63,8 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
     private AuthToken authToken;
     private String username;
     private String password;
-    private int retryCount = RETRY_COUNT_INIT;
-    private Duration retryDelay = Duration.of(1, ChronoUnit.SECONDS);
+    private int retryCount = DEFAULT_RETRYCOUNT;
+    private Duration retryDelay = Duration.of(DEFAULT_RETRYDELAY_SECONDS, ChronoUnit.SECONDS);
     private Neo4jEmbeddedSettings embeddedSettings = new Neo4jEmbeddedSettings();
 
     /**
@@ -143,6 +153,7 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
     }
 
     /**
+     * Default value ({@value #DEFAULT_RETRYCOUNT}).
      * @param retryCount The retry count
      */
     public void setRetryCount(int retryCount) {
@@ -157,6 +168,7 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
     }
 
     /**
+     * Default value ({@value #DEFAULT_RETRYDELAY_SECONDS}).
      * @param retryDelay The delay between retry attempts
      */
     public void setRetryDelay(Duration retryDelay) {
@@ -244,12 +256,29 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
      */
     @ConfigurationProperties("embedded")
     public static class Neo4jEmbeddedSettings implements Toggleable {
+        /**
+         * The default enable value.
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final boolean DEFAULT_ENABLED = true;
+
+        /**
+         * The default ephemeral value.
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final boolean DEFAULT_EPHEMERAL = false;
+
+        /**
+         * The default drop data value.
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final boolean DEFAULT_DROPDATA = false;
 
         private Map<String, Object> options = Collections.emptyMap();
         private String directory;
-        private boolean dropData = false;
-        private boolean ephemeral = false;
-        private boolean enabled = true;
+        private boolean dropData = DEFAULT_DROPDATA;
+        private boolean ephemeral = DEFAULT_EPHEMERAL;
+        private boolean enabled = DEFAULT_ENABLED;
 
         /**
          * @return Whether the embedded sever is enabled
@@ -260,6 +289,7 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
         }
 
         /**
+         * Default value ({@value #DEFAULT_ENABLED}).
          * @param enabled enable the server
          */
         public void setEnabled(boolean enabled) {
@@ -304,6 +334,7 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
         }
 
         /**
+         * Default value ({@value #DEFAULT_DROPDATA}).
          * @param dropData drop the existing data
          */
         public void setDropData(boolean dropData) {
@@ -318,6 +349,7 @@ public class Neo4jBoltConfiguration implements Neo4jBoltSettings {
         }
 
         /**
+         * Default value ({@value #DEFAULT_EPHEMERAL}).
          * @param ephemeral define the embedded ser as ephemeral
          */
         public void setEphemeral(boolean ephemeral) {

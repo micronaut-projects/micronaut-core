@@ -29,12 +29,36 @@ import io.micronaut.security.config.SecurityConfigurationProperties;
 public class SecuritySessionConfigurationProperties implements SecuritySessionConfiguration {
     public static final String PREFIX = SecurityConfigurationProperties.PREFIX + ".session";
 
-    private String loginSuccessTargetUrl = "/";
-    private String loginFailureTargetUrl = "/";
-    private String logoutTargetUrl = "/";
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = false;
+
+    /**
+     * The default login success target URL.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_LOGINSUCCESSTARGETURL = "/";
+
+    /**
+     * The default login failure target URL.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_LOGINFAILURETARGETURL = "/";
+
+    /**
+     * The default login target URL.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_LOGOUTTARGETURL = "/";
+
+    private String loginSuccessTargetUrl = DEFAULT_LOGINSUCCESSTARGETURL;
+    private String loginFailureTargetUrl = DEFAULT_LOGINFAILURETARGETURL;
+    private String logoutTargetUrl = DEFAULT_LOGOUTTARGETURL;
     private String unauthorizedTargetUrl;
     private String forbiddenTargetUrl;
-    private boolean enabled = false;
+    private boolean enabled = DEFAULT_ENABLED;
 
     @Override
     public boolean isEnabled() {
@@ -67,7 +91,7 @@ public class SecuritySessionConfigurationProperties implements SecuritySessionCo
     }
 
     /**
-     * Sets the login success target URL.
+     * Sets the login success target URL. Default value ({@value #DEFAULT_LOGINSUCCESSTARGETURL}).
      *
      * @param loginSuccessTargetUrl The URL
      */
@@ -78,7 +102,7 @@ public class SecuritySessionConfigurationProperties implements SecuritySessionCo
     }
 
     /**
-     * Sets the login failure target URL.
+     * Sets the login failure target URL. Default value ({@value #DEFAULT_LOGINFAILURETARGETURL}).
      *
      * @param loginFailureTargetUrl The URL
      */
@@ -89,7 +113,7 @@ public class SecuritySessionConfigurationProperties implements SecuritySessionCo
     }
 
     /**
-     * Sets the logout target URL.
+     * Sets the logout target URL. Default value ({@value #DEFAULT_LOGOUTTARGETURL}).
      *
      * @param logoutTargetUrl The URL
      */
@@ -122,7 +146,7 @@ public class SecuritySessionConfigurationProperties implements SecuritySessionCo
     }
 
     /**
-     * Sets whether the session config is enabled.
+     * Sets whether the session config is enabled. Default value ({@value #DEFAULT_ENABLED}).
      *
      * @param enabled True if it is enabled
      */

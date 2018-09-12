@@ -35,16 +35,29 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     /**
      * Cookie name.
      */
-    public static final String DEFAULT_COOKIE_NAME = "SESSION";
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_COOKIENAME = "SESSION";
 
-    private boolean rememberMe = false;
-    private boolean base64Encode = true;
+    /**
+     * The default remember me value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_REMEMBERME = false;
+
+    /**
+     * The default base64 encode value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_BASE64ENCODE = true;
+
+    private boolean rememberMe = DEFAULT_REMEMBERME;
+    private boolean base64Encode = DEFAULT_BASE64ENCODE;
     private TemporalAmount cookieMaxAge;
     private String cookiePath;
     private String domainName;
-    private String cookieName = DEFAULT_COOKIE_NAME;
+    private String cookieName = DEFAULT_COOKIENAME;
     private String prefix;
-    private String[] headerNames = new String[]{HttpHeaders.AUTHORIZATION_INFO, HttpHeaders.X_AUTH_TOKEN};
+    private String[] headerNames = new String[] { HttpHeaders.AUTHORIZATION_INFO, HttpHeaders.X_AUTH_TOKEN };
 
     /**
      * @return Whether the Base64 encode sessions IDs sent back to clients
@@ -54,6 +67,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     }
 
     /**
+     * Default value ({@value #DEFAULT_BASE64ENCODE}).
      * @param base64Encode Enable the Base64 encode for sessions IDs sent back to clients
      */
     protected void setBase64Encode(boolean base64Encode) {
@@ -68,7 +82,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     }
 
     /**
-     *
+     * Default value ({@value #DEFAULT_COOKIENAME}).
      * @param cookieName Set the cookie name to use
      */
     protected void setCookieName(String cookieName) {
@@ -97,6 +111,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     }
 
     /**
+     * Default values ([{@value io.micronaut.http.HttpHeaders#AUTHORIZATION_INFO}, {@value io.micronaut.http.HttpHeaders#X_AUTH_TOKEN}]).
      * @param headerNames Set the header names when using a Header strategy
      */
     protected void setHeaderNames(String[] headerNames) {
@@ -153,6 +168,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     }
 
     /**
+     * Default value ({@value #DEFAULT_REMEMBERME}).
      * @param rememberMe Enable the remember me setting
      */
     protected void setRememberMe(boolean rememberMe) {

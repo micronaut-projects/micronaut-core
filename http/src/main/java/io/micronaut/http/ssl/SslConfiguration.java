@@ -33,16 +33,40 @@ public class SslConfiguration implements Toggleable {
      */
     public static final String PREFIX = "micronaut.ssl";
 
-    private boolean enabled = false;
-    private int port = 8443;
-    private boolean buildSelfSigned = false;
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = false;
+
+    /**
+     * The default port value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_PORT = 8443;
+
+    /**
+     * The default build self signed value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_BUILDSELFSIGNED = false;
+
+    /**
+     * The default protocol.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_PROTOCOL = "TLS";
+
+    private boolean enabled = DEFAULT_ENABLED;
+    private int port = DEFAULT_PORT;
+    private boolean buildSelfSigned = DEFAULT_BUILDSELFSIGNED;
     private KeyConfiguration key = new KeyConfiguration();
     private KeyStoreConfiguration keyStore = new KeyStoreConfiguration();
     private TrustStoreConfiguration trustStore = new TrustStoreConfiguration();
     private ClientAuthentication clientAuthentication;
     private String[] ciphers;
     private String[] protocols;
-    private String protocol = "TLS";
+    private String protocol = DEFAULT_PROTOCOL;
 
     /**
      * @return Whether SSL is enabled.
@@ -53,7 +77,7 @@ public class SslConfiguration implements Toggleable {
     }
 
     /**
-     * Whether SSL is enabled.
+     * Whether SSL is enabled. Default value ({@value io.micronaut.http.ssl.SslConfiguration#DEFAULT_ENABLED}).
      *
      * @param enabled True if SSL is enabled
      */
@@ -125,7 +149,7 @@ public class SslConfiguration implements Toggleable {
     }
 
     /**
-     * Sets the SSL port.
+     * Sets the SSL port. Default value ({@value io.micronaut.http.ssl.SslConfiguration#DEFAULT_PORT}).
      *
      * @param port The port
      */
@@ -134,7 +158,7 @@ public class SslConfiguration implements Toggleable {
     }
 
     /**
-     * Sets whether to build a self signed certificate.
+     * Sets whether to build a self signed certificate. Default value ({@value io.micronaut.http.ssl.SslConfiguration#DEFAULT_BUILDSELFSIGNED}).
      *
      * @param buildSelfSigned True if a certificate should be built
      */
@@ -200,7 +224,7 @@ public class SslConfiguration implements Toggleable {
     }
 
     /**
-     * Sets the protocol to use.
+     * Sets the protocol to use. Default value ({@value io.micronaut.http.ssl.SslConfiguration#DEFAULT_PROTOCOL}).
      *
      * @param protocol The protocol
      */
