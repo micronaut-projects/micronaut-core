@@ -65,7 +65,6 @@ class HeaderBindingSpec extends AbstractMicronautSpec {
         '/header/multiple'        | "Header: [application/json]" | ['Content-Type': 'application/json']
         '/header/simple'          | "Header: application/json"   | ['Content-Type': 'application/json']
         '/header/with-value'      | "Header: application/json"   | ['Content-Type': 'application/json']
-
     }
 
     @Controller("/header")

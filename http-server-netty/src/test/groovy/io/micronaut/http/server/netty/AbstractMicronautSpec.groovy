@@ -30,7 +30,6 @@ abstract class AbstractMicronautSpec extends Specification {
 
     static final SPEC_NAME_PROPERTY = 'spec.name'
 
-
     @Shared File uploadDir = File.createTempDir()
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
             getConfiguration() << [(SPEC_NAME_PROPERTY):getClass().simpleName]
@@ -46,7 +45,6 @@ abstract class AbstractMicronautSpec extends Specification {
     Map<String, Object> getConfiguration() {
         ['micronaut.server.multipart.location':uploadDir.absolutePath]
     }
-
 
     void cleanupSpec()  {
         uploadDir.delete()

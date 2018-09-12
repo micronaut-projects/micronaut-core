@@ -49,12 +49,9 @@ class DefaultJsonErrorHandlingSpec extends AbstractMicronautSpec {
         def body = e.response.getBody(String).orElse(null)
         def result = new JsonSlurper().parseText(body)
 
-
-
         then:
         result['_links'].self.href == '/errors/string'
         result.message.startsWith('Invalid JSON')
-
     }
 
     @Controller("/errors")

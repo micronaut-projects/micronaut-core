@@ -39,7 +39,6 @@ class CookieBindingSpec extends AbstractMicronautSpec {
         }
         rxClient.retrieve(request).blockingFirst() == result
 
-
         where:
         uri                | result              | headers
         '/cookie/all'      | "Cookie Value: bar" | ['Cookie': 'myVar=bar']
@@ -47,7 +46,6 @@ class CookieBindingSpec extends AbstractMicronautSpec {
         '/cookie/optional' | "Cookie Value: 10"  | ['Cookie': 'myVar=10']
         '/cookie/optional' | "Cookie Value: -1"  | ['Cookie': 'myVar=foo']
         '/cookie/optional' | "Cookie Value: -1"  | [:]
-
     }
 
     void "test set HTTP cookies for client"() {

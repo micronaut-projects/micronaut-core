@@ -39,7 +39,6 @@ import spock.lang.Stepwise
 @Stepwise
 class NettyHttpServerSpec extends Specification {
 
-
     void "test Micronaut server running"() {
         when:
         ApplicationContext applicationContext = Micronaut.run()
@@ -155,7 +154,6 @@ class NettyHttpServerSpec extends Specification {
         RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         client.exchange(HttpRequest.POST('/person/job/test', '{}'), String).blockingFirst()
-
 
         then:
         def e = thrown(HttpClientResponseException)

@@ -51,7 +51,6 @@ class NettyHttpResponseSpec extends Specification {
         HttpStatus.OK | HttpHeaders.CONTENT_TYPE | "application/json"
     }
 
-
     void "test add simple cookie"() {
         given:
         DefaultFullHttpResponse nettyResponse = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
