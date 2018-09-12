@@ -127,4 +127,12 @@ public class CloseReason {
     public String getReason() {
         return reason;
     }
+
+    @Override
+    public String toString() {
+        return "CloseReason{" +
+                "code=" + code +
+                ", reason='" + reason + '\'' +
+                '}';
+    }
 }
