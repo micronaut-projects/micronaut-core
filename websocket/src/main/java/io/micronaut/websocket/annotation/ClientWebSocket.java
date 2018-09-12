@@ -58,4 +58,9 @@ public @interface ClientWebSocket {
      */
     @AliasFor(member = "value")
     String uri() default DEFAULT_URI;
+
+    /**
+     * @return The WebSocket version to use to connect
+     */
+    String version() default "13";
 }

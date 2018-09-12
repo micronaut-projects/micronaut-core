@@ -65,7 +65,7 @@ import java.util.Optional;
 public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandler {
     private final WebSocketClientHandshaker handshaker;
     private final WebSocketBean<T> webSocketBean;
-    private final MutableHttpRequest<Object> originatingRequest;
+    private final MutableHttpRequest<?> originatingRequest;
     private final FlowableEmitter<T> emitter;
     private final UriMatchInfo matchInfo;
     private final MediaTypeCodecRegistry codecRegistry;
@@ -85,7 +85,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
      * @param emitter The socket emitter
      */
     public NettyWebSocketClientHandler(
-            MutableHttpRequest<Object> request,
+            MutableHttpRequest<?> request,
             WebSocketBean<T> webSocketBean,
             final WebSocketClientHandshaker handshaker,
             RequestBinderRegistry requestBinderRegistry,
@@ -191,6 +191,9 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                         getSession().close(CloseReason.INTERNAL_ERROR);
                     }
                 }
+            } else {
+                emitter.onNext(targetBean);
+                emitter.onComplete();
             }
             return;
         }

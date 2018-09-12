@@ -18,7 +18,9 @@ package io.micronaut.http.netty.websocket;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
+import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.http.HttpRequest;
@@ -40,8 +42,10 @@ import io.netty.util.AttributeKey;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 
+import javax.annotation.Nullable;
 import java.net.URI;
 import java.nio.ByteBuffer;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
@@ -54,7 +58,7 @@ import java.util.concurrent.CompletableFuture;
  * @since 1.0
  */
 @Internal
-public class NettyRxWebSocketSession extends MutableConvertibleValuesMap<Object> implements RxWebSocketSession {
+public class NettyRxWebSocketSession implements RxWebSocketSession {
     /**
      * The WebSocket session is stored within a Channel attribute using the given key.
      */
@@ -66,6 +70,7 @@ public class NettyRxWebSocketSession extends MutableConvertibleValuesMap<Object>
     private final String protocolVersion;
     private final boolean isSecure;
     private final MediaTypeCodecRegistry codecRegistry;
+    private final MutableConvertibleValues<Object> attributes;
 
     /**
      * Creates a new netty web socket session.
@@ -90,11 +95,17 @@ public class NettyRxWebSocketSession extends MutableConvertibleValuesMap<Object>
         this.isSecure = isSecure;
         this.channel.attr(WEB_SOCKET_SESSION_KEY).set(this);
         this.codecRegistry = codecRegistry;
+        this.attributes = request.getAttribute("micronaut.SESSION", MutableConvertibleValues.class).orElseGet(() -> new MutableConvertibleValuesMap());
     }
 
     @Override
     public String getId() {
         return id;
+    }
+
+    @Override
+    public MutableConvertibleValues<Object> getAttributes() {
+        return attributes;
     }
 
     @Override
@@ -227,5 +238,35 @@ public class NettyRxWebSocketSession extends MutableConvertibleValuesMap<Object>
             }
         }
         throw new WebSocketSessionException("Unable to encode WebSocket message: " + message);
+    }
+
+    @Override
+    public MutableConvertibleValues<Object> put(CharSequence key, @Nullable Object value) {
+        return attributes.put(key, value);
+    }
+
+    @Override
+    public MutableConvertibleValues<Object> remove(CharSequence key) {
+        return attributes.remove(key);
+    }
+
+    @Override
+    public MutableConvertibleValues<Object> clear() {
+        return attributes.clear();
+    }
+
+    @Override
+    public Set<String> names() {
+        return attributes.names();
+    }
+
+    @Override
+    public Collection<Object> values() {
+        return attributes.values();
+    }
+
+    @Override
+    public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
+        return attributes.get(name, conversionContext);
     }
 }

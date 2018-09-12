@@ -16,6 +16,7 @@
 
 package io.micronaut.http.server.netty.websocket;
 
+import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.*;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
@@ -78,6 +79,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     private final WebSocketBeanRegistry webSocketBeanRegistry;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final ChannelGroup webSocketSessions;
+    private final ApplicationEventPublisher eventPublisher;
     private WebSocketServerHandshaker handshaker;
 
     /**
@@ -85,15 +87,23 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
      * @param webSocketSessions The websocket sessions for the server
      * @param router The router
      * @param binderRegistry the request binder registry
-     * @param webSocketBeanRegistry The web socket bean registyr
+     * @param webSocketBeanRegistry The web socket bean register
      * @param mediaTypeCodecRegistry The codec registry
+     * @param eventPublisher The event publisher
      */
-    public NettyServerWebSocketUpgradeHandler(ChannelGroup webSocketSessions, Router router, RequestBinderRegistry binderRegistry, WebSocketBeanRegistry webSocketBeanRegistry, MediaTypeCodecRegistry mediaTypeCodecRegistry) {
+    public NettyServerWebSocketUpgradeHandler(
+            ChannelGroup webSocketSessions,
+            Router router,
+            RequestBinderRegistry binderRegistry,
+            WebSocketBeanRegistry webSocketBeanRegistry,
+            MediaTypeCodecRegistry mediaTypeCodecRegistry,
+            ApplicationEventPublisher eventPublisher) {
         this.router = router;
         this.binderRegistry = binderRegistry;
         this.webSocketBeanRegistry = webSocketBeanRegistry;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.webSocketSessions = webSocketSessions;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -155,7 +165,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
                             //Adding new handler to the existing pipeline to handle WebSocket Messages
                             WebSocketBean<?> webSocketBean = webSocketBeanRegistry.getWebSocket(rm.getTarget().getClass());
 
-                            handleHandshake(ctx, msg, actualResponse);
+                            handleHandshake(ctx, msg, webSocketBean, actualResponse);
 
                             ChannelPipeline pipeline = ctx.pipeline();
 
@@ -169,6 +179,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
                                         webSocketBean,
                                         binderRegistry,
                                         mediaTypeCodecRegistry,
+                                        eventPublisher,
                                         ctx
                                 );
                                 pipeline.addAfter("wsdecoder", NettyWebSocketServerHandler.ID, webSocketHandler);
@@ -199,14 +210,17 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
      * Do the handshaking for WebSocket request.
      * @param ctx The channel handler context
      * @param req The request
+     * @param webSocketBean The web socket bean
      * @param response The response
      **/
-    protected ChannelFuture handleHandshake(ChannelHandlerContext ctx, NettyHttpRequest req, MutableHttpResponse<?> response) {
+    protected ChannelFuture handleHandshake(ChannelHandlerContext ctx, NettyHttpRequest req, WebSocketBean<?> webSocketBean, MutableHttpResponse<?> response) {
+        int maxFramePayloadLength = webSocketBean.messageMethod().getValue(OnMessage.class, "maxPayloadLength", Integer.class).orElse(65536);
         WebSocketServerHandshakerFactory wsFactory =
                 new WebSocketServerHandshakerFactory(
                         getWebSocketURL(ctx, req),
                         null,
-                        true
+                        true,
+                        maxFramePayloadLength
                 );
         handshaker = wsFactory.newHandshaker(req.getNativeRequest());
         MutableHttpHeaders headers = response.getHeaders();

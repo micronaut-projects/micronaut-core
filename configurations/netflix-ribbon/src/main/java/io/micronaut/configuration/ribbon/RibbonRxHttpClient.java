@@ -21,11 +21,7 @@ import com.netflix.loadbalancer.reactive.ExecutionListener;
 import com.netflix.loadbalancer.reactive.LoadBalancerCommand;
 import hu.akarnokd.rxjava.interop.RxJavaInterop;
 import io.micronaut.context.BeanContext;
-import io.micronaut.context.annotation.Parameter;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Prototype;
-import io.micronaut.context.annotation.Replaces;
-import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -39,15 +35,12 @@ import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.ssl.NettyClientSslBuilder;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.HttpClientFilter;
-import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.reactivex.Flowable;
 import rx.Observable;
 
 import javax.annotation.Nullable;
 import javax.inject.Inject;
-import javax.inject.Named;
 import java.net.URI;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -82,9 +75,9 @@ public class RibbonRxHttpClient extends DefaultHttpClient {
      */
     @Inject
     public RibbonRxHttpClient(
-            LoadBalancer loadBalancer,
-            HttpClientConfiguration configuration,
-            @Nullable String contextPath,
+            @Parameter LoadBalancer loadBalancer,
+            @Parameter HttpClientConfiguration configuration,
+            @Parameter @Nullable String contextPath,
             @Nullable ThreadFactory threadFactory,
             NettyClientSslBuilder nettyClientSslBuilder,
             MediaTypeCodecRegistry codecRegistry,
