@@ -71,6 +71,7 @@ class NettyHttpServerSpec extends Specification {
         response.body() == "Person Named Fred"
 
         when: "Run another server with same port"
+        sleep(1_000) // wait for port to be not available
         ApplicationContext.run(EmbeddedServer, propertySource, Environment.TEST)
 
         then:"An error is thrown"
