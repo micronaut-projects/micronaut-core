@@ -38,6 +38,7 @@ import javax.validation.ConstraintViolationException
 @Stepwise
 class EurekaClientSpec extends Specification {
 
+    @Shared
     Map<String, Object> embeddedSeverConfiguration = [
             (EurekaConfiguration.HOST): System.getenv('EUREKA_HOST'),
             (EurekaConfiguration.PORT): System.getenv('EUREKA_PORT'),

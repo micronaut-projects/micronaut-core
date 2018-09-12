@@ -106,6 +106,7 @@ class ConsulClientSpec extends Specification {
         Flowable.fromPublisher(client.deregister('xxxxxxxx')).blockingFirst()
 
         when:
+        int oldSize = Flowable.fromPublisher(client.getServices()).blockingFirst().size()
         def entry = new NewServiceEntry("test-service")
                             .address(embeddedServer.getHost())
                             .port(embeddedServer.getPort())
@@ -113,17 +114,18 @@ class ConsulClientSpec extends Specification {
         Map<String, ServiceEntry> entries = Flowable.fromPublisher(client.getServices()).blockingFirst()
 
         then:
-        entries.size() == 1
+        entries.size() == oldSize + 1
         entries.containsKey('test-service')
 
         when:
+        oldSize = entries.size()
         HttpStatus result = Flowable.fromPublisher(client.deregister('test-service')).blockingFirst()
         entries = Flowable.fromPublisher(client.getServices()).blockingFirst()
 
         then:
         result == HttpStatus.OK
         !entries.containsKey('test-service')
-        entries.size() == 0
+        entries.size() == oldSize - 1
     }
 
     void "test register service with health check"() {
