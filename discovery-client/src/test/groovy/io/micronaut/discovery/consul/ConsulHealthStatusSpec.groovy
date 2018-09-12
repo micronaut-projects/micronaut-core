@@ -21,6 +21,7 @@ import io.micronaut.discovery.consul.client.v1.ConsulClient
 import io.micronaut.health.HealthStatus
 import io.micronaut.http.HttpStatus
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.Ignore
 import spock.lang.IgnoreIf
 import spock.lang.Specification
 
@@ -31,6 +32,7 @@ import spock.lang.Specification
 @IgnoreIf({ !env['CONSUL_HOST'] && !env['CONSUL_PORT'] })
 class ConsulHealthStatusSpec extends Specification {
 
+    @Ignore("https://github.com/micronaut-projects/micronaut-core/issues/567")
     void "test the consul service's health status is correct"() {
         given:
 
