@@ -17,6 +17,7 @@
 package io.micronaut.http.server.netty.resources
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.context.exceptions.DependencyInjectionException
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
@@ -200,7 +201,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.router.static.resources.paths': ['classpath:'],
                 'micronaut.router.static.resources.enabled': true,
-                'micronaut.router.static.resources.mapping': '/static/**'], 'test')
+                'micronaut.router.static.resources.mapping': '/static/**'], Environment.TEST)
 
         then:
         thrown(DependencyInjectionException)
