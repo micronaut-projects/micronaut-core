@@ -327,8 +327,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                                     }
                                     exceptionCaught(ctx, error);
                                 },
-                                () -> { }
+                                () -> messageHandled(ctx, session, v)
                         );
+                    } else {
+                        messageHandled(ctx, session, v);
                     }
                 } catch (Throwable e) {
                     if (LOG.isErrorEnabled()) {
@@ -351,8 +353,20 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             CloseWebSocketFrame cwsf = (CloseWebSocketFrame) msg;
             handleCloseFrame(ctx, cwsf);
         } else {
-            ctx.fireChannelRead(msg);
+            ctx.channel().writeAndFlush(new CloseWebSocketFrame(CloseReason.UNSUPPORTED_DATA.getCode(), CloseReason.UNSUPPORTED_DATA.getReason())).addListener(ChannelFutureListener.CLOSE);
+
         }
+    }
+
+    /**
+     * Method called once a message has been handled by the handler.
+     *
+     * @param ctx The channel handler context
+     * @param session The session
+     * @param message The message that was handled
+     */
+    protected void messageHandled(ChannelHandlerContext ctx, NettyRxWebSocketSession session, Object message) {
+        // no-op
     }
 
     private void handleCloseFrame(ChannelHandlerContext ctx, CloseWebSocketFrame cwsf) {

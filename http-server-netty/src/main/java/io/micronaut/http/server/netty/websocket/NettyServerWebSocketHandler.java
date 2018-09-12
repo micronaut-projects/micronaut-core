@@ -33,6 +33,7 @@ import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.RxWebSocketSession;
 import io.micronaut.websocket.context.WebSocketBean;
+import io.micronaut.websocket.event.WebSocketMessageProcessedEvent;
 import io.micronaut.websocket.event.WebSocketSessionClosedEvent;
 import io.micronaut.websocket.event.WebSocketSessionOpenEvent;
 import io.netty.channel.Channel;
@@ -63,7 +64,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Internal
-public class NettyWebSocketServerHandler extends AbstractNettyWebSocketHandler {
+public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
     /**
      * The id of the handler used when adding it to the Netty pipeline.
@@ -86,7 +87,7 @@ public class NettyWebSocketServerHandler extends AbstractNettyWebSocketHandler {
      * @param eventPublisher The event publisher
      * @param ctx            The channel handler context
      */
-    NettyWebSocketServerHandler(
+    NettyServerWebSocketHandler(
             ChannelGroup webSocketSessions,
             WebSocketServerHandshaker handshaker,
             HttpRequest<?> request,
@@ -211,6 +212,19 @@ public class NettyWebSocketServerHandler extends AbstractNettyWebSocketHandler {
     @Override
     protected Object invokeExecutable(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
         return ServerRequestContext.with(originatingRequest, (Supplier<Object>) () -> boundExecutable.invoke(messageHandler.getTarget()));
+    }
+
+    @Override
+    protected void messageHandled(ChannelHandlerContext ctx, NettyRxWebSocketSession session, Object message) {
+        ctx.executor().execute(() -> {
+            try {
+                eventPublisher.publishEvent(new WebSocketMessageProcessedEvent<>(session, message));
+            } catch (Exception e) {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Error publishing WebSocket message processed event: " + e.getMessage(), e);
+                }
+            }
+        });
     }
 
     @Override
