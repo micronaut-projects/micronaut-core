@@ -16,7 +16,9 @@
 
 package io.micronaut.websocket;
 
+import io.micronaut.http.MutableHttpRequest;
 import io.reactivex.Flowable;
+
 import java.net.URI;
 import java.util.Map;
 
@@ -29,11 +31,16 @@ import java.util.Map;
  */
 public interface RxWebSocketClient extends WebSocketClient {
 
+    @Override
+    <T extends AutoCloseable> Flowable<T> connect(Class<T> clientEndpointType, MutableHttpRequest<?> request);
+
     /**
      * {@inheritDoc}
      */
     @Override
-    <T extends AutoCloseable> Flowable<T> connect(Class<T> clientEndpointType, URI uri);
+    default <T extends AutoCloseable> Flowable<T> connect(Class<T> clientEndpointType, URI uri) {
+        return (Flowable<T>) WebSocketClient.super.connect(clientEndpointType, uri);
+    }
 
     /**
      * {@inheritDoc}

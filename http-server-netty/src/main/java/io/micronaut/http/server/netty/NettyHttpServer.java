@@ -257,7 +257,8 @@ public class NettyHttpServer implements EmbeddedServer {
                                 router,
                                 requestArgumentSatisfier.getBinderRegistry(),
                                 webSocketBeanRegistry,
-                                mediaTypeCodecRegistry
+                                mediaTypeCodecRegistry,
+                                applicationContext
                         ));
                         pipeline.addLast(MICRONAUT_HANDLER, new RoutingInBoundHandler(
                             beanLocator,

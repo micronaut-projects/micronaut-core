@@ -276,29 +276,34 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
 
     @Override
     public CompletableFuture<RedisSession> save(RedisSession session) {
-        Map<byte[], byte[]> changes = session.delta(charset);
-        if (changes.isEmpty()) {
+        if (writeMode == RedisHttpSessionConfiguration.WriteMode.BACKGROUND) {
+            // changes already written in the background
             return CompletableFuture.completedFuture(session);
         } else {
-            Set<String> removedKeys = session.removedKeys;
-            byte[][] removedKeyBytes = removedKeys.stream().map(str -> (RedisSession.ATTR_PREFIX + str).getBytes(charset)).toArray(byte[][]::new);
-            if (!removedKeys.isEmpty()) {
-                CompletableFuture<RedisSession> completableFuture = new CompletableFuture<>();
-                byte[] sessionKey = getSessionKey(session.getId());
-                sessionCommands.deleteAttributes(sessionKey, removedKeyBytes)
-                        .whenComplete((aVoid, throwable) -> {
-                            if (throwable == null) {
-                                saveSessionDelta(session, changes, completableFuture);
-                            } else {
-                                completableFuture.completeExceptionally(throwable);
-                            }
-                        });
-                return completableFuture;
+            Map<byte[], byte[]> changes = session.delta(charset);
+            if (changes.isEmpty()) {
+                return CompletableFuture.completedFuture(session);
             } else {
+                Set<String> removedKeys = session.removedKeys;
+                byte[][] removedKeyBytes = removedKeys.stream().map(str -> (RedisSession.ATTR_PREFIX + str).getBytes(charset)).toArray(byte[][]::new);
+                if (!removedKeys.isEmpty()) {
+                    CompletableFuture<RedisSession> completableFuture = new CompletableFuture<>();
+                    byte[] sessionKey = getSessionKey(session.getId());
+                    sessionCommands.deleteAttributes(sessionKey, removedKeyBytes)
+                            .whenComplete((aVoid, throwable) -> {
+                                if (throwable == null) {
+                                    saveSessionDelta(session, changes, completableFuture);
+                                } else {
+                                    completableFuture.completeExceptionally(throwable);
+                                }
+                            });
+                    return completableFuture;
+                } else {
 
-                CompletableFuture<RedisSession> future = new CompletableFuture<>();
-                saveSessionDelta(session, changes, future);
-                return future;
+                    CompletableFuture<RedisSession> future = new CompletableFuture<>();
+                    saveSessionDelta(session, changes, future);
+                    return future;
+                }
             }
         }
     }
@@ -533,6 +538,11 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
                     attributeMap.put(attrName, data.get(name));
                 }
             }
+        }
+
+        @Override
+        public boolean isModified() {
+            return !modifications.isEmpty();
         }
 
         @Override

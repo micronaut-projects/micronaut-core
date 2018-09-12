@@ -44,6 +44,11 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
     String getId();
 
     /**
+     * @return Only the attributes of the session
+     */
+    MutableConvertibleValues<Object> getAttributes();
+
+    /**
      * Whether the session is open.
      * @return True if it is
      */
@@ -78,7 +83,7 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
     String getProtocolVersion();
 
     /**
-     * Broadcast the given message to the remote peer.
+     * Send the given message to the remote peer.
      *
      * @param message The message
      * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
@@ -88,7 +93,7 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
     <T> Publisher<T> send(T message, MediaType mediaType);
 
     /**
-     * Broadcast the given message to the remote peer asynchronously.
+     * Send the given message to the remote peer asynchronously.
      *
      * @param message The message
      *  @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
@@ -98,7 +103,7 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
     <T> CompletableFuture<T> sendAsync(T message, MediaType mediaType);
 
     /**
-     * Broadcast the given message to the remote peer synchronously.
+     * Send the given message to the remote peer synchronously.
      *
      * @param message The message
      * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
@@ -106,7 +111,7 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
     void sendSync(Object message, MediaType mediaType);
 
     /**
-     * Broadcast the given message to the remote peer.
+     * Send the given message to the remote peer.
      *
      * @param message The message
      * @param <T> The message type
@@ -117,7 +122,7 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
     }
 
     /**
-     * Broadcast the given message to the remote peer asynchronously.
+     * Send the given message to the remote peer asynchronously.
      *
      * @param message The message
      * @param <T> The message type
@@ -128,7 +133,7 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
     }
 
     /**
-     * Broadcast the given message to the remote peer synchronously.
+     * Send the given message to the remote peer synchronously.
      *
      * @param message The message
      */

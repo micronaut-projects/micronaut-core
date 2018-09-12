@@ -37,6 +37,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.*;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.bind.RequestBinderRegistry;
@@ -51,6 +52,7 @@ import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.multipart.MultipartException;
+import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.content.HttpContentUtil;
 import io.micronaut.http.netty.stream.HttpStreamsClientHandler;
@@ -65,6 +67,7 @@ import io.micronaut.jackson.parser.JacksonProcessor;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.websocket.RxWebSocketClient;
 import io.micronaut.websocket.annotation.ClientWebSocket;
+import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
@@ -666,12 +669,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     @Override
-    public <T extends AutoCloseable> Flowable<T> connect(Class<T> clientEndpointType, URI uri) {
-        MutableHttpRequest<Object> request = io.micronaut.http.HttpRequest.GET(uri);
+    public <T extends AutoCloseable> Flowable<T> connect(Class<T> clientEndpointType, io.micronaut.http.MutableHttpRequest<?> request) {
         Publisher<URI> uriPublisher = resolveRequestURI(request);
         return Flowable.fromPublisher(uriPublisher)
                 .switchMap((resolvedURI) -> connectWebSocket(resolvedURI, request, clientEndpointType, null));
-
     }
 
     @Override
@@ -705,7 +706,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         }
     }
 
-    private <T> Flowable<T> connectWebSocket(URI uri, MutableHttpRequest<Object> request, Class<T> clientEndpointType, WebSocketBean<T> webSocketBean) {
+    private <T> Flowable<T> connectWebSocket(URI uri, MutableHttpRequest<?> request, Class<T> clientEndpointType, WebSocketBean<T> webSocketBean) {
         Bootstrap bootstrap = this.bootstrap.clone();
         if (webSocketBean == null) {
             webSocketBean = webSocketRegistry.getWebSocket(clientEndpointType);
@@ -713,11 +714,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
         WebSocketBean<T> finalWebSocketBean = webSocketBean;
         return Flowable.create(emitter -> {
-
-            // TODO: allow version / frame size customization
             SslContext sslContext = buildSslContext(uri);
-            WebSocketVersion protocolVersion = WebSocketVersion.V13;
-            int maxFramePayloadLength = 1280000;
+            WebSocketVersion protocolVersion = finalWebSocketBean.getBeanDefinition().getValue(ClientWebSocket.class, "version", WebSocketVersion.class).orElse(WebSocketVersion.V13);
+            int maxFramePayloadLength = finalWebSocketBean.messageMethod().getValue(OnMessage.class, "maxPayloadLength", Integer.class).orElse(65536);
 
             bootstrap.remoteAddress(uri.getHost(), uri.getPort());
             bootstrap.handler(new HttpClientInitializer(
@@ -734,11 +733,17 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     try {
                         URI webSocketURL = URI.create("ws://" + uri.getHost() + ":" + uri.getPort() + uri.getPath());
 
+                        MutableHttpHeaders headers = request.getHeaders();
+                        HttpHeaders customHeaders = EmptyHttpHeaders.INSTANCE;
+                        if (headers instanceof NettyHttpHeaders) {
+                            customHeaders = ((NettyHttpHeaders) headers).getNettyHeaders();
+                        }
+
                         webSocketHandler = new NettyWebSocketClientHandler<>(
                                 request,
                                 finalWebSocketBean,
                                 WebSocketClientHandshakerFactory.newHandshaker(
-                                        webSocketURL, protocolVersion, null, false, EmptyHttpHeaders.INSTANCE, maxFramePayloadLength),
+                                        webSocketURL, protocolVersion, null, false, customHeaders, maxFramePayloadLength),
                                 requestBinderRegistry,
                                 mediaTypeCodecRegistry,
                                 emitter);

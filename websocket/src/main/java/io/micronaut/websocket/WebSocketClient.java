@@ -16,6 +16,8 @@
 
 package io.micronaut.websocket;
 
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.websocket.annotation.ClientWebSocket;
 import org.reactivestreams.Publisher;
 import java.net.URI;
@@ -34,13 +36,13 @@ public interface WebSocketClient extends AutoCloseable {
      * Connect the given client endpoint type to the URI over WebSocket.
      *
      * @param clientEndpointType The endpoint type. Should be a class annotated with {@link ClientWebSocket}
-     * @param uri The URI to connect over
+     * @param request The original request to establish the connection
      * @param <T> The generic type
      * @return A {@link Publisher} that emits the {@link ClientWebSocket} instance
      */
     <T extends AutoCloseable> Publisher<T> connect(
             Class<T> clientEndpointType,
-            URI uri
+            MutableHttpRequest<?> request
     );
 
     /**
@@ -74,4 +76,19 @@ public interface WebSocketClient extends AutoCloseable {
     ) {
         return connect(clientEndpointType, URI.create(uri));
     }
+
+    /**
+     * Connect the given client endpoint type to the URI over WebSocket.
+     *
+     * @param clientEndpointType The endpoint type. Should be a class annotated with {@link ClientWebSocket}
+     * @param uri The URI to connect over
+     * @param <T> The generic type
+     * @return A {@link Publisher} that emits the {@link ClientWebSocket} instance
+     */
+    default <T extends AutoCloseable> Publisher<T> connect(
+            Class<T> clientEndpointType,
+            URI uri
+    ) {
+        return connect(clientEndpointType, HttpRequest.GET(uri));
+    };
 }

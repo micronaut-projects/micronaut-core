@@ -16,6 +16,7 @@
 
 package io.micronaut.http.server.netty.websocket;
 
+import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.BoundExecutable;
@@ -32,6 +33,8 @@ import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.RxWebSocketSession;
 import io.micronaut.websocket.context.WebSocketBean;
+import io.micronaut.websocket.event.WebSocketSessionClosedEvent;
+import io.micronaut.websocket.event.WebSocketSessionOpenEvent;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.group.ChannelGroup;
@@ -68,6 +71,7 @@ public class NettyWebSocketServerHandler extends AbstractNettyWebSocketHandler {
     public static final String ID = "websocket-handler";
 
     private final WebSocketServerHandshaker handshaker;
+    private final ApplicationEventPublisher eventPublisher;
 
 
     /**
@@ -79,6 +83,7 @@ public class NettyWebSocketServerHandler extends AbstractNettyWebSocketHandler {
      * @param webSocketBean  The web socket bean
      * @param binderRegistry The binder registry
      * @param mediaTypeCodecRegistry The codec registry
+     * @param eventPublisher The event publisher
      * @param ctx            The channel handler context
      */
     NettyWebSocketServerHandler(
@@ -89,6 +94,7 @@ public class NettyWebSocketServerHandler extends AbstractNettyWebSocketHandler {
             WebSocketBean<?> webSocketBean,
             RequestBinderRegistry binderRegistry,
             MediaTypeCodecRegistry mediaTypeCodecRegistry,
+            ApplicationEventPublisher eventPublisher,
             ChannelHandlerContext ctx) {
         super(
                 ctx,
@@ -103,8 +109,16 @@ public class NettyWebSocketServerHandler extends AbstractNettyWebSocketHandler {
 
         request.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
         request.setAttribute(HttpAttributes.ROUTE, routeMatch.getRoute());
-
+        this.eventPublisher = eventPublisher;
         this.handshaker = handshaker;
+
+        try {
+            eventPublisher.publishEvent(new WebSocketSessionOpenEvent(session));
+        } catch (Exception e) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Error publishing WebSocket opened event: " + e.getMessage(), e);
+            }
+        }
     }
 
     @Override
@@ -162,6 +176,7 @@ public class NettyWebSocketServerHandler extends AbstractNettyWebSocketHandler {
         };
 
         webSocketSessions.add(channel);
+
         return session;
     }
 
@@ -203,6 +218,13 @@ public class NettyWebSocketServerHandler extends AbstractNettyWebSocketHandler {
         Channel channel = ctx.channel();
         channel.attr(NettyRxWebSocketSession.WEB_SOCKET_SESSION_KEY).set(null);
         webSocketSessions.remove(channel);
+        try {
+            eventPublisher.publishEvent(new WebSocketSessionClosedEvent(session));
+        } catch (Exception e) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Error publishing WebSocket closed event: " + e.getMessage(), e);
+            }
+        }
         super.handlerRemoved(ctx);
     }
 

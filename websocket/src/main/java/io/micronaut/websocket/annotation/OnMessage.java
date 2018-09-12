@@ -37,4 +37,10 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.METHOD})
 @Executable
 public @interface OnMessage {
+
+    /**
+     * The maximum size of a WebSocket payload.
+     * @return The max size
+     */
+    int maxPayloadLength() default 65536;
 }
