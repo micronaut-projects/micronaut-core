@@ -40,7 +40,7 @@ class ConsumesSpec extends Specification {
 
     def "@Consumes allow you to control which media type is accepted"() {
         given:
-        def book = new Book(title: "The Stand", pages: 1000)
+        Book book = new Book(title: "The Stand", pages: 1000)
 
         when:
         HttpRequest request = HttpRequest.POST("/test", book)
