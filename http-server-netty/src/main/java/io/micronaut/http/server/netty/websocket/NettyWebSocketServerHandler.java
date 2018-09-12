@@ -135,8 +135,8 @@ public class NettyWebSocketServerHandler extends AbstractNettyWebSocketHandler {
 
             @Override
             public Set<? extends RxWebSocketSession> getOpenSessions() {
-                return webSocketSessions.stream().flatMap((Function<Channel, Stream<RxWebSocketSession>>) channel1 -> {
-                    NettyRxWebSocketSession s = channel1.attr(NettyRxWebSocketSession.WEB_SOCKET_SESSION_KEY).get();
+                return webSocketSessions.stream().flatMap((Function<Channel, Stream<RxWebSocketSession>>) ch -> {
+                    NettyRxWebSocketSession s = ch.attr(NettyRxWebSocketSession.WEB_SOCKET_SESSION_KEY).get();
                     if (s != null && s.isOpen()) {
                         return Stream.of(s);
                     }
@@ -200,7 +200,9 @@ public class NettyWebSocketServerHandler extends AbstractNettyWebSocketHandler {
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        webSocketSessions.remove(ctx.channel());
+        Channel channel = ctx.channel();
+        channel.attr(NettyRxWebSocketSession.WEB_SOCKET_SESSION_KEY).set(null);
+        webSocketSessions.remove(channel);
         super.handlerRemoved(ctx);
     }
 

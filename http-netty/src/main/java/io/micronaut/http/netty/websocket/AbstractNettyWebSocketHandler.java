@@ -38,6 +38,8 @@ import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.bind.WebSocketState;
 import io.micronaut.websocket.bind.WebSocketStateBinderRegistry;
 import io.micronaut.websocket.context.WebSocketBean;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.group.ChannelGroup;
@@ -207,14 +209,31 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         Collections.singletonList(cause)
                 );
 
-                invokeAndClose(
-                        ctx,
-                        CloseReason.INTERNAL_ERROR,
-                        webSocketBean.getTarget(),
-                        boundExecutable,
-                        errorMethod,
-                        false
-                );
+                Object target = errorMethod.getTarget();
+                Object result;
+                try {
+                    result = boundExecutable.invoke(target);
+                } catch (Exception e) {
+
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("Error invoking to @OnError handler " + target.getClass().getSimpleName() + "." + errorMethod.getExecutableMethod() + ": " + e.getMessage(), e);
+                    }
+                    handleUnexpected(ctx, e);
+                    return;
+                }
+                if (Publishers.isConvertibleToPublisher(result)) {
+                    Flowable<?> flowable = instrumentPublisher(ctx, result);
+                    flowable.toList().subscribe((BiConsumer<List<?>, Throwable>) (objects, throwable) -> {
+                        if (throwable != null) {
+
+                            if (LOG.isErrorEnabled()) {
+                                LOG.error("Error subscribing to @OnError handler " + target.getClass().getSimpleName() + "." + errorMethod.getExecutableMethod() + ": " + throwable.getMessage(), throwable);
+                            }
+                        }
+                        handleUnexpected(ctx, throwable);
+                    });
+                }
+
             } catch (UnsatisfiedArgumentException e) {
                 handleUnexpected(ctx, cause);
             }
@@ -283,7 +302,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     if (LOG.isErrorEnabled()) {
                         LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + e.getMessage(), e);
                     }
-                    handleCloseFrame(ctx, new CloseWebSocketFrame(CloseReason.UNSUPPORTED_DATA.getCode(), CloseReason.UNSUPPORTED_DATA.getReason() + ": " + e.getMessage()));
+                    exceptionCaught(ctx, e);
                     return;
                 }
             }
@@ -306,9 +325,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                                     if (LOG.isErrorEnabled()) {
                                         LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + error.getMessage(), error);
                                     }
-                                    if (currentSession.isOpen()) {
-                                        currentSession.close(CloseReason.INTERNAL_ERROR);
-                                    }
+                                    exceptionCaught(ctx, error);
                                 },
                                 () -> { }
                         );
@@ -317,13 +334,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     if (LOG.isErrorEnabled()) {
                         LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + e.getMessage(), e);
                     }
-                    if (currentSession.isOpen()) {
-                        currentSession.close(CloseReason.INTERNAL_ERROR);
-                    }
+                    exceptionCaught(ctx, e);
                 }
 
             } else {
-                handleCloseFrame(ctx, new CloseWebSocketFrame(CloseReason.UNSUPPORTED_DATA.getCode(), CloseReason.UNSUPPORTED_DATA.getReason() + ": " + "Cannot convert data [] to target type: "));
+                ctx.channel().writeAndFlush(new CloseWebSocketFrame(CloseReason.UNSUPPORTED_DATA.getCode(), CloseReason.UNSUPPORTED_DATA.getReason() + ": " + "Cannot convert data [] to target type: "))
+                             .addListener(ChannelFutureListener.CLOSE);
             }
         } else if (msg instanceof PingWebSocketFrame) {
             // respond with pong
@@ -344,6 +360,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             Optional<? extends MethodExecutionHandle<?, ?>> opt = webSocketBean.closeMethod();
             if (getSession().isOpen()) {
                 CloseReason cr = new CloseReason(cwsf.statusCode(), cwsf.reasonText());
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Closing WebSocket session {} with reason {}", session, cr);
+                }
                 if (opt.isPresent()) {
                     MethodExecutionHandle<?, ?> methodExecutionHandle = opt.get();
                     Object target = methodExecutionHandle.getTarget();
@@ -356,23 +375,31 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                                 Collections.singletonList(cr)
                         );
 
-                        invokeAndClose(ctx, cr, target, boundExecutable, methodExecutionHandle, true);
+                        invokeAndClose(ctx, target, boundExecutable, methodExecutionHandle, true);
                     } catch (Throwable e) {
                         if (LOG.isErrorEnabled()) {
                             LOG.error("Error invoking @OnClose handler for WebSocket bean [" + target + "]: " + e.getMessage(), e);
                         }
                     }
                 } else {
-                    getSession().close(cr);
+                    ctx.close();
                 }
             }
         }
     }
 
-    private void invokeAndClose(ChannelHandlerContext ctx, CloseReason defaultCloseReason, Object target, BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> methodExecutionHandle, boolean isClose) {
-        Object result = invokeExecutable(boundExecutable, methodExecutionHandle);
+    private void invokeAndClose(ChannelHandlerContext ctx, Object target, BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> methodExecutionHandle, boolean isClose) {
+        Object result;
+        try {
+            result = invokeExecutable(boundExecutable, methodExecutionHandle);
+        } catch (Exception e) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Error invoking @OnClose handler " + target.getClass().getSimpleName() + "." + methodExecutionHandle.getExecutableMethod() + ": " + e.getMessage(), e);
+            }
+            ctx.close();
+            return;
+        }
 
-        NettyRxWebSocketSession currentSession = getSession();
         if (Publishers.isConvertibleToPublisher(result)) {
             Flowable<?> flowable = instrumentPublisher(ctx, result);
             flowable.toList().subscribe((BiConsumer<List<?>, Throwable>) (objects, throwable) -> {
@@ -382,15 +409,11 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         LOG.error("Error subscribing to @" + (isClose ? "OnClose" : "OnError") + " handler for WebSocket bean [" + target + "]: " + throwable.getMessage(), throwable);
                     }
                 }
-                currentSession.close(defaultCloseReason);
+                ctx.close();
             });
 
         } else {
-            if (result instanceof CloseReason) {
-                currentSession.close((CloseReason) result);
-            } else {
-                currentSession.close(defaultCloseReason);
-            }
+            ctx.close();
         }
     }
 
@@ -429,6 +452,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         if (LOG.isErrorEnabled()) {
             LOG.error("Unexpected Exception in WebSocket [" + webSocketBean + "]: " + cause.getMessage(), cause);
         }
-        handleCloseFrame(ctx, new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()));
+        Channel channel = ctx.channel();
+        if (channel.isOpen()) {
+            channel.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()))
+                    .addListener(ChannelFutureListener.CLOSE);
+        }
     }
 }
