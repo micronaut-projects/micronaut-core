@@ -162,6 +162,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
 
         cleanup:
         embeddedServer.stop()
+        embeddedServer.close()
     }
 
     void "test resources with configured mapping automatically resolves index.html in path"() {
@@ -191,17 +192,22 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
 
         cleanup:
         embeddedServer.stop()
+        embeddedServer.close()
     }
 
     void "test its not possible to configure a path with 'classpath:'"() {
         when:
-        ApplicationContext.run(EmbeddedServer, [
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.router.static.resources.paths': ['classpath:'],
                 'micronaut.router.static.resources.enabled': true,
                 'micronaut.router.static.resources.mapping': '/static/**'], 'test')
 
         then:
         thrown(DependencyInjectionException)
+
+        cleanup:
+        embeddedServer?.stop()
+        embeddedServer?.close()
     }
 
 }
