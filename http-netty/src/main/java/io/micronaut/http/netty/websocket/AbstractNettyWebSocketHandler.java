@@ -354,7 +354,6 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             handleCloseFrame(ctx, cwsf);
         } else {
             ctx.channel().writeAndFlush(new CloseWebSocketFrame(CloseReason.UNSUPPORTED_DATA.getCode(), CloseReason.UNSUPPORTED_DATA.getReason())).addListener(ChannelFutureListener.CLOSE);
-
         }
     }
 
@@ -371,11 +370,12 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
     private void handleCloseFrame(ChannelHandlerContext ctx, CloseWebSocketFrame cwsf) {
         if (closed.compareAndSet(false, true)) {
+            ctx.pipeline().remove(this);
             Optional<? extends MethodExecutionHandle<?, ?>> opt = webSocketBean.closeMethod();
             if (getSession().isOpen()) {
                 CloseReason cr = new CloseReason(cwsf.statusCode(), cwsf.reasonText());
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("Closing WebSocket session {} with reason {}", session, cr);
+                    LOG.debug("Closing WebSocket session {} with reason {}", getSession(), cr);
                 }
                 if (opt.isPresent()) {
                     MethodExecutionHandle<?, ?> methodExecutionHandle = opt.get();
