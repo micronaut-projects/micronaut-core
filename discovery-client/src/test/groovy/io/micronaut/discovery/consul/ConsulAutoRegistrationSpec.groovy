@@ -21,6 +21,7 @@ import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.consul.client.v1.ConsulClient
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.Ignore
 import spock.lang.IgnoreIf
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -32,7 +33,7 @@ import spock.util.concurrent.PollingConditions
 @IgnoreIf({ !env['CONSUL_HOST'] && !env['CONSUL_PORT'] })
 class ConsulAutoRegistrationSpec extends Specification {
 
-
+    @Ignore("https://github.com/micronaut-projects/micronaut-core/issues/566")
     void 'test that the service is automatically registered with Consul with a TTL configuration'() {
         when: "A new server is bootstrapped"
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
@@ -65,6 +66,7 @@ class ConsulAutoRegistrationSpec extends Specification {
         }
     }
 
+    @Ignore("https://github.com/micronaut-projects/micronaut-core/issues/566")
     void 'test that the service is automatically registered with Consul with a HTTP configuration'() {
         when: "A new server is bootstrapped"
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
@@ -98,6 +100,7 @@ class ConsulAutoRegistrationSpec extends Specification {
         }
     }
 
+    @Ignore("https://github.com/micronaut-projects/micronaut-core/issues/566")
     void 'test that a service can be registered with tags and queried with tags'() {
         when: "A new server is bootstrapped"
         String serviceId = 'myService'
