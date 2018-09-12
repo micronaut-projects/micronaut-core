@@ -171,7 +171,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
 
                             try {
                                 // re-configure the pipeline
-                                NettyWebSocketServerHandler webSocketHandler = new NettyWebSocketServerHandler(
+                                NettyServerWebSocketHandler webSocketHandler = new NettyServerWebSocketHandler(
                                         webSocketSessions,
                                         handshaker,
                                         msg,
@@ -182,7 +182,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
                                         eventPublisher,
                                         ctx
                                 );
-                                pipeline.addAfter("wsdecoder", NettyWebSocketServerHandler.ID, webSocketHandler);
+                                pipeline.addAfter("wsdecoder", NettyServerWebSocketHandler.ID, webSocketHandler);
                                 pipeline.remove(NettyHttpServer.HTTP_STREAMS_CODEC);
                                 pipeline.remove(NettyServerWebSocketUpgradeHandler.this);
                             } catch (Throwable e) {
