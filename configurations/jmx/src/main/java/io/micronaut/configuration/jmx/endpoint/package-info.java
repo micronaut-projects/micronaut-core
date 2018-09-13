@@ -14,18 +14,13 @@
  * limitations under the License.
  */
 
+/**
+ * Configures MBeans for endpoints.
+ */
+@Requires(classes = Endpoint.class)
+@Experimental
 package io.micronaut.configuration.jmx.endpoint;
 
-import io.micronaut.configuration.jmx.context.DefaultNameGenerator;
-
-import javax.inject.Named;
-import javax.inject.Singleton;
-
-/**
- * Generates object names for endpoint bean definitions
- */
-@Singleton
-@Named("endpoint")
-public class EndpointNameGenerator extends DefaultNameGenerator {
-
-}
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.management.endpoint.annotation.Endpoint;

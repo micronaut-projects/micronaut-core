@@ -14,18 +14,10 @@
  * limitations under the License.
  */
 
-package io.micronaut.configuration.jmx.endpoint;
-
-import io.micronaut.configuration.jmx.context.DefaultNameGenerator;
-
-import javax.inject.Named;
-import javax.inject.Singleton;
-
 /**
- * Generates object names for endpoint bean definitions
+ * Classes that relate to MBeans and the bean context.
  */
-@Singleton
-@Named("endpoint")
-public class EndpointNameGenerator extends DefaultNameGenerator {
+@Experimental
+package io.micronaut.configuration.jmx.context;
 
-}
+import io.micronaut.core.annotation.Experimental;

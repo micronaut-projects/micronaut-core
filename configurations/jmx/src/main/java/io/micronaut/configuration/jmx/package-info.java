@@ -17,7 +17,4 @@
 /**
  * A configuration that creates beans for JMX
  */
-@Requires(property = JmxConfiguration.PREFIX)
 package io.micronaut.configuration.jmx;
-
-import io.micronaut.context.annotation.Requires;
