@@ -35,9 +35,9 @@ class PojoWebSocketSpec extends Specification {
         then:
         conditions.eventually {
             bob.replies.contains(new Message(text:"[fred] Hello bob!"))
-            bob.replies.size() == 2
             fred.replies.contains(new Message(text:"[bob] Joined!"))
-            fred.replies.size() == 1
+            !fred.replies.contains(new Message(text:"[fred] Hello bob!"))
+            !bob.replies.contains(new Message(text:"[bob] Joined!"))
         }
 
         when:
@@ -45,11 +45,9 @@ class PojoWebSocketSpec extends Specification {
 
         then:
         conditions.eventually {
-
             fred.replies.contains(new Message(text:"[bob] Hi fred. How are things?"))
-            fred.replies.size() == 2
+            !bob.replies.contains(new Message(text:"[bob] Hi fred. How are things?"))
             bob.replies.contains(new Message(text:"[fred] Hello bob!"))
-            bob.replies.size() == 2
         }
         fred.sendAsync(new Message(text:  "foo")).get().text == 'foo'
         fred.sendRx(new Message(text:  "bar")).blockingGet().text == 'bar'
