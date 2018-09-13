@@ -37,7 +37,7 @@ public class HeartbeatConfiguration implements Toggleable {
     public static final boolean DEFAULT_ENABLED = true;
 
     /**
-     * The default interval seconds
+     * The default interval seconds.
      */
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_INTERVAL_SECONDS = 15;

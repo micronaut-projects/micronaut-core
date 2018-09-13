@@ -48,37 +48,37 @@ public class HttpServerConfiguration {
     public static final String PREFIX = "micronaut.server";
 
     /**
-     * The default value random port
+     * The default value random port.
      */
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_RANDOM_PORT = -1;
 
     /**
-     * The default max request size
+     * The default max request size.
      */
     @SuppressWarnings("WeakerAccess")
     public static final long DEFAULT_MAX_REQUEST_SIZE = 1024 * 1024 * 10; // 10MB
 
     /**
-     * The default read idle time
+     * The default read idle time.
      */
     @SuppressWarnings("WeakerAccess")
     public static final long DEFAULT_READIDLETIME_SECONDS = 60;
 
     /**
-     * The default write idle time
+     * The default write idle time.
      */
     @SuppressWarnings("WeakerAccess")
     public static final long DEFAULT_WRITEIDLETIME_SECONDS = 60;
 
     /**
-     * The default date header
+     * The default date header.
      */
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_DATEHEADER = true;
 
     /**
-     * The default idle time
+     * The default idle time.
      */
     @SuppressWarnings("WeakerAccess")
     public static final long DEFAULT_IDLETIME_SECONDS = 60;
@@ -316,7 +316,7 @@ public class HttpServerConfiguration {
         public static final boolean DEFAULT_ENABLED = false;
 
         /**
-         * The default max file size
+         * The default max file size.
          */
         @SuppressWarnings("WeakerAccess")
         public static final long DEFAULT_MAX_FILE_SIZE = 1024 * 1024; // 1MB

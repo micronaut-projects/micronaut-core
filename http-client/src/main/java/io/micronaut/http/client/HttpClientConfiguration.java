@@ -45,31 +45,31 @@ import java.util.concurrent.ThreadFactory;
 public abstract class HttpClientConfiguration {
 
     /**
-     * The default read timeout in seconds
+     * The default read timeout in seconds.
      */
     @SuppressWarnings("WeakerAccess")
     public static final long DEFAULT_READTIMEOUT_SECONDS = 10;
 
     /**
-     * The default read timeout in seconds
+     * The default read timeout in seconds.
      */
     @SuppressWarnings("WeakerAccess")
     public static final long DEFAULT_READIDLETIMEOUT_SECONDS = 60;
 
     /**
-     * The default shutdown timeout in millis
+     * The default shutdown timeout in millis.
      */
     @SuppressWarnings("WeakerAccess")
     public static final long DEFAULT_SHUTDOWNTIMEOUT_MILLISECONDS = 100;
 
     /**
-     * The default shutdown timeout in millis
+     * The default shutdown timeout in millis.
      */
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_MAXCONTENTLENGTH = 1024 * 1024 * 10; // 10MB;
 
     /**
-     * The default follow redirects value;
+     * The default follow redirects value.
      */
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_FOLLOWREDIRECTS = true;
