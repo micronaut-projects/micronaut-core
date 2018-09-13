@@ -114,8 +114,8 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
             Optional<UriRouteMatch<Object, Object>> routeMatch = router.find(HttpMethod.GET, msg.getUri()).findFirst();
 
             if (routeMatch.isPresent()) {
-
                 UriRouteMatch<Object, Object> rm = routeMatch.get();
+                msg.setAttribute(HttpAttributes.ROUTE_MATCH, rm);
                 if (rm.isAnnotationPresent(OnMessage.class)) {
                     List<HttpFilter> filters = router.findFilters(msg);
                     AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(msg);
