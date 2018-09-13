@@ -84,7 +84,7 @@ public interface ConsulOperations {
      *
      * @param checkId The check ID
      * @param note    An optional note
-     * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
+     * @return An {@link io.micronaut.http.HttpStatus} of {@link io.micronaut.http.HttpStatus#OK} if all is well
      */
     @Put("/agent/check/pass/{checkId}{?note}")
     Publisher<HttpStatus> pass(String checkId, @Nullable String note);
@@ -94,7 +94,7 @@ public interface ConsulOperations {
      *
      * @param checkId The check ID
      * @param note    An optional note
-     * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
+     * @return An {@link io.micronaut.http.HttpStatus} of {@link io.micronaut.http.HttpStatus#OK} if all is well
      */
     @Put("/agent/check/warn/{checkId}{?note}")
     Publisher<HttpStatus> warn(String checkId, @Nullable String note);
@@ -104,7 +104,7 @@ public interface ConsulOperations {
      *
      * @param checkId The check ID
      * @param note    An optional note
-     * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
+     * @return An {@link io.micronaut.http.HttpStatus} of {@link io.micronaut.http.HttpStatus#OK} if all is well
      */
     @Put("/agent/check/fail/{checkId}{?note}")
     Publisher<HttpStatus> fail(String checkId, @Nullable String note);
@@ -220,7 +220,7 @@ public interface ConsulOperations {
      * Pass the TTL check. See https://www.consul.io/api/agent/check.html.
      *
      * @param checkId The check ID
-     * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
+     * @return An {@link io.micronaut.http.HttpStatus} of {@link io.micronaut.http.HttpStatus#OK} if all is well
      */
     default Publisher<HttpStatus> pass(String checkId) {
         return pass(checkId, null);
@@ -230,7 +230,7 @@ public interface ConsulOperations {
      * Warn the TTL check. See https://www.consul.io/api/agent/check.html.
      *
      * @param checkId The check ID
-     * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
+     * @return An {@link io.micronaut.http.HttpStatus} of {@link io.micronaut.http.HttpStatus#OK} if all is well
      */
     default Publisher<HttpStatus> warn(String checkId) {
         return warn(checkId, null);
@@ -240,7 +240,7 @@ public interface ConsulOperations {
      * Fail the TTL check. See https://www.consul.io/api/agent/check.html.
      *
      * @param checkId The check ID
-     * @return An {@link HttpStatus} of {@link HttpStatus#OK} if all is well
+     * @return An {@link io.micronaut.http.HttpStatus} of {@link io.micronaut.http.HttpStatus#OK} if all is well
      */
     default Publisher<HttpStatus> fail(String checkId) {
         return fail(checkId, null);

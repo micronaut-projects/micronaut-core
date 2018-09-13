@@ -72,7 +72,7 @@ public interface Router {
     <T> Optional<UriRouteMatch<T>> route(HttpMethod httpMethod, CharSequence uri);
 
     /**
-     * Found a {@link RouteMatch} for the given {@link HttpStatus} code.
+     * Found a {@link RouteMatch} for the given {@link io.micronaut.http.HttpStatus} code.
      *
      * @param status The HTTP status
      * @param <T>    The matched route
@@ -81,7 +81,7 @@ public interface Router {
     <T> Optional<RouteMatch<T>> route(HttpStatus status);
 
     /**
-     * Found a {@link RouteMatch} for the given {@link HttpStatus} code.
+     * Found a {@link RouteMatch} for the given {@link io.micronaut.http.HttpStatus} code.
      *
      * @param originatingClass The class the error originates from
      * @param status The HTTP status

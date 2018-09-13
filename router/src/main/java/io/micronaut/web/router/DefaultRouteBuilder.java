@@ -614,7 +614,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     /**
-     * Represents a route for an {@link HttpStatus} code.
+     * Represents a route for an {@link io.micronaut.http.HttpStatus} code.
      */
     class DefaultStatusRoute extends AbstractRoute implements StatusRoute, Comparable<StatusRoute> {
 
@@ -691,7 +691,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         /**
-         * @return The {@link HttpStatus}
+         * @return The {@link io.micronaut.http.HttpStatus}
          */
         public HttpStatus getStatus() {
             return status;

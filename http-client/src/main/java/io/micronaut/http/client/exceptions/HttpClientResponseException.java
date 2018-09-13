@@ -80,7 +80,7 @@ public class HttpClientResponseException extends HttpClientException {
     }
 
     /**
-     * @return The {@link HttpStatus} returned
+     * @return The {@link io.micronaut.http.HttpStatus} returned
      */
     public HttpStatus getStatus() {
         return getResponse().getStatus();
