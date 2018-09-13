@@ -34,6 +34,7 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
       fi
 
       ./gradlew --stop
+      ./gradlew --no-daemon assemble  || EXIT_STATUS=$?
       ./gradlew --no-daemon docs  || EXIT_STATUS=$?
       ./gradlew --no-daemon publishGuide  || EXIT_STATUS=$?
       ./gradlew --no-daemon publishConfigurationReference  || EXIT_STATUS=$?
