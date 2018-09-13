@@ -182,6 +182,20 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             }
 
             @Override
+            public <T> void broadcastSync(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
+                WebSocketFrame frame = encodeMessage(message, mediaType);
+                try {
+                    webSocketSessions.writeAndFlush(frame, ch -> {
+                        Attribute<NettyRxWebSocketSession> attr = ch.attr(NettyRxWebSocketSession.WEB_SOCKET_SESSION_KEY);
+                        NettyRxWebSocketSession s = attr.get();
+                        return s != null && s.isOpen() && filter.test(s);
+                    }).sync();
+                } catch (InterruptedException e) {
+                    throw new WebSocketSessionException("Broadcast Interrupted");
+                }
+            }
+
+            @Override
             public <T> Flowable<T> broadcast(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
                 return Flowable.create(emitter -> {
                     try {
