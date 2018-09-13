@@ -33,7 +33,10 @@ class SimpleTextWebSocketSpec extends Specification {
         fred.topic == 'stuff'
         fred.username == 'fred'
         bob.username == 'bob'
-
+        conditions.eventually {
+            fred.replies.contains("[bob] Joined!")
+            fred.replies.size() == 1
+        }
 
 
         when:"A message is sent"
@@ -43,8 +46,6 @@ class SimpleTextWebSocketSpec extends Specification {
         conditions.eventually {
             bob.replies.contains("[fred] Hello bob!")
             bob.replies.size() == 1
-            fred.replies.contains("[bob] Joined!")
-            fred.replies.size() == 1
         }
 
         when:

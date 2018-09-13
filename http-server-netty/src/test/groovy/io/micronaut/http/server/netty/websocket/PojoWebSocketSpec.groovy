@@ -24,7 +24,10 @@ class PojoWebSocketSpec extends Specification {
         fred.username == 'fred'
         bob.username == 'bob'
 
-
+        conditions.eventually {
+            fred.replies.contains(new Message(text:"[bob] Joined!"))
+            fred.replies.size() == 1
+        }
 
         when:"A message is sent"
         fred.send(new Message(text: "Hello bob!"))
