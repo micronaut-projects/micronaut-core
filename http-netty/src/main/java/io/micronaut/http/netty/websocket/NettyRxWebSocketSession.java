@@ -232,7 +232,13 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
         return "WebSocket Session: " + getId();
     }
 
-    private WebSocketFrame encodeMessage(Object message, MediaType mediaType) {
+    /**
+     * Encode the given message with the given media type.
+     * @param message The message
+     * @param mediaType The media type
+     * @return The encoded frame
+     */
+    protected WebSocketFrame encodeMessage(Object message, MediaType mediaType) {
         if (message instanceof byte[]) {
             return new BinaryWebSocketFrame(Unpooled.wrappedBuffer((byte[]) message));
         } else if (ClassUtils.isJavaLangType(message.getClass())) {
