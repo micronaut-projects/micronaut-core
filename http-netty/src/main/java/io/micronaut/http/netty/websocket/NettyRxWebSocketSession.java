@@ -29,6 +29,7 @@ import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.RxWebSocketSession;
+import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -45,12 +46,10 @@ import io.reactivex.Flowable;
 import javax.annotation.Nullable;
 import java.net.URI;
 import java.nio.ByteBuffer;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.function.Predicate;
 
 /**
  * Implementation of the {@link RxWebSocketSession} interface for Netty and RxJava.
@@ -203,6 +202,16 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
                 });
             }
         }, BackpressureStrategy.ERROR);
+    }
+
+    @Override
+    public <T> Flowable<T> broadcast(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
+        Objects.requireNonNull(filter, "Filter cannot be null");
+        if (filter.test(this)) {
+            return send(message, mediaType);
+        } else {
+            return Flowable.empty();
+        }
     }
 
     @Override
