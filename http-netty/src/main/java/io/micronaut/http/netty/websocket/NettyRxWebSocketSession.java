@@ -215,6 +215,14 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
     }
 
     @Override
+    public <T> void broadcastSync(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
+        Objects.requireNonNull(filter, "Filter cannot be null");
+        if (filter.test(this)) {
+            sendSync(message, mediaType);
+        }
+    }
+
+    @Override
     public void close() {
         close(CloseReason.NORMAL);
     }
