@@ -81,38 +81,25 @@ task javadoc(type: Javadoc, description: 'Generate javadocs from all child proje
     }
 }
 
-
-task copyConfigurationReference(type: Copy) {
-    ext {
-        destinationFileName = "configurationreference.html"
-    }
+task cleanupPropertyReference(type: Delete) {
     group = DOCUMENTATION_GROUP
-    from "${rootProject.projectDir}/src/main/docs/resources/style/page.html"
-    into "${rootProject.buildDir}/docs/guide/"
-    filter(org.apache.tools.ant.filters.ReplaceTokens, tokens: [
-            projectVersion: projectVersion,
-            pagetitle: 'Configuration Reference | Micronaut',
-            docscontent: org.asciidoctor.Asciidoctor.Factory.create().render(new File("${project.projectDir}/src/main/docs/generated/propertyReference.adoc").exists() ? new File("${project.projectDir}/src/main/docs/generated/propertyReference.adoc").text : '', [:] as Map<String, Object>)])
-    rename { String fileName ->
-        fileName.replace("page.html", destinationFileName)
+    delete file( "${rootProject.buildDir}/docs/guide/configurationreference.html" )
+}
+
+task createDocsGeneratedFolders {
+    doLast {
+        if(!new File("${rootProject.buildDir}/generated").exists()) {
+            new File("${rootProject.buildDir}/generated").mkdir()
+        }
+        if(!new File("${rootProject.buildDir}/generated/configurationProperties").exists()) {
+            new File("${rootProject.buildDir}/generated/configurationProperties").mkdir()
+        }
     }
 }
 
-task cleanupGuideFiles(type: Delete) {
-    group = DOCUMENTATION_GROUP
-    delete fileTree("${rootProject.buildDir}/docs/guide") {
-        include '*.html'
-        exclude 'index.html'
-        exclude copyConfigurationReference.destinationFileName
-    }
-    delete fileTree("${rootProject.buildDir}/docs/guide/pages") {
-        include '*.html'
-    }
-}
-
-task mergeConfigProps() {
+task mergeConfigProps(dependsOn: createDocsGeneratedFolders) {
     inputs.files( fileTree( "$project.buildDir/config-props" ) ).skipWhenEmpty()
-    outputs.file( "${project.projectDir}/src/main/docs/generated/propertyReference.adoc" )
+    outputs.file( "${project.buildDir}/generated/propertyReference.adoc" )
     doLast {
         outputs.files.singleFile.withOutputStream { out ->
             List<File> files = new ArrayList<>(inputs.files.files).sort { File f -> f.name }
@@ -127,8 +114,38 @@ task mergeConfigProps() {
         }
     }
 }
-copyConfigurationReference.mustRunAfter mergeConfigProps
-copyConfigurationReference.finalizedBy cleanupGuideFiles
+
+task publishConfigurationReference(type: Copy) {
+    dependsOn cleanupPropertyReference, createDocsGeneratedFolders, mergeConfigProps
+    ext {
+        destinationFileName = "configurationreference.html"
+    }
+    group = DOCUMENTATION_GROUP
+
+    inputs.files file("${project.buildDir}/generated/propertyReference.adoc")
+
+    from "${rootProject.projectDir}/src/main/docs/resources/style/page.html"
+    into "${rootProject.buildDir}/docs/guide/"
+    filter(org.apache.tools.ant.filters.ReplaceTokens, tokens: [
+            projectVersion: projectVersion,
+            pagetitle: 'Configuration Reference | Micronaut',
+            docscontent: org.asciidoctor.Asciidoctor.Factory.create().render(new File("${project.buildDir}/generated/propertyReference.adoc").exists() ? new File("${project.buildDir}/generated/propertyReference.adoc").text : '', [:] as Map<String, Object>)])
+    rename { String fileName ->
+        fileName.replace("page.html", destinationFileName)
+    }
+}
+
+task cleanupGuideFiles(type: Delete) {
+    group = DOCUMENTATION_GROUP
+    delete fileTree("${rootProject.buildDir}/docs/guide") {
+        include '*.html'
+        exclude 'index.html'
+        exclude publishConfigurationReference.destinationFileName
+    }
+    delete fileTree("${rootProject.buildDir}/docs/guide/pages") {
+        include '*.html'
+    }
+}
 
 task publishGuide(type: grails.doc.gradle.PublishGuide) {
     group = DOCUMENTATION_GROUP
@@ -149,7 +166,7 @@ task publishGuide(type: grails.doc.gradle.PublishGuide) {
             'api': '../api',
             'sourceDir':rootProject.projectDir.absolutePath,
             'sourcedir':rootProject.projectDir.absolutePath,
-            'includedir': "${rootProject.projectDir.absolutePath}/src/main/docs/generated/",
+            'includedir': "${rootProject.buildDir.absolutePath}/generated/",
             'javaee': 'https://docs.oracle.com/javaee/8/api/',
             'javase': 'https://docs.oracle.com/javase/8/docs/api/',
             'groovyapi': 'http://docs.groovy-lang.org/latest/html/gapi/',
@@ -173,13 +190,13 @@ task publishGuide(type: grails.doc.gradle.PublishGuide) {
 '''
     }
 }
-publishGuide.dependsOn mergeConfigProps
-publishGuide.dependsOn copyConfigurationReference
 
 publishGuide.mustRunAfter javadoc
+
 task docs(dependsOn:[javadoc, publishGuide]) {
     group = DOCUMENTATION_GROUP
 }
+docs.finalizedBy cleanupGuideFiles
 
 def assembleTask = project.tasks.findByName("assemble")
 if(assembleTask == null) {
