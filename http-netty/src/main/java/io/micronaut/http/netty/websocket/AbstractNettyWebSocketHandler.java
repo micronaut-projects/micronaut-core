@@ -464,7 +464,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         }
 
         if (LOG.isErrorEnabled()) {
-            LOG.error("Unexpected Exception in WebSocket [" + webSocketBean + "]: " + cause.getMessage(), cause);
+            LOG.error("Unexpected Exception in WebSocket [" + webSocketBean.getTarget() + "]: " + cause.getMessage(), cause);
         }
         Channel channel = ctx.channel();
         if (channel.isOpen()) {
