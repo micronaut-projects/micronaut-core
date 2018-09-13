@@ -54,13 +54,13 @@ public abstract class RegistrationConfiguration implements Toggleable {
     public static final int DEFAULT_RETRYDELAY_SECONDS = 1;
 
     /**
-     * The default deregister value
+     * The default deregister value.
      */
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_DEREGISTER = true;
 
     /**
-     * The default fail fast value
+     * The default fail fast value.
      */
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_FAILFAST = true;
