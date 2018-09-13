@@ -19,6 +19,7 @@ public class ReactivePojoChatServerWebSocket {
         return session.broadcast(message, isValid(topic, session));
     }
 
+    // tag::onmessage[]
     @OnMessage
     public Publisher<Message> onMessage(
             String topic,
@@ -30,6 +31,7 @@ public class ReactivePojoChatServerWebSocket {
         Message newMessage = new Message(text);
         return session.broadcast(newMessage, isValid(topic, session));
     }
+    // end::onmessage[]
 
     @OnClose
     public Publisher<Message> onClose(

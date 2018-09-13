@@ -1,12 +1,16 @@
 package io.micronaut.http.server.netty.websocket
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.client.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.RxWebSocketClient
 import io.micronaut.websocket.RxWebSocketSession
 import io.micronaut.websocket.WebSocketClient
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
+
+import javax.inject.Inject
+import javax.inject.Singleton
 
 class SimpleTextWebSocketSpec extends Specification {
 
@@ -72,8 +76,21 @@ class SimpleTextWebSocketSpec extends Specification {
             !fred.session.isOpen()
         }
 
+        when:"A bean is retrieved that injects a websocket client"
+        MyBean myBean = embeddedServer.applicationContext.getBean(MyBean)
+
+        then:
+        myBean.myClient != null
+
         cleanup:
         wsClient.close()
         embeddedServer.close()
+    }
+
+    @Singleton
+    static class MyBean {
+        @Inject
+        @Client("http://localhost:8080")
+        RxWebSocketClient myClient
     }
 }
