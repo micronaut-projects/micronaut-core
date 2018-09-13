@@ -17,6 +17,8 @@
 package io.micronaut.security;
 
 import javax.inject.Singleton;
+
+import io.micronaut.aop.InterceptPhase;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.http.annotation.Controller;
@@ -39,6 +41,11 @@ import java.util.Optional;
 @Singleton
 public class SecuredInterceptor implements MethodInterceptor<Object, Object> {
 
+    /**
+     * The position on the interceptor in the chain.
+     */
+    public static final int POSITION = InterceptPhase.VALIDATE.getPosition();
+
     protected final SecurityService securityService;
 
     /**
@@ -49,6 +56,11 @@ public class SecuredInterceptor implements MethodInterceptor<Object, Object> {
         this.securityService = securityService;
     }
 
+    @Override
+    public int getOrder() {
+        return POSITION;
+    }
+
     /**
      *
      * @param context The context
@@ -56,7 +68,7 @@ public class SecuredInterceptor implements MethodInterceptor<Object, Object> {
      * @throws MissingRoleException when the user does not have any of the required roles
      * @throws NotAuthenticatedException when the user is not authenticated and @Secured values require authentication
      */
-                       @Override
+    @Override
     public Object intercept(MethodInvocationContext<Object, Object> context) {
         if (context.hasDeclaredAnnotation(Secured.class)) {
             if (context.findAnnotation(Controller.class).isPresent()) {
