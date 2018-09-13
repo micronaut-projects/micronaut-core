@@ -410,6 +410,11 @@ subprojects { Project subproject ->
         }
     }
 
+    task javaDocAtReplacement(type: io.micronaut.docs.JavaDocAtValueReplacementTask, dependsOn: moveConfigProps) {
+        adocFile = new File("${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc")
+        rootProjectDir = rootProject.projectDir
+    }
+
     task replaceAtLink(dependsOn: moveConfigProps) {
         doLast {
             File file = new File("${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc")
@@ -435,13 +440,23 @@ subprojects { Project subproject ->
             }
         }
     }
-
-    task processConfigProps(dependsOn: replaceAtLink) {
+    task createDocsGeneratedFolders {
+        doLast {
+            if(!new File("${rootProject.buildDir}/generated").exists()) {
+                new File("${rootProject.buildDir}/generated").mkdir()
+            }
+            if(!new File("${rootProject.buildDir}/generated/configurationProperties").exists()) {
+                new File("${rootProject.buildDir}/generated/configurationProperties").mkdir()
+            }
+        }
+    }
+    task processConfigProps(dependsOn: [replaceAtLink, javaDocAtReplacement, createDocsGeneratedFolders]) {
         group 'documentation'
         ext {
-            individualConfigPropsFolder = 'src/main/docs/generated/configurationProperties'
+            individualConfigPropsFolder = "${rootProject.buildDir}/generated/configurationProperties"
         }
         doLast {
+
             def f = new File("${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc")
             if (f.exists()) {
                 def lines = f.readLines()
@@ -456,7 +471,7 @@ subprojects { Project subproject ->
                         configurationPropertyName = sub
                     }
                     if (line == separator) {
-                        File outputfile = new File("${rootProject.projectDir}/${individualConfigPropsFolder}/${configurationPropertyName}.adoc")
+                        File outputfile = new File("${individualConfigPropsFolder}/${configurationPropertyName}.adoc")
                         outputfile.createNewFile()
                         outputfile.text = accumulator.join('\n')
                         accumulator = []
