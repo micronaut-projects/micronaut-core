@@ -16,6 +16,8 @@
 
 package io.micronaut.websocket;
 
+import java.util.Objects;
+
 /**
  * Enumeration of close events. See https://tools.ietf.org/html/rfc6455#section-11.7.
  *
@@ -126,6 +128,20 @@ public class CloseReason {
      */
     public String getReason() {
         return reason;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+        CloseReason that = (CloseReason) o;
+        return code == that.code &&
+                Objects.equals(reason, that.reason);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(code, reason);
     }
 
     @Override
