@@ -1,17 +1,17 @@
 package io.micronaut.http.server.netty.websocket;
 
+// tag::imports[]
 import io.micronaut.websocket.WebSocketSession;
-import io.micronaut.websocket.annotation.ClientWebSocket;
-import io.micronaut.websocket.annotation.OnMessage;
-import io.micronaut.websocket.annotation.OnOpen;
+import io.micronaut.websocket.annotation.*;
 import io.reactivex.Single;
-
 import java.util.Collection;
 import java.util.concurrent.ConcurrentLinkedQueue;
+// end::imports[]
 import java.util.concurrent.Future;
 
-@ClientWebSocket("/chat/{topic}/{username}")
-public abstract class ChatClientWebSocket implements AutoCloseable {
+// tag::class[]
+@ClientWebSocket("/chat/{topic}/{username}") // <1>
+public abstract class ChatClientWebSocket implements AutoCloseable { // <2>
 
     private WebSocketSession session;
     private String topic;
@@ -19,11 +19,10 @@ public abstract class ChatClientWebSocket implements AutoCloseable {
     private Collection<String> replies = new ConcurrentLinkedQueue<>();
 
     @OnOpen
-    public void onOpen(String topic, String username, WebSocketSession session) {
+    public void onOpen(String topic, String username, WebSocketSession session) { // <3>
         this.topic = topic;
         this.username = username;
         this.session = session;
-        System.out.println("Client session opened for username = " + username);
     }
 
     public String getTopic() {
@@ -45,10 +44,10 @@ public abstract class ChatClientWebSocket implements AutoCloseable {
     @OnMessage
     public void onMessage(
             String message) {
-        System.out.println("Client received message = " + message);
-        replies.add(message);
+        replies.add(message); // <4>
     }
 
+// end::class[]
     public abstract void send(String message);
 
     public abstract Future<String> sendAsync(String message);

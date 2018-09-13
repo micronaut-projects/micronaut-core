@@ -1,67 +1,38 @@
 package io.micronaut.http.server.netty.websocket;
 
 import io.micronaut.websocket.WebSocketSession;
-import io.micronaut.websocket.annotation.OnClose;
-import io.micronaut.websocket.annotation.OnMessage;
-import io.micronaut.websocket.annotation.OnOpen;
-import io.micronaut.websocket.annotation.ServerWebSocket;
+import io.micronaut.websocket.annotation.*;
+import java.util.function.Predicate;
 
-import java.util.Set;
-
-@ServerWebSocket("/chat/{topic}/{username}")
+@ServerWebSocket("/chat/{topic}/{username}") // <1>
 public class ChatServerWebSocket {
 
-    @OnOpen
+    @OnOpen // <2>
     public void onOpen(String topic, String username, WebSocketSession session) {
-        Set<? extends WebSocketSession> openSessions = session.getOpenSessions();
-        System.out.println("Server session opened for username = " + username);
-        System.out.println("Server openSessions = " + openSessions);
-        for (WebSocketSession openSession : openSessions) {
-            if(isValid(topic, session, openSession)) {
-                String msg = "[" + username + "] Joined!";
-                System.out.println("Server sending msg = " + msg);
-                openSession.sendSync(msg);
-            }
-        }
+        String msg = "[" + username + "] Joined!";
+        session.broadcastSync(msg, isValid(topic, session));
     }
 
-    @OnMessage
+    @OnMessage // <3>
     public void onMessage(
             String topic,
             String username,
             String message,
             WebSocketSession session) {
-
-        Set<? extends WebSocketSession> openSessions = session.getOpenSessions();
-        System.out.println("Server received message = " + message);
-        System.out.println("Server openSessions = " + openSessions);
-        for (WebSocketSession openSession : openSessions) {
-            if(isValid(topic, session, openSession)) {
-                String msg = "[" + username + "] " + message;
-                System.out.println("Server sending msg = " + msg);
-                openSession.sendSync(msg);
-            }
-        }
+        String msg = "[" + username + "] " + message;
+        session.broadcastSync(msg, isValid(topic, session)); // <4>
     }
 
-    @OnClose
+    @OnClose // <5>
     public void onClose(
             String topic,
             String username,
             WebSocketSession session) {
-        Set<? extends WebSocketSession> openSessions = session.getOpenSessions();
-        System.out.println("Server session closing for username = " + username);
-        System.out.println("Server openSessions = " + openSessions);
-        for (WebSocketSession openSession : openSessions) {
-            if(isValid(topic, session, openSession)) {
-                String msg = "[" + username + "] Disconnected!";
-                System.out.println("Server sending msg = " + msg);
-                openSession.sendSync(msg);
-            }
-        }
+        String msg = "[" + username + "] Disconnected!";
+        session.broadcastSync(msg, isValid(topic, session));
     }
 
-    private boolean isValid(String topic, WebSocketSession session, WebSocketSession openSession) {
-        return openSession != session && topic.equalsIgnoreCase(openSession.getUriVariables().get("topic", String.class).orElse(null));
+    private Predicate<WebSocketSession> isValid(String topic, WebSocketSession session) {
+        return s -> s != session && topic.equalsIgnoreCase(s.getUriVariables().get("topic", String.class, null));
     }
 }

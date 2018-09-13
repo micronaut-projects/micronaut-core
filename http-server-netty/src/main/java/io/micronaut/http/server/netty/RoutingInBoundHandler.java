@@ -69,6 +69,7 @@ import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 import io.micronaut.web.router.resource.StaticResourceResolver;
+import io.micronaut.websocket.annotation.OnMessage;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.ByteBufOutputStream;
@@ -435,7 +436,16 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
         }
         // all ok proceed to try and execute the route
-        handleRouteMatch(route, nettyHttpRequest, ctx);
+        if (route.isAnnotationPresent(OnMessage.class)) {
+            handleStatusError(
+                    ctx,
+                    request,
+                    nettyHttpRequest,
+                    HttpResponse.status(HttpStatus.BAD_REQUEST),
+                    "Not a WebSocket request");
+        } else {
+            handleRouteMatch(route, nettyHttpRequest, ctx);
+        }
     }
 
     private void handleStatusError(

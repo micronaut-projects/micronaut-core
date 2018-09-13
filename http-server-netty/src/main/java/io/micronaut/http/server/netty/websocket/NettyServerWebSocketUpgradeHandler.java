@@ -38,6 +38,7 @@ import io.netty.channel.*;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.handler.codec.http.DefaultHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshakerFactory;
@@ -51,10 +52,7 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -72,7 +70,6 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     public static final String SCHEME_SECURE_WEBSOCKET = "wss://";
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyServerWebSocketUpgradeHandler.class);
-
 
     private final Router router;
     private final RequestBinderRegistry binderRegistry;
@@ -110,7 +107,8 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     protected final void channelRead0(ChannelHandlerContext ctx, NettyHttpRequest<?> msg) {
 
         HttpHeaders headers = msg.getHeaders();
-        if ("Upgrade".equalsIgnoreCase(headers.get(HttpHeaderNames.CONNECTION)) &&
+        String connectValue = headers.get(HttpHeaderNames.CONNECTION, String.class).orElse("").toLowerCase(Locale.ENGLISH);
+        if (connectValue.contains(HttpHeaderValues.UPGRADE) &&
                 "WebSocket".equalsIgnoreCase(headers.get(HttpHeaderNames.UPGRADE))) {
 
             Optional<UriRouteMatch<Object, Object>> routeMatch = router.find(HttpMethod.GET, msg.getUri()).findFirst();
@@ -213,6 +211,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
      * @param req The request
      * @param webSocketBean The web socket bean
      * @param response The response
+     * @return The channel future
      **/
     protected ChannelFuture handleHandshake(ChannelHandlerContext ctx, NettyHttpRequest req, WebSocketBean<?> webSocketBean, MutableHttpResponse<?> response) {
         int maxFramePayloadLength = webSocketBean.messageMethod().getValue(OnMessage.class, "maxPayloadLength", Integer.class).orElse(65536);
