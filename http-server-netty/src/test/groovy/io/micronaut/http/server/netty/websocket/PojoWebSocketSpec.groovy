@@ -12,7 +12,7 @@ class PojoWebSocketSpec extends Specification {
     void "test POJO websocket exchange"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
-        PollingConditions conditions = new PollingConditions(timeout: 3, delay: 0.5)
+        PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
 
         when: "a websocket connection is established"
         RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURI())
@@ -32,7 +32,7 @@ class PojoWebSocketSpec extends Specification {
         then:
         conditions.eventually {
             bob.replies.contains(new Message(text:"[fred] Hello bob!"))
-            bob.replies.size() == 1
+            bob.replies.size() == 2
             fred.replies.contains(new Message(text:"[bob] Joined!"))
             fred.replies.size() == 1
         }
@@ -46,7 +46,7 @@ class PojoWebSocketSpec extends Specification {
             fred.replies.contains(new Message(text:"[bob] Hi fred. How are things?"))
             fred.replies.size() == 2
             bob.replies.contains(new Message(text:"[fred] Hello bob!"))
-            bob.replies.size() == 1
+            bob.replies.size() == 2
         }
         fred.sendAsync(new Message(text:  "foo")).get().text == 'foo'
         fred.sendRx(new Message(text:  "bar")).blockingGet().text == 'bar'

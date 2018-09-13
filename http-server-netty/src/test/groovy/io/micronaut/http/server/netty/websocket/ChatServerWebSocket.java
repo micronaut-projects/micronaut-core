@@ -51,6 +51,7 @@ public class ChatServerWebSocket {
             WebSocketSession session) {
         Set<? extends WebSocketSession> openSessions = session.getOpenSessions();
         System.out.println("Server session closing for username = " + username);
+        System.out.println("Server openSessions = " + openSessions);
         for (WebSocketSession openSession : openSessions) {
             if(isValid(topic, session, openSession)) {
                 String msg = "[" + username + "] Disconnected!";

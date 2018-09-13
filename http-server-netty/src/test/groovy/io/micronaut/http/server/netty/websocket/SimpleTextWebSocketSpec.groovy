@@ -12,8 +12,8 @@ class SimpleTextWebSocketSpec extends Specification {
 
     void "test simple text websocket exchange"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.build('micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
-        PollingConditions conditions = new PollingConditions(timeout: 3, delay: 0.5)
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        PollingConditions conditions = new PollingConditions(timeout: 15    , delay: 0.5)
 
         when: "a websocket connection is established"
         RxWebSocketClient wsClient = embeddedServer.applicationContext.createBean(RxWebSocketClient, embeddedServer.getURI())
@@ -63,20 +63,12 @@ class SimpleTextWebSocketSpec extends Specification {
 
         when:
         bob.close()
-
+        fred.close()
 
         then:
         conditions.eventually {
             !bob.session.isOpen()
-        }
-
-        when:
-        fred.send("Damn bob left")
-
-        then:
-        conditions.eventually {
-            fred.replies.contains("[bob] Disconnected!")
-            !bob.replies.contains("[bob] Disconnected!")
+            !fred.session.isOpen()
         }
 
         cleanup:

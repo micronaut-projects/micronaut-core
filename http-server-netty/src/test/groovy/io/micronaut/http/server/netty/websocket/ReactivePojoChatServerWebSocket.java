@@ -5,22 +5,18 @@ import io.micronaut.websocket.annotation.OnClose;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.annotation.ServerWebSocket;
-import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
-import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.function.Predicate;
 
 @ServerWebSocket("/pojo/chat/{topic}/{username}")
 public class ReactivePojoChatServerWebSocket {
 
     @OnOpen
     public Publisher<Message> onOpen(String topic, String username, WebSocketSession session) {
-        System.out.println("Server session opened for username = " + username);
-        System.out.println("Server openSessions = " + session.getOpenSessions());
-
         String text = "[" + username + "] Joined!";
-        return buildMessagePublisher(topic, session, text);
+        Message message = new Message(text);
+        return session.broadcast(message, isValid(topic, session));
     }
 
     @OnMessage
@@ -30,9 +26,9 @@ public class ReactivePojoChatServerWebSocket {
             Message message,
             WebSocketSession session) {
 
-        System.out.println("Server received message = " + message);
         String text = "[" + username + "] " + message.getText();
-        return buildMessagePublisher(topic, session, text);
+        Message newMessage = new Message(text);
+        return session.broadcast(newMessage, isValid(topic, session));
     }
 
     @OnClose
@@ -40,28 +36,13 @@ public class ReactivePojoChatServerWebSocket {
             String topic,
             String username,
             WebSocketSession session) {
-        System.out.println("Server session closing for username = " + username);
-        System.out.println("Server openSessions = " + session.getOpenSessions());
 
         String text = "[" + username + "] Disconnected!";
-        return buildMessagePublisher(topic, session, text);
+        Message message = new Message(text);
+        return session.broadcast(message, isValid(topic, session));
     }
 
-    private Publisher<Message> buildMessagePublisher(String topic, WebSocketSession session, String text) {
-        Set<? extends WebSocketSession> openSessions = session.getOpenSessions();
-        Set<Publisher<Message>> messagePublishers = openSessions.stream()
-                .filter((openSession) -> isValid(topic, session, openSession))
-                .map((s) -> {
-                    Message newMessage = new Message();
-                    newMessage.setText(text);
-                    System.out.println("Sending back new Message = " + newMessage);
-                    return s.send(newMessage);
-                }).collect(Collectors.toSet());
-
-        return Flowable.concat(messagePublishers);
-    }
-
-    private boolean isValid(String topic, WebSocketSession session, WebSocketSession openSession) {
-        return openSession != session && topic.equalsIgnoreCase(openSession.getUriVariables().get("topic", String.class).orElse(null));
+    private Predicate<WebSocketSession> isValid(String topic, WebSocketSession session) {
+        return s -> s != session && topic.equalsIgnoreCase(s.getUriVariables().get("topic", String.class, null));
     }
 }
