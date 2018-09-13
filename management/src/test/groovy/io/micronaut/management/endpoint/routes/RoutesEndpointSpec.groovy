@@ -17,6 +17,7 @@ package io.micronaut.management.endpoint.routes
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
@@ -35,7 +36,7 @@ class RoutesEndpointSpec extends Specification {
 
     void "test routes endpoint"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': getClass().simpleName, 'endpoints.routes.sensitive': false], "test")
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['spec.name': getClass().simpleName, 'endpoints.routes.sensitive': false], Environment.TEST)
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:

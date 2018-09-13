@@ -14,34 +14,30 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.authentication;
+package io.micronaut.security.exceptions;
 
-import io.micronaut.context.annotation.Primary;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.hateos.JsonError;
 import io.micronaut.http.hateos.Link;
 import io.micronaut.http.server.exceptions.ExceptionHandler;
-
 import javax.inject.Singleton;
 
-
 /**
- * Handles the server response when an {@link AuthenticationException} is thrown.
+ * Handles the server response when an {@link MissingRoleException} is thrown.
  *
- * @author James Kleeh
+ * @author Sergio del Amo
  * @since 1.0
  */
 @Singleton
-@Primary
-@Produces
-public class AuthenticationExceptionHandler implements ExceptionHandler<AuthenticationException, HttpResponse> {
+public class MissingRoleExceptionHandler implements ExceptionHandler<MissingRoleException, HttpResponse> {
 
     @Override
-    public HttpResponse handle(HttpRequest request, AuthenticationException exception) {
+    public HttpResponse handle(HttpRequest request, MissingRoleException exception) {
         JsonError error = new JsonError(exception.getMessage());
         error.link(Link.SELF, Link.of(request.getUri()));
-        return HttpResponse.unauthorized().body(error);
+        return HttpResponse.status(HttpStatus.FORBIDDEN).body(error);
     }
 }
+
