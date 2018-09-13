@@ -1,6 +1,15 @@
 Micronaut features automatic configuration of the https://lettuce.io[Lettuce] driver for https://redis.io[Redis] via the `redis-lettuce` module.
 
 == Configuring Lettuce
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply the `redis-lettuce` feature to configure the Lettuce driver in your project:
+----
+> mn create-app my-app --features redis-lettuce
+----
+====
+
 
 To configure the Lettuce driver you should first add the `redis-lettuce` module to your classpath:
 

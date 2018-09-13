@@ -10,8 +10,13 @@ The goal of the HTTP server is to make it as easy as possible to expose APIs tha
 compile "io.micronaut:http-server-netty"
 ----
 
-A "Hello World" server application written in Java can be seen below:
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI's `create-app` command, the `http-server` dependency is included by default.
+====
 
+A "Hello World" server application written in Java can be seen below:
 
 .Micronaut Server Hello World
 [source,java]
