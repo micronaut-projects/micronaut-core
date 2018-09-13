@@ -729,6 +729,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 @Override
                 protected void addFinalHandler(ChannelPipeline pipeline) {
                     pipeline.remove(HANDLER_DECODER);
+                    ReadTimeoutHandler readTimeoutHandler = pipeline.get(ReadTimeoutHandler.class);
+                    if (readTimeoutHandler != null) {
+                        pipeline.remove(readTimeoutHandler);
+                    }
                     final NettyWebSocketClientHandler webSocketHandler;
                     try {
                         URI webSocketURL = URI.create("ws://" + uri.getHost() + ":" + uri.getPort() + uri.getPath());
