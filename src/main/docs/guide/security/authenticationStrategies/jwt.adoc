@@ -5,6 +5,15 @@ include::{includedir}configurationProperties/io.micronaut.security.token.config.
 Micronaut ships with security capabilities based on https://jwt.io/[Json Web Token (JWT)].
 JWT is an https://tools.ietf.org/html/rfc7519[IETF standard] which defines a secure way to encapsulate arbitrary data that can be sent over unsecure URL’s.
 
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply either the `security-jwt` feature to configure JWT support in your project:
+----
+> mn create-app my-app --features security-jwt
+----
+====
+
 To use the Micronaut's JWT based authentication capabilities you must have the `security-jwt` dependency on your classpath. For example in `build.gradle`:
 
 .build.gradle
