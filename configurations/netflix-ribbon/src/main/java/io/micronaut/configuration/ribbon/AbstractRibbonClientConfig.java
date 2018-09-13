@@ -60,9 +60,9 @@ public abstract class AbstractRibbonClientConfig implements IClientConfig {
     }
 
     /**
-     * Sets an optional {@link VipAddressResolver}.
+     * Sets an optional {@link com.netflix.client.VipAddressResolver}.
      *
-     * @param resolver The {@link VipAddressResolver}
+     * @param resolver The {@link com.netflix.client.VipAddressResolver}
      */
     @Inject
     public void setVipAddressResolver(Optional<VipAddressResolver> resolver) {
