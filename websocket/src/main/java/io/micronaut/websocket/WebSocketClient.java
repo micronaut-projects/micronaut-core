@@ -18,7 +18,6 @@ package io.micronaut.websocket;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpRequest;
-import io.micronaut.websocket.annotation.ClientWebSocket;
 import org.reactivestreams.Publisher;
 import java.net.URI;
 import java.util.Map;
@@ -35,10 +34,10 @@ public interface WebSocketClient extends AutoCloseable {
     /**
      * Connect the given client endpoint type to the URI over WebSocket.
      *
-     * @param clientEndpointType The endpoint type. Should be a class annotated with {@link ClientWebSocket}
+     * @param clientEndpointType The endpoint type. Should be a class annotated with {@link io.micronaut.websocket.annotation.ClientWebSocket}
      * @param request The original request to establish the connection
      * @param <T> The generic type
-     * @return A {@link Publisher} that emits the {@link ClientWebSocket} instance
+     * @return A {@link Publisher} that emits the {@link io.micronaut.websocket.annotation.ClientWebSocket} instance
      */
     <T extends AutoCloseable> Publisher<T> connect(
             Class<T> clientEndpointType,
@@ -46,13 +45,13 @@ public interface WebSocketClient extends AutoCloseable {
     );
 
     /**
-     * Connect the given client endpoint type. Unlike {@link #connect(Class, URI)} this method will the value declared within the {@link ClientWebSocket} as the URI
+     * Connect the given client endpoint type. Unlike {@link #connect(Class, URI)} this method will the value declared within the {@link io.micronaut.websocket.annotation.ClientWebSocket} as the URI
      * and expand the URI with the given parameters.
      *
-     * @param clientEndpointType The endpoint type. Should be a class annotated with {@link ClientWebSocket}
+     * @param clientEndpointType The endpoint type. Should be a class annotated with {@link io.micronaut.websocket.annotation.ClientWebSocket}
      * @param parameters The URI parameters for the endpoint
      * @param <T> The generic type
-     * @return A {@link Publisher} that emits the {@link ClientWebSocket} instance
+     * @return A {@link Publisher} that emits the {@link io.micronaut.websocket.annotation.ClientWebSocket} instance
      */
     <T extends AutoCloseable> Publisher<T> connect(
             Class<T> clientEndpointType,
@@ -65,10 +64,10 @@ public interface WebSocketClient extends AutoCloseable {
     /**
      * Connect the given client endpoint type to the URI over WebSocket.
      *
-     * @param clientEndpointType The endpoint type. Should be a class annotated with {@link ClientWebSocket}
+     * @param clientEndpointType The endpoint type. Should be a class annotated with {@link io.micronaut.websocket.annotation.ClientWebSocket}
      * @param uri The URI to connect over
      * @param <T> The generic type
-     * @return A {@link Publisher} that emits the {@link ClientWebSocket} instance
+     * @return A {@link Publisher} that emits the {@link io.micronaut.websocket.annotation.ClientWebSocket} instance
      */
     default <T extends AutoCloseable> Publisher<T> connect(
             Class<T> clientEndpointType,
@@ -80,10 +79,10 @@ public interface WebSocketClient extends AutoCloseable {
     /**
      * Connect the given client endpoint type to the URI over WebSocket.
      *
-     * @param clientEndpointType The endpoint type. Should be a class annotated with {@link ClientWebSocket}
+     * @param clientEndpointType The endpoint type. Should be a class annotated with {@link io.micronaut.websocket.annotation.ClientWebSocket}
      * @param uri The URI to connect over
      * @param <T> The generic type
-     * @return A {@link Publisher} that emits the {@link ClientWebSocket} instance
+     * @return A {@link Publisher} that emits the {@link io.micronaut.websocket.annotation.ClientWebSocket} instance
      */
     default <T extends AutoCloseable> Publisher<T> connect(
             Class<T> clientEndpointType,

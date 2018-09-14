@@ -501,4 +501,12 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     public ChannelGroup getChannelGroup() {
         return this.webSocketSessions;
     }
+
+    /**
+     *
+     * @return {@link io.micronaut.http.server.netty.NettyHttpServer} which implements {@link WebSocketSessionRepository}
+     */
+    public WebSocketSessionRepository getWebSocketSessionRepository() {
+        return this;
+    }
 }

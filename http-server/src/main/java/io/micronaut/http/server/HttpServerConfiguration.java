@@ -224,7 +224,7 @@ public class HttpServerConfiguration {
     }
 
     /**
-     * Sets the host to bind to
+     * Sets the host to bind to.
      * @param host The host
      */
     public void setHost(String host) {
@@ -326,7 +326,6 @@ public class HttpServerConfiguration {
          */
         @SuppressWarnings("WeakerAccess")
         public static final boolean DEFAULT_DISK = false;
-
 
         private File location;
         private long maxFileSize = DEFAULT_MAX_FILE_SIZE;

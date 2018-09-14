@@ -20,7 +20,6 @@ import io.micronaut.http.MediaType;
 import io.reactivex.Flowable;
 
 import java.util.Set;
-import java.util.function.Predicate;
 
 /**
  * Generalization of the {@link WebSocketSession} interface for RxJava.
