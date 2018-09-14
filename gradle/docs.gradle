@@ -115,10 +115,8 @@ task mergeConfigProps(dependsOn: createDocsGeneratedFolders) {
     }
 }
 
-mergeConfigProps.mustRunAfter cleanupPropertyReference
-
 task publishConfigurationReference(type: Copy) {
-    dependsOn cleanupPropertyReference, mergeConfigProps
+    dependsOn mergeConfigProps, cleanupPropertyReference
     ext {
         destinationFileName = "configurationreference.html"
         inputFileName = "${rootProject.buildDir}/generated/propertyReference.adoc"
