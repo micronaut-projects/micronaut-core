@@ -1,11 +1,3 @@
-https://kafka.apache.org/documentation/streams/[Kafka Streams] is a platform for building real time streaming applications.
-
-When using Micronaut with Kafka Stream, your application gains all of the features from Micronaut (configuration management, AOP, DI, health checks etc.), simplifying the construction of Kafka Stream applications.
-
-Since Micronaut's DI and AOP is compile time, you can build low overhead stream applications with ease.
-
-=== Defining Kafka Streams
-
 [TIP]
 .Using the CLI
 ====
@@ -14,6 +6,14 @@ If you are creating your project using the Micronaut CLI, supply the `kafka-stre
 $ mn create-app my-app --features kafka-streams
 ----
 ====
+
+https://kafka.apache.org/documentation/streams/[Kafka Streams] is a platform for building real time streaming applications.
+
+When using Micronaut with Kafka Stream, your application gains all of the features from Micronaut (configuration management, AOP, DI, health checks etc.), simplifying the construction of Kafka Stream applications.
+
+Since Micronaut's DI and AOP is compile time, you can build low overhead stream applications with ease.
+
+=== Defining Kafka Streams
 
 To define Kafka Streams you should first add the `kafka-streams` configuration to your build.
 

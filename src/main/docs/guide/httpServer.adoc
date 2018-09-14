@@ -1,3 +1,9 @@
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI's `create-app` command, the `http-server` dependency is included by default.
+====
+
 Micronaut includes both non-blocking HTTP server and client APIs based on https://netty.io[Netty].
 
 The design of the HTTP server in Micronaut is optimized for interchanging messages between Microservices, typically in JSON, and is not intended as a full server-side MVC framework. For example, there is currently no support for server-side views or features typical of a traditional server-side MVC framework.
@@ -9,12 +15,6 @@ The goal of the HTTP server is to make it as easy as possible to expose APIs tha
 ----
 compile "io.micronaut:http-server-netty"
 ----
-
-[TIP]
-.Using the CLI
-====
-If you are creating your project using the Micronaut CLI's `create-app` command, the `http-server` dependency is included by default.
-====
 
 A "Hello World" server application written in Java can be seen below:
 
