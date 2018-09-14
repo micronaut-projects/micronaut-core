@@ -60,7 +60,7 @@ public class Route53DiscoveryConfiguration extends DiscoveryConfiguration {
     }
 
     /**
-     * enable/disabled this feature.
+     * enable/disabled this feature. Default value ({@value io.micronaut.discovery.DiscoveryConfiguration#DEFAULT_ENABLED}).
      * @param enabled Whether discovery is enabled
      */
     @Override

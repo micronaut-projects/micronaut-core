@@ -1,6 +1,7 @@
 package io.micronaut.docs.respondingnotfound
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
@@ -16,7 +17,7 @@ class BooksSpec extends Specification {
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name':'respondingnotfound'
-    ], "test")
+    ], Environment.TEST)
 
     @AutoCleanup
     @Shared

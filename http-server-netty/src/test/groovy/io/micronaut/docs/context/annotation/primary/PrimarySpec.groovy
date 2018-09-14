@@ -16,6 +16,7 @@
 package io.micronaut.docs.context.annotation.primary
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -31,7 +32,7 @@ class PrimarySpec extends Specification {
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'primaryspec'
-    ], "test")
+    ], Environment.TEST)
 
     @AutoCleanup
     @Shared

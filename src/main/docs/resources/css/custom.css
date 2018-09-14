@@ -183,7 +183,7 @@ a:hover,
     .project {
         margin-top: 75px;
     }
-    #main {
+    body#docs #main {
         padding-left: 25em;
         margin-left: 0;
         margin-right: 0;

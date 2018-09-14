@@ -16,6 +16,7 @@
 package io.micronaut.security.authorization
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -40,7 +41,7 @@ class AuthorizationSpec extends Specification {
                     [pattern: '/urlMap/**',    access: 'isAuthenticated()'],
                     [pattern: '/anonymous/**', access: 'isAnonymous()'],
             ]
-    ], "test")
+    ], Environment.TEST)
     @Shared @AutoCleanup RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
     void "test /beans is secured"() {

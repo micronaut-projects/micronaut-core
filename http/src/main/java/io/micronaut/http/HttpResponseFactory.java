@@ -30,7 +30,7 @@ public interface HttpResponseFactory {
     HttpResponseFactory INSTANCE = DefaultHttpFactories.resolveDefaultResponseFactory();
 
     /**
-     * Creates an {@link HttpStatus#OK} response with a body.
+     * Creates an {@link io.micronaut.http.HttpStatus#OK} response with a body.
      *
      * @param body The body
      * @param <T>  The body type

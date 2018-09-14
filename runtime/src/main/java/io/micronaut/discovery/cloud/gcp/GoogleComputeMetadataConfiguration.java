@@ -39,11 +39,41 @@ public class GoogleComputeMetadataConfiguration implements Toggleable {
      */
     public static final String PREFIX = ApplicationConfiguration.PREFIX + "." + Environment.GOOGLE_COMPUTE + ".metadata";
 
-    private boolean enabled = true;
-    private String metadataUrl = "http://metadata.google.internal/computeMetadata/v1/project/";
-    private String projectMetadataUrl = "http://metadata.google.internal/project/v1/project/";
-    private Duration readTimeout = Duration.ofSeconds(5);
-    private Duration connectTimeout = Duration.ofSeconds(2);
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = true;
+
+    /**
+     * The default metadata url value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_METADATAURL = "http://metadata.google.internal/computeMetadata/v1/project/";
+
+    /**
+     * The default project metadata url value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_PROJECTMETADATAURL = "http://metadata.google.internal/project/v1/project/";
+
+    /**
+     * The default read timeout in seconds.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_READTIMEOUT = 5;
+
+    /**
+     * The default connect timeout in seconds.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_CONNECTTIMEOUT = 2;
+
+    private boolean enabled = DEFAULT_ENABLED;
+    private String metadataUrl = DEFAULT_METADATAURL;
+    private String projectMetadataUrl = DEFAULT_PROJECTMETADATAURL;
+    private Duration readTimeout = Duration.ofSeconds(DEFAULT_READTIMEOUT);
+    private Duration connectTimeout = Duration.ofSeconds(DEFAULT_CONNECTTIMEOUT);
 
     /**
      * @return Whether the Google Compute configuration is enabled
@@ -54,6 +84,7 @@ public class GoogleComputeMetadataConfiguration implements Toggleable {
     }
 
     /**
+     * Default value ({@value #DEFAULT_ENABLED}).
      * @param enabled Enable or disable the Google Compute configuration
      */
     public void setEnabled(boolean enabled) {
@@ -68,6 +99,7 @@ public class GoogleComputeMetadataConfiguration implements Toggleable {
     }
 
     /**
+     * Default value ({@value #DEFAULT_METADATAURL}).
      * @param metadataUrl The metadata Url
      */
     public void setMetadataUrl(String metadataUrl) {
@@ -82,6 +114,7 @@ public class GoogleComputeMetadataConfiguration implements Toggleable {
     }
 
     /**
+     * Default value ({@value #DEFAULT_PROJECTMETADATAURL}).
      * @param projectMetadataUrl The project metadata Url
      */
     public void setProjectMetadataUrl(String projectMetadataUrl) {
@@ -96,6 +129,7 @@ public class GoogleComputeMetadataConfiguration implements Toggleable {
     }
 
     /**
+     * Default value ({@value #DEFAULT_READTIMEOUT} seconds).
      * @param readTimeout The read timeout
      */
     public void setReadTimeout(Duration readTimeout) {
@@ -110,6 +144,7 @@ public class GoogleComputeMetadataConfiguration implements Toggleable {
     }
 
     /**
+     * Default value ({@value #DEFAULT_CONNECTTIMEOUT}).
      * @param connectTimeout The connect timeout
      */
     public void setConnectTimeout(Duration connectTimeout) {

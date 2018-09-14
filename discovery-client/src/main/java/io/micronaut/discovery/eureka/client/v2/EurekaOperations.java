@@ -40,7 +40,7 @@ public interface EurekaOperations {
      *
      * @param appId    The application id
      * @param instance The instance
-     * @return A status of {@link HttpStatus#NO_CONTENT} on success
+     * @return A status of {@link io.micronaut.http.HttpStatus#NO_CONTENT} on success
      */
     @Post("/apps/{appId}")
     @Retryable(
@@ -54,7 +54,7 @@ public interface EurekaOperations {
      *
      * @param appId      The application id
      * @param instanceId The instance id (this is the value of {@link InstanceInfo#getId()})
-     * @return A status of {@link HttpStatus#OK} on success
+     * @return A status of {@link io.micronaut.http.HttpStatus#OK} on success
      */
     @Delete("/apps/{appId}/{instanceId}")
     @Retryable(
@@ -105,7 +105,7 @@ public interface EurekaOperations {
      *
      * @param appId      The application id
      * @param instanceId The instance id
-     * @return A status of {@link HttpStatus#OK} on success
+     * @return A status of {@link io.micronaut.http.HttpStatus#OK} on success
      */
     @Put("/apps/{appId}/{instanceId}")
     Publisher<HttpStatus> heartbeat(@NotBlank String appId, @NotBlank String instanceId);
@@ -116,7 +116,7 @@ public interface EurekaOperations {
      * @param appId      The application id
      * @param instanceId The instance id
      * @param status     The status to use
-     * @return A status of {@link HttpStatus#OK} on success
+     * @return A status of {@link io.micronaut.http.HttpStatus#OK} on success
      */
     @Put("/apps/{appId}/{instanceId}/status?value={status}")
     Publisher<HttpStatus> updateStatus(@NotBlank String appId, @NotBlank String instanceId, @NotNull InstanceInfo.Status status);
@@ -128,7 +128,7 @@ public interface EurekaOperations {
      * @param instanceId The instance id
      * @param key        The key to update
      * @param value      The value to update
-     * @return A status of {@link HttpStatus#OK} on success
+     * @return A status of {@link io.micronaut.http.HttpStatus#OK} on success
      */
     @Put("/apps/{appId}/{instanceId}/metadata?{key}={value}")
     Publisher<HttpStatus> updateMetadata(@NotBlank String appId, @NotBlank String instanceId, @NotBlank String key, @NotBlank String value);

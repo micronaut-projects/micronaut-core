@@ -31,9 +31,20 @@ import org.apache.velocity.app.VelocityEngine;
 @ConfigurationProperties(VelocityViewsRendererConfigurationProperties.PREFIX)
 public class VelocityViewsRendererConfigurationProperties implements VelocityViewsRendererConfiguration {
     public static final String PREFIX = ViewsConfigurationProperties.PREFIX + ".velocity";
+
+    /**
+     * The default extension.
+     */
+    @SuppressWarnings("WeakerAccess")
     public static final String DEFAULT_EXTENSION = "vm";
 
-    private boolean enabled = true;
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = true;
+
+    private boolean enabled = DEFAULT_ENABLED;
 
     private String defaultExtension = DEFAULT_EXTENSION;
 
@@ -56,7 +67,7 @@ public class VelocityViewsRendererConfigurationProperties implements VelocityVie
     }
 
     /**
-     * Whether velocity views are enabled.
+     * Whether velocity views are enabled. Default value ({@value #DEFAULT_ENABLED}).
      *
      * @param enabled True if they are
      */
@@ -65,7 +76,7 @@ public class VelocityViewsRendererConfigurationProperties implements VelocityVie
     }
 
     /**
-     * Sets the defautlt extension to use for velocity templates.
+     * Sets the defautlt extension to use for velocity templates. Default value ({@value #DEFAULT_EXTENSION}).
      *
      * @param defaultExtension The default extension
      */

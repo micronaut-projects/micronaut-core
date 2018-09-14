@@ -6,14 +6,9 @@ To use the Micronaut's security capabilities you must have the `security` depend
 compile "io.micronaut:security"
 ----
 
-To enable security capabilities enable security:
+Enable security capabilities with:
 
-[source, yaml]
-----
-micronaut:
-    security:
-        enabled: true
-----
+include::{includedir}configurationProperties/io.micronaut.security.config.SecurityConfigurationProperties.adoc[]
 
 Once you enable security, Micronaut returns HTTP Status Unauthorized (401) for any endpoint invocation.
 

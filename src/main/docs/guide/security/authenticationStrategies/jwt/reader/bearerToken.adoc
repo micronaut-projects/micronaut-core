@@ -8,19 +8,7 @@ image::jwt-bearer-token.svg[]
 
 The following configuration properties are available to customize Bearer Token read:
 
-|===
-
-| Configuration Property | Default Value | Description
-
-| `micronaut.security.token.jwt.bearer.enabled` | `true` | link:{api}/io/micronaut/security/token/jwt/bearer/BearerTokenReader.html[BearerTokenReader] is enabled by default
-
-| `micronaut.security.token.jwt.bearer.headerName` | `Authorization` | Header name
-
-| `micronaut.security.token.jwt.bearer.prefix` | `Bearer` | e.g. `Bearer XXXXXXXXXXX`
-
-|===
-
-See the javadoc for api:security.token.jwt.bearer.BearerTokenConfigurationProperties[] for more information.
+include::{includedir}configurationProperties/io.micronaut.security.token.jwt.bearer.BearerTokenConfigurationProperties.adoc[]
 
 == Sending tokens in the request
 

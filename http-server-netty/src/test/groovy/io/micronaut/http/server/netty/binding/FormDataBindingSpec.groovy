@@ -30,7 +30,6 @@ import io.micronaut.http.annotation.Post
  */
 class FormDataBindingSpec extends AbstractMicronautSpec {
 
-
     void "test simple string-based body parsing"() {
 
         when:
@@ -43,11 +42,9 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         response.status == HttpStatus.OK
         response.body.isPresent()
         response.body.get() == "name: Fred, age: 10"
-
     }
 
     void "test pojo body parsing"() {
-
         when:
         def response = rxClient.exchange(HttpRequest.POST('/form/pojo', [
                 name:"Fred",
@@ -55,12 +52,10 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
                 something: "else"
         ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockingFirst()
 
-
         then:
         response.status == HttpStatus.OK
         response.body.isPresent()
         response.body.get() == "name: Fred, age: 10"
-
     }
 
     void "test simple string-based body parsing with missing data"() {
@@ -69,12 +64,11 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
                 name:"Fred"
         ]).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), String).blockingFirst()
 
-
         then:
         def e = thrown(HttpClientResponseException)
         e.response.status == HttpStatus.BAD_REQUEST
-
     }
+    
     @Controller(value = '/form', consumes = MediaType.APPLICATION_FORM_URLENCODED)
     static class FormController {
         @Post('/simple')

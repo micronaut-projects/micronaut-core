@@ -259,7 +259,7 @@ class UploadSpec extends AbstractMicronautSpec {
         response.getBody().get() == 'bar: 9'
     }
 
-    @IgnoreIf({ System.getenv("TRAVIS")})
+    @IgnoreIf({ env["TRAVIS"] })
     void "test simple in-memory file upload exceeds size"() {
         given:
         MultipartBody requestBody = MultipartBody.builder()

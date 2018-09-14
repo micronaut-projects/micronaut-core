@@ -21,6 +21,7 @@ import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.consul.client.v1.ConsulClient
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.Ignore
 import spock.lang.IgnoreIf
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -29,10 +30,10 @@ import spock.util.concurrent.PollingConditions
  * @author graemerocher
  * @since 1.0
  */
-@IgnoreIf({ !System.getenv('CONSUL_HOST') && !System.getenv('CONSUL_PORT') })
+@IgnoreIf({ !env['CONSUL_HOST'] && !env['CONSUL_PORT'] })
 class ConsulAutoRegistrationSpec extends Specification {
 
-
+    @Ignore("https://github.com/micronaut-projects/micronaut-core/issues/566")
     void 'test that the service is automatically registered with Consul with a TTL configuration'() {
         when: "A new server is bootstrapped"
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
@@ -40,10 +41,9 @@ class ConsulAutoRegistrationSpec extends Specification {
                  'consul.client.host'              : System.getenv('CONSUL_HOST'),
                  'consul.client.port'              : System.getenv('CONSUL_PORT')])
         ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
-        DiscoveryClient discoveryClient = ApplicationContext.run(
-                DiscoveryClient,
-                ['consul.client.host': System.getenv('CONSUL_HOST'),
-                 'consul.client.port'              : System.getenv('CONSUL_PORT'), "micronaut.caches.discoveryClient.enabled": false])
+        Map discoveryClientMap = ['consul.client.host': System.getenv('CONSUL_HOST'),
+                                  'consul.client.port'              : System.getenv('CONSUL_PORT'), "micronaut.caches.discoveryClient.enabled": false]
+        DiscoveryClient discoveryClient = ApplicationContext.build(discoveryClientMap).run(DiscoveryClient)
 
         PollingConditions conditions = new PollingConditions(timeout: 3)
 
@@ -66,6 +66,7 @@ class ConsulAutoRegistrationSpec extends Specification {
         }
     }
 
+    @Ignore("https://github.com/micronaut-projects/micronaut-core/issues/566")
     void 'test that the service is automatically registered with Consul with a HTTP configuration'() {
         when: "A new server is bootstrapped"
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
@@ -74,11 +75,9 @@ class ConsulAutoRegistrationSpec extends Specification {
                  'consul.client.host'                   : System.getenv('CONSUL_HOST'),
                  'consul.client.port'                   : System.getenv('CONSUL_PORT')])
         ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
-        DiscoveryClient discoveryClient = ApplicationContext.run(
-                DiscoveryClient,
-                ['consul.client.host': System.getenv('CONSUL_HOST'),
-                 'consul.client.port'              : System.getenv('CONSUL_PORT'), "micronaut.caches.discoveryClient.enabled": false])
-
+        Map discoveryClientMap = ['consul.client.host': System.getenv('CONSUL_HOST'),
+                                  'consul.client.port'              : System.getenv('CONSUL_PORT'), "micronaut.caches.discoveryClient.enabled": false]
+        DiscoveryClient discoveryClient = ApplicationContext.build(discoveryClientMap).run(DiscoveryClient)
 
         PollingConditions conditions = new PollingConditions(timeout: 3)
 
@@ -101,7 +100,7 @@ class ConsulAutoRegistrationSpec extends Specification {
         }
     }
 
-
+    @Ignore("https://github.com/micronaut-projects/micronaut-core/issues/566")
     void 'test that a service can be registered with tags and queried with tags'() {
         when: "A new server is bootstrapped"
         String serviceId = 'myService'
@@ -112,16 +111,19 @@ class ConsulAutoRegistrationSpec extends Specification {
                  'consul.client.port'              : System.getenv('CONSUL_PORT')])
 
         // a client with tags specified
-        DiscoveryClient discoveryClient = ApplicationContext.run(DiscoveryClient, ['consul.client.host': System.getenv('CONSUL_HOST'),
-                                                                                   'consul.client.port': System.getenv('CONSUL_PORT'),
-                                                                                   "micronaut.caches.discoveryClient.enabled": false,
-                                                                                   'consul.client.discovery.tags.myService':'foo' ])
+        Map discoveryClientConfig = ['consul.client.host': System.getenv('CONSUL_HOST'),
+         'consul.client.port': System.getenv('CONSUL_PORT'),
+         "micronaut.caches.discoveryClient.enabled": false,
+         'consul.client.discovery.tags.myService':'foo' ]
+        DiscoveryClient discoveryClient = ApplicationContext.build(discoveryClientConfig).run(DiscoveryClient)
 
 
-        DiscoveryClient anotherClient = ApplicationContext.run(DiscoveryClient, ['consul.client.host': System.getenv('CONSUL_HOST'),
-                                                                                   'consul.client.port': System.getenv('CONSUL_PORT'),
-                                                                                    "micronaut.caches.discoveryClient.enabled": false,
-                                                                                   'consul.client.discovery.tags.myService':['someother'] ])
+        Map anotherClientConfig = ['consul.client.host': System.getenv('CONSUL_HOST'),
+                                   'consul.client.port': System.getenv('CONSUL_PORT'),
+                                   "micronaut.caches.discoveryClient.enabled": false,
+                                   'consul.client.discovery.tags.myService':['someother'] ]
+
+        DiscoveryClient anotherClient = ApplicationContext.build(anotherClientConfig).run(DiscoveryClient)
         PollingConditions conditions = new PollingConditions(timeout: 3)
 
         then: "the server is registered with Consul"

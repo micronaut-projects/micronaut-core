@@ -16,6 +16,7 @@
 package io.micronaut.security.rules.sensitive
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -32,7 +33,7 @@ class SensitiveTrueByDefaultSpec extends Specification {
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name': 'sensitive',
             'micronaut.security.enabled': true,
-    ], "test")
+    ], Environment.TEST)
 
     @Shared
     @AutoCleanup

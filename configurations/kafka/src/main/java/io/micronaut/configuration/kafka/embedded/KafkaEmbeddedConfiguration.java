@@ -39,7 +39,13 @@ public class KafkaEmbeddedConfiguration implements Toggleable {
     @SuppressWarnings("WeakerAccess")
     public static final String PREFIX = AbstractKafkaConfiguration.PREFIX + ".embedded";
 
-    private boolean enabled = false;
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = false;
+
+    private boolean enabled = DEFAULT_ENABLED;
     private List<String> topics = new ArrayList<>();
     private Properties properties = new Properties();
 
@@ -49,7 +55,7 @@ public class KafkaEmbeddedConfiguration implements Toggleable {
     }
 
     /**
-     * Sets whether the embedded Kafka server is enabled.
+     * Sets whether the embedded Kafka server is enabled. Default value ({@value #DEFAULT_ENABLED}).
      *
      * @param enabled True if it is.
      */

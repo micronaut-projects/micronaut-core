@@ -37,10 +37,22 @@ public class AmazonMetadataConfiguration implements Toggleable {
      */
     public static final String PREFIX = ApplicationConfiguration.PREFIX + "." + Environment.AMAZON_EC2 + ".metadata";
 
-    private String url = "http://169.254.169.254/";
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = true;
+
+    /**
+     * The default url value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_URL = "http://169.254.169.254/";
+
+    private String url = DEFAULT_URL;
     private String metadataUrl;
     private String instanceDocumentUrl;
-    private boolean enabled = true;
+    private boolean enabled = DEFAULT_ENABLED;
 
     /**
      * @return Whether the Amazon EC2 configuration is enabled
@@ -51,6 +63,7 @@ public class AmazonMetadataConfiguration implements Toggleable {
     }
 
     /**
+     * Default value ({@value #DEFAULT_ENABLED}).
      * @param enabled Enable or disable the Amazon EC2 configuration
      */
     public void setEnabled(boolean enabled) {
@@ -65,6 +78,7 @@ public class AmazonMetadataConfiguration implements Toggleable {
     }
 
     /**
+     * Default value ({@value #DEFAULT_URL}).
      * @param url The url
      */
     public void setUrl(String url) {

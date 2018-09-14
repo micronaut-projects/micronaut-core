@@ -46,8 +46,8 @@ class HeartbeatTaskSpec extends Specification {
 
         cleanup:
         embeddedServer.stop()
+        embeddedServer.close()
     }
-
 
     @Singleton
     static class HeartbeatListener implements ApplicationEventListener<HeartbeatEvent> {

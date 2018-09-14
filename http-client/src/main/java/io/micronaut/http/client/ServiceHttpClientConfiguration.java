@@ -43,12 +43,30 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration {
      */
     public static final String PREFIX = "micronaut.http.services";
 
+    /**
+     * The default health check uri.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_HEALTHCHECKURI = "/health";
+
+    /**
+     * The default health check value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_HEALTHCHECK = false;
+
+    /**
+     * The default health check interval in seconds.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final long DEFAULT_HEALTHCHECKINTERVAL_SECONDS = 30;
+
     private final String serviceId;
     private final ServiceConnectionPoolConfiguration connectionPoolConfiguration;
     private List<URI> urls = Collections.emptyList();
-    private String healthCheckUri = "/health";
-    private boolean healthCheck = false;
-    private Duration healthCheckInterval = Duration.ofSeconds(30);
+    private String healthCheckUri = DEFAULT_HEALTHCHECKURI;
+    private boolean healthCheck = DEFAULT_HEALTHCHECK;
+    private Duration healthCheckInterval = Duration.ofSeconds(DEFAULT_HEALTHCHECKINTERVAL_SECONDS);
     private String path;
 
     /**
@@ -112,7 +130,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration {
     }
 
     /**
-     * Sets the health check URI.
+     * Sets the health check URI. Default value ({@value #DEFAULT_HEALTHCHECKURI}).
      *
      * @param healthCheckUri The health check URI
      */
@@ -130,7 +148,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration {
     }
 
     /**
-     * Sets whether the service health should be checked.
+     * Sets whether the service health should be checked. Default value ({@value #DEFAULT_HEALTHCHECK}).
      * @param healthCheck True if the health should be checked
      */
     public void setHealthCheck(boolean healthCheck) {
@@ -165,7 +183,7 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration {
     }
 
     /**
-     * Sets the default duration to check health status.
+     * Sets the default duration to check health status. Default value ({@value #DEFAULT_HEALTHCHECKINTERVAL_SECONDS} seconds).
      *
      * @param healthCheckInterval The duration
      */

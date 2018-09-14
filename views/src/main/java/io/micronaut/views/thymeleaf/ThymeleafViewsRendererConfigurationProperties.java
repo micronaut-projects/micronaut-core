@@ -48,12 +48,36 @@ public class ThymeleafViewsRendererConfigurationProperties implements ThymeleafV
     @SuppressWarnings("WeakerAccess")
     public static final String DEFAULT_SUFFIX = ".html";
 
-    private boolean enabled = true;
-    private String characterEncoding = "UTF-8";
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = true;
+
+    /**
+     * The default character encoding value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_CHARACTER_ENCODING = "UTF-8";
+
+    /**
+     * The default force suffix.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_FORCESUFFIX = false;
+
+    /**
+     * The default force template mode.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_FORCETEMPLATEMODE = false;
+
+    private boolean enabled = DEFAULT_ENABLED;
+    private String characterEncoding = DEFAULT_CHARACTER_ENCODING;
     private TemplateMode templateMode = AbstractConfigurableTemplateResolver.DEFAULT_TEMPLATE_MODE;
     private String suffix = DEFAULT_SUFFIX;
-    private boolean forceSuffix = false;
-    private boolean forceTemplateMode = false;
+    private boolean forceSuffix = DEFAULT_FORCESUFFIX;
+    private boolean forceTemplateMode = DEFAULT_FORCETEMPLATEMODE;
     private boolean cacheable = AbstractConfigurableTemplateResolver.DEFAULT_CACHEABLE;
     private Long cacheTTLMs = AbstractConfigurableTemplateResolver.DEFAULT_CACHE_TTL_MS;
     private boolean checkExistence = AbstractConfigurableTemplateResolver.DEFAULT_EXISTENCE_CHECK;
@@ -142,7 +166,7 @@ public class ThymeleafViewsRendererConfigurationProperties implements ThymeleafV
     }
 
     /**
-     * Sets whether thymeleaf rendering is enabled.
+     * Sets whether thymeleaf rendering is enabled. Default value ({@value #DEFAULT_ENABLED}).
      *
      * @param enabled True if is enabled
      */
@@ -151,7 +175,7 @@ public class ThymeleafViewsRendererConfigurationProperties implements ThymeleafV
     }
 
     /**
-     * Sets the character encoding to use.
+     * Sets the character encoding to use. Default value ({@value #DEFAULT_CHARACTER_ENCODING}).
      *
      * @param characterEncoding The character encoding
      */
@@ -184,7 +208,7 @@ public class ThymeleafViewsRendererConfigurationProperties implements ThymeleafV
     }
 
     /**
-     * Sets whether to force the suffix.
+     * Sets whether to force the suffix. Default value ({@value #DEFAULT_FORCESUFFIX}).
      *
      * @param forceSuffix True if the suffix should be forced
      */
@@ -193,7 +217,7 @@ public class ThymeleafViewsRendererConfigurationProperties implements ThymeleafV
     }
 
     /**
-     * Sets whether to force template mode.
+     * Sets whether to force template mode. Default value ({@value #DEFAULT_FORCETEMPLATEMODE}).
      *
      * @param forceTemplateMode True if template mode should be forced
      */
