@@ -217,6 +217,7 @@ public class HttpServerConfiguration {
 
     /**
      * Sets the port to bind to. Default value ({@value #DEFAULT_RANDOM_PORT})
+     *
      * @param port The port
      */
     public void setPort(int port) {
@@ -224,7 +225,8 @@ public class HttpServerConfiguration {
     }
 
     /**
-     * Sets the host to bind to
+     * Sets the host to bind to.
+     *
      * @param host The host
      */
     public void setHost(String host) {
@@ -233,6 +235,7 @@ public class HttpServerConfiguration {
 
     /**
      * Sets the default read timeout.
+     *
      * @param readTimeout The read timeout
      */
     public void setReadTimeout(Integer readTimeout) {
@@ -241,6 +244,7 @@ public class HttpServerConfiguration {
 
     /**
      * Sets the name of the server header.
+     *
      * @param serverHeader The server header
      */
     public void setServerHeader(String serverHeader) {
@@ -249,6 +253,7 @@ public class HttpServerConfiguration {
 
     /**
      * Sets the maximum request size. Default value ({@value #DEFAULT_MAX_REQUEST_SIZE} => // 10MB)
+     *
      * @param maxRequestSize The max request size
      */
     public void setMaxRequestSize(@ReadableBytes long maxRequestSize) {
@@ -257,6 +262,7 @@ public class HttpServerConfiguration {
 
     /**
      * Sets the amount of time a connection can remain idle without any reads occurring. Default value ({@value #DEFAULT_READIDLETIME_SECONDS} seconds).
+     *
      * @param readIdleTime The read idle time
      */
     public void setReadIdleTime(Duration readIdleTime) {
@@ -265,6 +271,7 @@ public class HttpServerConfiguration {
 
     /**
      * Sets the amount of time a connection can remain idle without any writes occurring. Default value ({@value #DEFAULT_WRITEIDLETIME_SECONDS} seconds).
+     *
      * @param writeIdleTime The write idle time
      */
     public void setWriteIdleTime(Duration writeIdleTime) {
@@ -273,6 +280,7 @@ public class HttpServerConfiguration {
 
     /**
      * Sets the idle time of connections for the server. Default value ({@value #DEFAULT_IDLETIME_SECONDS} seconds).
+     *
      * @param idleTime The idle time
      */
     public void setIdleTime(Duration idleTime) {
@@ -281,6 +289,7 @@ public class HttpServerConfiguration {
 
     /**
      * Sets the multipart configuration.
+     *
      * @param multipart The multipart configuration
      */
     public void setMultipart(MultipartConfiguration multipart) {
@@ -297,6 +306,7 @@ public class HttpServerConfiguration {
 
     /**
      * Sets whether a date header should be sent back. Default value ({@value #DEFAULT_DATEHEADER}).
+     *
      * @param dateHeader True if a date header should be sent.
      */
     public void setDateHeader(boolean dateHeader) {
@@ -326,7 +336,6 @@ public class HttpServerConfiguration {
          */
         @SuppressWarnings("WeakerAccess")
         public static final boolean DEFAULT_DISK = false;
-
 
         private File location;
         private long maxFileSize = DEFAULT_MAX_FILE_SIZE;

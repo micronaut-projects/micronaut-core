@@ -44,7 +44,7 @@ To configure a weigher to be used with the `maximumWeight` configuration, create
 ====
 If you are creating your project using the Micronaut CLI, supply the `redis-lettuce` feature to configure Redis/Lettuce in your project:
 ----
-> mn create-app my-app --features redis-lettuce
+$ mn create-app my-app --features redis-lettuce
 ----
 ====
 

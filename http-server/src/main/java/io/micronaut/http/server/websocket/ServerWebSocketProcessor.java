@@ -42,8 +42,8 @@ import java.util.Set;
 @Internal
 public class ServerWebSocketProcessor extends DefaultRouteBuilder implements ExecutableMethodProcessor<ServerWebSocket> {
 
-
     private Set<Class> mappedWebSockets = new HashSet<>(4);
+
     /**
      * Default constructor.
      *

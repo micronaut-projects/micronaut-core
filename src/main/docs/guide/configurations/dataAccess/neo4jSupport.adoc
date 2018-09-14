@@ -6,7 +6,7 @@ Micronaut features dedicated support for automatically configuring the https://n
 ====
 If you are creating your project using the Micronaut CLI, supply the `neo4j-bolt` feature to configure the Neo4j Bolt driver in your project:
 ----
-> mn create-app my-app --features neo4j-bolt
+$ mn create-app my-app --features neo4j-bolt
 ----
 ====
 
@@ -83,6 +83,15 @@ When the `neo4j-bolt` module is activated a api:configuration.neo4j.bolt.health.
 See the section on the <<healthEndpoint, Health Endpoint>> for more information.
 
 == Using GORM for Neo4j
+
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply the `neo4j-gorm` feature to configure GORM for Neo4j in your project:
+----
+$ mn create-app my-app --features neo4j-gorm
+----
+====
 
 For Groovy users and users familiar with Grails, special support has been added to Micronaut for using http://gorm.grails.org/latest/neo4j/manual[GORM for Neo4j].
 

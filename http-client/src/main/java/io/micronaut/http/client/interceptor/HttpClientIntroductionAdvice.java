@@ -505,7 +505,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         String clientId = clientAnn.getValue(String.class).orElse(null);
         String path = clientAnn.get("path", String.class).orElse(null);
         String clientKey = computeClientKey(clientId, path);
-        if (clientKey == null) return null;
+        if (clientKey == null) {
+            return null;
+        }
 
         return clients.computeIfAbsent(clientKey, integer -> {
             HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(clientId)).orElse(null);

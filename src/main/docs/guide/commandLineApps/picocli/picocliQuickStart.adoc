@@ -1,3 +1,14 @@
+
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply the `picocli` feature to configure Picocli in your project:
+----
+$ mn create-app my-app --features picocli
+----
+====
+
+
 To add support for Picocli to an existing project, you should first add the picocli dependency and the Micronaut picocli configuration to your build configuration. For example in Gradle:
 
 .build.gradle
@@ -33,7 +44,7 @@ This section will show a quick example that provides a command line interface to
 When creating this example project with the Micronaut CLI, use the `create-cli-app` command, and add the `--features=http-client` flag:
 
 ----
-> mn create-cli-app example.git-star --features http-client
+$ mn create-cli-app example.git-star --features http-client
 ----
 This will add the `io.micronaut:http-client` dependency to the build. You can also manually add this to your `gradle.build`:
 

@@ -1,3 +1,12 @@
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply the `kafka-streams` feature to include a simple Kafka Streams configuration in your project:
+----
+$ mn create-app my-app --features kafka-streams
+----
+====
+
 https://kafka.apache.org/documentation/streams/[Kafka Streams] is a platform for building real time streaming applications.
 
 When using Micronaut with Kafka Stream, your application gains all of the features from Micronaut (configuration management, AOP, DI, health checks etc.), simplifying the construction of Kafka Stream applications.

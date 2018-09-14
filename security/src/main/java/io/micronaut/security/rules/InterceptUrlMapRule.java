@@ -24,7 +24,6 @@ import io.micronaut.security.config.InterceptUrlMapPattern;
 import io.micronaut.security.token.config.TokenConfiguration;
 import io.micronaut.web.router.RouteMatch;
 import javax.annotation.Nullable;
-import java.net.URI;
 import java.util.*;
 
 /**

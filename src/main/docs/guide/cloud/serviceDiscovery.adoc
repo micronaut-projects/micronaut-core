@@ -1,14 +1,26 @@
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply either of `discovery-consul` or `discovery-eureka` features to enable service-discovery in your project:
+----
+$ mn create-app my-app --features discovery-consul
+----
+====
+
 Service Discovery enables the ability for Microservices to find each other without necessarily knowing the physical location or IP address of associated services.
 
 There are many ways Service Discovery can be implemented, including:
 
-* You could manually implement Service Discovery using DNS without requiring a third party tool or component.
-* You could use a discovery server such as https://github.com/Netflix/eureka[Eureka], https://www.consul.io[Consul] or https://zookeeper.apache.org[ZooKeeper].
-* You could delegate the work to a container runtime, such as https://kubernetes.io[Kubernetes].
+* Manually implement Service Discovery using DNS without requiring a third party tool or component.
+* Use a discovery server such as https://github.com/Netflix/eureka[Eureka], https://www.consul.io[Consul] or https://zookeeper.apache.org[ZooKeeper].
+* Delegate the work to a container runtime, such as https://kubernetes.io[Kubernetes].
 
-With that in mind Micronaut tries to flexible to support all of these approaches. As of this writing Micronaut features integrated support for the popular Service Discovery servers Eureka and Consul.
+With that in mind, Micronaut tries to flexible to support all of these approaches. As of this writing, Micronaut features integrated support for the popular Service Discovery servers:
 
-To include Service Discovery in your application simply the first step is to add the `discovery-client` dependency to your application, for example in `build.gradle`:
+* Eureka
+* Consul
+
+To include Service Discovery in your application simply the first step is to add the `discovery-client` dependency to your application:
 
 .build.gradle
 [source,groovy]
