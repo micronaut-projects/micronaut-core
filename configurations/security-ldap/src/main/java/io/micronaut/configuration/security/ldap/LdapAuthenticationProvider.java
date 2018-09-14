@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.ldap;
+package io.micronaut.configuration.security.ldap;
 
+import io.micronaut.configuration.security.ldap.configuration.LdapConfiguration;
+import io.micronaut.configuration.security.ldap.context.ContextBuilder;
+import io.micronaut.configuration.security.ldap.context.LdapSearchResult;
+import io.micronaut.configuration.security.ldap.context.LdapSearchService;
+import io.micronaut.configuration.security.ldap.group.LdapGroupProcessor;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.security.authentication.*;
-import io.micronaut.security.ldap.configuration.LdapConfiguration;
-import io.micronaut.security.ldap.context.ContextBuilder;
-import io.micronaut.security.ldap.context.LdapSearchResult;
-import io.micronaut.security.ldap.context.LdapSearchService;
-import io.micronaut.security.ldap.group.LdapGroupProcessor;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;

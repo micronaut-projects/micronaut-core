@@ -4,9 +4,8 @@ import com.unboundid.ldap.listener.InMemoryDirectoryServer
 import com.unboundid.ldap.listener.InMemoryDirectoryServerConfig
 import com.unboundid.ldap.listener.InMemoryListenerConfig
 import com.unboundid.ldif.LDIFReader
-import com.unboundid.util.ssl.KeyStoreKeyManager
 import com.unboundid.util.ssl.SSLUtil
-import com.unboundid.util.ssl.TrustStoreTrustManager
+import io.micronaut.configuration.security.ldap.LdapAuthenticationProvider
 import io.micronaut.core.io.ResourceResolver
 import io.micronaut.http.ssl.SslBuilder
 import io.micronaut.http.ssl.SslConfiguration
@@ -15,10 +14,7 @@ import io.micronaut.security.authentication.AuthenticationResponse
 import io.reactivex.Flowable
 import spock.lang.Specification
 
-import javax.net.ssl.KeyManagerFactory
-import javax.net.ssl.TrustManager
 import javax.net.ssl.TrustManagerFactory
-import java.security.KeyStore
 
 abstract class InMemoryLdapSpec extends Specification {
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.ldap;
+package io.micronaut.configuration.security.ldap;
 
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.security.authentication.AuthenticationResponse;

@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.ldap.configuration;
+package io.micronaut.configuration.security.ldap.configuration;
 
+import io.micronaut.configuration.security.ldap.context.ContextConfigurationContextSettings;
+import io.micronaut.configuration.security.ldap.context.ContextSettings;
+import io.micronaut.configuration.security.ldap.context.SearchSettings;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.security.config.SecurityConfigurationProperties;
-import io.micronaut.security.ldap.context.ContextConfigurationContextSettings;
-import io.micronaut.security.ldap.context.ContextSettings;
-import io.micronaut.security.ldap.context.SearchSettings;
 
 /**
  * Configuration for LDAP authentication.
