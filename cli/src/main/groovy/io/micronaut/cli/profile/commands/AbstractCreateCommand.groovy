@@ -255,6 +255,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         files
     }
 
+    @CompileStatic(TypeCheckingMode.SKIP)
     boolean handle(CreateServiceCommandObject cmd) {
         if (profileRepository == null) throw new IllegalStateException("Property 'profileRepository' must be set")
 
@@ -308,7 +309,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                     }
                 }
             }
-            def ant = new ConsoleAntBuilder()
+            AntBuilder ant = new ConsoleAntBuilder()
 
             for (Feature f in features) {
                 def location = f.location
@@ -328,9 +329,9 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                 if (skeletonDir.exists()) {
                     copySrcToTarget(ant, skeletonDir, ['**/' + APPLICATION_YML], profileInstance.binaryExtensions)
                     copySrcToTarget(ant, new File(skeletonDir, cmd.build + "-build"), ['**/' + APPLICATION_YML], profileInstance.binaryExtensions)
+                    ant.chmod(dir: targetDirectory, includes: profileInstance.executablePatterns.join(' '), perm: 'u+x')
                 }
             }
-
 
             replaceBuildTokens(cmd.build, profileInstance, features, projectTargetDirectory)
 

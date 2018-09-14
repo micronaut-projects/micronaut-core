@@ -32,7 +32,7 @@ public interface CookieFactory {
      */
     CookieFactory INSTANCE = SoftServiceLoader
         .load(CookieFactory.class)
-        .firstOr("io.micronaut.http.simple.cookies.SimpleCookieFactory", CookieFactory.class.getClassLoader())
+        .firstOr("io.micronaut.http.netty.cookies.NettyCookieFactory", CookieFactory.class.getClassLoader())
         .map(ServiceDefinition::load)
         .orElse(null);
 

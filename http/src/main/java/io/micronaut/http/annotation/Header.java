@@ -24,10 +24,29 @@ import io.micronaut.core.bind.annotation.Bindable;
 import java.lang.annotation.*;
 
 /**
- * An annotation that can be applied to method argument to indicate that the method argument is bound from an HTTP header
- * This also can be used in conjection with @Headers to list headers on a client class that will always be applied.
- * Example on a class:
+ * <p>An annotation that can be applied to method argument to indicate that the method argument is bound from an HTTP header
+ *   This also can be used in conjunction with &#064;Headers to list headers on a client class that will always be applied.</p>
+ * <p></p>
+ * <p>The following example demonstrates usage at the type level to declare default values to pass in the request when using the {@code Client} annotation:</p>
+ * <p></p>
  *
+ * <pre class="code">
+ * &#064;Header(name="X-Username",value='Freddy'),
+ * &#064;Header(name="X-MyParam",value='${foo.bar}')
+ * &#064;Client('/users')
+ * interface UserClient {
+ *
+ * }
+ * </pre>
+ *
+ * <p>When declared as a binding annotation the <code>&#064;Header</code> annotation is declared on each parameter to be bound:</p>
+ *
+ * <pre class="code">
+ * &#064;Get('/user')
+ * User get(&#064;Header('X-Username') String username, &#064;Header('X-MyParam') String myparam) {
+ *    return new User(username, myparam);
+ * }
+ * </pre>
  *
  * @author Graeme Rocher
  * @author rvanderwerf

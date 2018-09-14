@@ -14,6 +14,15 @@ You can then open a browser tab to the location `http://localhost:9411` to view 
 
 == Sending Traces to Zipkin
 
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply the `tracing-zipkin` feature to include Zipkin tracing in your project:
+----
+> mn create-app my-app --features tracing-zipkin
+----
+====
+
 To send tracing spans to Zipkin the minimal configuration requires you add the following dependencies to `build.gradle` or `pom.xml`:
 
 .Adding Zipkin Dependencies

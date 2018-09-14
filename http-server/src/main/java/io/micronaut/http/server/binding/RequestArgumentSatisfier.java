@@ -23,8 +23,9 @@ import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.server.binding.binders.BodyArgumentBinder;
-import io.micronaut.http.server.binding.binders.NonBlockingBodyArgumentBinder;
+import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.bind.binders.BodyArgumentBinder;
+import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UnresolvedArgument;
 
@@ -52,6 +53,13 @@ public class RequestArgumentSatisfier {
      */
     public RequestArgumentSatisfier(RequestBinderRegistry requestBinderRegistry) {
         this.binderRegistry = requestBinderRegistry;
+    }
+
+    /**
+     * @return The request binder registry
+     */
+    public RequestBinderRegistry getBinderRegistry() {
+        return binderRegistry;
     }
 
     /**

@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.runtime.ApplicationConfiguration;
 
 import java.net.URI;
 import java.time.Duration;
@@ -74,8 +75,13 @@ public class ServiceHttpClientConfiguration extends HttpClientConfiguration {
      *
      * @param serviceId The service id
      * @param connectionPoolConfiguration The connection pool configuration
+     * @param applicationConfiguration The application configuration
      */
-    public ServiceHttpClientConfiguration(@Parameter String serviceId, ServiceConnectionPoolConfiguration connectionPoolConfiguration) {
+    public ServiceHttpClientConfiguration(
+            @Parameter String serviceId,
+            ServiceConnectionPoolConfiguration connectionPoolConfiguration,
+            ApplicationConfiguration applicationConfiguration) {
+        super(applicationConfiguration);
         this.serviceId = serviceId;
         this.connectionPoolConfiguration = connectionPoolConfiguration;
     }

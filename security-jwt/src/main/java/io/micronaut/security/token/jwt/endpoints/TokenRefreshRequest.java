@@ -18,6 +18,10 @@ package io.micronaut.security.token.jwt.endpoints;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Pattern;
+
 /**
  * Encapsulate the request to get a new access token.
  *
@@ -26,9 +30,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  */
 public class TokenRefreshRequest {
 
+    @NotBlank
+    @NotNull
+    @Pattern(regexp = "refresh_token")
     @JsonProperty("grant_type")
     private String grantType;
 
+    @NotNull
+    @NotBlank
     @JsonProperty("refresh_token")
     private String refreshToken;
 

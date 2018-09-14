@@ -12,3 +12,10 @@ dependencies {
     testCompile dependencyVersion("rxjava2")
     testCompile dependencyVersion("reactor")
 }
+
+//tasks.withType(Test) {
+//    testLogging {
+//        showStandardStreams = true
+//        exceptionFormat = 'full'
+//    }
+//}

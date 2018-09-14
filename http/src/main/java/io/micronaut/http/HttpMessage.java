@@ -21,7 +21,10 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.util.HttpUtil;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Optional;
 
@@ -55,6 +58,13 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
      * @return The request body
      */
     Optional<B> getBody();
+
+    /**
+     * @return The request character encoding. Defaults to {@link StandardCharsets#UTF_8}
+     */
+    default Charset getCharacterEncoding() {
+        return HttpUtil.resolveCharset(this).orElse(StandardCharsets.UTF_8);
+    }
 
     @Override
     default HttpMessage<B> setAttribute(CharSequence name, Object value) {

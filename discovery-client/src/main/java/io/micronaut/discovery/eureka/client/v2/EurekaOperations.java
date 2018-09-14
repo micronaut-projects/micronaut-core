@@ -16,7 +16,6 @@
 
 package io.micronaut.discovery.eureka.client.v2;
 
-import io.micronaut.discovery.eureka.EurekaConfiguration;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.*;
 import io.micronaut.retry.annotation.Retryable;
@@ -44,8 +43,8 @@ public interface EurekaOperations {
      */
     @Post("/apps/{appId}")
     @Retryable(
-        attempts = "${" + EurekaConfiguration.EurekaRegistrationConfiguration.PREFIX + ".retryCount:3}",
-        delay = "${" + EurekaConfiguration.EurekaRegistrationConfiguration.PREFIX + ".retryDelay:1s}"
+        attempts = AbstractEurekaClient.EXPR_EUREKA_REGISTRATION_RETRY_COUNT,
+        delay = AbstractEurekaClient.EXPR_EUREKA_REGISTRATION_RETRY_DELAY
     )
     Publisher<HttpStatus> register(@NotBlank String appId, @Valid @NotNull @Body InstanceInfo instance);
 
@@ -58,8 +57,8 @@ public interface EurekaOperations {
      */
     @Delete("/apps/{appId}/{instanceId}")
     @Retryable(
-        attempts = "${" + EurekaConfiguration.EurekaRegistrationConfiguration.PREFIX + ".retryCount:3}",
-        delay = "${" + EurekaConfiguration.EurekaRegistrationConfiguration.PREFIX + ".retryDelay:1s}"
+        attempts = AbstractEurekaClient.EXPR_EUREKA_REGISTRATION_RETRY_COUNT,
+        delay = AbstractEurekaClient.EXPR_EUREKA_REGISTRATION_RETRY_DELAY
     )
     Publisher<HttpStatus> deregister(@NotBlank String appId, @NotBlank String instanceId);
 
