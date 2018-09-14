@@ -416,6 +416,8 @@ subprojects { Project subproject ->
     }
 
     task replaceAtLink(dependsOn: moveConfigProps) {
+        group 'documentation'
+
         doLast {
             File file = new File("${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc")
             if ( file.exists()) {
@@ -441,6 +443,8 @@ subprojects { Project subproject ->
         }
     }
     task createDocsGeneratedFolders {
+        group 'documentation'
+
         doLast {
             if(!new File("${rootProject.buildDir}/generated").exists()) {
                 new File("${rootProject.buildDir}/generated").mkdir()
@@ -483,8 +487,6 @@ subprojects { Project subproject ->
             }
         }
     }
-
-    jar.dependsOn(processConfigProps)
 
     groovydoc {
         classpath += project.configurations.documentation
