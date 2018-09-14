@@ -7,7 +7,7 @@ compile "io.micronaut.configuration:jmx"
 
 The configuration will create a bean for the management bean server based on configuration.
 
-
+include::{includedir}configurationProperties/io.micronaut.configuration.jmx.JmxConfiguration.adoc[]
 
 === Endpoints
 
