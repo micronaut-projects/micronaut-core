@@ -28,7 +28,7 @@ import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.annotation.QueryValue;
-import io.micronaut.web.router.UriRouteMatch;
+import io.micronaut.http.uri.UriMatchInfo;
 
 import java.util.Optional;
 
@@ -63,17 +63,11 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
 
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
         boolean hasAnnotation = annotationMetadata.hasAnnotation(QueryValue.class);
-        boolean bindAll = false;
         String parameterName = annotationMetadata.getValue(QueryValue.class, String.class).orElse(argument.getName());
-
         // If we need to bind all request params to command object
         // checks if the variable is defined with modifier char *
         // eg. ?pojo*
-        Optional route = source.getAttribute(HttpAttributes.ROUTE_MATCH);
-        if (route.isPresent()) {
-            UriRouteMatch routeMatch = (UriRouteMatch) route.get();
-            bindAll = routeMatch.isExploded(parameterName);
-        }
+        boolean bindAll = source.getAttribute(HttpAttributes.ROUTE_MATCH, UriMatchInfo.class).map(umi -> umi.isExploded(parameterName)).orElse(false);
 
         BindingResult<T> result;
         // if the annotation is present or the HTTP method doesn't allow a request body
