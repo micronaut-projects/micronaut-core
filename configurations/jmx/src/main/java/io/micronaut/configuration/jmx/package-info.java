@@ -15,6 +15,6 @@
  */
 
 /**
- * A configuration that creates beans for JMX
+ * A configuration that creates beans for JMX.
  */
 package io.micronaut.configuration.jmx;

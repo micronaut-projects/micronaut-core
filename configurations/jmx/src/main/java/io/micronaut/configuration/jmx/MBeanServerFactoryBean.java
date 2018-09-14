@@ -32,6 +32,12 @@ import javax.management.MBeanServerFactory;
 import java.lang.management.ManagementFactory;
 import java.util.List;
 
+/**
+ * A factory to create a management bean server bean.
+ *
+ * @author James Kleeh
+ * @since 1.0
+ */
 @Factory
 public class MBeanServerFactoryBean {
 
@@ -40,11 +46,18 @@ public class MBeanServerFactoryBean {
     private final JmxConfiguration configuration;
     private final ApplicationContext applicationContext;
 
+    /**
+     * @param configuration The JMX configuration
+     * @param applicationContext The application context
+     */
     public MBeanServerFactoryBean(JmxConfiguration configuration, ApplicationContext applicationContext) {
         this.configuration = configuration;
         this.applicationContext = applicationContext;
     }
 
+    /**
+     * @return The management bean server
+     */
     @Requires(missingBeans = MBeanServer.class)
     @Singleton
     public MBeanServer getMBeanServer() {
