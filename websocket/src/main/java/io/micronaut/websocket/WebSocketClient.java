@@ -90,5 +90,5 @@ public interface WebSocketClient extends AutoCloseable {
             URI uri
     ) {
         return connect(clientEndpointType, HttpRequest.GET(uri));
-    };
+    }
 }
