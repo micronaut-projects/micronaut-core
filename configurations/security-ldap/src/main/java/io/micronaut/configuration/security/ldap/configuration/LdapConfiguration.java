@@ -36,7 +36,9 @@ public class LdapConfiguration implements Toggleable {
 
     public static final String PREFIX = SecurityConfigurationProperties.PREFIX + ".ldap";
 
-    private boolean enabled = true;
+    private static final boolean DEFAULT_ENABLED = true;
+
+    private boolean enabled = DEFAULT_ENABLED;
     private ContextConfiguration context;
     private SearchConfiguration search;
     private GroupConfiguration group;
@@ -62,7 +64,7 @@ public class LdapConfiguration implements Toggleable {
     }
 
     /**
-     * Sets whether this configuration is enabled.
+     * Sets whether this configuration is enabled. Default {@value DEFAULT_ENABLED}.
      *
      * @param enabled The enabled setting
      */
@@ -148,10 +150,12 @@ public class LdapConfiguration implements Toggleable {
          */
         public static final String PREFIX = LdapConfiguration.PREFIX + ".context";
 
+        private static final String DEFAULT_FACTORY = "com.sun.jndi.ldap.LdapCtxFactory";
+
         private String server;
         private String managerDn;
         private String managerPassword;
-        private String factory = "com.sun.jndi.ldap.LdapCtxFactory";
+        private String factory = DEFAULT_FACTORY;
 
         /**
          * @return The ldap server URL
@@ -209,7 +213,7 @@ public class LdapConfiguration implements Toggleable {
         }
 
         /**
-         * Sets the context factory class.
+         * Sets the context factory class. Default {@value DEFAULT_FACTORY}
          *
          * @param factory The factory class
          */
@@ -229,9 +233,12 @@ public class LdapConfiguration implements Toggleable {
          */
         public static final String PREFIX = LdapConfiguration.PREFIX + ".search";
 
-        private boolean subtree = true;
+        private static final boolean DEFAULT_SUBTREE = true;
+        private static final String DEFAULT_FILTER = "(uid={0})";
+
+        private boolean subtree = DEFAULT_SUBTREE;
         private String base = "";
-        private String filter = "(uid={0})";
+        private String filter = DEFAULT_FILTER;
         private String[] attributes = null;
 
         /**
@@ -242,7 +249,7 @@ public class LdapConfiguration implements Toggleable {
         }
 
         /**
-         * Sets if the subtree should be searched.
+         * Sets if the subtree should be searched. Default {@value DEFAULT_SUBTREE}
          *
          * @param subtree The subtree
          */
@@ -274,7 +281,7 @@ public class LdapConfiguration implements Toggleable {
         }
 
         /**
-         * Sets the search filter.
+         * Sets the search filter. Default {@value DEFAULT_FILTER}
          *
          * @param filter The search filter
          */
@@ -290,7 +297,7 @@ public class LdapConfiguration implements Toggleable {
         }
 
         /**
-         * Sets the attributes to return.
+         * Sets the attributes to return. Default all
          *
          * @param attributes The attributes
          */
@@ -315,11 +322,16 @@ public class LdapConfiguration implements Toggleable {
 
         public static final String PREFIX = LdapConfiguration.PREFIX + ".groups";
 
-        private boolean enabled = false;
-        private boolean subtree = true;
+        private static final boolean DEFAULT_ENABLED = false;
+        private static final boolean DEFAULT_SUBTREE= true;
+        private static final String DEFAULT_FILTER = "uniquemember={0}";
+        private static final String DEFAULT_ATTR = "cn";
+
+        private boolean enabled = DEFAULT_ENABLED;
+        private boolean subtree = DEFAULT_SUBTREE;
         private String base = "";
-        private String filter = "uniquemember={0}";
-        private String attribute = "cn";
+        private String filter = DEFAULT_FILTER;
+        private String attribute = DEFAULT_ATTR;
 
         /**
          * @return True if the subtree should be searched
@@ -329,7 +341,7 @@ public class LdapConfiguration implements Toggleable {
         }
 
         /**
-         * Sets if the subtree should be searched.
+         * Sets if the subtree should be searched. Default {@value DEFAULT_SUBTREE}
          *
          * @param subtree The subtree
          */
@@ -361,7 +373,7 @@ public class LdapConfiguration implements Toggleable {
         }
 
         /**
-         * Sets the group search filter.
+         * Sets the group search filter. Default {@value DEFAULT_FILTER}
          *
          * @param filter The filter
          */
@@ -377,7 +389,7 @@ public class LdapConfiguration implements Toggleable {
         }
 
         /**
-         * Sets the group attribute name.
+         * Sets the group attribute name. Default {@value DEFAULT_ATTR}
          *
          * @param attribute The attribute name
          */
@@ -391,7 +403,7 @@ public class LdapConfiguration implements Toggleable {
         }
 
         /**
-         * Sets if group search is enabled.
+         * Sets if group search is enabled. Default {@value DEFAULT_ENABLED}
          *
          * @param enabled The enabled setting
          */
