@@ -323,7 +323,7 @@ public class LdapConfiguration implements Toggleable {
         public static final String PREFIX = LdapConfiguration.PREFIX + ".groups";
 
         private static final boolean DEFAULT_ENABLED = false;
-        private static final boolean DEFAULT_SUBTREE= true;
+        private static final boolean DEFAULT_SUBTREE = true;
         private static final String DEFAULT_FILTER = "uniquemember={0}";
         private static final String DEFAULT_ATTR = "cn";
 
