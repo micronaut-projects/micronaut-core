@@ -6,6 +6,15 @@ Since Micronaut's DI and AOP is compile time, you can build low overhead stream 
 
 === Defining Kafka Streams
 
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply the `kafka-streams` feature to include a simple Kafka Streams configuration in your project:
+----
+$ mn create-app my-app --features kafka-streams
+----
+====
+
 To define Kafka Streams you should first add the `kafka-streams` configuration to your build.
 
 For example in Gradle:

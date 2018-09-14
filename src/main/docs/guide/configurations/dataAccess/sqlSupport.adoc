@@ -2,6 +2,15 @@ Java data sources can be configured for one of three currently provided implemen
 
 == Configuring a JDBC DataSource
 
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply one of the `jdbc-tomcat`, `jdbc-hikari`, or `jdbc-dbcp` features to preconfigure a simple JDBC connection in your project, along with a default H2 database driver:
+----
+$ mn create-app my-app --features jdbc-tomcat
+----
+====
+
 To get started, simply add a dependency to one of the JDBC configurations that corresponds to the implementation you would like to use.
 
 .build.gradle

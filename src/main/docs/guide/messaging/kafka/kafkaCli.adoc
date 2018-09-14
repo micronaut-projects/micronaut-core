@@ -1,7 +1,7 @@
 To create a project with Kafka support using the Micronaut CLI, supply the `kafka` feature to the `features` flag.
 
 ----
-> mn create-app my-kafka-app --features kafka
+$ mn create-app my-kafka-app --features kafka
 ----
 
 This will create a project with the minimum necessary configuration for Kafka.
@@ -13,7 +13,7 @@ The Micronaut CLI includes a specialized profile for Kafka-based messaging appli
 To create a project using the Kafka profile, use the `profile` flag:
 
 ----
-> mn create-app my-kafka-service --profile kafka
+$ mn create-app my-kafka-service --profile kafka
 ----
 
 As you'd expect, you can start the application with `./gradlew run` (for Gradle) or `./mvnw compile exec:exec` (Maven). The application will (with the default config) attempt to connect to Kafka at `http://localhost:9092`, and will continue to run without starting up an HTTP server. All communication to/from the service will take place via Kafka producers and/or listeners.
@@ -21,9 +21,9 @@ As you'd expect, you can start the application with `./gradlew run` (for Gradle)
 Within the new project, you can now run the Kafka-specific code generation commands:
 
 ----
-mn> create-kafka-producer Message
+$ mn create-kafka-producer Message
 | Rendered template Producer.java to destination src/main/java/my/kafka/app/MessageProducer.java
 
-mn> create-kafka-listener Message
+$ mn create-kafka-listener Message
 | Rendered template Listener.java to destination src/main/java/my/kafka/app/MessageListener.java
 ----

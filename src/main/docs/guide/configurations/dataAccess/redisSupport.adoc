@@ -6,7 +6,7 @@ Micronaut features automatic configuration of the https://lettuce.io[Lettuce] dr
 ====
 If you are creating your project using the Micronaut CLI, supply the `redis-lettuce` feature to configure the Lettuce driver in your project:
 ----
-> mn create-app my-app --features redis-lettuce
+$ mn create-app my-app --features redis-lettuce
 ----
 ====
 

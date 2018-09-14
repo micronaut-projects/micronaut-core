@@ -1,14 +1,14 @@
 https://zeroturnaround.com/software/jrebel/[JRebel] is a proprietary reloading solution that involves an agent library, as well as sophisticated IDE support. The JRebel documentation includes detailed steps for IDE integration and usage of the tool. In this section, we will simply show how to install and configure the agent for Maven and Gradle projects.
 
-== CLI Feature
-
-You can create a new application with JRebel preconfigured, using the CLI. To do this, use the `jrebel` feature. Please note that you will still need to install JRebel and configure the path to the agent.
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply the `jrebel` feature to preconfigure JRebel reloading in your project. Please note that you will still need to install JRebel and supply the correct path to the agent in the `gradle.properties` file (for Gradle) or `pom.xml` (for Maven). The steps necessary are described below.
 
 ----
-> mn create-app my-reloading-app --features jrebel
+$ mn create-app my-app --features jrebel
 ----
-
-This feature will include the appropriate build tool config for Gradle or Maven to load the agent, however you will need to supply the correct path to the agent in the `gradle.properties` file (for Gradle) or `pom.xml` (for Maven). The steps necessary are described below.
+====
 
 == Install/configure JRebel Agent
 

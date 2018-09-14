@@ -68,8 +68,6 @@ $ mn
 mn>
 ----
 
-
-
 == Help and Info
 
 General usage information can be viewed using the `help` command.

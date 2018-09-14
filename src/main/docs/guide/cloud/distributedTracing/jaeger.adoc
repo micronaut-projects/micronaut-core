@@ -29,7 +29,7 @@ See https://www.jaegertracing.io/docs/getting-started/[Getting Started with Jaeg
 ====
 If you are creating your project using the Micronaut CLI, supply the `tracing-jaeger` feature to include Jaeger tracing in your project:
 ----
-> mn create-app my-app --features tracing-jaeger
+$ mn create-app my-app --features tracing-jaeger
 ----
 ====
 
