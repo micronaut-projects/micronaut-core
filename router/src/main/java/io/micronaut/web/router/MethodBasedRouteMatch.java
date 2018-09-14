@@ -25,9 +25,10 @@ import java.util.Collection;
 /**
  * Match a route based on a method.
  *
+ * @param <T> The target
  * @param <R> The route
  */
-public interface MethodBasedRouteMatch<R> extends RouteMatch<R>, MethodExecutionHandle<R> {
+public interface MethodBasedRouteMatch<T, R> extends RouteMatch<R>, MethodExecutionHandle<T, R> {
 
     /**
      * <p>Returns the required arguments for this RouteMatch<./p>

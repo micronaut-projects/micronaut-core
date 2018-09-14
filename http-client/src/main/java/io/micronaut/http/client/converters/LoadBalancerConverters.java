@@ -17,12 +17,15 @@
 package io.micronaut.http.client.converters;
 
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.http.client.LoadBalancer;
 
 import javax.inject.Singleton;
 import java.net.MalformedURLException;
+import java.net.URI;
 import java.net.URL;
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -35,6 +38,14 @@ import java.util.function.Function;
 public class LoadBalancerConverters implements TypeConverterRegistrar {
     @Override
     public void register(ConversionService<?> conversionService) {
+        conversionService.addConverter(URI.class, LoadBalancer.class, (TypeConverter<URI, LoadBalancer>) (object, targetType, context) -> {
+            try {
+                return Optional.of(LoadBalancer.fixed(object.toURL()));
+            } catch (MalformedURLException e) {
+                context.reject(e);
+                return Optional.empty();
+            }
+        });
         conversionService.addConverter(URL.class, LoadBalancer.class, (Function<URL, LoadBalancer>) LoadBalancer::fixed);
         conversionService.addConverter(String.class, LoadBalancer.class, (Function<String, LoadBalancer>) url -> {
             try {

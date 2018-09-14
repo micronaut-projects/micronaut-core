@@ -4,7 +4,7 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
-import io.micronaut.http.server.binding.RequestBinderRegistry;
+import io.micronaut.http.bind.RequestBinderRegistry;
 
 import javax.inject.Singleton;
 import java.util.Optional;

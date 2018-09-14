@@ -27,15 +27,20 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.StreamUtils;
-import io.micronaut.http.*;
+import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.Status;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
@@ -68,6 +73,8 @@ import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import io.micronaut.web.router.qualifier.ConsumesMediaTypeQualifier;
 import io.micronaut.web.router.resource.StaticResourceResolver;
+import io.micronaut.websocket.annotation.OnMessage;
+import io.micronaut.websocket.annotation.OnOpen;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.ByteBufOutputStream;
@@ -77,6 +84,7 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.HttpHeaderValues;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.timeout.IdleState;
@@ -224,6 +232,16 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 // handle error with a method that is global with bad request
                 errorRoute = router.route(HttpStatus.BAD_REQUEST).orElse(null);
             }
+        } else if (cause instanceof HttpStatusException) {
+            HttpStatusException statusException = (HttpStatusException) cause;
+            if (declaringType != null) {
+                // handle error with a method that is non global with bad request
+                errorRoute = router.route(declaringType, statusException.getStatus()).orElse(null);
+            }
+            if (errorRoute == null) {
+                // handle error with a method that is global with bad request
+                errorRoute = router.route(statusException.getStatus()).orElse(null);
+            }
         }
 
         // any another other exception may arise. handle these with non global exception marked method or a global exception marked method.
@@ -247,7 +265,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             try {
                 Object result = errorRoute.execute();
                 io.micronaut.http.MutableHttpResponse<?> response = errorResultToResponse(result);
-                MethodBasedRouteMatch<?> methodBasedRoute = (MethodBasedRouteMatch) errorRoute;
+                MethodBasedRouteMatch<?, ?> methodBasedRoute = (MethodBasedRouteMatch) errorRoute;
                 AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(nettyHttpRequest);
                 Flowable<MutableHttpResponse<?>> routePublisher = buildRoutePublisher(
                         methodBasedRoute.getDeclaringType(),
@@ -339,9 +357,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             );
             return;
         }
-        Optional<UriRouteMatch<Object>> routeMatch = Optional.empty();
+        Optional<UriRouteMatch<Object, Object>> routeMatch = Optional.empty();
 
-        List<UriRouteMatch<Object>> uriRoutes = router
+        List<UriRouteMatch<Object, Object>> uriRoutes = router
             .find(httpMethod, requestPath)
             .filter((match) -> match.test(request))
             .collect(StreamUtils.minAll(
@@ -351,7 +369,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         if (uriRoutes.size() > 1) {
             throw new DuplicateRouteException(requestPath, uriRoutes);
         } else if (uriRoutes.size() == 1) {
-            UriRouteMatch<Object> establishedRoute = uriRoutes.get(0);
+            UriRouteMatch<Object, Object> establishedRoute = uriRoutes.get(0);
             request.setAttribute(HttpAttributes.ROUTE, establishedRoute.getRoute());
             request.setAttribute(HttpAttributes.ROUTE_MATCH, establishedRoute);
             request.setAttribute(HttpAttributes.URI_TEMPLATE, establishedRoute.getRoute().getUriMatchTemplate().toString());
@@ -424,7 +442,16 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             }
         }
         // all ok proceed to try and execute the route
-        handleRouteMatch(route, nettyHttpRequest, ctx);
+        if (route.isAnnotationPresent(OnMessage.class) || route.isAnnotationPresent(OnOpen.class)) {
+            handleStatusError(
+                    ctx,
+                    request,
+                    nettyHttpRequest,
+                    HttpResponse.status(HttpStatus.BAD_REQUEST),
+                    "Not a WebSocket request");
+        } else {
+            handleRouteMatch(route, nettyHttpRequest, ctx);
+        }
     }
 
     private void handleStatusError(
@@ -1100,10 +1127,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (nativeBuffer instanceof ByteBuf) {
                 byteBuf = (ByteBuf) nativeBuffer;
             } else {
-                byteBuf = Unpooled.copiedBuffer(byteBuffer.asNioBuffer());
+                byteBuf = Unpooled.wrappedBuffer(byteBuffer.asNioBuffer());
             }
         } else if (body instanceof byte[]) {
-            byteBuf = Unpooled.copiedBuffer((byte[]) body);
+            byteBuf = Unpooled.wrappedBuffer((byte[]) body);
 
         } else if (body instanceof Writable) {
             byteBuf = context.alloc().ioBuffer(128);

@@ -51,7 +51,7 @@ public @interface Error {
     Class<? extends Throwable> exception() default Throwable.class;
 
     /**
-     * @return The {@link HttpStatus} code to map
+     * @return The {@link io.micronaut.http.HttpStatus} code to map
      */
     HttpStatus status() default HttpStatus.INTERNAL_SERVER_ERROR;
 

@@ -34,7 +34,10 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
       fi
 
       ./gradlew --stop
-      ./gradlew --no-daemon docs || EXIT_STATUS=$?
+      ./gradlew --console=plain --no-daemon assemble  || EXIT_STATUS=$?
+      ./gradlew --console=plain --no-daemon processConfigProps  || EXIT_STATUS=$?
+      ./gradlew --console=plain --no-daemon docs  || EXIT_STATUS=$?
+      ./gradlew --console=plain --no-daemon publishConfigurationReference  || EXIT_STATUS=$?
 
       git clone https://${GH_TOKEN}@github.com/micronaut-projects/micronaut-docs.git -b gh-pages gh-pages --single-branch > /dev/null
 

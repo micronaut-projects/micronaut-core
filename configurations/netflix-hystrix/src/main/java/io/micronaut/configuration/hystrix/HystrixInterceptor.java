@@ -133,9 +133,9 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
                     @SuppressWarnings("unchecked")
                     @Override
                     protected Observable<Object> resumeWithFallback() {
-                        Optional<MethodExecutionHandle<Object>> fallbackMethod = recoveryInterceptor.findFallbackMethod(context);
+                        Optional<? extends MethodExecutionHandle<?, Object>> fallbackMethod = recoveryInterceptor.findFallbackMethod(context);
                         if (fallbackMethod.isPresent()) {
-                            MethodExecutionHandle<Object> handle = fallbackMethod.get();
+                            MethodExecutionHandle<?, Object> handle = fallbackMethod.get();
                             Object result = handle.invoke(context.getParameterValues());
                             Optional<Observable> converted = ConversionService.SHARED.convert(result, Observable.class);
                             if (converted.isPresent()) {
@@ -188,9 +188,9 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
 
                     @Override
                     protected Object getFallback() {
-                        Optional<MethodExecutionHandle<Object>> fallbackMethod = recoveryInterceptor.findFallbackMethod(context);
+                        Optional<? extends MethodExecutionHandle<?, Object>> fallbackMethod = recoveryInterceptor.findFallbackMethod(context);
                         if (fallbackMethod.isPresent()) {
-                            MethodExecutionHandle<Object> handle = fallbackMethod.get();
+                            MethodExecutionHandle<?, Object> handle = fallbackMethod.get();
                             return handle.invoke(context.getParameterValues());
                         }
                         return super.getFallback();

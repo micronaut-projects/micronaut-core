@@ -30,8 +30,20 @@ import java.time.Duration;
 @ConfigurationProperties("micronaut.heartbeat")
 public class HeartbeatConfiguration implements Toggleable {
 
-    private Duration interval = Duration.ofSeconds(15);
-    private boolean enabled = true;
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = true;
+
+    /**
+     * The default interval seconds.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_INTERVAL_SECONDS = 15;
+
+    private Duration interval = Duration.ofSeconds(DEFAULT_INTERVAL_SECONDS);
+    private boolean enabled = DEFAULT_ENABLED;
 
     /**
      * @return The interval with which to publish {@link HeartbeatEvent} instances
@@ -41,6 +53,7 @@ public class HeartbeatConfiguration implements Toggleable {
     }
 
     /**
+     * Default value ({@value #DEFAULT_INTERVAL_SECONDS} seconds).
      * @param interval The interval to publish {@link HeartbeatEvent} instances
      */
     public void setInterval(Duration interval) {
@@ -56,6 +69,7 @@ public class HeartbeatConfiguration implements Toggleable {
     }
 
     /**
+     * Default value ({@value #DEFAULT_ENABLED}).
      * @param enabled Enable the publish of {@link HeartbeatEvent} event instances
      */
     public void setEnabled(boolean enabled) {

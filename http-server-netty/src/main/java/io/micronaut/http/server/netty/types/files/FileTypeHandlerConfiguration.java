@@ -27,12 +27,26 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 @ConfigurationProperties("netty.responses.file")
 public class FileTypeHandlerConfiguration {
 
-    protected int cacheSeconds = 60;
+    /**
+     * The default cache seconds.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_CACHESECONDS = 60;
+
+    private int cacheSeconds = DEFAULT_CACHESECONDS;
 
     /**
      * @return the cache seconds
      */
     public int getCacheSeconds() {
         return cacheSeconds;
+    }
+
+    /**
+     * Cache Seconds. Default value ({@value #DEFAULT_CACHESECONDS}).
+     * @param cacheSeconds cache seconds
+     */
+    public void setCacheSeconds(int cacheSeconds) {
+        this.cacheSeconds = cacheSeconds;
     }
 }

@@ -16,6 +16,7 @@
 package io.micronaut.docs.produces
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -32,7 +33,7 @@ class ProducesSpec extends Specification {
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             'spec.name':'producesspec'
-    ], "test")
+    ], Environment.TEST)
 
     @AutoCleanup
     @Shared

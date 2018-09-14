@@ -1,6 +1,7 @@
 package io.micronaut.docs.security.principalparam
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -16,7 +17,7 @@ class UserControllerSpec extends Specification {
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
             "spec.name": "principalparam",
             "micronaut.security.enabled": true,
-    ], "test")
+    ], Environment.TEST)
 
     @Shared
     @AutoCleanup

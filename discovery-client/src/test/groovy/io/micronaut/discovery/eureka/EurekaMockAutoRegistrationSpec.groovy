@@ -16,6 +16,7 @@
 package io.micronaut.discovery.eureka
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.discovery.eureka.client.v2.EurekaClient
@@ -36,26 +37,23 @@ import javax.validation.ConstraintViolationException
 @Stepwise
 class EurekaMockAutoRegistrationSpec extends Specification {
 
-
     void "test that an application can be registered and de-registered with Eureka"() {
-
         given:
-        EmbeddedServer eurekaServer = ApplicationContext.run(EmbeddedServer, [
+        Map eurekaServerConfig = [
                 'jackson.serialization.WRAP_ROOT_VALUE': true,
                 (MockEurekaServer.ENABLED): true
-        ])
+        ]
+        EmbeddedServer eurekaServer = ApplicationContext.run(EmbeddedServer, eurekaServerConfig, Environment.TEST)
 
         when: "An application is started and eureka configured"
         String serviceId = 'myService'
-        EmbeddedServer application = ApplicationContext.run(
-                EmbeddedServer,
-                ['consul.client.registration.enabled'              : false,
-                 "micronaut.caches.discoveryClient.enabled": false,
-                 'eureka.client.host'                       : eurekaServer.getHost(),
-                 'eureka.client.port'                       : eurekaServer.getPort(),
-                 'jackson.deserialization.UNWRAP_ROOT_VALUE': true,
-                 'micronaut.application.name'                : serviceId]
-        )
+        Map applicationConfig = ['consul.client.registration.enabled'        : false,
+                                 "micronaut.caches.discoveryClient.enabled"  : false,
+                                 'eureka.client.host'                        : eurekaServer.getHost(),
+                                 'eureka.client.port'                        : eurekaServer.getPort(),
+                                 'jackson.deserialization.UNWRAP_ROOT_VALUE' : true,
+                                 'micronaut.application.name'                : serviceId]
+        EmbeddedServer application = ApplicationContext.run(EmbeddedServer, applicationConfig, Environment.TEST)
 
         EurekaClient eurekaClient = application.applicationContext.getBean(EurekaClient)
         PollingConditions conditions = new PollingConditions(timeout: 5, delay: 0.5)
@@ -71,8 +69,6 @@ class EurekaMockAutoRegistrationSpec extends Specification {
             InstanceInfo instanceInfo = MockEurekaServer.instances[NameUtils.hyphenate(serviceId)].values().first()
             instanceInfo.status == InstanceInfo.Status.UP
         }
-
-
 
         when: "The application is stopped"
         application?.stop()
@@ -91,7 +87,6 @@ class EurekaMockAutoRegistrationSpec extends Specification {
         cleanup:
         eurekaServer?.stop()
     }
-
 
     @Unroll
     void "test that an application can be registered and de-registered with Eureka with metadata"() {
@@ -141,6 +136,5 @@ class EurekaMockAutoRegistrationSpec extends Specification {
         'myService' | [homePageUrl:'http://home', statusPageUrl:'http://status', healthCheckUrl:'http://health', secureHealthCheckUrl:'http://securehealth']
         'myService' | ['metadata':[foo:'bar']]
         'myService' | [port:9999, securePort:9998]
-
     }
 }

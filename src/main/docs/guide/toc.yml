@@ -75,15 +75,18 @@ httpServer:
   jsonBinding: JSON Binding with Jackson
   datavalidation: Data Validation
   staticResources: Serving Static Resources
-#  contentNegotiation: Content Negotiation
   errorHandling: Error Handling
   formData: Handling Form Data
   serverIO: Writing Response Data
   uploads: File Uploads
   transfers: File Transfers
-  sse: Server Sent Events
   filters: HTTP Filters
   sessions: HTTP Sessions
+  sse: Server Sent Events
+  websocket:
+    title: WebSocket Support
+    websocketServer: Using @ServerWebSocket
+    websocketClient: Using @ClientWebSocket
   serverEvents: Server Events
   serverConfiguration:
     title: Configuring the HTTP Server
@@ -254,6 +257,7 @@ security:
       claimsGeneration: Claims Generation
       render:
         title: Token Render
+      tokenPropagation: Token Propagation
   endpoints:
     title: Built-In Security Controllers
     login: Login Controller
@@ -285,4 +289,3 @@ appendix:
   usingsnapshots: Using Snapshots
   problems: Common Problems
   breaks: Breaking Changes
-  propertyReference: Configuration Property Reference

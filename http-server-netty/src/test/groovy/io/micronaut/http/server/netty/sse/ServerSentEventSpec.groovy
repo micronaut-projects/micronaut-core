@@ -37,7 +37,6 @@ import java.time.temporal.ChronoUnit
  */
 class ServerSentEventSpec extends AbstractMicronautSpec {
 
-
     void "test consume event stream object"() {
         given:
         SseClient client = embeddedServer.applicationContext.getBean(SseClient)
@@ -46,15 +45,12 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
         expect:
         events.size() == 4
         events.first().data == new Foo(name: "Foo 1",age:11)
-
     }
 
     void "test consume event stream string"() {
         given:
         SseClient client = embeddedServer.applicationContext.getBean(SseClient)
         List<Event<String>> events = client.string().collectList().block()
-
-
 
         expect:
         events.size() == 4
@@ -71,11 +67,9 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
         events.first().data == new Foo(name: "Foo 1",age:11)
         events.first().id == "1"
         events.first().retry == Duration.ofMinutes(2)
-
     }
 
     void "test receive error from supplier"() {
-
         given:
         SseClient client = embeddedServer.applicationContext.getBean(SseClient)
 
@@ -84,9 +78,7 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
 
         then:
         events.size() == 0
-
     }
-
 
     @Client('/sse')
     static interface SseClient {
@@ -105,7 +97,6 @@ class ServerSentEventSpec extends AbstractMicronautSpec {
 
         @Get(value = '/on-error', processes = MediaType.TEXT_EVENT_STREAM)
         Flux<Event<String>> onError()
-
     }
 
     @Controller('/sse')

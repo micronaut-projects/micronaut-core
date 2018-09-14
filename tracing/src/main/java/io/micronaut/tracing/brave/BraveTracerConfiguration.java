@@ -52,7 +52,13 @@ public class BraveTracerConfiguration implements Toggleable {
     @ConfigurationBuilder(prefixes = "", excludes = {"errorParser", "clock", "endpoint", "spanReporter", "propagationFactory", "currentTraceContext", "sampler"})
     protected Tracing.Builder tracingBuilder = Tracing.newBuilder();
 
-    private boolean enabled = false;
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = false;
+
+    private boolean enabled = DEFAULT_ENABLED;
     private float samplerProbability = DEFAULT_SAMPLER_PROBABILITY;
 
     /**
@@ -78,6 +84,7 @@ public class BraveTracerConfiguration implements Toggleable {
     }
 
     /**
+     * Default value ({@value #DEFAULT_ENABLED}).
      * @param enabled True if tracing is enabled
      */
     public void setEnabled(boolean enabled) {

@@ -1,0 +1,1 @@
+Micronaut features dedicated support for creating WebSocket clients and servers. The pkg:websocket.annotation[] package includes a set of annotations for defining both clients and servers.

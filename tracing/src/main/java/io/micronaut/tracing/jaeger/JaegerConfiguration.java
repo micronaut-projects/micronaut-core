@@ -44,7 +44,14 @@ public class JaegerConfiguration implements Toggleable  {
     @ConfigurationBuilder(prefixes = "with", includes = "tracerTags")
     protected final Configuration configuration;
 
-    private boolean enabled;
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = false;
+
+    private boolean enabled = DEFAULT_ENABLED;
+
     private boolean expandExceptionLogs;
     private boolean zipkinSharedRpcSpan;
 
@@ -99,7 +106,7 @@ public class JaegerConfiguration implements Toggleable  {
     }
 
     /**
-     * Enable/Disable Jaeger.
+     * Enable/Disable Jaeger. Default value ({@value #DEFAULT_ENABLED}).
      *
      * @param enabled A boolean to enable/disabled Jaeger
      */

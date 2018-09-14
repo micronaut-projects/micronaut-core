@@ -1,0 +1,59 @@
+The ann:websocket.annotation.ServerWebSocket[] annotation can be applied to any class that should map to a WebSocket URI. The following example is a simple chat WebSocket implementation:
+
+.WebSocket Chat Example
+[source,java]
+----
+include::{testswebsocket}/ChatServerWebSocket.java[]
+----
+
+<1> The ann:websocket.annotation.ServerWebSocket[] annotation is used to define the path the WebSocket is mapped under. The URI can be a URI template.
+<2> The ann:websocket.annotation.OnOpen[] annotation is used to declare a method that is invoked when the WebSocket is opened.
+<3> The ann:websocket.annotation.OnMessage[] annotation is used to declare a method that is invoked when a message is received.
+<4> The passed api:websocket.WebSocketSession[] instance can be used to broadcast messages to other WebSocket clients.
+<5> The ann:websocket.annotation.OnClose[] annotation is used to declare a method that is invoked when the WebSocket is closed.
+
+TIP: A working example of WebSockets in action can be found in the https://github.com/micronaut-projects/micronaut-examples/tree/master/websocket-chat[Micronaut Examples] GitHub repository.
+
+In terms of binding the method arguments to each WebSocket method can be:
+
+* A variable from the URI template (in the above example `topic` and `username` are variables in the URI template)
+* An instance of api:websocket.WebSocketSession[]
+
+=== The @OnClose Method
+
+The ann:websocket.annotation.OnClose[] method can also optionally receive a api:websocket.CloseReason[]. The `@OnClose` method is invoked prior to the session closing.
+
+=== The @OnMessage Method
+
+The ann:websocket.annotation.OnMessage[] method can define a parameter that is the message body. The parameter can be one of the following:
+
+* A Netty `WebSocketFrame`
+* Any Java primitive or simple type (such as `String`). In fact any type that can be converted from `ByteBuf` (you can register additional api:core.convert.TypeConverter[] beans if you wish to support a custom type).
+* A `byte[]`, a `ByteBuf` or a Java NIO `ByteBuffer`.
+* A Plain Old Java Object (POJO). In the case of a POJO the POJO will be decoded by default  as JSON using api:jackson.codec.JsonMediaTypeCodec[]. You can register a custom codec if necessary and define the content type of the handler using the ann:http.annotation.Consumes[] annotation.
+
+=== The @OnError Method
+
+A method annotated with ann:websocket.annotation.OnError[] can be added to implement custom error handling. The `@OnError` method can optionally define a parameter that receives the exception type that is to be handled. If no `@OnError` handling is present and a unrecoverable exception occurs the WebSocket is automatically closed.
+
+=== Non-Blocking Message Handling
+
+The previous example uses the `broadcastSync` method of the api:websocket.WebSocketSession[] interface which blocks until the broadcast is complete. You can however implement non-blocking WebSocket servers by instead returning a rs:Publisher[] or a `Future` from each WebSocket handler method. For example:
+
+.WebSocket Chat Example
+[source,java]
+----
+include::{testswebsocket}/ReactivePojoChatServerWebSocket.java[tag=onmessage, indent=0]
+----
+
+=== @ServerWebSocket and Scopes
+
+By default a unique `@ServerWebSocket` instance is created for each WebSocket connection. This allows you to retrieve the api:websocket.WebSocketSession[] from the `@OnOpen` handler and assign it to a field of the  `@ServerWebSocket` instance.
+
+If you define the `@ServerWebSocket` as `@Singleton` it should be noted that extra care will need to be taken to synchronize local state to avoid thread safety issues.
+
+=== Sharing Sessions with the HTTP Session
+
+The api:websocket.WebSocketSession[] is by default backed by an in-memory map. If you add the the `session` module you can however share <<sessions,sessions>> between the HTTP server and the WebSocket server.
+
+NOTE: When sessions are backed by a persistent store such as Redis then after each message is processed the session is updated to the backing store.

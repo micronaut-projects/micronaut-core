@@ -19,6 +19,7 @@ import com.nimbusds.jwt.EncryptedJWT
 import com.nimbusds.jwt.JWTParser
 import com.nimbusds.jwt.SignedJWT
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
@@ -50,7 +51,7 @@ class SignRSANotEncrypSpec extends Specification implements AuthorizationUtils {
             'micronaut.security.token.enabled': true,
             'micronaut.security.token.jwt.enabled': true,
             'pem.path': pemFile.absolutePath,
-    ], "test")
+    ], Environment.TEST)
 
     @Shared
     @AutoCleanup

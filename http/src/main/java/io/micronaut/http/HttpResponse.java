@@ -84,7 +84,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#OK} response with an empty body.
+     * Return an {@link io.micronaut.http.HttpStatus#OK} response with an empty body.
      *
      * @param <T> The response type
      * @return The ok response
@@ -94,7 +94,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#NOT_FOUND} response with an empty body.
+     * Return an {@link io.micronaut.http.HttpStatus#NOT_FOUND} response with an empty body.
      *
      * @param <T> The response type
      * @return The response
@@ -104,7 +104,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#UNAUTHORIZED} response with an empty body.
+     * Return an {@link io.micronaut.http.HttpStatus#UNAUTHORIZED} response with an empty body.
      *
      * @param <T> The response type
      * @return The response
@@ -114,7 +114,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#NOT_FOUND} response with a body.
+     * Return an {@link io.micronaut.http.HttpStatus#NOT_FOUND} response with a body.
      *
      * @param body The response body
      * @param <T>  The body type
@@ -126,7 +126,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#BAD_REQUEST} response with an empty body.
+     * Return an {@link io.micronaut.http.HttpStatus#BAD_REQUEST} response with an empty body.
      *
      * @param <T> The response type
      * @return The response
@@ -136,7 +136,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#BAD_REQUEST} response with an empty body.
+     * Return an {@link io.micronaut.http.HttpStatus#BAD_REQUEST} response with a body.
      *
      * @param body The response body
      * @param <T>  The body type
@@ -147,7 +147,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#UNPROCESSABLE_ENTITY} response with an empty body.
+     * Return an {@link io.micronaut.http.HttpStatus#UNPROCESSABLE_ENTITY} response with an empty body.
      *
      * @param <T> The response type
      * @return The response
@@ -157,7 +157,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#METHOD_NOT_ALLOWED} response with an empty body.
+     * Return an {@link io.micronaut.http.HttpStatus#METHOD_NOT_ALLOWED} response with an empty body.
      *
      * @param allowed Allowed Http Methods
      * @param <T>     The response type
@@ -169,7 +169,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#METHOD_NOT_ALLOWED} response with an empty body.
+     * Return an {@link io.micronaut.http.HttpStatus#METHOD_NOT_ALLOWED} response with an empty body.
      *
      * @param allowed Allowed Http Methods
      * @param <T>     The response type
@@ -181,7 +181,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#INTERNAL_SERVER_ERROR} response with an empty body.
+     * Return an {@link io.micronaut.http.HttpStatus#INTERNAL_SERVER_ERROR} response with an empty body.
      *
      * @param <T> The response type
      * @return The response
@@ -191,7 +191,18 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#ACCEPTED} response with an empty body.
+     * Return an {@link io.micronaut.http.HttpStatus#INTERNAL_SERVER_ERROR} response with a body.
+     *
+     * @param body The response body
+     * @param <T> The response type
+     * @return The response
+     */
+    static <T> MutableHttpResponse<T> serverError(T body) {
+        return HttpResponseFactory.INSTANCE.<T>status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+    }
+
+    /**
+     * Return an {@link io.micronaut.http.HttpStatus#ACCEPTED} response with an empty body.
      *
      * @param <T> The response type
      * @return The response
@@ -201,7 +212,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#ACCEPTED} response with an empty body and a {@link HttpHeaders#LOCATION} header.
+     * Return an {@link io.micronaut.http.HttpStatus#ACCEPTED} response with an empty body and a {@link HttpHeaders#LOCATION} header.
      *
      * @param location the location in which the new resource will be available
      * @param <T>      The response type
@@ -215,7 +226,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#NO_CONTENT} response with an empty body.
+     * Return an {@link io.micronaut.http.HttpStatus#NO_CONTENT} response with an empty body.
      *
      * @param <T> The response type
      * @return The response
@@ -225,7 +236,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#NOT_MODIFIED} response with an empty body.
+     * Return an {@link io.micronaut.http.HttpStatus#NOT_MODIFIED} response with an empty body.
      *
      * @param <T> The response type
      * @return The response
@@ -235,7 +246,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#OK} response with a body.
+     * Return an {@link io.micronaut.http.HttpStatus#OK} response with a body.
      *
      * @param body The response body
      * @param <T>  The body type
@@ -246,7 +257,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#CREATED} response with a body.
+     * Return an {@link io.micronaut.http.HttpStatus#CREATED} response with a body.
      *
      * @param body The response body
      * @param <T>  The body type
@@ -258,7 +269,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#CREATED} response with the location of the new resource.
+     * Return an {@link io.micronaut.http.HttpStatus#CREATED} response with the location of the new resource.
      *
      * @param location The location of the new resource
      * @param <T>      The response type
@@ -272,7 +283,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#CREATED} response with a body and the location of the new resource.
+     * Return an {@link io.micronaut.http.HttpStatus#CREATED} response with a body and the location of the new resource.
      *
      * @param body     The response body
      * @param location The location of the new resource
@@ -286,7 +297,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#SEE_OTHER} response with the location of the new resource.
+     * Return an {@link io.micronaut.http.HttpStatus#SEE_OTHER} response with the location of the new resource.
      *
      * @param location The location of the new resource
      * @param <T>      The response type
@@ -300,7 +311,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#TEMPORARY_REDIRECT} response with the location of the new resource.
+     * Return an {@link io.micronaut.http.HttpStatus#TEMPORARY_REDIRECT} response with the location of the new resource.
      *
      * @param location The location of the new resource
      * @param <T>      The response type
@@ -314,7 +325,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#PERMANENT_REDIRECT} response with the location of the new resource.
+     * Return an {@link io.micronaut.http.HttpStatus#PERMANENT_REDIRECT} response with the location of the new resource.
      *
      * @param location The location of the new resource
      * @param <T>      The response type
@@ -328,7 +339,7 @@ public interface HttpResponse<B> extends HttpMessage<B> {
     }
 
     /**
-     * Return an {@link HttpStatus#MOVED_PERMANENTLY} response with the location of the new resource.
+     * Return an {@link io.micronaut.http.HttpStatus#MOVED_PERMANENTLY} response with the location of the new resource.
      *
      * @param location The location of the new resource
      * @param <T>      The response type

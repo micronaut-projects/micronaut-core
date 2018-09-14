@@ -44,7 +44,7 @@ import spock.util.concurrent.PollingConditions
  * @author Rvanderwerf
  * @since 1.0
  */
-@IgnoreIf({ !System.getenv('AWS_NAMESPACE_NAME') || !System.getenv('AWS_SUBNET_ID')})
+@IgnoreIf({ !env['AWS_NAMESPACE_NAME'] || !env['AWS_SUBNET_ID'] })
 @Stepwise
 class Route53AutoNamingClientSpec extends Specification {
 

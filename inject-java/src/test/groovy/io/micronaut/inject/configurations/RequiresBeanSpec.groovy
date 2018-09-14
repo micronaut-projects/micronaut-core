@@ -43,7 +43,7 @@ class RequiresBeanSpec extends Specification {
         !context.containsBean(RequiresJava9)
     }
 
-    @IgnoreIf({ System.getenv("TRAVIS") } ) // fails on travis, which is expected
+    @IgnoreIf({ env["TRAVIS"] } ) // fails on travis, which is expected
     void "test that a condition can be required for a bean when false"() {
         given:
         BeanContext context = new DefaultBeanContext()

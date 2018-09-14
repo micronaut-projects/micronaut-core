@@ -9,6 +9,11 @@ Micronaut is built with Java 8, however works fine with Java 9/10 and above as w
 There are some considerations to take into account when using Java 9/10 with Micronaut.
 
 === The javax.annotation package
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, the `javax.annotation` dependency will be added to your project automatically if you are using Java 9+.
+====
 
 The `javax.annotation`, which includes `@PostConstruct`, `@PreDestroy` etc. is no longer part of the core JDK but instead a module. If you run under Java 9+ you will need to import the module or add the dependency to your classpath:
 

@@ -17,6 +17,7 @@ package io.micronaut.security.events
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.context.env.Environment
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -54,7 +55,7 @@ class EventListenerSpec extends Specification {
             'micronaut.security.enabled': true,
             'micronaut.security.endpoints.login.enabled': true,
             'micronaut.security.endpoints.logout.enabled': true,
-    ], "test")
+    ], Environment.TEST)
     @Shared @AutoCleanup RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
     def "failed login publishes LoginFailedEvent"() {

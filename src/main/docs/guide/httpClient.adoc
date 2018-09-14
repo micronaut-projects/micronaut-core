@@ -1,6 +1,12 @@
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, the `http-client` dependency is included by default.
+====
+
 A critical component of any Microservice architecture is the client communication between Microservices. With that in mind Micronaut features a built in HTTP client that has both a low-level API and a higher level AOP-driven API.
 
-TIP: Regardless whether you choose to use Micronaut's HTTP server, you may wish to use the Micronaut HTTP client in your application since it is a feature-rich client implementation
+TIP: Regardless whether you choose to use Micronaut's HTTP server, you may wish to use the Micronaut HTTP client in your application since it is a feature-rich client implementation.
 
 To use the HTTP client you must have the `http-client` dependency on your classpath. For example in `build.gradle`:
 

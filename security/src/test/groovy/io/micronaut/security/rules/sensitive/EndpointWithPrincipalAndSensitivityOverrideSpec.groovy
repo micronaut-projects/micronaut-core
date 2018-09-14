@@ -16,6 +16,7 @@
 package io.micronaut.security.rules.sensitive
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.client.RxHttpClient
@@ -32,7 +33,7 @@ class EndpointWithPrincipalAndSensitivityOverrideSpec extends Specification {
             'micronaut.security.enabled': true,
             'endpoints.defaultendpoint.sensitive': false,
 
-    ], "test")
+    ], Environment.TEST)
 
     @Shared
     @AutoCleanup

@@ -40,6 +40,12 @@ public class CacheConfiguration {
      */
     public static final String PREFIX = "micronaut.caches";
 
+    /**
+     * The default test mode value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_TESTMODE = false;
+
     protected Charset charset;
 
     private Integer initialCapacity;
@@ -47,7 +53,7 @@ public class CacheConfiguration {
     private Long maximumWeight;
     private Duration expireAfterWrite;
     private Duration expireAfterAccess;
-    private boolean testMode = false;
+    private boolean testMode = DEFAULT_TESTMODE;
     private final String cacheName;
 
     /**
@@ -171,7 +177,7 @@ public class CacheConfiguration {
     }
 
     /**
-     * Set whether test mode is enabled.
+     * Set whether test mode is enabled. Default value ({@value #DEFAULT_TESTMODE}).
      *
      * @param testMode True if test mode is eanbled
      */

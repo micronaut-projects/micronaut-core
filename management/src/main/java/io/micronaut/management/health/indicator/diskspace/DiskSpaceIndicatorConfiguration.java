@@ -31,9 +31,27 @@ import java.io.File;
 @ConfigurationProperties("endpoints.health.disk-space")
 public class DiskSpaceIndicatorConfiguration implements Toggleable {
 
-    private boolean enabled = true;
-    private File path = new File(".");
-    private long threshold = 1024 * 1024 * 10; // 10MB
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = true;
+
+    /**
+     * The default path value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_PATH = ".";
+
+    /**
+     * The default threshold value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final long DEFAULT_THRESHOLD = 1024 * 1024 * 10; // 10MB
+
+    private boolean enabled = DEFAULT_ENABLED;
+    private File path = new File(DEFAULT_PATH);
+    private long threshold = DEFAULT_THRESHOLD;
 
     /**
      * @return Whether the health indicator is enabled
@@ -44,6 +62,7 @@ public class DiskSpaceIndicatorConfiguration implements Toggleable {
     }
 
     /**
+     * Default value ({@value #DEFAULT_ENABLED}).
      * @param enabled Enable the health indication endpoint
      */
     protected void setEnabled(boolean enabled) {
@@ -58,6 +77,7 @@ public class DiskSpaceIndicatorConfiguration implements Toggleable {
     }
 
     /**
+     * Default value ({@value #DEFAULT_PATH}).
      * @param path The file path
      */
     protected void setPath(File path) {
@@ -72,6 +92,7 @@ public class DiskSpaceIndicatorConfiguration implements Toggleable {
     }
 
     /**
+     * Default value ({@value #DEFAULT_THRESHOLD} => 10MB).
      * @param threshold Set the threshold
      */
     protected void setThreshold(@ReadableBytes long threshold) {

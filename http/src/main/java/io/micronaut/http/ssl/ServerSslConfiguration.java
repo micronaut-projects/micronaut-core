@@ -96,8 +96,6 @@ public class ServerSslConfiguration extends SslConfiguration {
         }
     }
 
-
-
     /**
      * The default {@link io.micronaut.http.ssl.SslConfiguration.KeyConfiguration}.
      */
@@ -106,7 +104,6 @@ public class ServerSslConfiguration extends SslConfiguration {
     @Requires(property = ServerSslConfiguration.PREFIX + "." + KeyConfiguration.PREFIX)
     public static class DefaultKeyConfiguration extends KeyConfiguration {
     }
-
 
     /**
      * The default {@link io.micronaut.http.ssl.SslConfiguration.KeyStoreConfiguration}.

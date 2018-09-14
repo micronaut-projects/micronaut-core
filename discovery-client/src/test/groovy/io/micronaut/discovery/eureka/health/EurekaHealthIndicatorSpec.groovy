@@ -16,6 +16,7 @@
 package io.micronaut.discovery.eureka.health
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.discovery.eureka.MockEurekaServer
 import io.micronaut.health.HealthStatus
 import io.micronaut.management.health.indicator.HealthResult
@@ -30,14 +31,14 @@ class EurekaHealthIndicatorSpec extends Specification {
 
     void "test eureka health indicator"() {
         given:
-        EmbeddedServer eurekaServer = ApplicationContext.run(EmbeddedServer, [
+        Map eurekaServerMap = [
                 'jackson.serialization.WRAP_ROOT_VALUE': true,
                 (MockEurekaServer.ENABLED)             : true
-        ])
+        ]
+        EmbeddedServer eurekaServer = ApplicationContext.run(EmbeddedServer, eurekaServerMap, Environment.TEST)
 
-        ApplicationContext applicationContext = ApplicationContext.run(
-                'eureka.client.defaultZone': eurekaServer.getURL()
-        )
+        Map applicationContextMap = ['eureka.client.defaultZone': eurekaServer.getURL()]
+        ApplicationContext applicationContext = ApplicationContext.run(applicationContextMap, Environment.TEST)
 
         EurekaHealthIndicator healthIndicator = applicationContext.getBean(EurekaHealthIndicator)
 
@@ -46,7 +47,6 @@ class EurekaHealthIndicatorSpec extends Specification {
 
         then:
         healthResult.status == HealthStatus.UP
-
 
         cleanup:
         eurekaServer?.stop()

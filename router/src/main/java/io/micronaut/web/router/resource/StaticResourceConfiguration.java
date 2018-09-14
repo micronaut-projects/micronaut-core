@@ -43,9 +43,21 @@ public class StaticResourceConfiguration implements Toggleable {
      */
     public static final String PREFIX = "micronaut.router.static.resources";
 
-    private boolean enabled = false;
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = false;
+
+    /**
+     * The default mapping value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_MAPPING = "/**";
+
+    private boolean enabled = DEFAULT_ENABLED;
     private List<String> paths = Collections.emptyList();
-    private String mapping = "/**";
+    private String mapping = DEFAULT_MAPPING;
 
     private final ResourceResolver resourceResolver;
 
@@ -95,7 +107,7 @@ public class StaticResourceConfiguration implements Toggleable {
     }
 
     /**
-     * Sets whether static resources are enabled.
+     * Sets whether static resources are enabled. Default value ({@value #DEFAULT_ENABLED}).
      *
      * @param enabled True if they are enabled.
      */
@@ -114,7 +126,7 @@ public class StaticResourceConfiguration implements Toggleable {
     }
 
     /**
-     * Sets default mapping.
+     * Sets default mapping. Default value ({@value #DEFAULT_MAPPING}).
      *
      * @param mapping The mapping
      */

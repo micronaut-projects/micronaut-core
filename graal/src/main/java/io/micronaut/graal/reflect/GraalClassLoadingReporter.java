@@ -43,11 +43,12 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
     /**
      * System property that indicates the location of the reflection JSON file.
      */
-    public static final String REFLECTION_JSON_FILE = "graal.reflection.json";
+    public static final String REFLECTION_JSON_FILE = "graalvm.reflection.json";
     /**
      * System property that indicates whether class analysis is is enabled.
      */
-    public static final String GRAAL_CLASS_ANALYSIS = "graal.class.analysis";
+    public static final String GRAAL_CLASS_ANALYSIS = "graalvm.class.analysis";
+
     private static final String NETTY_TYPE = "io.netty.channel.socket.nio.NioServerSocketChannel";
     private final Set<String> classes = new ConcurrentSkipListSet<>();
     private final Set<String> beans = new ConcurrentSkipListSet<>();
