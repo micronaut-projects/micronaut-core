@@ -15,9 +15,9 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Messaging related exceptions.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+package io.micronaut.messaging.exceptions;

@@ -16,8 +16,9 @@
 
 package io.micronaut.security.authentication;
 
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
 import java.io.Serializable;
-import java.util.Objects;
 
 /**
  *
@@ -26,7 +27,12 @@ import java.util.Objects;
  */
 public class UsernamePasswordCredentials implements Serializable, AuthenticationRequest<String, String> {
 
+    @NotBlank
+    @NotNull
     private String username;
+
+    @NotBlank
+    @NotNull
     private String password;
 
     /**
@@ -92,17 +98,21 @@ public class UsernamePasswordCredentials implements Serializable, Authentication
 
     @Override
     public boolean equals(Object o) {
-        if (o instanceof UsernamePasswordCredentials) {
-            UsernamePasswordCredentials that = (UsernamePasswordCredentials) o;
-            return username.equals(that.username) &&
-                    password.equals(that.password);
-        } else {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        UsernamePasswordCredentials that = (UsernamePasswordCredentials) o;
+
+        if (username != null ? !username.equals(that.username) : that.username != null) {
             return false;
         }
+        return password != null ? password.equals(that.password) : that.password == null;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(username, password);
+        int result = username != null ? username.hashCode() : 0;
+        result = 31 * result + (password != null ? password.hashCode() : 0);
+        return result;
     }
 }

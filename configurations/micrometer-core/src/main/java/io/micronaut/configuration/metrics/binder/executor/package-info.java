@@ -15,9 +15,9 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Contains classes that bind metrics for configured {@link java.util.concurrent.ExecutorService} beans.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+package io.micronaut.configuration.metrics.binder.executor;

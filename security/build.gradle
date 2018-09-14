@@ -7,10 +7,9 @@ dependencies {
     compile project(":runtime")
     compile project(":management")
     compile project(":http")
-
     compile project(":http-server")
+    compile project(':configurations:hibernate-validator')
     testCompile project(":http-client")
-
     testCompile project(":inject-groovy")
     testCompile project(":http-server-netty")
     testCompile "org.yaml:snakeyaml:$snakeYamlVersion"

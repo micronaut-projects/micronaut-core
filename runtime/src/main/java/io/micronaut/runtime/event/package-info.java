@@ -15,9 +15,9 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Common applications events.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+package io.micronaut.runtime.event;

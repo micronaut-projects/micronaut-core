@@ -17,7 +17,7 @@
 package io.micronaut.jackson.codec;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.micronaut.codec.CodecConfiguration;
+import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.MediaType;
 import io.micronaut.runtime.ApplicationConfiguration;
 

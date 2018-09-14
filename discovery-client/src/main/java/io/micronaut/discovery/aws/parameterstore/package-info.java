@@ -15,9 +15,9 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Integration with AWS ParameterStore.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+package io.micronaut.discovery.aws.parameterstore;

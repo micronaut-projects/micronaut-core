@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.codec;
+package io.micronaut.http.codec;
 
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.http.MediaType;

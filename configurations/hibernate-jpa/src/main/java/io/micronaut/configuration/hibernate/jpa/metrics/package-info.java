@@ -15,9 +15,9 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Classes related to tracking metrics for Hibernate.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+package io.micronaut.configuration.hibernate.jpa.metrics;
