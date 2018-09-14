@@ -69,14 +69,13 @@ abstract class InterceptUrlMapRule extends AbstractSecurityRule {
      */
     @Override
     public SecurityRuleResult check(HttpRequest request, @Nullable RouteMatch routeMatch, @Nullable Map<String, Object> claims) {
-        final URI uri = request.getUri();
-        final String uriString = uri.toString();
+        final String path = request.getUri().getPath();
         final HttpMethod httpMethod = request.getMethod();
 
         Optional<InterceptUrlMapPattern> matchedPattern = getPatternList()
                 .stream()
                 .filter(p -> p.getHttpMethod().map(method -> method.equals(httpMethod)).orElse(true))
-                .filter(p -> pathMatcher.matches(p.getPattern(), uriString))
+                .filter(p -> pathMatcher.matches(p.getPattern(), path))
                 .findFirst();
 
         return matchedPattern
