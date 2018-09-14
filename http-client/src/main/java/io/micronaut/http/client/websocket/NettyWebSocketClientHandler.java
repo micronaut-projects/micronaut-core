@@ -48,6 +48,8 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshaker;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.handler.timeout.IdleState;
+import io.netty.handler.timeout.IdleStateEvent;
 import io.reactivex.Flowable;
 import io.reactivex.FlowableEmitter;
 
@@ -101,6 +103,21 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
         String clientPath = webSocketBean.getBeanDefinition().getValue(ClientWebSocket.class, String.class).orElse("");
         UriMatchTemplate matchTemplate = UriMatchTemplate.of(clientPath);
         this.matchInfo = matchTemplate.match(request.getPath()).orElse(null);
+    }
+
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+        if (evt instanceof IdleStateEvent) {
+            IdleStateEvent idleStateEvent = (IdleStateEvent) evt;
+            if (idleStateEvent.state() == IdleState.ALL_IDLE) {
+                // close the connection if it is idle for too long
+                if (clientSession != null && clientSession.isOpen()) {
+                    clientSession.close(CloseReason.NORMAL);
+                }
+            }
+        } else {
+            super.userEventTriggered(ctx, evt);
+        }
     }
 
     @Override

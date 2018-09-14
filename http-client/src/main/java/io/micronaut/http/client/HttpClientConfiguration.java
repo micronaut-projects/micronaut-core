@@ -205,7 +205,7 @@ public abstract class HttpClientConfiguration {
 
 
     /**
-     * For streaming requests, the {@link #getReadTimeout()} method does not apply instead a configurable
+     * For streaming requests and WebSockets, the {@link #getReadTimeout()} method does not apply instead a configurable
      * idle timeout is applied.
      *
      * @return The default amount of time to allow read operation connections  to remain idle
