@@ -22,7 +22,7 @@ import javax.inject.Named;
 import javax.inject.Singleton;
 
 /**
- * Generates object names for endpoint bean definitions
+ * Generates object names for endpoint bean definitions.
  */
 @Singleton
 @Named("endpoint")

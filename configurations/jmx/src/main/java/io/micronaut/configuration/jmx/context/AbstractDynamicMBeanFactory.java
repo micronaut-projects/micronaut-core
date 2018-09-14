@@ -99,7 +99,7 @@ public abstract class AbstractDynamicMBeanFactory implements DynamicMBeanFactory
     }
 
     /**
-     * Returns the management bean description
+     * Returns the management bean description.
      * @see MBeanInfo#getDescription()
      *
      * @param beanDefinition The bean definition

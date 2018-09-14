@@ -47,15 +47,21 @@ import java.util.function.Supplier;
 @Requires(property = JmxConfiguration.PREFIX + ".registerEndpoints", defaultValue = "true")
 public class EndpointMethodJmxProcessor implements ExecutableMethodProcessor<Endpoint> {
 
-    private final Map<BeanDefinition, List<ExecutableMethod>> methods = new HashMap<>(5);
-
     private static final Logger LOG = LoggerFactory.getLogger(EndpointMethodJmxProcessor.class);
+
+    private final Map<BeanDefinition, List<ExecutableMethod>> methods = new HashMap<>(5);
 
     private final MBeanServer mBeanServer;
     private final NameGenerator nameGenerator;
     private final DynamicMBeanFactory mBeanFactory;
     private final BeanContext beanContext;
 
+    /**
+     * @param mBeanServer The server to register the endpoint beans with
+     * @param nameGenerator The class to generate the bean names
+     * @param mBeanFactory The factory to create the beans with
+     * @param beanContext The bean context to retrieve the endpoint instance
+     */
     public EndpointMethodJmxProcessor(MBeanServer mBeanServer,
                                       @Named("endpoint") NameGenerator nameGenerator,
                                       @Named("endpoint") DynamicMBeanFactory mBeanFactory,
@@ -77,6 +83,11 @@ public class EndpointMethodJmxProcessor implements ExecutableMethodProcessor<End
         });
     }
 
+    /**
+     * Registers the management beans.
+     *
+     * @param event The startup event
+     */
     @EventListener
     void onStartup(StartupEvent event) {
 
