@@ -1,13 +1,11 @@
 package io.micronaut.security.ldap
 
+import io.micronaut.configuration.security.ldap.LdapAuthenticationProvider
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.ssl.ClientAuthentication
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.security.authentication.AuthenticationFailed
 import io.micronaut.security.authentication.AuthenticationResponse
 import io.micronaut.security.authentication.UserDetails
-import io.micronaut.security.ldap.configuration.LdapConfiguration
-import spock.lang.Ignore
 
 class LdapAuthenticationSpec extends InMemoryLdapSpec {
     

@@ -14,41 +14,24 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.ldap.context;
+package io.micronaut.configuration.security.ldap.context;
+
+import javax.naming.NamingException;
+import java.util.List;
 
 /**
- * Contract to provide settings to search LDAP.
+ * Generic functional interface that returns a list of search
+ * results from LDAP.
  *
  * @author James Kleeh
  * @since 1.0
  */
-public interface SearchSettings {
+@FunctionalInterface
+public interface SearchProvider {
 
     /**
-     * @return True if the subtree should be searched
+     * @return The list of search results
+     * @throws NamingException If the search encounters an exception
      */
-    boolean isSubtree();
-
-    /**
-     * @return The base DN to start the search
-     */
-    String getBase();
-
-    /**
-     * @return The search filter
-     */
-    String getFilter();
-
-    /**
-     * @return The search filter arguments
-     */
-    Object[] getArguments();
-
-    /**
-     * A null value indicates all attributes should be returned.
-     *
-     * @return Which attributes should be returned from the search
-     */
-    String[] getAttributes();
-
+    List<LdapSearchResult> get() throws NamingException;
 }

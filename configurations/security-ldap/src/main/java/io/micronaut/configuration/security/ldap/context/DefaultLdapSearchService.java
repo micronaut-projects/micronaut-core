@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.ldap.context;
+package io.micronaut.configuration.security.ldap.context;
 
 import javax.inject.Singleton;
 import javax.naming.NamingEnumeration;

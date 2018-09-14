@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.ldap.context;
+package io.micronaut.configuration.security.ldap.context;
 
-import io.micronaut.security.ldap.configuration.LdapConfiguration;
+import io.micronaut.configuration.security.ldap.configuration.LdapConfiguration;
 
 /**
  * Implementation of {@link ContextSettings} that derives its values from

@@ -14,27 +14,27 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.ldap.configuration;
+package io.micronaut.configuration.security.ldap.configuration;
 
-import io.micronaut.security.ldap.context.SearchSettings;
+import io.micronaut.configuration.security.ldap.context.SearchSettings;
 
 /**
  * Implementation of {@link SearchSettings} that derives values from an
- * instance of {@link LdapConfiguration.SearchConfiguration}.
+ * instance of {@link LdapConfiguration.GroupConfiguration}.
  *
  * @author James Kleeh
  * @since 1.0
  */
-public class SearchPropertiesSearchSettings implements SearchSettings {
+public class GroupPropertiesSearchSettings implements SearchSettings {
 
-    private final LdapConfiguration.SearchConfiguration properties;
+    private final LdapConfiguration.GroupConfiguration properties;
     private final Object[] arguments;
 
     /**
-     * @param properties The search configuration
-     * @param arguments  The search arguments
+     * @param properties The group configuration
+     * @param arguments  The arguments for the filter
      */
-    SearchPropertiesSearchSettings(LdapConfiguration.SearchConfiguration properties, Object[] arguments) {
+    GroupPropertiesSearchSettings(LdapConfiguration.GroupConfiguration properties, Object[] arguments) {
         this.properties = properties;
         this.arguments = arguments;
     }
@@ -61,6 +61,6 @@ public class SearchPropertiesSearchSettings implements SearchSettings {
 
     @Override
     public String[] getAttributes() {
-        return properties.getAttributes();
+        return new String[] { properties.getAttribute() };
     }
 }

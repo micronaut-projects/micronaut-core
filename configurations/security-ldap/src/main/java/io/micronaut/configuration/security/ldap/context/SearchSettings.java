@@ -14,26 +14,41 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.ldap;
-
-import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.security.authentication.AuthenticationResponse;
-
-import java.util.Set;
+package io.micronaut.configuration.security.ldap.context;
 
 /**
- * Responsible for mapping the result of LDAP authentication to an {@link AuthenticationResponse}.
+ * Contract to provide settings to search LDAP.
  *
  * @author James Kleeh
  * @since 1.0
  */
-public interface ContextAuthenticationMapper {
+public interface SearchSettings {
 
     /**
-     * @param attributes The attributes in the context
-     * @param username The username used to authenticate
-     * @param groups The roles associated with the user
-     * @return An {@link AuthenticationResponse}
+     * @return True if the subtree should be searched
      */
-    AuthenticationResponse map(ConvertibleValues<Object> attributes, String username, Set<String> groups);
+    boolean isSubtree();
+
+    /**
+     * @return The base DN to start the search
+     */
+    String getBase();
+
+    /**
+     * @return The search filter
+     */
+    String getFilter();
+
+    /**
+     * @return The search filter arguments
+     */
+    Object[] getArguments();
+
+    /**
+     * A null value indicates all attributes should be returned.
+     *
+     * @return Which attributes should be returned from the search
+     */
+    String[] getAttributes();
+
 }

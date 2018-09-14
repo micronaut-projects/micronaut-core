@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.ldap.context;
+package io.micronaut.configuration.security.ldap.context;
 
 /**
  * Contract to hold settings for creating an LDAP context.

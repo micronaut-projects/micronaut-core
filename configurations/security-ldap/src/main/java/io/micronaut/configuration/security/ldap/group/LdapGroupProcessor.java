@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.ldap.group;
+package io.micronaut.configuration.security.ldap.group;
 
-import io.micronaut.security.ldap.context.LdapSearchResult;
-import io.micronaut.security.ldap.context.SearchProvider;
+import io.micronaut.configuration.security.ldap.context.LdapSearchResult;
+import io.micronaut.configuration.security.ldap.context.SearchProvider;
 
 import javax.naming.NamingException;
 import java.util.Collections;
