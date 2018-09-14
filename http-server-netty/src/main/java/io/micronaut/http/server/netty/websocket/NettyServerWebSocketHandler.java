@@ -181,43 +181,6 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 return uriVars;
             }
 
-            @Override
-            public <T> void broadcastSync(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
-                WebSocketFrame frame = encodeMessage(message, mediaType);
-                try {
-                    webSocketSessions.writeAndFlush(frame, ch -> {
-                        Attribute<NettyRxWebSocketSession> attr = ch.attr(NettyRxWebSocketSession.WEB_SOCKET_SESSION_KEY);
-                        NettyRxWebSocketSession s = attr.get();
-                        return s != null && s.isOpen() && filter.test(s);
-                    }).sync();
-                } catch (InterruptedException e) {
-                    throw new WebSocketSessionException("Broadcast Interrupted");
-                }
-            }
-
-            @Override
-            public <T> Flowable<T> broadcast(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
-                return Flowable.create(emitter -> {
-                    try {
-                        WebSocketFrame frame = encodeMessage(message, mediaType);
-                        webSocketSessions.writeAndFlush(frame, ch -> {
-                            Attribute<NettyRxWebSocketSession> attr = ch.attr(NettyRxWebSocketSession.WEB_SOCKET_SESSION_KEY);
-                            NettyRxWebSocketSession s = attr.get();
-                            return s != null && s.isOpen() && filter.test(s);
-                        }).addListener(future -> {
-                            if (future.isSuccess()) {
-                                emitter.onNext(message);
-                                emitter.onComplete();
-                            } else {
-                                Throwable cause = future.cause();
-                                emitter.onError(new WebSocketSessionException("Broadcast Failure: " + cause.getMessage(), cause));
-                            }
-                        });
-                    } catch (Throwable e) {
-                        emitter.onError(new WebSocketSessionException("Broadcast Failure: " + e.getMessage(), e));
-                    }
-                }, BackpressureStrategy.BUFFER);
-            }
         };
 
         webSocketSessions.add(channel);
