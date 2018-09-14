@@ -16,7 +16,7 @@
 
 package io.micronaut.runtime.http.codec;
 
-import io.micronaut.codec.CodecConfiguration;
+import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.IOUtils;

@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Post;
@@ -30,12 +31,14 @@ import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.security.token.jwt.validator.JwtTokenValidator;
 import io.micronaut.security.token.validator.TokenValidator;
 import io.micronaut.security.token.jwt.render.AccessRefreshToken;
+import io.micronaut.validation.Validated;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import io.reactivex.functions.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.validation.Valid;
 import java.util.Map;
 import java.util.Optional;
 
@@ -50,6 +53,7 @@ import java.util.Optional;
 @Requires(property = OauthControllerConfigurationProperties.PREFIX + ".enabled")
 @Controller("${" + OauthControllerConfigurationProperties.PREFIX + ".path:/oauth/access_token}")
 @Secured(SecurityRule.IS_ANONYMOUS)
+@Validated
 public class OauthController {
 
     private static final Logger LOG = LoggerFactory.getLogger(OauthController.class);
@@ -74,11 +78,7 @@ public class OauthController {
      */
     @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})
     @Post
-    public Single<HttpResponse<AccessRefreshToken>> index(TokenRefreshRequest tokenRefreshRequest) {
-        if (!validateTokenRefreshRequest(tokenRefreshRequest)) {
-            return Single.just(HttpResponse.status(HttpStatus.BAD_REQUEST));
-        }
-
+    public Single<HttpResponse<AccessRefreshToken>> index(@Valid TokenRefreshRequest tokenRefreshRequest) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("grantType: {} refreshToken: {}", tokenRefreshRequest.getGrantType(), tokenRefreshRequest.getRefreshToken());
         }
@@ -92,16 +92,5 @@ public class OauthController {
             }
             return HttpResponse.serverError();
         }).first(HttpResponse.status(HttpStatus.FORBIDDEN));
-    }
-
-    /**
-     *
-     * @param tokenRefreshRequest An instance of {@link TokenRefreshRequest}
-     * @return true if the object is valid
-     */
-    protected boolean validateTokenRefreshRequest(TokenRefreshRequest tokenRefreshRequest) {
-        return tokenRefreshRequest.getGrantType() != null &&
-                tokenRefreshRequest.getGrantType().equals("refresh_token") &&
-                tokenRefreshRequest.getRefreshToken() != null;
     }
 }
