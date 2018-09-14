@@ -1,6 +1,13 @@
-The metrics endpoint returns information about the "metrics" of the application.
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply one of `micrometer-atlas`, `micrometer-graphite`, `micrometer-prometheus`, or `micrometer-statsd` features to enable metrics and preconfigure the selected registery in your project:
+----
+$ mn create-app my-app --features micrometer-atlas
+----
+====
 
-To execute the metrics endpoint, send a GET request to `/metrics`.  This will return a list of the metric names registered with the `MeterRegistry` bean.
+The metrics endpoint returns information about the "metrics" of the application. To execute the metrics endpoint, send a GET request to `/metrics`.  This will return a list of the metric names registered with the `MeterRegistry` bean.
 
 You can get specific metrics by using `/metrics/[name]` such as `/metrics/jvm.memory.used`.  This would return something like:
 

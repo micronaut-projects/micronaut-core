@@ -14,6 +14,15 @@ Alternatively you can https://www.consul.io/docs/install/index.html[install and 
 
 == Enabling Distributed Configuration with Consul
 
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply the `config-consul` feature to enable Consul's distributed configuration in your project:
+----
+$ mn create-app my-app --features config-consul
+----
+====
+
 To enable distributed configuration, similar to Spring Boot and Grails, you need to create a `src/main/resources/bootstrap.yml` configuration file and configure Consul as well as enable the configuration client:
 
 .bootstrap.yml

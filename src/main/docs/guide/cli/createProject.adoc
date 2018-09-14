@@ -161,7 +161,7 @@ To create an app with Groovy & Spock support, supply the appropriate features vi
 
 [source,bash]
 ----
-mn> create-app my-groovy-app --features groovy,spock
+$ mn create-app my-groovy-app --features groovy,spock
 ----
 
 This will include the Groovy & Spock dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.
@@ -172,7 +172,7 @@ To create an app with Kotlin & Spek support, supply the appropriate features via
 
 [source,bash]
 ----
-mn> create-app my-kotlin-app --features kotlin,spek
+$ mn create-app my-kotlin-app --features kotlin,spek
 ----
 
 This will include the Kotlin & Spek dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.
@@ -184,7 +184,7 @@ By default `create-app` will create a Gradle project, with a `build.gradle` file
 
 [source,bash]
 ----
-mn> create-app my-maven-app --build maven
+$ mn create-app my-maven-app --build maven
 ----
 
 
@@ -272,7 +272,7 @@ To create an app with Groovy & Spock support, supply the appropriate features vi
 
 [source,bash]
 ----
-mn> create-cli-app my-groovy-app --lang=groovy --test=spock
+$ mn create-cli-app my-groovy-app --lang=groovy --test=spock
 ----
 
 This will include the Groovy & Spock dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.
@@ -283,7 +283,7 @@ To create an app with Kotlin & Spek support, supply the appropriate features via
 
 [source,bash]
 ----
-mn> create-cli-app my-kotlin-app --lang=kotlin --test=spek
+$ mn create-cli-app my-kotlin-app --lang=kotlin --test=spek
 ----
 
 This will include the Kotlin & Spek dependencies in your project, and write the appropriates values in `micronaut-cli.yml`.
@@ -295,7 +295,7 @@ By default `create-cli-app` will create a Gradle project, with a `build.gradle` 
 
 [source,bash]
 ----
-mn> create-cli-app my-maven-app --build maven
+$ mn create-cli-app my-maven-app --build maven
 ----
 
 
