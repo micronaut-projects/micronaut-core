@@ -178,7 +178,7 @@ class MockConsulServer implements ConsulOperations {
 
     @Override
     Publisher<List<HealthEntry>> getHealthyServices(
-            @NotNull String service, Optional<Boolean> passing, Optional<String> tag, Optional<String> dc) {
+            @NotNull String service, @Nullable Boolean passing, @Nullable String tag, @Nullable String dc) {
         ServiceEntry serviceEntry = services.get(service)
         List<HealthEntry> healthEntries = []
         if(serviceEntry != null) {

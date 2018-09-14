@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="${resourcesPath}/css/pdf.css" type="text/css" media="print" title="PDF" charset="utf-8" />
     <link rel="stylesheet" href="${resourcesPath}/css/highlight/agate.css">
     <script src="${resourcesPath}/js/highlight.pack.js"></script>
+    <script src="${resourcesPath}/js/guide.js"></script>
     <script>hljs.initHighlightingOnLoad();</script>
     <script src="${resourcesPath}/js/docs.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/clipboard.js/1.5.13/clipboard.min.js"></script>
@@ -22,7 +23,7 @@
 
 </head>
 
-<body class="body" onload="addJsClass();" onhashchange="highlightMenu()">
+<body class="body" id="docs" onload="addJsClass();" onhashchange="highlightMenu()">
 
 <div id="table-of-content-nav-link" class="desktop">
     <a title="Collapse/Open Table of contents" title="Hide Table of Contents" href="javascript:hideTableOfContents();" class="button">[ + ]</a>
@@ -65,6 +66,12 @@
                 </li>
                 <li class="mobile">
                     <a title="Go to API documentation" href="${path}/api/index.html" class="button">API</a>
+                </li>
+                <li class="desktop">
+                    <a title="Go to Configuration Reference documentation" href="${path}/guide/configurationreference.html" class="button">Configuration Reference</a>
+                </li>
+                <li class="mobile">
+                    <a title="Go to Configuration Reference documentation" href="${path}/guide/configurationreference.html" class="button">Conf</a>
                 </li>
             </ul>
 
@@ -113,77 +120,6 @@
 </div>
 
 <script type="text/javascript">
-    function wrapElementsInLinks(x) {
-        var i;
-        for (i = 0; i < x.length; i++) {
-            if (x[i].id !== '') {
-                var link = document.createElement('a');
-                link.innerHTML = x[i].outerHTML;
-                link.setAttribute('href', 'index.html#'+x[i].id);
-                x[i].parentNode.insertBefore(link, x[i]);
-                x[i].remove();
-            }
-        }
-    }
-    wrapElementsInLinks(document.querySelectorAll("h1"));
-    wrapElementsInLinks(document.querySelectorAll("h2"));
-    wrapElementsInLinks(document.querySelectorAll("h3"));
-
-    var tocId = "table-of-content";
-    var tocLink = "table-of-content-nav-link";
-    var mainId = "main";
-    function hideTableOfContents() {
-        document.getElementById(tocId).style.display = "none";
-        document.getElementById(mainId).style.paddingLeft = "0";
-        var aEl = document.getElementById(tocLink).getElementsByTagName("a")[0];
-        replaceLink(aEl, "javascript:showTableOfContents();", "[ - ]", 'Show Table of Contents');
-        goToLocation();
-    }
-
-    function goToLocation() {
-        if(location.hash != '') {
-            window.location = location;
-        }
-    }
-
-    function replaceLink(anchorElement, href, text, titleAttr) {
-        anchorElement.setAttribute("href", href);
-        anchorElement.setAttribute("title", titleAttr);
-        anchorElement.innerText = text;
-    }
-
-    function showTableOfContents() {
-        document.getElementById(tocId).style.display = "block";
-        document.getElementById(mainId).style.paddingLeft = "25em";
-        var aEl = document.getElementById(tocLink).getElementsByTagName("a")[0];
-        replaceLink(aEl, "javascript:hideTableOfContents();", "[ + ]", 'Hide Table of Contents');
-        goToLocation();
-    }
-
-    function scrollToTop() {
-        document.getElementById(tocId).style.display = "block";
-        document.body.scrollTop = 0; // For Safari
-        document.documentElement.scrollTop = 0; // For Chrome, Firefox, IE and Opera
-    }
-
-    function highlightMenu() {
-        var cssClass = 'toc-item-highlighted';
-        var els = document.getElementsByClassName(cssClass);
-        for (var x = 0; x < els.length; x++) {
-            els[x].classList.remove(cssClass);
-        }
-        console.log("highlighting hash" + location.hash);
-        if(location.hash != '') {
-            var elId = "toc-item-"+location.hash.replace('#', '');
-            if(document.getElementById(elId)) {
-                document.getElementById(elId).getElementsByTagName('a')[0].classList.add(cssClass);
-                document.getElementById(elId).scrollIntoView(true);
-            }
-        }
-    }
-
-    goToLocation();
-    highlightMenu();
 
 </script>
 </body>

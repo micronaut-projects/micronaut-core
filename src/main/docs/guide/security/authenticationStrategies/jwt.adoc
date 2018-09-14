@@ -1,5 +1,18 @@
+The following configuration properties are available to customize token based authentication:
+
+include::{includedir}configurationProperties/io.micronaut.security.token.config.TokenConfigurationProperties.adoc[]
+
 Micronaut ships with security capabilities based on https://jwt.io/[Json Web Token (JWT)].
 JWT is an https://tools.ietf.org/html/rfc7519[IETF standard] which defines a secure way to encapsulate arbitrary data that can be sent over unsecure URL’s.
+
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply either the `security-jwt` feature to configure JWT support in your project:
+----
+> mn create-app my-app --features security-jwt
+----
+====
 
 To use the Micronaut's JWT based authentication capabilities you must have the `security-jwt` dependency on your classpath. For example in `build.gradle`:
 
@@ -11,21 +24,7 @@ compile "io.micronaut:security-jwt"
 
 The following configuration properties are available to customize JWT based authentication behaviour:
 
-|===
-
-| Configuration Property | Default Value | Description
-
-| `micronaut.security.token.jwt.enabled` | `false` |  You can enable JWT capabilities by enabling this property.
-
-| `micronaut.security.token.rolesName` | `roles` | Default roles claim name
-
-| `micronaut.security.token.defaultExpiration` |  `3600` | Access token expiration time in seconds
-
-| `micronaut.security.token.refreshTokenExpiration` | `null` | Refresh token expiration time in milliseconds. By default, they don't expire.
-
-|===
-
-See the javadoc for api:security.token.jwt.config.JwtConfigurationProperties[] and api:security.token.config.TokenConfigurationProperties[] for more information.
+include::{includedir}configurationProperties/io.micronaut.security.token.jwt.config.JwtConfigurationProperties.adoc[]
 
 == What does a JWT look like?
 

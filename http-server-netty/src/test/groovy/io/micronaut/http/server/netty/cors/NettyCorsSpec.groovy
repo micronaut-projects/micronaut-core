@@ -37,7 +37,6 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         response.contentLength == -1
         headerNames.size() == 1
         headerNames.contains("connection")
-
     }
 
     void "test cors request without configuration"() {
@@ -75,7 +74,6 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         !headerNames.contains(ACCESS_CONTROL_ALLOW_METHODS)
         !headerNames.contains(ACCESS_CONTROL_EXPOSE_HEADERS)
         response.header(ACCESS_CONTROL_ALLOW_CREDENTIALS) == 'true'
-
     }
 
     void "test cors request with controlled method"() {
@@ -136,7 +134,6 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         then:
         response.code() == HttpStatus.FORBIDDEN.code
         headerNames == ['connection'] as Set
-
     }
 
     void "test cors request with invalid header"() {
@@ -150,7 +147,6 @@ class NettyCorsSpec extends AbstractMicronautSpec {
 
         expect: "it passes through because only preflight requests check allowed headers"
         response.code() == HttpStatus.NO_CONTENT.code
-
     }
 
     void "test preflight request with invalid header"() {
@@ -162,7 +158,6 @@ class NettyCorsSpec extends AbstractMicronautSpec {
                         .header(ACCESS_CONTROL_REQUEST_HEADERS, 'Foo, Accept')
 
         ).onErrorReturn({ t -> t.response} ).blockingFirst()
-
 
         expect: "it fails because preflight requests check allowed headers"
         response.code() == HttpStatus.FORBIDDEN.code
@@ -225,7 +220,6 @@ class NettyCorsSpec extends AbstractMicronautSpec {
         response.header(VARY) == ORIGIN
         response.headers.getAll(ACCESS_CONTROL_EXPOSE_HEADERS) == ['x', 'y']
         !headerNames.contains(ACCESS_CONTROL_ALLOW_CREDENTIALS)
-
     }
 
     Map<String, Object> getConfiguration() {

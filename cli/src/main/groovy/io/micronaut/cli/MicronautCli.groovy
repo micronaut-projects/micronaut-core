@@ -253,6 +253,9 @@ class MicronautCli {
             // we already called initializeApplication() when creating the parser
             if (parseResult.hasSubcommand()) {
                 return handleCommand(parseResult) ? 0 : 1
+            } else if (parseResult.unmatched()) {
+                MicronautConsole.instance.error("The command '${parseResult.unmatched().get(0)}' was not found. Some commands like 'create-app' are only available outside of a project.")
+                return 1
             } else {
                 handleInteractiveMode()
             }

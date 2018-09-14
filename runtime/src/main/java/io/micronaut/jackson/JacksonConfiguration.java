@@ -39,10 +39,16 @@ import java.util.TimeZone;
 @ConfigurationProperties("jackson")
 public class JacksonConfiguration {
 
+    /**
+     * The default array size threshold value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_ARRAYSIZETHRESHOLD = 100;
+
     private String dateFormat;
     private Locale locale;
     private TimeZone timeZone;
-    private int arraySizeThreshold = 100;
+    private int arraySizeThreshold = DEFAULT_ARRAYSIZETHRESHOLD;
     private Map<SerializationFeature, Boolean> serialization = Collections.emptyMap();
     private Map<DeserializationFeature, Boolean> deserialization = Collections.emptyMap();
     private Map<MapperFeature, Boolean> mapper = Collections.emptyMap();
@@ -145,7 +151,7 @@ public class JacksonConfiguration {
     }
 
     /**
-     * Sets the array size threshold for data binding.
+     * Sets the array size threshold for data binding. Default value ({@value #DEFAULT_ARRAYSIZETHRESHOLD}).
      * @param arraySizeThreshold The array size threshold
      */
     public void setArraySizeThreshold(int arraySizeThreshold) {

@@ -30,12 +30,13 @@ import java.util.stream.Collectors;
 /**
  * Represents a match for an error.
  *
- * @param <T> The type
+ * @param <T> The target type
+ * @param <R> The return type
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
-class ErrorRouteMatch<T> extends StatusRouteMatch<T> {
+class ErrorRouteMatch<T, R> extends StatusRouteMatch<T, R> {
 
     private final Throwable error;
     private final Map<String, Object> variables;

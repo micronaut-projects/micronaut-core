@@ -1,6 +1,14 @@
 Micronaut features dedicated support for automatically configuring the https://neo4j.com/docs/developer-manual/current/drivers/[Neo4j Bolt Driver] for the popular https://neo4j.com/[Neo4j] Graph Database.
 
 == Configuring Neoj4 Bolt
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply the `neo4j-bolt` feature to configure the Neo4j Bolt driver in your project:
+----
+> mn create-app my-app --features neo4j-bolt
+----
+====
 
 To configure the Neo4j Bolt driver you should first add the `neo4j-bolt` module to your classpath:
 

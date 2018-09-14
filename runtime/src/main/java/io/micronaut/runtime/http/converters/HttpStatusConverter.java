@@ -25,7 +25,7 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
- * Converts numbers to {@link HttpStatus} objects.
+ * Converts numbers to {@link io.micronaut.http.HttpStatus} objects.
  *
  * @author graemerocher
  * @since 1.0

@@ -284,5 +284,4 @@ class CorsFilterSpec extends Specification {
         response.getHeaders().getAll(ACCESS_CONTROL_ALLOW_HEADERS) == ['X-Header', 'Y-Header'] // Allow headers are echo'd from the request
         response.getHeaders().get(ACCESS_CONTROL_MAX_AGE) == '1800' // Max age is set from config
     }
-
 }

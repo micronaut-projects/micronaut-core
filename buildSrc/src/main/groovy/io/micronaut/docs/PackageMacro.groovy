@@ -41,7 +41,6 @@ class PackageMacro extends InlineMacroProcessor {
         ] as Map<String, Object>
 
         String pkg = target
-        println "ATTRIBUTES $attributes"
         if (attributes.text) {
             pkg = attributes.text
         }

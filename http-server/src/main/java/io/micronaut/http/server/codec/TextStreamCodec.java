@@ -16,7 +16,7 @@
 
 package io.micronaut.http.server.codec;
 
-import io.micronaut.codec.CodecConfiguration;
+import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
 import io.micronaut.core.type.Argument;

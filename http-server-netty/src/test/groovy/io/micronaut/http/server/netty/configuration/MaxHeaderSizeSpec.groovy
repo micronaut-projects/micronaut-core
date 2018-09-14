@@ -52,7 +52,6 @@ class MaxHeaderSizeSpec extends Specification {
         cleanup:
         embeddedServer.stop()
         client.stop()
-
     }
 
     @Controller('/max-header')

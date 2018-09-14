@@ -35,7 +35,13 @@ import java.util.stream.Stream;
 @Requires(AbstractKafkaConfiguration.PREFIX)
 public class KafkaDefaultConfiguration extends AbstractKafkaConfiguration {
 
-    private Duration healthTimeout = Duration.ofSeconds(1);
+    /**
+     * The default health timeout value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_HEALTHTIMEOUT = 1;
+
+    private Duration healthTimeout = Duration.ofSeconds(DEFAULT_HEALTHTIMEOUT);
 
     /**
      * Constructs the default Kafka configuration.
@@ -60,7 +66,7 @@ public class KafkaDefaultConfiguration extends AbstractKafkaConfiguration {
     }
 
     /**
-     * The health check timeout.
+     * The health check timeout. Default value ({@value #DEFAULT_HEALTHTIMEOUT} seconds).
      *
      * @param healthTimeout The duration
      */

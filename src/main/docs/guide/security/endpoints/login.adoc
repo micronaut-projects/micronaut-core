@@ -1,13 +1,6 @@
 You can enable `LoginController` with configuration property:
 
-|===
-
-| Configuration Property | Default Value | Possible Values
-
-| `micronaut.security.endpoints.login.enabled` | false | `true` or `false`
-| `micronaut.security.endpoints.login.path` | `/login` | default path for `POST` requests.
-
-|===
+include::{includedir}configurationProperties/io.micronaut.security.endpoints.LoginControllerConfigurationProperties.adoc[]
 
 The response of the Login Endpoint is handled by a bean instance of link:{api}/io/micronaut/security/handlers/LoginHandler.html[LoginHandler].
 

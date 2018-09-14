@@ -46,7 +46,6 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
                 HttpRequest.POST('/json/string', json), String
         ).blockingFirst()
 
-
         then:
         def e = thrown(HttpClientResponseException)
         e.message == """Invalid JSON: Unexpected end-of-input
@@ -56,8 +55,6 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         when:
         def body = e.response.getBody(String).orElse(null)
         def result = new JsonSlurper().parseText(body)
-
-
 
         then:
         result['_links'].self.href == '/json/string'
@@ -102,10 +99,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         result.message.startsWith('Invalid JSON')
     }
 
-
-
     void "test simple map body parsing"() {
-
         when:
         def json = '{"title":"The Stand"}'
         def response = rxClient.exchange(
@@ -116,9 +110,7 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         response.body() == "Body: [title:The Stand]"
     }
 
-
     void  "test simple string-based body parsing"() {
-
         when:
         def json = '{"title":"The Stand"}'
         def response = rxClient.exchange(
@@ -127,11 +119,9 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
 
         then:
         response.body() == "Body: $json"
-
     }
 
     void "test simple string-based body parsing with invalid mime type"() {
-
         when:
         def json = '{"title":"The Stand"}'
         rxClient.exchange(
@@ -142,8 +132,6 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.UNSUPPORTED_MEDIA_TYPE
     }
-
-
 
     void "test simple POGO body parsing"() {
         when:
@@ -163,11 +151,9 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
                 HttpRequest.POST('/json/object-to-object', json), String
         ).blockingFirst()
 
-
         then:
         response.body() == json
     }
-
 
     void "test array POGO body parsing"() {
         when:
@@ -192,7 +178,6 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
     }
 
     void "test list POGO body parsing"() {
-
         when:
         def json = '[{"name":"Fred", "age":10},{"name":"Barney", "age":11}]'
         def response = rxClient.exchange(
@@ -209,8 +194,6 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def response = rxClient.exchange(
                 HttpRequest.POST('/json/future', json), String
         ).blockingFirst()
-
-
 
         then:
         response.body() == "Body: $json".toString()
@@ -239,7 +222,6 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
     }
 
     void "test publisher argument handling with POGO"() {
-
         when:
         def json = '{"name":"Fred","age":10}'
         def response = rxClient.exchange(

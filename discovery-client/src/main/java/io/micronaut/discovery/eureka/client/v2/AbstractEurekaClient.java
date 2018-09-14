@@ -61,6 +61,9 @@ import java.util.stream.Collectors;
 @RequiresEureka
 abstract class AbstractEurekaClient implements EurekaClient {
 
+    static final String EXPR_EUREKA_REGISTRATION_RETRY_DELAY = "${" + EurekaConfiguration.EurekaRegistrationConfiguration.PREFIX + ".retry-delay:3s}";
+    static final String EXPR_EUREKA_REGISTRATION_RETRY_COUNT = "${" + EurekaConfiguration.EurekaRegistrationConfiguration.PREFIX + ".retry-count:10}";
+
     private final EurekaConfiguration.EurekaDiscoveryConfiguration discoveryConfiguration;
 
     /**
@@ -130,7 +133,7 @@ abstract class AbstractEurekaClient implements EurekaClient {
     }
 
     /**
-     * @return A {@link Publisher} with applications info
+     * @return A {@link Publisher} with applications info.
      */
     @SuppressWarnings("WeakerAccess")
     @Get("/apps")

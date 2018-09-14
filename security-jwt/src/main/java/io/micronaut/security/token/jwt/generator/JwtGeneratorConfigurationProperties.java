@@ -49,7 +49,7 @@ public class JwtGeneratorConfigurationProperties implements JwtGeneratorConfigur
     }
 
     /**
-     * Sets the refresh token expiration.
+     * Refresh token expiration. By default refresh tokens, do not expire.
      * @param refreshTokenExpiration The expiration
      */
     public void setRefreshTokenExpiration(Integer refreshTokenExpiration) {
@@ -57,7 +57,7 @@ public class JwtGeneratorConfigurationProperties implements JwtGeneratorConfigur
     }
 
     /**
-     * Sets the access token expiration.
+     * Access token expiration. Default value ({@value #DEFAULT_EXPIRATION}).
      * @param accessTokenExpiration The expiration
      */
     public void setAccessTokenExpiration(Integer accessTokenExpiration) {

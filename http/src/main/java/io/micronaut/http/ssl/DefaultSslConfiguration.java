@@ -63,8 +63,6 @@ public class DefaultSslConfiguration extends SslConfiguration {
         super.setTrustStore(trustStore);
     }
 
-
-
     /**
      * The default {@link io.micronaut.http.ssl.SslConfiguration.KeyConfiguration}.
      */
@@ -73,7 +71,6 @@ public class DefaultSslConfiguration extends SslConfiguration {
     @ConfigurationProperties(KeyConfiguration.PREFIX)
     public static class DefaultKeyConfiguration extends KeyConfiguration {
     }
-
 
     /**
      * The default {@link io.micronaut.http.ssl.SslConfiguration.KeyStoreConfiguration}.

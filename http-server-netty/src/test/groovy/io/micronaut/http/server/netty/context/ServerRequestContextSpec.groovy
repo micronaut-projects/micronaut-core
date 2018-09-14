@@ -44,7 +44,6 @@ class ServerRequestContextSpec extends Specification {
         "thread" | '/test-context/thread'
     }
 
-
     @Client('/test-context')
     static interface TestClient {
 
@@ -60,7 +59,6 @@ class ServerRequestContextSpec extends Specification {
         @Get("/thread")
         String thread()
     }
-
 
     @Controller('/test-context')
     @Produces(MediaType.TEXT_PLAIN)

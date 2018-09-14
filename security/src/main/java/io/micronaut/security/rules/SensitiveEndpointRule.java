@@ -24,8 +24,7 @@ import io.micronaut.web.router.RouteMatch;
 
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
-import java.lang.reflect.Method;
-import java.util.*;
+import java.util.Map;
 
 /**
  * Finds any sensitive endpoints and processes requests that match their

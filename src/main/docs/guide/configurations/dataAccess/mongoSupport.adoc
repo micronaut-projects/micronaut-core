@@ -2,7 +2,7 @@
 
 Micronaut features the ability to automatically configure the native MongoDB Java driver.
 
-To enable this you first need to add the `mongo-reactive` module to your classpath:
+To enable Lettuce, add the following dependency to your application:
 
 .build.gradle
 [source,groovy]

@@ -35,12 +35,13 @@ import java.util.function.Function;
 /**
  * Default implementation of the {@link RouteMatch} interface for matches to URIs.
  *
- * @param <T>
+ * @param <T> The target type
+ * @param <R> The return type
  * @author Graeme Rocher
  * @since 1.0
  */
 @Internal
-class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteMatch<T> {
+class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements UriRouteMatch<T, R> {
 
     private final HttpMethod httpMethod;
     private final UriMatchInfo matchInfo;
@@ -65,19 +66,19 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
     }
 
     @Override
-    public UriRouteMatch<T> decorate(Function<RouteMatch<T>, T> executor) {
+    public UriRouteMatch<T, R> decorate(Function<RouteMatch<R>, R> executor) {
         Map<String, Object> variables = getVariables();
         List<Argument> arguments = getRequiredArguments();
         RouteMatch thisRoute = this;
-        return new DefaultUriRouteMatch<T>(matchInfo, uriRoute, defaultCharset, conversionService) {
+        return new DefaultUriRouteMatch<T, R>(matchInfo, uriRoute, defaultCharset, conversionService) {
             @Override
             public List<Argument> getRequiredArguments() {
                 return Collections.unmodifiableList(arguments);
             }
 
             @Override
-            public T execute(Map argumentValues) {
-                return (T) executor.apply(thisRoute);
+            public R execute(Map argumentValues) {
+                return (R) executor.apply(thisRoute);
             }
 
             @Override
@@ -88,13 +89,8 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
     }
 
     @Override
-    public UriRouteMatch<T> fulfill(Map<String, Object> argumentValues) {
-        return (UriRouteMatch<T>) super.fulfill(argumentValues);
-    }
-
-    @Override
-    protected RouteMatch<T> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments) {
-        return new DefaultUriRouteMatch<T>(matchInfo, uriRoute, defaultCharset, conversionService) {
+    protected RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments) {
+        return new DefaultUriRouteMatch<T, R>(matchInfo, uriRoute, defaultCharset, conversionService) {
 
             @Override
             public List<Argument> getRequiredArguments() {
@@ -111,6 +107,11 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
                 return super.getRequiredInput(name);
             }
         };
+    }
+
+    @Override
+    public UriRouteMatch<T, R> fulfill(Map<String, Object> argumentValues) {
+        return (UriRouteMatch<T, R>) super.fulfill(argumentValues);
     }
 
     @Override
@@ -135,6 +136,11 @@ class DefaultUriRouteMatch<T> extends AbstractRouteMatch<T> implements UriRouteM
             decoded.put(k, v);
         }
         return decoded;
+    }
+
+    @Override
+    public boolean isExploded(String variable) {
+        return matchInfo.isExploded(variable);
     }
 
     @Override

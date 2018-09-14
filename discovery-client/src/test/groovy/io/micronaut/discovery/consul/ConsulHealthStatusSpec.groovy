@@ -15,37 +15,74 @@
  */
 package io.micronaut.discovery.consul
 
+import io.micronaut.discovery.DiscoveryClient
+import io.micronaut.discovery.ServiceInstance
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.discovery.consul.client.v1.ConsulClient
 import io.micronaut.health.HealthStatus
 import io.micronaut.http.HttpStatus
 import io.micronaut.runtime.server.EmbeddedServer
+import org.testcontainers.containers.GenericContainer
+import spock.lang.AutoCleanup
+import spock.lang.Ignore
 import spock.lang.IgnoreIf
+import spock.lang.Shared
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-@IgnoreIf({ !System.getenv('CONSUL_HOST') && !System.getenv('CONSUL_PORT') })
 class ConsulHealthStatusSpec extends Specification {
+
+    @Shared
+    @AutoCleanup
+    GenericContainer consulContainer =
+            new GenericContainer("consul:latest")
+                    .withExposedPorts(8500)
+
+    @Shared String consulHost
+    @Shared int consulPort
+
+    def setupSpec() {
+        consulContainer.start()
+        consulHost = consulContainer.containerIpAddress
+        consulPort = consulContainer.getMappedPort(8500)
+    }
 
     void "test the consul service's health status is correct"() {
         given:
 
-        String serviceId = 'myService'
-        EmbeddedServer application = ApplicationContext.run(
+        String serviceId = 'test-auto-reg'
+
+        when:
+        EmbeddedServer embeddedServer = ApplicationContext.run(
                 EmbeddedServer,
-                ['consul.client.host': System.getenv('CONSUL_HOST'),
-                 'consul.client.port': System.getenv('CONSUL_PORT'),
+                ['consul.client.host': consulHost,
+                 'consul.client.port': consulPort,
                  'micronaut.application.name': serviceId] // short heart beat interval
         )
 
-        when:"An application is set to fail"
+        Map discoveryClientMap = ['consul.client.host': consulHost,
+                                  'consul.client.port': consulPort,
+                                  "micronaut.caches.discovery-client.enabled": false]
+        DiscoveryClient discoveryClient = ApplicationContext.run(DiscoveryClient, discoveryClientMap)
 
-        ConsulClient consulClient = application.getApplicationContext().getBean(ConsulClient)
-        HttpStatus status = Flowable.fromPublisher(consulClient.fail("service:myService:${application.port}")).blockingFirst()
+        PollingConditions conditions = new PollingConditions(timeout: 3)
+
+        then:
+        conditions.eventually {
+            List<ServiceInstance> instances = Flowable.fromPublisher(discoveryClient.getInstances(serviceId)).blockingFirst()
+            instances.size() == 1
+            instances[0].port == embeddedServer.getPort()
+            instances[0].host == embeddedServer.getHost()
+        }
+
+        when:"An application is set to fail"
+        ConsulClient consulClient = embeddedServer.getApplicationContext().getBean(ConsulClient)
+        HttpStatus status = Flowable.fromPublisher(consulClient.fail("service:$serviceId:${embeddedServer.port}")).blockingFirst()
 
         then:"The status is ok"
         status == HttpStatus.OK
@@ -58,9 +95,6 @@ class ConsulHealthStatusSpec extends Specification {
         services[0].healthStatus == HealthStatus.DOWN
 
         cleanup:
-        application?.stop()
-
-
-
+        embeddedServer?.stop()
     }
 }

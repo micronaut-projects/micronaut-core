@@ -50,7 +50,6 @@ class CustomStaticMappingLocalSpec extends AbstractMicronautSpec {
         e = thrown(HttpClientResponseException)
         e.response.code() == HttpStatus.BAD_REQUEST.code
         e.response.reason() == "You sent me bad stuff - from Test2Controller.badHandler()"
-
     }
 
     void "test that a bad request response for invalid request data can be redirected by the router to the local method"() {
@@ -75,7 +74,6 @@ class CustomStaticMappingLocalSpec extends AbstractMicronautSpec {
         e = thrown(HttpClientResponseException)
         e.response.code() == HttpStatus.BAD_REQUEST.code
         e.response.reason() == "You sent me bad stuff - from Test2Controller.badHandler()"
-
     }
 
     void "test that a not found response request data can be handled by a local method"() {

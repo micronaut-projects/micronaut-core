@@ -44,7 +44,13 @@ public class HandlebarsViewsRendererConfigurationProperties implements Handlebar
     @SuppressWarnings("WeakerAccess")
     public static final String DEFAULT_EXTENSION = "hbs";
 
-    private boolean enabled = true;
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = true;
+
+    private boolean enabled = DEFAULT_ENABLED;
     private String defaultExtension = DEFAULT_EXTENSION;
 
     /**
@@ -66,7 +72,7 @@ public class HandlebarsViewsRendererConfigurationProperties implements Handlebar
     }
 
     /**
-     * Whether handlebars view rendering is enabled.
+     * Whether handlebars view rendering is enabled. Default value ({@value #DEFAULT_ENABLED}).
      *
      * @param enabled True if is enabled
      */
@@ -75,7 +81,7 @@ public class HandlebarsViewsRendererConfigurationProperties implements Handlebar
     }
 
     /**
-     * The default extension.
+     * The default extension. Default value ({@value #DEFAULT_EXTENSION}).
      *
      * @param defaultExtension The extension
      */

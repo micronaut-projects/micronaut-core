@@ -1,0 +1,60 @@
+The ann:websocket.annotation.ClientWebSocket[] annotation can be used in combination with the api:websocket.WebSocketClient[] interface to define WebSocket clients.
+
+You can inject a reference to the a api:websocket.WebSocketClient[] instance using the ann:http.client.Client[] annotation:
+
+[source,java]
+----
+@Inject
+@Client("http://localhost:8080")
+RxWebSocketClient webSocketClient;
+----
+
+This allows you to use the same service discovery and load balancing features for WebSocket clients.
+
+Once you have a reference to the api:websocket.WebSocketClient[] interface you can use the `connect` method to obtain a connected instance of a bean annotated with ann:websocket.annotation.ClientWebSocket[].
+
+For example consider the following implementation:
+
+.WebSocket Chat Example
+[source,java]
+----
+include::{testswebsocket}/ChatClientWebSocket.java[tag=imports]
+
+include::{testswebsocket}/ChatClientWebSocket.java[tag=class]
+}
+----
+
+<1> The class is abstract (more on that later) and is annotated with ann:websocket.annotation.ClientWebSocket[]
+<2> The client must implement `AutoCloseable` and you should ensure that the connection is closed at some point.
+<3> You can use the same annotations as on the server, in this case `@OnOpen` to obtain a reference to the underlying session.
+<4> The `@OnMessage` annotation can be used to define the method that receives responses from the server.
+
+You can also define abstract methods that start with either `send` or `broadcast` and these methods will be implemented for you at compile time. For example:
+
+.WebSocket Send Methods
+[source,java]
+----
+public abstract void send(String message);
+----
+
+Note by returning `void` this tells Micronaut that the method is a blocking send. You can instead define methods that return either futures or a rs:Publisher[]:
+
+.WebSocket Send Methods
+[source,java]
+----
+public abstract io.reactivex.Single<String> send(String message);
+----
+
+The above example defines a send method that returns an rx:Single[].
+
+Once you have defined a client class you can connect to the client socket and start sending messages:
+
+
+.Connecting a Client WebSocket
+[source,java]
+----
+ChatClientWebSocket chatClient = webSocketClient.connect(ChatClientWebSocket.class, "/chat/football/fred").blockingFirst();
+chatClient.send("Hello World!");
+----
+
+NOTE: For illustration purposes we use `blockingFirst()` to obtain the client, it is however possible to combine `connect` (which returns an rx:Flowable[]) to perform non-blocking interaction via WebSocket.
