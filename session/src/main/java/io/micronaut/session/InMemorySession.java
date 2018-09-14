@@ -107,6 +107,11 @@ public class InMemorySession implements Session {
     }
 
     @Override
+    public boolean isModified() {
+        return isNew;
+    }
+
+    @Override
     @Nonnull
     public Instant getCreationTime() {
         return creationTime;

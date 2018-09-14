@@ -64,7 +64,7 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
     }
 
     @Override
-    protected void decode(ChannelHandlerContext ctx, HttpRequest msg, List<Object> out) throws Exception {
+    protected void decode(ChannelHandlerContext ctx, HttpRequest msg, List<Object> out) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Server {}:{} Received Request: {} {}", embeddedServer.getHost(), embeddedServer.getPort(), msg.method(), msg.uri());
         }

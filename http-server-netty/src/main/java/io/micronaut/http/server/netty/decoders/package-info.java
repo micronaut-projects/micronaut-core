@@ -15,7 +15,7 @@
  */
 
 /**
- * Netty converters for various data types.
+ * Netty decoders for Micronaut.
  *
  * @author Graeme Rocher
  * @since 1.0

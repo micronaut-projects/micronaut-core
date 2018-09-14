@@ -92,6 +92,11 @@ public interface Session extends MutableConvertibleValues<Object> {
     boolean isNew();
 
     /**
+     * @return Has the session been modified
+     */
+    boolean isModified();
+
+    /**
      * Retrieve an attribute for the given name.
      *
      * @param attr The attribute name

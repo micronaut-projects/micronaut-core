@@ -328,13 +328,13 @@ public class DefaultBeanContext implements BeanContext {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <R> Optional<MethodExecutionHandle<R>> findExecutionHandle(Class<?> beanType, String method, Class... arguments) {
+    public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, String method, Class... arguments) {
         return findExecutionHandle(beanType, null, method, arguments);
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public <R> Optional<MethodExecutionHandle<R>> findExecutionHandle(Class<?> beanType, Qualifier<?> qualifier, String method, Class... arguments) {
+    public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(Class<T> beanType, Qualifier<?> qualifier, String method, Class... arguments) {
         Optional<? extends BeanDefinition<?>> foundBean = findBeanDefinition(beanType, (Qualifier) qualifier);
         if (foundBean.isPresent()) {
             BeanDefinition<?> beanDefinition = foundBean.get();
@@ -384,7 +384,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <R> Optional<MethodExecutionHandle<R>> findExecutionHandle(Object bean, String method, Class[] arguments) {
+    public <T, R> Optional<MethodExecutionHandle<T, R>> findExecutionHandle(T bean, String method, Class[] arguments) {
         if (bean != null) {
             Optional<? extends BeanDefinition<?>> foundBean = findBeanDefinition(bean.getClass());
             if (foundBean.isPresent()) {
@@ -2092,7 +2092,7 @@ public class DefaultBeanContext implements BeanContext {
      * @param <T> The type
      * @param <R> The return type
      */
-    private abstract static class AbstractExecutionHandle<T, R> implements MethodExecutionHandle<R> {
+    private abstract static class AbstractExecutionHandle<T, R> implements MethodExecutionHandle<T, R> {
         protected final ExecutableMethod<T, R> method;
 
         /**
@@ -2152,6 +2152,11 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         @Override
+        public T getTarget() {
+            return target;
+        }
+
+        @Override
         public R invoke(Object... arguments) {
             return method.invoke(target, arguments);
         }
@@ -2195,6 +2200,21 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         @Override
+        public T getTarget() {
+            T target = this.target;
+            if (target == null) {
+                synchronized (this) { // double check
+                    target = this.target;
+                    if (target == null) {
+                        target = beanContext.getBean(beanType, qualifier);
+                        this.target = target;
+                    }
+                }
+            }
+            return target;
+        }
+
+        @Override
         public Method getTargetMethod() {
             return method.getTargetMethod();
         }
@@ -2207,16 +2227,7 @@ public class DefaultBeanContext implements BeanContext {
         @Override
         public R invoke(Object... arguments) {
             if (isSingleton) {
-                T target = this.target;
-                if (target == null) {
-                    synchronized (this) { // double check
-                        target = this.target;
-                        if (target == null) {
-                            target = beanContext.getBean(beanType, qualifier);
-                            this.target = target;
-                        }
-                    }
-                }
+                T target = getTarget();
 
                 return method.invoke(target, arguments);
             } else {
