@@ -48,22 +48,4 @@ public interface RxWebSocketSession extends WebSocketSession {
      */
     @Override
     <T> Flowable<T> send(T message, MediaType mediaType);
-
-    @Override
-    <T> Flowable<T> broadcast(T message, MediaType mediaType, Predicate<WebSocketSession> filter);
-
-    @Override
-    default <T> Flowable<T> broadcast(T message, MediaType mediaType) {
-        return Flowable.fromPublisher(WebSocketSession.super.broadcast(message, mediaType));
-    }
-
-    @Override
-    default <T> Flowable<T> broadcast(T message) {
-        return Flowable.fromPublisher(WebSocketSession.super.broadcast(message));
-    }
-
-    @Override
-    default <T> Flowable<T> broadcast(T message, Predicate<WebSocketSession> filter) {
-        return Flowable.fromPublisher(WebSocketSession.super.broadcast(message, filter));
-    }
 }
