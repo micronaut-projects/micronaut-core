@@ -15,9 +15,9 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Support classes for returning the correct health result from the HTTP server.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+package io.micronaut.management.endpoint.health.filter;

@@ -15,9 +15,9 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Utilities for use with GraalVM native image.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+package io.micronaut.graal.reflect;

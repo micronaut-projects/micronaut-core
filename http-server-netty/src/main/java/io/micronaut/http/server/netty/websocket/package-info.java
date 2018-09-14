@@ -15,9 +15,9 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Netty Server WebSocket support classes.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+package io.micronaut.http.server.netty.websocket;

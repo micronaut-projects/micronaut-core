@@ -15,9 +15,9 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Support classes for binding the {@link io.micronaut.http.context.ServerRequestContext}.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+package io.micronaut.http.server.context;

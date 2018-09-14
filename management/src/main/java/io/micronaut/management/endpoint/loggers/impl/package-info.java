@@ -15,9 +15,12 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Implementation specific classes for the logging system.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+@Internal
+package io.micronaut.management.endpoint.loggers.impl;
+
+import io.micronaut.core.annotation.Internal;

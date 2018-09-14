@@ -15,9 +15,9 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Contains classes that integrate Micronaut and Kafka Streams.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+package io.micronaut.configuration.kafka.streams;

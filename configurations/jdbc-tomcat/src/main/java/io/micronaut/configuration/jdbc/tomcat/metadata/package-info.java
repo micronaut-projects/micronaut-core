@@ -15,9 +15,9 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Contains classes for reading JDBC metadata for Tomcat.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+package io.micronaut.configuration.jdbc.tomcat.metadata;
