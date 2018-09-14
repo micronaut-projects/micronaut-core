@@ -15,9 +15,9 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Classes for configuring transaction management for data sources.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+package io.micronaut.spring.tx.datasource;

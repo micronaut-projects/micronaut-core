@@ -15,9 +15,9 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Classes related to handling the {@link io.micronaut.scheduling.annotation.Async} annotation.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+package io.micronaut.scheduling.async;

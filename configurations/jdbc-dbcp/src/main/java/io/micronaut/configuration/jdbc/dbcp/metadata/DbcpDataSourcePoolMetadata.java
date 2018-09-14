@@ -28,6 +28,8 @@ import java.util.Optional;
 /**
  * {@link io.micronaut.jdbc.metadata.DataSourcePoolMetadata} for a DBCP {@link BasicDataSource}.
  *
+ * NOTICE: Forked from Spring Boot.
+ *
  * @author Stephane Nicoll
  * @author Christian Oestreich
  * @since 1.0.0

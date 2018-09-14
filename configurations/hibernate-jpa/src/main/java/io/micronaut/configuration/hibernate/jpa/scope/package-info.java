@@ -15,9 +15,9 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Classes related to the {@link io.micronaut.configuration.hibernate.jpa.scope.CurrentSession} scope.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+package io.micronaut.configuration.hibernate.jpa.scope;

@@ -15,9 +15,9 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Converters related to HTTP.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+package io.micronaut.runtime.http.converters;

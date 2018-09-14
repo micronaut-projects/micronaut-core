@@ -15,9 +15,9 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Support classes for JWT validation.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+package io.micronaut.security.token.jwt.validator;

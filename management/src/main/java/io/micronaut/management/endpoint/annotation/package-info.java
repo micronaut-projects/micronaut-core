@@ -15,9 +15,9 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Annotations for defining management endpoints.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+package io.micronaut.management.endpoint.annotation;

@@ -15,9 +15,9 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Contains classes that bind metrics for configured JDBC data sources.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+package io.micronaut.configuration.metrics.binder.datasource;

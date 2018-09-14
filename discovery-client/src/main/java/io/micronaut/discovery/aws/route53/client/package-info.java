@@ -15,9 +15,9 @@
  */
 
 /**
- * Netty encoders for the Server.
+ * Integration with AWS Route53.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.http.server.netty.encoders;
+package io.micronaut.discovery.aws.route53.client;
