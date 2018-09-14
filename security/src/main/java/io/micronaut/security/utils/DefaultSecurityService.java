@@ -33,6 +33,7 @@ import java.util.List;
  */
 @Singleton
 public class DefaultSecurityService implements SecurityService {
+
     /**
      * Get the username of the current user.
      *
@@ -88,7 +89,7 @@ public class DefaultSecurityService implements SecurityService {
             return false;
         }
         return getAuthentication().map(authentication -> {
-            if (authentication.getAttributes() !=null && authentication.getAttributes().containsKey(rolesKey)) {
+            if (authentication.getAttributes() != null && authentication.getAttributes().containsKey(rolesKey)) {
                 Object authorities = authentication.getAttributes().get(rolesKey);
                 if (authorities instanceof List) {
                     return ((List) authorities).contains(role);

@@ -195,8 +195,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
                             ctx.writeAndFlush(actualResponse);
                         }
                     });
-                }
-                else {
+                } else {
                     ctx.fireExceptionCaught(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"));
                 }
             } else {

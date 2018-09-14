@@ -33,7 +33,6 @@ import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
 import org.slf4j.Logger;

@@ -130,7 +130,6 @@ public class HttpResponseEncoder extends MessageToMessageEncoder<MutableHttpResp
         });
     }
 
-
     private MutableHttpResponse<?> encodeBodyWithCodec(MutableHttpResponse<?> response,
                                                        Object body,
                                                        MediaTypeCodec codec,

@@ -17,12 +17,9 @@
 package io.micronaut.http;
 
 import io.micronaut.http.cookie.Cookies;
-import io.micronaut.http.util.HttpUtil;
 
 import java.net.InetSocketAddress;
 import java.net.URI;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;

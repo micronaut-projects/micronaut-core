@@ -22,8 +22,8 @@ import javax.lang.model.element.Modifier;
 import java.util.Set;
 
 /**
- * An adapter that implements all methods of the {@link javax.lang.model.type.TypeVisitor} interface. Subclasses can
- * selectively override.
+ * An adapter that implements all methods of the {@link javax.lang.model.type.TypeVisitor}
+ * interface subclasses can selectively override.
  *
  * @param <R> The return type of the visitor's method
  * @param <P> The type of the additional parameter to the visitor's methods.

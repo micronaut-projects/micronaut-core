@@ -85,7 +85,6 @@ public class DatasourceFactory implements AutoCloseable {
         return dataSourcePoolMetadata;
     }
 
-
     @Override
     @PreDestroy
     public void close() {
