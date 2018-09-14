@@ -733,6 +733,13 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     if (readTimeoutHandler != null) {
                         pipeline.remove(readTimeoutHandler);
                     }
+
+                    Optional<Duration> readIdleTime = configuration.getReadIdleTime();
+                    if (readIdleTime.isPresent()) {
+                        Duration duration = readIdleTime.get();
+                        pipeline.addLast(new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
+                    }
+
                     final NettyWebSocketClientHandler webSocketHandler;
                     try {
                         URI webSocketURL = URI.create("ws://" + uri.getHost() + ":" + uri.getPort() + uri.getPath());
