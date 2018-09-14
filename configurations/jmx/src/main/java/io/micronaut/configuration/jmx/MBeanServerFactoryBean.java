@@ -57,7 +57,7 @@ public class MBeanServerFactoryBean {
                 }
 
                 return servers.get(0);
-            } else if (!configuration.ignoreAgentNotFound) {
+            } else if (!configuration.isIgnoreAgentNotFound()) {
                 throw new BeanInstantiationException("Could not find MBeanServer with agentId [" + agentId + "].");
             }
         }
@@ -74,7 +74,7 @@ public class MBeanServerFactoryBean {
 
         MBeanServer server;
 
-        if (configuration.addToFactory) {
+        if (configuration.isAddToFactory()) {
             server = MBeanServerFactory.createMBeanServer(domain);
             applicationContext.registerSingleton((ApplicationEventListener<ShutdownEvent>) event -> {
                 MBeanServerFactory.releaseMBeanServer(server);
