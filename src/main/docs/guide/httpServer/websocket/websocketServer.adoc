@@ -12,6 +12,8 @@ include::{testswebsocket}/ChatServerWebSocket.java[]
 <4> The passed api:websocket.WebSocketSession[] instance can be used to broadcast messages to other WebSocket clients.
 <5> The ann:websocket.annotation.OnClose[] annotation is used to declare a method that is invoked when the WebSocket is closed.
 
+TIP: A working example of WebSockets in action can be found in the https://github.com/micronaut-projects/micronaut-examples/tree/master/websocket-chat[Micronaut Examples] GitHub repository.
+
 In terms of binding the method arguments to each WebSocket method can be:
 
 * A variable from the URI template (in the above example `topic` and `username` are variables in the URI template)
@@ -43,6 +45,12 @@ The previous example uses the `broadcastSync` method of the api:websocket.WebSoc
 ----
 include::{testswebsocket}/ReactivePojoChatServerWebSocket.java[tag=onmessage, indent=0]
 ----
+
+=== @ServerWebSocket and Scopes
+
+By default a unique `@ServerWebSocket` instance is created for each WebSocket connection. This allows you to retrieve the api:websocket.WebSocketSession[] from the `@OnOpen` handler and assign it to a field of the  `@ServerWebSocket` instance.
+
+If you define the `@ServerWebSocket` as `@Singleton` it should be noted that extra care will need to be taken to synchronize local state to avoid thread safety issues.
 
 === Sharing Sessions with the HTTP Session
 
