@@ -55,13 +55,17 @@ public abstract class AbstractSecurityRule implements SecurityRule {
         if (claims == null) {
             roles.add(SecurityRule.IS_ANONYMOUS);
         } else {
-            Object rolesObject = claims.get(tokenConfiguration.getRolesName());
-            if (rolesObject instanceof Iterable) {
-                for (Object o : ((Iterable) rolesObject)) {
-                    roles.add(o.toString());
+            if (!claims.isEmpty()) {
+                Object rolesObject = claims.get(tokenConfiguration.getRolesName());
+                if (rolesObject != null) {
+                    if (rolesObject instanceof Iterable) {
+                        for (Object o : ((Iterable) rolesObject)) {
+                            roles.add(o.toString());
+                        }
+                    } else {
+                        roles.add(rolesObject.toString());
+                    }
                 }
-            } else {
-                roles.add(rolesObject.toString());
             }
             roles.add(SecurityRule.IS_ANONYMOUS);
             roles.add(SecurityRule.IS_AUTHENTICATED);
