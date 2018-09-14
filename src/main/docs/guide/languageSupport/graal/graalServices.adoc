@@ -1,4 +1,4 @@
-To get started creating a Microservice that can be compiled into a native image use the `graal-native-image` feature when creating the application:
+To get started creating a Microservice that can be compiled into a native image, use the `graal-native-image` feature when creating the application with the CLI:
 
 .Creating a Graal Native Microservice
 [source,bash]
