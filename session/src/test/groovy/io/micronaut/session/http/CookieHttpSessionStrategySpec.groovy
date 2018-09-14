@@ -45,7 +45,7 @@ class CookieHttpSessionStrategySpec extends Specification {
         CookieHttpSessionStrategy strategy = new CookieHttpSessionStrategy(new HttpSessionConfiguration())
         def nettyRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/test')
         CookieEncoder encoder = ServerCookieEncoder.STRICT
-        def encoded = encoder.encode(((NettyCookie) Cookie.of(HttpSessionConfiguration.DEFAULT_COOKIE_NAME, new String(Base64.encoder.encode("1234".bytes)))).getNettyCookie())
+        def encoded = encoder.encode(((NettyCookie) Cookie.of(HttpSessionConfiguration.DEFAULT_COOKIENAME, new String(Base64.encoder.encode("1234".bytes)))).getNettyCookie())
         nettyRequest.headers().add(HttpHeaders.COOKIE, encoded)
         HttpRequest request = new NettyHttpRequest(nettyRequest, Mock(ChannelHandlerContext), ConversionService.SHARED, new HttpServerConfiguration())
 

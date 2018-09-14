@@ -47,7 +47,7 @@ public class HttpHeaderTokenWriterConfigurationProperties implements HttpHeaderT
     }
 
     /**
-     * Enable {@link io.micronaut.security.token.writer.HttpHeaderTokenWriter}. Default value {@value #DEFAULT_ENABLED}
+     * Enable {@link io.micronaut.security.token.writer.HttpHeaderTokenWriter}. Default value ({@value #DEFAULT_ENABLED}).
      * @param enabled enabled flag
      */
     public void setEnabled(boolean enabled) {
@@ -55,7 +55,7 @@ public class HttpHeaderTokenWriterConfigurationProperties implements HttpHeaderT
     }
 
     /**
-     * Value prefix for Http Header. Default value {@value HttpHeaderValues#AUTHORIZATION_PREFIX_BEARER}
+     * Value prefix for Http Header. Default value ({@value io.micronaut.http.HttpHeaderValues#AUTHORIZATION_PREFIX_BEARER}).
      * @param prefix preffix before the header value
      */
     public void setPrefix(String prefix) {

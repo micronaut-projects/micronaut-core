@@ -32,7 +32,7 @@ public class HttpStatusException extends HttpException {
     private Object body;
 
     /**
-     * @param status  The {@link HttpStatus}
+     * @param status  The {@link io.micronaut.http.HttpStatus}
      * @param message The message
      */
     public HttpStatusException(HttpStatus status, String message) {
@@ -41,7 +41,7 @@ public class HttpStatusException extends HttpException {
     }
 
     /**
-     * @param status The {@link HttpStatus}
+     * @param status The {@link io.micronaut.http.HttpStatus}
      * @param body   The arbitrary object to return
      */
     public HttpStatusException(HttpStatus status, Object body) {
@@ -50,7 +50,7 @@ public class HttpStatusException extends HttpException {
     }
 
     /**
-     * @return The {@link HttpStatus}
+     * @return The {@link io.micronaut.http.HttpStatus}
      */
     public HttpStatus getStatus() {
         return status;

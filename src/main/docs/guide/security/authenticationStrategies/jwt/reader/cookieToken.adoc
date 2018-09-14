@@ -6,22 +6,6 @@ image::jwt-cookie.svg[]
 
 Reading tokens from Cookies is disabled by default. Note that using JWT tokens from cookies requires JWT Authentication to be enabled.
 
-|===
-
-| Configuration Property | Default Value | Description
-
-| `micronaut.security.token.jwt.cookie.enabled` | `false` | Disabled by default.
-
-| `micronaut.security.token.jwt.cookie.cookieName` | `JWT` | Cookie name
-
-| `micronaut.security.token.jwt.cookie.logoutTargetUrl` | `/` | String to be parsed into a URI which represents where the user is redirected to after logout.
-
-| `micronaut.security.token.jwt.cookie.loginSuccessTargetUrl` | `/` | String to be parsed into a URI which represents where the user is redirected to after a successful login.
-
-| `micronaut.security.token.jwt.cookie.loginFailureTargetUrl` | `/` | String to be parsed into a URI which represents where the user is redirected to after a failed login.
-
-|===
-
-See the javadoc for api:security.token.jwt.cookie.JwtCookieConfigurationProperties[] for more information.
+include::{includedir}configurationProperties/io.micronaut.security.token.jwt.cookie.JwtCookieConfigurationProperties.adoc[]
 
 TIP: Read the http://guides.micronaut.io/micronaut-security-jwt-cookie/guide/index.html[Micronaut JWT Authentication with Cookies] to learn more.

@@ -35,13 +35,43 @@ public abstract class RegistrationConfiguration implements Toggleable {
      */
     public static final String PREFIX = "registration";
 
+    /**
+     * The default enable value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_ENABLED = true;
+
+    /**
+     * The default retry count value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_RETRY_COUNT = -1;
+
+    /**
+     * The default retry delay in seconds.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_RETRYDELAY_SECONDS = 1;
+
+    /**
+     * The default deregister value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_DEREGISTER = true;
+
+    /**
+     * The default fail fast value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_FAILFAST = true;
+
     private String healthPath;
-    private int retryCount = -1;
+    private int retryCount = DEFAULT_RETRY_COUNT;
     private Duration timeout;
-    private Duration retryDelay = Duration.of(1, ChronoUnit.SECONDS);
-    private boolean failFast = true;
-    private boolean enabled = true;
-    private boolean deregister = true;
+    private Duration retryDelay = Duration.of(DEFAULT_RETRYDELAY_SECONDS, ChronoUnit.SECONDS);
+    private boolean failFast = DEFAULT_FAILFAST;
+    private boolean enabled = DEFAULT_ENABLED;
+    private boolean deregister = DEFAULT_DEREGISTER;
 
     /**
      * @return The default timeout for registration
@@ -65,6 +95,7 @@ public abstract class RegistrationConfiguration implements Toggleable {
     }
 
     /**
+     * Default value ({@value #DEFAULT_FAILFAST}).
      * @param failFast Whether to fail server startup if registration fails
      */
     public void setFailFast(boolean failFast) {
@@ -79,6 +110,7 @@ public abstract class RegistrationConfiguration implements Toggleable {
     }
 
     /**
+     * Default value ({@value #DEFAULT_DEREGISTER}).
      * @param deregister Whether to deregister the service on shutdown
      */
     public void setDeregister(boolean deregister) {
@@ -94,6 +126,7 @@ public abstract class RegistrationConfiguration implements Toggleable {
     }
 
     /**
+     * Default value ({@value #DEFAULT_ENABLED}).
      * @param enabled Whether service registration is enabled
      */
     public void setEnabled(boolean enabled) {
@@ -108,6 +141,7 @@ public abstract class RegistrationConfiguration implements Toggleable {
     }
 
     /**
+     * Default value ({@value #DEFAULT_RETRY_COUNT}).
      * @param retryCount The retry count
      */
     public void setRetryCount(int retryCount) {
@@ -122,6 +156,7 @@ public abstract class RegistrationConfiguration implements Toggleable {
     }
 
     /**
+     * Default value ({@value #DEFAULT_RETRYDELAY_SECONDS} seconds).
      * @param retryDelay The retry delay
      */
     public void setRetryDelay(Duration retryDelay) {

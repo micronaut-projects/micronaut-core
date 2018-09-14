@@ -47,22 +47,22 @@ public interface ExecutorConfiguration {
     String PREFIX_CONSUMER = PREFIX + ".consumer";
 
     /**
-     * @return The {@link ExecutorType}
+     * @return The {@link io.micronaut.scheduling.executor.ExecutorType}
      */
     ExecutorType getType();
 
     /**
-     * @return The parallelism for {@link ExecutorType#WORK_STEALING}
+     * @return The parallelism for {@link io.micronaut.scheduling.executor.ExecutorType#WORK_STEALING}
      */
     @Min(1L) Integer getParallelism();
 
     /**
-     * @return The number of threads for {@link ExecutorType#FIXED}
+     * @return The number of threads for {@link io.micronaut.scheduling.executor.ExecutorType#FIXED}
      */
     @Min(1L) Integer getNumberOfThreads();
 
     /**
-     * @return The core pool size for {@link ExecutorType#SCHEDULED}
+     * @return The core pool size for {@link io.micronaut.scheduling.executor.ExecutorType#SCHEDULED}
      */
     @Min(1L) Integer getCorePoolSize();
 

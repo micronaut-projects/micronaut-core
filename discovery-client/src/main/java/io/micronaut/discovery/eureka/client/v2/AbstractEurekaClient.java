@@ -130,7 +130,7 @@ abstract class AbstractEurekaClient implements EurekaClient {
     }
 
     /**
-     * @return A {@link Publisher} with applications info
+     * @return A {@link Publisher} with applications info.
      */
     @SuppressWarnings("WeakerAccess")
     @Get("/apps")

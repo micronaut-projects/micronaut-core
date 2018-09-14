@@ -84,6 +84,7 @@ class ApiMacro extends InlineMacroProcessor {
                 type: ':link',
                 target: "${baseUri}/${target.replace('.','/')}.html${methodRef}${propRef}".toString()
         ] as Map<String, Object>
+        options.target = options.target.replaceAll('\\$', '.')
 
         if (attributes.text) {
             shortName = attributes.text

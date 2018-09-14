@@ -48,7 +48,7 @@ public class SecretSignatureConfiguration {
     }
 
     /**
-     * jwsAlgorithm setter.
+     * {@link com.nimbusds.jose.JWSAlgorithm}. Defaults to HS256
      * @param jwsAlgorithm JWS Algorithm
      */
     public void setJwsAlgorithm(JWSAlgorithm jwsAlgorithm) {
@@ -56,7 +56,6 @@ public class SecretSignatureConfiguration {
     }
 
     /**
-     *
      * @return Secret's length must be at least 256 bits. it is used to sign JWT.
      */
     public String getSecret() {
@@ -64,7 +63,7 @@ public class SecretSignatureConfiguration {
     }
 
     /**
-     * secret setter.
+     * Secret used to sign JWT. Length must be at least 256 bits.
      * @param secret Signature Secret
      */
     public void setSecret(String secret) {
@@ -88,8 +87,8 @@ public class SecretSignatureConfiguration {
     }
 
     /**
-     * base64 setter.
-     * @param base64 boolean flag indicating wether the supplied secret is base64 encoded
+     * Indicates whether the supplied secret is base64 encoded
+     * @param base64 boolean flag indicating whether the supplied secret is base64 encoded
      */
     public void setBase64(boolean base64) {
         this.base64 = base64;

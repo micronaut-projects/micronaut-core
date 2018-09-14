@@ -163,14 +163,14 @@ public class HealthEndpoint {
         }
 
         /**
-         * @return How {@link io.micronaut.health.HealthStatus} map to {@link HttpStatus} codes.
+         * @return How {@link io.micronaut.health.HealthStatus} map to {@link io.micronaut.http.HttpStatus} codes.
          */
         public Map<String, HttpStatus> getHttpMapping() {
             return httpMapping;
         }
 
         /**
-         * Set how {@link io.micronaut.health.HealthStatus} map to {@link HttpStatus} codes.
+         * Set how {@link io.micronaut.health.HealthStatus} map to {@link io.micronaut.http.HttpStatus} codes.
          *
          * @param httpMapping The http mappings
          */

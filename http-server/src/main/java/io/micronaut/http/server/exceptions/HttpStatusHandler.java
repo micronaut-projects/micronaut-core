@@ -27,7 +27,7 @@ import io.micronaut.http.hateos.JsonError;
 import javax.inject.Singleton;
 
 /**
- * Handles exception of type {@link HttpStatusException}.
+ * Handles exception of type {@link io.micronaut.http.exceptions.HttpStatusException}.
  *
  * @author Iván López
  * @since 1.0

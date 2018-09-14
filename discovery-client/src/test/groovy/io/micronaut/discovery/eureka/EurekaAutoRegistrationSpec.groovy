@@ -19,6 +19,7 @@ import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.discovery.eureka.client.v2.EurekaClient
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.Ignore
 import spock.lang.IgnoreIf
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -27,10 +28,10 @@ import spock.util.concurrent.PollingConditions
  * @author graemerocher
  * @since 1.0
  */
-@IgnoreIf({ !System.getenv('EUREKA_HOST') && !System.getenv('EUREKA_PORT')})
+@IgnoreIf({ !env['EUREKA_HOST'] && !env['EUREKA_PORT'] })
 class EurekaAutoRegistrationSpec extends Specification{
 
-
+    @Ignore("https://github.com/micronaut-projects/micronaut-core/issues/566")
     void "test that an application can be registered and de-registered with Eureka"() {
         when: "An application is started and eureka configured"
         String serviceId = 'myService'
@@ -46,7 +47,7 @@ class EurekaAutoRegistrationSpec extends Specification{
         )
 
         // run a Eureka client
-        EurekaClient eurekaClient = ApplicationContext.run(EurekaClient, eurekaConfiguration)
+        EurekaClient eurekaClient = ApplicationContext.build(eurekaConfiguration).run(EurekaClient)
 
         // since Eureka is eventually consistent a long timeout/delay is required slowing this test down significantly
         PollingConditions conditions = new PollingConditions(timeout: 30, delay: 1)
