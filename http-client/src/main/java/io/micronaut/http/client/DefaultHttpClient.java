@@ -716,7 +716,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         return Flowable.create(emitter -> {
             SslContext sslContext = buildSslContext(uri);
             WebSocketVersion protocolVersion = finalWebSocketBean.getBeanDefinition().getValue(ClientWebSocket.class, "version", WebSocketVersion.class).orElse(WebSocketVersion.V13);
-            int maxFramePayloadLength = finalWebSocketBean.messageMethod().getValue(OnMessage.class, "maxPayloadLength", Integer.class).orElse(65536);
+            int maxFramePayloadLength = finalWebSocketBean.messageMethod().flatMap(m -> m.getValue(OnMessage.class, "maxPayloadLength", Integer.class)).orElse(65536);
 
             bootstrap.remoteAddress(uri.getHost(), uri.getPort());
             bootstrap.handler(new HttpClientInitializer(

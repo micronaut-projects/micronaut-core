@@ -46,7 +46,7 @@ public interface WebSocketBean<T> {
      *
      * @return the method
      */
-    MethodExecutionHandle<T, ?> messageMethod();
+    Optional<MethodExecutionHandle<T, ?>> messageMethod();
 
     /**
      * Returns the method annotated with {@link io.micronaut.websocket.annotation.OnClose}.

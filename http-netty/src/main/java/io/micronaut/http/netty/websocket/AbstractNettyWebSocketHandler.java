@@ -107,7 +107,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         this.uriVariables = uriVariables;
         this.webSocketBean = webSocketBean;
         this.originatingRequest = request;
-        this.messageHandler = webSocketBean.messageMethod();
+        this.messageHandler = webSocketBean.messageMethod().orElse(null);
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.webSocketVersion = version;
         this.session = createWebSocketSession(ctx);
@@ -115,20 +115,25 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         if (session != null) {
 
             ExecutableBinder<WebSocketState> binder = new DefaultExecutableBinder<>();
-            BoundExecutable<?, ?> bound = binder.tryBind(messageHandler.getExecutableMethod(), webSocketBinder, new WebSocketState(session, originatingRequest));
-            List<Argument<?>> unboundArguments = bound.getUnboundArguments();
 
-            if (unboundArguments.size() == 1) {
-                this.bodyArgument = unboundArguments.iterator().next();
+            if (messageHandler != null) {
+                BoundExecutable<?, ?> bound = binder.tryBind(messageHandler.getExecutableMethod(), webSocketBinder, new WebSocketState(session, originatingRequest));
+                List<Argument<?>> unboundArguments = bound.getUnboundArguments();
+
+                if (unboundArguments.size() == 1) {
+                    this.bodyArgument = unboundArguments.iterator().next();
+                } else {
+                    this.bodyArgument = null;
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("WebSocket @OnMessage method " + webSocketBean.getTarget() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 message parameter, but found 2 possible candidates: " + unboundArguments);
+                    }
+
+                    if (session.isOpen()) {
+                        session.close(CloseReason.INTERNAL_ERROR);
+                    }
+                }
             } else {
                 this.bodyArgument = null;
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("WebSocket @OnMessage method " + webSocketBean.getTarget() + "." + messageHandler.getExecutableMethod() + " should define exactly 1 message parameter, but found 2 possible candidates: " + unboundArguments);
-                }
-
-                if (session.isOpen()) {
-                    session.close(CloseReason.INTERNAL_ERROR);
-                }
             }
 
             Optional<? extends MethodExecutionHandle<?, ?>> executionHandle = webSocketBean.openMethod();
@@ -290,59 +295,69 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      */
     protected void handleWebSocketFrame(ChannelHandlerContext ctx, WebSocketFrame msg) {
         if (msg instanceof TextWebSocketFrame || msg instanceof BinaryWebSocketFrame) {
-            Argument<?> bodyArgument = this.getBodyArgument();
-            Optional<?> converted = ConversionService.SHARED.convert(msg.content(), bodyArgument);
-            NettyRxWebSocketSession currentSession = getSession();
 
-            if (!converted.isPresent()) {
-                MediaType mediaType = messageHandler.getValue(Consumes.class, MediaType.class).orElse(MediaType.APPLICATION_JSON_TYPE);
-                try {
-                    converted = mediaTypeCodecRegistry.findCodec(mediaType).map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content())));
-                } catch (CodecException e) {
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + e.getMessage(), e);
-                    }
-                    exceptionCaught(ctx, e);
-                    return;
+            if (messageHandler == null) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("WebSocket bean [" + webSocketBean.getTarget() + "] received message, but defined no @OnMessage handler. Dropping frame...");
                 }
-            }
-
-            if (converted.isPresent()) {
-                Object v = converted.get();
-
-                ExecutableBinder<WebSocketState> executableBinder = new DefaultExecutableBinder<>(
-                        Collections.singletonMap(bodyArgument, v)
-                );
-
-                try {
-                    BoundExecutable boundExecutable = executableBinder.bind(messageHandler.getExecutableMethod(), webSocketBinder, new WebSocketState(currentSession, originatingRequest));
-                    Object result = invokeExecutable(boundExecutable, messageHandler);
-                    if (Publishers.isConvertibleToPublisher(result)) {
-                        Flowable<?> flowable = instrumentPublisher(ctx, result);
-                        flowable.subscribe(
-                                (o) -> { } ,
-                                (error) -> {
-                                    if (LOG.isErrorEnabled()) {
-                                        LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + error.getMessage(), error);
-                                    }
-                                    exceptionCaught(ctx, error);
-                                },
-                                () -> messageHandled(ctx, session, v)
-                        );
-                    } else {
-                        messageHandled(ctx, session, v);
-                    }
-                } catch (Throwable e) {
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + e.getMessage(), e);
-                    }
-                    exceptionCaught(ctx, e);
-                }
-
+                ctx.channel().writeAndFlush(new CloseWebSocketFrame(CloseReason.UNSUPPORTED_DATA.getCode(), CloseReason.UNSUPPORTED_DATA.getReason())).addListener(ChannelFutureListener.CLOSE);
             } else {
-                ctx.channel().writeAndFlush(new CloseWebSocketFrame(CloseReason.UNSUPPORTED_DATA.getCode(), CloseReason.UNSUPPORTED_DATA.getReason() + ": " + "Cannot convert data [] to target type: "))
-                             .addListener(ChannelFutureListener.CLOSE);
+
+                Argument<?> bodyArgument = this.getBodyArgument();
+                Optional<?> converted = ConversionService.SHARED.convert(msg.content(), bodyArgument);
+                NettyRxWebSocketSession currentSession = getSession();
+
+                if (!converted.isPresent()) {
+                    MediaType mediaType = messageHandler.getValue(Consumes.class, MediaType.class).orElse(MediaType.APPLICATION_JSON_TYPE);
+                    try {
+                        converted = mediaTypeCodecRegistry.findCodec(mediaType).map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content())));
+                    } catch (CodecException e) {
+                        if (LOG.isErrorEnabled()) {
+                            LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + e.getMessage(), e);
+                        }
+                        exceptionCaught(ctx, e);
+                        return;
+                    }
+                }
+
+                if (converted.isPresent()) {
+                    Object v = converted.get();
+
+                    ExecutableBinder<WebSocketState> executableBinder = new DefaultExecutableBinder<>(
+                            Collections.singletonMap(bodyArgument, v)
+                    );
+
+                    try {
+                        BoundExecutable boundExecutable = executableBinder.bind(messageHandler.getExecutableMethod(), webSocketBinder, new WebSocketState(currentSession, originatingRequest));
+                        Object result = invokeExecutable(boundExecutable, messageHandler);
+                        if (Publishers.isConvertibleToPublisher(result)) {
+                            Flowable<?> flowable = instrumentPublisher(ctx, result);
+                            flowable.subscribe(
+                                    (o) -> { } ,
+                                    (error) -> {
+                                        if (LOG.isErrorEnabled()) {
+                                            LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + error.getMessage(), error);
+                                        }
+                                        exceptionCaught(ctx, error);
+                                    },
+                                    () -> messageHandled(ctx, session, v)
+                            );
+                        } else {
+                            messageHandled(ctx, session, v);
+                        }
+                    } catch (Throwable e) {
+                        if (LOG.isErrorEnabled()) {
+                            LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + e.getMessage(), e);
+                        }
+                        exceptionCaught(ctx, e);
+                    }
+
+                } else {
+                    ctx.channel().writeAndFlush(new CloseWebSocketFrame(CloseReason.UNSUPPORTED_DATA.getCode(), CloseReason.UNSUPPORTED_DATA.getReason() + ": " + "Cannot convert data [] to target type: "))
+                            .addListener(ChannelFutureListener.CLOSE);
+                }
             }
+
         } else if (msg instanceof PingWebSocketFrame) {
             // respond with pong
             PingWebSocketFrame frame = (PingWebSocketFrame) msg;
