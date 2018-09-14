@@ -13,6 +13,6 @@ compile "io.micronaut:management"
 ====
 If you are creating your project using the Micronaut CLI, supply the `management` feature to configure the management endpoints in your project:
 ----
-> mn create-app my-app --features management
+$ mn create-app my-app --features management
 ----
 ====

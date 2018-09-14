@@ -7,7 +7,7 @@ You should now be able to run the Micronaut CLI from the command prompt as follo
 
 [source,bash]
 ----
-> mn
+$ mn
 | Starting interactive mode...
 | Enter a command name to run. Use TAB for completion:
 mn>

@@ -1,8 +1,17 @@
 ==== Setting up a Hibernate/JPA EntityManager
 
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply the `hibernate-jpa` feature to include a Hibernate JPA configuration in your project:
+----
+$ mn create-app my-app --features hibernate-jpa
+----
+====
+
 Micronaut features built in support for configuring a http://hibernate.org[Hibernate] / JPA `EntityManager` that builds on the <<sqlSupport, SQL DataSource support>>.
 
-Once you have <<sqlSupport, configured one or many DataSources>> to use Hibernate you need to add the `hibernate-jpa` dependency to your build configuration:
+Once you have <<sqlSupport, configured one or many DataSources>> to use Hibernate, you will need to add the `hibernate-jpa` dependency to your build configuration:
 
 .build.gradle
 [source,groovy]
@@ -89,9 +98,18 @@ If you encounter a `LazyInitializationException` when returning a Hibernate enti
 
 ==== Using GORM for Hibernate
 
-For Groovy users and users familiar with Grails framework special support for http://gorm.grails.org[GORM for Hibernate] is available. To use GORM for Hibernate you *should not* include Micronaut's built in <<sqlSupport, SQL Support>> or the `hibernate-jpa` dependency since GORM itself takes responsibility for creating the `DataSource`, `SessionFactory` etc.
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply the `hibernate-gorm` feature to include GORM, a basic connection pool configuration, and a default H2 database driver in your project:
+----
+$ mn create-app my-app --features hibernate-gorm
+----
+====
 
-Instead you should only define the `hibernate-gorm` dependency, a connection pool implementation and the necessary JDBC driver. For example:
+For Groovy users and users familiar with the Grails framework, special support for http://gorm.grails.org[GORM for Hibernate] is available. To use GORM for Hibernate you *should not* include Micronaut's built in <<sqlSupport, SQL Support>> or the `hibernate-jpa` dependency since GORM itself takes responsibility for creating the `DataSource`, `SessionFactory` etc.
+
+Rather, you only need to include the  `hibernate-gorm` dependency in your project, a connection pool implementation, and the desired JDBC driver. For example:
 
 .Configuring GORM for Hibernate
 [source,groovy]
@@ -103,7 +121,7 @@ Instead you should only define the `hibernate-gorm` dependency, a connection poo
   runtime  'com.h2database:h2:1.4.196'
 ----
 
-After that you should use the same http://gorm.grails.org/latest/hibernate/manual/index.html#configuration[configuration properties described in the GORM documentation]. For example:
+You can now use the same http://gorm.grails.org/latest/hibernate/manual/index.html#configuration[configuration properties described in the GORM documentation]. For example:
 
 .Configuring GORM for Hibernate
 [source,yaml]

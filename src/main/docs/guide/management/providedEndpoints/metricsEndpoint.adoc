@@ -77,6 +77,15 @@ You may even use multiple/nested tags like `/metrics/jvm.memory.used?tag=id:PS%2
 
 == Configuration
 
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply one of `micrometer-atlas`, `micrometer-graphite`, `micrometer-prometheus`, or `micrometer-statsd` features to enable metrics and preconfigure the selected registery in your project:
+----
+$ mn create-app my-app --features micrometer-atlas
+----
+====
+
 Currently the metrics endpoint will only be enabled if you include the `micrometer-core` (or one of the typed registries such as `micrometer-registry-statsd` or `micrometer-registry-graphite`) AND the `management` dependencies.  You will also need to have the global metrics flag enabled (true by default).
 
 .Property
