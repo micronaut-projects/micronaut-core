@@ -1,8 +1,3 @@
-https://github.com/Netflix/ribbon[Netflix Ribbon] is a inter-process communication library used at Netflix that has support for customizable load balancing strategies.
-
-If you need more flexibility in how your application performs client-side load balancing then you may wish use Micronaut's Netflix Ribbon support.
-
-
 [TIP]
 .Using the CLI
 ====
@@ -12,6 +7,9 @@ $ mn create-app my-app --features netflix-ribbon
 ----
 ====
 
+https://github.com/Netflix/ribbon[Netflix Ribbon] is a inter-process communication library used at Netflix that has support for customizable load balancing strategies.
+
+If you need more flexibility in how your application performs client-side load balancing then you may wish use Micronaut's Netflix Ribbon support.
 
 To add Ribbon support to your application add the `netflix-ribbon` configuration to `build.gradle` or `pom.xml`:
 

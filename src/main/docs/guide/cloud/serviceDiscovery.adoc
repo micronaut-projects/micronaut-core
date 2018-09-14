@@ -1,3 +1,12 @@
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply either of `discovery-consul` or `discovery-eureka` features to enable service-discovery in your project:
+----
+$ mn create-app my-app --features discovery-consul
+----
+====
+
 Service Discovery enables the ability for Microservices to find each other without necessarily knowing the physical location or IP address of associated services.
 
 There are many ways Service Discovery can be implemented, including:
@@ -10,15 +19,6 @@ With that in mind, Micronaut tries to flexible to support all of these approache
 
 * Eureka
 * Consul
-
-[TIP]
-.Using the CLI
-====
-If you are creating your project using the Micronaut CLI, supply either of `discovery-consul` or `discovery-eureka` features to enable service-discovery in your project:
-----
-$ mn create-app my-app --features discovery-consul
-----
-====
 
 To include Service Discovery in your application simply the first step is to add the `discovery-client` dependency to your application:
 
