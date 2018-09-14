@@ -26,6 +26,7 @@ import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.web.router.Router;
@@ -79,13 +80,13 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     private final RequestBinderRegistry binderRegistry;
     private final WebSocketBeanRegistry webSocketBeanRegistry;
     private final MediaTypeCodecRegistry mediaTypeCodecRegistry;
-    private final ChannelGroup webSocketSessions;
+    private final WebSocketSessionRepository webSocketSessionRepository;
     private final ApplicationEventPublisher eventPublisher;
     private WebSocketServerHandshaker handshaker;
 
     /**
      * Default constructor.
-     * @param webSocketSessions The websocket sessions for the server
+     * @param webSocketSessionRepository The websocket sessions repository
      * @param router The router
      * @param binderRegistry the request binder registry
      * @param webSocketBeanRegistry The web socket bean register
@@ -93,7 +94,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
      * @param eventPublisher The event publisher
      */
     public NettyServerWebSocketUpgradeHandler(
-            ChannelGroup webSocketSessions,
+            WebSocketSessionRepository webSocketSessionRepository,
             Router router,
             RequestBinderRegistry binderRegistry,
             WebSocketBeanRegistry webSocketBeanRegistry,
@@ -103,7 +104,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
         this.binderRegistry = binderRegistry;
         this.webSocketBeanRegistry = webSocketBeanRegistry;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
-        this.webSocketSessions = webSocketSessions;
+        this.webSocketSessionRepository = webSocketSessionRepository;
         this.eventPublisher = eventPublisher;
     }
 
@@ -176,7 +177,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
                                 pipeline.remove(NettyHttpServer.HTTP_STREAMS_CODEC);
                                 pipeline.remove(NettyServerWebSocketUpgradeHandler.this);
                                 NettyServerWebSocketHandler webSocketHandler = new NettyServerWebSocketHandler(
-                                        webSocketSessions,
+                                        webSocketSessionRepository,
                                         handshaker,
                                         msg,
                                         rm,

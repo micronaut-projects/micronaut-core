@@ -254,7 +254,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                         ));
                         pipeline.addLast(HttpResponseEncoder.ID, new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration));
                         pipeline.addLast(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
-                                webSocketSessions,
+                                getWebSocketSessionRepository(),
                                 router,
                                 requestArgumentSatisfier.getBinderRegistry(),
                                 webSocketBeanRegistry,
