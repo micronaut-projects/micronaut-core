@@ -19,9 +19,6 @@ package io.micronaut.web.router;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.inject.ExecutableMethod;
-
-import javax.annotation.Nonnull;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
@@ -32,10 +29,11 @@ import java.util.function.Function;
  * A {@link RouteMatch} for a status code.
  *
  * @param <T> The type
+ * @param <R> The return type
  * @author Graeme Rocher
  * @since 1.0
  */
-class StatusRouteMatch<T> extends AbstractRouteMatch<T> {
+class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
 
     final HttpStatus httpStatus;
 
@@ -55,8 +53,8 @@ class StatusRouteMatch<T> extends AbstractRouteMatch<T> {
     }
 
     @Override
-    protected RouteMatch<T> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments) {
-        return new StatusRouteMatch<T>(httpStatus, abstractRoute, conversionService) {
+    protected RouteMatch<R> newFulfilled(Map<String, Object> newVariables, List<Argument> requiredArguments) {
+        return new StatusRouteMatch<T, R>(httpStatus, abstractRoute, conversionService) {
             @Override
             public Collection<Argument> getRequiredArguments() {
                 return Collections.unmodifiableCollection(requiredArguments);
@@ -70,11 +68,11 @@ class StatusRouteMatch<T> extends AbstractRouteMatch<T> {
     }
 
     @Override
-    public RouteMatch<T> decorate(Function<RouteMatch<T>, T> executor) {
+    public RouteMatch<R> decorate(Function<RouteMatch<R>, R> executor) {
         Map<String, Object> variables = getVariables();
         Collection<Argument> arguments = getRequiredArguments();
         RouteMatch thisRoute = this;
-        return new StatusRouteMatch<T>(httpStatus, abstractRoute, conversionService) {
+        return new StatusRouteMatch<T, R>(httpStatus, abstractRoute, conversionService) {
             @Override
             public Collection<Argument> getRequiredArguments() {
                 return Collections.unmodifiableCollection(arguments);

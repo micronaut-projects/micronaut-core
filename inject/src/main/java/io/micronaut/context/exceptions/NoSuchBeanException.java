@@ -30,7 +30,7 @@ public class NoSuchBeanException extends BeanContextException {
      * @param beanType The bean type
      */
     public NoSuchBeanException(Class beanType) {
-        super("No bean of type [" + beanType.getName() + "] exists. If you are using Java or Kotlin make sure you have enabled annotation processing.");
+        super("No bean of type [" + beanType.getName() + "] exists. Ensure the class is declared a bean and if you are using Java or Kotlin make sure you have enabled annotation processing.");
     }
 
     /**
@@ -39,7 +39,7 @@ public class NoSuchBeanException extends BeanContextException {
      * @param <T>       The type
      */
     public <T> NoSuchBeanException(Class<T> beanType, Qualifier<T> qualifier) {
-        super("No bean of type [" + beanType.getName() + "] exists" + (qualifier != null ? " for the given qualifier: " + qualifier : "") + ". If you are using Java or Kotlin make sure you have enabled annotation processing.");
+        super("No bean of type [" + beanType.getName() + "] exists" + (qualifier != null ? " for the given qualifier: " + qualifier : "") + ". Ensure the class is declared a bean and if you are using Java or Kotlin make sure you have enabled annotation processing.");
     }
 
     /**

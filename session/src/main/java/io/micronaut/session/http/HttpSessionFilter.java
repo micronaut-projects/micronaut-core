@@ -130,7 +130,7 @@ public class HttpSessionFilter extends OncePerRequestHttpServerFilter {
                        session.put(sessionAttr, body.get());
                     }
 
-                    if (session.isNew()) {
+                    if (session.isNew() || session.isModified()) {
                         return Flowable
                             .fromPublisher(Publishers.fromCompletableFuture(() -> sessionStore.save(session)))
                             .map((s) -> new SessionAndResponse(Optional.of(s), response));

@@ -35,7 +35,7 @@ class ConstructorDependencyFailureSpec extends Specification {
         e.message.normalize() == '''\
 Failed to inject value for parameter [a] of class: io.micronaut.inject.failures.ctordependencyfailure.B
 
-Message: No bean of type [io.micronaut.inject.failures.ctordependencyfailure.A] exists. If you are using Java or Kotlin make sure you have enabled annotation processing.
+Message: No bean of type [io.micronaut.inject.failures.ctordependencyfailure.A] exists. Ensure the class is declared a bean and if you are using Java or Kotlin make sure you have enabled annotation processing.
 Path Taken: new B([A a])'''
     }
 }

@@ -81,9 +81,14 @@ task javadoc(type: Javadoc, description: 'Generate javadocs from all child proje
     }
 }
 
-task cleanupPropertyReference(type: Delete) {
+task cleanupPropertyReference {
     group = DOCUMENTATION_GROUP
-    delete file( "${rootProject.buildDir}/docs/guide/configurationreference.html" )
+    doLast {
+        File f = new File( "${rootProject.buildDir}/docs/guide/configurationreference.html" )
+        if(f.exists()) {
+            f.delete()
+        }
+    }
 }
 
 task createDocsGeneratedFolders {
@@ -116,20 +121,22 @@ task mergeConfigProps(dependsOn: createDocsGeneratedFolders) {
 }
 
 task publishConfigurationReference(type: Copy) {
-    dependsOn cleanupPropertyReference, createDocsGeneratedFolders, mergeConfigProps
+    dependsOn mergeConfigProps, cleanupPropertyReference
     ext {
         destinationFileName = "configurationreference.html"
+        inputFileName = "${rootProject.buildDir}/generated/propertyReference.adoc"
     }
     group = DOCUMENTATION_GROUP
 
-    inputs.files file("${project.buildDir}/generated/propertyReference.adoc")
+    inputs.files file(inputFileName)
 
     from "${rootProject.projectDir}/src/main/docs/resources/style/page.html"
     into "${rootProject.buildDir}/docs/guide/"
     filter(org.apache.tools.ant.filters.ReplaceTokens, tokens: [
             projectVersion: projectVersion,
-            pagetitle: 'Configuration Reference | Micronaut',
-            docscontent: org.asciidoctor.Asciidoctor.Factory.create().render(new File("${project.buildDir}/generated/propertyReference.adoc").exists() ? new File("${project.buildDir}/generated/propertyReference.adoc").text : '', [:] as Map<String, Object>)])
+            pagetitle     : 'Configuration Reference | Micronaut',
+            docscontent   : org.asciidoctor.Asciidoctor.Factory.create().render(new File(inputFileName).exists() ? new File(inputFileName).text : '', [:] as Map<String, Object>)
+    ])
     rename { String fileName ->
         fileName.replace("page.html", destinationFileName)
     }

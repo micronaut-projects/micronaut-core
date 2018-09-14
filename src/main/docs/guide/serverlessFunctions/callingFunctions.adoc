@@ -6,6 +6,13 @@ Micronaut provides support for invoking functions (either locally or deployed to
 compile "io.micronaut:function-client"
 ----
 
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI's `create-function` command, the `function-client` dependency is included by default.
+====
+
+
 The developer's primary use of this feature will be in defining interfaces that are annotated with link:{api}/io/micronaut/function/client/FunctionClient.html[FunctionClient]. When this annotation is applied, methods on the interface will become invokers of respective methods on the remote (or local) function associated with the interface.
 
 In addition, the `function-client` works together with Micronaut's <<serviceDiscovery, Service Discovery>> functionality, identifying any functions that are registered with the current service discovery provider and making them available to the client application.

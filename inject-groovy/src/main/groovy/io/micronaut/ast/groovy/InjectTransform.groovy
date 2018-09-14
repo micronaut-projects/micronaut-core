@@ -373,6 +373,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         }
                     }
                 }
+
+                if (!isInterface) {
+                    node.visitContents(this)
+                }
             } else {
                 ClassNode superClass = node.getSuperClass()
                 List<ClassNode> superClasses = []

@@ -1,7 +1,9 @@
 dependencies {
     compile project(":buffer-netty")
     compile project(":http")
+    compile project(":websocket")
     compileOnly project(":inject-java")
     compile dependencyVersion("netty")
+    compile dependencyVersion("rxjava2")
     compile dependencyModuleVersion("netty", "netty-handler")
 }

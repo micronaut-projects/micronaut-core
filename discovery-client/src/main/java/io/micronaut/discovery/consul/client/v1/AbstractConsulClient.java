@@ -43,6 +43,12 @@ import java.util.Optional;
 @Client(id = ConsulClient.SERVICE_ID, path = "/v1", configuration = ConsulConfiguration.class)
 @Requires(beans = ConsulConfiguration.class)
 public abstract class AbstractConsulClient implements ConsulClient {
+
+    static final String CONSUL_REGISTRATION_RETRY_COUNT = "${" + ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retry-count:10}";
+    static final String CONSUL_REGISTRATION_RETRY_DELAY = "${" + ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retry-delay:3s}";
+    static final String EXPR_CONSUL_CONFIG_RETRY_COUNT = "${" + ConsulConfiguration.ConsulConfigDiscoveryConfiguration.PREFIX + ".retry-count:3}";
+    static final String EXPR_CONSUL_CONFIG_RETRY_DELAY = "${" + ConsulConfiguration.ConsulConfigDiscoveryConfiguration.PREFIX + ".retry-delay:1s}";
+
     private static final Logger LOG = LoggerFactory.getLogger(AbstractConsulClient.class);
 
     private ConsulConfiguration consulConfiguration = new ConsulConfiguration();
@@ -72,11 +78,11 @@ public abstract class AbstractConsulClient implements ConsulClient {
         } else {
             ConsulConfiguration.ConsulDiscoveryConfiguration discovery = consulConfiguration.getDiscovery();
             boolean passing = discovery.isPassing();
-            Optional<String> datacenter = Optional.ofNullable(discovery.getDatacenters().get(serviceId));
-            Optional<String> tag = Optional.ofNullable(discovery.getTags().get(serviceId));
+            String datacenter = discovery.getDatacenters().get(serviceId);
+            String tag = discovery.getTags().get(serviceId);
             Optional<String> scheme = Optional.ofNullable(discovery.getSchemes().get(serviceId));
 
-            Publisher<List<HealthEntry>> healthyServicesPublisher = getHealthyServices(serviceId, Optional.of(passing), tag, datacenter);
+            Publisher<List<HealthEntry>> healthyServicesPublisher = getHealthyServices(serviceId, passing, tag, datacenter);
             return Publishers.map(healthyServicesPublisher, healthEntries -> {
                 List<ServiceInstance> serviceInstances = new ArrayList<>();
                 for (HealthEntry healthEntry : healthEntries) {

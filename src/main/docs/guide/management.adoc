@@ -8,3 +8,11 @@ To use the `management` features described in this section, add the dependency o
 compile "io.micronaut:management"
 ----
 
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply the `management` feature to configure the management endpoints in your project:
+----
+> mn create-app my-app --features management
+----
+====

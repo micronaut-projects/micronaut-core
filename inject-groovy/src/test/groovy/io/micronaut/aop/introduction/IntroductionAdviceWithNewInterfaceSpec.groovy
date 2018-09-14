@@ -49,7 +49,7 @@ class MyBean  {
         !beanDefinition.isAbstract()
         beanDefinition != null
         beanDefinition.injectedFields.size() == 0
-        beanDefinition.executableMethods.size() == 1
+        beanDefinition.executableMethods.size() == 2
         beanDefinition.findMethod("onApplicationEvent", Object).isPresent()
         ApplicationEventListener.class.isAssignableFrom(beanDefinition.beanType)
 
@@ -89,7 +89,7 @@ abstract class MyBean2 {
         beanDefinition != null
         ApplicationEventListener.class.isAssignableFrom(beanDefinition.beanType)
         beanDefinition.injectedFields.size() == 0
-        beanDefinition.executableMethods.size() == 1
+        beanDefinition.executableMethods.size() == 2
         beanDefinition.findMethod("onApplicationEvent", Object).isPresent()
 
         when:

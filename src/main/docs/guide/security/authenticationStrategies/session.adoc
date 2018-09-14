@@ -1,5 +1,15 @@
 Micronaut supports Session based authentication.
 
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply either the `security-session` feature to configure session security in your project:
+----
+> mn create-app my-app --features security-session
+----
+====
+
+
 To use the Micronaut's session based authentication capabilities you must have the `security-session` dependency on your classpath. For example in `build.gradle`:
 
 .build.gradle

@@ -3,6 +3,8 @@ apply plugin: 'com.github.johnrengelman.plugin-shadow'
 dependencies {
     shadowCompile project(":runtime")
     shadowCompile project(":router")
+    shadowCompile project(":websocket")
+    compile project(":websocket")
     compile project(":runtime")
     compile project(":router")
     compileOnly project(":inject-java")

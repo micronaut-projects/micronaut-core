@@ -16,7 +16,6 @@
 
 package io.micronaut.discovery.consul.client.v1;
 
-import io.micronaut.discovery.consul.ConsulConfiguration;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.*;
@@ -27,7 +26,6 @@ import javax.annotation.Nullable;
 import javax.validation.constraints.NotNull;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * API operations for Consul.
@@ -70,8 +68,8 @@ public interface ConsulOperations {
     @Get("/kv/{+key}?recurse=true{&dc}{&raw}{&seperator}")
     @Produces(single = true)
     @Retryable(
-        attempts = "${" + ConsulConfiguration.ConsulConfigDiscoveryConfiguration.PREFIX + ".retryCount:3}",
-        delay = "${" + ConsulConfiguration.ConsulConfigDiscoveryConfiguration.PREFIX + ".retryDelay:1s}"
+        attempts = AbstractConsulClient.EXPR_CONSUL_CONFIG_RETRY_COUNT,
+        delay = AbstractConsulClient.EXPR_CONSUL_CONFIG_RETRY_DELAY
     )
     Publisher<List<KeyValue>> readValues(
         String key,
@@ -144,8 +142,8 @@ public interface ConsulOperations {
      */
     @Put("/agent/service/register")
     @Retryable(
-        attempts = "${" + ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retryCount:3}",
-        delay = "${" + ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retryDelay:1s}"
+        attempts = AbstractConsulClient.CONSUL_REGISTRATION_RETRY_COUNT,
+        delay = AbstractConsulClient.CONSUL_REGISTRATION_RETRY_DELAY
     )
     Publisher<HttpStatus> register(@NotNull @Body NewServiceEntry entry);
 
@@ -157,8 +155,8 @@ public interface ConsulOperations {
      */
     @Put("/agent/service/deregister/{service}")
     @Retryable(
-        attempts = "${" + ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retryCount:3}",
-        delay = "${" + ConsulConfiguration.ConsulRegistrationConfiguration.PREFIX + ".retryDelay:1s}"
+        attempts = AbstractConsulClient.CONSUL_REGISTRATION_RETRY_COUNT,
+        delay = AbstractConsulClient.CONSUL_REGISTRATION_RETRY_DELAY
     )
     Publisher<HttpStatus> deregister(@NotNull String service);
 
@@ -184,9 +182,9 @@ public interface ConsulOperations {
     @Produces(single = true)
     Publisher<List<HealthEntry>> getHealthyServices(
         @NotNull String service,
-        Optional<Boolean> passing,
-        Optional<String> tag,
-        Optional<String> dc);
+        @Nullable Boolean passing,
+        @Nullable String tag,
+        @Nullable String dc);
 
     /**
      * Gets all of the registered nodes.
@@ -253,6 +251,6 @@ public interface ConsulOperations {
      * @return The {@link HealthEntry} instances
      */
     default Publisher<List<HealthEntry>> getHealthyServices(@NotNull String service) {
-        return getHealthyServices(service, Optional.empty(), Optional.empty(), Optional.empty());
+        return getHealthyServices(service, null, null, null);
     }
 }

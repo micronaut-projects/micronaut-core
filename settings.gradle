@@ -36,6 +36,7 @@ include "security"
 include "security-jwt"
 include "security-session"
 include "views"
+include "websocket"
 
 // configurations
 include "configurations:gorm-common"

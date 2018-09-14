@@ -128,11 +128,14 @@ public interface ApplicationContextBuilder {
      * @param <T>          The type, a subclass of {@link ApplicationContextLifeCyle}
      * @return The running bean
      */
-    default <T extends ApplicationContextLifeCyle> T run(Class<T> type) {
+    default <T extends AutoCloseable> T run(Class<T> type) {
         ApplicationContext applicationContext = start();
         T bean = applicationContext.getBean(type);
-        if (!bean.isRunning()) {
-            bean.start();
+        if (bean instanceof LifeCycle) {
+            LifeCycle lifeCycle = (LifeCycle) bean;
+            if (!lifeCycle.isRunning()) {
+                lifeCycle.start();
+            }
         }
         return bean;
     }

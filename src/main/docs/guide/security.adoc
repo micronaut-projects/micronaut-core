@@ -1,3 +1,11 @@
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply either the `security-jwt` or `security-session` features configure the security support in your project:
+----
+> mn create-app my-app --features security-jwt
+----
+====
 To use the Micronaut's security capabilities you must have the `security` dependency on your classpath. For example in `build.gradle`:
 
 .build.gradle

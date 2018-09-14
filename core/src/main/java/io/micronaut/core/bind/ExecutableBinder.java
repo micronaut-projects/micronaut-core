@@ -48,4 +48,22 @@ public interface ExecutableBinder<S> {
             ArgumentBinderRegistry<S> registry,
             S source
     ) throws UnsatisfiedArgumentException;
+
+    /**
+     * Binds a given {@link Executable} using the given registry and source object. Unlike {@link #bind(Executable, ArgumentBinderRegistry, Object)} this
+     * method will not throw an {@link UnsatisfiedArgumentException} if an argument cannot be bound. Instead the {@link BoundExecutable#getUnboundArguments()} property
+     * will be populated with any arguments that could not be bound
+     *
+     * @param target The target executable
+     * @param registry The registry to use
+     * @param source The binding source
+     * @param <T> The executable target type
+     * @param <R> The executable return type
+     * @return The bound executable
+     */
+    <T, R> BoundExecutable<T, R> tryBind(
+            Executable<T, R> target,
+            ArgumentBinderRegistry<S> registry,
+            S source
+    );
 }
