@@ -139,6 +139,17 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         );
 
         HttpClient httpClient = getClient(context, clientAnnotation);
+
+        Class<?> declaringType = context.getDeclaringType();
+        if (Closeable.class == declaringType || AutoCloseable.class == declaringType) {
+            String clientId = clientAnnotation.getValue(String.class).orElse(null);
+            String path = clientAnnotation.get("path", String.class).orElse(null);
+            String clientKey = computeClientKey(clientId, path);
+            clients.remove(clientKey);
+            httpClient.close();
+            return null;
+        }
+
         Optional<Class<? extends Annotation>> httpMethodMapping = context.getAnnotationTypeByStereotype(HttpMethodMapping.class);
         if (context.hasStereotype(HttpMethodMapping.class) && httpClient != null) {
             AnnotationValue<HttpMethodMapping> mapping = context.getAnnotation(HttpMethodMapping.class);
@@ -291,7 +302,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             cookies.forEach(request::cookie);
 
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
-            final Class<Object> methodDeclaringType = context.getDeclaringType();
+            final Class<?> methodDeclaringType = declaringType;
             if (Publishers.isConvertibleToPublisher(javaReturnType) || isFuture) {
                 boolean isSingle = Publishers.isSingle(javaReturnType) || isFuture || context.getValue(Produces.class, "single", Boolean.class).orElse(false);
                 Argument<?> publisherArgument = returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
@@ -492,14 +503,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     private HttpClient getClient(MethodInvocationContext<Object, Object> context, AnnotationValue<Client> clientAnn) {
         String clientId = clientAnn.getValue(String.class).orElse(null);
-        if (StringUtils.isEmpty(clientId)) {
-            return null;
-        }
         String path = clientAnn.get("path", String.class).orElse(null);
-        String clientKey = clientId;
-        if (StringUtils.isNotEmpty(path)) {
-            clientKey = clientKey + path;
-        }
+        String clientKey = computeClientKey(clientId, path);
+        if (clientKey == null) return null;
 
         return clients.computeIfAbsent(clientKey, integer -> {
             HttpClient clientBean = beanContext.findBean(HttpClient.class, Qualifiers.byName(clientId)).orElse(null);
@@ -588,6 +594,17 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
             return client;
         });
+    }
+
+    private String computeClientKey(String clientId, String path) {
+        if (StringUtils.isEmpty(clientId)) {
+            return null;
+        }
+        String clientKey = clientId;
+        if (StringUtils.isNotEmpty(path)) {
+            clientKey = clientKey + path;
+        }
+        return clientKey;
     }
 
     private String appendQuery(String uri, Map<String, String> queryParams) {
