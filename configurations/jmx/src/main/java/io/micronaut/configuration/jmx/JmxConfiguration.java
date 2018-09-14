@@ -38,11 +38,15 @@ public class JmxConfiguration {
 
     public static final String PREFIX = "jmx";
 
+    private static final Boolean DEFAULT_REG_ENDPOINTS = true;
+    private static final Boolean DEFAULT_IGNORE_AGENT = false;
+    private static final Boolean DEFAULT_ADD_FACTORY = true;
+
     private String agentId = null;
     private String domain = null;
-    private boolean addToFactory = true;
-    private boolean ignoreAgentNotFound = false;
-    private boolean registerEndpoints = true;
+    private boolean addToFactory = DEFAULT_ADD_FACTORY;
+    private boolean ignoreAgentNotFound = DEFAULT_IGNORE_AGENT;
+    private boolean registerEndpoints = DEFAULT_REG_ENDPOINTS;
 
     /**
      * If specified, it is expected the {@link javax.management.MBeanServerFactory#findMBeanServer}
@@ -96,7 +100,7 @@ public class JmxConfiguration {
     }
 
     /**
-     * Sets if the server should be kept in the factory.
+     * Sets if the server should be kept in the factory. Default {@value DEFAULT_ADD_FACTORY}.
      *
      * @param addToFactory The add to factory flag
      */
@@ -116,7 +120,7 @@ public class JmxConfiguration {
     }
 
     /**
-     * Sets to ignore the exception if the agent is not found.
+     * Sets to ignore the exception if the agent is not found. Default {@value DEFAULT_IGNORE_AGENT}.
      *
      * @param ignoreAgentNotFound The ignoreAgentNotFound
      */
@@ -134,7 +138,7 @@ public class JmxConfiguration {
     }
 
     /**
-     * Sets if endpoints should be registered.
+     * Sets if endpoints should be registered. Default {@value DEFAULT_REG_ENDPOINTS}.
      *
      * @param registerEndpoints The flag
      */
