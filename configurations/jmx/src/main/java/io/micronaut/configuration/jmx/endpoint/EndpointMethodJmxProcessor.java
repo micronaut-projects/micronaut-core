@@ -16,9 +16,11 @@
 
 package io.micronaut.configuration.jmx.endpoint;
 
+import io.micronaut.configuration.jmx.JmxConfiguration;
 import io.micronaut.configuration.jmx.context.DynamicMBeanFactory;
 import io.micronaut.configuration.jmx.context.NameGenerator;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.async.SupplierUtil;
@@ -42,6 +44,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Singleton
+@Requires(property = JmxConfiguration.PREFIX + ".registerEndpoints", defaultValue = "true")
 public class EndpointMethodJmxProcessor implements ExecutableMethodProcessor<Endpoint> {
 
     private final Map<BeanDefinition, List<ExecutableMethod>> methods = new HashMap<>(5);

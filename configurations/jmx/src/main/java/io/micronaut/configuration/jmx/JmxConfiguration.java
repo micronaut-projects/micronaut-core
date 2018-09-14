@@ -38,10 +38,11 @@ public class JmxConfiguration {
 
     public static final String PREFIX = "jmx";
 
-    protected String agentId = null;
-    protected String domain = null;
-    protected boolean addToFactory = true;
-    protected boolean ignoreAgentNotFound = false;
+    private String agentId = null;
+    private String domain = null;
+    private boolean addToFactory = true;
+    private boolean ignoreAgentNotFound = false;
+    private boolean registerEndpoints = true;
 
     /**
      * If specified, it is expected the {@link javax.management.MBeanServerFactory#findMBeanServer}
@@ -54,6 +55,15 @@ public class JmxConfiguration {
     }
 
     /**
+     * Sets the agent id.
+     *
+     * @param agentId The agent id
+     */
+    public void setAgentId(String agentId) {
+        this.agentId = agentId;
+    }
+
+    /**
      * Used if {@link #getAgentId()} returns null and
      * {@link java.lang.management.ManagementFactory#getPlatformMBeanServer()} throws
      * an exception.
@@ -62,6 +72,15 @@ public class JmxConfiguration {
      */
     public String getDomain() {
         return domain;
+    }
+
+    /**
+     * Sets the domain to create a new server with.
+     *
+     * @param domain The domain
+     */
+    public void setDomain(String domain) {
+        this.domain = domain;
     }
 
     /**
@@ -77,6 +96,15 @@ public class JmxConfiguration {
     }
 
     /**
+     * Sets if the server should be kept in the factory.
+     *
+     * @param addToFactory The add to factory flag
+     */
+    public void setAddToFactory(boolean addToFactory) {
+        this.addToFactory = addToFactory;
+    }
+
+    /**
      * If a server could not be found with the {@link #agentId},
      * an exception will be thrown unless this method returns
      * true.
@@ -85,5 +113,32 @@ public class JmxConfiguration {
      */
     public boolean isIgnoreAgentNotFound() {
         return ignoreAgentNotFound;
+    }
+
+    /**
+     * Sets to ignore the exception if the agent is not found.
+     *
+     * @param ignoreAgentNotFound The ignoreAgentNotFound
+     */
+    public void setIgnoreAgentNotFound(boolean ignoreAgentNotFound) {
+        this.ignoreAgentNotFound = ignoreAgentNotFound;
+    }
+
+    /**
+     * If management beans should be registered for endpoints.
+     *
+     * @return True if endpoints should be registered
+     */
+    public boolean isRegisterEndpoints() {
+        return registerEndpoints;
+    }
+
+    /**
+     * Sets if endpoints should be registered.
+     *
+     * @param registerEndpoints The flag
+     */
+    public void setRegisterEndpoints(boolean registerEndpoints) {
+        this.registerEndpoints = registerEndpoints;
     }
 }
