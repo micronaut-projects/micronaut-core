@@ -52,13 +52,14 @@ import java.util.stream.Collectors;
 /**
  * Abstract implementation of the {@link RouteMatch} interface.
  *
+ * @param <T> The target type
  * @param <R> Route Match
  * @author Graeme Rocher
  * @since 1.0
  */
-abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
+abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
-    protected final MethodExecutionHandle<R> executableMethod;
+    protected final MethodExecutionHandle<T, R> executableMethod;
     protected final ConversionService<?> conversionService;
     protected final Map<String, Argument> requiredInputs;
     protected final DefaultRouteBuilder.AbstractRoute abstractRoute;
@@ -82,6 +83,11 @@ abstract class AbstractRouteMatch<R> implements MethodBasedRouteMatch<R> {
         }
 
         this.acceptedMediaTypes = abstractRoute.getConsumes();
+    }
+
+    @Override
+    public T getTarget() {
+        return executableMethod.getTarget();
     }
 
     @Nonnull

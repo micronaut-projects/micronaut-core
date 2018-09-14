@@ -17,6 +17,7 @@
 package io.micronaut.http.util;
 
 import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.HttpMessage;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 
@@ -54,7 +55,7 @@ public class HttpUtil {
      * @param request The request
      * @return An {@link Optional} of {@link Charset}
      */
-    public static Optional<Charset> resolveCharset(HttpRequest<?> request) {
+    public static Optional<Charset> resolveCharset(HttpMessage<?> request) {
         try {
             Optional<Charset> contentTypeCharset = request
                 .getContentType()

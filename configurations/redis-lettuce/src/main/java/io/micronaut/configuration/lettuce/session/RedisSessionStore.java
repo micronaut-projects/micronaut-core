@@ -536,6 +536,11 @@ public class RedisSessionStore extends RedisPubSubAdapter<String, String> implem
         }
 
         @Override
+        public boolean isModified() {
+            return !modifications.isEmpty();
+        }
+
+        @Override
         public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
             Optional<T> result = super.get(name, conversionContext);
             if (!result.isPresent() && attributeMap.containsKey(name)) {

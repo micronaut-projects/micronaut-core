@@ -26,11 +26,12 @@ import java.util.function.Function;
 /**
  * A {@link RouteMatch} that matches a URI and {@link HttpMethod}.
  *
- * @param <R> The route
+ * @param <T> The target type
+ * @param <R> The return type
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface UriRouteMatch<R> extends UriMatchInfo, MethodBasedRouteMatch<R> {
+public interface UriRouteMatch<T, R> extends UriMatchInfo, MethodBasedRouteMatch<T, R> {
 
     /**
      * @return The backing {@link UriRoute}
@@ -70,8 +71,8 @@ public interface UriRouteMatch<R> extends UriMatchInfo, MethodBasedRouteMatch<R>
     HttpMethod getHttpMethod();
 
     @Override
-    UriRouteMatch<R> fulfill(Map<String, Object> argumentValues);
+    UriRouteMatch<T, R> fulfill(Map<String, Object> argumentValues);
 
     @Override
-    UriRouteMatch<R> decorate(Function<RouteMatch<R>, R> executor);
+    UriRouteMatch<T, R> decorate(Function<RouteMatch<R>, R> executor);
 }
