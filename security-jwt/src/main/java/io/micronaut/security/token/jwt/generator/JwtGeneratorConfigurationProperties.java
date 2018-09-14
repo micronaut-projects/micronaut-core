@@ -57,7 +57,7 @@ public class JwtGeneratorConfigurationProperties implements JwtGeneratorConfigur
     }
 
     /**
-     * Access token expiration. Default value ({@value #DEFAULT_EXPIRATION}).
+     * Access token expiration. Default value ({@value DEFAULT_EXPIRATION}).
      * @param accessTokenExpiration The expiration
      */
     public void setAccessTokenExpiration(Integer accessTokenExpiration) {
