@@ -20,6 +20,7 @@ import io.micronaut.core.util.StringUtils;
 
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -83,6 +84,19 @@ public class AnnotationValueBuilder<T extends Annotation> {
     public AnnotationValueBuilder<T>  value(@Nullable String str) {
         if (StringUtils.isNotEmpty(str)) {
             values.put(AnnotationMetadata.VALUE_MEMBER, str);
+        }
+        return this;
+    }
+
+    /**
+     * Sets the value member to the given String[] values.
+     *
+     * @param values The String[]
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T>  values(@Nullable String[] values) {
+        if (values != null && values.length > 0) {
+            this.values.put(AnnotationMetadata.VALUE_MEMBER, values);
         }
         return this;
     }
