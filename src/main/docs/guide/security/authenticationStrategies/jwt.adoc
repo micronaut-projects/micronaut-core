@@ -10,7 +10,7 @@ JWT is an https://tools.ietf.org/html/rfc7519[IETF standard] which defines a sec
 ====
 If you are creating your project using the Micronaut CLI, supply either the `security-jwt` feature to configure JWT support in your project:
 ----
-> mn create-app my-app --features security-jwt
+$ mn create-app my-app --features security-jwt
 ----
 ====
 

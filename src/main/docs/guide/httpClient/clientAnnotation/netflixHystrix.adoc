@@ -1,3 +1,12 @@
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply the `netflix-hystrix` feature to configure Hystrix in your project:
+----
+$ mn create-app my-app --features netflix-hystrix
+----
+====
+
 https://github.com/Netflix/Hystrix[Netflix Hystrix] is a fault tolerance library developed by the Netflix team and designed to improve resilience of inter process communication.
 
 Micronaut features integration with Hystrix through the `netflix-hystrix` module, which you can add to your `build.gradle` or `pom.xml`:

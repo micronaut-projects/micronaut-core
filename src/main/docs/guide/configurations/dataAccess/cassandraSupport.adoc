@@ -1,4 +1,13 @@
-Add the following to the `build.gradle`:
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply the `cassandra` feature to include Cassandra configuration in your project:
+----
+$ mn create-app my-app --features cassandra
+----
+====
+
+To enable the Cassandra configuration, add the following dependency to your application:
 
 .build.gradle
 [source,groovy]

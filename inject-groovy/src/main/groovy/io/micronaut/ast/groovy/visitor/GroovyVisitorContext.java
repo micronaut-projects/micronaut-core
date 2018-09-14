@@ -58,6 +58,9 @@ public class GroovyVisitorContext implements VisitorContext {
 
     }
 
+    /**
+     * @return The source unit
+     */
     SourceUnit getSourceUnit() {
         return sourceUnit;
     }

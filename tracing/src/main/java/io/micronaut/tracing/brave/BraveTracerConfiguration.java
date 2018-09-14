@@ -49,14 +49,14 @@ public class BraveTracerConfiguration implements Toggleable {
     public static final String PREFIX = "tracing.zipkin";
     public static final float DEFAULT_SAMPLER_PROBABILITY = 0.1f;
 
-    @ConfigurationBuilder(prefixes = "", excludes = {"errorParser", "clock", "endpoint", "spanReporter", "propagationFactory", "currentTraceContext", "sampler"})
-    protected Tracing.Builder tracingBuilder = Tracing.newBuilder();
-
     /**
      * The default enable value.
      */
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_ENABLED = false;
+
+    @ConfigurationBuilder(prefixes = "", excludes = {"errorParser", "clock", "endpoint", "spanReporter", "propagationFactory", "currentTraceContext", "sampler"})
+    protected Tracing.Builder tracingBuilder = Tracing.newBuilder();
 
     private boolean enabled = DEFAULT_ENABLED;
     private float samplerProbability = DEFAULT_SAMPLER_PROBABILITY;

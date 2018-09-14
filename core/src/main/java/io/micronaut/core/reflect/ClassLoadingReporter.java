@@ -67,6 +67,7 @@ public interface ClassLoadingReporter extends AutoCloseable, Toggleable {
             }
         }
     }
+
     /**
      * Report a class that is present.
      *

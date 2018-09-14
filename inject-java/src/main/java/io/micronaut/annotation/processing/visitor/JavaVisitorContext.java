@@ -38,9 +38,6 @@ public class JavaVisitorContext implements VisitorContext {
     private final Elements elements;
     private final AnnotationUtils annotationUtils;
     private final Types types;
-
-
-
     private final ModelUtils modelUtils;
 
     /**
@@ -50,6 +47,7 @@ public class JavaVisitorContext implements VisitorContext {
      * @param elements The elements
      * @param annotationUtils The annotation utils
      * @param types Type types
+     * @param modelUtils The model utils
      */
     public JavaVisitorContext(Messager messager, Elements elements, AnnotationUtils annotationUtils, Types types, ModelUtils modelUtils) {
         this.messager = messager;

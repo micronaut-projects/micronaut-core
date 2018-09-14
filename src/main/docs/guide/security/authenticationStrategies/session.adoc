@@ -5,7 +5,7 @@ Micronaut supports Session based authentication.
 ====
 If you are creating your project using the Micronaut CLI, supply either the `security-session` feature to configure session security in your project:
 ----
-> mn create-app my-app --features security-session
+$ mn create-app my-app --features security-session
 ----
 ====
 

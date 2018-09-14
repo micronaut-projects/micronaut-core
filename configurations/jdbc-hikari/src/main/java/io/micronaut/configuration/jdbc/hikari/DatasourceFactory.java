@@ -45,6 +45,10 @@ public class DatasourceFactory implements AutoCloseable {
 
     private ApplicationContext applicationContext;
 
+    /**
+     * Default constructor.
+     * @param applicationContext The application context
+     */
     public DatasourceFactory(ApplicationContext applicationContext) {
         this.applicationContext = applicationContext;
     }

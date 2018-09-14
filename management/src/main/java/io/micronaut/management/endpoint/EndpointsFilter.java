@@ -31,7 +31,6 @@ import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.RouteMatchUtils;
 import org.reactivestreams.Publisher;
 
-import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.Optional;
 

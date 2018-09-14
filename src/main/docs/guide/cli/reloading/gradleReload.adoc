@@ -3,13 +3,13 @@ Gradle supports https://docs.gradle.org/current/userguide/command_line_interface
 .Run the app
 [source,bash]
 ----
-> ./gradlew run
+$ ./gradlew run
 ----
 
 .Run the recompilation
 [source,bash]
 ----
-> ./gradlew -t classes
+$ ./gradlew -t classes
 ----
 
 The `classes` task will be rerun every time a source file is modified, allowing the reloading agent to pick up the change.
