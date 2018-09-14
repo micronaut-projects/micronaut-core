@@ -26,7 +26,6 @@ import io.micronaut.inject.visitor.VisitorContext;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
-import org.codehaus.groovy.ast.Variable;
 
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -117,6 +116,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                     elements.add(new GroovyFieldElement(node, AstAnnotationUtils.getAnnotationMetadata(node)));
                 }
             }
+
             @Override
             public void accept(ClassNode classNode, MethodNode methodNode) {
                 elements.add(new GroovyMethodElement(methodNode, AstAnnotationUtils.getAnnotationMetadata(methodNode)));

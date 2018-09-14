@@ -58,7 +58,8 @@ public class SecretEncryptionConfiguration {
     }
 
     /**
-     * {@link com.nimbusds.jose.JWEAlgorithm}
+     * {@link com.nimbusds.jose.JWEAlgorithm}.
+     *
      * @param jweAlgorithm JWT Algorithm
      */
     public void setJweAlgorithm(JWEAlgorithm jweAlgorithm) {
@@ -66,7 +67,8 @@ public class SecretEncryptionConfiguration {
     }
 
     /**
-     * {@link com.nimbusds.jose.EncryptionMethod}
+     * {@link com.nimbusds.jose.EncryptionMethod}.
+     *
      * @param encryptionMethod Encryption Method
      */
     public void setEncryptionMethod(EncryptionMethod encryptionMethod) {

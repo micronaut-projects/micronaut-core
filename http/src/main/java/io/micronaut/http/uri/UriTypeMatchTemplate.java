@@ -44,11 +44,12 @@ public class UriTypeMatchTemplate extends UriMatchTemplate {
     }
 
     /**
-     * @param templateString The template
-     * @param segments       The segments
-     * @param matchPattern   The match pattern
-     * @param variableTypes  The variable types
-     * @param variables      The variables
+     * @param templateString    The template
+     * @param segments          The segments
+     * @param matchPattern      The match pattern
+     * @param variableTypes     The variable types
+     * @param variableModifiers The variables and modifiers
+     * @param variables         The variables
      */
     protected UriTypeMatchTemplate(CharSequence templateString, List<PathSegment> segments, Pattern matchPattern, Class[] variableTypes, Map<String, Character> variableModifiers, String... variables) {
         super(templateString, segments, matchPattern, variableModifiers, variables);
