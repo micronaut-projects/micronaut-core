@@ -38,7 +38,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE})
 @Bean
-@DefaultScope(Singleton.class)
 public @interface ServerWebSocket {
 
     /**

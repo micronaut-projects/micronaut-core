@@ -25,9 +25,12 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.DefaultRouteBuilder;
 import io.micronaut.web.router.UriRoute;
 import io.micronaut.websocket.annotation.OnMessage;
+import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.annotation.ServerWebSocket;
 
 import javax.inject.Singleton;
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * A processor that exposes WebSocket URIs via the router.
@@ -37,7 +40,10 @@ import javax.inject.Singleton;
  */
 @Singleton
 @Internal
-public class ServerEndpointProcessor extends DefaultRouteBuilder implements ExecutableMethodProcessor<ServerWebSocket> {
+public class ServerWebSocketProcessor extends DefaultRouteBuilder implements ExecutableMethodProcessor<ServerWebSocket> {
+
+
+    private Set<Class> mappedWebSockets = new HashSet<>(4);
     /**
      * Default constructor.
      *
@@ -45,13 +51,19 @@ public class ServerEndpointProcessor extends DefaultRouteBuilder implements Exec
      * @param uriNamingStrategy The {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy}
      * @param conversionService The {@link ConversionService}
      */
-    ServerEndpointProcessor(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
+    ServerWebSocketProcessor(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService<?> conversionService) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
     }
 
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        if (method.isAnnotationPresent(OnMessage.class)) {
+        Class<?> beanType = beanDefinition.getBeanType();
+        if (mappedWebSockets.contains(beanType)) {
+            return;
+        }
+
+        if (method.isAnnotationPresent(OnMessage.class) || method.isAnnotationPresent(OnOpen.class)) {
+            mappedWebSockets.add(beanType);
             String uri = beanDefinition.getValue(ServerWebSocket.class, String.class).orElse("/ws");
 
             UriRoute route = GET(uri, method);

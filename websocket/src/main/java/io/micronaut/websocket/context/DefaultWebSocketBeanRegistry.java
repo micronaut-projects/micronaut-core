@@ -146,8 +146,8 @@ class DefaultWebSocketBeanRegistry implements WebSocketBeanRegistry {
         }
 
         @Override
-        public MethodExecutionHandle<T, ?> messageMethod() {
-            return onMessage;
+        public Optional<MethodExecutionHandle<T, ?>> messageMethod() {
+            return Optional.of(onMessage);
         }
 
         @Override

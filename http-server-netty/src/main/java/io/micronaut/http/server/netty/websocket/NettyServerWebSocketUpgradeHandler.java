@@ -32,6 +32,7 @@ import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.annotation.OnMessage;
+import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.channel.*;
@@ -116,7 +117,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
             if (routeMatch.isPresent()) {
 
                 UriRouteMatch<Object, Object> rm = routeMatch.get();
-                if (rm.isAnnotationPresent(OnMessage.class)) {
+                if (rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class)) {
                     List<HttpFilter> filters = router.findFilters(msg);
                     AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(msg);
                     MutableHttpResponse<?> proceed = HttpResponse.ok();
@@ -195,10 +196,12 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
                         }
                     });
                 }
-                return;
+                else {
+                    ctx.fireExceptionCaught(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"));
+                }
+            } else {
+                ctx.fireExceptionCaught(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"));
             }
-
-            ctx.fireExceptionCaught(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"));
         } else {
             // pass the message along
             ctx.fireChannelRead(msg);
@@ -214,7 +217,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
      * @return The channel future
      **/
     protected ChannelFuture handleHandshake(ChannelHandlerContext ctx, NettyHttpRequest req, WebSocketBean<?> webSocketBean, MutableHttpResponse<?> response) {
-        int maxFramePayloadLength = webSocketBean.messageMethod().getValue(OnMessage.class, "maxPayloadLength", Integer.class).orElse(65536);
+        int maxFramePayloadLength = webSocketBean.messageMethod().flatMap(m -> m.getValue(OnMessage.class, "maxPayloadLength", Integer.class)).orElse(65536);
         WebSocketServerHandshakerFactory wsFactory =
                 new WebSocketServerHandshakerFactory(
                         getWebSocketURL(ctx, req),
