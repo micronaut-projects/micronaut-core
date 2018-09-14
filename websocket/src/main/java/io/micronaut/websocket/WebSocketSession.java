@@ -21,17 +21,14 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.http.MediaType;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
-import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
 import java.net.URI;
 import java.security.Principal;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.function.Predicate;
 
 /**
  * Represents an open WebSocket connection. Based largely on {@code javax.websocket} and likely to be able to implement the spec in the future.
