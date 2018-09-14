@@ -81,9 +81,14 @@ task javadoc(type: Javadoc, description: 'Generate javadocs from all child proje
     }
 }
 
-task cleanupPropertyReference(type: Delete) {
+task cleanupPropertyReference {
     group = DOCUMENTATION_GROUP
-    delete file( "${rootProject.buildDir}/docs/guide/configurationreference.html" )
+    doLast {
+        File f = new File( "${rootProject.buildDir}/docs/guide/configurationreference.html" )
+        if(f.exists()) {
+            f.delete()
+        }
+    }
 }
 
 task createDocsGeneratedFolders {
