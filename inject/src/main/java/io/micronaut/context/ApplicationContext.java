@@ -29,9 +29,29 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * An application context extends a {@link BeanContext} and adds the concepts of configuration, environments and
- * runtimes.
+ * <p>An application context extends a {@link BeanContext} and adds the concepts of configuration, environments and
+ *   runtimes.</p>
+ * <p>
+ * <p>The {@link ApplicationContext} is the main entry point for starting and running Micronaut applications. It
+ * can be though of as a container object for all dependency injected objects.</p>
+ * <p>
+ * <p>The {@link ApplicationContext} can be started via the {@link #run()} method. For example:</p>
  *
+ * <pre class="code">
+ *     ApplicationContext context = ApplicationContext.run();
+ * </pre>
+ *
+ * <p>Alternatively, the {@link #build()} method can be used to customize the {@code ApplicationContext} using the {@link ApplicationContextBuilder} interface
+ * prior to running. For example:</p>
+ * <pre class="code">
+ *     ApplicationContext context = ApplicationContext.build().environments("test").start();
+ * </pre>
+ *
+ * <p>The {@link #getEnvironment()} method can be used to obtain a reference to the application {@link Environment}, which contains the loaded configuration
+ * and active environment names.</p>
+ *
+ * @see ApplicationContextBuilder
+ * @see Environment
  * @author Graeme Rocher
  * @since 1.0
  */

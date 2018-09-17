@@ -17,7 +17,7 @@
 package io.micronaut.runtime;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.ApplicationContextLifeCyle;
+import io.micronaut.context.ApplicationContextLifeCycle;
 import io.micronaut.context.env.Environment;
 
 /**
@@ -34,7 +34,7 @@ import io.micronaut.context.env.Environment;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface EmbeddedApplication<T extends EmbeddedApplication> extends ApplicationContextLifeCyle<T> {
+public interface EmbeddedApplication<T extends EmbeddedApplication> extends ApplicationContextLifeCycle<T> {
 
 
     /**

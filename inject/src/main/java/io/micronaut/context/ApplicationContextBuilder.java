@@ -125,7 +125,7 @@ public interface ApplicationContextBuilder {
      * Run the {@link ApplicationContext} with the given type. Returning an instance of the type.
      *
      * @param type         The type of the bean to run
-     * @param <T>          The type, a subclass of {@link ApplicationContextLifeCyle}
+     * @param <T>          The type, a subclass of {@link ApplicationContextLifeCycle}
      * @return The running bean
      */
     default <T extends AutoCloseable> T run(Class<T> type) {
