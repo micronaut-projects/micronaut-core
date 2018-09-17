@@ -30,6 +30,7 @@ import io.micronaut.discovery.event.ServiceShutdownEvent;
 import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
+import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
@@ -100,7 +101,7 @@ import java.util.function.BiConsumer;
  * @since 1.0
  */
 @Singleton
-public class NettyHttpServer implements EmbeddedServer {
+public class NettyHttpServer implements EmbeddedServer, WebSocketSessionRepository {
     public static final String HTTP_STREAMS_CODEC = "http-streams-codec";
     @SuppressWarnings("WeakerAccess")
     public static final String HTTP_CODEC = "http-codec";
@@ -253,7 +254,7 @@ public class NettyHttpServer implements EmbeddedServer {
                         ));
                         pipeline.addLast(HttpResponseEncoder.ID, new HttpResponseEncoder(mediaTypeCodecRegistry, serverConfiguration));
                         pipeline.addLast(NettyServerWebSocketUpgradeHandler.ID, new NettyServerWebSocketUpgradeHandler(
-                                webSocketSessions,
+                                getWebSocketSessionRepository(),
                                 router,
                                 requestArgumentSatisfier.getBinderRegistry(),
                                 webSocketBeanRegistry,
@@ -484,5 +485,28 @@ public class NettyHttpServer implements EmbeddedServer {
                 biConsumer.accept(channelOption, value);
             }
         }
+    }
+
+    @Override
+    public void addChannel(Channel channel) {
+        this.webSocketSessions.add(channel);
+    }
+
+    @Override
+    public void removeChannel(Channel channel) {
+        this.webSocketSessions.remove(channel);
+    }
+
+    @Override
+    public ChannelGroup getChannelGroup() {
+        return this.webSocketSessions;
+    }
+
+    /**
+     *
+     * @return {@link io.micronaut.http.server.netty.NettyHttpServer} which implements {@link WebSocketSessionRepository}
+     */
+    public WebSocketSessionRepository getWebSocketSessionRepository() {
+        return this;
     }
 }

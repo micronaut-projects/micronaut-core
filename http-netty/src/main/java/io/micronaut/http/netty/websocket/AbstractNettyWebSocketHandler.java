@@ -42,8 +42,14 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.channel.group.ChannelGroup;
-import io.netty.handler.codec.http.websocketx.*;
+
+import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.WebSocketFrame;
+import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.reactivex.Flowable;
 import io.reactivex.functions.BiConsumer;
 import io.reactivex.schedulers.Schedulers;
@@ -78,7 +84,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     protected final NettyRxWebSocketSession session;
     protected final MediaTypeCodecRegistry mediaTypeCodecRegistry;
     protected final WebSocketVersion webSocketVersion;
-    protected final ChannelGroup webSocketSessions;
+    protected final WebSocketSessionRepository webSocketSessionRepository;
     private final Argument<?> bodyArgument;
     private final AtomicBoolean closed = new AtomicBoolean(false);
 
@@ -91,7 +97,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param request The originating request
      * @param uriVariables The URI variables
      * @param version The websocket version being used
-     * @param webSocketSessions The web socket sessions if they are supported (like on the server), null otherwise
+     * @param webSocketSessionRepository The web socket repository if they are supported (like on the server), null otherwise
      */
     protected AbstractNettyWebSocketHandler(
             ChannelHandlerContext ctx,
@@ -101,8 +107,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             HttpRequest<?> request,
             Map<String, Object> uriVariables,
             WebSocketVersion version,
-            ChannelGroup webSocketSessions) {
-        this.webSocketSessions = webSocketSessions;
+            WebSocketSessionRepository webSocketSessionRepository) {
+        this.webSocketSessionRepository = webSocketSessionRepository;
         this.webSocketBinder = new WebSocketStateBinderRegistry(binderRegistry);
         this.uriVariables = uriVariables;
         this.webSocketBean = webSocketBean;
@@ -362,6 +368,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             // respond with pong
             PingWebSocketFrame frame = (PingWebSocketFrame) msg;
             ctx.channel().writeAndFlush(new PongWebSocketFrame(frame.content()));
+
         } else if (msg instanceof PongWebSocketFrame) {
             return;
         } else if (msg instanceof CloseWebSocketFrame) {
