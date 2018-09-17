@@ -15,12 +15,12 @@
  */
 
 /**
- * Classes related to handling of WebSocket beans.
+ * Compile time visitor classes for WebSocket.
  *
  * @author graemerocher
  * @since 1.0
  */
 @Internal
-package io.micronaut.websocket.context;
+package io.micronaut.websocket.visitor;
 
 import io.micronaut.core.annotation.Internal;
