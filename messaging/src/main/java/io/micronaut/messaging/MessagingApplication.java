@@ -17,7 +17,7 @@
 package io.micronaut.messaging;
 
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.ApplicationContextLifeCyle;
+import io.micronaut.context.ApplicationContextLifeCycle;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.naming.Described;
 import io.micronaut.inject.BeanDefinition;
@@ -92,7 +92,7 @@ public class MessagingApplication implements EmbeddedApplication, Described {
     }
 
     @Override
-    public ApplicationContextLifeCyle stop() {
+    public ApplicationContextLifeCycle stop() {
         ApplicationContext applicationContext = getApplicationContext();
         if (applicationContext != null && applicationContext.isRunning()) {
             applicationContext.stop();

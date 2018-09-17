@@ -21,7 +21,7 @@ package io.micronaut.context;
  *
  * @param <T> The concrete type
  */
-public interface ApplicationContextLifeCyle<T extends ApplicationContextLifeCyle> extends ApplicationContextProvider, LifeCycle {
+public interface ApplicationContextLifeCycle<T extends ApplicationContextLifeCycle> extends ApplicationContextProvider, LifeCycle {
 
     @SuppressWarnings("unchecked")
     @Override
