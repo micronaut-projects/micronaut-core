@@ -44,6 +44,8 @@ config:
   eachProperty: Using @EachProperty to Drive Configuration
   eachBean: Using @EachBean to Drive Configuration
   # validation: Validating Configuration
+  jmx:
+    title: JMX Support
 aop:
   title: Aspect Oriented Programming
   aroundAdvice: Around Advice
@@ -230,8 +232,6 @@ management:
     routesEndpoint: The Routes Endpoint
     loggersEndpoint: The Loggers Endpoint
     stopEndpoint: The Server Stop Endpoint
-jmx:
-  title: JMX Support
 security:
   title: Security
   authenticationProviders: Authentication Providers
