@@ -2,7 +2,7 @@ Profiles can include commands for generating common code artifacts. Not all comm
 
 [source,bash]
 ----
-mn> profile-info service
+$ mn profile-info service
 Profile: service
 ------------------
 The service profile
