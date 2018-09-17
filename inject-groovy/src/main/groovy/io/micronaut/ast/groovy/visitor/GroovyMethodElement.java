@@ -20,8 +20,13 @@ import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.visitor.ClassElement;
 import io.micronaut.inject.visitor.MethodElement;
+import io.micronaut.inject.visitor.ParameterElement;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.MethodNode;
+import org.codehaus.groovy.ast.Parameter;
+
+import java.util.Arrays;
+import java.util.function.Function;
 
 /**
  * A method element returning data from a {@link MethodNode}.
@@ -86,5 +91,13 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     public ClassElement getReturnType() {
         ClassNode returnType = methodNode.getReturnType();
         return new GroovyClassElement(returnType, AstAnnotationUtils.getAnnotationMetadata(returnType));
+    }
+
+    @Override
+    public ParameterElement[] getParameters() {
+        Parameter[] parameters = methodNode.getParameters();
+        return Arrays.stream(parameters).map((Function<Parameter, ParameterElement>) parameter ->
+                new GroovyParameterElement(parameter, AstAnnotationUtils.getAnnotationMetadata(parameter))
+        ).toArray(ParameterElement[]::new);
     }
 }

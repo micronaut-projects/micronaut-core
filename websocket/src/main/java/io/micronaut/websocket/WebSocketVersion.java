@@ -14,25 +14,14 @@
  * limitations under the License.
  */
 
-package io.micronaut.inject.visitor;
-
-import javax.annotation.Nullable;
+package io.micronaut.websocket;
 
 /**
- * Stores data about an element that references a method.
+ * Enum representing the different WebSocket versions.
  *
- * @author James Kleeh
+ * @author graemerocher
  * @since 1.0
  */
-public interface MethodElement extends Element {
-
-    /**
-     * @return The return type of the method
-     */
-    @Nullable ClassElement getReturnType();
-
-    /**
-     * @return The method parameters
-     */
-    ParameterElement[] getParameters();
+public enum WebSocketVersion {
+    V00, V07, V08, V13
 }
