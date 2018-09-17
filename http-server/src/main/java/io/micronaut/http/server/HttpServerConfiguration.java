@@ -226,7 +226,6 @@ public class HttpServerConfiguration {
 
     /**
      * Sets the host to bind to.
-     *
      * @param host The host
      */
     public void setHost(String host) {
