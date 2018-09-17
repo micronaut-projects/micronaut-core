@@ -14,25 +14,38 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.authentication;
-
-import org.reactivestreams.Publisher;
+package io.micronaut.configuration.security.ldap.context;
 
 /**
- * Defines an authentication provider.
+ * Contract to hold settings for creating an LDAP context.
  *
- * @author Sergio del Amo
- * @author Graeme Rocher
+ * @author James Kleeh
  * @since 1.0
  */
-public interface AuthenticationProvider {
+public interface ContextSettings {
 
     /**
-     * Authenticates a user with the given request. If a successful authentication is
-     * returned, the object must be an instance of {@link UserDetails}.
-     *
-     * @param authenticationRequest The request to authenticate
-     * @return A publisher that emits 0 or 1 responses
+     * @return True if the context should be pooled
      */
-    Publisher<AuthenticationResponse> authenticate(AuthenticationRequest authenticationRequest);
+    boolean getPooled();
+
+    /**
+     * @return The factory class
+     */
+    String getFactory();
+
+    /**
+     * @return The URL of the LDAP server
+     */
+    String getUrl();
+
+    /**
+     * @return The user DN to bind with
+     */
+    String getDn();
+
+    /**
+     * @return The password to bind with
+     */
+    String getPassword();
 }
