@@ -9,7 +9,7 @@ include::{testswebsocket}/ChatServerWebSocket.java[]
 <1> The ann:websocket.annotation.ServerWebSocket[] annotation is used to define the path the WebSocket is mapped under. The URI can be a URI template.
 <2> The ann:websocket.annotation.OnOpen[] annotation is used to declare a method that is invoked when the WebSocket is opened.
 <3> The ann:websocket.annotation.OnMessage[] annotation is used to declare a method that is invoked when a message is received.
-<4> The passed api:websocket.WebSocketSession[] instance can be used to broadcast messages to other WebSocket clients.
+<4> You can use a api:websocket.WebSocketBroadcaster[] to broadcast messages to every WebSocket session. You can filter which sessions to communicate with a `Predicate`. Also, you could use the passed api:websocket.WebSocketSession[] instance to send a message to it with `WebSocketSession::send`.
 <5> The ann:websocket.annotation.OnClose[] annotation is used to declare a method that is invoked when the WebSocket is closed.
 
 TIP: A working example of WebSockets in action can be found in the https://github.com/micronaut-projects/micronaut-examples/tree/master/websocket-chat[Micronaut Examples] GitHub repository.

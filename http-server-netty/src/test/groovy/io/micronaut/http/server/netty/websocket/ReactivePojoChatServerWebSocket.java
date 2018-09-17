@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.websocket;
 
+import io.micronaut.websocket.WebSocketBroadcaster;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.OnClose;
 import io.micronaut.websocket.annotation.OnMessage;
@@ -12,11 +13,17 @@ import java.util.function.Predicate;
 @ServerWebSocket("/pojo/chat/{topic}/{username}")
 public class ReactivePojoChatServerWebSocket {
 
+    private WebSocketBroadcaster broadcaster;
+
+    public ReactivePojoChatServerWebSocket(WebSocketBroadcaster broadcaster) {
+        this.broadcaster = broadcaster;
+    }
+
     @OnOpen
     public Publisher<Message> onOpen(String topic, String username, WebSocketSession session) {
         String text = "[" + username + "] Joined!";
         Message message = new Message(text);
-        return session.broadcast(message, isValid(topic, session));
+        return broadcaster.broadcast(message, isValid(topic, session));
     }
 
     // tag::onmessage[]
@@ -29,7 +36,7 @@ public class ReactivePojoChatServerWebSocket {
 
         String text = "[" + username + "] " + message.getText();
         Message newMessage = new Message(text);
-        return session.broadcast(newMessage, isValid(topic, session));
+        return broadcaster.broadcast(newMessage, isValid(topic, session));
     }
     // end::onmessage[]
 
@@ -41,7 +48,7 @@ public class ReactivePojoChatServerWebSocket {
 
         String text = "[" + username + "] Disconnected!";
         Message message = new Message(text);
-        return session.broadcast(message, isValid(topic, session));
+        return broadcaster.broadcast(message, isValid(topic, session));
     }
 
     private Predicate<WebSocketSession> isValid(String topic, WebSocketSession session) {
