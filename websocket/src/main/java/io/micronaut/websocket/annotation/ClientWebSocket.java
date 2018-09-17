@@ -18,6 +18,7 @@ package io.micronaut.websocket.annotation;
 
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.*;
+import io.micronaut.websocket.WebSocketVersion;
 import io.micronaut.websocket.interceptor.ClientWebSocketInterceptor;
 import io.micronaut.websocket.interceptor.WebSocketSessionAware;
 
@@ -26,6 +27,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
+import static io.micronaut.websocket.annotation.WebSocketComponent.DEFAULT_URI;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
@@ -37,29 +39,30 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE})
-@Bean
+@WebSocketComponent
 @Introduction(interfaces = WebSocketSessionAware.class)
 @Type(ClientWebSocketInterceptor.class)
 public @interface ClientWebSocket {
-    /**
-     * The default websocket URI.
-     */
-    String DEFAULT_URI = "/ws";
 
     /**
      * @return The URI of the action
      */
     @AliasFor(member = "uri")
+    @AliasFor(annotation = WebSocketComponent.class, member = "value")
+    @AliasFor(annotation = WebSocketComponent.class, member = "uri")
     String value() default DEFAULT_URI;
 
     /**
      * @return The URI of the action
      */
     @AliasFor(member = "value")
+    @AliasFor(annotation = WebSocketComponent.class, member = "value")
+    @AliasFor(annotation = WebSocketComponent.class, member = "uri")
     String uri() default DEFAULT_URI;
 
     /**
      * @return The WebSocket version to use to connect
      */
-    String version() default "13";
+    @AliasFor(annotation = WebSocketComponent.class, member = "version")
+    WebSocketVersion version() default WebSocketVersion.V13;
 }

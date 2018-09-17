@@ -19,20 +19,15 @@ package io.micronaut.inject.visitor;
 import javax.annotation.Nullable;
 
 /**
- * Stores data about an element that references a method.
+ * Represents a parameter to a method or constructor.
  *
- * @author James Kleeh
+ * @author graemerocher
  * @since 1.0
  */
-public interface MethodElement extends Element {
+public interface ParameterElement extends Element {
 
     /**
-     * @return The return type of the method
+     * @return The type of the parameter
      */
-    @Nullable ClassElement getReturnType();
-
-    /**
-     * @return The method parameters
-     */
-    ParameterElement[] getParameters();
+    @Nullable ClassElement getType();
 }

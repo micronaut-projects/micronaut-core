@@ -79,7 +79,7 @@ public class LoadedVisitor {
             return true;
         }
         AnnotationMetadata annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement);
-        return annotationMetadata.hasAnnotation(classAnnotation);
+        return annotationMetadata.hasStereotype(classAnnotation);
     }
 
     /**
@@ -90,7 +90,7 @@ public class LoadedVisitor {
         if (elementAnnotation.equals("java.lang.Object")) {
             return true;
         }
-        return annotationMetadata.hasDeclaredAnnotation(elementAnnotation);
+        return annotationMetadata.hasDeclaredStereotype(elementAnnotation);
     }
 
     /**
@@ -123,5 +123,10 @@ public class LoadedVisitor {
                     visitorContext
             );
         }
+    }
+
+    @Override
+    public String toString() {
+        return visitor.toString();
     }
 }

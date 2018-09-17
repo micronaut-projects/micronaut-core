@@ -18,9 +18,14 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
+import io.micronaut.inject.visitor.ClassElement;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.Modifier;
+import javax.lang.model.element.TypeElement;
+import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.NoType;
+import javax.lang.model.type.TypeMirror;
 
 /**
  * An abstract class for other elements to extend from.
@@ -94,5 +99,29 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.visitor
     @Override
     public String toString() {
         return element.toString();
+    }
+
+    /**
+     * Obtain the ClassElement for the given mirror.
+     *
+     * @param returnType The return type
+     * @param visitorContext The visitor context
+     * @return The class element
+     */
+    protected ClassElement mirrorToClassElement(TypeMirror returnType, JavaVisitorContext visitorContext) {
+        if (returnType instanceof NoType) {
+            return new JavaVoidElement();
+        } else if (returnType instanceof DeclaredType) {
+            Element e = ((DeclaredType) returnType).asElement();
+            if (e instanceof TypeElement) {
+                TypeElement typeElement = (TypeElement) e;
+                return new JavaClassElement(
+                        typeElement,
+                        visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement),
+                        visitorContext
+                );
+            }
+        }
+        return null;
     }
 }
