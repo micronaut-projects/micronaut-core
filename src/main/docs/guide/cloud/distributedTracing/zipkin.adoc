@@ -19,7 +19,7 @@ You can then open a browser tab to the location `http://localhost:9411` to view 
 ====
 If you are creating your project using the Micronaut CLI, supply the `tracing-zipkin` feature to include Zipkin tracing in your project:
 ----
-> mn create-app my-app --features tracing-zipkin
+$ mn create-app my-app --features tracing-zipkin
 ----
 ====
 

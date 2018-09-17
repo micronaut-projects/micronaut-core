@@ -6,7 +6,7 @@ Micronaut supports reactive and non-blocking client to connect to Postgres using
 ====
 If you are creating your project using the Micronaut CLI, supply the `postgres-reactive` feature to configure the Reactive Postgres client in your project:
 ----
-> mn create-app my-app --features postgres-reactive
+$ mn create-app my-app --features postgres-reactive
 ----
 ====
 

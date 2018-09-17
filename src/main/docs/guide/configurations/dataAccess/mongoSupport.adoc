@@ -1,8 +1,15 @@
 ==== Setting up the Native MongoDB Driver
 
-Micronaut features the ability to automatically configure the native MongoDB Java driver.
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply the `mongo-reactive` feature to configure the native MongoDB driver in your project:
+----
+$ mn create-app my-app --features mongo-reactive
+----
+====
 
-To enable Lettuce, add the following dependency to your application:
+Micronaut includes a configuration to automatically configure the native MongoDB Java driver. To use this configuration, add the following dependency to your application:
 
 .build.gradle
 [source,groovy]
@@ -104,6 +111,15 @@ When the `mongo-reactive` module is activated a api:configuration.mongo.reactive
 See the section on the <<healthEndpoint, Health Endpoint>> for more information.
 
 ==== Using GORM for MongoDB
+
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply the `mongo-gorm` feature to configure GORM for MongoDB in your project:
+----
+$ mn create-app my-app --features mongo-gorm
+----
+====
 
 For Groovy users and users familiar with Grails, special support has been added to Micronaut for using http://gorm.grails.org/latest/mongodb/manual[GORM for MongoDB].
 

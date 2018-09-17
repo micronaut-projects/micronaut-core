@@ -88,6 +88,19 @@ public class AnnotationValueBuilder<T extends Annotation> {
     }
 
     /**
+     * Sets the value member to the given String[] values.
+     *
+     * @param values The String[]
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T>  values(@Nullable String[] values) {
+        if (values != null && values.length > 0) {
+            this.values.put(AnnotationMetadata.VALUE_MEMBER, values);
+        }
+        return this;
+    }
+
+    /**
      * Sets the value member to the given boolean value.
      *
      * @param bool The boolean

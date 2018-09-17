@@ -81,27 +81,26 @@ task javadoc(type: Javadoc, description: 'Generate javadocs from all child proje
     }
 }
 
-task cleanupPropertyReference(type: Delete) {
+task cleanupPropertyReference {
     group = DOCUMENTATION_GROUP
-    delete file( "${rootProject.buildDir}/docs/guide/configurationreference.html" )
-}
-
-task createDocsGeneratedFolders {
     doLast {
-        if(!new File("${rootProject.buildDir}/generated").exists()) {
-            new File("${rootProject.buildDir}/generated").mkdir()
-        }
-        if(!new File("${rootProject.buildDir}/generated/configurationProperties").exists()) {
-            new File("${rootProject.buildDir}/generated/configurationProperties").mkdir()
+        File f = new File( "${rootProject.buildDir}/docs/guide/configurationreference.html" )
+        if(f.exists()) {
+            f.delete()
         }
     }
 }
 
-task mergeConfigProps(dependsOn: createDocsGeneratedFolders) {
+task mergeConfigurationReference() {
+    ext {        
+        inputFileName = "${rootProject.buildDir}/generated/propertyReference.adoc"
+    }
+    group = DOCUMENTATION_GROUP
     inputs.files( fileTree( "$project.buildDir/config-props" ) ).skipWhenEmpty()
-    outputs.file( "${project.buildDir}/generated/propertyReference.adoc" )
     doLast {
-        outputs.files.singleFile.withOutputStream { out ->
+        File outputFile = new File(inputFileName)
+        outputFile.createNewFile()
+        outputFile.withOutputStream { out ->
             List<File> files = new ArrayList<>(inputs.files.files).sort { File f -> f.name }
             for ( file in files ) {
                 String header = "=== " + file.name.replace('.adoc', '').split('-').collect { token ->
@@ -111,29 +110,26 @@ task mergeConfigProps(dependsOn: createDocsGeneratedFolders) {
                     out << header << '\n' << it << '\n'
                 }
             }
-        }
+        }                
     }
 }
-
-task publishConfigurationReference(type: Copy) {
-    dependsOn mergeConfigProps, cleanupPropertyReference
+task publishConfigurationReference(dependsOn: mergeConfigurationReference) {
     ext {
-        destinationFileName = "configurationreference.html"
-        inputFileName = "${rootProject.buildDir}/generated/propertyReference.adoc"
+        destinationFileName = "${rootProject.buildDir}/docs/guide/configurationreference.html"
     }
-    group = DOCUMENTATION_GROUP
-
-    inputs.files file(inputFileName)
-
-    from "${rootProject.projectDir}/src/main/docs/resources/style/page.html"
-    into "${rootProject.buildDir}/docs/guide/"
-    filter(org.apache.tools.ant.filters.ReplaceTokens, tokens: [
-            projectVersion: projectVersion,
-            pagetitle     : 'Configuration Reference | Micronaut',
-            docscontent   : org.asciidoctor.Asciidoctor.Factory.create().render(new File(inputFileName).exists() ? new File(inputFileName).text : '', [:] as Map<String, Object>)
-    ])
-    rename { String fileName ->
-        fileName.replace("page.html", destinationFileName)
+    doLast {
+        String textPage = new File("${rootProject.projectDir}/src/main/docs/resources/style/page.html").text    
+        textPage = textPage.replace("@projectVersion@", projectVersion)
+        textPage = textPage.replace("@pagetitle@", 'Configuration Reference | Micronaut')
+        if (new File(mergeConfigurationReference.inputFileName).exists()) {
+            String html = org.asciidoctor.Asciidoctor.Factory.create().render(new File(mergeConfigurationReference.inputFileName).text, [:])
+            textPage = textPage.replace("@docscontent@", html)
+            File configurationreference = new File(destinationFileName)
+            configurationreference.createNewFile()                    
+            configurationreference.text = textPage
+        } else {
+            logger.quiet "${mergeConfigurationReference.inputFileName} does not exist."
+        }    
     }
 }
 
@@ -192,21 +188,31 @@ task publishGuide(type: grails.doc.gradle.PublishGuide) {
 '''
     }
 }
-
-publishGuide.mustRunAfter javadoc
-
-task docs(dependsOn:[javadoc, publishGuide]) {
+task zipDocs(type:Zip) {
     group = DOCUMENTATION_GROUP
+    baseName = "${project.name}-${project.version}"
+    destinationDir = new File(project.buildDir, "distributions")
+    from project.files("${buildDir}/docs")
 }
-docs.finalizedBy cleanupGuideFiles
-
-def assembleTask = project.tasks.findByName("assemble")
-if(assembleTask == null) {
-    task assemble(dependsOn: docs, type:Zip) {
-        baseName = "${project.name}-${project.version}"
-        destinationDir = new File(project.buildDir, "distributions")
-        from project.files("${buildDir}/docs")
+task assemble() {
+    subprojects.each { subproject ->
+        if (subproject.tasks.findByName("assemble") != null) {
+            dependsOn subproject.tasks.findByName("assemble")
+        }
     }
 }
-
+task processConfigProps() {
+    subprojects.each { subproject ->
+        if (subproject.tasks.findByName("processConfigProps") != null) {
+            dependsOn subproject.tasks.findByName("processConfigProps")
+        }
+    }
+}
+task docs(dependsOn: [assemble, publishGuide, processConfigProps, publishConfigurationReference]) {
+    group = DOCUMENTATION_GROUP
+}
+processConfigProps.mustRunAfter assemble
+publishGuide.mustRunAfter processConfigProps
+publishConfigurationReference.mustRunAfter publishGuide
+docs.finalizedBy zipDocs
 

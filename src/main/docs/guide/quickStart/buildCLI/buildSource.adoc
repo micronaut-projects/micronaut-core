@@ -2,7 +2,7 @@ Clone the repository:
 
 [source,bash]
 ----
-> git clone https://github.com/micronaut-projects/micronaut-core.git
+$ git clone https://github.com/micronaut-projects/micronaut-core.git
 ----
 
 
@@ -10,7 +10,7 @@ Clone the repository:
 
 [source,bash]
 ----
-> ./gradlew cli:fatJar
+$ ./gradlew cli:fatJar
 ----
 
 This will create the farJar for CLI.
@@ -35,7 +35,7 @@ You should now be able to run the Micronaut CLI.
 
 [source,bash]
 ----
-> mn
+$ mn
 | Starting interactive mode...
 | Enter a command name to run. Use TAB for completion:
 mn>

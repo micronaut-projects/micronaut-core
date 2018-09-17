@@ -39,10 +39,10 @@ import static io.micronaut.tracing.jaeger.JaegerConfiguration.PREFIX;
  */
 @ConfigurationProperties(PREFIX)
 public class JaegerConfiguration implements Toggleable  {
+    /**
+     * The configuration prefix.
+     */
     public static final String PREFIX = "tracing.jaeger";
-
-    @ConfigurationBuilder(prefixes = "with", includes = "tracerTags")
-    protected final Configuration configuration;
 
     /**
      * The default enable value.
@@ -50,8 +50,10 @@ public class JaegerConfiguration implements Toggleable  {
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_ENABLED = false;
 
-    private boolean enabled = DEFAULT_ENABLED;
+    @ConfigurationBuilder(prefixes = "with", includes = "tracerTags")
+    protected final Configuration configuration;
 
+    private boolean enabled = DEFAULT_ENABLED;
     private boolean expandExceptionLogs;
     private boolean zipkinSharedRpcSpan;
 

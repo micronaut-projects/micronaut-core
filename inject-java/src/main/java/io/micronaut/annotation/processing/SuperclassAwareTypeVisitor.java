@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Processes the type and its super classes
+ * Processes the type and its super classes.
  *
  * @param <R>
  * @param <P>

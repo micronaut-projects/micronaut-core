@@ -22,7 +22,6 @@ import org.reactivestreams.Publisher;
 import java.net.URI;
 import java.util.Map;
 
-
 /**
  * Interface that provides a way to connect a client over WebSocket.
  *

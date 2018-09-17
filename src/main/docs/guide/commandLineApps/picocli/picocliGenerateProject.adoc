@@ -5,7 +5,7 @@ This will add the dependencies for the `picocli` feature, and set the profile of
 The main class of the project is set to the `*Command` class (based on the project name - e.g., `hello-world` will generate `HelloWorldCommand`):
 
 ----
-> mn create-cli-app my-cli-app
+$ mn create-cli-app my-cli-app
 ----
 
 The generated command looks like this:
@@ -55,7 +55,7 @@ Now you can build the project and start the application. The build will create a
 Running this jar from Java will run the generated `MyCliAppCommand`.
 
 ----
-> java -jar build/libs/my-cli-app-0.1-all.jar -v
+$ java -jar build/libs/my-cli-app-0.1-all.jar -v
 ----
 
 
@@ -64,7 +64,7 @@ Running this jar from Java will run the generated `MyCliAppCommand`.
 Alternatively, to create a project with picocli support using the Micronaut CLI, supply the `picocli` feature to the `features` flag.
 
 ----
-> mn create-app my-picocli-app --features picocli
+$ mn create-app my-picocli-app --features picocli
 ----
 
 This will create a project with the `service` profile that has the minimum necessary configuration for picocli.
@@ -78,7 +78,7 @@ This will create a Micronaut app with picocli support, without an HTTP server (a
 The `cli` profile provides a command for generating picocli commands and subcommands.
 
 ----
-> mn create-app example --profile cli
+$ mn create-app example --profile cli
 ----
 
 Note that the main class of the project is set to the default `Application` class.
@@ -86,8 +86,8 @@ Note that the main class of the project is set to the default `Application` clas
 If you want a picocli command to be the main class of this application, you need to first generate a command with `create-command`:
 
 ----
-> cd example
-> ../mn
+$ cd example
+$ ../mn
 mn> create-command example.my-command
 | Rendered template Command.java to destination src/main/java/example/MyCommand.java
 | Rendered template CommandTest.java to destination src/test/java/example/MyCommandTest.java
