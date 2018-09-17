@@ -50,6 +50,7 @@ public class WebSocketMessageEncoder {
     public WebSocketMessageEncoder(MediaTypeCodecRegistry codecRegistry) {
         this.codecRegistry = codecRegistry;
     }
+
     /**
      * Encode the given message with the given media type.
      * @param message The message

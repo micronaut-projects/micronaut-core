@@ -17,21 +17,15 @@
 package io.micronaut.http.netty.websocket;
 
 import io.micronaut.http.MediaType;
-import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.websocket.WebSocketBroadcaster;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
-import io.netty.channel.group.ChannelGroup;
-import io.netty.channel.group.DefaultChannelGroup;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.Attribute;
-import io.netty.util.concurrent.GlobalEventExecutor;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 
 import javax.inject.Singleton;
-import java.io.Closeable;
-import java.io.IOException;
 import java.util.function.Predicate;
 
 /**
@@ -46,6 +40,11 @@ public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
     private final WebSocketMessageEncoder webSocketMessageEncoder;
     private final WebSocketSessionRepository webSocketSessionRepository;
 
+    /**
+     *
+     * @param webSocketMessageEncoder A instance of {@link io.micronaut.http.netty.websocket.WebSocketMessageEncoder} responsible of encoding WebSocket messages.
+     * @param webSocketSessionRepository A instance of {@link io.micronaut.http.netty.websocket.WebSocketSessionRepository}. Defines a ChannelGroup repository to handle WebSockets.
+     */
     public NettyServerWebSocketBroadcaster(WebSocketMessageEncoder webSocketMessageEncoder,
                                            WebSocketSessionRepository webSocketSessionRepository) {
         this.webSocketMessageEncoder = webSocketMessageEncoder;

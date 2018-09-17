@@ -26,7 +26,22 @@ import io.netty.channel.Channel;
  * @since 1.0
  */
 public interface WebSocketSessionRepository {
+
+    /**
+     * Adds a channel to the repository.
+     * @param channel The channel
+     */
     void addChannel(Channel channel);
+
+    /**
+     * Remove a channel from the repository.
+     * @param channel The channel
+     */
     void removeChannel(Channel channel);
+
+    /**
+     * Returns the {@link io.netty.channel.group.ChannelGroup} used to store WebSocketSessions.
+     * @return A {@link io.netty.channel.group.ChannelGroup}
+     */
     ChannelGroup getChannelGroup();
 }
