@@ -17,6 +17,7 @@
 package io.micronaut.configuration.jmx.endpoint;
 
 import io.micronaut.configuration.jmx.context.DefaultNameGenerator;
+import io.micronaut.inject.BeanDefinition;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -28,4 +29,15 @@ import javax.inject.Singleton;
 @Named("endpoint")
 public class EndpointNameGenerator extends DefaultNameGenerator {
 
+    private static final String MICRONUAT_ENDPOINT = "io.micronaut.management.endpoint";
+
+    @Override
+    protected String getDomain(BeanDefinition<?> beanDefinition) {
+        String domain = super.getDomain(beanDefinition);
+        if (domain.startsWith(MICRONUAT_ENDPOINT)) {
+            return MICRONUAT_ENDPOINT;
+        } else {
+            return domain;
+        }
+    }
 }
