@@ -24,9 +24,7 @@ import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.*;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
 /**
  * A {@link io.micronaut.inject.visitor.TypeElementVisitor} that validates WebSocket implementations at compile time.
@@ -34,13 +32,14 @@ import java.util.List;
  * @author graemerocher
  * @since 1.0
  */
-public class ServerWebSocketVisitor implements TypeElementVisitor<WebSocketComponent, WebSocketMapping> {
+public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, WebSocketMapping> {
 
+    private Map<String, UriMatchTemplate> uriCache = new HashMap<>(3);
 
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
         String uri = element.getValue(WebSocketComponent.class, String.class).orElse(WebSocketComponent.DEFAULT_URI);
-        UriMatchTemplate template = UriMatchTemplate.of(uri);
+        UriMatchTemplate template = uriCache.computeIfAbsent(uri, UriMatchTemplate::of);
         List<String> variables = template.getVariables();
         ParameterElement[] parameters = element.getParameters();
         if (ArrayUtils.isNotEmpty(parameters)) {

@@ -1,1 +1,1 @@
-io.micronaut.websocket.visitor.ServerWebSocketVisitor
+io.micronaut.websocket.visitor.WebSocketVisitor
