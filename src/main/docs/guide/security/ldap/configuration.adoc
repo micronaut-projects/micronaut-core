@@ -1,0 +1,6 @@
+The LDAP authentication in Micronaut supports configuration of one or more LDAP servers to authenticate with. Each server has it's own settings and can be enabled or disabled.
+
+include::{includedir}configurationProperties/io.micronaut.configuration.security.ldap.configuration.LdapConfiguration.adoc[]
+include::{includedir}configurationProperties/io.micronaut.configuration.security.ldap.configuration.LdapConfiguration$ContextConfiguration.adoc[]
+include::{includedir}configurationProperties/io.micronaut.configuration.security.ldap.configuration.LdapConfiguration$SearchConfiguration.adoc[]
+include::{includedir}configurationProperties/io.micronaut.configuration.security.ldap.configuration.LdapConfiguration$GroupConfiguration.adoc[]

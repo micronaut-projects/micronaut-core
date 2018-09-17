@@ -42,15 +42,17 @@ public class Authenticator {
     protected final Collection<AuthenticationProvider> authenticationProviders;
 
     /**
-     * @param authenticationProviders a List of availabble authentication providers
+     * @param authenticationProviders a List of available authentication providers
      */
     public Authenticator(Collection<AuthenticationProvider> authenticationProviders) {
         this.authenticationProviders = authenticationProviders;
     }
 
     /**
-     * @param credentials instance of {@link UsernamePasswordCredentials}
-     * @return Empty optional if authentication failed. If any {@link AuthenticationProvider} authenticates, that {@link AuthenticationResponse} is sent.
+     * Authenticates the user with the provided credentials.
+     *
+     * @param credentials The credentials to authenticate with
+     * @return A publisher that emits {@link AuthenticationResponse} objects
      */
     public Publisher<AuthenticationResponse> authenticate(UsernamePasswordCredentials credentials) {
         if (this.authenticationProviders == null) {

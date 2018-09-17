@@ -1,0 +1,61 @@
+dn: dc=example,dc=com
+objectclass: domain
+objectclass: top
+
+dn: ou=groups,dc=example,dc=com
+objectclass: organizationalUnit
+ou: groups
+
+dn: uid=riemann,dc=example,dc=com
+objectclass: organizationalPerson
+objectclass: person
+objectclass: top
+objectclass: inetOrgPerson
+uid: riemann
+sn: riemann
+cn: riemann
+userpassword: password
+
+dn: uid=gauss,dc=example,dc=com
+objectclass: organizationalPerson
+objectclass: person
+objectclass: top
+objectclass: inetOrgPerson
+uid: gauss
+sn: gauss
+cn: gauss
+userpassword: password
+
+dn: uid=euler,dc=example,dc=com
+objectclass: organizationalPerson
+objectclass: person
+objectclass: top
+objectclass: inetOrgPerson
+uid: euler
+sn: euler
+cn: euler
+userpassword: password
+
+dn: uid=euclid,dc=example,dc=com
+objectclass: organizationalPerson
+objectclass: person
+objectclass: top
+objectclass: inetOrgPerson
+uid: euclid
+sn: euclid
+cn: euclid
+userpassword: password
+
+dn: cn=users,ou=groups,dc=example,dc=com
+objectclass: groupOfNames
+cn: users
+member: uid=euclid,dc=example,dc=com
+member: uid=euler,dc=example,dc=com
+member: uid=gauss,dc=example,dc=com
+member: uid=riemann,dc=example,dc=com
+
+dn: cn=admins,ou=groups,dc=example,dc=com
+objectclass: groupOfNames
+cn: admins
+member: uid=gauss,dc=example,dc=com
+member: uid=riemann,dc=example,dc=com

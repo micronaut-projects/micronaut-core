@@ -265,6 +265,10 @@ security:
     refresh: Refresh Controller
   retrievingAuthenticatedUser: Retrieve the authenticated user
   securityEvents: Security Events
+  ldap:
+    title: LDAP Authentication
+    configuration: Configuration
+    extending: Extending Default Behavior
 cli:
   title: Micronaut CLI
   createProject: Creating a Project

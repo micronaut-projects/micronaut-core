@@ -14,25 +14,24 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.authentication;
+package io.micronaut.configuration.security.ldap.context;
 
-import org.reactivestreams.Publisher;
+import javax.naming.NamingException;
+import java.util.List;
 
 /**
- * Defines an authentication provider.
+ * Generic functional interface that returns a list of search
+ * results from LDAP.
  *
- * @author Sergio del Amo
- * @author Graeme Rocher
+ * @author James Kleeh
  * @since 1.0
  */
-public interface AuthenticationProvider {
+@FunctionalInterface
+public interface SearchProvider {
 
     /**
-     * Authenticates a user with the given request. If a successful authentication is
-     * returned, the object must be an instance of {@link UserDetails}.
-     *
-     * @param authenticationRequest The request to authenticate
-     * @return A publisher that emits 0 or 1 responses
+     * @return The list of search results
+     * @throws NamingException If the search encounters an exception
      */
-    Publisher<AuthenticationResponse> authenticate(AuthenticationRequest authenticationRequest);
+    List<LdapSearchResult> get() throws NamingException;
 }

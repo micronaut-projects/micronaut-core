@@ -1,0 +1,6 @@
+dependencies {
+    compileOnly project(":inject-java")
+    compile project(":security")
+
+    testCompile "com.unboundid:unboundid-ldapsdk:4.0.7"
+}
