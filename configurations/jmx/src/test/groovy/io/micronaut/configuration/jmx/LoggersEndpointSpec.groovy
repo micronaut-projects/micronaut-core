@@ -35,12 +35,15 @@ class LoggersEndpointSpec extends Specification {
         info.operations[1].impact == MBeanOperationInfo.INFO
         info.operations[1].signature.length == 1
         info.operations[1].signature[0].type == 'java.lang.String'
+        info.operations[1].signature[0].name == 'name'
         info.operations[2].name == "setLogLevel"
         info.operations[2].returnType == "void"
         info.operations[2].impact == MBeanOperationInfo.ACTION
         info.operations[2].signature.length == 2
         info.operations[2].signature[0].type == 'java.lang.String'
+        info.operations[2].signature[0].name == 'name'
         info.operations[2].signature[1].type == LogLevel.getName()
+        info.operations[2].signature[1].name == 'configuredLevel'
 
         when:
         Object data = server.invoke(name, "loggers", [] as Object[], [] as String[])
@@ -63,5 +66,7 @@ class LoggersEndpointSpec extends Specification {
         then:
         data.configuredLevel == LogLevel.DEBUG
 
+        cleanup:
+        ctx.close()
     }
 }
