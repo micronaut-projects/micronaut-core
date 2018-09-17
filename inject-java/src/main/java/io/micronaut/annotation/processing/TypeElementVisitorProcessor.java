@@ -129,8 +129,10 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
             Element enclosingElement = classElement.getEnclosingElement();
             // don't process inner class unless this is the visitor for it
-            if (!enclosingElement.getKind().isClass() ||
-                    concreteClass.getQualifiedName().equals(classElement.getQualifiedName())) {
+            boolean shouldVisit = !enclosingElement.getKind().isClass() ||
+                    concreteClass.getQualifiedName().equals(classElement.getQualifiedName());
+
+            if (shouldVisit) {
                 TypeElement superClass = modelUtils.superClassFor(classElement);
                 if (superClass != null && !modelUtils.isObjectClass(superClass)) {
                     superClass.accept(this, o);

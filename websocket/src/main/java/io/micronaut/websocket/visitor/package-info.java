@@ -14,25 +14,13 @@
  * limitations under the License.
  */
 
-package io.micronaut.inject.visitor;
-
-import javax.annotation.Nullable;
-
 /**
- * Stores data about an element that references a method.
+ * Compile time visitor classes for WebSocket.
  *
- * @author James Kleeh
+ * @author graemerocher
  * @since 1.0
  */
-public interface MethodElement extends Element {
+@Internal
+package io.micronaut.websocket.visitor;
 
-    /**
-     * @return The return type of the method
-     */
-    @Nullable ClassElement getReturnType();
-
-    /**
-     * @return The method parameters
-     */
-    ParameterElement[] getParameters();
-}
+import io.micronaut.core.annotation.Internal;

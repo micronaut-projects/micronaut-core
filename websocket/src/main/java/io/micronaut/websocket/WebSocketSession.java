@@ -21,17 +21,14 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.http.MediaType;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
-import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
 import java.net.URI;
 import java.security.Principal;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.function.Predicate;
 
 /**
  * Represents an open WebSocket connection. Based largely on {@code javax.websocket} and likely to be able to implement the spec in the future.
@@ -88,18 +85,6 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
     String getProtocolVersion();
 
     /**
-     * When used on the server this method will broadcast a message to all open WebSocket connections that match the given filter. When
-     * used on the client this method behaves the same as {@link #send(Object)}.
-     *
-     * @param message The message
-     * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
-     * @param filter The filter to apply
-     * @param <T> The message type
-     * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
-     */
-    <T> Publisher<T> broadcast(T message, MediaType mediaType, Predicate<WebSocketSession> filter);
-
-    /**
      * Send the given message to the remote peer.
      *
      * @param message The message
@@ -118,159 +103,6 @@ public interface WebSocketSession extends MutableConvertibleValues<Object>, Auto
      * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
      */
     <T> CompletableFuture<T> sendAsync(T message, MediaType mediaType);
-
-    /**
-     * When used on the server this method will broadcast a message to all open WebSocket connections. When
-     * used on the client this method behaves the same as {@link #send(Object)}.
-     *
-     * @param message The message
-     * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
-     * @param <T> The message type
-     * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
-     */
-    default <T> Publisher<T> broadcast(T message, MediaType mediaType) {
-        return broadcast(message, mediaType, (s) -> true);
-    }
-
-    /**
-     * When used on the server this method will broadcast a message to all open WebSocket connections. When
-     * used on the client this method behaves the same as {@link #send(Object)}.
-     *
-     * @param message The message
-     * @param <T> The message type
-     * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
-     */
-    default <T> Publisher<T> broadcast(T message) {
-        return broadcast(message, MediaType.APPLICATION_JSON_TYPE, (s) -> true);
-    }
-
-    /**
-     * When used on the server this method will broadcast a message to all open WebSocket connections that match the given filter. When
-     * used on the client this method behaves the same as {@link #send(Object)}.
-     *
-     * @param message The message
-     * @param filter The filter to apply
-     * @param <T> The message type
-     * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
-     */
-    default <T> Publisher<T> broadcast(T message, Predicate<WebSocketSession> filter) {
-        Objects.requireNonNull(filter, "The filter cannot be null");
-        return broadcast(message, MediaType.APPLICATION_JSON_TYPE, filter);
-    }
-
-    /**
-     * When used on the server this method will broadcast a message to all open WebSocket connections. When
-     * used on the client this method behaves the same as {@link #send(Object)}.
-     *
-     * @param message The message
-     * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
-     * @param filter The filter
-     * @param <T> The message type
-     * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
-     */
-    default <T> CompletableFuture<T> broadcastAsync(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
-        CompletableFuture<T> future = new CompletableFuture<>();
-        Flowable.fromPublisher(broadcast(message, mediaType, filter)).subscribe(
-                (o) -> { },
-                future::completeExceptionally,
-                () -> future.complete(message)
-        );
-        return future;
-    }
-
-    /**
-     * When used on the server this method will broadcast a message to all open WebSocket connections. When
-     * used on the client this method behaves the same as {@link #send(Object)}.
-     *
-     * @param message The message
-     * @param <T> The message type
-     * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
-     */
-    default <T> CompletableFuture<T> broadcastAsync(T message) {
-        return broadcastAsync(message, MediaType.APPLICATION_JSON_TYPE, (o) -> true);
-    }
-
-    /**
-     * When used on the server this method will broadcast a message to all open WebSocket connections that match the given filter. When
-     * used on the client this method behaves the same as {@link #send(Object)}.
-     *
-     * @param message The message
-     * @param filter The filter to apply
-     * @param <T> The message type
-     * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
-     */
-    default <T> CompletableFuture<T> broadcastAsync(T message, Predicate<WebSocketSession> filter) {
-        return broadcastAsync(message, MediaType.APPLICATION_JSON_TYPE, filter);
-    }
-
-
-    /**
-     * When used on the server this method will broadcast a message to all open WebSocket connections. When
-     * used on the client this method behaves the same as {@link #send(Object)}.
-     *
-     * @param message The message
-     * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
-     * @param <T> The message type
-     * @return A {@link Publisher} that either emits an error or emits the message once it has been published successfully.
-     */
-    default <T> CompletableFuture<T> broadcastAsync(T message, MediaType mediaType) {
-        return broadcastAsync(message, mediaType, (o) -> true);
-    }
-
-    /**
-     * When used on the server this method will broadcast a message to all open WebSocket connections. When
-     * used on the client this method behaves the same as {@link #send(Object)}.
-     *
-     * @param message The message
-     * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
-     * @param filter The filter
-     * @param <T> The message type
-     */
-    default <T> void broadcastSync(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
-        try {
-            broadcastAsync(message, mediaType, filter).get();
-        } catch (InterruptedException e) {
-            throw new WebSocketSessionException("Broadcast Interrupted");
-        } catch (ExecutionException e) {
-            throw new WebSocketSessionException("Broadcast Failure: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * When used on the server this method will broadcast a message to all open WebSocket connections. When
-     * used on the client this method behaves the same as {@link #send(Object)}.
-     *
-     * @param message The message
-     * @param <T> The message type
-     */
-    default <T> void broadcastSync(T message) {
-        broadcastSync(message, MediaType.APPLICATION_JSON_TYPE, (o) -> true);
-    }
-
-    /**
-     * When used on the server this method will broadcast a message to all open WebSocket connections that match the given filter. When
-     * used on the client this method behaves the same as {@link #send(Object)}.
-     *
-     * @param message The message
-     * @param filter The filter to apply
-     * @param <T> The message type
-     */
-    default <T> void broadcastSync(T message, Predicate<WebSocketSession> filter) {
-        broadcastSync(message, MediaType.APPLICATION_JSON_TYPE, filter);
-    }
-
-
-    /**
-     * When used on the server this method will broadcast a message to all open WebSocket connections. When
-     * used on the client this method behaves the same as {@link #send(Object)}.
-     *
-     * @param message The message
-     * @param mediaType The media type of the message. Used to lookup an appropriate codec via the {@link io.micronaut.http.codec.MediaTypeCodecRegistry}.
-     * @param <T> The message type
-     */
-    default <T> void broadcastSync(T message, MediaType mediaType) {
-        broadcastSync(message, mediaType, (o) -> true);
-    }
 
     /**
      * Send the given message to the remote peer synchronously.

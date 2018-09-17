@@ -16,28 +16,20 @@
 
 package io.micronaut.http.netty.websocket;
 
-import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.ConvertibleMultiValues;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.RxWebSocketSession;
-import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.exceptions.WebSocketSessionException;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
-import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
-import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.util.AttributeKey;
 import io.reactivex.BackpressureStrategy;
@@ -45,11 +37,12 @@ import io.reactivex.Flowable;
 
 import javax.annotation.Nullable;
 import java.net.URI;
-import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
-import java.util.function.Predicate;
 
 /**
  * Implementation of the {@link RxWebSocketSession} interface for Netty and RxJava.
@@ -71,6 +64,7 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
     private final boolean isSecure;
     private final MediaTypeCodecRegistry codecRegistry;
     private final MutableConvertibleValues<Object> attributes;
+    private final WebSocketMessageEncoder messageEncoder;
 
     /**
      * Creates a new netty web socket session.
@@ -95,6 +89,7 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
         this.isSecure = isSecure;
         this.channel.attr(WEB_SOCKET_SESSION_KEY).set(this);
         this.codecRegistry = codecRegistry;
+        this.messageEncoder = new WebSocketMessageEncoder(this.codecRegistry);
         this.attributes = request.getAttribute("micronaut.SESSION", MutableConvertibleValues.class).orElseGet(() -> new MutableConvertibleValuesMap());
     }
 
@@ -144,7 +139,7 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
             if (message != null) {
                 CompletableFuture<T> future = new CompletableFuture<>();
 
-                WebSocketFrame frame = encodeMessage(message, mediaType);
+                WebSocketFrame frame = messageEncoder.encodeMessage(message, mediaType);
                 channel.writeAndFlush(frame).addListener(f -> {
                     if (f.isSuccess()) {
                         future.complete(message);
@@ -166,7 +161,7 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
         if (isOpen()) {
             if (message != null) {
                 try {
-                    WebSocketFrame frame = encodeMessage(message, mediaType);
+                    WebSocketFrame frame = messageEncoder.encodeMessage(message, mediaType);
                     channel.writeAndFlush(frame).sync().get();
                 } catch (InterruptedException e) {
                     throw new WebSocketSessionException("Send interrupt: " + e.getMessage(), e);
@@ -189,7 +184,7 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
             if (!isOpen()) {
                 emitter.onError(new WebSocketSessionException("Session closed"));
             } else {
-                WebSocketFrame frame = encodeMessage(message, mediaType);
+                WebSocketFrame frame = messageEncoder.encodeMessage(message, mediaType);
 
                 ChannelFuture channelFuture = channel.writeAndFlush(frame);
                 channelFuture.addListener(future -> {
@@ -202,24 +197,6 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
                 });
             }
         }, BackpressureStrategy.ERROR);
-    }
-
-    @Override
-    public <T> Flowable<T> broadcast(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
-        Objects.requireNonNull(filter, "Filter cannot be null");
-        if (filter.test(this)) {
-            return send(message, mediaType);
-        } else {
-            return Flowable.empty();
-        }
-    }
-
-    @Override
-    public <T> void broadcastSync(T message, MediaType mediaType, Predicate<WebSocketSession> filter) {
-        Objects.requireNonNull(filter, "Filter cannot be null");
-        if (filter.test(this)) {
-            sendSync(message, mediaType);
-        }
     }
 
     @Override
@@ -238,32 +215,6 @@ public class NettyRxWebSocketSession implements RxWebSocketSession {
     @Override
     public String toString() {
         return "WebSocket Session: " + getId();
-    }
-
-    /**
-     * Encode the given message with the given media type.
-     * @param message The message
-     * @param mediaType The media type
-     * @return The encoded frame
-     */
-    protected WebSocketFrame encodeMessage(Object message, MediaType mediaType) {
-        if (message instanceof byte[]) {
-            return new BinaryWebSocketFrame(Unpooled.wrappedBuffer((byte[]) message));
-        } else if (ClassUtils.isJavaLangType(message.getClass())) {
-            String s = message.toString();
-            return new TextWebSocketFrame(s);
-        } else if (message instanceof ByteBuf) {
-            return new BinaryWebSocketFrame((ByteBuf) message);
-        } else if (message instanceof ByteBuffer) {
-            return new BinaryWebSocketFrame(Unpooled.wrappedBuffer((ByteBuffer) message));
-        } else {
-            Optional<MediaTypeCodec> codec = codecRegistry.findCodec(mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
-            if (codec.isPresent()) {
-                io.micronaut.core.io.buffer.ByteBuffer encoded = codec.get().encode(message, new NettyByteBufferFactory(channel.alloc()));
-                return new TextWebSocketFrame((ByteBuf) encoded.asNativeBuffer());
-            }
-        }
-        throw new WebSocketSessionException("Unable to encode WebSocket message: " + message);
     }
 
     @Override
