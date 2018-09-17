@@ -16,8 +16,6 @@
 
 package io.micronaut.websocket.annotation;
 
-import io.micronaut.context.annotation.Executable;
-
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -35,7 +33,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.METHOD})
-@Executable
+@WebSocketMapping
 public @interface OnMessage {
 
     /**

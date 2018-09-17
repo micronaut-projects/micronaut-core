@@ -14,25 +14,26 @@
  * limitations under the License.
  */
 
-package io.micronaut.inject.visitor;
+package io.micronaut.websocket.annotation;
 
-import javax.annotation.Nullable;
+import io.micronaut.context.annotation.Executable;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * Stores data about an element that references a method.
+ * Stereotype meta-annotation applied to all WebSocket related annotations such as {@link OnOpen}, {@link OnMessage} etc..
  *
- * @author James Kleeh
+ * @author graemerocher
  * @since 1.0
  */
-public interface MethodElement extends Element {
-
-    /**
-     * @return The return type of the method
-     */
-    @Nullable ClassElement getReturnType();
-
-    /**
-     * @return The method parameters
-     */
-    ParameterElement[] getParameters();
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.ANNOTATION_TYPE})
+@Executable
+public @interface WebSocketMapping {
 }
