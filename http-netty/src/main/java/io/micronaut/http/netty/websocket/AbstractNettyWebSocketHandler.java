@@ -42,8 +42,14 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.channel.group.ChannelGroup;
-import io.netty.handler.codec.http.websocketx.*;
+
+import io.netty.handler.codec.http.websocketx.BinaryWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.CloseWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
+import io.netty.handler.codec.http.websocketx.WebSocketFrame;
+import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.reactivex.Flowable;
 import io.reactivex.functions.BiConsumer;
 import io.reactivex.schedulers.Schedulers;
@@ -362,6 +368,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             // respond with pong
             PingWebSocketFrame frame = (PingWebSocketFrame) msg;
             ctx.channel().writeAndFlush(new PongWebSocketFrame(frame.content()));
+
         } else if (msg instanceof PongWebSocketFrame) {
             return;
         } else if (msg instanceof CloseWebSocketFrame) {
