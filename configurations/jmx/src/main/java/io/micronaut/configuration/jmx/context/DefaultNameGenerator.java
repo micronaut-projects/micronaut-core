@@ -35,10 +35,17 @@ public class DefaultNameGenerator implements NameGenerator {
     @Override
     public ObjectName generate(BeanDefinition<?> beanDefinition) throws MalformedObjectNameException {
         Class type = beanDefinition.getBeanType();
-        String pkg = type.getPackage().getName();
         Hashtable<String, String> properties = new Hashtable<>(1);
         properties.put("type", type.getSimpleName());
 
-        return new ObjectName(pkg, properties);
+        return new ObjectName(getDomain(beanDefinition), properties);
+    }
+
+    /**
+     * @param beanDefinition The bean definition
+     * @return The domain used for the {@link ObjectName}
+     */
+    protected String getDomain(BeanDefinition<?> beanDefinition) {
+        return beanDefinition.getBeanType().getPackage().getName();
     }
 }

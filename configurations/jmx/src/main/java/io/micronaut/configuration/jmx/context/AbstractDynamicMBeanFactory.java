@@ -80,9 +80,12 @@ public abstract class AbstractDynamicMBeanFactory implements DynamicMBeanFactory
                 if (matchedMethods.size() == 1) {
                     //noinspection unchecked
                     Object returnVal = matchedMethods.get(0).invoke(instanceSupplier.get(), params);
-                    if (Publishers.isSingle(returnVal.getClass()) || Publishers.isConvertibleToPublisher(returnVal)) {
-                        return Flowable.fromPublisher(Publishers.convertPublisher(returnVal, Publisher.class)).blockingFirst();
+                    if (returnVal != null) {
+                        if (Publishers.isSingle(returnVal.getClass()) || Publishers.isConvertibleToPublisher(returnVal)) {
+                            return Flowable.fromPublisher(Publishers.convertPublisher(returnVal, Publisher.class)).blockingFirst();
+                        }
                     }
+
                     return returnVal;
                 } else {
                     //would be necessary at this point to convert the signature string[] to a class[]

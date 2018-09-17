@@ -56,7 +56,11 @@ public class EndpointMBeanFactory extends AbstractDynamicMBeanFactory {
     protected int getImpact(ExecutableMethod method) {
         int impact = MBeanOperationInfo.INFO; //read
         if (method.hasAnnotation(Write.class)) {
-            impact = MBeanOperationInfo.ACTION_INFO;
+            if (method.getReturnType().getType() == void.class) {
+                impact = MBeanOperationInfo.ACTION;
+            } else {
+                impact = MBeanOperationInfo.ACTION_INFO;
+            }
         } else if (method.hasAnnotation(Delete.class)) {
             impact = MBeanOperationInfo.ACTION;
         }
