@@ -442,22 +442,18 @@ subprojects { Project subproject ->
             }
         }
     }
-    task createDocsGeneratedFolders {
+    task processConfigProps(dependsOn: [replaceAtLink, javaDocAtReplacement]) {
         group 'documentation'
-
-        doLast {
+        ext {
+            individualConfigPropsFolder = "${rootProject.buildDir}/generated/configurationProperties"
+        }
+        doFirst {
             if(!new File("${rootProject.buildDir}/generated").exists()) {
                 new File("${rootProject.buildDir}/generated").mkdir()
             }
             if(!new File("${rootProject.buildDir}/generated/configurationProperties").exists()) {
                 new File("${rootProject.buildDir}/generated/configurationProperties").mkdir()
             }
-        }
-    }
-    task processConfigProps(dependsOn: [replaceAtLink, javaDocAtReplacement, createDocsGeneratedFolders]) {
-        group 'documentation'
-        ext {
-            individualConfigPropsFolder = "${rootProject.buildDir}/generated/configurationProperties"
         }
         doLast {
 
