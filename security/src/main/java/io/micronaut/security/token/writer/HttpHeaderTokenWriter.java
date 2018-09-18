@@ -67,6 +67,9 @@ public class HttpHeaderTokenWriter implements TokenWriter {
         StringBuilder sb = new StringBuilder();
         if (httpHeaderTokenWriterConfiguration.getPrefix() != null) {
             sb.append(httpHeaderTokenWriterConfiguration.getPrefix());
+            if (!httpHeaderTokenWriterConfiguration.getPrefix().endsWith(" ")) {
+                sb.append(" ");
+            }
         }
         sb.append(token);
         return sb.toString();
