@@ -171,7 +171,7 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         pattern = null;
         variableModifiers = null;
         String[] variables = newList.toArray(new String[newList.size()]);
-        return newUriMatchTemplate(uriTemplate, newSegments, newPattern, variables, newMap);
+        return newUriMatchTemplate(normalizeNested(toString(), uriTemplate), newSegments, newPattern, variables, newMap);
     }
 
     @Override

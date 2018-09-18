@@ -112,7 +112,18 @@ public class ClassUtils {
      * @return True if it is
      */
     public static boolean isJavaLangType(Class type) {
-        return COMMON_CLASS_MAP.containsKey(type.getName());
+        String typeName = type.getName();
+        return isJavaLangType(typeName);
+    }
+
+    /**
+     * Return whether the given class is a common type found in <tt>java.lang</tt> such as String or a primitive type.
+     *
+     * @param typeName The type name
+     * @return True if it is
+     */
+    public static boolean isJavaLangType(String typeName) {
+        return COMMON_CLASS_MAP.containsKey(typeName);
     }
 
     /**
