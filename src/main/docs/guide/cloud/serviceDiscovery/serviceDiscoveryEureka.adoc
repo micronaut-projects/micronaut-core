@@ -25,7 +25,7 @@ eureka:
     defaultZone: "${EUREKA_HOST:localhost}:${EUREKA_PORT:8761}"
 ----
 
-== Customizing Service Registration
+== Customizing Eureka Service Registration
 
 You can customize various aspects of registration with Eureka using the api:discovery.eureka.EurekaConfiguration[]. Notice that `EurekaConfiguration` extends api:discovery.client.DiscoveryClientConfiguration[]  which in turn extends api:http.client.HttpClientConfiguration[] allowing you to customize the settings for the Eureka client, including read timeout, proxy configuration and so on.
 
@@ -43,7 +43,13 @@ eureka:
             durationInSecs: 60 # The lease information
          metadata: # arbitrary instance metadata
             foo: bar
+         retry-count: 10 # How many times to retry
+         retry-delay: 5s # How long to wait between retries
 ----
+
+
+include::{includedir}configurationProperties/io.micronaut.discovery.eureka.EurekaConfiguration$EurekaRegistrationConfiguration.adoc[]
+
 
 == Eureka Basic Authentication
 
