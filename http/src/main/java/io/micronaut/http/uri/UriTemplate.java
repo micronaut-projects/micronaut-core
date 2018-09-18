@@ -17,6 +17,7 @@
 package io.micronaut.http.uri;
 
 import io.micronaut.core.beans.BeanMap;
+import io.micronaut.core.util.StringUtils;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
@@ -278,7 +279,40 @@ public class UriTemplate implements Comparable<UriTemplate> {
      * @return The new {@link UriTemplate}
      */
     protected UriTemplate newUriTemplate(CharSequence uriTemplate, List<PathSegment> newSegments) {
-        return new UriTemplate(this.templateString + uriTemplate, newSegments);
+        return new UriTemplate(normalizeNested(this.templateString, uriTemplate), newSegments);
+    }
+
+    /**
+     * Normalize a nested URI
+     * @param uri The URI
+     * @param nested The nested URI
+     * @return The new URI
+     */
+    protected String normalizeNested(String uri, CharSequence nested) {
+        if (StringUtils.isEmpty(nested)) {
+            return uri;
+        }
+
+        String nestedStr = nested.toString();
+        char firstNested = nestedStr.charAt(0);
+        if (nestedStr.length() == 1 && firstNested == '/') {
+            return uri;
+        }
+
+        switch (firstNested) {
+            case '/':
+                if (uri.endsWith("/")) {
+                    return uri + nestedStr.substring(1);
+                } else {
+                    return uri + nestedStr;
+                }
+            default:
+                if (uri.endsWith("/")) {
+                    return uri + nestedStr;
+                } else {
+                    return uri + "/" + nestedStr;
+                }
+        }
     }
 
     /**

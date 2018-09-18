@@ -16,15 +16,21 @@
 
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.annotation.processing.AnnotationProcessingOutputVisitor;
 import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.annotation.processing.ModelUtils;
+import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.writer.GeneratedFile;
 
+import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.Element;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
+import java.util.Optional;
 
 /**
  * The visitor context when visiting Java code.
@@ -32,29 +38,46 @@ import javax.tools.Diagnostic;
  * @author James Kleeh
  * @since 1.0
  */
-public class JavaVisitorContext implements VisitorContext {
+public class JavaVisitorContext extends MutableConvertibleValuesMap<Object> implements VisitorContext {
 
     private final Messager messager;
     private final Elements elements;
     private final AnnotationUtils annotationUtils;
     private final Types types;
     private final ModelUtils modelUtils;
+    private final AnnotationProcessingOutputVisitor outputVisitor;
 
     /**
      * The default constructor.
-     *
-     * @param messager The messager
+     *  @param messager The messager
      * @param elements The elements
      * @param annotationUtils The annotation utils
      * @param types Type types
      * @param modelUtils The model utils
+     * @param filer The filer
      */
-    public JavaVisitorContext(Messager messager, Elements elements, AnnotationUtils annotationUtils, Types types, ModelUtils modelUtils) {
+    public JavaVisitorContext(Messager messager, Elements elements, AnnotationUtils annotationUtils, Types types, ModelUtils modelUtils, Filer filer) {
         this.messager = messager;
         this.elements = elements;
         this.annotationUtils = annotationUtils;
         this.types = types;
         this.modelUtils = modelUtils;
+        this.outputVisitor = new AnnotationProcessingOutputVisitor(filer);
+    }
+
+    @Override
+    public void info(String message, io.micronaut.inject.visitor.Element element) {
+        if (StringUtils.isNotEmpty(message)) {
+            Element el = (Element) element.getNativeType();
+            messager.printMessage(Diagnostic.Kind.NOTE, message, el);
+        }
+    }
+
+    @Override
+    public void info(String message) {
+        if (StringUtils.isNotEmpty(message)) {
+            messager.printMessage(Diagnostic.Kind.NOTE, message);
+        }
     }
 
     @Override
@@ -67,6 +90,11 @@ public class JavaVisitorContext implements VisitorContext {
     public void warn(String message, io.micronaut.inject.visitor.Element element) {
         Element el = (Element) element.getNativeType();
         messager.printMessage(Diagnostic.Kind.WARNING, message, el);
+    }
+
+    @Override
+    public Optional<GeneratedFile> visitMetaInfFile(String path) {
+        return outputVisitor.visitMetaInfFile(path);
     }
 
     /**

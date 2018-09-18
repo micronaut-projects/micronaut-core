@@ -57,7 +57,13 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             return false;
         }
 
-        JavaVisitorContext visitorContext = new JavaVisitorContext(processingEnv.getMessager(), elementUtils, annotationUtils, typeUtils, modelUtils);
+        JavaVisitorContext visitorContext = new JavaVisitorContext(
+                processingEnv.getMessager(),
+                elementUtils,
+                annotationUtils,
+                typeUtils,
+                modelUtils,
+                filer);
         SoftServiceLoader<TypeElementVisitor> serviceLoader = SoftServiceLoader.load(TypeElementVisitor.class, getClass().getClassLoader());
         Map<String, LoadedVisitor> loadedVisitors = new HashMap<>();
         for (ServiceDefinition<TypeElementVisitor> definition : serviceLoader) {
@@ -85,7 +91,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         roundEnv.getRootElements()
                 .stream()
-                .filter(element -> element.getKind().isClass())
+                .filter(element -> element.getKind().isClass() || element.getKind().isInterface())
                 .map(modelUtils::classElementFor)
                 .filter(typeElement -> {
                     return groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType);
