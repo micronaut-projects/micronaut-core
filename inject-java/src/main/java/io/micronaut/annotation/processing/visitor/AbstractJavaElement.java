@@ -26,6 +26,7 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.NoType;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVariable;
 
 /**
  * An abstract class for other elements to extend from.
@@ -120,6 +121,15 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.visitor
                         visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement),
                         visitorContext
                 );
+            }
+        } else if (returnType instanceof TypeVariable) {
+            TypeVariable tv = (TypeVariable) returnType;
+            TypeMirror upperBound = tv.getUpperBound();
+            ClassElement classElement = mirrorToClassElement(upperBound, visitorContext);
+            if (classElement != null) {
+                return classElement;
+            } else {
+                return mirrorToClassElement(tv.getLowerBound(), visitorContext);
             }
         }
         return null;
