@@ -16,14 +16,20 @@
 
 package io.micronaut.ast.groovy.visitor;
 
+import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.inject.visitor.Element;
 import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor;
+import io.micronaut.inject.writer.GeneratedFile;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.control.ErrorCollector;
 import org.codehaus.groovy.control.Janitor;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
+
+import java.io.File;
+import java.util.Optional;
 
 /**
  * The visitor context when visiting Groovy code.
@@ -32,7 +38,7 @@ import org.codehaus.groovy.syntax.SyntaxException;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class GroovyVisitorContext implements VisitorContext {
+public class GroovyVisitorContext extends MutableConvertibleValuesMap<Object> implements VisitorContext {
 
     private final ErrorCollector errorCollector;
     private final SourceUnit sourceUnit;
@@ -46,6 +52,16 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     @Override
+    public void info(String message, Element element) {
+        // no-op
+    }
+
+    @Override
+    public void info(String message) {
+        // no-op
+    }
+
+    @Override
     public void fail(String message, Element element) {
         errorCollector.addError(buildErrorMessage(message, element));
     }
@@ -56,6 +72,20 @@ public class GroovyVisitorContext implements VisitorContext {
         final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
         System.err.println("WARNING: " + message + "\n\n" + sample);
 
+    }
+
+    @Override
+    public Optional<GeneratedFile> visitMetaInfFile(String path) {
+        File classesDir = sourceUnit.getConfiguration().getTargetDirectory();
+        if (classesDir != null) {
+
+            DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
+                    classesDir
+            );
+            return outputVisitor.visitMetaInfFile(path);
+        }
+
+        return Optional.empty();
     }
 
     /**

@@ -16,6 +16,12 @@
 
 package io.micronaut.inject.visitor;
 
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.inject.writer.GeneratedFile;
+
+import java.util.Optional;
+
 /**
  * Provides a way for {@link TypeElementVisitor} classes to log messages during compilation and fail compilation.
  *
@@ -23,7 +29,22 @@ package io.micronaut.inject.visitor;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface VisitorContext {
+public interface VisitorContext extends MutableConvertibleValues<Object> {
+
+    /**
+     * Allows printing informational messages.
+     *
+     * @param message The message
+     * @param element The element
+     */
+    void info(String message, Element element);
+
+    /**
+     * Allows printing informational messages.
+     *
+     * @param message The message
+     */
+    void info(String message);
 
     /**
      * Allows failing compilation for a given element with the given message.
@@ -40,4 +61,14 @@ public interface VisitorContext {
      * @param element The element
      */
     void warn(String message, Element element);
+
+    /**
+     * Visit a file within the META-INF directory.
+     *
+     * @param path The path to the file
+     * @return An optional file it was possible to create it
+     */
+    @Experimental
+    Optional<GeneratedFile> visitMetaInfFile(String path);
+
 }
