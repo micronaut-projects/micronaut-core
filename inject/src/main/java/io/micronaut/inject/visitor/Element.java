@@ -18,6 +18,8 @@ package io.micronaut.inject.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 
+import java.util.Optional;
+
 /**
  * Stores data about a compile time element. The underlying object can be a class, field, or method.
  *
@@ -25,12 +27,10 @@ import io.micronaut.core.annotation.AnnotationMetadata;
  * @since 1.0
  */
 public interface Element extends AnnotationMetadata {
-
     /**
      * @return The name of the element.
      */
     String getName();
-
     /**
      * @return True if the element is protected.
      */
@@ -61,6 +61,13 @@ public interface Element extends AnnotationMetadata {
      */
     default boolean isStatic() {
         return false;
+    }
+
+    /**
+     * @return The documentation, if any.
+     */
+    default Optional<String> getDocumentation() {
+        return Optional.empty();
     }
 
     /**
