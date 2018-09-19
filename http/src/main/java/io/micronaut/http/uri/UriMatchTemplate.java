@@ -99,6 +99,17 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         return Arrays.asList(variables);
     }
 
+
+    /**
+     * Checks whether the given variable is exploded (using the * modifier). See https://tools.ietf.org/html/rfc6570#section-3.
+     *
+     * @param variable The name of the variable
+     * @return True if is exploded
+     */
+    public boolean isExploded(String variable) {
+        Character c = variableModifiers.get(variable);
+        return c != null && c == '*';
+    }
     /**
      * Match the given URI string.
      *
