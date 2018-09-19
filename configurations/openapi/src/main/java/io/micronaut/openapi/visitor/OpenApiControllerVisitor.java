@@ -18,6 +18,7 @@ package io.micronaut.openapi.visitor;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
@@ -48,6 +49,7 @@ import io.swagger.v3.oas.models.responses.ApiResponses;
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * A {@link TypeElementVisitor} the builds the Swagger model from Micronaut controllers at compile time.
@@ -84,6 +86,25 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 }
             }).orElse(new io.swagger.v3.oas.models.Operation());
 
+
+            List<AnnotationValue<io.swagger.v3.oas.annotations.responses.ApiResponse>> responseAnnotations = element.getAnnotationValuesByType(io.swagger.v3.oas.annotations.responses.ApiResponse.class);
+            if (CollectionUtils.isNotEmpty(responseAnnotations)) {
+                ApiResponses apiResponses = new ApiResponses();
+                for (AnnotationValue<io.swagger.v3.oas.annotations.responses.ApiResponse> r : responseAnnotations) {
+
+                    JsonNode jn = toJson(r.getValues());
+                    try {
+                        Optional<ApiResponse> newResponse = Optional.of(jsonMapper.treeToValue(jn, ApiResponse.class));
+                        newResponse.ifPresent(apiResponse -> {
+                            String name = r.get("responseCode", String.class).orElse("default");
+                            apiResponses.put(name, apiResponse);
+                        });
+                    } catch (JsonProcessingException e) {
+                        context.warn("Error reading Swagger ApiResponses for element [" + element + "]: " + e.getMessage(), element);
+                    }
+                }
+                swaggerOperation.setResponses(apiResponses);
+            }
 
             HttpMethod httpMethod = HttpMethod.valueOf(httpMethodClass.getSimpleName().toUpperCase(Locale.ENGLISH));
             JavadocDescription javadocDescription = element.getDocumentation().map(s -> new JavadocParser().parse(s)).orElse(null);
