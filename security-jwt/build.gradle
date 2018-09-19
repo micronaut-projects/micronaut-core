@@ -8,7 +8,7 @@ buildscript {
 }
 
 ext {
-    nimbusJoseJwtVersion = '5.9'
+    nimbusJoseJwtVersion = '5.14'
     snakeYamlVersion = '1.19'
     bouncyCastleVersion = '1.53'
     gebVersion = '2.1'

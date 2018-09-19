@@ -212,7 +212,6 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
                 if (argument.isAnnotationPresent(Body.class)) {
                     body = definedValue;
-                    break;
                 } else if (annotationMetadata.isAnnotationPresent(Header.class)) {
 
                     String headerName = annotationMetadata.getValue(Header.class, String.class).orElse(null);
@@ -284,6 +283,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             request = HttpRequest.create(httpMethod, appendQuery(uri, queryParams));
             if (body != null) {
                 request.body(body);
+
+                MediaType[] contentTypes = context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
+                if (ArrayUtils.isNotEmpty(contentTypes)) {
+                    request.contentType(contentTypes[0]);
+                }
             }
 
             // Set the URI template used to make the request for tracing purposes
@@ -301,6 +305,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             cookies.forEach(request::cookie);
 
+            MediaType[] acceptTypes = context.getValue(Consumes.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
+
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
             final Class<?> methodDeclaringType = declaringType;
             if (Publishers.isConvertibleToPublisher(javaReturnType) || isFuture) {
@@ -314,30 +320,22 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     isSingle = true;
                 }
 
-
                 Publisher<?> publisher;
-
-                MediaType[] contentTypes = context.getValue(Consumes.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
-                if (ArrayUtils.isNotEmpty(contentTypes) && HttpMethod.permitsRequestBody(request.getMethod())) {
-                    request.contentType(contentTypes[0]);
-                }
 
                 if (!isSingle && httpClient instanceof StreamingHttpClient) {
                     StreamingHttpClient streamingHttpClient = (StreamingHttpClient) httpClient;
-                    if (HttpResponse.class.isAssignableFrom(argumentType)) {
-                        request.accept(context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES));
-                        publisher = streamingHttpClient.exchangeStream(
-                                request
-                        );
-                    } else if (Void.class.isAssignableFrom(argumentType)) {
+
+                    if (!Void.class.isAssignableFrom(argumentType)) {
+                        request.accept(acceptTypes);
+                    }
+
+                    if (HttpResponse.class.isAssignableFrom(argumentType) ||
+                            Void.class.isAssignableFrom(argumentType)) {
                         publisher = streamingHttpClient.exchangeStream(
                                 request
                         );
                     } else {
-                        MediaType[] acceptTypes = context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
-                        request.accept(acceptTypes);
-
-                        boolean isEventStream = Arrays.stream(acceptTypes).anyMatch(mediaType -> mediaType.equals(MediaType.TEXT_EVENT_STREAM_TYPE));
+                        boolean isEventStream = Arrays.asList(acceptTypes).contains(MediaType.TEXT_EVENT_STREAM_TYPE);
 
                         if (isEventStream && streamingHttpClient instanceof SseClient) {
                             SseClient sseClient = (SseClient) streamingHttpClient;
@@ -366,22 +364,21 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
                 } else {
 
-                    if (HttpResponse.class.isAssignableFrom(argumentType)) {
-                        request.accept(context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES));
-                        publisher = httpClient.exchange(
-                                request, publisherArgument, errorType
-                        );
-                    } else if (Void.class.isAssignableFrom(argumentType)) {
+                    if (Void.class.isAssignableFrom(argumentType)) {
                         publisher = httpClient.exchange(
                                 request, null, errorType
                         );
                     } else {
-                        MediaType[] acceptTypes = context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
                         request.accept(acceptTypes);
-
-                        publisher = httpClient.retrieve(
-                                request, publisherArgument, errorType
-                        );
+                        if (HttpResponse.class.isAssignableFrom(argumentType)) {
+                            publisher = httpClient.exchange(
+                                    request, publisherArgument, errorType
+                            );
+                        } else {
+                            publisher = httpClient.retrieve(
+                                    request, publisherArgument, errorType
+                            );
+                        }
                     }
                 }
 
@@ -435,6 +432,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             } else {
                 BlockingHttpClient blockingHttpClient = httpClient.toBlocking();
+
+                if (void.class != javaReturnType) {
+                    request.accept(acceptTypes);
+                }
+
                 if (HttpResponse.class.isAssignableFrom(javaReturnType)) {
                     return blockingHttpClient.exchange(
                         request, returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT), errorType
