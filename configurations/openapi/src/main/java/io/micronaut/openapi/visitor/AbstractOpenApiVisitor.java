@@ -25,6 +25,8 @@ import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.openapi.util.Yaml;
 import io.swagger.v3.core.util.Json;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.servers.ServerVariable;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
@@ -129,7 +131,28 @@ abstract class AbstractOpenApiVisitor  {
 
                         if (areAnnotationValues) {
                             String annotationName = ((AnnotationValue) first).getAnnotationName();
-                            if (ServerVariable.class.getName().equals(annotationName)) {
+                            if (Content.class.getName().equals(annotationName)) {
+                                Map mediaTypes = new LinkedHashMap();
+                                for (Object o : a) {
+                                    AnnotationValue<Content> sv = (AnnotationValue<Content>) o;
+                                    String name = sv.get("mediaType", String.class).orElse(null);
+                                    if (name != null) {
+                                        Map<CharSequence, Object> map = toValueMap(sv.getValues());
+                                        mediaTypes.put(name, map);
+                                    }
+                                }
+                                newValues.put(key, mediaTypes);
+                            }
+                            else if (ApiResponse.class.getName().equals(annotationName)) {
+                                Map responses = new LinkedHashMap();
+                                for (Object o : a) {
+                                    AnnotationValue<ApiResponse> sv = (AnnotationValue<ApiResponse>) o;
+                                    String name = sv.get("responseCode", String.class).orElse("default");
+                                    Map<CharSequence, Object> map = toValueMap(sv.getValues());
+                                    responses.put(name, map);
+                                }
+                                newValues.put(key, responses);
+                            } else if (ServerVariable.class.getName().equals(annotationName)) {
                                 Map variables = new LinkedHashMap();
                                 for (Object o : a) {
                                     AnnotationValue<ServerVariable> sv = (AnnotationValue<ServerVariable>) o;
@@ -145,15 +168,20 @@ abstract class AbstractOpenApiVisitor  {
                                 }
                                 newValues.put(key, variables);
                             } else {
-                                List list = new ArrayList();
-                                for (Object o : a) {
-                                    if (o instanceof AnnotationValue) {
-                                        list.add(toValueMap(((AnnotationValue<?>) o).getValues()));
-                                    } else {
-                                        list.add(o);
+                                if (a.length == 1) {
+                                    newValues.put(key, toValueMap(((AnnotationValue<?>) a[0]).getValues()));
+                                } else {
+
+                                    List list = new ArrayList();
+                                    for (Object o : a) {
+                                        if (o instanceof AnnotationValue) {
+                                            list.add(toValueMap(((AnnotationValue<?>) o).getValues()));
+                                        } else {
+                                            list.add(o);
+                                        }
                                     }
+                                    newValues.put(key, list);
                                 }
-                                newValues.put(key, list);
                             }
                         } else {
                             newValues.put(key, value);
