@@ -49,7 +49,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     /**
      * @param filer The {@link Filer} for creating new files
      */
-    AnnotationProcessingOutputVisitor(Filer filer) {
+    public AnnotationProcessingOutputVisitor(Filer filer) {
         this.filer = filer;
     }
 
