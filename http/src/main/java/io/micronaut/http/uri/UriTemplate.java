@@ -283,7 +283,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
     }
 
     /**
-     * Normalize a nested URI
+     * Normalize a nested URI.
      * @param uri The URI
      * @param nested The nested URI
      * @return The new URI
@@ -295,11 +295,34 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
         String nestedStr = nested.toString();
         char firstNested = nestedStr.charAt(0);
-        if (nestedStr.length() == 1 && firstNested == '/') {
+        int len = nestedStr.length();
+        if (len == 1 && firstNested == '/') {
             return uri;
         }
 
         switch (firstNested) {
+            case '{':
+                if (len > 1) {
+                    switch (nested.charAt(1)) {
+                        case '/':
+                        case '#':
+                        case '?':
+                        case '&':
+                            if (uri.endsWith("/")) {
+                                return uri.substring(0, uri.length() - 1) + nestedStr;
+                            } else {
+                                return uri + nestedStr;
+                            }
+                        default:
+                            if (uri.endsWith("/")) {
+                                return uri + "/" + nestedStr;
+                            } else {
+                                return uri + nestedStr;
+                            }
+                    }
+                } else {
+                    return uri;
+                }
             case '/':
                 if (uri.endsWith("/")) {
                     return uri + nestedStr.substring(1);
