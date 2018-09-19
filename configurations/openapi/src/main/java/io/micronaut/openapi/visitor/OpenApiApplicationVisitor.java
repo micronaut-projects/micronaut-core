@@ -18,15 +18,23 @@ package io.micronaut.openapi.visitor;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.visitor.ClassElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
 import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.servers.Server;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.models.OpenAPI;
 
 import java.io.Writer;
+import java.lang.annotation.Annotation;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -58,11 +66,63 @@ public class OpenApiApplicationVisitor extends AbstractOpenApiVisitor implements
             context.put(ATTR_OPENAPI, openAPI);
         }
 
+        // handle type level tags
+        List<io.swagger.v3.oas.models.tags.Tag> tagList = processOpenApiAnnotation(
+                element,
+                context,
+                Tag.class,
+                io.swagger.v3.oas.models.tags.Tag.class,
+                openAPI.getTags()
+        );
+        openAPI.setTags(tagList);
+
+        // handle type level security requirements
+        List<io.swagger.v3.oas.models.security.SecurityRequirement> securityRequirements = processOpenApiAnnotation(
+                element,
+                context,
+                SecurityRequirement.class,
+                io.swagger.v3.oas.models.security.SecurityRequirement.class,
+                openAPI.getSecurity()
+        );
+        openAPI.setSecurity(securityRequirements);
+
+        // handle type level servers
+        List<io.swagger.v3.oas.models.servers.Server> servers = processOpenApiAnnotation(
+                element,
+                context,
+                Server.class,
+                io.swagger.v3.oas.models.servers.Server.class,
+                openAPI.getServers()
+        );
+        openAPI.setServers(servers);
+
         if (Boolean.getBoolean(ATTR_TEST_MODE)) {
             testReference = openAPI;
         }
 
         this.classElement = element;
+    }
+
+    private <T, A extends Annotation> List<T> processOpenApiAnnotation(ClassElement element, VisitorContext context, Class<A> annotationType, Class<T> modelType, List<T> tagList) {
+        List<AnnotationValue<A>> annotations = element.getAnnotationValuesByType(annotationType);
+        if (CollectionUtils.isNotEmpty(annotations)) {
+            if (CollectionUtils.isEmpty(tagList)) {
+                tagList = new ArrayList<>();
+
+            }
+            for (AnnotationValue<A> tag : annotations) {
+                JsonNode jsonNode = toJson(tag.getValues());
+                try {
+                    T t = jsonMapper.treeToValue(jsonNode, modelType);
+                    if (t != null) {
+                        tagList.add(t);
+                    }
+                } catch (JsonProcessingException e) {
+                    context.warn("Error reading OpenAPI" + annotationType + " annotation", element);
+                }
+            }
+        }
+        return tagList;
     }
 
     private OpenAPI readOpenAPI(ClassElement element, VisitorContext context) {
