@@ -19,8 +19,11 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.ServiceInstanceList
 import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Header
+import io.micronaut.http.annotation.Post
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -58,6 +61,22 @@ class ClientIntroductionAdviceSpec extends Specification {
         client.close()
     }
 
+    void "test a client with a body and header"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        ApplicationContext ctx = ApplicationContext.run()
+        ctx.registerSingleton(new TestServiceInstanceList(server.getURI()))
+
+        when:
+        OfferClient client = ctx.getBean(OfferClient)
+
+        then:
+        client.post('abc', 'bar') == 'abc header=bar'
+
+        cleanup:
+        server.close()
+    }
+
     @Controller('/aop')
     static class AopController implements MyApi {
         @Override
@@ -79,6 +98,11 @@ class ClientIntroductionAdviceSpec extends Specification {
         @Get
         String index() {
             "offer"
+        }
+
+        @Post(produces = MediaType.TEXT_PLAIN, consumes = MediaType.TEXT_PLAIN)
+        String post(@Body String data, @Header String foo)  {
+            return data + ' header=' + foo
         }
     }
 
@@ -102,6 +126,9 @@ class ClientIntroductionAdviceSpec extends Specification {
     static interface OfferClient {
         @Get
         String index()
+
+        @Post(produces = MediaType.TEXT_PLAIN, consumes = MediaType.TEXT_PLAIN)
+        String post(@Body String data, @Header String foo)
     }
 
     class TestServiceInstanceList implements ServiceInstanceList {
