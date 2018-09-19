@@ -24,6 +24,7 @@ import io.micronaut.inject.visitor.TypeElementVisitor
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
+import org.codehaus.groovy.ast.ConstructorNode
 import org.codehaus.groovy.ast.FieldNode
 import org.codehaus.groovy.ast.GenericsType
 import org.codehaus.groovy.ast.MethodNode
@@ -120,6 +121,9 @@ class LoadedVisitor {
             case FieldNode:
             case PropertyNode:
                 visitor.visitField(new GroovyFieldElement((Variable) annotatedNode, annotationMetadata), visitorContext)
+                break
+            case ConstructorNode:
+                visitor.visitConstructor(new GroovyConstructorElement((ConstructorNode) annotatedNode, annotationMetadata), visitorContext)
                 break
             case MethodNode:
                 visitor.visitMethod(new GroovyMethodElement((MethodNode) annotatedNode, annotationMetadata), visitorContext)

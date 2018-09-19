@@ -18,6 +18,7 @@ package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.ast.groovy.utils.AstClassUtils;
+import io.micronaut.ast.groovy.utils.AstGenericUtils;
 import io.micronaut.ast.groovy.utils.PublicMethodVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.visitor.ClassElement;
@@ -28,10 +29,7 @@ import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
 
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * A class element returning data from a {@link ClassNode}.
@@ -53,8 +51,35 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
     }
 
     @Override
-    public String getName() {
+    public Map<String, ClassElement> getTypeArguments() {
+        Map<String, ClassNode> spec = AstGenericUtils.createGenericsSpec(classNode);
+        if (!spec.isEmpty()) {
+            Map<String, ClassElement> map = new LinkedHashMap<>(spec.size());
+            for (Map.Entry<String, ClassNode> entry : spec.entrySet()) {
+                map.put(entry.getKey(), new GroovyClassElement(entry.getValue(), getAnnotationMetadata()));
+            }
+            return Collections.unmodifiableMap(map);
+        }
+        return Collections.emptyMap();
+    }
+
+    @Override
+    public boolean isArray() {
+        return classNode.isArray();
+    }
+
+    @Override
+    public String toString() {
         return classNode.getName();
+    }
+
+    @Override
+    public String getName() {
+        if (isArray()) {
+            return classNode.getComponentType().getName();
+        } else {
+            return classNode.getName();
+        }
     }
 
     @Override

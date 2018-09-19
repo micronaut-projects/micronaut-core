@@ -108,12 +108,22 @@ public class LoadedVisitor {
                     visitorContext
             );
         } else if (element instanceof ExecutableElement) {
-            visitor.visitMethod(
-                    new JavaMethodElement(
-                        (ExecutableElement) element,
-                        annotationMetadata, visitorContext),
-                    visitorContext
-            );
+            ExecutableElement executableElement = (ExecutableElement) element;
+            if (executableElement.getSimpleName().toString().equals("<init>")) {
+                visitor.visitConstructor(
+                        new JavaConstructorElement(
+                                executableElement,
+                                annotationMetadata, visitorContext),
+                        visitorContext
+                );
+            } else {
+                visitor.visitMethod(
+                        new JavaMethodElement(
+                                executableElement,
+                                annotationMetadata, visitorContext),
+                        visitorContext
+                );
+            }
         } else if (element instanceof TypeElement) {
             visitor.visitClass(
                     new JavaClassElement(

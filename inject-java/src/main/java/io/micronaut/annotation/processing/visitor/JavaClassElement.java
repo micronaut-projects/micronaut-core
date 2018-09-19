@@ -22,15 +22,12 @@ import io.micronaut.inject.visitor.ClassElement;
 import io.micronaut.inject.visitor.Element;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import javax.lang.model.element.ElementKind;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.Types;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 /**
  * A class element returning data from a {@link TypeElement}.
@@ -42,6 +39,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
 
     private final TypeElement classElement;
     private final JavaVisitorContext visitorContext;
+    private final List<? extends TypeMirror> typeArguments;
 
     /**
      * @param classElement       The {@link TypeElement}
@@ -52,6 +50,25 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         super(classElement, annotationMetadata);
         this.classElement = classElement;
         this.visitorContext = visitorContext;
+        this.typeArguments = Collections.emptyList();
+    }
+
+    /**
+     * @param classElement       The {@link TypeElement}
+     * @param annotationMetadata The annotation metadata
+     * @param visitorContext The visitor context
+     * @param typeArguments The type arguments
+     */
+    JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext, List<? extends TypeMirror> typeArguments) {
+        super(classElement, annotationMetadata);
+        this.classElement = classElement;
+        this.visitorContext = visitorContext;
+        this.typeArguments = typeArguments;
+    }
+
+    @Override
+    public boolean isArray() {
+        return classElement.asType().getKind() == TypeKind.ARRAY;
     }
 
     @Override
@@ -69,6 +86,29 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
             return types.isAssignable(thisType, thatType);
         }
         return false;
+    }
+
+    @Override
+    public Map<String, ClassElement> getTypeArguments() {
+        List<? extends TypeParameterElement> typeParameters = classElement.getTypeParameters();
+        if (typeParameters.size() == typeArguments.size()) {
+            Iterator<? extends TypeParameterElement> tpi = typeParameters.iterator();
+            Iterator<? extends TypeMirror> tai = typeArguments.iterator();
+
+            Map<String, ClassElement> map = new LinkedHashMap<>();
+            while (tpi.hasNext()) {
+                TypeParameterElement tpe = tpi.next();
+                TypeMirror typeMirror = tai.next();
+
+                ClassElement classElement = mirrorToClassElement(typeMirror, visitorContext);
+                if (classElement != null) {
+                    map.put(tpe.toString(), classElement);
+                }
+            }
+
+            return Collections.unmodifiableMap(map);
+        }
+        return Collections.emptyMap();
     }
 
     @Override
