@@ -46,6 +46,15 @@ public interface ClassElement extends Element {
     }
 
     /**
+     * Returns the bean properties (getters and setters) for this class element.
+     *
+     * @return The bean properties for this class element
+     */
+    default List<PropertyElement> getBeanProperties() {
+        return Collections.emptyList();
+    }
+
+    /**
      * Returns whether the class element is an array.
      *
      * @return True if this class element is an array
