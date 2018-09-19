@@ -46,6 +46,17 @@ public interface TypeElementVisitor<C, E> {
         // no-op
     }
 
+
+    /**
+     * Executed when a constructor is encountered that matches the <C> generic.
+     *
+     * @param element The element
+     * @param context The visitor context
+     */
+    default void visitConstructor(ConstructorElement element, VisitorContext context) {
+        // no-op
+    }
+
     /**
      * Executed when a field is encountered that matches the <E> generic.
      *

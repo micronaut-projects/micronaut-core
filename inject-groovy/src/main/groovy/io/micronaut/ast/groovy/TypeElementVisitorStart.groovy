@@ -6,6 +6,8 @@ import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.io.service.ServiceDefinition
 import io.micronaut.core.io.service.SoftServiceLoader
+import io.micronaut.core.reflect.ClassUtils
+import io.micronaut.core.reflect.InstantiationUtils
 import io.micronaut.inject.visitor.TypeElementVisitor
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ModuleNode
@@ -17,6 +19,9 @@ import org.codehaus.groovy.transform.GroovyASTTransformation
 @CompileStatic
 @GroovyASTTransformation(phase = CompilePhase.INITIALIZATION)
 class TypeElementVisitorStart implements ASTTransformation {
+
+
+    public static final String ELEMENT_VISITORS_PROPERTY = "micronaut.element.visitors"
 
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
@@ -35,6 +40,18 @@ class TypeElementVisitorStart implements ASTTransformation {
                     TypeElementVisitor visitor = definition.load()
                     LoadedVisitor newLoadedVisitor = new LoadedVisitor(visitor, visitorContext)
                     loadedVisitors.put(definition.getName(), newLoadedVisitor)
+                }
+            }
+
+
+            def val = System.getProperty(ELEMENT_VISITORS_PROPERTY)
+            if (val) {
+                for (v in val.split(",")) {
+                    def visitor = InstantiationUtils.tryInstantiate(v, source.classLoader).orElse(null)
+                    if (visitor instanceof TypeElementVisitor) {
+                        LoadedVisitor newLoadedVisitor = new LoadedVisitor(visitor, visitorContext)
+                        loadedVisitors.put(visitor.getClass().getName(), newLoadedVisitor)
+                    }
                 }
             }
 

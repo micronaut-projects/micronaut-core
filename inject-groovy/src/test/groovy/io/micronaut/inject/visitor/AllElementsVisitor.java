@@ -24,6 +24,8 @@ public class AllElementsVisitor implements TypeElementVisitor<Controller, Object
     private static List<String> VISITED_ELEMENTS = new ArrayList<>();
     private static Map<VisitorContext, Boolean> started = new LinkedHashMap<>();
     private static Map<VisitorContext, Boolean> finished = new LinkedHashMap<>();
+    public static List<ClassElement> VISITED_CLASS_ELEMENTS = new ArrayList<>();
+    public static List<MethodElement> VISITED_METHOD_ELEMENTS = new ArrayList<>();
 
     public static List<String> getVisited() {
         return Collections.unmodifiableList(VISITED_ELEMENTS);
@@ -31,6 +33,8 @@ public class AllElementsVisitor implements TypeElementVisitor<Controller, Object
 
     public static void clearVisited() {
         VISITED_ELEMENTS = new ArrayList<>();
+        VISITED_CLASS_ELEMENTS = new ArrayList<>();
+        VISITED_METHOD_ELEMENTS = new ArrayList<>();
     }
 
     @Override
@@ -39,6 +43,9 @@ public class AllElementsVisitor implements TypeElementVisitor<Controller, Object
             throw new RuntimeException("Started should be null");
         }
         started.put(visitorContext, true);
+        VISITED_ELEMENTS.clear();
+        VISITED_CLASS_ELEMENTS.clear();
+        VISITED_METHOD_ELEMENTS.clear();
     }
 
 
@@ -53,11 +60,13 @@ public class AllElementsVisitor implements TypeElementVisitor<Controller, Object
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         visit(element);
+        VISITED_CLASS_ELEMENTS.add(element);
     }
 
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
         visit(element);
+        VISITED_METHOD_ELEMENTS.add(element);
     }
 
     @Override
