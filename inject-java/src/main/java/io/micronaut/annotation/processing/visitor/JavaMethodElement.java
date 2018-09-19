@@ -25,6 +25,7 @@ import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -50,6 +51,11 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
         super(executableElement, annotationMetadata);
         this.executableElement = executableElement;
         this.visitorContext = visitorContext;
+    }
+
+    @Override
+    public Optional<String> getDocumentation() {
+        return Optional.ofNullable(visitorContext.getElements().getDocComment(executableElement));
     }
 
     @Override
