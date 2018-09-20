@@ -129,7 +129,12 @@ class LoadedVisitor {
                 visitor.visitMethod(new GroovyMethodElement((MethodNode) annotatedNode, annotationMetadata), visitorContext)
                 break
             case ClassNode:
-                visitor.visitClass(new GroovyClassElement((ClassNode) annotatedNode, annotationMetadata), visitorContext)
+                ClassNode cn = (ClassNode) annotatedNode
+                if (cn.isEnum()) {
+
+                } else {
+                    visitor.visitClass(new GroovyClassElement(cn, annotationMetadata), visitorContext)
+                }
                 break
         }
     }
