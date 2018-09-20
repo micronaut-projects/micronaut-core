@@ -17,6 +17,7 @@
 package io.micronaut.security.token.propagation;
 
 import io.micronaut.core.util.Toggleable;
+import io.micronaut.http.util.OutgointRequestProcessorMatcher;
 
 /**
  * Token propagation Configuration.
@@ -24,18 +25,7 @@ import io.micronaut.core.util.Toggleable;
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface TokenPropagationConfiguration extends Toggleable {
-
-    /**
-     * @return a regular expression to match the service.
-     */
-    String getServicesRegex();
-
-    /**
-     *
-     * @return a regular expression to match the uri.
-     */
-    String getUriRegex();
+public interface TokenPropagationConfiguration extends Toggleable, OutgointRequestProcessorMatcher {
 
     /**
      *

@@ -208,9 +208,11 @@ task processConfigProps() {
         }
     }
 }
-task docs(dependsOn: [assemble, publishGuide, processConfigProps, publishConfigurationReference]) {
+task docs(dependsOn: [assemble, javadoc, publishGuide, processConfigProps, publishConfigurationReference]) {
     group = DOCUMENTATION_GROUP
 }
+javadoc.mustRunAfter assemble
+processConfigProps.mustRunAfter javadoc
 processConfigProps.mustRunAfter assemble
 publishGuide.mustRunAfter processConfigProps
 publishConfigurationReference.mustRunAfter publishGuide
