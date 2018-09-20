@@ -96,7 +96,7 @@ class LoadedVisitor {
             return true
         }
         AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(classNode)
-        return annotationMetadata.hasAnnotation(classAnnotation)
+        return annotationMetadata.hasStereotype(classAnnotation)
     }
 
     /**
@@ -107,7 +107,7 @@ class LoadedVisitor {
         if (elementAnnotation == ClassHelper.OBJECT) {
             return true
         }
-        return annotationMetadata.hasAnnotation(elementAnnotation)
+        return annotationMetadata.hasStereotype(elementAnnotation)
     }
 
     /**

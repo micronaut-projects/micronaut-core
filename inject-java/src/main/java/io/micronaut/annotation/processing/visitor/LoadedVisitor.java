@@ -90,7 +90,7 @@ public class LoadedVisitor {
         if (elementAnnotation.equals("java.lang.Object")) {
             return true;
         }
-        return annotationMetadata.hasDeclaredStereotype(elementAnnotation);
+        return annotationMetadata.hasStereotype(elementAnnotation);
     }
 
     /**
