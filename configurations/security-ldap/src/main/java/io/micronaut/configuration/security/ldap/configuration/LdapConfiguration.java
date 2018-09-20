@@ -64,7 +64,7 @@ public class LdapConfiguration implements Toggleable {
     }
 
     /**
-     * Sets whether this configuration is enabled. Default {@value DEFAULT_ENABLED}.
+     * Sets whether this configuration is enabled. Default {@value #DEFAULT_ENABLED}.
      *
      * @param enabled The enabled setting
      */
@@ -213,7 +213,7 @@ public class LdapConfiguration implements Toggleable {
         }
 
         /**
-         * Sets the context factory class. Default {@value DEFAULT_FACTORY}
+         * Sets the context factory class. Default {@value #DEFAULT_FACTORY}
          *
          * @param factory The factory class
          */
@@ -249,7 +249,7 @@ public class LdapConfiguration implements Toggleable {
         }
 
         /**
-         * Sets if the subtree should be searched. Default {@value DEFAULT_SUBTREE}
+         * Sets if the subtree should be searched. Default {@value #DEFAULT_SUBTREE}
          *
          * @param subtree The subtree
          */
@@ -341,7 +341,7 @@ public class LdapConfiguration implements Toggleable {
         }
 
         /**
-         * Sets if the subtree should be searched. Default {@value DEFAULT_SUBTREE}
+         * Sets if the subtree should be searched. Default {@value #DEFAULT_SUBTREE}
          *
          * @param subtree The subtree
          */
@@ -373,7 +373,7 @@ public class LdapConfiguration implements Toggleable {
         }
 
         /**
-         * Sets the group search filter. Default {@value DEFAULT_FILTER}
+         * Sets the group search filter. Default {@value #DEFAULT_FILTER}
          *
          * @param filter The filter
          */
@@ -389,7 +389,7 @@ public class LdapConfiguration implements Toggleable {
         }
 
         /**
-         * Sets the group attribute name. Default {@value DEFAULT_ATTR}
+         * Sets the group attribute name. Default {@value #DEFAULT_ATTR}
          *
          * @param attribute The attribute name
          */
@@ -403,7 +403,7 @@ public class LdapConfiguration implements Toggleable {
         }
 
         /**
-         * Sets if group search is enabled. Default {@value DEFAULT_ENABLED}
+         * Sets if group search is enabled. Default {@value #DEFAULT_ENABLED}
          *
          * @param enabled The enabled setting
          */
