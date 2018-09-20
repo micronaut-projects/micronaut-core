@@ -30,6 +30,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
+import java.net.URI;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -90,8 +91,8 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
         private final String path;
         private final StandardLocation classOutput;
-
         private FileObject inputObject;
+        private FileObject outputObject;
 
         /**
          * @param path The path for the generated file
@@ -100,6 +101,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
             this.path = path;
             classOutput = StandardLocation.CLASS_OUTPUT;
         }
+
         /**
          * @param path The path for the generated file
          * @param location The location
@@ -110,18 +112,27 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
         }
 
         @Override
+        public URI toURI() {
+            try {
+                return getOutputObject().toUri();
+            } catch (IOException e) {
+                throw new ClassGenerationException("Unable to return URI for file object: " + path);
+            }
+        }
+
+        @Override
         public String getName() {
             return path;
         }
 
         @Override
         public Writer openWriter() throws IOException {
-            return filer.createResource(classOutput, "", path).openWriter();
+            return getOutputObject().openWriter();
         }
 
         @Override
         public OutputStream openOutputStream() throws IOException {
-            return filer.createResource(classOutput, "", path).openOutputStream();
+            return getOutputObject().openOutputStream();
         }
 
         @Override
@@ -150,6 +161,13 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
             } catch (FileNotFoundException e) {
                 return null;
             }
+        }
+
+        private FileObject getOutputObject() throws IOException {
+            if (outputObject == null) {
+                outputObject = filer.createResource(classOutput, "", path);
+            }
+            return outputObject;
         }
     }
 
