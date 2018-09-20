@@ -17,6 +17,7 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
+import io.micronaut.ast.groovy.utils.ExtendedParameter;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.visitor.ClassElement;
 import io.micronaut.inject.visitor.MethodElement;
@@ -101,7 +102,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     public ParameterElement[] getParameters() {
         Parameter[] parameters = methodNode.getParameters();
         return Arrays.stream(parameters).map((Function<Parameter, ParameterElement>) parameter ->
-                new GroovyParameterElement(parameter, AstAnnotationUtils.getAnnotationMetadata(parameter))
+                new GroovyParameterElement(parameter, AstAnnotationUtils.getAnnotationMetadata(new ExtendedParameter(methodNode, parameter)))
         ).toArray(ParameterElement[]::new);
     }
 }
