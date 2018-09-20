@@ -1,0 +1,7 @@
+dependencies {
+    compile project(":inject")
+    compileOnly project(":inject-java")
+    compileOnly project(":management")
+
+    testCompile project(":management")
+}
