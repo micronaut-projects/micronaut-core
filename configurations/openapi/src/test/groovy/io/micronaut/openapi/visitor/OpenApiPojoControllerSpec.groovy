@@ -448,4 +448,85 @@ class MyBean {}
         pathItem.get.responses['default'].content['application/json'].schema.type == 'array'
         pathItem.get.responses['default'].content['application/json'].schema.items.$ref == '#/components/schemas/MyPet'
     }
+
+
+    void "test build OpenAPI doc when no Body tag specified in POST"() {
+
+        given:"An API definition"
+        when:
+        buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.reactivex.*;
+import io.micronaut.http.annotation.*;
+import java.util.List;
+import io.swagger.v3.oas.annotations.media.*;
+
+/**
+ * @author graemerocher
+ * @since 1.0
+ */
+
+@Controller("/pets")
+interface PetOperations<T extends Pet> {
+
+    @Post("/")
+    Single<T> save(String name, int age);
+}
+
+class Pet {
+    private int age;
+    private String name;
+    
+    public void setAge(int a) {
+        age = a;
+    }
+    
+    /**
+     * The age
+     */
+    public int getAge() {
+        return age;
+    }
+    
+    public void setName(String n) {
+        name = n;
+    }
+    
+    public String getName() {
+        return name;
+    }
+}
+@javax.inject.Singleton
+class MyBean {}
+''')
+        then:"the state is correct"
+        AbstractOpenApiVisitor.testReference != null
+
+        when:"The OpenAPI is retrieved"
+        OpenAPI openAPI = AbstractOpenApiVisitor.testReference
+        Schema petSchema = openAPI.components.schemas['Pet']
+
+        then:"the components are valid"
+        petSchema.type == 'object'
+        petSchema.properties.size() == 2
+        petSchema.properties['age'].type == 'integer'
+        petSchema.properties['age'].description == 'The age'
+        petSchema.properties['name'].type == 'string'
+
+        when:"the /pets path is retrieved"
+        PathItem pathItem = openAPI.paths.get("/pets")
+
+        then:"it is included in the OpenAPI doc"
+        pathItem.post.operationId == 'save'
+        pathItem.post.requestBody
+        pathItem.post.requestBody.required
+        pathItem.post.requestBody.content
+        pathItem.post.requestBody.content.size() == 1
+        pathItem.post.requestBody.content['application/json'].schema
+        pathItem.post.requestBody.content['application/json'].schema.type == 'object'
+        pathItem.post.requestBody.content['application/json'].schema.properties.size() == 2
+        pathItem.post.requestBody.content['application/json'].schema.properties['name'].type == 'string'
+        !pathItem.post.requestBody.content['application/json'].schema.properties['name'].nullable
+    }
 }
