@@ -38,6 +38,7 @@ include "security-jwt"
 include "security-session"
 include "views"
 include "websocket"
+include "multitenancy"
 
 // configurations
 include "configurations:gorm-common"
@@ -68,5 +69,6 @@ include "configurations:kafka-streams"
 include "configurations:postgres-reactive"
 include "configurations:picocli"
 include "configurations:security-ldap"
+include "configurations:multitenancy-gorm"
 
 include "build-projects:asciidoc-config-props"

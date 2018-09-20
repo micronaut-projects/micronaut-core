@@ -25,6 +25,7 @@ import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
+import io.micronaut.http.util.RequestProcessor;
 import io.micronaut.security.token.writer.TokenWriter;
 import org.reactivestreams.Publisher;
 import java.util.Optional;
@@ -44,40 +45,20 @@ import static io.micronaut.security.filters.SecurityFilter.TOKEN;
 public class TokenPropagationHttpClientFilter implements HttpClientFilter  {
     protected final TokenPropagationConfiguration tokenPropagationConfiguration;
     protected final TokenWriter tokenWriter;
+    protected final RequestProcessor requestProcessor;
 
     /**
      *
      * @param tokenWriter bean responsible of writing the token to the target request
      * @param tokenPropagationConfiguration JWT Propagation configuration
+     * @param requestProcessor Utility to decide whether to process the request
      */
     public TokenPropagationHttpClientFilter(TokenWriter tokenWriter,
-                                            TokenPropagationConfiguration tokenPropagationConfiguration) {
+                                            TokenPropagationConfiguration tokenPropagationConfiguration,
+                                            RequestProcessor requestProcessor) {
         this.tokenWriter = tokenWriter;
         this.tokenPropagationConfiguration = tokenPropagationConfiguration;
-    }
-
-    /**
-     *
-     * @param serviceId request's service identifier
-     * @param uri request's uri
-     * @return true if the request should be processed by this filter.
-     */
-    public boolean shouldProcessRequest(Optional<String> serviceId, String uri) {
-
-        if (tokenPropagationConfiguration.getServicesRegex() != null && serviceId.isPresent()) {
-            Pattern pattern = Pattern.compile(tokenPropagationConfiguration.getServicesRegex());
-            if (pattern.matcher(serviceId.get()).matches()) {
-                return true;
-            }
-        }
-        if (tokenPropagationConfiguration.getUriRegex() != null && uri != null) {
-            Pattern pattern = Pattern.compile(tokenPropagationConfiguration.getUriRegex());
-            if (pattern.matcher(uri).matches()) {
-                return true;
-            }
-        }
-
-        return false;
+        this.requestProcessor = requestProcessor;
     }
 
     /**
@@ -89,9 +70,7 @@ public class TokenPropagationHttpClientFilter implements HttpClientFilter  {
     @Override
     public Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> targetRequest, ClientFilterChain chain) {
 
-        Optional<String> serviceId = targetRequest.getAttribute(HttpAttributes.SERVICE_ID.toString(), String.class);
-        String uri = targetRequest.getUri().toString();
-        if (!shouldProcessRequest(serviceId, uri)) {
+        if (!requestProcessor.shouldProcessRequest(tokenPropagationConfiguration, targetRequest)) {
             return chain.proceed(targetRequest);
         }
 

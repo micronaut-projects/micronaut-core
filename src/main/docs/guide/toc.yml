@@ -269,6 +269,9 @@ security:
     title: LDAP Authentication
     configuration: Configuration
     extending: Extending Default Behavior
+multitenancy:
+  title: Multi-Tenancy
+  multitenancyGorm: Multi-Tenancy GORM
 cli:
   title: Micronaut CLI
   createProject: Creating a Project
