@@ -45,3 +45,8 @@ In addition, the following built-in endpoint(s) are provided by the `management`
 |Shuts down the application server (see <<stopEndpoint, ServerStopEndpoint>>)
 
 |===
+
+
+=== JMX
+
+Micronaut provides functionality to register endpoints with JMX. See the section on <<jmx, JMX>> to get started.
