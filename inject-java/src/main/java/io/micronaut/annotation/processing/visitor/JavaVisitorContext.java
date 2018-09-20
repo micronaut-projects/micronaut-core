@@ -97,6 +97,11 @@ public class JavaVisitorContext extends MutableConvertibleValuesMap<Object> impl
         return outputVisitor.visitMetaInfFile(path);
     }
 
+    @Override
+    public Optional<GeneratedFile> visitGeneratedFile(String path) {
+        return outputVisitor.visitGeneratedFile(path);
+    }
+
     /**
      * The messager.
      *

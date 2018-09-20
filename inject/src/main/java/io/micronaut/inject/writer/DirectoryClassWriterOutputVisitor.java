@@ -58,6 +58,17 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
         );
     }
 
+    @Override
+    public Optional<GeneratedFile> visitGeneratedFile(String path) {
+        File parentFile = targetDir.getParentFile();
+        File generatedDir = new File(parentFile, "generated");
+        File f = new File(generatedDir, path);
+        if (f.getParentFile().mkdirs()) {
+            return Optional.of(new FileBackedGeneratedFile(f));
+        }
+        return Optional.empty();
+    }
+
     private String getClassFileName(String className) {
         return className.replace('.', File.separatorChar) + ".class";
     }
