@@ -151,12 +151,19 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         }
 
         @Override
-        public Object visitExecutable(ExecutableElement method, Object o) {
-            AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(method);
+        public Object visitExecutable(ExecutableElement executableElement, Object o) {
+            AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(executableElement);
+            if (executableElement.getSimpleName().toString().equals("<init>")) {
+                visitors.forEach(v -> v.visit(executableElement, methodAnnotationMetadata));
+                return null;
+            } else {
 
-            visitors.stream()
-                    .filter(v -> v.matches(methodAnnotationMetadata))
-                    .forEach(v -> v.visit(method, methodAnnotationMetadata));
+
+                visitors.stream()
+                        .filter(v -> v.matches(methodAnnotationMetadata))
+                        .forEach(v -> v.visit(executableElement, methodAnnotationMetadata));
+            }
+
 
             return null;
         }

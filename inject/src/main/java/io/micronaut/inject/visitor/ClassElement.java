@@ -16,7 +16,10 @@
 
 package io.micronaut.inject.visitor;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * Stores data about an element that references a class.
@@ -35,6 +38,53 @@ public interface ClassElement extends Element {
     boolean isAssignable(String type);
 
     /**
+     * @param visitorContext The visitor context.
+     * @return The elements contained in this class element
+     */
+    default List<Element> getElements(VisitorContext visitorContext) {
+        return Collections.emptyList();
+    }
+
+    /**
+     * Returns the bean properties (getters and setters) for this class element.
+     *
+     * @return The bean properties for this class element
+     */
+    default List<PropertyElement> getBeanProperties() {
+        return Collections.emptyList();
+    }
+
+    /**
+     * Returns whether the class element is an array.
+     *
+     * @return True if this class element is an array
+     */
+    default boolean isArray() {
+        return false;
+    }
+
+    /**
+     * @return Whether the type is iterable (either an array or an Iterable)
+     */
+    default boolean isIterable() {
+        return isArray() || isAssignable(Iterable.class);
+    }
+
+    /**
+     * @return The type arguments for this class element
+     */
+    default Map<String, ClassElement> getTypeArguments() {
+        return Collections.emptyMap();
+    }
+
+    /**
+     * @return The first type argument
+     */
+    default Optional<ClassElement> getFirstTypeArgument() {
+        return getTypeArguments().values().stream().findFirst();
+    }
+
+    /**
      * Tests whether one type is assignable to another.
      *
      * @param type The type to check
@@ -43,10 +93,4 @@ public interface ClassElement extends Element {
     default boolean isAssignable(Class<?> type) {
         return isAssignable(type.getName());
     }
-
-    /**
-     * @param visitorContext The visitor context.
-     * @return The elements contained in this class element
-     */
-    List<Element> getElements(VisitorContext visitorContext);
 }

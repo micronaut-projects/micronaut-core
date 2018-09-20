@@ -74,6 +74,9 @@ class DefaultFilterRoute implements FilterRoute {
 
     @Override
     public Optional<HttpFilter> match(HttpMethod method, URI uri) {
+        if (httpMethods != null && !httpMethods.contains(method)) {
+            return Optional.empty();
+        }
         String uriStr = uri.toString();
         for (String pattern : patterns) {
             if (PathMatcher.ANT.matches(pattern, uriStr)) {

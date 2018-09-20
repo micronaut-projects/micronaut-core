@@ -43,7 +43,7 @@ public class InstantiationUtils {
     public static Optional<?> tryInstantiate(String name, ClassLoader classLoader) {
         try {
             return ClassUtils.forName(name, classLoader)
-                .map((Function<Class, Optional>) InstantiationUtils::tryInstantiate);
+                .flatMap(InstantiationUtils::tryInstantiate);
         } catch (Throwable e) {
             Logger log = LoggerFactory.getLogger(InstantiationUtils.class);
             if (log.isDebugEnabled()) {
