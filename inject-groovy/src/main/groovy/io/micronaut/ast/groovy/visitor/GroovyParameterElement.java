@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.visitor.ClassElement;
 import io.micronaut.inject.visitor.ParameterElement;
+import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.Parameter;
 
 import javax.annotation.Nullable;
@@ -70,6 +71,11 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     @Nullable
     @Override
     public ClassElement getType() {
-        return new GroovyClassElement(parameter.getType(), AstAnnotationUtils.getAnnotationMetadata(parameter.getType()));
+        ClassNode t = parameter.getType();
+        if (t.isEnum()) {
+            return new GroovyEnumElement(t, AstAnnotationUtils.getAnnotationMetadata(t));
+        } else {
+            return new GroovyClassElement(t, AstAnnotationUtils.getAnnotationMetadata(t));
+        }
     }
 }

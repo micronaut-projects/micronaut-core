@@ -30,9 +30,6 @@ import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.PropertyNode;
-
-import javax.lang.model.type.TypeMirror;
-import javax.lang.model.util.Elements;
 import java.lang.reflect.Modifier;
 import java.util.*;
 
@@ -61,7 +58,14 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
         if (!spec.isEmpty()) {
             Map<String, ClassElement> map = new LinkedHashMap<>(spec.size());
             for (Map.Entry<String, ClassNode> entry : spec.entrySet()) {
-                map.put(entry.getKey(), new GroovyClassElement(entry.getValue(), getAnnotationMetadata()));
+                ClassNode cn = entry.getValue();
+                GroovyClassElement classElement;
+                if (cn.isEnum()) {
+                    classElement = new GroovyEnumElement(cn, getAnnotationMetadata());
+                } else {
+                    classElement = new GroovyClassElement(cn, getAnnotationMetadata());
+                }
+                map.put(entry.getKey(), classElement);
             }
             return Collections.unmodifiableMap(map);
         }
@@ -260,7 +264,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
         final String propertyName;
 
 
-        public GetterAndSetter(String propertyName) {
+        GetterAndSetter(String propertyName) {
             this.propertyName = propertyName;
         }
     }
