@@ -21,6 +21,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
+import java.net.URI;
 
 /**
  * A common interface to allow referencing a generated file in either Groovy or Java.
@@ -29,6 +30,13 @@ import java.io.Writer;
  * @since 1.0
  */
 public interface GeneratedFile {
+
+    /**
+     * The URI to write to.
+     *
+     * @return The URI
+     */
+    URI toURI();
 
     /**
      * @return The name of the file
