@@ -281,7 +281,7 @@ public class LdapConfiguration implements Toggleable {
         }
 
         /**
-         * Sets the search filter. Default {@value DEFAULT_FILTER}
+         * Sets the search filter. Default {@value #DEFAULT_FILTER}
          *
          * @param filter The search filter
          */
