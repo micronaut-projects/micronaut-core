@@ -213,6 +213,7 @@ interface PetOperations<T extends Pet> {
 
 @Schema(name="MyPet", description="Pet description")
 class Pet {
+    private PetType type;
     private int age;
     private String name;
     
@@ -236,6 +237,18 @@ class Pet {
     public String getName() {
         return name;
     }
+    
+    public void setType(PetType t) {
+        type = t;
+    }
+    
+    public PetType getType() {
+        return type;
+    }
+}
+
+enum PetType {
+    DOG, CAT;
 }
 @javax.inject.Singleton
 class MyBean {}
@@ -246,17 +259,22 @@ class MyBean {}
         when:"The OpenAPI is retrieved"
         OpenAPI openAPI = AbstractOpenApiVisitor.testReference
         Schema petSchema = openAPI.components.schemas['MyPet']
+        Schema petType = openAPI.components.schemas['PetType']
 
         then:"the components are valid"
         petSchema.type == 'object'
         petSchema.description == "Pet description"
-        petSchema.properties.size() == 2
+        petSchema.properties.size() == 3
         petSchema.properties['age'].type == 'integer'
         petSchema.properties['age'].description == 'Pet age'
         petSchema.properties['age'].maximum == 20
         petSchema.properties['name'].type == 'string'
         petSchema.properties['name'].description == 'Pet name'
         petSchema.properties['name'].maxLength == 20
+        petSchema.properties['type'].$ref == '#/components/schemas/PetType'
+        petType.type == 'string'
+        petType.enum.contains('DOG')
+        petType.enum.contains('CAT')
 
         when:"the /pets path is retrieved"
         PathItem pathItem = openAPI.paths.get("/pets")
