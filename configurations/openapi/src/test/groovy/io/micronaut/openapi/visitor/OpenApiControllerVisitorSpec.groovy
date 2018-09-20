@@ -165,4 +165,47 @@ class MyBean {}
         operation.parameters[0].schema.description == 'the generated UUID'
 
     }
+
+    void "test parse @Header, @CookieValue, @QueryValue parameter data"() {
+        given:
+        buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.swagger.v3.oas.annotations.*;
+import io.swagger.v3.oas.annotations.media.*;
+import io.swagger.v3.oas.annotations.enums.*;
+import io.micronaut.http.annotation.*;
+import java.util.List;
+
+@Controller("/")
+class MyController {
+
+    @Get("/subscription/{subscriptionId}")
+    public String getSubscription(@Parameter(description="foo") @CookieValue String subscriptionId, @QueryValue String q, @Header String contentType) { 
+        return null;                               
+     }
+}
+
+@javax.inject.Singleton
+class MyBean {}
+''')
+        Operation operation = AbstractOpenApiVisitor.testReference?.paths?.get("/subscription/{subscriptionId}")?.get
+
+        expect:
+        operation != null
+        operation.operationId == 'getSubscription'
+        operation.parameters.size() == 3
+        operation.parameters[0].in == 'cookie'
+        operation.parameters[0].name == 'subscriptionId'
+        operation.parameters[0].required
+        operation.parameters[0].description == 'foo'
+        operation.parameters[1].in == 'query'
+        operation.parameters[1].name == 'q'
+        operation.parameters[1].required
+        operation.parameters[2].in == 'header'
+        operation.parameters[2].name == 'content-type'
+        operation.parameters[2].required
+
+
+    }
 }
