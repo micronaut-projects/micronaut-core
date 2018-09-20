@@ -16,6 +16,7 @@
 
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.inject.visitor.ClassElement;
 import io.micronaut.inject.visitor.Element;
@@ -55,6 +56,11 @@ final class JavaVoidElement implements ClassElement, AnnotationMetadataDelegate 
     @Override
     public Object getNativeType() {
         return void.class;
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return AnnotationMetadata.EMPTY_METADATA;
     }
 
     @Override

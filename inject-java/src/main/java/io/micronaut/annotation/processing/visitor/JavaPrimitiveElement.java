@@ -16,6 +16,7 @@
 
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.inject.visitor.ClassElement;
@@ -94,6 +95,11 @@ public enum JavaPrimitiveElement implements ClassElement, AnnotationMetadataDele
     @Override
     public Object getNativeType() {
         return ClassUtils.forName(typeName, getClass().getClassLoader());
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return AnnotationMetadata.EMPTY_METADATA;
     }
 
     /**
