@@ -25,19 +25,19 @@ import java.util.regex.Pattern;
 
 /**
  *
- * Implementation of {@link io.micronaut.http.util.RequestProcessor}.
+ * Implementation of {@link OutgoingHttpRequestProcessor}.
  * @author Sergio del Amo
  * @since 1.0
  */
 @Singleton
-public class RequestProcessorImpl implements RequestProcessor {
+public class OutgoingHttpRequestProcessorImpl implements OutgoingHttpRequestProcessor {
 
     /**
-     * @param matcher A {@link RequestProcessorMatcher} implementation. Entity defining matching rules.
+     * @param matcher A {@link OutgointRequestProcessorMatcher} implementation. Entity defining matching rules.
      * @param request The request
      * @return true if the request should be processed
      */
-    public boolean shouldProcessRequest(RequestProcessorMatcher matcher, HttpRequest<?> request) {
+    public boolean shouldProcessRequest(OutgointRequestProcessorMatcher matcher, HttpRequest<?> request) {
         Optional<String> serviceId = request.getAttribute(HttpAttributes.SERVICE_ID.toString(), String.class);
         String uri = request.getUri().toString();
         return shouldProcessRequest(matcher, serviceId.orElse(null), uri);
@@ -45,21 +45,19 @@ public class RequestProcessorImpl implements RequestProcessor {
 
     /**
      *
-     * @param matcher A {@link RequestProcessorMatcher} implementation. Entity defining matching rules.
+     * @param matcher A {@link OutgointRequestProcessorMatcher} implementation. Entity defining matching rules.
      * @param serviceId The service id
      * @param uri The URI of the request being processed
      * @return true if the request should be processed
      */
-    public boolean shouldProcessRequest(RequestProcessorMatcher matcher, String serviceId, String uri) {
-        if (matcher.getServiceIdRegex() != null && serviceId != null) {
-            Pattern pattern = Pattern.compile(matcher.getServiceIdRegex());
-            if (pattern.matcher(serviceId).matches()) {
+    public boolean shouldProcessRequest(OutgointRequestProcessorMatcher matcher, String serviceId, String uri) {
+        if (matcher.getServiceIdPattern() != null && serviceId != null) {
+            if (matcher.getServiceIdPattern().matcher(serviceId).matches()) {
                 return true;
             }
         }
-        if (matcher.getUriRegex() != null && uri != null) {
-            Pattern pattern = Pattern.compile(matcher.getUriRegex());
-            if (pattern.matcher(uri).matches()) {
+        if (matcher.getUriPattern() != null && uri != null) {
+            if (matcher.getUriPattern().matcher(uri).matches()) {
                 return true;
             }
         }

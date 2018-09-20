@@ -17,7 +17,7 @@
 package io.micronaut.multitenancy.propagation;
 
 import io.micronaut.core.util.Toggleable;
-import io.micronaut.http.util.RequestProcessorMatcher;
+import io.micronaut.http.util.OutgointRequestProcessorMatcher;
 
 /**
  * Tenant propagation Configuration.
@@ -25,7 +25,7 @@ import io.micronaut.http.util.RequestProcessorMatcher;
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface TenantPropagationConfiguration extends Toggleable, RequestProcessorMatcher {
+public interface TenantPropagationConfiguration extends Toggleable, OutgointRequestProcessorMatcher {
 
     /**
      * @return the path intercepted by {@link io.micronaut.multitenancy.propagation.TenantPropagationHttpClientFilter}.

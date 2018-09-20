@@ -17,7 +17,6 @@
 package io.micronaut.security.token.propagation;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
@@ -25,11 +24,10 @@ import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
-import io.micronaut.http.util.RequestProcessor;
+import io.micronaut.http.util.OutgoingHttpRequestProcessor;
 import io.micronaut.security.token.writer.TokenWriter;
 import org.reactivestreams.Publisher;
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 import static io.micronaut.security.filters.SecurityFilter.TOKEN;
 
@@ -45,20 +43,20 @@ import static io.micronaut.security.filters.SecurityFilter.TOKEN;
 public class TokenPropagationHttpClientFilter implements HttpClientFilter  {
     protected final TokenPropagationConfiguration tokenPropagationConfiguration;
     protected final TokenWriter tokenWriter;
-    protected final RequestProcessor requestProcessor;
+    protected final OutgoingHttpRequestProcessor outgoingHttpRequestProcessor;
 
     /**
      *
      * @param tokenWriter bean responsible of writing the token to the target request
      * @param tokenPropagationConfiguration JWT Propagation configuration
-     * @param requestProcessor Utility to decide whether to process the request
+     * @param outgoingHttpRequestProcessor Utility to decide whether to process the request
      */
     public TokenPropagationHttpClientFilter(TokenWriter tokenWriter,
                                             TokenPropagationConfiguration tokenPropagationConfiguration,
-                                            RequestProcessor requestProcessor) {
+                                            OutgoingHttpRequestProcessor outgoingHttpRequestProcessor) {
         this.tokenWriter = tokenWriter;
         this.tokenPropagationConfiguration = tokenPropagationConfiguration;
-        this.requestProcessor = requestProcessor;
+        this.outgoingHttpRequestProcessor = outgoingHttpRequestProcessor;
     }
 
     /**
@@ -70,7 +68,7 @@ public class TokenPropagationHttpClientFilter implements HttpClientFilter  {
     @Override
     public Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> targetRequest, ClientFilterChain chain) {
 
-        if (!requestProcessor.shouldProcessRequest(tokenPropagationConfiguration, targetRequest)) {
+        if (!outgoingHttpRequestProcessor.shouldProcessRequest(tokenPropagationConfiguration, targetRequest)) {
             return chain.proceed(targetRequest);
         }
 

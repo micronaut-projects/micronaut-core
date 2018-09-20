@@ -3,20 +3,18 @@ package io.micronaut.security.propagation
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MutableHttpRequest
 import io.micronaut.http.filter.ClientFilterChain
-import io.micronaut.http.util.RequestProcessor
-import io.micronaut.http.util.RequestProcessorImpl
+import io.micronaut.http.util.OutgoingHttpRequestProcessor
+import io.micronaut.http.util.OutgoingHttpRequestProcessorImpl
 import io.micronaut.security.filters.SecurityFilter
-import io.micronaut.security.token.propagation.TokenPropagationConfiguration
 import io.micronaut.security.token.propagation.TokenPropagationHttpClientFilter
 import io.micronaut.security.token.writer.TokenWriter
 import spock.lang.Shared
 import spock.lang.Specification
-import spock.lang.Unroll
 
 class TokenPropagationHttpClientFilterSpec extends Specification {
 
     @Shared
-    RequestProcessor requestProcessor = new RequestProcessorImpl()
+    OutgoingHttpRequestProcessor requestProcessor = new OutgoingHttpRequestProcessorImpl()
 
     void "if current request attribute TOKEN contains a token, it gets written to target request"() {
         given:

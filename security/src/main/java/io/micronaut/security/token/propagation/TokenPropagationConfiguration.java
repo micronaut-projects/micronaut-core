@@ -17,7 +17,7 @@
 package io.micronaut.security.token.propagation;
 
 import io.micronaut.core.util.Toggleable;
-import io.micronaut.http.util.RequestProcessorMatcher;
+import io.micronaut.http.util.OutgointRequestProcessorMatcher;
 
 /**
  * Token propagation Configuration.
@@ -25,7 +25,7 @@ import io.micronaut.http.util.RequestProcessorMatcher;
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface TokenPropagationConfiguration extends Toggleable, RequestProcessorMatcher {
+public interface TokenPropagationConfiguration extends Toggleable, OutgointRequestProcessorMatcher {
 
     /**
      *

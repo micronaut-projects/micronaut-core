@@ -16,20 +16,25 @@
 
 package io.micronaut.http.util;
 
-import io.micronaut.http.HttpRequest;
+import java.util.regex.Pattern;
 
 /**
+ * Defines regular expressions to match requests.
  *
- * Defines a utility class which evaluates if a {@link io.micronaut.http.HttpRequest} should be processed.
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface RequestProcessor {
+public interface OutgointRequestProcessorMatcher {
+
+    /**
+     * @return a regular expresion to validate the service id against.
+     */
+    Pattern getServiceIdPattern();
+
     /**
      *
-     * @param matcher Request Matcher
-     * @param request The request
-     * @return true if the request should be processed
+     * @return a regular expression to validate the target request uri against.
      */
-    boolean shouldProcessRequest(RequestProcessorMatcher matcher, HttpRequest<?> request);
+    Pattern getUriPattern();
+
 }
