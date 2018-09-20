@@ -224,9 +224,11 @@ public class NameUtils {
             prefixLength = PREFIX_LENTGH;
         } else if (methodName.startsWith("is")) {
             prefixLength = IS_LENTGH;
+        } else {
+            return false;
         }
         if (len > prefixLength) {
-            return Character.isUpperCase(methodName.charAt(PREFIX_LENTGH));
+            return Character.isUpperCase(methodName.charAt(prefixLength));
         }
         return false;
     }

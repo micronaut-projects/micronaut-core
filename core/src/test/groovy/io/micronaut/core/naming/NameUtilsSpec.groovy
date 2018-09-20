@@ -167,4 +167,19 @@ class NameUtilsSpec extends Specification {
         ""                         | ""
         "one/two/three"            | "three"
     }
+
+    @Unroll
+    void "test isGetterName #name"() {
+        expect:
+        NameUtils.isGetterName(name) == getter
+
+        where:
+        name                       | getter
+        "foo"                      | false
+        "isFoo"                    | true
+        "isfoo"                    | false
+        "getFoo"                   | true
+        "getfoo"                   | false
+        "a"                        | false
+    }
 }
