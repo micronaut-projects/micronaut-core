@@ -51,7 +51,7 @@ public class OpenApiApplicationVisitor extends AbstractOpenApiVisitor implements
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
-        context.info("Generating OpenAPI Documentation", element);
+        context.info("Generating OpenAPI Documentation");
         Optional<OpenAPI> attr = context.get(ATTR_OPENAPI, OpenAPI.class);
         OpenAPI openAPI = readOpenAPI(element, context);
         if (attr.isPresent()) {

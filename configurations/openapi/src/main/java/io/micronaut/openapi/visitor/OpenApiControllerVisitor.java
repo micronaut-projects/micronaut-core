@@ -16,6 +16,7 @@
 
 package io.micronaut.openapi.visitor;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -37,6 +38,8 @@ import io.swagger.v3.core.util.PrimitiveType;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.media.ArraySchema;
 import io.swagger.v3.oas.models.media.Content;
@@ -75,6 +78,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
             matchTemplate = matchTemplate.nest(element.getValue(HttpMethodMapping.class, String.class).orElse("/"));
 
             PathItem pathItem = resolvePathItem(context, matchTemplate);
+            OpenAPI openAPI = resolveOpenAPI(context);
 
             io.swagger.v3.oas.models.Operation swaggerOperation = element.findAnnotation(Operation.class).flatMap(o -> {
                 JsonNode jsonNode = toJson(o.getValues());
@@ -175,7 +179,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 ClassElement returnType = element.getReturnType();
                 if (returnType != null) {
                     String mediaType = element.getValue(Produces.class, String.class).orElse(MediaType.APPLICATION_JSON);
-                    Content content = buildContent(returnType, mediaType);
+                    Content content = buildContent(returnType, mediaType, openAPI, context);
                     okResponse.setContent(content);
                 }
                 responses.put(ApiResponses.DEFAULT, okResponse);
@@ -209,7 +213,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                         }
                         requestBody.setRequired(!parameter.isAnnotationPresent(Nullable.class) && !parameterType.isAssignable(Optional.class));
 
-                        Content content = buildContent(parameterType, consumesMediaType);
+                        Content content = buildContent(parameterType, consumesMediaType, openAPI, context);
                         requestBody.setContent(content);
                         swaggerOperation.setRequestBody(requestBody);
                     }
@@ -272,7 +276,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
 
                     Schema schema = newParameter.getSchema();
                     if (schema == null) {
-                        schema = resolveSchema(parameterType, consumesMediaType);
+                        schema = resolveSchema(parameterType, consumesMediaType, openAPI, context);
                     }
 
                     if (schema != null) {
@@ -285,15 +289,15 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
         });
     }
 
-    private Content buildContent(ClassElement type, String mediaType) {
+    private Content buildContent(ClassElement type, String mediaType, OpenAPI openAPI, VisitorContext context) {
         Content content = new Content();
         io.swagger.v3.oas.models.media.MediaType mt = new io.swagger.v3.oas.models.media.MediaType();
-        mt.setSchema(resolveSchema(type, mediaType));
+        mt.setSchema(resolveSchema(type, mediaType, openAPI, context));
         content.addMediaType(mediaType, mt);
         return content;
     }
 
-    private Schema resolveSchema(ClassElement type, String mediaType) {
+    private Schema resolveSchema(ClassElement type, String mediaType, OpenAPI openAPI, VisitorContext context) {
         Schema schema = null;
 
         boolean isPublisher = false;
@@ -309,9 +313,22 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
             if (ClassUtils.isJavaLangType(typeName)) {
                 schema = getPrimitiveType(typeName);
             } else if (type.isIterable()) {
-                String componentType = type.getFirstTypeArgument().map(Element::getName).orElse(Object.class.getName());
-                schema = getPrimitiveType(componentType);
-                schema = arraySchema(schema);
+                Optional<ClassElement> componentType = type.getFirstTypeArgument();
+                if (componentType.isPresent()) {
+                    schema = getPrimitiveType(componentType.get().getName());
+                } else {
+                    schema = getPrimitiveType(Object.class.getName());
+                }
+
+                if (schema != null) {
+                    schema = arraySchema(schema);
+                } else if (componentType.isPresent()) {
+                    ClassElement componentElement = componentType.get();
+                    // we must have a POJO so let's create a component
+                    schema = getSchemaDefinition(mediaType, openAPI, context, componentElement);
+                }
+            } else {
+                schema = getSchemaDefinition(mediaType, openAPI, context, type);
             }
 
         }
@@ -325,7 +342,89 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
         return schema;
     }
 
+    private Schema getSchemaDefinition(String mediaType, OpenAPI openAPI, VisitorContext context, ClassElement type) {
+        Schema schema;
+        AnnotationValue<io.swagger.v3.oas.annotations.media.Schema> schemaValue = type.getAnnotation(io.swagger.v3.oas.annotations.media.Schema.class);
+        Map<String, Schema> schemas = resolveSchemas(openAPI);
+        if (schemaValue != null) {
+            String schemaName = schemaValue.get("name", String.class).orElse(NameUtils.getSimpleName(type.getName()));
+            schema = schemas.get(schemaName);
+            if (schema == null) {
+                JsonNode schemaJson = toJson(schemaValue.getValues());
+                try {
+                    schema = jsonMapper.treeToValue(schemaJson, Schema.class);
+
+                    if (schema != null) {
+                        populateSchemaProperties(mediaType, openAPI, context, type, schema);
+                        schema.setName(schemaName);
+                        schemas.put(schemaName, schema);
+                    }
+                } catch (JsonProcessingException e) {
+                    context.warn("Error reading Swagger Parameter for element [" + type + "]: " + e.getMessage(), type);
+                }
+            }
+        } else {
+            String schemaName = NameUtils.getSimpleName(type.getName());
+            schema = schemas.get(schemaName);
+            if (schema == null) {
+                schema = new Schema();
+                schema.setType("object");
+                schema.setName(schemaName);
+                populateSchemaProperties(mediaType, openAPI, context, type, schema);
+
+                schemas.put(schemaName, schema);
+
+            }
+        }
+        if (schema != null) {
+            Schema schemaRef = new Schema();
+            schemaRef.set$ref("#/components/schemas/" + schema.getName());
+            return schemaRef;
+        }
+        return null;
+    }
+
+    private void populateSchemaProperties(String mediaType, OpenAPI openAPI, VisitorContext context, ClassElement type, Schema schema) {
+        List<PropertyElement> beanProperties = type.getBeanProperties();
+        for (PropertyElement beanProperty : beanProperties) {
+            if (beanProperty.isAnnotationPresent(JsonIgnore.class) || beanProperty.isAnnotationPresent(Hidden.class)) {
+                continue;
+            }
+            Schema propertySchema = resolveSchema(beanProperty.getType(), mediaType, openAPI, context);
+            Optional<String> documentation = beanProperty.getDocumentation();
+            if (StringUtils.isEmpty(propertySchema.getDescription())) {
+                String doc = documentation.orElse(null);
+                if (doc != null) {
+                    JavadocDescription desc = new JavadocParser().parse(doc);
+                    propertySchema.setDescription(desc.getMethodDescription());
+                }
+            }
+            if (beanProperty.isAnnotationPresent(Deprecated.class)) {
+                propertySchema.setDeprecated(true);
+            }
+            propertySchema.setNullable(beanProperty.isAnnotationPresent(Nullable.class));
+            schema.addProperties(beanProperty.getName(), propertySchema);
+        }
+    }
+
+    private Map<String, Schema> resolveSchemas(OpenAPI openAPI) {
+        Components components = openAPI.getComponents();
+        if (components == null) {
+            components = new Components();
+            openAPI.setComponents(components);
+        }
+        Map<String, Schema> schemas = components.getSchemas();
+        if (schemas == null) {
+            schemas = new LinkedHashMap<>();
+            components.setSchemas(schemas);
+        }
+        return schemas;
+    }
+
     private ArraySchema arraySchema(Schema schema) {
+        if (schema == null) {
+            return null;
+        }
         ArraySchema arraySchema = new ArraySchema();
         arraySchema.setItems(schema);
         return arraySchema;
