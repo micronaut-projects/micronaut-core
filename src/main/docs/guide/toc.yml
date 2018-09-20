@@ -44,6 +44,8 @@ config:
   eachProperty: Using @EachProperty to Drive Configuration
   eachBean: Using @EachBean to Drive Configuration
   # validation: Validating Configuration
+  jmx:
+    title: JMX Support
 aop:
   title: Aspect Oriented Programming
   aroundAdvice: Around Advice
