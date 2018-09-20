@@ -30,6 +30,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.servers.Server;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
 
 import java.io.Writer;
 import java.lang.annotation.Annotation;
@@ -146,7 +147,15 @@ public class OpenApiApplicationVisitor extends AbstractOpenApiVisitor implements
             Optional<OpenAPI> attr = visitorContext.get(ATTR_OPENAPI, OpenAPI.class);
 
             attr.ifPresent(openAPI -> {
-                Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile("swagger.yml");
+                String fileName = "swagger.yml";
+                Info info = openAPI.getInfo();
+                if (info != null) {
+                    String version = info.getVersion();
+                    if (version != null) {
+                        fileName = "swagger-" + version + ".yml";
+                    }
+                }
+                Optional<GeneratedFile> generatedFile = visitorContext.visitGeneratedFile(fileName);
                 if (generatedFile.isPresent()) {
                     GeneratedFile f = generatedFile.get();
                     try {
