@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs
+package io.micronaut.testutils
 
 trait YamlAsciidocTagCleaner {
 
-    String cleanYamlAsciidocTag(String str) {
-        str.replaceAll('//tag::yamlconfig\\[]', '').replaceAll('//end::yamlconfig\\[]', '').trim()
+    String cleanYamlAsciidocTag(String str, String tagName = 'yamlconfig') {
+        str.replaceAll('//tag::'+tagName+'\\[]', '').replaceAll('//end::'+tagName+'\\[]', '').trim()
     }
 
     Map flatten(Map m, String separator = '.') {
