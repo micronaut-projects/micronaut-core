@@ -51,7 +51,7 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Anno
     /**
      * @return The variable values following a successful match.
      */
-    Map<String, Object> getVariables();
+    Map<String, Object> getVariableValues();
 
     /**
      * Execute the route with the given values. The passed map should contain values for every argument returned by
@@ -167,7 +167,7 @@ public interface RouteMatch<R> extends Callable<R>, Predicate<HttpRequest>, Anno
      * @return True if it is
      */
     default boolean isSatisfied(String name) {
-        Object val = getVariables().get(name);
+        Object val = getVariableValues().get(name);
         return val != null && !(val instanceof UnresolvedArgument);
     }
 }

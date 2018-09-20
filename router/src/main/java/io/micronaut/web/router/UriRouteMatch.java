@@ -47,7 +47,7 @@ public interface UriRouteMatch<T, R> extends UriMatchInfo, MethodBasedRouteMatch
      * @return The required arguments in order to invoke this route
      */
     default List<Argument> getRequiredArguments() {
-        Map<String, Object> matchVariables = getVariables();
+        Map<String, Object> matchVariables = getVariableValues();
 
         Argument[] arguments = getArguments();
         List<Argument> actualArguments = new ArrayList<>(arguments.length);

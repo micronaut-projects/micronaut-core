@@ -146,7 +146,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     @Override
     public boolean isExecutable() {
-        Map<String, Object> variables = getVariables();
+        Map<String, Object> variables = getVariableValues();
         for (Map.Entry<String, Argument> entry : requiredInputs.entrySet()) {
             Object value = variables.get(entry.getKey());
             if (value == null || value instanceof UnresolvedArgument) {
@@ -206,7 +206,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             return executableMethod.invoke();
         } else {
             List argumentList = new ArrayList();
-            Map<String, Object> variables = getVariables();
+            Map<String, Object> variables = getVariableValues();
             Iterator<Object> valueIterator = variables.values().iterator();
             int i = 0;
             for (Argument targetArgument : targetArguments) {
@@ -237,7 +237,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             return executableMethod.invoke();
         } else {
             ConversionService conversionService = this.conversionService;
-            Map<String, Object> uriVariables = getVariables();
+            Map<String, Object> uriVariables = getVariableValues();
             List argumentList = new ArrayList();
 
             for (Map.Entry<String, Argument> entry : requiredInputs.entrySet()) {
@@ -304,7 +304,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
 
     @Override
     public RouteMatch<R> fulfill(Map<String, Object> argumentValues) {
-        Map<String, Object> oldVariables = getVariables();
+        Map<String, Object> oldVariables = getVariableValues();
         Map<String, Object> newVariables = new LinkedHashMap<>(oldVariables);
         for (Argument requiredArgument : getArguments()) {
             Object value = argumentValues.get(requiredArgument.getName());

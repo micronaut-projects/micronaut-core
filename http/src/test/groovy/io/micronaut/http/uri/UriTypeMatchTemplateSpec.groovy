@@ -32,7 +32,7 @@ class UriTypeMatchTemplateSpec extends Specification {
 
         expect:
         info.isPresent() == matches
-        info.orElse(null)?.variables == variables
+        info.orElse(null)?.variableValues == variables
 
 
         where:
@@ -51,7 +51,7 @@ class UriTypeMatchTemplateSpec extends Specification {
 
         expect:
         info.isPresent() == matches
-        info.orElse(null)?.variables == variables
+        info.orElse(null)?.variableValues == variables
 
 
         where:
