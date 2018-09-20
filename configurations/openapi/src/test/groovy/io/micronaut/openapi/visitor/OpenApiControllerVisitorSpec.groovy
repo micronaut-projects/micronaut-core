@@ -18,8 +18,7 @@ class OpenApiControllerVisitorSpec extends AbstractTypeElementSpec {
         buildBeanDefinition('test.MyBean', '''
 package test;
 
-import io.reactivex.Maybe;
-import io.reactivex.Single;
+import io.reactivex.*;
 import io.micronaut.http.annotation.*;
 import java.util.List;
 
@@ -39,6 +38,14 @@ interface PetOperations<T extends String> {
     @Get("/")
     Single<List<T>> list();
 
+    /**
+     * List the pets
+     *
+     * @return a list of pet names
+     */
+    @Get("/flowable")
+    Flowable<T> flowable();
+    
     @Get("/random")
     Maybe<T> random();
 
@@ -72,8 +79,10 @@ class MyBean {}
         then:"it is included in the OpenAPI doc"
         pathItem.get.operationId == 'list'
         pathItem.get.description == 'List the pets'
-        pathItem.get.responses['200']
-        pathItem.get.responses['200'].description == 'a list of pet names'
+        pathItem.get.responses['default']
+        pathItem.get.responses['default'].description == 'a list of pet names'
+        pathItem.get.responses['default'].content['application/json'].schema
+        pathItem.get.responses['default'].content['application/json'].schema.type == 'array'
         pathItem.post.operationId == 'save'
         pathItem.post.requestBody
         pathItem.post.requestBody.required
@@ -95,7 +104,20 @@ class MyBean {}
         pathItem.get.parameters[0].description == 'The slug name'
         pathItem.get.parameters[0].schema.type == 'string'
         pathItem.get.responses.size() == 1
-        pathItem.get.responses['200'] != null
+        pathItem.get.responses['default'] != null
+        pathItem.get.responses['default'].content['application/json'].schema.type == 'string'
+
+        when:"A flowable is returned"
+        pathItem = openAPI.paths.get("/pets/flowable")
+
+        then:
+        pathItem.get.operationId == 'flowable'
+        pathItem.get.responses['default']
+        pathItem.get.responses['default'].description == 'a list of pet names'
+        pathItem.get.responses['default'].content['application/json'].schema
+        pathItem.get.responses['default'].content['application/json'].schema.type == 'array'
+
+
     }
 
     void "test parse custom parameter data"() {
