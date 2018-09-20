@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.inject.visitor.ClassElement;
 
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.*;
@@ -117,12 +118,21 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.visitor
             List<? extends TypeMirror> typeArguments = dt.getTypeArguments();
             if (e instanceof TypeElement) {
                 TypeElement typeElement = (TypeElement) e;
-                return new JavaClassElement(
-                        typeElement,
-                        visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement),
-                        visitorContext,
-                        typeArguments
-                );
+                if (typeElement.getKind() == ElementKind.ENUM) {
+                    return new JavaEnumElement(
+                            typeElement,
+                            visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement),
+                            visitorContext,
+                            typeArguments
+                    );
+                } else {
+                    return new JavaClassElement(
+                            typeElement,
+                            visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement),
+                            visitorContext,
+                            typeArguments
+                    );
+                }
             }
         } else if (returnType instanceof PrimitiveType) {
             PrimitiveType pt = (PrimitiveType) returnType;
