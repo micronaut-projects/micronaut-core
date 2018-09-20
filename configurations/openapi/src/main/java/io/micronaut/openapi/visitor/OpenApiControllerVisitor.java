@@ -301,43 +301,48 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
     private Schema resolveSchema(ClassElement type, String mediaType, OpenAPI openAPI, VisitorContext context) {
         Schema schema = null;
 
-        boolean isPublisher = false;
+        if (type instanceof EnumElement) {
+            schema = getSchemaDefinition(mediaType, openAPI, context, type);
+        } else {
 
-        if (isContainerType(type)) {
-            isPublisher = type.isAssignable(Publisher.class.getName()) && !type.isAssignable("reactor.core.publisher.Mono");
-            type = type.getFirstTypeArgument().orElse(null);
-        }
+            boolean isPublisher = false;
 
-        if (type != null) {
-
-            String typeName = type.getName();
-            if (ClassUtils.isJavaLangType(typeName)) {
-                schema = getPrimitiveType(typeName);
-            } else if (type.isIterable()) {
-                Optional<ClassElement> componentType = type.getFirstTypeArgument();
-                if (componentType.isPresent()) {
-                    schema = getPrimitiveType(componentType.get().getName());
-                } else {
-                    schema = getPrimitiveType(Object.class.getName());
-                }
-
-                if (schema != null) {
-                    schema = arraySchema(schema);
-                } else if (componentType.isPresent()) {
-                    ClassElement componentElement = componentType.get();
-                    // we must have a POJO so let's create a component
-                    schema = getSchemaDefinition(mediaType, openAPI, context, componentElement);
-                }
-            } else {
-                schema = getSchemaDefinition(mediaType, openAPI, context, type);
+            if (isContainerType(type)) {
+                isPublisher = type.isAssignable(Publisher.class.getName()) && !type.isAssignable("reactor.core.publisher.Mono");
+                type = type.getFirstTypeArgument().orElse(null);
             }
 
-        }
+            if (type != null) {
 
-        if (schema != null) {
-            boolean isStream = MediaType.TEXT_EVENT_STREAM.equals(mediaType) || MediaType.APPLICATION_JSON_STREAM.equals(mediaType);
-            if ((!isStream && isPublisher) || type.isIterable()) {
-                schema = arraySchema(schema);
+                String typeName = type.getName();
+                if (ClassUtils.isJavaLangType(typeName)) {
+                    schema = getPrimitiveType(typeName);
+                } else if (type.isIterable()) {
+                    Optional<ClassElement> componentType = type.getFirstTypeArgument();
+                    if (componentType.isPresent()) {
+                        schema = getPrimitiveType(componentType.get().getName());
+                    } else {
+                        schema = getPrimitiveType(Object.class.getName());
+                    }
+
+                    if (schema != null) {
+                        schema = arraySchema(schema);
+                    } else if (componentType.isPresent()) {
+                        ClassElement componentElement = componentType.get();
+                        // we must have a POJO so let's create a component
+                        schema = getSchemaDefinition(mediaType, openAPI, context, componentElement);
+                    }
+                } else {
+                    schema = getSchemaDefinition(mediaType, openAPI, context, type);
+                }
+
+            }
+
+            if (schema != null) {
+                boolean isStream = MediaType.TEXT_EVENT_STREAM.equals(mediaType) || MediaType.APPLICATION_JSON_STREAM.equals(mediaType);
+                if ((!isStream && isPublisher) || type.isIterable()) {
+                    schema = arraySchema(schema);
+                }
             }
         }
         return schema;
@@ -356,7 +361,12 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                     schema = jsonMapper.treeToValue(schemaJson, Schema.class);
 
                     if (schema != null) {
-                        populateSchemaProperties(mediaType, openAPI, context, type, schema);
+                        if (type instanceof EnumElement) {
+                            schema.setType("string");
+                            schema.setEnum(((EnumElement) type).values());
+                        } else {
+                            populateSchemaProperties(mediaType, openAPI, context, type, schema);
+                        }
                         schema.setName(schemaName);
                         schemas.put(schemaName, schema);
                     }
@@ -369,12 +379,15 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
             schema = schemas.get(schemaName);
             if (schema == null) {
                 schema = new Schema();
-                schema.setType("object");
+                if (type instanceof EnumElement) {
+                    schema.setType("string");
+                    schema.setEnum(((EnumElement) type).values());
+                } else {
+                    schema.setType("object");
+                    populateSchemaProperties(mediaType, openAPI, context, type, schema);
+                }
                 schema.setName(schemaName);
-                populateSchemaProperties(mediaType, openAPI, context, type, schema);
-
                 schemas.put(schemaName, schema);
-
             }
         }
         if (schema != null) {
