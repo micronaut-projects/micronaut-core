@@ -21,6 +21,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
@@ -219,27 +220,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
 
                 Parameter newParameter = null;
 
-                if (parameter.isAnnotationPresent(io.swagger.v3.oas.annotations.Parameter.class)) {
-                    Optional<Parameter> opt = parameter.findAnnotation(io.swagger.v3.oas.annotations.Parameter.class).flatMap(o -> {
-                        Map<CharSequence, Object> paramValues = toValueMap(o.getValues());
-                        Object in = paramValues.get("in");
-                        if (in != null) {
-                            paramValues.put("in", in.toString().toLowerCase(Locale.ENGLISH));
-                        }
-                        JsonNode jsonNode = jsonMapper.valueToTree(paramValues);
-                        try {
-                            Parameter value = jsonMapper.treeToValue(jsonNode, Parameter.class);
-                            return Optional.ofNullable(value);
-                        } catch (JsonProcessingException e) {
-                            context.warn("Error reading Swagger Parameter for element [" + parameter + "]: " + e.getMessage(), parameter);
-                            return Optional.empty();
-                        }
-                    });
-
-                    if (opt.isPresent()) {
-                        newParameter = opt.get();
-                    }
-                } else if (!parameter.hasStereotype(Bindable.class) && pathVariables.contains(parameterName)) {
+                if (!parameter.hasStereotype(Bindable.class) && pathVariables.contains(parameterName)) {
                     newParameter = new Parameter();
                     newParameter.setIn(ParameterIn.PATH.toString());
                     newParameter.setExplode(matchTemplate.isExploded(parameterName));
@@ -248,6 +229,63 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                     newParameter = new Parameter();
                     newParameter.setIn(ParameterIn.HEADER.toString());
                     newParameter.setName(headerName);
+                } else if (parameter.isAnnotationPresent(CookieValue.class)) {
+                    String cookieName = parameter.getValue(CookieValue.class, String.class).orElse(parameterName);
+                    newParameter = new Parameter();
+                    newParameter.setIn(ParameterIn.COOKIE.toString());
+                    newParameter.setName(cookieName);
+                } else if (parameter.isAnnotationPresent(QueryValue.class)) {
+                    String queryVar = parameter.getValue(QueryValue.class, String.class).orElse(parameterName);
+                    newParameter = new Parameter();
+                    newParameter.setIn(ParameterIn.QUERY.toString());
+                    newParameter.setName(queryVar);
+                }
+
+                if (parameter.isAnnotationPresent(io.swagger.v3.oas.annotations.Parameter.class)) {
+                    AnnotationValue<io.swagger.v3.oas.annotations.Parameter> paramAnn = parameter.findAnnotation(io.swagger.v3.oas.annotations.Parameter.class).orElse(null);
+
+                    if (paramAnn != null) {
+                        Map<CharSequence, Object> paramValues = toValueMap(paramAnn.getValues());
+                        Object in = paramValues.get("in");
+                        if (in != null) {
+                            paramValues.put("in", in.toString().toLowerCase(Locale.ENGLISH));
+                        }
+
+                        JsonNode jsonNode = jsonMapper.valueToTree(paramValues);
+
+                        if (newParameter == null) {
+                            try {
+                                newParameter = jsonMapper.treeToValue(jsonNode, Parameter.class);
+                            } catch (JsonProcessingException e) {
+                                context.warn("Error reading Swagger Parameter for element [" + parameter + "]: " + e.getMessage(), parameter);
+                            }
+                        } else {
+                            try {
+                                Parameter v = jsonMapper.treeToValue(jsonNode, Parameter.class);
+                                if (v != null) {
+                                    // horrible hack because Swagger ParameterDeserializer breaks updating existing objects
+                                    BeanMap<Parameter> beanMap = BeanMap.of(v);
+                                    BeanMap<Parameter> target = BeanMap.of(newParameter);
+                                    for (CharSequence name : paramValues.keySet()) {
+                                        Object o = beanMap.get(name.toString());
+                                        target.put(name.toString(), o);
+                                    }
+                                } else {
+                                    BeanMap<Parameter> target = BeanMap.of(newParameter);
+                                    for (CharSequence name : paramValues.keySet()) {
+                                        Object o = paramValues.get(name.toString());
+                                        try {
+                                            target.put(name.toString(), o);
+                                        } catch (Exception e) {
+                                            // ignore
+                                        }
+                                    }
+                                }
+                            } catch (IOException e) {
+                                context.warn("Error reading Swagger Parameter for element [" + parameter + "]: " + e.getMessage(), parameter);
+                            }
+                        }
+                    }
                 }
 
                 if (newParameter != null) {
