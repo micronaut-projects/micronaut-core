@@ -19,6 +19,7 @@ package io.micronaut.docs.server.binding;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.validation.Validated;
 
 import javax.annotation.Nullable;
 import javax.validation.Valid;
@@ -30,6 +31,7 @@ import javax.validation.Valid;
  */
 // tag::class[]
 @Controller("/api")
+@Validated
 public class BookmarkController {
 // end::class[]
 

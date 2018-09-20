@@ -48,7 +48,7 @@ class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
     }
 
     @Override
-    public Map<String, Object> getVariables() {
+    public Map<String, Object> getVariableValues() {
         return Collections.emptyMap();
     }
 
@@ -61,7 +61,7 @@ class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
             }
 
             @Override
-            public Map<String, Object> getVariables() {
+            public Map<String, Object> getVariableValues() {
                 return newVariables;
             }
         };
@@ -69,7 +69,7 @@ class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
 
     @Override
     public RouteMatch<R> decorate(Function<RouteMatch<R>, R> executor) {
-        Map<String, Object> variables = getVariables();
+        Map<String, Object> variables = getVariableValues();
         Collection<Argument> arguments = getRequiredArguments();
         RouteMatch thisRoute = this;
         return new StatusRouteMatch<T, R>(httpStatus, abstractRoute, conversionService) {
@@ -84,7 +84,7 @@ class StatusRouteMatch<T, R> extends AbstractRouteMatch<T, R> {
             }
 
             @Override
-            public Map<String, Object> getVariables() {
+            public Map<String, Object> getVariableValues() {
                 return variables;
             }
         };

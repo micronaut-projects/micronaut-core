@@ -40,7 +40,7 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
     public void visitMethod(MethodElement element, VisitorContext context) {
         String uri = element.getValue(WebSocketComponent.class, String.class).orElse(WebSocketComponent.DEFAULT_URI);
         UriMatchTemplate template = uriCache.computeIfAbsent(uri, UriMatchTemplate::of);
-        List<String> variables = template.getVariables();
+        List<String> variables = template.getVariableNames();
         ParameterElement[] parameters = element.getParameters();
         if (ArrayUtils.isNotEmpty(parameters)) {
 

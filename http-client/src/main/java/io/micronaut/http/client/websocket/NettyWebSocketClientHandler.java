@@ -238,7 +238,7 @@ public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandle
                 @Override
                 public ConvertibleValues<Object> getUriVariables() {
                     if (matchInfo != null) {
-                        return ConvertibleValues.of(matchInfo.getVariables());
+                        return ConvertibleValues.of(matchInfo.getVariableValues());
                     }
                     return ConvertibleValues.empty();
                 }

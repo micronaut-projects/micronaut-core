@@ -172,7 +172,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             Map<String, Object> paramMap = context.getParameterValueMap();
             Map<String, String> queryParams = new LinkedHashMap<>();
-            List<String> uriVariables = uriTemplate.getVariables();
+            List<String> uriVariables = uriTemplate.getVariableNames();
 
             boolean variableSatisfied = uriVariables.isEmpty() || uriVariables.containsAll(paramMap.keySet());
             MutableHttpRequest<Object> request;

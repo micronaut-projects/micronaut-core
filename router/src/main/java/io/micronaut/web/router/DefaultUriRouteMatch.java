@@ -21,6 +21,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.UriMatchInfo;
+import io.micronaut.http.uri.UriMatchVariable;
 
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
@@ -67,7 +68,7 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
 
     @Override
     public UriRouteMatch<T, R> decorate(Function<RouteMatch<R>, R> executor) {
-        Map<String, Object> variables = getVariables();
+        Map<String, Object> variables = getVariableValues();
         List<Argument> arguments = getRequiredArguments();
         RouteMatch thisRoute = this;
         return new DefaultUriRouteMatch<T, R>(matchInfo, uriRoute, defaultCharset, conversionService) {
@@ -82,7 +83,7 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
             }
 
             @Override
-            public Map<String, Object> getVariables() {
+            public Map<String, Object> getVariableValues() {
                 return variables;
             }
         };
@@ -98,7 +99,7 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
             }
 
             @Override
-            public Map<String, Object> getVariables() {
+            public Map<String, Object> getVariableValues() {
                 return newVariables;
             }
 
@@ -120,8 +121,8 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
     }
 
     @Override
-    public Map<String, Object> getVariables() {
-        Map<String, Object> variables = matchInfo.getVariables();
+    public Map<String, Object> getVariableValues() {
+        Map<String, Object> variables = matchInfo.getVariableValues();
         Map<String, Object> decoded = new LinkedHashMap<>(variables.size());
         for (Map.Entry<String, Object> entry : variables.entrySet()) {
             String k = entry.getKey();
@@ -139,8 +140,8 @@ class DefaultUriRouteMatch<T, R> extends AbstractRouteMatch<T, R> implements Uri
     }
 
     @Override
-    public boolean isExploded(String variable) {
-        return matchInfo.isExploded(variable);
+    public List<UriMatchVariable> getVariables() {
+        return matchInfo.getVariables();
     }
 
     @Override

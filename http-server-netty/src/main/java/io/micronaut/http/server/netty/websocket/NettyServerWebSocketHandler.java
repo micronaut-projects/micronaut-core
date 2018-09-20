@@ -103,7 +103,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 mediaTypeCodecRegistry,
                 webSocketBean,
                 request,
-                routeMatch.getVariables(),
+                routeMatch.getVariableValues(),
                 handshaker.version(),
                 webSocketSessionRepository);
 
