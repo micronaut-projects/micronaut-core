@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.visitor.ClassElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -32,6 +33,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 
+import java.io.File;
 import java.io.Writer;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
@@ -46,6 +48,10 @@ import java.util.Optional;
  */
 @Experimental
 public class OpenApiApplicationVisitor extends AbstractOpenApiVisitor implements TypeElementVisitor<OpenAPIDefinition, Object> {
+    /**
+     * System property that enables setting the target file to write to.
+     */
+    public static final String MICRONAUT_OPENAPI_TARGET_FILE = "micronaut.openapi.target.file";
 
     private ClassElement classElement;
 
@@ -147,22 +153,36 @@ public class OpenApiApplicationVisitor extends AbstractOpenApiVisitor implements
             Optional<OpenAPI> attr = visitorContext.get(ATTR_OPENAPI, OpenAPI.class);
 
             attr.ifPresent(openAPI -> {
-                String fileName = "swagger.yml";
-                Info info = openAPI.getInfo();
-                if (info != null) {
-                    String version = info.getVersion();
-                    if (version != null) {
-                        fileName = "swagger-" + version + ".yml";
-                    }
-                }
-                Optional<GeneratedFile> generatedFile = visitorContext.visitGeneratedFile(fileName);
-                if (generatedFile.isPresent()) {
-                    GeneratedFile f = generatedFile.get();
+                String property = System.getProperty(MICRONAUT_OPENAPI_TARGET_FILE);
+                if (StringUtils.isNotEmpty(property)) {
+                    File f = new File(property);
+                    visitorContext.info("Writing OpenAPI YAML to destination: " + f);
                     try {
-                        Writer writer = f.openWriter();
-                        yamlMapper.writeValue(writer, openAPI);
+                        f.getParentFile().mkdirs();
+                        yamlMapper.writeValue(f, openAPI);
                     } catch (Exception e) {
                         visitorContext.warn("Unable to generate swagger.yml: " + e.getMessage() , classElement);
+                    }
+                } else {
+
+                    String fileName = "swagger.yml";
+                    Info info = openAPI.getInfo();
+                    if (info != null) {
+                        String version = info.getVersion();
+                        if (version != null) {
+                            fileName = "swagger-" + version + ".yml";
+                        }
+                    }
+                    Optional<GeneratedFile> generatedFile = visitorContext.visitGeneratedFile(fileName);
+                    if (generatedFile.isPresent()) {
+                        GeneratedFile f = generatedFile.get();
+                        try {
+                            visitorContext.info("Writing OpenAPI YAML to destination: " + f.toURI());
+                            Writer writer = f.openWriter();
+                            yamlMapper.writeValue(writer, openAPI);
+                        } catch (Exception e) {
+                            visitorContext.warn("Unable to generate swagger.yml: " + e.getMessage() , classElement);
+                        }
                     }
                 }
             });
