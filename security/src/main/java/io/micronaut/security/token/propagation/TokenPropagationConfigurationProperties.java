@@ -44,7 +44,7 @@ public class TokenPropagationConfigurationProperties implements TokenPropagation
 
     private boolean enabled = DEFAULT_ENABLED;
 
-    private String servicesRegex;
+    private String serviceIdRegex;
 
     private String uriRegex;
 
@@ -54,16 +54,16 @@ public class TokenPropagationConfigurationProperties implements TokenPropagation
      * @return a regular expression to match the service.
      */
     @Override
-    public String getServicesRegex() {
-        return this.servicesRegex;
+    public String getServiceIdRegex() {
+        return this.serviceIdRegex;
     }
 
     /**
      * a regular expression to match the service id.
-     * @param servicesRegex serviceId regular expression
+     * @param serviceIdRegex serviceId regular expression
      */
-    public void setServicesRegex(String servicesRegex) {
-        this.servicesRegex = servicesRegex;
+    public void setServiceIdRegex(String serviceIdRegex) {
+        this.serviceIdRegex = serviceIdRegex;
     }
 
     /**
