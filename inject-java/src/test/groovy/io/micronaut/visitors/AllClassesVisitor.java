@@ -25,9 +25,16 @@ import java.util.List;
 public class AllClassesVisitor implements TypeElementVisitor<Object, Get> {
 
     public static List<String> VISITED_ELEMENTS = new ArrayList<>();
+    public static List<ClassElement> VISITED_CLASS_ELEMENTS = new ArrayList<>();
+
+    public AllClassesVisitor() {
+        VISITED_ELEMENTS.clear();
+        VISITED_CLASS_ELEMENTS.clear();
+    }
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
+        VISITED_CLASS_ELEMENTS.add(element);
         visit(element);
     }
 

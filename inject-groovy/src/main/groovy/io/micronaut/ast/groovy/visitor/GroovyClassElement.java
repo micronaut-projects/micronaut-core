@@ -18,20 +18,23 @@ package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.ast.groovy.utils.AstClassUtils;
+import io.micronaut.ast.groovy.utils.AstGenericUtils;
 import io.micronaut.ast.groovy.utils.PublicMethodVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.visitor.ClassElement;
 import io.micronaut.inject.visitor.Element;
+import io.micronaut.inject.visitor.PropertyElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
+import org.codehaus.groovy.ast.PropertyNode;
 
+import javax.lang.model.type.TypeMirror;
+import javax.lang.model.util.Elements;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 /**
  * A class element returning data from a {@link ClassNode}.
@@ -53,8 +56,129 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
     }
 
     @Override
-    public String getName() {
+    public Map<String, ClassElement> getTypeArguments() {
+        Map<String, ClassNode> spec = AstGenericUtils.createGenericsSpec(classNode);
+        if (!spec.isEmpty()) {
+            Map<String, ClassElement> map = new LinkedHashMap<>(spec.size());
+            for (Map.Entry<String, ClassNode> entry : spec.entrySet()) {
+                map.put(entry.getKey(), new GroovyClassElement(entry.getValue(), getAnnotationMetadata()));
+            }
+            return Collections.unmodifiableMap(map);
+        }
+        return Collections.emptyMap();
+    }
+
+    @Override
+    public List<PropertyElement> getBeanProperties() {
+        List<PropertyNode> propertyNodes = classNode.getProperties();
+        List<PropertyElement> propertyElements = new ArrayList<>();
+        Set<String> groovyProps = new HashSet<>();
+        for (PropertyNode propertyNode : propertyNodes) {
+            if (propertyNode.isPublic() && !propertyNode.isStatic()) {
+                groovyProps.add(propertyNode.getName());
+                GroovyPropertyElement groovyPropertyElement = new GroovyPropertyElement(
+                        AstAnnotationUtils.getAnnotationMetadata(propertyNode.getField()),
+                        new GroovyClassElement(propertyNode.getType(),
+                                AnnotationMetadata.EMPTY_METADATA),
+                        propertyNode.getName(),
+                        false,
+                        propertyNode
+                );
+                propertyElements.add(groovyPropertyElement);
+            }
+        }
+        Map<String, GetterAndSetter> props = new LinkedHashMap<>();
+        classNode.visitContents(
+                new PublicMethodVisitor(null) {
+
+                    @Override
+                    protected boolean isAcceptable(MethodNode node) {
+                        boolean validModifiers = node.isPublic() && !node.isStatic() && !node.isSynthetic() && !node.isAbstract();
+                        if (validModifiers) {
+                            String methodName = node.getName();
+                            if (methodName.contains("$")) {
+                                return false;
+                            }
+
+                            if (NameUtils.isGetterName(methodName) && node.getParameters().length == 0) {
+                                return true;
+                            } else {
+                                return NameUtils.isSetterName(methodName) && node.getParameters().length == 1;
+                            }
+                        }
+                        return validModifiers;
+                    }
+
+                    @Override
+                    public void accept(ClassNode classNode, MethodNode node) {
+                        String methodName = node.getName();
+                        if (NameUtils.isGetterName(methodName) && node.getParameters().length == 0) {
+                            String propertyName = NameUtils.getPropertyNameForGetter(methodName);
+                            if (groovyProps.contains(propertyName)) {
+                                return;
+                            }
+                            ClassElement getterReturnType = new GroovyClassElement(node.getReturnType(), AnnotationMetadata.EMPTY_METADATA);
+
+                            GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
+                            getterAndSetter.type = getterReturnType;
+                            getterAndSetter.getter = node;
+                            if (getterAndSetter.setter != null) {
+                                ClassNode typeMirror = getterAndSetter.setter.getParameters()[0].getType();
+                                ClassElement setterParameterType = new GroovyClassElement(typeMirror, AnnotationMetadata.EMPTY_METADATA);
+                                if (!setterParameterType.getName().equals(getterReturnType.getName())) {
+                                    getterAndSetter.setter = null; // not a compatible setter
+                                }
+                            }
+                        } else if (NameUtils.isSetterName(methodName) && node.getParameters().length == 1) {
+                            String propertyName = NameUtils.getPropertyNameForSetter(methodName);
+                            if (groovyProps.contains(propertyName)) {
+                                return;
+                            }
+                            ClassNode typeMirror = node.getParameters()[0].getType();
+                            ClassElement setterParameterType = new GroovyClassElement(typeMirror, AnnotationMetadata.EMPTY_METADATA);
+
+                            GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
+                            ClassElement propertyType = getterAndSetter.type;
+                            if (propertyType != null) {
+                                if (propertyType.getName().equals(setterParameterType.getName())) {
+                                    getterAndSetter.setter = node;
+                                }
+                            } else {
+                                getterAndSetter.setter = node;
+                            }
+                        }
+                    }
+                });
+        if (!props.isEmpty()) {
+            for (Map.Entry<String, GetterAndSetter> entry : props.entrySet()) {
+                String propertyName = entry.getKey();
+                GetterAndSetter value = entry.getValue();
+                if (value.getter != null) {
+                    GroovyPropertyElement propertyElement = new GroovyPropertyElement(AstAnnotationUtils.getAnnotationMetadata(value.getter), value.type, propertyName, value.setter == null, value.getter);
+                    propertyElements.add(propertyElement);
+                }
+            }
+        }
+        return Collections.unmodifiableList(propertyElements);
+    }
+
+    @Override
+    public boolean isArray() {
+        return classNode.isArray();
+    }
+
+    @Override
+    public String toString() {
         return classNode.getName();
+    }
+
+    @Override
+    public String getName() {
+        if (isArray()) {
+            return classNode.getComponentType().getName();
+        } else {
+            return classNode.getName();
+        }
     }
 
     @Override
@@ -124,5 +248,20 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
         }.accept(classNode);
 
         return elements;
+    }
+
+    /**
+     * Internal holder class for getters and setters.
+     */
+    private class GetterAndSetter {
+        ClassElement type;
+        MethodNode getter;
+        MethodNode setter;
+        final String propertyName;
+
+
+        public GetterAndSetter(String propertyName) {
+            this.propertyName = propertyName;
+        }
     }
 }

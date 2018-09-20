@@ -60,7 +60,7 @@ public class TestController {
 ''')
         expect:
         ControllerGetVisitor.VISITED_ELEMENTS == ["test.TestController", "getMethod"]
-        AllElementsVisitor.VISITED_ELEMENTS == ["test.TestController", "privateField", "protectedField", "publicField", "packagePrivateField", "<init>", "setterMethod", "getMethod", "postMethod"]
+        AllElementsVisitor.VISITED_ELEMENTS == ["test.TestController", "privateField", "protectedField", "publicField", "packagePrivateField",  "setterMethod", "getMethod", "postMethod"]
         AllClassesVisitor.VISITED_ELEMENTS == ["test.TestController", "getMethod"]
     }
 

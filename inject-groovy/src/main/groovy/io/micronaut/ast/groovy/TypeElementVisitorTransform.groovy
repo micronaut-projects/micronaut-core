@@ -62,6 +62,8 @@ class TypeElementVisitorTransform implements ASTTransformation {
         ModuleNode moduleNode = source.getAST()
         List<ClassNode> classes = moduleNode.getClasses()
 
+        if (loadedVisitors == null) return
+
         for (ClassNode classNode in classes) {
             if (!(classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers()))) {
                 Collection<LoadedVisitor> matchedVisitors = loadedVisitors.values().findAll { v -> v.matches(classNode) }

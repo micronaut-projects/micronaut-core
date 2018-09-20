@@ -66,7 +66,7 @@ class TestController {
 ''')
         expect:
         ControllerGetVisitor.getVisited() == ["test.TestController", "getMethod"]
-        AllElementsVisitor.getVisited().toSet() == ["test.TestController", "<init>", "privateField", "protectedField", "publicField", "packagePrivateField", "property", "setterMethod", "getMethod", "postMethod"].toSet()
+        AllElementsVisitor.getVisited().toSet() == ["test.TestController","privateField", "protectedField", "publicField", "packagePrivateField", "property", "setterMethod", "getMethod", "postMethod"].toSet()
         AllClassesVisitor.getVisited() == ["test.TestController", "getMethod"]
     }
 

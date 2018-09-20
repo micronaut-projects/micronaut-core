@@ -23,10 +23,9 @@ import io.micronaut.inject.visitor.ClassElement;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.NoType;
-import javax.lang.model.type.TypeMirror;
-import javax.lang.model.type.TypeVariable;
+import javax.lang.model.type.*;
+import java.util.List;
+import java.util.Locale;
 
 /**
  * An abstract class for other elements to extend from.
@@ -113,15 +112,21 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.visitor
         if (returnType instanceof NoType) {
             return new JavaVoidElement();
         } else if (returnType instanceof DeclaredType) {
-            Element e = ((DeclaredType) returnType).asElement();
+            DeclaredType dt = (DeclaredType) returnType;
+            Element e = dt.asElement();
+            List<? extends TypeMirror> typeArguments = dt.getTypeArguments();
             if (e instanceof TypeElement) {
                 TypeElement typeElement = (TypeElement) e;
                 return new JavaClassElement(
                         typeElement,
                         visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement),
-                        visitorContext
+                        visitorContext,
+                        typeArguments
                 );
             }
+        } else if (returnType instanceof PrimitiveType) {
+            PrimitiveType pt = (PrimitiveType) returnType;
+            return JavaPrimitiveElement.valueOf(pt.toString().toUpperCase(Locale.ENGLISH));
         } else if (returnType instanceof TypeVariable) {
             TypeVariable tv = (TypeVariable) returnType;
             TypeMirror upperBound = tv.getUpperBound();
@@ -130,6 +135,23 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.visitor
                 return classElement;
             } else {
                 return mirrorToClassElement(tv.getLowerBound(), visitorContext);
+            }
+        } else if (returnType instanceof ArrayType) {
+            ArrayType at = (ArrayType) returnType;
+            TypeMirror componentType = at.getComponentType();
+            ClassElement arrayType = mirrorToClassElement(componentType, visitorContext);
+            if (arrayType != null) {
+                if (arrayType instanceof JavaPrimitiveElement) {
+                    JavaPrimitiveElement jpe = (JavaPrimitiveElement) arrayType;
+                    return jpe.toArray();
+                } else {
+                    return new JavaClassElement((TypeElement) arrayType.getNativeType(), arrayType, visitorContext) {
+                        @Override
+                        public boolean isArray() {
+                            return true;
+                        }
+                    };
+                }
             }
         }
         return null;
