@@ -51,13 +51,21 @@ public interface ClassWriterOutputVisitor {
     void visitServiceDescriptor(String type, String classname);
 
     /**
-     * Visit a file within the META-INF directory.
+     * Visit a file within the META-INF directory of the classes directory.
      *
      * @param path The path to the file
      * @return An optional file it was possible to create it
      * @throws IOException If the file couldn't be created
      */
     Optional<GeneratedFile> visitMetaInfFile(String path);
+
+    /**
+     * Visit a file that will be generated within the generated sources directory.
+     *
+     * @param path The path
+     * @return The file if it was possible to create it
+     */
+    Optional<GeneratedFile> visitGeneratedFile(String path);
 
     /**
      * Finish writing and flush any service entries to disk.

@@ -71,4 +71,13 @@ public interface VisitorContext extends MutableConvertibleValues<Object> {
     @Experimental
     Optional<GeneratedFile> visitMetaInfFile(String path);
 
+
+    /**
+     * Visit a file that will be located within the generated source directory.
+     *
+     * @param path The path to the file
+     * @return An optional file it was possible to create it
+     */
+    @Experimental
+    Optional<GeneratedFile> visitGeneratedFile(String path);
 }
