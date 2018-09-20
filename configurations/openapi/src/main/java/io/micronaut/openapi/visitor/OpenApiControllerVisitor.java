@@ -27,7 +27,6 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.uri.UriMatchTemplate;
@@ -39,17 +38,19 @@ import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.models.PathItem;
+import io.swagger.v3.oas.models.media.ArraySchema;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.parameters.RequestBody;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
+import org.reactivestreams.Publisher;
 
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.*;
-import java.util.function.Consumer;
+import java.util.concurrent.Future;
 
 /**
  * A {@link TypeElementVisitor} the builds the Swagger model from Micronaut controllers at compile time.
@@ -169,7 +170,14 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                     String returnDescription = javadocDescription.getReturnDescription();
                     okResponse.setDescription(returnDescription);
                 }
-                responses.put(String.valueOf(HttpStatus.OK.getCode()), okResponse);
+
+                ClassElement returnType = element.getReturnType();
+                if (returnType != null) {
+                    String mediaType = element.getValue(Produces.class, String.class).orElse(MediaType.APPLICATION_JSON);
+                    Content content = buildContent(returnType, mediaType);
+                    okResponse.setContent(content);
+                }
+                responses.put(ApiResponses.DEFAULT, okResponse);
             }
 
 
@@ -200,10 +208,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                         }
                         requestBody.setRequired(!parameter.isAnnotationPresent(Nullable.class) && !parameterType.isAssignable(Optional.class));
                         String mediaType = element.getValue(Consumes.class, String.class).orElse(MediaType.APPLICATION_JSON);
-                        Content content = new Content();
-                        io.swagger.v3.oas.models.media.MediaType mt = new io.swagger.v3.oas.models.media.MediaType();
-                        mt.setSchema(resolveSchema(parameterType));
-                        content.addMediaType(mediaType, mt);
+                        Content content = buildContent(parameterType, mediaType);
                         requestBody.setContent(content);
                         swaggerOperation.setRequestBody(requestBody);
                     }
@@ -279,8 +284,21 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
         });
     }
 
+    private Content buildContent(ClassElement type, String mediaType) {
+        Content content = new Content();
+        io.swagger.v3.oas.models.media.MediaType mt = new io.swagger.v3.oas.models.media.MediaType();
+        mt.setSchema(resolveSchema(type));
+        content.addMediaType(mediaType, mt);
+        return content;
+    }
+
     private Schema resolveSchema(ClassElement type) {
         Schema schema = null;
+
+        if (isContainerType(type)) {
+            type = type.getFirstTypeArgument().orElse(null);
+        }
+
         if (type != null) {
 
             String typeName = type.getName();
@@ -293,12 +311,32 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                     PrimitiveType primitiveType = PrimitiveType.fromType(wrapperType);
                     if (primitiveType != null) {
                         schema = primitiveType.createProperty();
-
                     }
                 }
             }
+
+        }
+
+        if (schema != null) {
+            if (type.isIterable()) {
+                ArraySchema arraySchema = new ArraySchema();
+                arraySchema.setItems(schema);
+                arraySchema.setType(schema.getType());
+                schema = arraySchema;
+            }
         }
         return schema;
+    }
+
+    private boolean isContainerType(ClassElement type) {
+        return CollectionUtils.setOf(
+                Optional.class.getName(),
+                Future.class.getName(),
+                Publisher.class.getName(),
+                "io.reactivex.Single",
+                "io.reactivex.Observable",
+                "io.reactivex.Maybe"
+        ).stream().anyMatch(type::isAssignable);
     }
 
 }
