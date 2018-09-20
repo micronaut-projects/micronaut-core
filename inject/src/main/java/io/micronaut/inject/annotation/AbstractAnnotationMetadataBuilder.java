@@ -254,6 +254,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
             }
             metadata.addDefaultAnnotationValues(annotationName, defaultValues);
+            if (!DefaultAnnotationMetadata.areAnnotationDefaultsRegistered(annotationName)) {
+                Map<String, Object> annotationDefaults = new HashMap<>(defaultValues.size());
+                for (Map.Entry<CharSequence, Object> entry: defaultValues.entrySet()) {
+                    annotationDefaults.put(entry.getKey().toString(), entry.getValue());
+                }
+                DefaultAnnotationMetadata.registerAnnotationDefaults(annotationName, annotationDefaults);
+            }
         }
 
         List<String> parentAnnotations = new ArrayList<>();
