@@ -38,6 +38,7 @@ import io.swagger.v3.core.util.PrimitiveType;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
@@ -49,6 +50,8 @@ import io.swagger.v3.oas.models.parameters.Parameter;
 import io.swagger.v3.oas.models.parameters.RequestBody;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.servers.Server;
 import org.reactivestreams.Publisher;
 
 import javax.annotation.Nullable;
@@ -95,24 +98,11 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
             }).orElse(new io.swagger.v3.oas.models.Operation());
 
 
-            List<AnnotationValue<io.swagger.v3.oas.annotations.responses.ApiResponse>> responseAnnotations = element.getAnnotationValuesByType(io.swagger.v3.oas.annotations.responses.ApiResponse.class);
-            if (CollectionUtils.isNotEmpty(responseAnnotations)) {
-                ApiResponses apiResponses = new ApiResponses();
-                for (AnnotationValue<io.swagger.v3.oas.annotations.responses.ApiResponse> r : responseAnnotations) {
+            readTags(element, swaggerOperation);
 
-                    JsonNode jn = toJson(r.getValues());
-                    try {
-                        Optional<ApiResponse> newResponse = Optional.of(jsonMapper.treeToValue(jn, ApiResponse.class));
-                        newResponse.ifPresent(apiResponse -> {
-                            String name = r.get("responseCode", String.class).orElse("default");
-                            apiResponses.put(name, apiResponse);
-                        });
-                    } catch (JsonProcessingException e) {
-                        context.warn("Error reading Swagger ApiResponses for element [" + element + "]: " + e.getMessage(), element);
-                    }
-                }
-                swaggerOperation.setResponses(apiResponses);
-            }
+            readSecurityRequirements(element, context, swaggerOperation);
+
+            readApiResponses(element, context, swaggerOperation);
 
             HttpMethod httpMethod = HttpMethod.valueOf(httpMethodClass.getSimpleName().toUpperCase(Locale.ENGLISH));
             JavadocDescription javadocDescription = element.getDocumentation().map(s -> new JavadocParser().parse(s)).orElse(null);
@@ -321,6 +311,66 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 }
             }
         });
+    }
+
+    private void readApiResponses(MethodElement element, VisitorContext context, io.swagger.v3.oas.models.Operation swaggerOperation) {
+        List<AnnotationValue<io.swagger.v3.oas.annotations.responses.ApiResponse>> responseAnnotations = element.getAnnotationValuesByType(io.swagger.v3.oas.annotations.responses.ApiResponse.class);
+        if (CollectionUtils.isNotEmpty(responseAnnotations)) {
+            ApiResponses apiResponses = new ApiResponses();
+            for (AnnotationValue<io.swagger.v3.oas.annotations.responses.ApiResponse> r : responseAnnotations) {
+
+                JsonNode jn = toJson(r.getValues());
+                try {
+                    Optional<ApiResponse> newResponse = Optional.of(jsonMapper.treeToValue(jn, ApiResponse.class));
+                    newResponse.ifPresent(apiResponse -> {
+                        String name = r.get("responseCode", String.class).orElse("default");
+                        apiResponses.put(name, apiResponse);
+                    });
+                } catch (JsonProcessingException e) {
+                    context.warn("Error reading Swagger ApiResponses for element [" + element + "]: " + e.getMessage(), element);
+                }
+            }
+            swaggerOperation.setResponses(apiResponses);
+        }
+    }
+
+    private void readSecurityRequirements(MethodElement element, VisitorContext context, io.swagger.v3.oas.models.Operation swaggerOperation) {
+        List<AnnotationValue<io.swagger.v3.oas.annotations.security.SecurityRequirement>> securityAnnotations = element.getAnnotationValuesByType(io.swagger.v3.oas.annotations.security.SecurityRequirement.class);
+        if (CollectionUtils.isNotEmpty(securityAnnotations)) {
+            for (AnnotationValue<io.swagger.v3.oas.annotations.security.SecurityRequirement> r : securityAnnotations) {
+                JsonNode jn = toJson(r.getValues());
+                try {
+                    Optional<SecurityRequirement> newRequirement = Optional.of(jsonMapper.treeToValue(jn, SecurityRequirement.class));
+                    newRequirement.ifPresent(swaggerOperation::addSecurityItem);
+                } catch (JsonProcessingException e) {
+                    context.warn("Error reading Swagger SecurityRequirement for element [" + element + "]: " + e.getMessage(), element);
+                }
+            }
+        }
+    }
+
+    private void readServers(MethodElement element, VisitorContext context, io.swagger.v3.oas.models.Operation swaggerOperation) {
+        List<AnnotationValue<io.swagger.v3.oas.annotations.servers.Server>> serverAnnotations = element.getAnnotationValuesByType(io.swagger.v3.oas.annotations.servers.Server.class);
+        if (CollectionUtils.isNotEmpty(serverAnnotations)) {
+            for (AnnotationValue<io.swagger.v3.oas.annotations.servers.Server> r : serverAnnotations) {
+                JsonNode jn = toJson(r.getValues());
+                try {
+                    Optional<Server> newRequirement = Optional.of(jsonMapper.treeToValue(jn, Server.class));
+                    newRequirement.ifPresent(swaggerOperation::addServersItem);
+                } catch (JsonProcessingException e) {
+                    context.warn("Error reading Swagger Server for element [" + element + "]: " + e.getMessage(), element);
+                }
+            }
+        }
+    }
+
+    private void readTags(MethodElement element, io.swagger.v3.oas.models.Operation swaggerOperation) {
+        List<AnnotationValue<Tag>> tagAnnotations = element.getAnnotationValuesByType(Tag.class);
+        if (CollectionUtils.isNotEmpty(tagAnnotations)) {
+            for (AnnotationValue<Tag> r : tagAnnotations) {
+                r.get("name", String.class).ifPresent(swaggerOperation::addTagsItem);
+            }
+        }
     }
 
     private Content buildContent(ClassElement type, String mediaType, OpenAPI openAPI, VisitorContext context) {
