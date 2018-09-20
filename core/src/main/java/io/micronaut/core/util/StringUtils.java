@@ -253,4 +253,18 @@ public final class StringUtils {
         uri = baseUri + uri;
         return uri.replaceAll("[\\/]{2,}", "/");
     }
+
+    /**
+     * Capitalizes the first character of the provided string.
+     *
+     * @param str The string to capitalize
+     * @return The capitalized string
+     */
+    public static String capitalize(String str) {
+        char[] array = str.toCharArray();
+        if (array.length > 0) {
+            array[0] = Character.toUpperCase(array[0]);
+        }
+        return new String(array);
+    }
 }

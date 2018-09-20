@@ -1,0 +1,14 @@
+Micronaut currently has basic support for JMX. At this time, the support is *experimental* and subject to change. To get started, simply add a dependency on the configuration.
+
+[source,groovy]
+----
+compile "io.micronaut.configuration:jmx"
+----
+
+The configuration will create a bean for the management bean server based on configuration.
+
+include::{includedir}configurationProperties/io.micronaut.configuration.jmx.JmxConfiguration.adoc[]
+
+=== Endpoints
+
+If the management dependency is also on the classpath, management beans will be created for all endpoints by default.
