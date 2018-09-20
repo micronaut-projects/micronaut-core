@@ -51,6 +51,7 @@ import io.swagger.v3.oas.models.responses.ApiResponses;
 import org.reactivestreams.Publisher;
 
 import javax.annotation.Nullable;
+import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.concurrent.Future;
@@ -342,7 +343,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
         return schema;
     }
 
-    private Schema getSchemaDefinition(String mediaType, OpenAPI openAPI, VisitorContext context, ClassElement type) {
+    private Schema getSchemaDefinition(String mediaType, OpenAPI openAPI, VisitorContext context, Element type) {
         Schema schema;
         AnnotationValue<io.swagger.v3.oas.annotations.media.Schema> schemaValue = type.getAnnotation(io.swagger.v3.oas.annotations.media.Schema.class);
         Map<String, Schema> schemas = resolveSchemas(openAPI);
@@ -384,26 +385,50 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
         return null;
     }
 
-    private void populateSchemaProperties(String mediaType, OpenAPI openAPI, VisitorContext context, ClassElement type, Schema schema) {
-        List<PropertyElement> beanProperties = type.getBeanProperties();
-        for (PropertyElement beanProperty : beanProperties) {
-            if (beanProperty.isAnnotationPresent(JsonIgnore.class) || beanProperty.isAnnotationPresent(Hidden.class)) {
-                continue;
-            }
-            Schema propertySchema = resolveSchema(beanProperty.getType(), mediaType, openAPI, context);
-            Optional<String> documentation = beanProperty.getDocumentation();
-            if (StringUtils.isEmpty(propertySchema.getDescription())) {
-                String doc = documentation.orElse(null);
-                if (doc != null) {
-                    JavadocDescription desc = new JavadocParser().parse(doc);
-                    propertySchema.setDescription(desc.getMethodDescription());
+    private void populateSchemaProperties(String mediaType, OpenAPI openAPI, VisitorContext context, Element type, Schema schema) {
+        ClassElement classElement = null;
+        if (type instanceof ClassElement) {
+            classElement = (ClassElement) type;
+        } else if (type instanceof PropertyElement) {
+            classElement = ((PropertyElement) type).getType();
+        } else if (type instanceof ParameterElement) {
+            classElement = ((ParameterElement) type).getType();
+        }
+        if (classElement != null) {
+            List<PropertyElement> beanProperties = classElement.getBeanProperties();
+            for (PropertyElement beanProperty : beanProperties) {
+                if (beanProperty.isAnnotationPresent(JsonIgnore.class) || beanProperty.isAnnotationPresent(Hidden.class)) {
+                    continue;
                 }
+                Schema propertySchema = resolveSchema(beanProperty.getType(), mediaType, openAPI, context);
+
+                if (propertySchema != null) {
+                    AnnotationValue<io.swagger.v3.oas.annotations.media.Schema> schemaAnn = beanProperty.getAnnotation(io.swagger.v3.oas.annotations.media.Schema.class);
+                    if (schemaAnn != null) {
+                        JsonNode schemaJson = toJson(schemaAnn.getValues());
+                        try {
+                            propertySchema = jsonMapper.readerForUpdating(propertySchema).readValue(schemaJson);
+                        } catch (IOException e) {
+                            context.warn("Error reading Swagger Parameter for element [" + type + "]: " + e.getMessage(), type);
+                        }
+                    }
+
+                    Optional<String> documentation = beanProperty.getDocumentation();
+                    if (StringUtils.isEmpty(propertySchema.getDescription())) {
+                        String doc = documentation.orElse(null);
+                        if (doc != null) {
+                            JavadocDescription desc = new JavadocParser().parse(doc);
+                            propertySchema.setDescription(desc.getMethodDescription());
+                        }
+                    }
+                    if (beanProperty.isAnnotationPresent(Deprecated.class)) {
+                        propertySchema.setDeprecated(true);
+                    }
+                    propertySchema.setNullable(beanProperty.isAnnotationPresent(Nullable.class));
+                    schema.addProperties(beanProperty.getName(), propertySchema);
+                }
+
             }
-            if (beanProperty.isAnnotationPresent(Deprecated.class)) {
-                propertySchema.setDeprecated(true);
-            }
-            propertySchema.setNullable(beanProperty.isAnnotationPresent(Nullable.class));
-            schema.addProperties(beanProperty.getName(), propertySchema);
         }
     }
 
