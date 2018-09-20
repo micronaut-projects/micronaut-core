@@ -13,15 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs
 
-trait YamlAsciidocTagCleaner {
+package io.micronaut.multitenancy.propagation;
 
-    String cleanYamlAsciidocTag(String str) {
-        str.replaceAll('//tag::yamlconfig\\[]', '').replaceAll('//end::yamlconfig\\[]', '').trim()
-    }
+import io.micronaut.core.util.Toggleable;
+import io.micronaut.http.util.OutgointRequestProcessorMatcher;
 
-    Map flatten(Map m, String separator = '.') {
-        m.collectEntries { k, v ->  v instanceof Map ? flatten(v, separator).collectEntries { q, r ->  [(k + separator + q): r] } : [(k):v] }
-    }
+/**
+ * Tenant propagation Configuration.
+ *
+ * @author Sergio del Amo
+ * @since 1.0
+ */
+public interface TenantPropagationConfiguration extends Toggleable, OutgointRequestProcessorMatcher {
+
+    /**
+     * @return the path intercepted by {@link io.micronaut.multitenancy.propagation.TenantPropagationHttpClientFilter}.
+     */
+    String getPath();
 }

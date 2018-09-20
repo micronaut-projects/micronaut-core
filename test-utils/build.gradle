@@ -1,0 +1,7 @@
+ext {
+    snakeYamlVersion = '1.19'
+}
+
+dependencies {
+    testCompile "org.yaml:snakeyaml:$snakeYamlVersion"
+}
