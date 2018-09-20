@@ -303,9 +303,9 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
 
                 copySkeleton(profileInstance, p, cmd)
 
-                ymlCache.each { File applicationYmlFile, String previousApplicationYml ->
-                    if (applicationYmlFile.exists()) {
-                        appendToYmlSubDocument(applicationYmlFile, previousApplicationYml)
+                for (Map.Entry<File, String> entry: ymlCache.entrySet()) {
+                    if (entry.getKey().exists()) {
+                        appendToYmlSubDocument(entry.getKey(), entry.getValue())
                     }
                 }
             }
