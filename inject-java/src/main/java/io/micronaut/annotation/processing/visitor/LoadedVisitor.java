@@ -22,11 +22,9 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
 import javax.annotation.processing.ProcessingEnvironment;
-import javax.lang.model.element.Element;
-import javax.lang.model.element.ExecutableElement;
-import javax.lang.model.element.TypeElement;
-import javax.lang.model.element.VariableElement;
+import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -125,13 +123,26 @@ public class LoadedVisitor {
                 );
             }
         } else if (element instanceof TypeElement) {
-            visitor.visitClass(
-                    new JavaClassElement(
-                            (TypeElement) element,
-                            annotationMetadata,
-                            visitorContext),
-                    visitorContext
-            );
+            TypeElement typeElement = (TypeElement) element;
+            boolean isEnum = typeElement.getKind() == ElementKind.ENUM;
+            if (isEnum) {
+                visitor.visitClass(
+                        new JavaEnumElement(
+                                typeElement,
+                                annotationMetadata,
+                                visitorContext,
+                                Collections.emptyList()),
+                        visitorContext
+                );
+            } else {
+                visitor.visitClass(
+                        new JavaClassElement(
+                                typeElement,
+                                annotationMetadata,
+                                visitorContext),
+                        visitorContext
+                );
+            }
         }
     }
 

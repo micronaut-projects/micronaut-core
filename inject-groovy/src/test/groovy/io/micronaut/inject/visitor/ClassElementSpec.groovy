@@ -40,6 +40,35 @@ public class TestController {
     }
 
 
+    void "test visit methods that take and return enums"() {
+        buildBeanDefinition('test.TestController', '''
+package test;
+
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.*;
+import javax.inject.Inject;
+
+@Controller("/test")
+public class TestController {
+    
+    @Get("/getMethod")
+    public HttpMethod getMethod(HttpMethod argument) {
+        return null;
+    }
+    
+
+}
+''')
+        expect:
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 1
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType instanceof EnumElement
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].returnType.values().contains("GET")
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters.size() == 1
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type instanceof EnumElement
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[0].parameters[0].type.values().contains("POST")
+    }
+
     void "test primitive types"() {
         buildBeanDefinition('test.TestController', '''
 package test;
