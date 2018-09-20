@@ -100,6 +100,7 @@ httpServer:
     thymeleaf: Thymeleaf
     handlebars: Handlebars.java
     velocity: Apache Velocity
+  openapi: OpenAPI / Swagger Support
 httpClient:
   title: The HTTP Client
   lowLevelHttpClient:
