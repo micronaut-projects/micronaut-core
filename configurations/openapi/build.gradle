@@ -1,0 +1,14 @@
+dependencies {
+    compileOnly project(":inject")
+    compile project(":http")
+    compile project(":validation")
+    compile "io.swagger.core.v3:swagger-core:2.0.4"
+    compile "io.swagger.core.v3:swagger-models:2.0.4"
+    compile "io.swagger.core.v3:swagger-annotations:2.0.4"
+
+    testCompileOnly project(":inject-java")
+    testCompileOnly project(":inject-groovy")
+    testCompile "com.google.testing.compile:compile-testing:0.12"
+    testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+
+}

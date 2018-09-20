@@ -19,6 +19,7 @@ package io.micronaut.annotation.processing.visitor;
 import io.micronaut.annotation.processing.GenericUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
 import javax.annotation.processing.ProcessingEnvironment;
@@ -55,10 +56,23 @@ public class LoadedVisitor {
                          ProcessingEnvironment processingEnvironment) {
         this.visitorContext = visitorContext;
         this.visitor = visitor;
-        TypeElement typeElement = processingEnvironment.getElementUtils().getTypeElement(visitor.getClass().getName());
-        List<? extends TypeMirror> generics = genericUtils.interfaceGenericTypesFor(typeElement, TypeElementVisitor.class.getName());
-        classAnnotation = generics.get(0).toString();
-        elementAnnotation = generics.get(1).toString();
+        Class<? extends TypeElementVisitor> aClass = visitor.getClass();
+
+        TypeElement typeElement = processingEnvironment.getElementUtils().getTypeElement(aClass.getName());
+        if (typeElement != null) {
+            List<? extends TypeMirror> generics = genericUtils.interfaceGenericTypesFor(typeElement, TypeElementVisitor.class.getName());
+            classAnnotation = generics.get(0).toString();
+            elementAnnotation = generics.get(1).toString();
+        } else {
+            Class[] classes = GenericTypeUtils.resolveInterfaceTypeArguments(aClass, TypeElementVisitor.class);
+            if (classes != null && classes.length == 2) {
+                classAnnotation = classes[0].getName();
+                elementAnnotation = classes[1].getName();
+            } else {
+                classAnnotation = Object.class.getName();
+                elementAnnotation = Object.class.getName();
+            }
+        }
     }
 
     /**

@@ -17,7 +17,7 @@ package io.micronaut.docs.base64
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
-import io.micronaut.docs.YamlAsciidocTagCleaner
+import io.micronaut.testutils.YamlAsciidocTagCleaner
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException

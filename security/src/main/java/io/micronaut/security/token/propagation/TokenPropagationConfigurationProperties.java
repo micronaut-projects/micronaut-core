@@ -19,6 +19,8 @@ package io.micronaut.security.token.propagation;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.security.token.config.TokenConfigurationProperties;
 
+import java.util.regex.Pattern;
+
 /**
  * Token Propagation Configuration Properties.
  *
@@ -44,33 +46,35 @@ public class TokenPropagationConfigurationProperties implements TokenPropagation
 
     private boolean enabled = DEFAULT_ENABLED;
 
-    private String servicesRegex;
+    private String serviceIdRegex;
 
     private String uriRegex;
+
+    Pattern serviceIdPattern;
+
+    Pattern uriPattern;
 
     private String path = DEFAULT_PATH;
 
     /**
      * @return a regular expression to match the service.
      */
-    @Override
-    public String getServicesRegex() {
-        return this.servicesRegex;
+    public String getServiceIdRegex() {
+        return this.serviceIdRegex;
     }
 
     /**
      * a regular expression to match the service id.
-     * @param servicesRegex serviceId regular expression
+     * @param serviceIdRegex serviceId regular expression
      */
-    public void setServicesRegex(String servicesRegex) {
-        this.servicesRegex = servicesRegex;
+    public void setServiceIdRegex(String serviceIdRegex) {
+        this.serviceIdRegex = serviceIdRegex;
     }
 
     /**
      *
      * @return a regular expression to match the uri.
      */
-    @Override
     public String getUriRegex() {
         return this.uriRegex;
     }
@@ -112,5 +116,21 @@ public class TokenPropagationConfigurationProperties implements TokenPropagation
     @Override
     public String getPath() {
         return this.path;
+    }
+
+    @Override
+    public Pattern getServiceIdPattern() {
+        if (this.serviceIdPattern == null && this.serviceIdRegex != null) {
+            serviceIdPattern = Pattern.compile(this.serviceIdRegex);
+        }
+        return serviceIdPattern;
+    }
+
+    @Override
+    public Pattern getUriPattern() {
+        if (this.uriPattern == null && this.uriRegex != null) {
+            uriPattern = Pattern.compile(this.uriRegex);
+        }
+        return uriPattern;
     }
 }
