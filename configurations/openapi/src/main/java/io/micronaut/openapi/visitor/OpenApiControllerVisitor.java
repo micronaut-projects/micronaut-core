@@ -157,6 +157,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
             List<Parameter> swaggerParameters = swaggerOperation.getParameters();
             List<String> pathVariables = matchTemplate.getVariables();
 
+            String consumesMediaType = element.getValue(Consumes.class, String.class).orElse(MediaType.APPLICATION_JSON);
             ApiResponses responses = swaggerOperation.getResponses();
             if (responses == null) {
                 responses = new ApiResponses();
@@ -207,8 +208,8 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                             }
                         }
                         requestBody.setRequired(!parameter.isAnnotationPresent(Nullable.class) && !parameterType.isAssignable(Optional.class));
-                        String mediaType = element.getValue(Consumes.class, String.class).orElse(MediaType.APPLICATION_JSON);
-                        Content content = buildContent(parameterType, mediaType);
+
+                        Content content = buildContent(parameterType, consumesMediaType);
                         requestBody.setContent(content);
                         swaggerOperation.setRequestBody(requestBody);
                     }
@@ -271,7 +272,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
 
                     Schema schema = newParameter.getSchema();
                     if (schema == null) {
-                        schema = resolveSchema(parameterType);
+                        schema = resolveSchema(parameterType, consumesMediaType);
                     }
 
                     if (schema != null) {
@@ -287,15 +288,18 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
     private Content buildContent(ClassElement type, String mediaType) {
         Content content = new Content();
         io.swagger.v3.oas.models.media.MediaType mt = new io.swagger.v3.oas.models.media.MediaType();
-        mt.setSchema(resolveSchema(type));
+        mt.setSchema(resolveSchema(type, mediaType));
         content.addMediaType(mediaType, mt);
         return content;
     }
 
-    private Schema resolveSchema(ClassElement type) {
+    private Schema resolveSchema(ClassElement type, String mediaType) {
         Schema schema = null;
 
+        boolean isPublisher = false;
+
         if (isContainerType(type)) {
+            isPublisher = type.isAssignable(Publisher.class.getName()) && !type.isAssignable("reactor.core.publisher.Mono");
             type = type.getFirstTypeArgument().orElse(null);
         }
 
@@ -303,26 +307,40 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
 
             String typeName = type.getName();
             if (ClassUtils.isJavaLangType(typeName)) {
-                Optional<Class> aClass = ClassUtils.forName(typeName, getClass().getClassLoader());
-                if (aClass.isPresent()) {
-                    Class concreteType = aClass.get();
-                    Class wrapperType = ReflectionUtils.getWrapperType(concreteType);
-
-                    PrimitiveType primitiveType = PrimitiveType.fromType(wrapperType);
-                    if (primitiveType != null) {
-                        schema = primitiveType.createProperty();
-                    }
-                }
+                schema = getPrimitiveType(typeName);
+            } else if (type.isIterable()) {
+                String componentType = type.getFirstTypeArgument().map(Element::getName).orElse(Object.class.getName());
+                schema = getPrimitiveType(componentType);
+                schema = arraySchema(schema);
             }
 
         }
 
         if (schema != null) {
-            if (type.isIterable()) {
-                ArraySchema arraySchema = new ArraySchema();
-                arraySchema.setItems(schema);
-                arraySchema.setType(schema.getType());
-                schema = arraySchema;
+            boolean isStream = MediaType.TEXT_EVENT_STREAM.equals(mediaType) || MediaType.APPLICATION_JSON_STREAM.equals(mediaType);
+            if ((!isStream && isPublisher) || type.isIterable()) {
+                schema = arraySchema(schema);
+            }
+        }
+        return schema;
+    }
+
+    private ArraySchema arraySchema(Schema schema) {
+        ArraySchema arraySchema = new ArraySchema();
+        arraySchema.setItems(schema);
+        return arraySchema;
+    }
+
+    private Schema getPrimitiveType(String typeName) {
+        Schema schema = null;
+        Optional<Class> aClass = ClassUtils.forName(typeName, getClass().getClassLoader());
+        if (aClass.isPresent()) {
+            Class concreteType = aClass.get();
+            Class wrapperType = ReflectionUtils.getWrapperType(concreteType);
+
+            PrimitiveType primitiveType = PrimitiveType.fromType(wrapperType);
+            if (primitiveType != null) {
+                schema = primitiveType.createProperty();
             }
         }
         return schema;
