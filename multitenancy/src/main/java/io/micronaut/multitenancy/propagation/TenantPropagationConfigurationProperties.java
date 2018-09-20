@@ -19,6 +19,8 @@ package io.micronaut.multitenancy.propagation;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.multitenancy.MultitenancyConfiguration;
 
+import java.util.regex.Pattern;
+
 /**
  * Tenant propagation Configuration Properties.
  *
@@ -48,12 +50,15 @@ public class TenantPropagationConfigurationProperties implements TenantPropagati
 
     private String uriRegex;
 
+    Pattern serviceIdPattern;
+
+    Pattern uriPattern;
+
     private String path = DEFAULT_PATH;
 
     /**
      * @return a regular expresion to validate the service id against.
      */
-    @Override
     public String getServiceIdRegex() {
         return this.serviceIdRegex;
     }
@@ -71,7 +76,6 @@ public class TenantPropagationConfigurationProperties implements TenantPropagati
      *
      * @return a regular expression to validate the target request uri against.
      */
-    @Override
     public String getUriRegex() {
         return this.uriRegex;
     }
@@ -113,5 +117,21 @@ public class TenantPropagationConfigurationProperties implements TenantPropagati
     @Override
     public String getPath() {
         return this.path;
+    }
+
+    @Override
+    public Pattern getServiceIdPattern() {
+        if (this.serviceIdPattern == null && this.serviceIdRegex != null) {
+            serviceIdPattern = Pattern.compile(this.serviceIdRegex);
+        }
+        return serviceIdPattern;
+    }
+
+    @Override
+    public Pattern getUriPattern() {
+        if (this.uriPattern == null && this.uriRegex != null) {
+            uriPattern = Pattern.compile(this.uriRegex);
+        }
+        return uriPattern;
     }
 }

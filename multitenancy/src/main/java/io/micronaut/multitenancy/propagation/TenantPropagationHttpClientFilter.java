@@ -22,11 +22,10 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
-import io.micronaut.http.util.RequestProcessor;
+import io.micronaut.http.util.OutgoingHttpRequestProcessor;
 import io.micronaut.multitenancy.tenantresolver.TenantResolver;
 import io.micronaut.multitenancy.exceptions.TenantException;
 import io.micronaut.multitenancy.writer.TenantWriter;
-import io.micronaut.security.token.propagation.TokenPropagationConfigurationProperties;
 import org.reactivestreams.Publisher;
 
 import java.io.Serializable;
@@ -38,29 +37,29 @@ import java.io.Serializable;
  * @since 1.0
  */
 @Filter("${" + TenantPropagationConfigurationProperties.PREFIX + ".path:/**}")
-@Requires(beans = {TenantWriter.class, TenantResolver.class, TenantPropagationConfiguration.class, RequestProcessor.class})
+@Requires(beans = {TenantWriter.class, TenantResolver.class, TenantPropagationConfiguration.class, OutgoingHttpRequestProcessor.class})
 @Requires(property = TenantPropagationConfigurationProperties.PREFIX + ".enabled")
 public class TenantPropagationHttpClientFilter implements HttpClientFilter  {
 
     protected final TenantPropagationConfiguration tenantPropagationConfiguration;
     protected final TenantWriter tokenWriter;
     protected final TenantResolver tenantResolver;
-    protected final RequestProcessor requestProcessor;
+    protected final OutgoingHttpRequestProcessor outgoingHttpRequestProcessor;
 
     /**
      * @param tenantResolver bean responsible of resolving the tenant
      * @param tokenWriter bean responsible of writing the token to the target request
      * @param tenantPropagationConfiguration Tenant Propagation configuration
-     * @param requestProcessor Utility to decide whether to process the request
+     * @param outgoingHttpRequestProcessor Utility to decide whether to process the request
      */
     public TenantPropagationHttpClientFilter(TenantResolver tenantResolver,
                                              TenantWriter tokenWriter,
                                              TenantPropagationConfiguration tenantPropagationConfiguration,
-                                             RequestProcessor requestProcessor) {
+                                             OutgoingHttpRequestProcessor outgoingHttpRequestProcessor) {
         this.tenantResolver = tenantResolver;
         this.tokenWriter = tokenWriter;
         this.tenantPropagationConfiguration = tenantPropagationConfiguration;
-        this.requestProcessor = requestProcessor;
+        this.outgoingHttpRequestProcessor = outgoingHttpRequestProcessor;
     }
 
     /**
@@ -71,7 +70,7 @@ public class TenantPropagationHttpClientFilter implements HttpClientFilter  {
      */
     @Override
     public Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> targetRequest, ClientFilterChain chain) {
-        if (!requestProcessor.shouldProcessRequest(tenantPropagationConfiguration, targetRequest)) {
+        if (!outgoingHttpRequestProcessor.shouldProcessRequest(tenantPropagationConfiguration, targetRequest)) {
             return chain.proceed(targetRequest);
         }
         try {

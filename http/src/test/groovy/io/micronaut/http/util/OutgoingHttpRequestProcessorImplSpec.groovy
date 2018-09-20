@@ -3,7 +3,9 @@ package io.micronaut.http.util
 import spock.lang.Specification
 import spock.lang.Unroll
 
-class RequestProcessorImplSpec extends Specification {
+import java.util.regex.Pattern
+
+class OutgoingHttpRequestProcessorImplSpec extends Specification {
     @Unroll("for a request with service #serviceId uri #uri given: serviceregex: #serviceIdRegex uriRegex: #uriRegex #description")
     void "test shouldProcessRequest"(boolean expected,
                                      String serviceId,
@@ -12,11 +14,8 @@ class RequestProcessorImplSpec extends Specification {
                                      String uriRegex,
                                      String description) {
         when:
-        def requestProcessorMatcher = Stub(RequestProcessorMatcher) {
-            getServiceIdRegex() >> serviceIdRegex
-            getUriRegex() >> uriRegex
-        }
-        RequestProcessor requestProcessor = new RequestProcessorImpl()
+        def requestProcessorMatcher = new MockOutgoingRequestProcessorMatcher(serviceIdRegex, uriRegex)
+        OutgoingHttpRequestProcessor requestProcessor = new OutgoingHttpRequestProcessorImpl()
 
         then:
         requestProcessor.shouldProcessRequest(requestProcessorMatcher, serviceId, uri) == expected
@@ -29,8 +28,31 @@ class RequestProcessorImplSpec extends Specification {
         true     || null                                  | '/api/books'    | null                     | '^.*books$'
         false    || 'https://mymicroservice.micronaut.io' | '/api/invoices' | null                     | '^.*books$'
 
-
         description = expected ? 'should be processed' : ' should NOT be processed'
+    }
+}
+
+class MockOutgoingRequestProcessorMatcher implements OutgointRequestProcessorMatcher {
+    Pattern serviceIdPattern
+    Pattern uriPattern
+
+    MockOutgoingRequestProcessorMatcher(String serviceIdRegex, String uriRegex) {
+        if (serviceIdRegex != null ) {
+            serviceIdPattern = Pattern.compile(serviceIdRegex)
+        }
+        if (uriRegex !=null ) {
+            uriPattern = Pattern.compile(uriRegex)
+        }
+    }
+
+    @Override
+    Pattern getServiceIdPattern() {
+        return serviceIdPattern
+    }
+
+    @Override
+    Pattern getUriPattern() {
+        return uriPattern
     }
 }
 
