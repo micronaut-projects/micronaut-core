@@ -30,7 +30,11 @@ public class JwtGeneratorConfigurationProperties implements JwtGeneratorConfigur
 
     public static final String PREFIX = JwtConfigurationProperties.PREFIX + ".generator";
 
-    private static final Integer DEFAULT_EXPIRATION = 3600;
+    /**
+     * The default expiration.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final Integer DEFAULT_EXPIRATION = 3600;
 
     private Integer refreshTokenExpiration = null;
     private Integer accessTokenExpiration = DEFAULT_EXPIRATION;
@@ -57,7 +61,7 @@ public class JwtGeneratorConfigurationProperties implements JwtGeneratorConfigur
     }
 
     /**
-     * Access token expiration. Default value ({@value DEFAULT_EXPIRATION}).
+     * Access token expiration. Default value ({@value #DEFAULT_EXPIRATION}).
      * @param accessTokenExpiration The expiration
      */
     public void setAccessTokenExpiration(Integer accessTokenExpiration) {
