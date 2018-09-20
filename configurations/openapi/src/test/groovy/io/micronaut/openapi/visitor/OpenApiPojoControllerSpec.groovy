@@ -3,15 +3,14 @@ package io.micronaut.openapi.visitor
 import io.micronaut.openapi.AbstractTypeElementSpec
 import io.swagger.v3.oas.annotations.enums.ParameterIn
 import io.swagger.v3.oas.models.OpenAPI
-import io.swagger.v3.oas.models.Operation
 import io.swagger.v3.oas.models.PathItem
 
-class OpenApiControllerVisitorSpec extends AbstractTypeElementSpec {
-
+class OpenApiPojoControllerSpec extends AbstractTypeElementSpec {
     def setup() {
         System.setProperty(AbstractOpenApiVisitor.ATTR_TEST_MODE, "true")
     }
-    void "test build OpenAPI doc for simple type with generics"() {
+
+    void "test build OpenAPI doc for POJO type with generics"() {
 
         given:"An API definition"
         when:
@@ -21,6 +20,7 @@ package test;
 import io.reactivex.*;
 import io.micronaut.http.annotation.*;
 import java.util.List;
+import io.swagger.v3.oas.annotations.media.*;
 
 /**
  * @author graemerocher
@@ -28,7 +28,7 @@ import java.util.List;
  */
 
 @Controller("/pets")
-interface PetOperations<T extends String> {
+interface PetOperations<T extends Pet> {
 
     /**
      * List the pets
@@ -65,7 +65,30 @@ interface PetOperations<T extends String> {
     Single<T> save(@Body T pet);
 }
 
-
+//@Schema
+class Pet {
+    private int age;
+    private String name;
+    
+    public void setAge(int a) {
+        age = a;
+    }
+    
+    /**
+     * The age
+     */
+    public int getAge() {
+        return age;
+    }
+    
+    public void setName(String n) {
+        name = n;
+    }
+    
+    public String getName() {
+        return name;
+    }
+}
 @javax.inject.Singleton
 class MyBean {}
 ''')
@@ -105,7 +128,11 @@ class MyBean {}
         pathItem.get.parameters[0].schema.type == 'string'
         pathItem.get.responses.size() == 1
         pathItem.get.responses['default'] != null
-        pathItem.get.responses['default'].content['application/json'].schema.type == 'string'
+        pathItem.get.responses['default'].content['application/json'].schema.type == 'object'
+        pathItem.get.responses['default'].content['application/json'].schema.properties.size() == 2
+        pathItem.get.responses['default'].content['application/json'].schema.properties['age'].type == 'integer'
+        pathItem.get.responses['default'].content['application/json'].schema.properties['age'].description == 'The age'
+        pathItem.get.responses['default'].content['application/json'].schema.properties['name'].type == 'string'
 
         when:"A flowable is returned"
         pathItem = openAPI.paths.get("/pets/flowable")
@@ -116,53 +143,5 @@ class MyBean {}
         pathItem.get.responses['default'].description == 'a list of pet names'
         pathItem.get.responses['default'].content['application/json'].schema
         pathItem.get.responses['default'].content['application/json'].schema.type == 'array'
-    }
-
-    void "test parse custom parameter data"() {
-        given:
-        buildBeanDefinition('test.MyBean', '''
-package test;
-
-import io.swagger.v3.oas.annotations.*;
-import io.swagger.v3.oas.annotations.media.*;
-import io.swagger.v3.oas.annotations.enums.*;
-import io.micronaut.http.annotation.*;
-import java.util.List;
-
-@Controller("/")
-class MyController {
-
-    @Get("/subscription/{subscriptionId}")
-    public String getSubscription(
-               @Parameter(in = ParameterIn.PATH, name = "subscriptionId",
-               \t\t\trequired = true, description = "parameter description",
-               \t\t\tallowEmptyValue = true, allowReserved = true,
-               \t\t\tschema = @Schema(
-                                    type = "string",
-                                    format = "uuid",
-                                    description = "the generated UUID")) String subscriptionId) { 
-        return null;                               
-     }
-}
-
-@javax.inject.Singleton
-class MyBean {}
-''')
-        Operation operation = AbstractOpenApiVisitor.testReference?.paths?.get("/subscription/{subscriptionId}")?.get
-
-        expect:
-        operation != null
-        operation.operationId == 'getSubscription'
-        operation.parameters.size() == 1
-        operation.parameters[0].in == 'path'
-        operation.parameters[0].name == 'subscriptionId'
-        operation.parameters[0].description == 'parameter description'
-        operation.parameters[0].required
-        operation.parameters[0].allowEmptyValue
-        operation.parameters[0].allowReserved
-        operation.parameters[0].schema.type == 'string'
-        operation.parameters[0].schema.format == 'uuid'
-        operation.parameters[0].schema.description == 'the generated UUID'
-
     }
 }
