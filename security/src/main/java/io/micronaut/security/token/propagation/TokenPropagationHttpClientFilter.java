@@ -17,7 +17,6 @@
 package io.micronaut.security.token.propagation;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
@@ -25,10 +24,10 @@ import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
+import io.micronaut.http.util.OutgoingHttpRequestProcessor;
 import io.micronaut.security.token.writer.TokenWriter;
 import org.reactivestreams.Publisher;
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 import static io.micronaut.security.filters.SecurityFilter.TOKEN;
 
@@ -44,40 +43,20 @@ import static io.micronaut.security.filters.SecurityFilter.TOKEN;
 public class TokenPropagationHttpClientFilter implements HttpClientFilter  {
     protected final TokenPropagationConfiguration tokenPropagationConfiguration;
     protected final TokenWriter tokenWriter;
+    protected final OutgoingHttpRequestProcessor outgoingHttpRequestProcessor;
 
     /**
      *
      * @param tokenWriter bean responsible of writing the token to the target request
      * @param tokenPropagationConfiguration JWT Propagation configuration
+     * @param outgoingHttpRequestProcessor Utility to decide whether to process the request
      */
     public TokenPropagationHttpClientFilter(TokenWriter tokenWriter,
-                                            TokenPropagationConfiguration tokenPropagationConfiguration) {
+                                            TokenPropagationConfiguration tokenPropagationConfiguration,
+                                            OutgoingHttpRequestProcessor outgoingHttpRequestProcessor) {
         this.tokenWriter = tokenWriter;
         this.tokenPropagationConfiguration = tokenPropagationConfiguration;
-    }
-
-    /**
-     *
-     * @param serviceId request's service identifier
-     * @param uri request's uri
-     * @return true if the request should be processed by this filter.
-     */
-    public boolean shouldProcessRequest(Optional<String> serviceId, String uri) {
-
-        if (tokenPropagationConfiguration.getServicesRegex() != null && serviceId.isPresent()) {
-            Pattern pattern = Pattern.compile(tokenPropagationConfiguration.getServicesRegex());
-            if (pattern.matcher(serviceId.get()).matches()) {
-                return true;
-            }
-        }
-        if (tokenPropagationConfiguration.getUriRegex() != null && uri != null) {
-            Pattern pattern = Pattern.compile(tokenPropagationConfiguration.getUriRegex());
-            if (pattern.matcher(uri).matches()) {
-                return true;
-            }
-        }
-
-        return false;
+        this.outgoingHttpRequestProcessor = outgoingHttpRequestProcessor;
     }
 
     /**
@@ -89,9 +68,7 @@ public class TokenPropagationHttpClientFilter implements HttpClientFilter  {
     @Override
     public Publisher<? extends HttpResponse<?>> doFilter(MutableHttpRequest<?> targetRequest, ClientFilterChain chain) {
 
-        Optional<String> serviceId = targetRequest.getAttribute(HttpAttributes.SERVICE_ID.toString(), String.class);
-        String uri = targetRequest.getUri().toString();
-        if (!shouldProcessRequest(serviceId, uri)) {
+        if (!outgoingHttpRequestProcessor.shouldProcessRequest(tokenPropagationConfiguration, targetRequest)) {
             return chain.proceed(targetRequest);
         }
 

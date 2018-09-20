@@ -100,7 +100,7 @@ public class JmxConfiguration {
     }
 
     /**
-     * Sets if the server should be kept in the factory. Default {@value DEFAULT_ADD_FACTORY}.
+     * Sets if the server should be kept in the factory. Default {@value #DEFAULT_ADD_FACTORY}.
      *
      * @param addToFactory The add to factory flag
      */
@@ -120,7 +120,7 @@ public class JmxConfiguration {
     }
 
     /**
-     * Sets to ignore the exception if the agent is not found. Default {@value DEFAULT_IGNORE_AGENT}.
+     * Sets to ignore the exception if the agent is not found. Default {@value #DEFAULT_IGNORE_AGENT}.
      *
      * @param ignoreAgentNotFound The ignoreAgentNotFound
      */
@@ -138,7 +138,7 @@ public class JmxConfiguration {
     }
 
     /**
-     * Sets if endpoints should be registered. Default {@value DEFAULT_REG_ENDPOINTS}.
+     * Sets if endpoints should be registered. Default {@value #DEFAULT_REG_ENDPOINTS}.
      *
      * @param registerEndpoints The flag
      */

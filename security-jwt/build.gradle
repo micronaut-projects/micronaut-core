@@ -8,8 +8,7 @@ buildscript {
 }
 
 ext {
-    nimbusJoseJwtVersion = '5.14'
-    snakeYamlVersion = '1.19'
+    nimbusJoseJwtVersion = '5.9'
     bouncyCastleVersion = '1.53'
     gebVersion = '2.1'
     seleniumVersion = '3.6.0'
@@ -34,7 +33,7 @@ dependencies {
     testCompile project(":inject-groovy")
     testCompile project(":http-server-netty")
 
-    testCompile "org.yaml:snakeyaml:$snakeYamlVersion"
+    testCompile project(":test-utils")
 }
 
 apply from: "${rootProject.projectDir}/gradle/geb.gradle"
