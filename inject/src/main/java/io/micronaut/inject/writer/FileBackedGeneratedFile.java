@@ -26,6 +26,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Reader;
 import java.io.Writer;
+import java.net.URI;
 import java.nio.file.Files;
 
 /**
@@ -42,6 +43,11 @@ class FileBackedGeneratedFile implements GeneratedFile {
      */
     FileBackedGeneratedFile(File file) {
         this.file = file;
+    }
+
+    @Override
+    public URI toURI() {
+        return file.toURI();
     }
 
     @Override
