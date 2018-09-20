@@ -45,6 +45,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     private final Filer filer;
     private final Map<String, Optional<GeneratedFile>> metaInfFiles = new HashMap<>();
     private final Map<String, FileObject> openedFiles = new HashMap<>();
+    private final Map<String, Optional<GeneratedFile>> generatedFiles = new HashMap<>();
 
     /**
      * @param filer The {@link Filer} for creating new files
@@ -67,6 +68,11 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
         });
     }
 
+    @Override
+    public Optional<GeneratedFile> visitGeneratedFile(String path) {
+        return generatedFiles.computeIfAbsent(path, s -> Optional.of(new GeneratedFileObject(path, StandardLocation.SOURCE_OUTPUT)));
+    }
+
     private FileObject openFileForReading(String path) {
         return openedFiles.computeIfAbsent(path, s -> {
             try {
@@ -83,6 +89,7 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
     class GeneratedFileObject implements GeneratedFile {
 
         private final String path;
+        private final StandardLocation classOutput;
 
         private FileObject inputObject;
 
@@ -91,6 +98,15 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
          */
         GeneratedFileObject(String path) {
             this.path = path;
+            classOutput = StandardLocation.CLASS_OUTPUT;
+        }
+        /**
+         * @param path The path for the generated file
+         * @param location The location
+         */
+        GeneratedFileObject(String path, StandardLocation location) {
+            this.path = path;
+            this.classOutput = location;
         }
 
         @Override
@@ -100,12 +116,12 @@ public class AnnotationProcessingOutputVisitor extends AbstractClassWriterOutput
 
         @Override
         public Writer openWriter() throws IOException {
-            return filer.createResource(StandardLocation.CLASS_OUTPUT, "", path).openWriter();
+            return filer.createResource(classOutput, "", path).openWriter();
         }
 
         @Override
         public OutputStream openOutputStream() throws IOException {
-            return filer.createResource(StandardLocation.CLASS_OUTPUT, "", path).openOutputStream();
+            return filer.createResource(classOutput, "", path).openOutputStream();
         }
 
         @Override

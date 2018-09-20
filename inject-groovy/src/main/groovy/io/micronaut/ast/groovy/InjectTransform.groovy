@@ -29,6 +29,7 @@ import io.micronaut.inject.annotation.DefaultAnnotationMetadata
 import io.micronaut.inject.configuration.ConfigurationMetadata
 import io.micronaut.inject.configuration.PropertyMetadata
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
+import io.micronaut.inject.writer.GeneratedFile
 
 import javax.inject.Named
 import java.util.concurrent.TimeUnit
@@ -215,6 +216,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                         @Override
                         Optional<File> visitMetaInfFile(String path) throws IOException {
+                            return Optional.empty()
+                        }
+
+                        @Override
+                        Optional<GeneratedFile> visitGeneratedFile(String path) {
                             return Optional.empty()
                         }
 

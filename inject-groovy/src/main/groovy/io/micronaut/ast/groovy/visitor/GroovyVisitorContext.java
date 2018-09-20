@@ -88,6 +88,20 @@ public class GroovyVisitorContext extends MutableConvertibleValuesMap<Object> im
         return Optional.empty();
     }
 
+    @Override
+    public Optional<GeneratedFile> visitGeneratedFile(String path) {
+        File classesDir = sourceUnit.getConfiguration().getTargetDirectory();
+        if (classesDir != null) {
+
+            DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
+                    classesDir
+            );
+            return outputVisitor.visitGeneratedFile(path);
+        }
+
+        return Optional.empty();
+    }
+
     /**
      * @return The source unit
      */
