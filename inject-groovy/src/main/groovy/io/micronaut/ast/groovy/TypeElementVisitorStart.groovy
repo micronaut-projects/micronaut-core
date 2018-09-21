@@ -38,8 +38,16 @@ class TypeElementVisitorStart implements ASTTransformation {
             for (ServiceDefinition<TypeElementVisitor> definition: serviceLoader) {
                 if (definition.isPresent()) {
                     TypeElementVisitor visitor = definition.load()
-                    LoadedVisitor newLoadedVisitor = new LoadedVisitor(visitor, visitorContext)
-                    loadedVisitors.put(definition.getName(), newLoadedVisitor)
+                    try {
+                        LoadedVisitor newLoadedVisitor = new LoadedVisitor(visitor, visitorContext)
+                        loadedVisitors.put(definition.getName(), newLoadedVisitor)
+                    } catch (TypeNotPresentException e) {
+                        // skip, all classes not on classpath
+                    } catch (NoClassDefFoundError e) {
+                        // skip, all classes not on classpath
+                    } catch (ClassNotFoundException e) {
+                        // skip, all classes not on classpath
+                    }
                 }
             }
 
