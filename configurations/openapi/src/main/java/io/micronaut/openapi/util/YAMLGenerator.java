@@ -1,5 +1,15 @@
-package io.micronaut.openapi.util;
+/*
+This copy of Jackson JSON processor YAML module is licensed under the
+Apache (Software) License, version 2.0 ("the License").
+See the License for details about distribution rights, and the
+specific rights regarding derivate works.
 
+You may obtain a copy of the License at:
+
+http://www.apache.org/licenses/LICENSE-2.0
+ */
+
+package io.micronaut.openapi.util;
 
 import java.io.*;
 import java.math.BigDecimal;
@@ -22,15 +32,26 @@ import com.fasterxml.jackson.core.io.IOContext;
 import com.fasterxml.jackson.dataformat.yaml.PackageVersion;
 
 /**
- * Copied from {@link com.fasterxml.jackson.dataformat.yaml.YAMLGenerator} to support snakeyaml >= 1.2
+ * Copied from {@link com.fasterxml.jackson.dataformat.yaml.YAMLGenerator} to support snakeyaml >= 1.2.
  */
-public class YAMLGenerator extends GeneratorBase
-{
-    /**
-     * Enumeration that defines all togglable features for YAML generators
+public class YAMLGenerator extends GeneratorBase {
+
+    /*
+    /**********************************************************
+    /* Internal constants
+    /**********************************************************
      */
-    public enum Feature implements FormatFeature // since 2.9
-    {
+
+    protected static final long MIN_INT_AS_LONG = (long) Integer.MIN_VALUE;
+    protected static final long MAX_INT_AS_LONG = (long) Integer.MAX_VALUE;
+    protected static final Pattern PLAIN_NUMBER_P = Pattern.compile("[0-9]*(\\.[0-9]*)?");
+    protected static final String TAG_BINARY = Tag.BINARY.toString();
+
+    /**
+     * Enumeration that defines all togglable features for YAML generators.
+     */
+    // since 2.9
+    public enum Feature implements FormatFeature {
         /**
          * Whether we are to write an explicit document start marker ("---")
          * or not.
@@ -124,12 +145,18 @@ public class YAMLGenerator extends GeneratorBase
         protected final boolean _defaultState;
         protected final int _mask;
 
+        private Feature(boolean defaultState) {
+            _defaultState = defaultState;
+            _mask = (1 << ordinal());
+        }
+
         /**
          * Method that calculates bit set (flags) of all features that
          * are enabled by default.
+         *
+         * @return The flag
          */
-        public static int collectDefaults()
-        {
+        public static int collectDefaults() {
             int flags = 0;
             for (Feature f : values()) {
                 if (f.enabledByDefault()) {
@@ -139,29 +166,23 @@ public class YAMLGenerator extends GeneratorBase
             return flags;
         }
 
-        private Feature(boolean defaultState) {
-            _defaultState = defaultState;
-            _mask = (1 << ordinal());
+        @Override
+        public boolean enabledByDefault() {
+            return _defaultState;
         }
 
         @Override
-        public boolean enabledByDefault() { return _defaultState; }
+        public boolean enabledIn(int flags) {
+            return (flags & _mask) != 0;
+        }
+
         @Override
-        public boolean enabledIn(int flags) { return (flags & _mask) != 0; }
-        @Override
-        public int getMask() { return _mask; }
+        public int getMask() {
+            return _mask;
+        }
     }
 
-    /*
-    /**********************************************************
-    /* Internal constants
-    /**********************************************************
-     */
 
-    protected final static long MIN_INT_AS_LONG = (long) Integer.MIN_VALUE;
-    protected final static long MAX_INT_AS_LONG = (long) Integer.MAX_VALUE;
-    protected final static Pattern PLAIN_NUMBER_P = Pattern.compile("[0-9]*(\\.[0-9]*)?");
-    protected final static String TAG_BINARY = Tag.BINARY.toString();
 
     /*
     /**********************************************************

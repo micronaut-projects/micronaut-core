@@ -142,8 +142,7 @@ abstract class AbstractOpenApiVisitor  {
                                     }
                                 }
                                 newValues.put(key, mediaTypes);
-                            }
-                            else if (ApiResponse.class.getName().equals(annotationName)) {
+                            } else if (ApiResponse.class.getName().equals(annotationName)) {
                                 Map responses = new LinkedHashMap();
                                 for (Object o : a) {
                                     AnnotationValue<ApiResponse> sv = (AnnotationValue<ApiResponse>) o;
