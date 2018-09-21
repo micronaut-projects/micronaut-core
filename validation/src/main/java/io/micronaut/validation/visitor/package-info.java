@@ -15,12 +15,9 @@
  */
 
 /**
- * Compile time visitor classes for WebSocket.
+ * This package includes visitors specific to compile time validation and checks.
  *
  * @author graemerocher
  * @since 1.0
  */
-@Internal
-package io.micronaut.websocket.visitor;
-
-import io.micronaut.core.annotation.Internal;
+package io.micronaut.validation.visitor;
