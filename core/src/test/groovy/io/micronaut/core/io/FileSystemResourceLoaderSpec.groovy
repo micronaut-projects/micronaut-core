@@ -30,7 +30,7 @@ class FileSystemResourceLoaderSpec extends Specification {
 
         expect:
         !loader.getResource(resource).isPresent()
-        
+
         where:
         base        | resource
         "."         | "src"

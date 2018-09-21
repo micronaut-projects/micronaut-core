@@ -1,11 +1,9 @@
 package io.micronaut.http.server.netty.websocket
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.http.client.Client
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.RxWebSocketClient
-import io.micronaut.websocket.RxWebSocketSession
-import io.micronaut.websocket.WebSocketClient
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 

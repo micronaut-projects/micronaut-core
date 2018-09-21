@@ -17,7 +17,7 @@
 package io.micronaut.http.client.docs.annotation;
 
 // tag::imports[]
-import io.micronaut.http.client.Client;
+import io.micronaut.http.client.annotation.Client;
 import io.reactivex.Single;
 // end::imports[]
 

@@ -7,11 +7,10 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
-import io.micronaut.security.Secured;
+import io.micronaut.security.annotation.Secured;
 import io.micronaut.security.authentication.Authentication;
-import javax.annotation.Nullable;
-import java.util.Collections;
-import java.util.Map;
+import javax.annotation.Nullable
+
 //end::imports[]
 
 @Requires(property = 'spec.name', value = 'authenticationparam')

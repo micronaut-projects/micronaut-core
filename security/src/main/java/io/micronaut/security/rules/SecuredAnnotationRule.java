@@ -17,7 +17,7 @@
 package io.micronaut.security.rules;
 
 import io.micronaut.http.HttpRequest;
-import io.micronaut.security.Secured;
+import io.micronaut.security.annotation.Secured;
 import io.micronaut.security.token.config.TokenConfiguration;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;

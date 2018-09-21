@@ -14,23 +14,10 @@
  * limitations under the License.
  */
 
-package io.micronaut.docs.server.intro;
-
-// tag::imports[]
-import io.micronaut.http.annotation.Get;
-import io.micronaut.http.client.annotation.Client;
-import io.reactivex.Single;
-// end::imports[]
-
 /**
- * @author graemerocher
+ * Annotations associated with the HTTP client.
+ *
+ * @author Graeme Rocher
  * @since 1.0
  */
-// tag::class[]
-@Client("/hello") // <1>
-public interface HelloClient {
-
-    @Get // <2>
-    Single<String> hello(); // <3>
-}
-// end::class[]
+package io.micronaut.http.client.annotation;

@@ -41,6 +41,7 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.*;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.sse.RxSseClient;

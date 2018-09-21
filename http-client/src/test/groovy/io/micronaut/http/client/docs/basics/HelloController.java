@@ -22,6 +22,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.client.*;
+import io.micronaut.http.client.annotation.Client;
 import io.reactivex.Maybe;
 // end::imports[]
 

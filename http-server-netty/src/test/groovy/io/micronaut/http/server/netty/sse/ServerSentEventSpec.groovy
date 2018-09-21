@@ -21,7 +21,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.Client
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.sse.Event
 import io.reactivex.Flowable

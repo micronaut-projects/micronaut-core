@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.client;
+package io.micronaut.http.client.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Type;
+import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.interceptor.HttpClientIntroductionAdvice;
 import io.micronaut.http.hateos.JsonError;
 import io.micronaut.retry.annotation.Recoverable;
@@ -31,7 +32,7 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 
 /**
- * A custom {@link Scope} for injecting {@link HttpClient} implementations.
+ * A custom {@link Scope} for injecting {@link io.micronaut.http.client.HttpClient} implementations.
  *
  * @author Graeme Rocher
  * @since 1.0
