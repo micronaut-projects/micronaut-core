@@ -44,7 +44,8 @@ public class JavadocParser {
     private int previousState = TEXT;
 
     /**
-     * Parse the javadoc in a {@link JavadocDescription}
+     * Parse the javadoc in a {@link JavadocDescription}.
+     *
      * @param text The text
      * @return The description
      */
@@ -78,7 +79,7 @@ public class JavadocParser {
                         if (c == '{' || c == '@') {
                             currentDoclet.delete(0, currentDoclet.length());
                             state = DOCLET_START;
-                        } else if(c == '<') {
+                        } else if (c == '<') {
                             state = TAG_START;
                         } else if (c != '}' && c != '>') {
                             currentDescription.append(c);
@@ -124,6 +125,7 @@ public class JavadocParser {
                         if (c == '>') {
                             state = TEXT;
                         }
+                    default:
 
                 }
             }

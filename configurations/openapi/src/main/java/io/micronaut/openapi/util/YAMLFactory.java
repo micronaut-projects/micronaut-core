@@ -1,17 +1,12 @@
 /*
- * Copyright 2017-2018 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+This copy of Jackson JSON processor YAML module is licensed under the
+Apache (Software) License, version 2.0 ("the License").
+See the License for details about distribution rights, and the
+specific rights regarding derivate works.
+
+You may obtain a copy of the License at:
+
+http://www.apache.org/licenses/LICENSE-2.0
  */
 
 package io.micronaut.openapi.util;
@@ -33,8 +28,7 @@ import java.nio.charset.Charset;
 /**
  * Copied from {@link com.fasterxml.jackson.dataformat.yaml.YAMLFactory} to support snakeyaml >= 1.20.
  */
-class YAMLFactory extends JsonFactory
-{
+class YAMLFactory extends JsonFactory {
 
     /**
      * Name used to identify YAML format.
@@ -65,9 +59,9 @@ class YAMLFactory extends JsonFactory
     /**********************************************************************
      */
 
-    protected int _yamlParserFeatures;
+    private int _yamlParserFeatures;
 
-    protected int _yamlGeneratorFeatures;
+    private int _yamlGeneratorFeatures;
 
     /*
     /**********************************************************************
@@ -75,7 +69,9 @@ class YAMLFactory extends JsonFactory
     /**********************************************************************
      */
 
-    protected DumperOptions.Version _version;
+    private DumperOptions.Version _version;
+
+    private final Charset UTF8 = Charset.forName("UTF-8");
 
     /**
      * Default constructor used to create factory instances.
@@ -87,10 +83,16 @@ class YAMLFactory extends JsonFactory
      * and this reuse only works within context of a single
      * factory instance.
      */
-    public YAMLFactory() { this(null); }
+    YAMLFactory() {
+        this(null);
+    }
 
-    public YAMLFactory(ObjectCodec oc)
-    {
+    /**
+     * Codec constructor.
+     *
+     * @param oc The object codec
+     */
+    private YAMLFactory(ObjectCodec oc) {
         super(oc);
         _yamlParserFeatures = DEFAULT_YAML_PARSER_FEATURE_FLAGS;
         _yamlGeneratorFeatures = DEFAULT_YAML_GENERATOR_FEATURE_FLAGS;
@@ -101,11 +103,7 @@ class YAMLFactory extends JsonFactory
         _version = null;
     }
 
-    /**
-     * @since 2.2.1
-     */
-    public YAMLFactory(YAMLFactory src, ObjectCodec oc)
-    {
+    private YAMLFactory(YAMLFactory src, ObjectCodec oc) {
         super(src, oc);
         _version = src._version;
         _yamlParserFeatures = src._yamlParserFeatures;
@@ -113,8 +111,7 @@ class YAMLFactory extends JsonFactory
     }
 
     @Override
-    public YAMLFactory copy()
-    {
+    public YAMLFactory copy() {
         _checkInvalidCopy(YAMLFactory.class);
         return new YAMLFactory(this, null);
     }
@@ -154,7 +151,9 @@ class YAMLFactory extends JsonFactory
 
     // No, we can't make use of char[] optimizations
     @Override
-    public boolean canUseCharArrays() { return false; }
+    public boolean canUseCharArrays() {
+        return false;
+    }
 
     // Add these in 2.7:
 
@@ -182,11 +181,10 @@ class YAMLFactory extends JsonFactory
     }
 
     /**
-     * Sub-classes need to override this method (as of 1.8)
+     * Sub-classes need to override this method (as of 1.8).
      */
     @Override
-    public MatchStrength hasFormat(InputAccessor acc) throws IOException
-    {
+    public MatchStrength hasFormat(InputAccessor acc) throws IOException {
         /* Actually quite possible to do, thanks to (optional) "---"
          * indicator we may be getting...
          */
@@ -223,92 +221,32 @@ class YAMLFactory extends JsonFactory
 
     /*
     /**********************************************************
-    /* Configuration, parser settings
-    /**********************************************************
-     */
-
-    /**
-     * Method for enabling or disabling specified parser feature
-     * (check {@link YAMLParser.Feature} for list of features)
-     */
-    public final YAMLFactory configure(YAMLParser.Feature f, boolean state)
-    {
-        if (state) {
-            enable(f);
-        } else {
-            disable(f);
-        }
-        return this;
-    }
-
-    /**
-     * Method for enabling specified parser feature
-     * (check {@link YAMLParser.Feature} for list of features)
-     */
-    public YAMLFactory enable(YAMLParser.Feature f) {
-        _yamlParserFeatures |= f.getMask();
-        return this;
-    }
-
-    /**
-     * Method for disabling specified parser features
-     * (check {@link YAMLParser.Feature} for list of features)
-     */
-    public YAMLFactory disable(YAMLParser.Feature f) {
-        _yamlParserFeatures &= ~f.getMask();
-        return this;
-    }
-
-    /**
-     * Checked whether specified parser feature is enabled.
-     */
-    public final boolean isEnabled(YAMLParser.Feature f) {
-        return (_yamlParserFeatures & f.getMask()) != 0;
-    }
-
-    /*
-    /**********************************************************
     /* Configuration, generator settings
     /**********************************************************
      */
 
     /**
-     * Method for enabling or disabling specified generator feature
-     * (check {@link YAMLGenerator.Feature} for list of features)
-     */
-    public final YAMLFactory configure(YAMLGenerator.Feature f, boolean state) {
-        if (state) {
-            enable(f);
-        } else {
-            disable(f);
-        }
-        return this;
-    }
-
-
-    /**
      * Method for enabling specified generator features
-     * (check {@link YAMLGenerator.Feature} for list of features)
+     * (check {@link YAMLGenerator.Feature} for list of features).
+     *
+     * @param f the feature
+     * @return the factory
      */
-    public YAMLFactory enable(YAMLGenerator.Feature f) {
+    YAMLFactory enable(YAMLGenerator.Feature f) {
         _yamlGeneratorFeatures |= f.getMask();
         return this;
     }
 
     /**
      * Method for disabling specified generator feature
-     * (check {@link YAMLGenerator.Feature} for list of features)
+     * (check {@link YAMLGenerator.Feature} for list of features).
+     *
+     * @param f the feature
+     * @return the factory
      */
-    public YAMLFactory disable(YAMLGenerator.Feature f) {
+    YAMLFactory disable(YAMLGenerator.Feature f) {
         _yamlGeneratorFeatures &= ~f.getMask();
         return this;
-    }
-
-    /**
-     * Check whether specified generator feature is enabled.
-     */
-    public final boolean isEnabled(YAMLGenerator.Feature f) {
-        return (_yamlGeneratorFeatures & f.getMask()) != 0;
     }
 
     /*
@@ -316,7 +254,6 @@ class YAMLFactory extends JsonFactory
     /* Overridden parser factory methods (for 2.1)
     /**********************************************************
      */
-
     @Override
     public YAMLParser createParser(String content) throws IOException {
         return createParser(new StringReader(content));
@@ -329,22 +266,19 @@ class YAMLFactory extends JsonFactory
     }
 
     @Override
-    public YAMLParser createParser(URL url) throws IOException
-    {
+    public YAMLParser createParser(URL url) throws IOException {
         IOContext ctxt = _createContext(url, true);
         return _createParser(_decorate(_optimizedStreamFromURL(url), ctxt), ctxt);
     }
 
     @Override
-    public YAMLParser createParser(InputStream in) throws IOException
-    {
+    public YAMLParser createParser(InputStream in) throws IOException {
         IOContext ctxt = _createContext(in, false);
         return _createParser(_decorate(in, ctxt), ctxt);
     }
 
     @Override
-    public YAMLParser createParser(Reader r) throws IOException
-    {
+    public YAMLParser createParser(Reader r) throws IOException {
         IOContext ctxt = _createContext(r, false);
         return _createParser(_decorate(r, ctxt), ctxt);
     }
@@ -360,8 +294,7 @@ class YAMLFactory extends JsonFactory
     }
 
     @Override
-    public YAMLParser createParser(byte[] data) throws IOException
-    {
+    public YAMLParser createParser(byte[] data) throws IOException {
         IOContext ctxt = _createContext(data, true);
         // [JACKSON-512]: allow wrapping with InputDecorator
         if (_inputDecorator != null) {
@@ -374,8 +307,7 @@ class YAMLFactory extends JsonFactory
     }
 
     @Override
-    public YAMLParser createParser(byte[] data, int offset, int len) throws IOException
-    {
+    public YAMLParser createParser(byte[] data, int offset, int len) throws IOException {
         IOContext ctxt = _createContext(data, true);
         // [JACKSON-512]: allow wrapping with InputDecorator
         if (_inputDecorator != null) {
@@ -394,8 +326,7 @@ class YAMLFactory extends JsonFactory
      */
 
     @Override
-    public YAMLGenerator createGenerator(OutputStream out, JsonEncoding enc) throws IOException
-    {
+    public YAMLGenerator createGenerator(OutputStream out, JsonEncoding enc) throws IOException {
         // false -> we won't manage the stream unless explicitly directed to
         IOContext ctxt = _createContext(out, false);
         ctxt.setEncoding(enc);
@@ -403,8 +334,7 @@ class YAMLFactory extends JsonFactory
     }
 
     @Override
-    public YAMLGenerator createGenerator(OutputStream out) throws IOException
-    {
+    public YAMLGenerator createGenerator(OutputStream out) throws IOException {
         // false -> we won't manage the stream unless explicitly directed to
         IOContext ctxt = _createContext(out, false);
         return _createGenerator(_createWriter(_decorate(out, ctxt),
@@ -412,15 +342,13 @@ class YAMLFactory extends JsonFactory
     }
 
     @Override
-    public YAMLGenerator createGenerator(Writer out) throws IOException
-    {
+    public YAMLGenerator createGenerator(Writer out) throws IOException {
         IOContext ctxt = _createContext(out, false);
         return _createGenerator(_decorate(out, ctxt), ctxt);
     }
 
     @Override
-    public JsonGenerator createGenerator(File f, JsonEncoding enc) throws IOException
-    {
+    public JsonGenerator createGenerator(File f, JsonEncoding enc) throws IOException {
         OutputStream out = new FileOutputStream(f);
         // true -> yes, we have to manage the stream since we created it
         IOContext ctxt = _createContext(f, true);
@@ -439,11 +367,11 @@ class YAMLFactory extends JsonFactory
     @Override
     protected YAMLParser _createParser(InputStream in, IOContext ctxt) throws IOException {
         return new YAMLParser(ctxt, _getBufferRecycler(), _parserFeatures, _yamlParserFeatures,
-                _objectCodec, _createReader(in, null, ctxt));
+                _objectCodec, createReader(in, null, ctxt));
     }
 
     @Override
-    protected YAMLParser _createParser(Reader r, IOContext ctxt) throws IOException {
+    protected YAMLParser _createParser(Reader r, IOContext ctxt) {
         return new YAMLParser(ctxt, _getBufferRecycler(), _parserFeatures, _yamlParserFeatures,
                 _objectCodec, r);
     }
@@ -451,7 +379,7 @@ class YAMLFactory extends JsonFactory
     // since 2.4
     @Override
     protected YAMLParser _createParser(char[] data, int offset, int len, IOContext ctxt,
-                                       boolean recyclable) throws IOException {
+                                       boolean recyclable) {
         return new YAMLParser(ctxt, _getBufferRecycler(), _parserFeatures, _yamlParserFeatures,
                 _objectCodec, new CharArrayReader(data, offset, len));
     }
@@ -459,7 +387,7 @@ class YAMLFactory extends JsonFactory
     @Override
     protected YAMLParser _createParser(byte[] data, int offset, int len, IOContext ctxt) throws IOException {
         return new YAMLParser(ctxt, _getBufferRecycler(), _parserFeatures, _yamlParserFeatures,
-                _objectCodec, _createReader(data, offset, len, null, ctxt));
+                _objectCodec, createReader(data, offset, len, null));
     }
 
     @Override
@@ -472,7 +400,7 @@ class YAMLFactory extends JsonFactory
     }
 
     @Override
-    protected YAMLGenerator _createUTF8Generator(OutputStream out, IOContext ctxt) throws IOException {
+    protected YAMLGenerator _createUTF8Generator(OutputStream out, IOContext ctxt) {
         // should never get called; ensure
         throw new IllegalStateException();
     }
@@ -490,11 +418,7 @@ class YAMLFactory extends JsonFactory
     /* Internal methods
     /**********************************************************
      */
-
-    protected final Charset UTF8 = Charset.forName("UTF-8");
-
-    protected Reader _createReader(InputStream in, JsonEncoding enc, IOContext ctxt) throws IOException
-    {
+    private Reader createReader(InputStream in, JsonEncoding enc, IOContext ctxt) throws IOException {
         if (enc == null) {
             enc = JsonEncoding.UTF8;
         }
@@ -507,14 +431,13 @@ class YAMLFactory extends JsonFactory
         return new InputStreamReader(in, enc.getJavaName());
     }
 
-    protected Reader _createReader(byte[] data, int offset, int len,
-                                   JsonEncoding enc, IOContext ctxt) throws IOException
-    {
+    private Reader createReader(byte[] data, int offset, int len,
+                                JsonEncoding enc) throws IOException {
         if (enc == null) {
             enc = JsonEncoding.UTF8;
         }
         // default to UTF-8 if encoding missing
-        if (enc == null || enc == JsonEncoding.UTF8) {
+        if (enc == JsonEncoding.UTF8) {
             return new UTF8Reader(data, offset, len, true);
         }
         ByteArrayInputStream in = new ByteArrayInputStream(data, offset, len);

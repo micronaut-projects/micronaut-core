@@ -1,9 +1,26 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.micronaut.openapi.util;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
+import io.micronaut.core.annotation.Internal;
 import io.swagger.v3.core.jackson.SchemaSerializer;
 import io.swagger.v3.core.jackson.mixin.ExtensionsMixin;
 import io.swagger.v3.core.util.DeserializationModule;
@@ -34,8 +51,20 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-public class Yaml {
+/**
+ * Helper class for generating Swagger YAML.
+ *
+ * @author graemerocher
+ * @since 1.0
+ */
+@Internal
+public final class Yaml {
 
+    /**
+     * Obtains the YAML mapper.
+     *
+     * @return The yaml mapper
+     */
     public static ObjectMapper mapper() {
         YAMLFactory factory = new YAMLFactory();
         factory.disable(YAMLGenerator.Feature.WRITE_DOC_START_MARKER);
