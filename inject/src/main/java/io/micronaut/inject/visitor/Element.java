@@ -83,9 +83,4 @@ public interface Element extends AnnotationMetadata {
     default boolean isFinal() {
         return false;
     }
-
-    /**
-     * @return The annotation metadata for the element.
-     */
-    AnnotationMetadata getAnnotationMetadata();
 }

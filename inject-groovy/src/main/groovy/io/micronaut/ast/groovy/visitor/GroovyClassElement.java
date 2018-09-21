@@ -61,9 +61,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                 ClassNode cn = entry.getValue();
                 GroovyClassElement classElement;
                 if (cn.isEnum()) {
-                    classElement = new GroovyEnumElement(cn, getAnnotationMetadata());
+                    classElement = new GroovyEnumElement(cn, AstAnnotationUtils.getAnnotationMetadata(cn));
                 } else {
-                    classElement = new GroovyClassElement(cn, getAnnotationMetadata());
+                    classElement = new GroovyClassElement(cn, AstAnnotationUtils.getAnnotationMetadata(cn));
                 }
                 map.put(entry.getKey(), classElement);
             }
@@ -262,7 +262,6 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
         MethodNode getter;
         MethodNode setter;
         final String propertyName;
-
 
         GetterAndSetter(String propertyName) {
             this.propertyName = propertyName;
