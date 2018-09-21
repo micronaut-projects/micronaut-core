@@ -178,6 +178,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     private Set<String> clientIdentifiers = Collections.emptySet();
     private WebSocketBeanRegistry webSocketRegistry = WebSocketBeanRegistry.EMPTY;
     private RequestBinderRegistry requestBinderRegistry;
+    private Logger log;
 
     /**
      * Construct a client for the given arguments.
@@ -295,6 +296,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         this.mediaTypeCodecRegistry = codecRegistry;
         this.filters = filters;
         this.annotationMetadataResolver = annotationMetadataResolver != null ? annotationMetadataResolver : AnnotationMetadataResolver.DEFAULT;
+        this.log = configuration.getLoggerName()
+                .map(LoggerFactory::getLogger).orElse(LOG);
     }
 
     /**
@@ -386,6 +389,13 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         return configuration;
     }
 
+    /**
+     * @return The client-specific logger name
+     */
+    public Logger getLog() {
+        return log;
+    }
+
     @Override
     public HttpClient start() {
         if (!isRunning()) {
@@ -410,7 +420,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     try {
                         cp.close();
                     } catch (Exception cause) {
-                        LOG.error("Error shutting down HTTP client connection pool: " + cause.getMessage(), cause);
+                        log.error("Error shutting down HTTP client connection pool: " + cause.getMessage(), cause);
                     }
 
                 }
@@ -422,9 +432,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     TimeUnit.MILLISECONDS
             );
             future.addListener(f -> {
-                if (!f.isSuccess() && LOG.isErrorEnabled()) {
+                if (!f.isSuccess() && log.isErrorEnabled()) {
                     Throwable cause = f.cause();
-                    LOG.error("Error shutting down HTTP client: " + cause.getMessage(), cause);
+                    log.error("Error shutting down HTTP client: " + cause.getMessage(), cause);
                 }
             });
             try {
@@ -803,8 +813,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 Flowable<HttpContent> httpContentFlowable = Flowable.fromPublisher(nettyStreamedHttpResponse.getNettyResponse());
                 return httpContentFlowable.map((Function<HttpContent, io.micronaut.http.HttpResponse<ByteBuffer<?>>>) message -> {
                     ByteBuf byteBuf = message.content();
-                    if (LOG.isTraceEnabled()) {
-                        LOG.trace("HTTP Client Streaming Response Received Chunk (length: {})", byteBuf.readableBytes());
+                    if (log.isTraceEnabled()) {
+                        log.trace("HTTP Client Streaming Response Received Chunk (length: {})", byteBuf.readableBytes());
                         traceBody("Response", byteBuf);
                     }
                     ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
@@ -843,8 +853,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     public void subscribe(Subscriber<? super JsonNode> downstreamSubscriber) {
                         httpContentFlowable.map(content -> {
                             ByteBuf chunk = content.content();
-                            if (LOG.isTraceEnabled()) {
-                                LOG.trace("HTTP Client Streaming Response Received Chunk (length: {})", chunk.readableBytes());
+                            if (log.isTraceEnabled()) {
+                                log.trace("HTTP Client Streaming Response Received Chunk (length: {})", chunk.readableBytes());
                                 traceBody("Chunk", chunk);
                             }
                             try {
@@ -1036,9 +1046,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             ChannelFuture closeFuture = channel.closeFuture();
             closeFuture.addListener(f2 -> {
                 if (!f2.isSuccess()) {
-                    if (LOG.isErrorEnabled()) {
+                    if (log.isErrorEnabled()) {
                         Throwable cause = f2.cause();
-                        LOG.error("Error closing request connection: " + cause.getMessage(), cause);
+                        log.error("Error closing request connection: " + cause.getMessage(), cause);
                     }
                 }
             });
@@ -1359,20 +1369,20 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         Flowable<HttpContent> requestBodyPublisher = publisher.map(o -> {
                             if (o instanceof CharSequence) {
                                 ByteBuf textChunk = Unpooled.copiedBuffer(((CharSequence) o), requestContentType.getCharset().orElse(StandardCharsets.UTF_8));
-                                if (LOG.isTraceEnabled()) {
+                                if (log.isTraceEnabled()) {
                                     traceChunk(textChunk);
                                 }
                                 return new DefaultHttpContent(textChunk);
                             } else if (o instanceof ByteBuf) {
                                 ByteBuf byteBuf = (ByteBuf) o;
-                                if (LOG.isTraceEnabled()) {
-                                    LOG.trace("Sending Bytes Chunk. Length: {}", byteBuf.readableBytes());
+                                if (log.isTraceEnabled()) {
+                                    log.trace("Sending Bytes Chunk. Length: {}", byteBuf.readableBytes());
                                 }
                                 return new DefaultHttpContent(byteBuf);
                             } else if (o instanceof byte[]) {
                                 byte[] bodyBytes = (byte[]) o;
-                                if (LOG.isTraceEnabled()) {
-                                    LOG.trace("Sending Bytes Chunk. Length: {}", bodyBytes.length);
+                                if (log.isTraceEnabled()) {
+                                    log.trace("Sending Bytes Chunk. Length: {}", bodyBytes.length);
                                 }
                                 return new DefaultHttpContent(Unpooled.wrappedBuffer(bodyBytes));
                             } else if (mediaTypeCodecRegistry != null) {
@@ -1380,7 +1390,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                 ByteBuf encoded = registeredCodec.map(codec -> (ByteBuf) codec.encode(o, byteBufferFactory).asNativeBuffer())
                                         .orElse(null);
                                 if (encoded != null) {
-                                    if (LOG.isTraceEnabled()) {
+                                    if (log.isTraceEnabled()) {
                                         traceChunk(encoded);
                                     }
                                     return new DefaultHttpContent(encoded);
@@ -1466,11 +1476,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 permitsBody,
                 poolMap == null
         );
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
-            LOG.debug("Chosen Server: {}({})", requestURI.getHost(), requestURI.getPort());
+        if (log.isDebugEnabled()) {
+            log.debug("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
+            log.debug("Chosen Server: {}({})", requestURI.getHost(), requestURI.getPort());
         }
-        if (LOG.isTraceEnabled()) {
+        if (log.isTraceEnabled()) {
             traceRequest(finalRequest, nettyRequest);
         }
 
@@ -1509,8 +1519,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 if (received.compareAndSet(false, true)) {
                     NettyStreamedHttpResponse response = new NettyStreamedHttpResponse(msg);
                     HttpHeaders headers = msg.headers();
-                    if (LOG.isTraceEnabled()) {
-                        LOG.trace("HTTP Client Streaming Response Received: {}", msg.status());
+                    if (log.isTraceEnabled()) {
+                        log.trace("HTTP Client Streaming Response Received: {}", msg.status());
                         traceHeaders(headers);
                     }
 
@@ -1567,11 +1577,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 }
             }
         });
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
-            LOG.debug("Chosen Server: {}({})", requestURI.getHost(), requestURI.getPort());
+        if (log.isDebugEnabled()) {
+            log.debug("Sending HTTP Request: {} {}", nettyRequest.method(), nettyRequest.uri());
+            log.debug("Chosen Server: {}({})", requestURI.getHost(), requestURI.getPort());
         }
-        if (LOG.isTraceEnabled()) {
+        if (log.isTraceEnabled()) {
             traceRequest(requestWrapper.get(), nettyRequest);
         }
 
@@ -1632,9 +1642,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 try {
                     HttpResponseStatus status = fullResponse.status();
                     HttpHeaders headers = fullResponse.headers();
-                    if (LOG.isTraceEnabled()) {
-                        LOG.trace("HTTP Client Response Received for Request: {} {}", request.getMethod(), request.getUri());
-                        LOG.trace("Status Code: {}", status);
+                    if (log.isTraceEnabled()) {
+                        log.trace("HTTP Client Response Received for Request: {} {}", request.getMethod(), request.getUri());
+                        log.trace("Status Code: {}", status);
                         traceHeaders(headers);
                         traceBody("Response", fullResponse.content());
                     }
@@ -1721,8 +1731,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         if (message == null) {
                             message = cause.getClass().getSimpleName();
                         }
-                        if (LOG.isTraceEnabled()) {
-                            LOG.trace("HTTP Client exception ({}) occurred for request : {} {}", message, request.getMethod(), request.getUri());
+                        if (log.isTraceEnabled()) {
+                            log.trace("HTTP Client exception ({}) occurred for request : {} {}", message, request.getMethod(), request.getUri());
                         }
 
                         if (cause instanceof TooLongFrameException) {
@@ -1801,24 +1811,24 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         if (io.micronaut.http.HttpMethod.permitsRequestBody(request.getMethod()) && request.getBody().isPresent() && nettyRequest instanceof FullHttpRequest) {
             FullHttpRequest fullHttpRequest = (FullHttpRequest) nettyRequest;
             ByteBuf content = fullHttpRequest.content();
-            if (LOG.isTraceEnabled()) {
+            if (log.isTraceEnabled()) {
                 traceBody("Request", content);
             }
         }
     }
 
     private void traceBody(String type, ByteBuf content) {
-        LOG.trace(type + " Body");
-        LOG.trace("----");
-        LOG.trace(content.toString(defaultCharset));
-        LOG.trace("----");
+        log.trace(type + " Body");
+        log.trace("----");
+        log.trace(content.toString(defaultCharset));
+        log.trace("----");
     }
 
     private void traceChunk(ByteBuf content) {
-        LOG.trace("Sending Chunk");
-        LOG.trace("----");
-        LOG.trace(content.toString(defaultCharset));
-        LOG.trace("----");
+        log.trace("Sending Chunk");
+        log.trace("----");
+        log.trace(content.toString(defaultCharset));
+        log.trace("----");
     }
 
     private void traceHeaders(HttpHeaders headers) {
@@ -1826,10 +1836,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             List<String> all = headers.getAll(name);
             if (all.size() > 1) {
                 for (String value : all) {
-                    LOG.trace("{}: {}", name, value);
+                    log.trace("{}: {}", name, value);
                 }
             } else if (!all.isEmpty()) {
-                LOG.trace("{}: {}", name, all.get(0));
+                log.trace("{}: {}", name, all.get(0));
             }
         }
     }
