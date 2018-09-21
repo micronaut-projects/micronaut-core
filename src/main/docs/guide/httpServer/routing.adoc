@@ -163,3 +163,27 @@ include::{testsuite}/server/routes/MyRoutes.java[tags=class, indent=0]
 <3> Use methods such as link:{api}/io/micronaut/web/router/RouteBuilder.html#GET-java.lang.String-java.lang.Class-java.lang.String-java.lang.Class...-[GET] to route to controller methods
 
 TIP: Unfortunately due to type erasure a Java method lambda reference cannot be used with the API. For Groovy there is a `GroovyRouteBuilder` class which can be subclassed that allows passing Groovy method references.
+
+== Route Compile Time Validation
+
+Micronaut supports validating route arguments at compile time with the validation library. To get started simply add a dependency.
+
+[source,groovy]
+.build.gradle
+----
+compile "io.micronaut:validation"
+----
+
+With the correct dependency on your classpath, route arguments will automatically be checked at compile time. The compilation will fail if any of the following conditions are met:
+
+* {blank}
+ The URI template contains a variable that is optional, but the parameter is not annotated with @Nullable or is an Optional.
+
+An optional variable is one that will allow the route to match a URI even if the value is not present. For example `/foo{/bar}` will match requests to `/foo` and `/foo/abc`. The non optional variant would be `/foo/{bar}`. See the <<_uri_path_variables, URI Path Variables>> section for more information.
+
+* {blank}
+ The URI template contains a variable that is missing from the route arguments.
+
+If an issue or bug is encountered with the route validation, please link:{github}/issues[file an issue]. In the meantime, to allow you to continue working without working around the issue, a system property can be set to disable the validation check.
+
+Set the system property `-Dmicronaut.route.validation=false` to skip the route validation.

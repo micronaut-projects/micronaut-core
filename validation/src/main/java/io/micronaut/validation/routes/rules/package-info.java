@@ -14,22 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.client.docs.basics;
-
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.*;
-
 /**
- * @author graemerocher
- * @since 1.0
+ * Package to store classes that provide route validation rules.
  */
-@Controller("/amazon")
-public class BookController {
-
-    @Post(value = "/book/{title}", consumes = {MediaType.APPLICATION_JSON, MediaType.APPLICATION_FORM_URLENCODED})
-    @Status(HttpStatus.CREATED)
-    Book save(String title) {
-        return new Book(title);
-    }
-}
+package io.micronaut.validation.routes.rules;
