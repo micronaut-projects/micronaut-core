@@ -32,6 +32,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.inject.visitor.*;
 import io.micronaut.openapi.javadoc.JavadocDescription;
 import io.micronaut.openapi.javadoc.JavadocParser;
@@ -153,7 +154,11 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
             boolean permitsRequestBody = HttpMethod.permitsRequestBody(httpMethod);
 
             List<Parameter> swaggerParameters = swaggerOperation.getParameters();
-            List<String> pathVariables = matchTemplate.getVariables();
+            List<UriMatchVariable> pv = matchTemplate.getVariables();
+            Map<String, UriMatchVariable> pathVariables = new LinkedHashMap<>(pv.size()) ;
+            for (UriMatchVariable variable : pv) {
+                pathVariables.put(variable.getName(), variable);
+            }
 
             String consumesMediaType = element.getValue(Consumes.class, String.class).orElse(MediaType.APPLICATION_JSON);
             ApiResponses responses = swaggerOperation.getResponses();
@@ -220,10 +225,11 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
 
                 Parameter newParameter = null;
 
-                if (!parameter.hasStereotype(Bindable.class) && pathVariables.contains(parameterName)) {
+                if (!parameter.hasStereotype(Bindable.class) && pathVariables.containsKey(parameterName)) {
+                    UriMatchVariable var = pathVariables.get(parameterName);
                     newParameter = new Parameter();
                     newParameter.setIn(ParameterIn.PATH.toString());
-                    newParameter.setExplode(matchTemplate.isExploded(parameterName));
+                    newParameter.setExplode(var.isExploded());
                 } else if (parameter.isAnnotationPresent(Header.class)) {
                     String headerName = parameter.getValue(Header.class, "name", String.class).orElseGet(() -> NameUtils.hyphenate(parameterName));
                     newParameter = new Parameter();
@@ -317,7 +323,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
             }
 
             if (HttpMethod.requiresRequestBody(httpMethod) && swaggerOperation.getRequestBody() == null) {
-                List<ParameterElement> bodyParameters = Arrays.stream(element.getParameters()).filter(p -> !pathVariables.contains(p.getName()) && !p.isAnnotationPresent(Bindable.class)).collect(Collectors.toList());
+                List<ParameterElement> bodyParameters = Arrays.stream(element.getParameters()).filter(p -> !pathVariables.containsKey(p.getName()) && !p.isAnnotationPresent(Bindable.class)).collect(Collectors.toList());
                 if (!bodyParameters.isEmpty()) {
 
                     RequestBody requestBody = new RequestBody();
