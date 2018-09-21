@@ -32,8 +32,8 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
 
     protected static final String VARIABLE_MATCH_PATTERN = "([^\\/\\?#&;\\+]";
     protected StringBuilder pattern;
-    private final Pattern matchPattern;
     protected List<UriMatchVariable> variables;
+    private final Pattern matchPattern;
     private final boolean isRoot;
 
     /**
@@ -190,7 +190,8 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
 
         /**
          * @param uri       The URI
-         * @param variables The variables
+         * @param variableValues Actual variable values
+         * @param variables Information about the URI template's expected variables
          */
         protected DefaultUriMatchInfo(String uri, Map<String, Object> variableValues, List<UriMatchVariable> variables) {
             this.uri = uri;
