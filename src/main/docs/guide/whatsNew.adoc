@@ -11,7 +11,7 @@ The following dependency upgrades occurred in this release:
 
 - Netty `4.1.28` -> `4.1.29`
 - RxJava `2.2.0` -> `2.2.2`
-- Groovy `2.5.1` -> `2.5.2`
+//- Groovy `2.5.1` -> `2.5.2`
 - Hibernate Core `5.3.4` -> `5.3.6.Final`
 - Jackson `2.9.6` -> `2.9.7`
 - Lettuce `5.0.4` -> `5.1.0`
