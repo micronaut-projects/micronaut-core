@@ -107,6 +107,8 @@ public abstract class HttpClientConfiguration {
 
     private SslConfiguration sslConfiguration = new ClientSslConfiguration();
 
+    private String loggerName;
+
     /**
      * Default constructor.
      */
@@ -150,6 +152,22 @@ public abstract class HttpClientConfiguration {
      */
     public boolean isFollowRedirects() {
         return followRedirects;
+    }
+
+    /**
+     * @return The client-specific logger name if configured
+     */
+    public Optional<String> getLoggerName() {
+        return Optional.ofNullable(loggerName);
+    }
+
+    /**
+     * Sets the client-specific logger name.
+     *
+     * @param loggerName The name of the logger.
+     */
+    public void setLoggerName(@Nullable String loggerName) {
+        this.loggerName = loggerName;
     }
 
     /**
