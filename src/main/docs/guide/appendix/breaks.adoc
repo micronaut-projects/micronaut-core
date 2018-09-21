@@ -6,6 +6,16 @@ This section will document breaking changes that may happen during milestone or 
 * The intercept url map security rule now no longer considers the query part of the request when determining if the request matches. Previously `/?value=true` would *not* match `/`.
 * Several APIs surrounding route URI matching and template parsing have changed to allow more information to be retrieved from the parsing process.
 
+The following packages have been renamed:
+
+* `io.micronaut.http.server.binding` -> `io.micronaut.http.bind`
+
+The following annotations have been moved to new locations:
+
+* `io.micronaut.http.client.Client` -> `io.micronaut.http.client.annotation.Client`
+* `io.micronaut.security.Secured` -> `io.micronaut.security.annotation.Secured`
+
+
 ==== 1.0.0.M4
 
 * Libraries compiled against earlier versions of Micronaut are not binary compatible with this release.

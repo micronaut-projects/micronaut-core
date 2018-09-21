@@ -16,7 +16,7 @@
 
 package io.micronaut.http.client.docs.annotation.retry;
 
-import io.micronaut.http.client.Client;
+import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.docs.annotation.Pet;
 import io.micronaut.http.client.docs.annotation.PetOperations;
 import io.micronaut.retry.annotation.Retryable;
