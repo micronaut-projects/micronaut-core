@@ -53,7 +53,7 @@ public class BookControllerTest {
         data.put("pages", "notnumber");
         data.put("url", "noturl");
         Flowable<HttpResponse<Book>> call = client.exchange(
-                POST("/binding/book/{title}", data)
+                POST("/binding/book", data)
                         .contentType(MediaType.APPLICATION_FORM_URLENCODED),
                 Book.class
         );

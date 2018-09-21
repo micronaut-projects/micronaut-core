@@ -15,9 +15,7 @@
  */
 
 /**
- * This package includes visitors specific to compile time validation and checks.
- *
- * @author graemerocher
- * @since 1.0
+ * Package to organize classes responsible for validating
+ * route arguments at compile time.
  */
-package io.micronaut.validation.visitor;
+package io.micronaut.validation.routes;

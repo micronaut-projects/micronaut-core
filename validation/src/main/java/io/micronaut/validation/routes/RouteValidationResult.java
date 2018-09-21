@@ -14,22 +14,29 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.client.docs.basics;
-
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.*;
+package io.micronaut.validation.routes;
 
 /**
- * @author graemerocher
+ * The result of route validation.
+ *
+ * @author James Kleeh
  * @since 1.0
  */
-@Controller("/amazon")
-public class BookController {
+public class RouteValidationResult {
 
-    @Post(value = "/book/{title}", consumes = {MediaType.APPLICATION_JSON, MediaType.APPLICATION_FORM_URLENCODED})
-    @Status(HttpStatus.CREATED)
-    Book save(String title) {
-        return new Book(title);
+    private boolean valid;
+    private String[] errorMessages;
+
+    public RouteValidationResult(String... errorMessages) {
+        this.valid = errorMessages.length == 0;
+        this.errorMessages = errorMessages;
+    }
+
+    public boolean isValid() {
+        return valid;
+    }
+
+    public String[] getErrorMessages() {
+        return errorMessages;
     }
 }

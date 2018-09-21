@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.validation.visitor;
+package io.micronaut.validation.async;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.visitor.ClassElement;
