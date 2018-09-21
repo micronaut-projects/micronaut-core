@@ -16,12 +16,20 @@
 
 package io.micronaut.core.io.scan;
 
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.util.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.*;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -30,12 +38,16 @@ import java.util.stream.Stream;
  * Loads resources from the classpath.
  *
  * @author James Kleeh
+ * @author graemerocher
  * @since 1.0
  */
 public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
 
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultClassPathResourceLoader.class);
+
     private final ClassLoader classLoader;
     private final String basePath;
+    private final Cache<String, Boolean> isDirectoryCache = Caffeine.newBuilder().maximumSize(50).build();
 
     /**
      * Default constructor.
@@ -64,7 +76,11 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      * @return An optional resource
      */
     public Optional<InputStream> getResourceAsStream(String path) {
-        return Optional.ofNullable(classLoader.getResourceAsStream(prefixPath(path)));
+        if (!isDirectory(path)) {
+            return Optional.ofNullable(classLoader.getResourceAsStream(prefixPath(path)));
+        } else {
+            return Optional.empty();
+        }
     }
 
     /**
@@ -74,7 +90,13 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
      * @return An optional resource
      */
     public Optional<URL> getResource(String path) {
-        return Optional.ofNullable(classLoader.getResource(prefixPath(path)));
+        boolean isDirectory = isDirectory(path);
+
+        if (!isDirectory) {
+            URL url = classLoader.getResource(prefixPath(path));
+            return Optional.ofNullable(url);
+        }
+        return Optional.empty();
     }
 
     /**
@@ -90,7 +112,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         } catch (IOException e) {
             return Stream.empty();
         }
-        Stream.Builder<URL> builder = Stream.<URL>builder();
+        Stream.Builder<URL> builder = Stream.builder();
         while (all.hasMoreElements()) {
             URL url = all.nextElement();
             builder.accept(url);
@@ -129,6 +151,52 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         return path;
     }
 
+    @SuppressWarnings("ConstantConditions")
+    private boolean isDirectory(String path) {
+        return isDirectoryCache.get(path, s -> {
+            URL url = classLoader.getResource(prefixPath(path));
+            if (url != null) {
+                try {
+                    URI uri = url.toURI();
+                    Path pathObject = null;
+                    synchronized (this) {
+
+                        if (uri.getScheme().equals("jar")) {
+                            FileSystem fileSystem = null;
+                            try {
+                                try {
+                                    fileSystem = FileSystems.getFileSystem(uri);
+                                } catch (FileSystemNotFoundException e) {
+                                    fileSystem = FileSystems.newFileSystem(uri, Collections.emptyMap(), classLoader);
+                                }
+
+                                pathObject = fileSystem.getPath(path);
+                                return pathObject == null || Files.isDirectory(pathObject);
+                            } finally {
+                                if (fileSystem != null && fileSystem.isOpen()) {
+                                    try {
+                                        fileSystem.close();
+                                    } catch (IOException e) {
+                                        if (LOG.isDebugEnabled()) {
+                                            LOG.debug("Error shutting down JAR file system [" + fileSystem + "]: " + e.getMessage(), e);
+                                        }
+                                    }
+                                }
+                            }
+                        } else if (uri.getScheme().equals("file")) {
+                            pathObject = Paths.get(uri);
+                            return pathObject == null || Files.isDirectory(pathObject);
+                        }
+
+                    }
+                } catch (URISyntaxException | IOException e) {
+                    // ignore
+                }
+            }
+            return true;
+        });
+    }
+
     @SuppressWarnings("MagicNumber")
     private String prefixPath(String path) {
         if (path.startsWith("classpath:")) {
@@ -144,4 +212,5 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
             return path;
         }
     }
+
 }

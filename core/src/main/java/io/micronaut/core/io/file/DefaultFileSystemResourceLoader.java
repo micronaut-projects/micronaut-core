@@ -71,7 +71,7 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
     @Override
     public Optional<URL> getResource(String path) {
         File file = getFile(normalize(path));
-        if (file.exists() && file.canRead()) {
+        if (file.exists() && file.canRead() && !file.isDirectory()) {
             try {
                 URL url = file.toURI().toURL();
                 return Optional.of(url);

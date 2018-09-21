@@ -19,5 +19,3 @@ micronaut:
                 mapping: /static/**
                 paths: classpath:public
 ----
-
-TIP: `index.html` will be resolved by default, __but only in the top level directory__. In the above example a request to `/static` will attempt to retrieve `src/main/resources/public/index.html`. Requests to `/static/foo` will *not* result in `src/main/resources/public/foo/index.html` being resolved.
