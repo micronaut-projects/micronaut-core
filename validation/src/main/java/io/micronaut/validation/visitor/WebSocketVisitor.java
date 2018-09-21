@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.websocket.visitor;
+package io.micronaut.validation.visitor;
 
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.util.ArrayUtils;
