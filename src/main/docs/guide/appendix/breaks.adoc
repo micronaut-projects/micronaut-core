@@ -2,6 +2,7 @@ This section will document breaking changes that may happen during milestone or 
 
 ==== 1.0.0.RC1
 
+* The default port if no port is specified is now port 8080 instead of a random port, except in the test environment. A random port can be obtained by setting the port to -1.
 * The CLI feature for Netflix Archaius was incorrectly named `netflix-archius`. The feature has now been renamed to reflect the correct name, `netflix-archaius`.
 * The intercept url map security rule now no longer considers the query part of the request when determining if the request matches. Previously `/?value=true` would *not* match `/`.
 * Several APIs surrounding route URI matching and template parsing have changed to allow more information to be retrieved from the parsing process.
@@ -14,6 +15,8 @@ The following annotations have been moved to new locations:
 
 * `io.micronaut.http.client.Client` -> `io.micronaut.http.client.annotation.Client`
 * `io.micronaut.security.Secured` -> `io.micronaut.security.annotation.Secured`
+
+
 
 
 ==== 1.0.0.M4
