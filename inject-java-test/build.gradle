@@ -1,0 +1,9 @@
+dependencies {
+    compile project(":inject-java")
+    compile "com.google.testing.compile:compile-testing:0.12"
+    compile dependencyVersion("groovy")
+    compile(dependencyVersion("spock")) {
+        exclude module:'groovy-all'
+    }
+    compile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+}

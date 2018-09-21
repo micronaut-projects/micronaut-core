@@ -13,7 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.openapi
+
+package io.micronaut.annotation.processing.test
 
 import com.sun.tools.javac.model.JavacElements
 import com.sun.tools.javac.util.Context
@@ -38,6 +39,7 @@ import javax.tools.JavaFileObject
  * @since 1.0
  */
 abstract class AbstractTypeElementSpec extends Specification {
+
     AnnotationMetadata buildTypeAnnotationMetadata(String cls) {
         Element element = buildTypeElement(cls)
         JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(JavacElements.instance(new Context()))
@@ -68,8 +70,7 @@ abstract class AbstractTypeElementSpec extends Specification {
         ).toList()
 
         def element = elements ? elements[0] : null
-        assert element instanceof TypeElement
-        return element
+        return (TypeElement) element
     }
 
     protected BeanDefinition buildBeanDefinition(String className, String cls) {
