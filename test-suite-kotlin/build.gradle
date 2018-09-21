@@ -5,7 +5,7 @@ plugins {
 
 dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.2.30"
-    compile project(':http-server-netty:')
+    compile project(':http-server-netty')
     compile project(':runtime')
 
     testCompileOnly project(':inject-java')
