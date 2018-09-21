@@ -13,19 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.openapi;
+package io.micronaut.annotation.processing.test;
 
-import static com.google.common.base.MoreObjects.firstNonNull;
-import static java.lang.Boolean.TRUE;
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.function.Predicate.isEqual;
-import static javax.tools.Diagnostic.Kind.ERROR;
-
-import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableListMultimap;
-import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
-import com.google.common.collect.Multimaps;
+import com.google.common.collect.*;
 import com.google.testing.compile.JavaFileObjects;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.ErroneousTree;
@@ -35,20 +25,27 @@ import com.sun.source.util.TreeScanner;
 import com.sun.source.util.Trees;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.util.Context;
-import io.micronaut.annotation.processing.PackageConfigurationInjectProcessor;
+import com.sun.tools.javac.util.JCDiagnostic;
+import com.sun.tools.javac.util.JCDiagnostic.DiagnosticType;
 import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor;
+import io.micronaut.annotation.processing.PackageConfigurationInjectProcessor;
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.*;
 import javax.annotation.processing.Processor;
 import javax.lang.model.element.Element;
-import javax.tools.Diagnostic;
-import javax.tools.DiagnosticCollector;
-import javax.tools.JavaCompiler;
-import javax.tools.JavaFileObject;
-import javax.tools.ToolProvider;
+import javax.tools.*;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+
+import static com.google.common.base.MoreObjects.firstNonNull;
+import static java.lang.Boolean.TRUE;
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.util.function.Predicate.isEqual;
+import static javax.tools.Diagnostic.Kind.ERROR;
 
 /** Methods to parse Java source files. */
 public final class Parser {
@@ -97,7 +94,10 @@ public final class Parser {
         finally {
             List<Diagnostic<? extends JavaFileObject>> diagnostics = diagnosticCollector.getDiagnostics();
             for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostics) {
-                System.err.println(diagnostic);
+                System.out.println(diagnostic);
+                if (diagnostic.getKind() == Diagnostic.Kind.ERROR) {
+                    throw new RuntimeException(diagnostic.toString());
+                }
             }
         }
     }

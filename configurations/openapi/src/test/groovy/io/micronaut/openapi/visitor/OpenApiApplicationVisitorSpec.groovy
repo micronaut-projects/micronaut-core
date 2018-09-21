@@ -1,7 +1,7 @@
 package io.micronaut.openapi.visitor
 
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.openapi.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.swagger.v3.oas.models.OpenAPI
 
 class OpenApiApplicationVisitorSpec extends AbstractTypeElementSpec {
