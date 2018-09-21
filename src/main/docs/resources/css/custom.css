@@ -217,3 +217,9 @@ a:hover,
     height: 95px;
     visibility: hidden;
 }
+
+@media print  {
+    .contribute-btn, .no-print, .no-print * {
+        display: none !important;
+    }
+}
