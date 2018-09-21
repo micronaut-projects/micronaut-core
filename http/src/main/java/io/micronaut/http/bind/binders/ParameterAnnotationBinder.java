@@ -75,6 +75,9 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
                         .findFirst()
                         .map(UriMatchVariable::isExploded)).orElse(false);
 
+        // Only maps and POJOs will "bindAll", lists work like normal
+        bindAll &= !Iterable.class.isAssignableFrom(argument.getType());
+
         BindingResult<T> result;
         // if the annotation is present or the HTTP method doesn't allow a request body
         // attempt to bind from request parameters. This avoids allowing the request URI to
