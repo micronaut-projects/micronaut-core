@@ -6,17 +6,16 @@ This section will document breaking changes that may happen during milestone or 
 * The CLI feature for Netflix Archaius was incorrectly named `netflix-archius`. The feature has now been renamed to reflect the correct name, `netflix-archaius`.
 * The intercept url map security rule now no longer considers the query part of the request when determining if the request matches. Previously `/?value=true` would *not* match `/`.
 * Several APIs surrounding route URI matching and template parsing have changed to allow more information to be retrieved from the parsing process.
+* The following packages have been renamed:
 
-The following packages have been renamed:
+ io.micronaut.http.server.binding -> io.micronaut.http.bind
 
-* `io.micronaut.http.server.binding` -> `io.micronaut.http.bind`
+* The following annotations have been moved to new locations:
 
-The following annotations have been moved to new locations:
+ io.micronaut.http.client.Client -> io.micronaut.http.client.annotation.Client
+ io.micronaut.security.Secured -> io.micronaut.security.annotation.Secured
 
-* `io.micronaut.http.client.Client` -> `io.micronaut.http.client.annotation.Client`
-* `io.micronaut.security.Secured` -> `io.micronaut.security.annotation.Secured`
-
-
+* The jackson deserialization features ACCEPT_SINGLE_VALUE_AS_ARRAY and UNWRAP_SINGLE_VALUE_ARRAYS are now enabled by default. To revert to the previous behavior, see the section on <<_jackson_configuration, Jackson Configuration>> for information on how to customize deserialization features.
 
 
 ==== 1.0.0.M4
