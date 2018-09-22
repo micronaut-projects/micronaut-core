@@ -242,7 +242,6 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         ExecutableElement setter;
         final String propertyName;
 
-
         public GetterAndSetter(String propertyName) {
             this.propertyName = propertyName;
         }
