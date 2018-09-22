@@ -69,12 +69,16 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         for (ServiceDefinition<TypeElementVisitor> definition : serviceLoader) {
             if (definition.isPresent()) {
                 TypeElementVisitor visitor = definition.load();
-                loadedVisitors.put(definition.getName(), new LoadedVisitor(
-                        visitor,
-                        visitorContext,
-                        genericUtils,
-                        processingEnv
-                ));
+                try {
+                    loadedVisitors.put(definition.getName(), new LoadedVisitor(
+                            visitor,
+                            visitorContext,
+                            genericUtils,
+                            processingEnv
+                    ));
+                } catch (TypeNotPresentException | NoClassDefFoundError e) {
+                    // skip, dependent classes not classpath
+                }
             }
         }
 

@@ -7,9 +7,7 @@ dependencies {
     compile "io.swagger.core.v3:swagger-annotations:2.0.4"
 
     testCompile project(":runtime")
-    testCompile project(":inject-java")
     testCompile project(":inject-groovy")
-    testCompile "com.google.testing.compile:compile-testing:0.12"
-    testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
-
+    testCompile project(":inject-java-test")
+    testCompile dependencyVersion("rxjava2")
 }

@@ -42,6 +42,12 @@ import java.util.Optional;
 public class HttpServerConfiguration {
 
     /**
+     * The default port value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_PORT = 8080;
+
+    /**
      * The prefix used for configuration.
      */
 
@@ -83,7 +89,7 @@ public class HttpServerConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final long DEFAULT_IDLETIME_SECONDS = 60;
 
-    private int port = DEFAULT_RANDOM_PORT; // default to random port
+    private Integer port;
     private String host;
     private Integer readTimeout;
     private long maxRequestSize = DEFAULT_MAX_REQUEST_SIZE;
@@ -141,8 +147,8 @@ public class HttpServerConfiguration {
     /**
      * @return The default server port
      */
-    public int getPort() {
-        return port;
+    public Optional<Integer> getPort() {
+        return Optional.ofNullable(port);
     }
 
     /**

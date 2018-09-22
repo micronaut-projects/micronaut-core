@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.security;
+package io.micronaut.security.annotation;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;

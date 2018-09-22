@@ -22,7 +22,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.consul.ConsulConfiguration;
 import io.micronaut.discovery.consul.ConsulServiceInstance;
-import io.micronaut.http.client.Client;
+import io.micronaut.http.client.annotation.Client;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

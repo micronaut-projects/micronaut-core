@@ -29,7 +29,7 @@ class FileSystemResourceLoaderSpec extends Specification {
         FileSystemResourceLoader loader = new DefaultFileSystemResourceLoader(base)
 
         expect:
-        Paths.get(loader.getResource(resource).get().toURI()).toFile().isDirectory()
+        !loader.getResource(resource).isPresent()
 
         where:
         base        | resource

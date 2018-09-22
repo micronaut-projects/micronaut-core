@@ -18,6 +18,8 @@ package io.micronaut.security;
 
 import io.micronaut.core.annotation.AnnotationMapper;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.security.annotation.Secured;
+
 import javax.annotation.security.RolesAllowed;
 import java.util.ArrayList;
 import java.util.List;

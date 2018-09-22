@@ -25,6 +25,7 @@ import java.util.Optional;
 /**
  *
  * Implementation of {@link OutgoingHttpRequestProcessor}.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */

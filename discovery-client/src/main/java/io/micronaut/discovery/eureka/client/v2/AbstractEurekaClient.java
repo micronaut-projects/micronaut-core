@@ -33,7 +33,7 @@ import io.micronaut.discovery.eureka.condition.RequiresEureka;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.http.client.Client;
+import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.jackson.annotation.JacksonFeatures;

@@ -21,7 +21,7 @@ import groovy.transform.NotYetImplemented
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.client.Client
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification

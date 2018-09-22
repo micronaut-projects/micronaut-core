@@ -1,5 +1,7 @@
 package io.micronaut.http.client;
 
+import io.micronaut.http.client.annotation.Client;
+
 import javax.inject.Inject;
 import javax.inject.Singleton;
 

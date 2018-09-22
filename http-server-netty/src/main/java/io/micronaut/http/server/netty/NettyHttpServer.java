@@ -31,6 +31,7 @@ import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
@@ -130,6 +131,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private final BeanLocator beanLocator;
     private final ThreadFactory threadFactory;
     private final WebSocketBeanRegistry webSocketBeanRegistry;
+    private final int specifiedPort;
     private volatile int serverPort;
     private final ApplicationContext applicationContext;
     private final SslContext sslContext;
@@ -180,7 +182,18 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         this.sslConfiguration = nettyServerSslBuilder.getSslConfiguration();
         this.router = router;
         this.ioExecutor = ioExecutor;
-        int port = sslConfiguration.isEnabled() ? sslConfiguration.getPort() : serverConfiguration.getPort();
+        Optional<Integer> configPort = serverConfiguration.getPort();
+        if (configPort.isPresent()) {
+            this.specifiedPort = configPort.get();
+        } else {
+            if (environment.getActiveNames().contains(Environment.TEST)) {
+                this.specifiedPort = -1;
+            } else {
+                this.specifiedPort = HttpServerConfiguration.DEFAULT_PORT;
+            }
+        }
+
+        int port = sslConfiguration.isEnabled() ? sslConfiguration.getPort() : specifiedPort;
         this.serverPort = port == -1 ? SocketUtils.findAvailableTcpPort() : port;
         this.executorSelector = executorSelector;
         OrderUtil.sort(outboundHandlers);
@@ -381,7 +394,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
     @SuppressWarnings("MagicNumber")
     private void bindServerToHost(ServerBootstrap serverBootstrap, @Nullable String host, AtomicInteger attempts) {
-        boolean isRandomPort = serverConfiguration.getPort() == -1;
+        boolean isRandomPort = specifiedPort == -1;
         if (!SocketUtils.isTcpPortAvailable(serverPort) && !isRandomPort) {
             throw new ServerStartupException("Unable to start Micronaut server on port: " + serverPort, new BindException("Address already in use"));
         }

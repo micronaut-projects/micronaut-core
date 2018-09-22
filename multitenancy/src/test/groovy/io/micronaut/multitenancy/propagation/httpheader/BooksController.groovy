@@ -4,9 +4,8 @@ import groovy.transform.CompileStatic
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.security.Secured
+import io.micronaut.security.annotation.Secured
 import io.micronaut.security.rules.SecurityRule
-import io.micronaut.security.utils.SecurityService
 
 @Requires(property = 'spec.name', value = 'multitenancy.httpheader.gorm')
 @CompileStatic

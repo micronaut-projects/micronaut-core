@@ -26,6 +26,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.client.*;
+import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
