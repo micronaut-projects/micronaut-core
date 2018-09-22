@@ -16,6 +16,7 @@
 
 package io.micronaut.http.resource;
 
+import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
@@ -40,6 +41,7 @@ public class ResourceLoaderFactory {
      * @return The class path resource loader
      */
     @Singleton
+    @Bean
     ClassPathResourceLoader getClassPathResourceLoader() {
         return new DefaultClassPathResourceLoader(ResourceLoaderFactory.class.getClassLoader());
     }

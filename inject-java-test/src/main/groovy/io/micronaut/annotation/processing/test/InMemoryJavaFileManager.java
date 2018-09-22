@@ -13,7 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.openapi;
+
+package io.micronaut.annotation.processing.test;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.base.Optional;
@@ -23,30 +24,19 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableList;
 import com.google.common.io.ByteSource;
 
-import java.io.ByteArrayOutputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.io.Reader;
-import java.io.StringWriter;
-import java.io.Writer;
+import javax.tools.*;
+import javax.tools.JavaFileObject.Kind;
+import java.io.*;
 import java.net.URI;
 import java.nio.charset.Charset;
 import java.util.Map.Entry;
-import javax.tools.FileObject;
-import javax.tools.ForwardingJavaFileManager;
-import javax.tools.JavaFileManager;
-import javax.tools.JavaFileObject;
-import javax.tools.JavaFileObject.Kind;
-import javax.tools.SimpleJavaFileObject;
-import javax.tools.StandardLocation;
 
 /**
  * A file manager implementation that stores all output in memory.
  *
  * @author Gregory Kick
  */
+@SuppressWarnings("all")
 final class InMemoryJavaFileManager extends ForwardingJavaFileManager<JavaFileManager> {
     private final LoadingCache<URI, JavaFileObject> inMemoryFileObjects =
             CacheBuilder.newBuilder().build(new CacheLoader<URI, JavaFileObject>() {

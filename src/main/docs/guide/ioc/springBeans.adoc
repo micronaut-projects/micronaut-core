@@ -12,7 +12,7 @@ like the folowing:
 ```groovy
 // grails-app/conf/spring/resources.groovy
 import io.micronaut.spring.beans.MicronautBeanProcessor
-import io.micronaut.http.client.Client
+import io.micronaut.http.client.annotation.Client
 
 beans = {
     httpClientBeanProcessor MicronautBeanProcessor, Client
@@ -24,7 +24,7 @@ Multiple types may be specified:
 ```groovy
 // grails-app/conf/spring/resources.groovy
 import io.micronaut.spring.beans.MicronautBeanProcessor
-import io.micronaut.http.client.Client
+import io.micronaut.http.client.annotation.Client
 import com.sample.Widget
 
 beans = {

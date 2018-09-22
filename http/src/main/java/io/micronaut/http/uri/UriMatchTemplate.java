@@ -189,9 +189,9 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         private final List<UriMatchVariable> variables;
 
         /**
-         * @param uri       The URI
-         * @param variableValues Actual variable values
-         * @param variables Information about the URI template's expected variables
+         * @param uri            The URI
+         * @param variableValues The map of variable names with values
+         * @param variables      The variables
          */
         protected DefaultUriMatchInfo(String uri, Map<String, Object> variableValues, List<UriMatchVariable> variables) {
             this.uri = uri;

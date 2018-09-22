@@ -35,6 +35,7 @@ import java.util.Optional;
 @Singleton
 public class StaticResourceResolver {
 
+    private static final String INDEX_PAGE = "index.html";
     private final String mapping;
     private final List<ResourceLoader> loaders;
     private final AntPathMatcher pathMatcher;
@@ -59,7 +60,7 @@ public class StaticResourceResolver {
             path = pathMatcher.extractPathWithinPattern(mapping, path);
             //A request to the root of the mapping
             if (StringUtils.isEmpty(path)) {
-                path = "index.html";
+                path = INDEX_PAGE;
             }
             if (path.startsWith("/")) {
                 path = path.substring(1);
@@ -68,6 +69,17 @@ public class StaticResourceResolver {
                 Optional<URL> resource = loader.getResource(path);
                 if (resource.isPresent()) {
                     return resource;
+                } else {
+                    if (path.indexOf('.') == -1) {
+                        if (!path.endsWith("/")) {
+                            path = path + "/";
+                        }
+                        path += INDEX_PAGE;
+                        resource = loader.getResource(path);
+                        if (resource.isPresent()) {
+                            return resource;
+                        }
+                    }
                 }
             }
         }

@@ -15,12 +15,9 @@
  */
 
 /**
- * Compile time visitor classes for WebSocket.
+ * Annotations associated with the HTTP client.
  *
- * @author graemerocher
+ * @author Graeme Rocher
  * @since 1.0
  */
-@Internal
-package io.micronaut.websocket.visitor;
-
-import io.micronaut.core.annotation.Internal;
+package io.micronaut.http.client.annotation;

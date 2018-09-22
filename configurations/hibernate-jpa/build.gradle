@@ -1,5 +1,5 @@
 dependencies {
-    compile 'org.hibernate:hibernate-core:5.3.4.Final'
+    compile 'org.hibernate:hibernate-core:5.3.6.Final'
 
     compile project(":aop")
     compile project(":jdbc")

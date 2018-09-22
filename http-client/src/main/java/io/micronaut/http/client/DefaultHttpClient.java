@@ -141,9 +141,21 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     protected static final String HANDLER_STREAM = "stream-handler";
     protected static final String HANDLER_DECODER = "http-decoder";
 
+    private static final String HANDLER_IDLE_STATE = "handler-idle-state";
+    private static final String HANDLER_MICRONAUT_WEBSOCKET_CLIENT = "handler-micronaut-websocket-client";
+    private static final String HANDLER_HTTP_PROXY = "handler-http-proxy";
+    private static final String HANDLER_SOCKS_5_PROXY = "handler-socks5-proxy";
+    private static final String HANDLER_MICRONAUT_FULL_HTTP_RESPONSE = "handler-micronaut-full-http-response";
+    private static final String HANDLER_READ_TIMEOUT = "handler-read-timeout";
+    private static final String HANDLER_HTTP_CLIENT_CODEC = "handler-http-client-codec";
+    private static final String HANDLER_SSL = "handler-ssl";
+    private static final String HANDLER_MICRONAUT_SSE_EVENT_STREAM = "handler-micronaut-sse-event-stream";
+    private static final String HANDLER_MICRONAUT_SSE_CONTENT = "handler-micronaut-sse-content";
+    private static final String HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM = "handler-micronaut-http-response-stream";
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
+    private static final String HANDLER_HTTP_CLIENT_INIT = "handler-http-client-init";
 
     protected final Bootstrap bootstrap;
     protected EventLoopGroup group;
@@ -425,7 +437,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
     /**
      * Sets the client identifiers that this client applies to. Used to select a subset of {@link HttpClientFilter}.
-     * The client identifiers are equivalents to the value of {@link Client#id()}
+     * The client identifiers are equivalents to the value of {@link io.micronaut.http.client.annotation.Client#id()}
      *
      * @param clientIdentifiers The client identifiers
      */
@@ -737,7 +749,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     Optional<Duration> readIdleTime = configuration.getReadIdleTime();
                     if (readIdleTime.isPresent()) {
                         Duration duration = readIdleTime.get();
-                        pipeline.addLast(new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
+                        pipeline.addLast(HANDLER_IDLE_STATE, new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
                     }
 
                     final NettyWebSocketClientHandler webSocketHandler;
@@ -758,7 +770,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                 requestBinderRegistry,
                                 mediaTypeCodecRegistry,
                                 emitter);
-                        pipeline.addLast(webSocketHandler);
+                        pipeline.addLast(HANDLER_MICRONAUT_WEBSOCKET_CLIENT, webSocketHandler);
                     } catch (Throwable e) {
                         emitter.onError(new WebSocketSessionException("Error opening WebSocket client session: " + e.getMessage(), e));
                     }
@@ -1253,10 +1265,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         if (StringUtils.isNotEmpty(username) && StringUtils.isNotEmpty(password)) {
             switch (proxyType) {
                 case HTTP:
-                    pipeline.addLast(new HttpProxyHandler(proxyAddress, username, password));
+                    pipeline.addLast(HANDLER_HTTP_PROXY, new HttpProxyHandler(proxyAddress, username, password));
                     break;
                 case SOCKS:
-                    pipeline.addLast(new Socks5ProxyHandler(proxyAddress, username, password));
+                    pipeline.addLast(HANDLER_SOCKS_5_PROXY, new Socks5ProxyHandler(proxyAddress, username, password));
                     break;
                 default:
                     // no-op
@@ -1264,10 +1276,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         } else {
             switch (proxyType) {
                 case HTTP:
-                    pipeline.addLast(new HttpProxyHandler(proxyAddress));
+                    pipeline.addLast(HANDLER_HTTP_PROXY, new HttpProxyHandler(proxyAddress));
                     break;
                 case SOCKS:
-                    pipeline.addLast(new Socks5ProxyHandler(proxyAddress));
+                    pipeline.addLast(HANDLER_SOCKS_5_PROXY, new Socks5ProxyHandler(proxyAddress));
                     break;
                 default:
                     // no-op
@@ -1480,7 +1492,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         NettyRequestWriter requestWriter = prepareRequest(requestWrapper.get(), requestURI);
         HttpRequest nettyRequest = requestWriter.getNettyRequest();
         ChannelPipeline pipeline = channel.pipeline();
-        pipeline.addLast(new SimpleChannelInboundHandler<StreamedHttpResponse>() {
+        pipeline.addLast(HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM, new SimpleChannelInboundHandler<StreamedHttpResponse>() {
 
             AtomicBoolean received = new AtomicBoolean(false);
 
@@ -1609,7 +1621,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             Emitter<io.micronaut.http.HttpResponse<O>> emitter,
             Argument<O> bodyType, Argument<E> errorType) {
         ChannelPipeline pipeline = channel.pipeline();
-        pipeline.addLast(new SimpleChannelInboundHandler<FullHttpResponse>() {
+        pipeline.addLast(HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, new SimpleChannelInboundHandler<FullHttpResponse>() {
 
             AtomicBoolean complete = new AtomicBoolean(false);
 
@@ -1684,6 +1696,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     }
                 } finally {
                     pipeline.remove(this);
+                    if (fullResponse.refCnt() > 1) {
+                        ReferenceCountUtil.safeRelease(fullResponse);
+                    }
                     if (channelPool != null) {
                         Channel ch = channelHandlerContext.channel();
                         if (!HttpUtil.isKeepAlive(fullResponse)) {
@@ -1869,7 +1884,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         return new AbstractChannelPoolHandler() {
             @Override
             public void channelCreated(Channel ch) {
-                ch.pipeline().addLast(new HttpClientInitializer(
+                ch.pipeline().addLast(HANDLER_HTTP_CLIENT_INIT, new HttpClientInitializer(
                         key.isSecure() ? sslContext : null,
                         key.getHost(),
                         key.getPort(),
@@ -1930,7 +1945,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         host,
                         port
                 );
-                p.addFirst("ssl-handler", sslHandler);
+                p.addFirst(HANDLER_SSL, sslHandler);
             }
 
             Optional<SocketAddress> proxy = configuration.getProxyAddress();
@@ -1946,17 +1961,17 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 Optional<Duration> readTimeout = configuration.getReadTimeout();
                 readTimeout.ifPresent(duration -> {
                     if (!duration.isNegative()) {
-                        p.addLast(new ReadTimeoutHandler(duration.toMillis(), TimeUnit.MILLISECONDS));
+                        p.addLast(HANDLER_READ_TIMEOUT, new ReadTimeoutHandler(duration.toMillis(), TimeUnit.MILLISECONDS));
                     }
                 });
             } else {
                 Optional<Duration> readIdleTime = configuration.getReadIdleTime();
                 if (readIdleTime.isPresent()) {
                     Duration duration = readIdleTime.get();
-                    p.addLast(new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
+                    p.addLast(HANDLER_IDLE_STATE, new IdleStateHandler(duration.toMillis(), duration.toMillis(), duration.toMillis(), TimeUnit.MILLISECONDS));
                 }
             }
-            p.addLast("http-client-codec", new HttpClientCodec());
+            p.addLast(HANDLER_HTTP_CLIENT_CODEC, new HttpClientCodec());
 
             p.addLast(HANDLER_DECODER, new HttpContentDecompressor());
 
@@ -1978,7 +1993,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             // if the content type is a SSE event stream we add a decoder
             // to delimit the content by lines
             if (acceptsEventStream()) {
-                p.addLast(new SimpleChannelInboundHandler<HttpContent>() {
+                p.addLast(HANDLER_MICRONAUT_SSE_EVENT_STREAM, new SimpleChannelInboundHandler<HttpContent>() {
 
                     LineBasedFrameDecoder decoder = new LineBasedFrameDecoder(
                             configuration.getMaxContentLength(),
@@ -1999,7 +2014,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
                 });
 
-                p.addLast(new SimpleChannelInboundHandler<ByteBuf>() {
+                p.addLast(HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandler<ByteBuf>() {
 
                     @Override
                     public boolean acceptInboundMessage(Object msg) {
