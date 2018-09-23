@@ -1,6 +1,6 @@
 package io.micronaut.openapi.visitor
 
-import io.micronaut.openapi.AbstractTypeElementSpec
+import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.swagger.v3.oas.models.Operation
 
 class OpenApiOperationParseSpec extends AbstractTypeElementSpec {

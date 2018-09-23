@@ -37,6 +37,10 @@ The above example will configure a cache called "myCache" with a maximum size of
 
 To configure a weigher to be used with the `maximumWeight` configuration, create a bean that implements `io.micronaut.caffeine.cache.Weigher`. To associate a given weigher with only a specific cache, annotate the bean with `@Named(<cache name>)`. Weighers without a named qualifier will apply to all caches that don't have a named weigher. If no beans are found, a default implementation will be used.
 
+
+include::{includedir}configurationProperties/io.micronaut.cache.CacheConfiguration.adoc[]
+
+
 == Caching with Redis
 
 [TIP]
@@ -64,6 +68,7 @@ dependencies {
 
 Then within your application configuration configure the Redis URL and Redis caches:
 
+//TODO: Move YAML snippet to test
 .Cache Configuration Example
 [source,yaml]
 ----
@@ -74,3 +79,5 @@ micronaut:
             myCache:
                 expireAfterWrite: "1h" # expire one hour after write
 ----
+
+include::{includedir}configurationProperties/io.micronaut.configuration.lettuce.cache.RedisCacheConfiguration.adoc[]

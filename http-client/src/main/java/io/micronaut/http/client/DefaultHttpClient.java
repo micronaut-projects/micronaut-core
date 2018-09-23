@@ -41,7 +41,6 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.bind.RequestBinderRegistry;
-import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.*;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.sse.RxSseClient;
@@ -448,7 +447,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
     /**
      * Sets the client identifiers that this client applies to. Used to select a subset of {@link HttpClientFilter}.
-     * The client identifiers are equivalents to the value of {@link Client#id()}
+     * The client identifiers are equivalents to the value of {@link io.micronaut.http.client.annotation.Client#id()}
      *
      * @param clientIdentifiers The client identifiers
      */

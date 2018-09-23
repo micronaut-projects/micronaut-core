@@ -21,11 +21,11 @@ import io.micronaut.http.HttpRequest;
 
 import javax.inject.Singleton;
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 /**
  *
  * Implementation of {@link OutgoingHttpRequestProcessor}.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */

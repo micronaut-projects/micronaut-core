@@ -72,7 +72,7 @@ public class UriMatchVariable {
         if (this == o) {
             return true;
         }
-        if (!(o instanceof UriMatchVariable)){
+        if (!(o instanceof UriMatchVariable)) {
             return false;
         }
         UriMatchVariable that = (UriMatchVariable) o;
