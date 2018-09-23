@@ -2,7 +2,7 @@ Reloading (or "hot-loading") refers to the framework reinitializing classes (and
 
 However, reloading support is available through the use of third-party JVM agents, along with automatic recompilation on file changes via a supporting build tool (such as Gradle) or IDE (such as Eclipse).
 
-The next sections document how to configure agent-reloading.
+The following sections document how to configure agent-reloading.
 
 
 

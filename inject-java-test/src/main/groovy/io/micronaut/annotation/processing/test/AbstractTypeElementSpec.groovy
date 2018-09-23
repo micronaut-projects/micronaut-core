@@ -13,7 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.openapi
+
+package io.micronaut.annotation.processing.test
 
 import com.sun.tools.javac.model.JavacElements
 import com.sun.tools.javac.util.Context
@@ -34,10 +35,18 @@ import javax.lang.model.element.VariableElement
 import javax.tools.JavaFileObject
 
 /**
+ * Base class to extend from to allow compilation of Java sources
+ * at runtime to allow testing of compile time behavior.
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
 abstract class AbstractTypeElementSpec extends Specification {
+
+    /**
+     * @param cls The class string
+     * @return The annotation metadata for the class
+     */
     AnnotationMetadata buildTypeAnnotationMetadata(String cls) {
         Element element = buildTypeElement(cls)
         JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(JavacElements.instance(new Context()))
@@ -45,6 +54,11 @@ abstract class AbstractTypeElementSpec extends Specification {
         return metadata
     }
 
+    /**
+     * @param cls   The class string
+     * @param methodName The method name
+     * @return The annotation metadata for the method
+     */
     AnnotationMetadata buildMethodAnnotationMetadata(String cls, String methodName) {
         TypeElement element = buildTypeElement(cls)
         Element method = element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
@@ -53,6 +67,12 @@ abstract class AbstractTypeElementSpec extends Specification {
         return metadata
     }
 
+    /**
+     * @param cls   The class string
+     * @param methodName The method name
+     * @param fieldName The field name
+     * @return The annotation metadata for the field
+     */
     AnnotationMetadata buildFieldAnnotationMetadata(String cls, String methodName, String fieldName) {
         TypeElement element = buildTypeElement(cls)
         ExecutableElement method = (ExecutableElement)element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
@@ -68,8 +88,7 @@ abstract class AbstractTypeElementSpec extends Specification {
         ).toList()
 
         def element = elements ? elements[0] : null
-        assert element instanceof TypeElement
-        return element
+        return (TypeElement) element
     }
 
     protected BeanDefinition buildBeanDefinition(String className, String cls) {

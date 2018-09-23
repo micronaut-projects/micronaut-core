@@ -103,7 +103,7 @@ The result of the command will tell you the ID of the namespace. Write that down
 
 ==== Creating the Service & DNS Records
 
-Next step is creating the Service and DNS records.
+The next step is creating the Service and DNS records.
 
 .Create Service
 [source,bash]
