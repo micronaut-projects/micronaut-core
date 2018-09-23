@@ -4,7 +4,7 @@ Like Spring and Grails, Micronaut features a api:scheduling.annotation.Scheduled
 
 The api:scheduling.annotation.Scheduled[] annotation can be added to any method of a bean and you should set either the `fixedRate`, `fixedDelay` or `cron` members.
 
-NOTE: Remember that the scope of the bean has an impact on behaviour. a `@Singleton` bean will share state (the fields of the instance) for each execution, whilst with a `@Prototype` bean a new instance is created for each execution.
+NOTE: Remember that the scope of the bean has an impact on behaviour. a `@Singleton` bean will share state (the fields of the instance) each time the scheduled method is executed, while for a `@Prototype` bean a new instance is created for each execution.
 
 === Scheduling at a Fixed Rate
 
@@ -65,8 +65,9 @@ The above example allows the task execution frequency to be configured with the 
 
 Tasks executed by `@Scheduled` are by default run on a jdk:java.util.concurrent.ScheduledExecutorService[] that is configured to have twice the number of threads as available processors.
 
-You can re-configure this thread pool as desired using `application.yml`, for example:
+You can configure this thread pool as desired using `application.yml`, for example:
 
+//TODO: Move YAML snippet to ExecutorServiceConfigSpec
 .Configuring Scheduled Task Thread Pool
 [source,yaml]
 ----
@@ -74,5 +75,7 @@ micronaut:
     executors:
         scheduled:
             type: scheduled
-            core-pool-size: 10
+            core-pool-size: 30
 ----
+
+include::{includedir}configurationProperties/io.micronaut.scheduling.executor.UserExecutorConfiguration.adoc[]
