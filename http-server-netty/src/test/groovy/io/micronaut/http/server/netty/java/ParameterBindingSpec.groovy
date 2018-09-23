@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.java
 
+import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
@@ -29,9 +30,19 @@ import javax.annotation.Nullable
  */
 class ParameterBindingSpec extends AbstractMicronautSpec {
 
-    void "test bind HTTP parameters for URI /books"() {
+    void 'route is build correctly for @Controller("/books") method: @Get("{?max}")'() {
         given:
         HttpRequest request = HttpRequest.GET('/books')
+        def response = rxClient.toBlocking().exchange(request)
+        def status = response.status
+
+        expect:
+        status == HttpStatus.OK
+    }
+
+    void 'route is build correctly for @Controller("/poetry") method: @Get("/{?max}")'() {
+        given:
+        HttpRequest request = HttpRequest.GET('/poetry')
         def response = rxClient.toBlocking().exchange(request)
         def status = response.status
 
@@ -77,10 +88,21 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
         '/java/parameter/optional-list?values=10&values=20'              | "Parameter Value: [10, 20]" | HttpStatus.OK
     }
 
+    @Requires(property = 'spec.name', value = 'ParameterBindingSpec')
     @Controller("/books")
     static class BookController {
 
         @Get("{?max}")
+        HttpStatus index(@Nullable Integer max) {
+            return HttpStatus.OK
+        }
+    }
+
+    @Requires(property = 'spec.name', value = 'ParameterBindingSpec')
+    @Controller("/poetry")
+    static class PoetryController {
+
+        @Get("/{?max}")
         HttpStatus index(@Nullable Integer max) {
             return HttpStatus.OK
         }
