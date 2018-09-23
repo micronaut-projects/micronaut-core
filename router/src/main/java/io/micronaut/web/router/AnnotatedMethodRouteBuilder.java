@@ -256,8 +256,10 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         if (StringUtils.isNotEmpty(value)) {
             boolean isFirstCharSlash = value.charAt(0) == '/';
             boolean isFirstCharVar = value.charAt(0) == '{';
-            if (value.length() == 1 && isFirstCharSlash) {
+            if (isFirstCharSlash && value.length() == 1) {
                 return rootUri.toString();
+            } else if (isFirstCharSlash && value.indexOf("{?") == 1) {
+                return rootUri.nest(value.substring(1)).toString();
             } else {
                 return rootUri.nest(isFirstCharSlash || isFirstCharVar ? value : '/' + value).toString();
             }
