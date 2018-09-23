@@ -79,9 +79,11 @@ public class DoOnStartup  {
 }
 ----
 
-The event listener will by default run on the `scheduled` executor. You can re-configure this thread pool as required in `application.yml`:
+The event listener will by default run on the `scheduled` executor. You can configure this thread pool as required in `application.yml`:
 
-.Configuring the `scheduled` executor
+
+//TODO: Move YAML snippet to ExecutorServiceConfigSpec
+.Configuring Scheduled Task Thread Pool
 [source,yaml]
 ----
 micronaut:

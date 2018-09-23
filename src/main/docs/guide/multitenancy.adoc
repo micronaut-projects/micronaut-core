@@ -20,7 +20,7 @@ A common requirement for supporting Multi-tenancy is the ability to resolve the 
 | Resolves the tenant id from a system property. See link:configurationreference.html#io.micronaut.multitenancy.tenantresolver.SystemPropertyTenantResolverConfigurationProperties[SystemPropertyTenantResolver Configuration Properties].
 |===
 
-Micronaut supports tenant propagation. Imagine the next scenario:
+Micronaut supports tenant propagation. As an example, take the following scenario:
 
 image:multitenancy.svg[]
 

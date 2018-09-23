@@ -1,6 +1,6 @@
 The quick start section presented a trivial example of what is possible with the ann:configuration.kafka.annotation.KafkaListener[] annotation.
 
-Using the `@KafkaListener` annotation Micronaut will build a link:{kafkaapi}/org/apache/kafka/clients/consumer/KafkaConsumer.html[KafkaConsumer] and start the `poll` loop by running the `KafkaConsumer` in a special `consumer` thread pool. You can re-configure the size of the thread pool based on the number of consumers in your application in `application.yml` as desired:
+Using the `@KafkaListener` annotation Micronaut will build a link:{kafkaapi}/org/apache/kafka/clients/consumer/KafkaConsumer.html[KafkaConsumer] and start the `poll` loop by running the `KafkaConsumer` in a special `consumer` thread pool. You can configure the size of the thread pool based on the number of consumers in your application in `application.yml` as desired:
 
 .Configuring the `consumer` thread pool
 [source,yaml]
