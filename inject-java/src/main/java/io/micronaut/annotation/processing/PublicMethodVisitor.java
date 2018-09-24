@@ -35,7 +35,7 @@ public abstract class PublicMethodVisitor<R, P> extends SuperclassAwareTypeVisit
 
 
     /**
-     * Only accepts public non file or static methods
+     * Only accepts public non file or static methods.
      *
      * @param element The {@link Element}
      * @return If the element is acceptable
