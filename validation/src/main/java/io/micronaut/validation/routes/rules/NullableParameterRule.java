@@ -41,7 +41,7 @@ public class NullableParameterRule implements RouteValidationRule {
         List<String> errorMessages = new ArrayList<>();
 
         for (UriMatchVariable variable: variables) {
-            if (variable.isOptional()) {
+            if (variable.isOptional() && !variable.isExploded()) {
                 Arrays.stream(parameters)
                         .filter(p -> p.getName().equals(variable.getName()))
                         .findFirst()
