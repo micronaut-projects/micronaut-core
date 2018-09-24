@@ -20,6 +20,7 @@ import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -59,6 +60,10 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
      */
     public GraalClassLoadingReporter() {
         classes.add(NETTY_TYPE);
+        List<Class<?>> knownReactiveTypes = Publishers.getKnownReactiveTypes();
+        for (Class<?> knownReactiveType : knownReactiveTypes) {
+            classes.add(knownReactiveType.getName());
+        }
         arrays.add("io.micronaut.http.MediaType[]");
     }
 
