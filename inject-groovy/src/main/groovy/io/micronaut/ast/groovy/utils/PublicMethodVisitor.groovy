@@ -27,12 +27,15 @@ import org.codehaus.groovy.ast.PropertyNode
 import org.codehaus.groovy.control.SourceUnit
 
 /**
+ * Visits public methods in a class node.
+ *
  * @author Graeme Rocher
  * @since 1.0
  */
 @CompileStatic
 @Internal
 abstract class PublicMethodVisitor extends ClassCodeVisitorSupport {
+
     final SourceUnit sourceUnit
     private final Set<String> processed = new HashSet<>()
     private ClassNode current

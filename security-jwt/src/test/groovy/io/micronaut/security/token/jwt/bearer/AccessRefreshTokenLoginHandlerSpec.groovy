@@ -90,5 +90,12 @@ class AccessRefreshTokenLoginHandlerSpec extends Specification {
         resp.body().username == "valid"
         resp.body().roles == ["foo", "bar"]
         resp.body().expiresIn
+
+        when: 'validate json response contains access_token and refresh_token keys as described in RFC6759'
+        String json = client.toBlocking().retrieve(HttpRequest.POST('/login', creds), String)
+
+        then:
+        json.contains('access_token')
+        json.contains('refresh_token')
     }
 }

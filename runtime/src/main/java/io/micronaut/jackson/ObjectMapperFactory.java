@@ -127,6 +127,8 @@ public class ObjectMapperFactory {
         }
 
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+        objectMapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
+        objectMapper.configure(DeserializationFeature.UNWRAP_SINGLE_VALUE_ARRAYS, true);
         jacksonConfiguration.ifPresent((configuration) -> {
             JsonInclude.Include include = configuration.getSerializationInclusion();
             if (include != null) {
