@@ -84,6 +84,10 @@ class MavenBuildTokens extends BuildTokens {
             dependencies.addAll f.dependencies.findAll() { Dependency dep -> dep.scope != 'build' }
         }
 
+        List<Dependency> annotationProcessors = dependencies
+                .unique()
+                .findAll( { it.scope == 'annotationProcessor'})
+
         dependencies = dependencies.unique()
             .findAll { scopeConversions.containsKey(it.scope) }
             .collect { convertScope(it) }
@@ -128,12 +132,25 @@ class MavenBuildTokens extends BuildTokens {
 
         arguments.each { String arg ->
             jvmArgsXml.argument("${arg}")
-
         }
+
+        def annotationProcessorsWriter = new StringWriter()
+        MarkupBuilder annotationProcessorPathsXml = new MarkupBuilder(annotationProcessorsWriter)
+        annotationProcessors.each { Dependency dep ->
+            def artifact = dep.artifact
+            annotationProcessorPathsXml.path {
+                groupId(artifact.groupId)
+                artifactId(artifact.artifactId)
+                version("\${micronaut.version}")
+            }
+        }
+
+
         tokens.put("arguments", prettyPrint(jvmArgsWriter.toString(), 12))
         tokens.put("dependencies", prettyPrint(dependenciesWriter.toString(), 8))
         tokens.put("repositories", prettyPrint(repositoriesWriter.toString(), 8))
         tokens.put("jdkversion", VersionInfo.getJdkVersion())
+        tokens.put("annotationProcessorPaths", prettyPrint(annotationProcessorsWriter.toString(), 14))
 
         tokens
     }
