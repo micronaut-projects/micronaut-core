@@ -21,6 +21,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.context.BeanContext;
@@ -356,9 +359,24 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                         request, publisherArgument
                                 );
                             } else {
-                                publisher = streamingHttpClient.dataStream(
+                                Publisher<ByteBuffer<?>> byteBufferPublisher = streamingHttpClient.dataStream(
                                         request
                                 );
+                                if (argumentType == ByteBuffer.class) {
+                                    publisher = byteBufferPublisher;
+                                } else if (argumentType == byte[].class) {
+                                    publisher = Flowable.fromPublisher(byteBufferPublisher)
+                                            .map(buffer -> {
+                                                byte[] bytes = buffer.toByteArray();
+                                                ((ReferenceCounted) buffer).release();
+                                                return bytes;
+                                            });
+                                } else {
+                                    throw new ConfigurationException("Cannot create the generated HTTP client's " +
+                                            "required return type, should be Publisher<ByteBuffer> or Publisher<byte[]> " +
+                                            "(or subclasses like Flowable or Flux)");
+                                }
+
                             }
                         }
                     }
