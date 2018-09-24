@@ -2,9 +2,9 @@ dependencies {
     compileOnly project(":inject")
     compile project(":http")
     compile project(":validation")
-    compile "io.swagger.core.v3:swagger-core:2.0.4"
-    compile "io.swagger.core.v3:swagger-models:2.0.4"
-    compile "io.swagger.core.v3:swagger-annotations:2.0.4"
+    compile dependencyVersion('swagger')
+    compile dependencyModuleVersion('swagger', 'swagger-models')
+    compile dependencyModuleVersion('swagger', 'swagger-annotations')
 
     testCompile project(":runtime")
     testCompile project(":inject-groovy")
