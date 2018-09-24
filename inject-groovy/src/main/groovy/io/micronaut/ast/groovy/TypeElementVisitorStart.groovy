@@ -22,7 +22,6 @@ import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.core.io.service.ServiceDefinition
 import io.micronaut.core.io.service.SoftServiceLoader
-import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.reflect.InstantiationUtils
 import io.micronaut.inject.visitor.TypeElementVisitor
 import org.codehaus.groovy.ast.ASTNode
@@ -54,13 +53,11 @@ class TypeElementVisitorStart implements ASTTransformation {
 
             ModuleNode moduleNode = source.getAST()
             SoftServiceLoader serviceLoader = SoftServiceLoader.load(TypeElementVisitor, TypeElementVisitorStart.classLoader)
-            GroovyVisitorContext visitorContext = new GroovyVisitorContext(source)
-
             for (ServiceDefinition<TypeElementVisitor> definition: serviceLoader) {
                 if (definition.isPresent()) {
                     TypeElementVisitor visitor = definition.load()
                     try {
-                        LoadedVisitor newLoadedVisitor = new LoadedVisitor(visitor, visitorContext)
+                        LoadedVisitor newLoadedVisitor = new LoadedVisitor(visitor)
                         loadedVisitors.put(definition.getName(), newLoadedVisitor)
                     } catch (TypeNotPresentException e) {
                         // skip, all classes not on classpath
@@ -78,7 +75,7 @@ class TypeElementVisitorStart implements ASTTransformation {
                 for (v in val.split(",")) {
                     def visitor = InstantiationUtils.tryInstantiate(v, source.classLoader).orElse(null)
                     if (visitor instanceof TypeElementVisitor) {
-                        LoadedVisitor newLoadedVisitor = new LoadedVisitor(visitor, visitorContext)
+                        LoadedVisitor newLoadedVisitor = new LoadedVisitor(visitor)
                         loadedVisitors.put(visitor.getClass().getName(), newLoadedVisitor)
                     }
                 }
@@ -86,7 +83,7 @@ class TypeElementVisitorStart implements ASTTransformation {
 
             for(loadedVisitor in loadedVisitors.values()) {
                 try {
-                    loadedVisitor.start()
+                    loadedVisitor.start(new GroovyVisitorContext(source))
                 } catch (Throwable e) {
                     AstMessageUtils.error(
                             source,
