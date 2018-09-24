@@ -44,9 +44,34 @@ public class Application {
 }
 ----
 
-With that in place you compile your project and a Swagger YAML file will be generated (for example `build/generated/source/apt/main/swagger-0.0.yml` in the above case)
+With that in place you compile your project and a Swagger YAML file will be generated. Note that depending on which language and build tool you use the location will differ. The following table summarizes this.
 
-The above configuration will produce YAML like the following:
+
+.Swagger Generation Location
+|===
+|Language |Build Tool|Location
+
+|Java
+|Gradle
+| `build/generated/source/apt/main/swagger-0.0.yml`
+
+|Java
+|Maven
+| `target/generated-sources/annotations/swagger-0.0.yml`
+
+|Kotlin
+|Gradle
+| `build/generated/source/kapt/main/swagger-0.0.yml`
+
+|Groovy
+|Gradle
+| `build/classes/groovy/generated/swagger-0.0.yml`
+
+|===
+
+Micronaut cannot unfortunately normalize the generation location as each Annotation Processing API for each language and build tool abstract away the concrete location.
+
+The previously defined annotations will produce YAML like the following:
 
 .Generated Swagger YAML
 [source,yaml]
