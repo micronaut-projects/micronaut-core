@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.validation.routes;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -23,11 +24,21 @@ import io.micronaut.inject.visitor.ParameterElement;
 
 import javax.annotation.Nullable;
 
+/**
+ * Models a route parameter.
+ *
+ * @author James Kleeh
+ * @since 1.0
+ */
 class RouteParameterElement implements ParameterElement, AnnotationMetadataDelegate {
 
     private final ParameterElement delegate;
     private final String name;
 
+    /**
+     * Default constructor.
+     * @param delegate The parameter to delegate to
+     */
     RouteParameterElement(ParameterElement delegate) {
         this.delegate = delegate;
         this.name = delegate.findAnnotation(Bindable.class).flatMap(av -> av.getValue(String.class)).orElse(delegate.getName());

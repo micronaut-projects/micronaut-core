@@ -69,7 +69,7 @@ class Foo {
 
         then:
         def ex = thrown(RuntimeException)
-        ex.message.contains("The uri variable [abc] is optional, but the corresponding route argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+        ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
     }
 
     void "test query optional parameter"() {
@@ -93,7 +93,7 @@ class Foo {
 
         then:
         def ex = thrown(RuntimeException)
-        ex.message.contains("The uri variable [abc] is optional, but the corresponding route argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+        ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
     }
 
     void "test ampersand optional parameter"() {
@@ -117,7 +117,7 @@ class Foo {
 
         then:
         def ex = thrown(RuntimeException)
-        ex.message.contains("The uri variable [abc] is optional, but the corresponding route argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
+        ex.message.contains("The uri variable [abc] is optional, but the corresponding method argument [java.lang.String abc] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.")
     }
 
     void "test required argument doesn't fail compilation"() {

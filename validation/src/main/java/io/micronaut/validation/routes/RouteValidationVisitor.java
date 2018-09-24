@@ -16,6 +16,8 @@
 
 package io.micronaut.validation.routes;
 
+import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
+import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.http.annotation.HttpMethodMapping;
 import io.micronaut.http.uri.UriMatchTemplate;
@@ -41,6 +43,13 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, HttpMe
 
     private List<RouteValidationRule> rules = new ArrayList<>();
     private boolean skipValidation = false;
+    private final PropertyPlaceholderResolver resolver = new DefaultPropertyPlaceholderResolver(null) {
+        @Override
+        protected boolean resolveReplacement(StringBuilder builder, String str, String expr) {
+            builder.append("tmp");
+            return true;
+        };
+    };
 
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
@@ -50,7 +59,10 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, HttpMe
         AnnotationValue<HttpMethodMapping> mappingAnnotation = element.getAnnotation(HttpMethodMapping.class);
         if (mappingAnnotation != null) {
             String uri = mappingAnnotation.getRequiredValue(String.class);
-            UriMatchTemplate template = UriMatchTemplate.of(uri.replaceAll("\\$\\{(.*?)}", "tmp"));
+
+
+
+            UriMatchTemplate template = UriMatchTemplate.of(resolver.resolveRequiredPlaceholders(uri));
             RouteParameterElement[] parameters = Arrays.stream(element.getParameters())
                     .map(RouteParameterElement::new)
                     .toArray(RouteParameterElement[]::new);

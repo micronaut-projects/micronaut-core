@@ -2,6 +2,7 @@ dependencies {
     compileOnly project(":inject-java")
     compileOnly project(":http-server")
     compile project(":inject")
+    compile project(":http")
     compile dependencyVersion("validation")
     compileOnly dependencyVersion("gorm")
     

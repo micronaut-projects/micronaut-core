@@ -27,15 +27,27 @@ public class RouteValidationResult {
     private boolean valid;
     private String[] errorMessages;
 
+    /**
+     * Default constructor.
+     * @param errorMessages The error messages.
+     */
     public RouteValidationResult(String... errorMessages) {
         this.valid = errorMessages.length == 0;
         this.errorMessages = errorMessages;
     }
 
+    /**
+     * Whether the route is valid.
+     * @return True if the route is valid
+     */
     public boolean isValid() {
         return valid;
     }
 
+    /**
+     * The error messages.
+     * @return An array or error messages
+     */
     public String[] getErrorMessages() {
         return errorMessages;
     }
