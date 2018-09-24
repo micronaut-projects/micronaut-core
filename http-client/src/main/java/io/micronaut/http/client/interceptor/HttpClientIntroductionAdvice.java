@@ -364,17 +364,16 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                 );
                                 if (argumentType == ByteBuffer.class) {
                                     publisher = byteBufferPublisher;
-                                } else if (argumentType == byte[].class) {
-                                    publisher = Flowable.fromPublisher(byteBufferPublisher)
-                                            .map(buffer -> {
-                                                byte[] bytes = buffer.toByteArray();
-                                                ((ReferenceCounted) buffer).release();
-                                                return bytes;
-                                            });
                                 } else {
-                                    throw new ConfigurationException("Cannot create the generated HTTP client's " +
-                                            "required return type, should be Publisher<ByteBuffer> or Publisher<byte[]> " +
-                                            "(or subclasses like Flowable or Flux)");
+                                    if (ConversionService.SHARED.canConvert(ByteBuffer.class, argumentType)) {
+                                        // It would be nice if we could capture the TypeConverter here
+                                        publisher = Flowable.fromPublisher(byteBufferPublisher)
+                                                .map(value -> ConversionService.SHARED.convert(value, argumentType).get());
+                                    } else {
+                                        throw new ConfigurationException("Cannot create the generated HTTP client's " +
+                                                "required return type, since no TypeConverter from ByteBuffer to " +
+                                                argumentType + " is registered");
+                                    }
                                 }
 
                             }
