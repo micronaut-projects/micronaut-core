@@ -166,24 +166,24 @@ TIP: Unfortunately due to type erasure a Java method lambda reference cannot be 
 
 == Route Compile Time Validation
 
-Micronaut supports validating route arguments at compile time with the validation library. To get started simply add a dependency.
+Micronaut supports validating route arguments at compile time with the validation library. To get started simply add the `validation` dependency to your build:
 
 [source,groovy]
 .build.gradle
 ----
+annotationProcessor "io.micronaut:validation" // for Java only
 compile "io.micronaut:validation"
 ----
+
+NOTE: For Java this `validation` dependency will also need to be added to the `annotationProcessor` scope and for Kotlin the dependency will need to be added to to `kapt` scope.
 
 With the correct dependency on your classpath, route arguments will automatically be checked at compile time. The compilation will fail if any of the following conditions are met:
 
 * {blank}
- The URI template contains a variable that is optional, but the parameter is not annotated with @Nullable or is an Optional.
+ The URI template contains a variable that is optional, but the method parameter is not annotated with `@Nullable` or is an `java.util.Optional`.
 
 An optional variable is one that will allow the route to match a URI even if the value is not present. For example `/foo{/bar}` will match requests to `/foo` and `/foo/abc`. The non optional variant would be `/foo/{bar}`. See the <<_uri_path_variables, URI Path Variables>> section for more information.
 
 * {blank}
- The URI template contains a variable that is missing from the route arguments.
+ The URI template contains a variable that is missing from the method arguments.
 
-If an issue or bug is encountered with the route validation, please link:{github}/issues[file an issue]. In the meantime, to allow you to continue working without working around the issue, a system property can be set to disable the validation check.
-
-Set the system property `-Dmicronaut.route.validation=false` to skip the route validation.
