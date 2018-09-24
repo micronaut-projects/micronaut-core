@@ -92,8 +92,8 @@ class StreamSpec extends Specification {
         Flowable<Elephant> _ = myClient.echoAsElephant(42, "Hello, big grey animal!")
         then:
         def ex = thrown(ConfigurationException)
-        ex.message == 'Cannot create the generated HTTP client\'s required return type, should be ' +
-                'Publisher<ByteBuffer> or Publisher<byte[]> (or subclasses like Flowable or Flux)'
+        ex.message == 'Cannot create the generated HTTP client\'s required return type, since no TypeConverter from ' +
+                'ByteBuffer to class io.micronaut.http.client.aop.StreamSpec$Elephant is registered'
     }
 
     @Client('/stream')
