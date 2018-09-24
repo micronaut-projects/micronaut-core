@@ -17,6 +17,8 @@
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.Toggleable;
+
 import javax.annotation.Nullable;
 import java.util.*;
 
@@ -33,6 +35,7 @@ public class ClassUtils {
     public static final String CLASS_EXTENSION = ".class";
     
     static final List<ClassLoadingReporter> CLASS_LOADING_REPORTERS;
+    static final boolean CLASS_LOADING_REPORTER_ENABLED;
 
     static {
         COMMON_CLASS_MAP.put(boolean.class.getName(), boolean.class);
@@ -76,6 +79,11 @@ public class ClassUtils {
         }
 
         CLASS_LOADING_REPORTERS = reporterList;
+        if (CLASS_LOADING_REPORTERS == Collections.EMPTY_LIST) {
+            CLASS_LOADING_REPORTER_ENABLED = false;
+        } else {
+            CLASS_LOADING_REPORTER_ENABLED = reporterList.stream().anyMatch(Toggleable::isEnabled);
+        }
     }
 
     /**

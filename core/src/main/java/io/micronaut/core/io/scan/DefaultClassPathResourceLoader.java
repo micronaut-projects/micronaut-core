@@ -190,10 +190,12 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
 
                     }
                 } catch (URISyntaxException | IOException e) {
-                    // ignore
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Error establishing whether path is a directory: " + e.getMessage(), e);
+                    }
                 }
             }
-            return true;
+            return path.indexOf('.') == -1; // fallback to less sophisticated approach
         });
     }
 
