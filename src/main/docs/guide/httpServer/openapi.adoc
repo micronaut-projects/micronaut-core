@@ -9,13 +9,17 @@ To enable this support you should add the following dependencies to your build c
 [source,groovy]
 ----
 annotationProcessor "io.micronaut.configuration:openapi" // <1>
-compile "io.swagger.core.v3:swagger-annotations:2.0.4" // <2>
+compile "io.swagger.core.v3:swagger-annotations" // <2>
 ----
 
 <1> The `openapi` configuration gets added into the annotation processor scope
 <2> The https://github.com/swagger-api/swagger-core/wiki/Swagger-2.X---Annotations[Swagger Annotations] are added to the compile classpath
 
-Once these are in place a minimum requirement is to add a `@OpenAPIDefinition` annotation to your `Application` class:
+NOTE: For Kotlin the `openapi` dependency should be in the `kapt` scope and for Groovy in the `compileOnly` scope.
+
+TIP: You can use the `swagger-*` feature when creating your app to setup Swagger / OpenAPI correctly: `mn create-app my-app --features swagger-java`
+
+Once dependencies have been configured a minimum requirement is to add a `@OpenAPIDefinition` annotation to your `Application` class:
 
 .Example @OpenAPIDefinition usage
 [source,java]
@@ -60,6 +64,8 @@ info:
     url: http://foo.bar
   version: "0.0"
 ----
+
+TIP: If you wish to expose the generated YAML as part of your deployed application you can copy the YAML to the `src/main/resources/public` directory and enable <<staticResources,Static Resources>> in your router configuration.
 
 === Controllers and Swagger Annotations
 
