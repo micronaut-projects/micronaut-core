@@ -72,6 +72,11 @@ ext {
                     group:'io.jaegertracing',
                     name:'jaeger-core'
             ],
+            'javax.annotation-api': [
+                    version: javaxAnnotationApiVersion,
+                    group:'javax.annotation',
+                    name:'javax.annotation-api'
+            ],
             jsr305:[
                     version:jsr305Version,
                     group:'com.google.code.findbugs',
