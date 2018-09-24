@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
@@ -33,6 +34,7 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.reflect.Array;
 import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * Default implementation of {@link AnnotationMetadata}.
@@ -116,6 +118,13 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         this.allStereotypes = allStereotypes;
         this.allAnnotations = allAnnotations;
         this.annotationsByStereotype = annotationsByStereotype;
+        if (ClassLoadingReporter.isReportingEnabled()) {
+            if (allAnnotations != null) {
+                for (String annotationName : allAnnotations.keySet()) {
+                    ClassUtils.forName(annotationName, DefaultAnnotationMetadata.class.getClassLoader()).ifPresent(ClassLoadingReporter::reportPresent);
+                }
+            }
+        }
     }
 
     @Override

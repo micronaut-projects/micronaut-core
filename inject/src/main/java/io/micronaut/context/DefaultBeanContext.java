@@ -1847,8 +1847,12 @@ public class DefaultBeanContext implements BeanContext {
                 .stream()
                 .filter(beanDefinitionReference -> beanDefinitionReference.isEnabled(DefaultBeanContext.this)).collect(Collectors.toList());
 
+        final boolean reportingEnabled = ClassLoadingReporter.isReportingEnabled();
         for (BeanDefinitionReference beanDefinitionReference : beanDefinitionReferences) {
             allReferences.add(beanDefinitionReference);
+            if (reportingEnabled) {
+                ClassLoadingReporter.reportPresent(beanDefinitionReference.getBeanType());
+            }
             if (beanDefinitionReference.isContextScope()) {
                 contextScopeBeans.add(beanDefinitionReference);
             }
