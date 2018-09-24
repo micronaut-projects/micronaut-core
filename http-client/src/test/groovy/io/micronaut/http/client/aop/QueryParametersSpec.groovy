@@ -2,11 +2,13 @@ package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -48,6 +50,7 @@ class QueryParametersSpec extends Specification {
         where:
         flavour << [ "pojo", "list", "map" ]
     }
+
     void "test query value with default value"() {
         given:
         RxHttpClient lowLevelClient = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL())
@@ -56,6 +59,27 @@ class QueryParametersSpec extends Specification {
         client.searchDefault("Riverside").albums.size() == 2
         client.searchDefault(null).albums.size() == 1
         lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-default'), SearchResult).blockingFirst().albums.size() == 1
+
+        when:
+        lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-exploded/list'), SearchResult).blockingFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.status == HttpStatus.NOT_FOUND // because null is returned
+
+        when:
+        lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-exploded/map'), SearchResult).blockingFirst()
+
+        then:
+        ex = thrown(HttpClientResponseException)
+        ex.status == HttpStatus.NOT_FOUND // because null is returned
+
+        when:
+        lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-exploded/pojo'), SearchResult).blockingFirst()
+
+        then:
+        ex = thrown(HttpClientResponseException)
+        ex.status == HttpStatus.NOT_FOUND // because null is returned
 
         cleanup:
         lowLevelClient.close()
