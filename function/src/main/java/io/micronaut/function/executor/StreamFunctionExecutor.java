@@ -81,6 +81,10 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
         Environment env = startEnvironment(applicationContext);
         String functionName = resolveFunctionName(env);
 
+        if (functionName == null) {
+            throw new InvocationException("No Function name configured. Set 'micronaut.function.name' in your Function configuration");
+        }
+
         LocalFunctionRegistry localFunctionRegistry = applicationContext.getBean(LocalFunctionRegistry.class);
         ExecutableMethod<Object, Object> method = resolveFunction(localFunctionRegistry, functionName);
         Class<?> returnJavaType = method.getReturnType().getType();

@@ -19,9 +19,8 @@ package io.micronaut.core.reflect;
 import io.micronaut.core.util.Toggleable;
 import org.slf4j.LoggerFactory;
 
-import java.util.Collections;
-
 import static io.micronaut.core.reflect.ClassUtils.CLASS_LOADING_REPORTERS;
+import static io.micronaut.core.reflect.ClassUtils.CLASS_LOADING_REPORTER_ENABLED;
 
 /**
  * An interface that can be implemented by classes that wish to listen to the classloading requirements for the an application. The {@link #close()} method will be called when the application terminates.
@@ -56,12 +55,20 @@ public interface ClassLoadingReporter extends AutoCloseable, Toggleable {
     void close();
 
     /**
+     * Whether report is enabled.
+     * @return True if it is
+     */
+    static boolean isReportingEnabled() {
+        return CLASS_LOADING_REPORTER_ENABLED;
+    }
+
+    /**
      * Report a class that is present.
      *
      * @param type The type
      */
     static void reportPresent(Class<?> type) {
-        if (CLASS_LOADING_REPORTERS != Collections.EMPTY_LIST) {
+        if (CLASS_LOADING_REPORTER_ENABLED) {
             for (ClassLoadingReporter reporter : CLASS_LOADING_REPORTERS) {
                 reporter.onPresent(type);
             }
@@ -74,7 +81,7 @@ public interface ClassLoadingReporter extends AutoCloseable, Toggleable {
      * @param type The type
      */
     static void reportBeanPresent(Class<?> type) {
-        if (CLASS_LOADING_REPORTERS != Collections.EMPTY_LIST) {
+        if (CLASS_LOADING_REPORTER_ENABLED) {
             for (ClassLoadingReporter reporter : CLASS_LOADING_REPORTERS) {
                 reporter.onBeanPresent(type);
             }
@@ -87,7 +94,7 @@ public interface ClassLoadingReporter extends AutoCloseable, Toggleable {
      * @param type The type
      */
     static void reportMissing(String type) {
-        if (CLASS_LOADING_REPORTERS != Collections.EMPTY_LIST) {
+        if (CLASS_LOADING_REPORTER_ENABLED) {
             for (ClassLoadingReporter reporter : CLASS_LOADING_REPORTERS) {
                 reporter.onMissing(type);
             }
@@ -99,11 +106,13 @@ public interface ClassLoadingReporter extends AutoCloseable, Toggleable {
      * Finish reporting classloading.
      */
     static void finish() {
-        for (ClassLoadingReporter classLoadingReporter : ClassUtils.CLASS_LOADING_REPORTERS) {
-            try {
-                classLoadingReporter.close();
-            } catch (Throwable e) {
-                LoggerFactory.getLogger(ClassLoadingReporter.class).warn("Error reporting classloading with loader [" + classLoadingReporter + "]: " + e.getMessage(), e);
+        if (CLASS_LOADING_REPORTER_ENABLED) {
+            for (ClassLoadingReporter classLoadingReporter : ClassUtils.CLASS_LOADING_REPORTERS) {
+                try {
+                    classLoadingReporter.close();
+                } catch (Throwable e) {
+                    LoggerFactory.getLogger(ClassLoadingReporter.class).warn("Error reporting classloading with loader [" + classLoadingReporter + "]: " + e.getMessage(), e);
+                }
             }
         }
     }
