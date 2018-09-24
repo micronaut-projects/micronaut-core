@@ -173,11 +173,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     private final List<HttpClientFilter> filters;
     private final Charset defaultCharset;
     private final ChannelPoolMap<RequestKey, ChannelPool> poolMap;
+    private final Logger log;
 
     private Set<String> clientIdentifiers = Collections.emptySet();
     private WebSocketBeanRegistry webSocketRegistry = WebSocketBeanRegistry.EMPTY;
     private RequestBinderRegistry requestBinderRegistry;
-    private Logger log;
 
     /**
      * Construct a client for the given arguments.
