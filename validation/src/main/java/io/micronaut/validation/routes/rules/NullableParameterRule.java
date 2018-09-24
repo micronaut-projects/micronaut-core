@@ -24,6 +24,7 @@ import io.micronaut.validation.routes.RouteValidationResult;
 
 import javax.annotation.Nullable;
 import java.util.*;
+import java.util.stream.Stream;
 
 /**
  * Validates route parameters are nullable or optional for optional
@@ -47,7 +48,7 @@ public class NullableParameterRule implements RouteValidationRule {
                         .findFirst()
                         .ifPresent(p -> {
                             ClassElement type = p.getType();
-                            if (!p.hasAnnotation(Nullable.class) && type != null && !type.isAssignable(Optional.class)) {
+                            if (!p.hasAnnotation(Nullable.class) && type != null && !isNullableType(type)) {
                                 errorMessages.add(String.format("The uri variable [%s] is optional, but the corresponding method argument [%s] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.", variable.getName(), p.toString()));
                             }
                         });
@@ -55,6 +56,10 @@ public class NullableParameterRule implements RouteValidationRule {
         }
 
         return new RouteValidationResult(errorMessages.toArray(new String[0]));
+    }
+
+    private boolean isNullableType(ClassElement type) {
+        return Stream.of(Optional.class, Map.class).anyMatch(type::isAssignable);
     }
 
 }
