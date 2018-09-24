@@ -48,4 +48,19 @@ class DefaultHttpClientConfigurationSpec extends Specification {
         'enabled'         | 'enabled'        | 'false' | false
         'max-connections' | 'maxConnections' | '10'    | 10
     }
+
+    void "test overriding logger for the client"() {
+        given:
+        def ctx = ApplicationContext.run(
+                ("micronaut.http.client.loggerName".toString()): "myclient.custom.logger"
+        )
+        HttpClientConfiguration config = ctx.getBean(HttpClientConfiguration)
+
+        expect:
+        config['loggerName'] == Optional.of('myclient.custom.logger')
+
+        cleanup:
+        ctx.close()
+
+    }
 }

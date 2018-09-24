@@ -27,10 +27,12 @@ import java.util.Optional;
  * @since 1.0
  */
 public interface Element extends AnnotationMetadata {
+
     /**
      * @return The name of the element.
      */
     String getName();
+
     /**
      * @return True if the element is protected.
      */

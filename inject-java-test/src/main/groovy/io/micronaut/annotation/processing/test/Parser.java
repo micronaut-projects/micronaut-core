@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.annotation.processing.test;
 
 import com.google.common.collect.*;
@@ -25,8 +26,6 @@ import com.sun.source.util.TreeScanner;
 import com.sun.source.util.Trees;
 import com.sun.tools.javac.api.JavacTool;
 import com.sun.tools.javac.util.Context;
-import com.sun.tools.javac.util.JCDiagnostic;
-import com.sun.tools.javac.util.JCDiagnostic.DiagnosticType;
 import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor;
 import io.micronaut.annotation.processing.PackageConfigurationInjectProcessor;
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor;
@@ -48,6 +47,7 @@ import static java.util.function.Predicate.isEqual;
 import static javax.tools.Diagnostic.Kind.ERROR;
 
 /** Methods to parse Java source files. */
+@SuppressWarnings("all")
 public final class Parser {
     /**
      * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method
@@ -216,6 +216,7 @@ public final class Parser {
      * {@link Trees}.
      */
     public static final class ParseResult {
+
         private final ImmutableListMultimap<Diagnostic.Kind, Diagnostic<? extends JavaFileObject>>
                 diagnostics;
         private final ImmutableList<? extends CompilationUnitTree> compilationUnits;

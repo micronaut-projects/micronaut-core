@@ -24,8 +24,8 @@ public class BookmarkController {
     }
 
     @Get("/bookmarks/list{?paginationCommand*}")
-    public HttpStatus list(@Valid @Nullable PaginationCommand paginationCommand) {
-        return HttpStatus.OK;
+    public PaginationCommand list(@Valid @Nullable PaginationCommand paginationCommand) {
+        return paginationCommand;
     }
 
 }

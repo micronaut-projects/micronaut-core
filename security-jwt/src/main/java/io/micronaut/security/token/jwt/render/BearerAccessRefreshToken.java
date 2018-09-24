@@ -23,6 +23,7 @@ import java.util.Collection;
 import java.util.List;
 
 /**
+ * Encapsulates an Access Token response as described in <a href="https://tools.ietf.org/html/rfc6749#section-4.1.4">RFC 6749</a>.
  *
  * @author Sergio del Amo
  * @since 1.0
