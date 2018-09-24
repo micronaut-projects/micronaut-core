@@ -15,6 +15,7 @@
  */
 package io.micronaut.cli.io.support
 
+import groovy.transform.InheritConstructors
 import groovy.xml.MarkupBuilder
 import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
@@ -27,6 +28,7 @@ import org.eclipse.aether.graph.Exclusion
  * @author James Kleeh
  * @since 1.0
  */
+@InheritConstructors
 class MavenBuildTokens extends BuildTokens {
 
     public static Map<String, String> scopeConversions = [:]
@@ -42,7 +44,9 @@ class MavenBuildTokens extends BuildTokens {
 
     Map getTokens(Profile profile, List<Feature> features) {
         Map tokens = [:]
-
+        tokens.put("testFramework", testFramework)
+        tokens.put("sourceLanguage", sourceLanguage)
+        
         def ln = System.getProperty("line.separator")
 
         def repositoriesWriter = new StringWriter()
@@ -86,7 +90,7 @@ class MavenBuildTokens extends BuildTokens {
 
         List<Dependency> annotationProcessors = dependencies
                 .unique()
-                .findAll( { it.scope == 'annotationProcessor'})
+                .findAll( { it.scope == 'annotationProcessor' || it.scope == 'kapt' })
 
         dependencies = dependencies.unique()
             .findAll { scopeConversions.containsKey(it.scope) }
@@ -138,7 +142,8 @@ class MavenBuildTokens extends BuildTokens {
         MarkupBuilder annotationProcessorPathsXml = new MarkupBuilder(annotationProcessorsWriter)
         annotationProcessors.each { Dependency dep ->
             def artifact = dep.artifact
-            annotationProcessorPathsXml.path {
+            String methodToCall = sourceLanguage == 'kotlin' ? 'annotationProcessorPath' : 'path'
+            annotationProcessorPathsXml."$methodToCall" {
                 groupId(artifact.groupId)
                 artifactId(artifact.artifactId)
                 version("\${micronaut.version}")
