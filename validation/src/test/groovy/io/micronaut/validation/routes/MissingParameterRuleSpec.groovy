@@ -46,7 +46,53 @@ class Foo {
 
         then:
         def ex = thrown(RuntimeException)
-        ex.message.contains("The uri variable [abc] has no corresponding route argument")
+        ex.message.contains("The route declares a uri variable named [abc], but no corresponding method argument is present")
+    }
+
+
+    void "test missing parameter with expression"() {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+
+@Controller("/\${version}/foo")
+class Foo {
+
+    @Get("/{abc}")
+    String abc(String abc) {
+        return "";
+    }
+}
+
+""")
+
+        then:
+        noExceptionThrown()
+
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get("/{abc}")
+    String abc() {
+        return "";
+    }
+}
+
+""")
+
+        then:
+        def ex = thrown(RuntimeException)
+        ex.message.contains("The route declares a uri variable named [abc], but no corresponding method argument is present")
     }
 
     void "test validation can be turned off with a system property"() {

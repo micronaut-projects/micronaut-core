@@ -13,10 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.validation.routes.rules;
 
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriMatchVariable;
+import io.micronaut.inject.visitor.ClassElement;
 import io.micronaut.inject.visitor.ParameterElement;
 import io.micronaut.validation.routes.RouteValidationResult;
 
@@ -24,7 +26,7 @@ import javax.annotation.Nullable;
 import java.util.*;
 
 /**
- * Validates route parameters are nullable or option for optional
+ * Validates route parameters are nullable or optional for optional
  * template variables.
  *
  * @author James Kleeh
@@ -44,8 +46,9 @@ public class NullableParameterRule implements RouteValidationRule {
                         .filter(p -> p.getName().equals(variable.getName()))
                         .findFirst()
                         .ifPresent(p -> {
-                            if (!p.hasAnnotation(Nullable.class) && !p.getType().isAssignable(Optional.class)) {
-                                errorMessages.add(String.format("The uri variable [%s] is optional, but the corresponding route argument [%s] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.", variable.getName(), p.toString()));
+                            ClassElement type = p.getType();
+                            if (!p.hasAnnotation(Nullable.class) && type != null && !type.isAssignable(Optional.class)) {
+                                errorMessages.add(String.format("The uri variable [%s] is optional, but the corresponding method argument [%s] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.", variable.getName(), p.toString()));
                             }
                         });
             }
