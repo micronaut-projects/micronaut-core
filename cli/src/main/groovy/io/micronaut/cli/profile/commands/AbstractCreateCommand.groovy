@@ -114,6 +114,13 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             def profile = createCommand.profileRepository.getProfile(createCommand.profile ?: createCommand.getDefaultProfile())
             def featureNames = profile.features.collect() { Feature f -> f.name }
 
+            if (createCommand instanceof AbstractCreateAppCommand) {
+                String lang = createCommand.lang?.name() ?: 'java'
+                Collection<SupportedLanguage> otherLangs = SupportedLanguage.values().findAll() { it.name() != lang}
+                for(o in otherLangs) {
+                    featureNames.removeIf({String n -> n.contains("-${o.name()}")})
+                }
+            }
             // if no feature specified, show all features for the selected profile
             if (!createCommand.features) {
                 return featureNames.iterator()
