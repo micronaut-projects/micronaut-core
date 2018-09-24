@@ -13,8 +13,6 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
-import javax.annotation.Nullable
-
 
 class QueryParametersSpec extends Specification {
 
@@ -50,7 +48,6 @@ class QueryParametersSpec extends Specification {
         where:
         flavour << [ "pojo", "list", "map" ]
     }
-
     void "test query value with default value"() {
         given:
         RxHttpClient lowLevelClient = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL())
@@ -94,7 +91,7 @@ class QueryParametersSpec extends Specification {
         }
 
         @Get("/search-exploded/list{?term*}")
-        SearchResult searchExploded2(@QueryValue @Nullable List term) {
+        SearchResult searchExploded2(@QueryValue List term) {
             // Yes, we get a list of terms, but we only use the first one
             def albums = artists.get(term?.getAt(0) ?: 'Unknown')
             if(albums) {
@@ -103,7 +100,7 @@ class QueryParametersSpec extends Specification {
         }
 
         @Get("/search-exploded/pojo{?params*}")
-        SearchResult searchExploded3(@QueryValue @Nullable SearchParamsAsList params) {
+        SearchResult searchExploded3(@QueryValue SearchParamsAsList params) {
             // We get a POJO with a list of terms, but we only use the first one
             def albums = artists.get(params.term?.get(0) ?: 'Unknown')
             if(albums) {
@@ -134,7 +131,7 @@ class QueryParametersSpec extends Specification {
         SearchResult searchExplodedMap(String flavour, Map params)
 
         @Get("/search-exploded/{flavour}{?term*}")
-        SearchResult searchExplodedList(String flavour, @Nullable List term)
+        SearchResult searchExplodedList(String flavour, List term)
 
         @Get("/search-default")
         SearchResult searchDefault(@QueryValue(defaultValue = "Tool") String term)
