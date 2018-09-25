@@ -58,18 +58,23 @@ class UriTemplateSpec extends Specification {
         uriTemplate.nest(nested).toString() == result
 
         where:
-        template       | nested               | arguments                               | result
-        '/poetry'      | '/{?max}'            | [max: '10']                             | '/poetry{?max}'
-        '/poetry'      | '{?max}'             | [max: '10']                             | '/poetry{?max}'
-        '/'            | '/hello/{name}'      | [name: 'Fred']                          | '/hello/{name}'
-        ''             | '/hello/{name}'      | [name: 'Fred']                          | '/hello/{name}'
-        '/test/'       | '/hello/{name}'      | [name: 'Fred']                          | '/test/hello/{name}'
-        '{var}'        | '{var2}'             | [var: 'foo', var2: 'bar']               | '{var}/{var2}'
-        '/book{/id}'   | '/author{/authorId}' | [id: 'foo', authorId: 'bar']            | '/book{/id}/author{/authorId}'
-        '{var}/'       | '{var2}'             | [var: 'foo', var2: 'bar']               | '{var}/{var2}'
-        '{var}'        | '/{var2}'            | [var: 'foo', var2: 'bar']               | '{var}/{var2}'
-        '{var}{?q}'    | '/{var2}'            | [var: 'foo', var2: 'bar', q: 'test']    | '{var}/{var2}{?q}'
-        '{var}{#hash}' | '{var2}'             | [var: 'foo', var2: 'bar', hash: 'test'] | '{var}/{var2}{#test}'
+        template       | nested                         | result
+        '/person'      | '/{fred}'                      | '/person/{fred}'
+        '/books'       | '{/id}'                        | '/books{/id}'
+        '/books/'      | '{/id}'                        | '/books{/id}'
+        ""             | '/authors{/authorId}'          | '/authors{/authorId}'
+        '/'            | '/regex/{color:^blue|orange$}' | '/regex/{color:^blue|orange$}'
+        '/poetry'      | '/{?max}'                      | '/poetry{?max}'
+        '/poetry'      | '{?max}'                       | '/poetry{?max}'
+        '/'            | '/hello/{name}'                | '/hello/{name}'
+        ''             | '/hello/{name}'                | '/hello/{name}'
+        '/test/'       | '/hello/{name}'                | '/test/hello/{name}'
+        '{var}'        | '{var2}'                       | '{var}/{var2}'
+        '/book{/id}'   | '/author{/authorId}'           | '/book{/id}/author{/authorId}'
+        '{var}/'       | '{var2}'                       | '{var}/{var2}'
+        '{var}'        | '/{var2}'                      | '{var}/{var2}'
+        '{var}{?q}'    | '/{var2}'                      | '{var}/{var2}{?q}'
+        '{var}{#hash}' | '{var2}'                       | '{var}/{var2}{#hash}'
 
     }
 
