@@ -14,25 +14,11 @@
  * limitations under the License.
  */
 
-package io.micronaut.inject.visitor;
-
-import javax.annotation.Nullable;
-
 /**
- * Stores data about an element that references a method.
+ * The AST package contains a generic AST over different languages (currently Groovy, Java and Kotlin).
  *
- * @author James Kleeh
+ * @see io.micronaut.inject.visitor.TypeElementVisitor
+ * @author graemerocher
  * @since 1.0
  */
-public interface MethodElement extends Element {
-
-    /**
-     * @return The return type of the method
-     */
-    @Nullable ClassElement getReturnType();
-
-    /**
-     * @return The method parameters
-     */
-    ParameterElement[] getParameters();
-}
+package io.micronaut.inject.ast;

@@ -18,8 +18,8 @@ package io.micronaut.validation.routes.rules;
 
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriMatchVariable;
-import io.micronaut.inject.visitor.ClassElement;
-import io.micronaut.inject.visitor.ParameterElement;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.validation.routes.RouteValidationResult;
 
 import javax.annotation.Nullable;

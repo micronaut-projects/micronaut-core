@@ -17,7 +17,7 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.inject.visitor.ConstructorElement;
+import io.micronaut.inject.ast.ConstructorElement;
 
 import javax.lang.model.element.ExecutableElement;
 

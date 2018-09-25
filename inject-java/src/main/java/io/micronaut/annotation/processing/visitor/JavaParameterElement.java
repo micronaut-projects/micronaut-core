@@ -18,8 +18,8 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.visitor.ClassElement;
-import io.micronaut.inject.visitor.ParameterElement;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ParameterElement;
 
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;

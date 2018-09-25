@@ -14,22 +14,18 @@
  * limitations under the License.
  */
 
-package io.micronaut.inject.visitor;
-
-import java.util.List;
+package io.micronaut.inject.ast;
 
 /**
- * Models an enum type.
+ * Element for constructors.
  *
  * @author graemerocher
  * @since 1.0
  */
-public interface EnumElement extends ClassElement {
+public interface ConstructorElement extends MethodElement {
 
-    /**
-     * The values that make up this enum.
-     *
-     * @return The values
-     */
-    List<String> values();
+    @Override
+    default String getName() {
+        return "<init>";
+    }
 }

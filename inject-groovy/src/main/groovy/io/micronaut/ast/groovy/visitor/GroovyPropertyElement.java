@@ -17,8 +17,8 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.inject.visitor.ClassElement;
-import io.micronaut.inject.visitor.PropertyElement;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.PropertyElement;
 
 import javax.annotation.Nullable;
 

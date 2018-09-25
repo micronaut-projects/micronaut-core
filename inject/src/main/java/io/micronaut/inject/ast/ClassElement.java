@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.inject.visitor;
+package io.micronaut.inject.ast;
 
 import java.util.Collections;
 import java.util.List;
@@ -25,6 +25,7 @@ import java.util.Optional;
  * Stores data about an element that references a class.
  *
  * @author James Kleeh
+ * @author graemerocher
  * @since 1.0
  */
 public interface ClassElement extends Element {
@@ -36,14 +37,6 @@ public interface ClassElement extends Element {
      * @return {@code true} if and only if the this type is assignable to the second
      */
     boolean isAssignable(String type);
-
-    /**
-     * @param visitorContext The visitor context.
-     * @return The elements contained in this class element
-     */
-    default List<Element> getElements(VisitorContext visitorContext) {
-        return Collections.emptyList();
-    }
 
     /**
      * Returns the bean properties (getters and setters) for this class element.

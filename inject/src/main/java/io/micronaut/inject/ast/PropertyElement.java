@@ -14,18 +14,27 @@
  * limitations under the License.
  */
 
-package io.micronaut.inject.visitor;
+package io.micronaut.inject.ast;
+
+import javax.annotation.Nullable;
 
 /**
- * Element for constructors.
+ * A property element represents a JavaBean property on a {@link ClassElement}.
  *
  * @author graemerocher
  * @since 1.0
  */
-public interface ConstructorElement extends MethodElement {
+public interface PropertyElement extends Element {
+    /**
+     * @return The type of the property
+     */
+    @Nullable
+    ClassElement getType();
 
-    @Override
-    default String getName() {
-        return "<init>";
-    }
+    /**
+     * Return true only if the property has a getter but no setter.
+     *
+     * @return True if the property is read only.
+     */
+    boolean isReadOnly();
 }

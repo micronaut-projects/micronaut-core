@@ -13,21 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.ast.groovy.visitor
 
-import io.micronaut.core.annotation.AnnotationMetadata
-import io.micronaut.core.annotation.AnnotationMetadataDelegate
-import io.micronaut.inject.ast.Element
+package io.micronaut.inject.ast;
 
 /**
- * Abstract Groovy element.
+ * Stores data about an element that references a field.
+ *
+ * @author James Kleeh
+ * @since 1.0
  */
-abstract class AbstractGroovyElement implements AnnotationMetadataDelegate, Element {
-
-    final AnnotationMetadata annotationMetadata
-
-    AbstractGroovyElement(AnnotationMetadata annotationMetadata) {
-        this.annotationMetadata = annotationMetadata
-    }
-
+public interface FieldElement extends Element {
 }

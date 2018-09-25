@@ -17,8 +17,8 @@
 package io.micronaut.validation.async;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.visitor.ClassElement;
-import io.micronaut.inject.visitor.MethodElement;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.scheduling.annotation.Async;

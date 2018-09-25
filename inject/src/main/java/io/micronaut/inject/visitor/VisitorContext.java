@@ -18,6 +18,7 @@ package io.micronaut.inject.visitor;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.writer.GeneratedFile;
 
 import java.util.Optional;

@@ -19,7 +19,7 @@ package io.micronaut.annotation.processing.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.inject.visitor.ClassElement;
+import io.micronaut.inject.ast.ClassElement;
 
 /**
  * A primitive type element.

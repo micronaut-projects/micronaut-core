@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.inject.visitor;
+package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 

@@ -17,11 +17,11 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.inject.visitor.ConstructorElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import org.codehaus.groovy.ast.ConstructorNode;
 
 /**
- * A {@link io.micronaut.inject.visitor.ConstructorElement} for Groovy.
+ * A {@link ConstructorElement} for Groovy.
  *
  * @author graemerocher
  * @since 1.0

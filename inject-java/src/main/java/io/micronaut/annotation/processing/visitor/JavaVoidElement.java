@@ -18,8 +18,8 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
-import io.micronaut.inject.visitor.ClassElement;
-import io.micronaut.inject.visitor.Element;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.util.Collections;

@@ -14,13 +14,20 @@
  * limitations under the License.
  */
 
-package io.micronaut.inject.visitor;
+package io.micronaut.inject.ast;
+
+import javax.annotation.Nullable;
 
 /**
- * Stores data about an element that references a field.
+ * Represents a parameter to a method or constructor.
  *
- * @author James Kleeh
+ * @author graemerocher
  * @since 1.0
  */
-public interface FieldElement extends Element {
+public interface ParameterElement extends Element {
+
+    /**
+     * @return The type of the parameter
+     */
+    @Nullable ClassElement getType();
 }
