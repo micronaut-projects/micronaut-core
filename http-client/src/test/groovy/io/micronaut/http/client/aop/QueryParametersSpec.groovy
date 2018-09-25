@@ -2,18 +2,18 @@ package io.micronaut.http.client.aop
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.RxHttpClient
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
-
-import javax.annotation.Nullable
 
 
 class QueryParametersSpec extends Specification {
@@ -60,6 +60,27 @@ class QueryParametersSpec extends Specification {
         client.searchDefault(null).albums.size() == 1
         lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-default'), SearchResult).blockingFirst().albums.size() == 1
 
+        when:
+        lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-exploded/list'), SearchResult).blockingFirst()
+
+        then:
+        def ex = thrown(HttpClientResponseException)
+        ex.status == HttpStatus.NOT_FOUND // because null is returned
+
+        when:
+        lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-exploded/map'), SearchResult).blockingFirst()
+
+        then:
+        ex = thrown(HttpClientResponseException)
+        ex.status == HttpStatus.NOT_FOUND // because null is returned
+
+        when:
+        lowLevelClient.retrieve(HttpRequest.GET('/itunes/search-exploded/pojo'), SearchResult).blockingFirst()
+
+        then:
+        ex = thrown(HttpClientResponseException)
+        ex.status == HttpStatus.NOT_FOUND // because null is returned
+
         cleanup:
         lowLevelClient.close()
     }
@@ -94,7 +115,7 @@ class QueryParametersSpec extends Specification {
         }
 
         @Get("/search-exploded/list{?term*}")
-        SearchResult searchExploded2(@QueryValue @Nullable List term) {
+        SearchResult searchExploded2(@QueryValue List term) {
             // Yes, we get a list of terms, but we only use the first one
             def albums = artists.get(term?.getAt(0) ?: 'Unknown')
             if(albums) {
@@ -103,7 +124,7 @@ class QueryParametersSpec extends Specification {
         }
 
         @Get("/search-exploded/pojo{?params*}")
-        SearchResult searchExploded3(@QueryValue @Nullable SearchParamsAsList params) {
+        SearchResult searchExploded3(@QueryValue SearchParamsAsList params) {
             // We get a POJO with a list of terms, but we only use the first one
             def albums = artists.get(params.term?.get(0) ?: 'Unknown')
             if(albums) {
@@ -134,7 +155,7 @@ class QueryParametersSpec extends Specification {
         SearchResult searchExplodedMap(String flavour, Map params)
 
         @Get("/search-exploded/{flavour}{?term*}")
-        SearchResult searchExplodedList(String flavour, @Nullable List term)
+        SearchResult searchExplodedList(String flavour, List term)
 
         @Get("/search-default")
         SearchResult searchDefault(@QueryValue(defaultValue = "Tool") String term)
