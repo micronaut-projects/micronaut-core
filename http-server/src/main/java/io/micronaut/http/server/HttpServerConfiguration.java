@@ -89,13 +89,8 @@ public class HttpServerConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final long DEFAULT_IDLETIME_SECONDS = 60;
 
-    /**
-     * The configuration to bind to all network interfaces.
-     */
-    public static final String ALL_HOSTS = "*";
-
     private Integer port;
-    private String host = "localhost";
+    private String host;
     private Integer readTimeout;
     private long maxRequestSize = DEFAULT_MAX_REQUEST_SIZE;
     private Duration readIdleTime = Duration.of(DEFAULT_READIDLETIME_SECONDS, ChronoUnit.SECONDS);
@@ -160,7 +155,7 @@ public class HttpServerConfiguration {
      * @return The default host
      */
     public Optional<String> getHost() {
-        return Optional.ofNullable(host).flatMap(h -> h.equals(ALL_HOSTS) ? Optional.empty() : Optional.of(h));
+        return Optional.ofNullable(host);
     }
 
     /**
@@ -236,8 +231,7 @@ public class HttpServerConfiguration {
     }
 
     /**
-     * Sets the host to bind to. Use {@value #ALL_HOSTS} to bind to all network interfaces.
-     *
+     * Sets the host to bind to.
      * @param host The host
      */
     public void setHost(String host) {
