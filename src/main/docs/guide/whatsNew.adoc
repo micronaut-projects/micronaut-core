@@ -1,5 +1,27 @@
 Apart from https://github.com/micronaut-projects/micronaut-core/milestone/5?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features.
 
+
+=== Support for GraalVM Native Images
+
+TODO
+
+=== Swagger / OpenAPI Documentation Support
+
+TODO
+
+=== Native WebSocket Support
+
+TODO
+
+=== Compilation Time Validation
+
+TODO
+
+=== Experimental JMX Support for Endpoints
+
+TODO
+
+
 === Documentation Improvements
 
 The documentation you are reading has been improved with a new configuration reference button at the top that contains a reference produced at compile time of all the available configuration options in Micronaut.
@@ -14,7 +36,7 @@ The following dependency upgrades occurred in this release:
 //- Groovy `2.5.1` -> `2.5.2`
 - Hibernate Core `5.3.4` -> `5.3.6.Final`
 - Jackson `2.9.6` -> `2.9.7`
-- Lettuce `5.0.4` -> `5.1.0`
+//- Lettuce `5.0.4` -> `5.1.0`
 - Reactor `3.1.8` -> `3.2.0`
 - SnakeYAML `1.20` -> `1.23`
 - Jaeger `0.30.4` -> `0.31.0`
