@@ -19,7 +19,6 @@ package io.micronaut.http.server.netty.types.files;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.netty.channel.ChannelHandlerContext;
@@ -27,11 +26,9 @@ import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
 import io.netty.handler.stream.ChunkedStream;
-import io.netty.handler.stream.ChunkedWriteHandler;
 
 import java.io.InputStream;
 import java.net.URL;
-import java.util.Optional;
 
 /**
  * Writes an {@link InputStream} to the Netty context.
