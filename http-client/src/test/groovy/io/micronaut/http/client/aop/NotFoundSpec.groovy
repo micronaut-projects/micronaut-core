@@ -41,7 +41,7 @@ class NotFoundSpec extends Specification {
         @Get('/maybe/{isbn}')
         Maybe<Boolean> maybe(String isbn)
 
-        @Get(value = '/flowable/{isbn}', processes = MediaType.TEXT_PLAIN)
+        @Get(value = '/flowable/{isbn}', processes = MediaType.TEXT_EVENT_STREAM)
         Flowable<Boolean> flowable(String isbn)
     }
 
@@ -61,7 +61,7 @@ class NotFoundSpec extends Specification {
             return Maybe.empty()
         }
 
-        @Get('/flowable/{isbn}')
+        @Get(value = '/flowable/{isbn}', processes = MediaType.TEXT_EVENT_STREAM)
         Flowable<Boolean> flowable(String isbn) {
             Boolean value = stock[isbn]
             if (value != null) {

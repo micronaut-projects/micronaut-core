@@ -25,6 +25,7 @@ import io.micronaut.core.convert.format.ReadableBytesTypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.convert.value.ConvertibleValuesMap;
 import io.micronaut.core.io.IOUtils;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -691,6 +692,14 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         });
 
         addConverter(Map.class, ConvertibleValues.class, (object, targetType, context) -> Optional.of(new ConvertibleValuesMap<Object>(object)));
+
+        // Micronaut ByteBuffer -> byte for streamed results from HTTP clients
+        addConverter(io.micronaut.core.io.buffer.ByteBuffer.class, byte[].class, (object, targetType, context) -> {
+            byte[] result = object.toByteArray();
+            ((ReferenceCounted)object).release();
+            return Optional.of(result);
+        });
+
     }
 
     /**
