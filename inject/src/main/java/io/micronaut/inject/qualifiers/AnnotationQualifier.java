@@ -53,7 +53,7 @@ class AnnotationQualifier<T> extends NameQualifier<T> {
             name = qualifier.annotationType().getSimpleName();
         }
 
-        return reduceByAnnotation(beanType, candidates, name);
+        return reduceByAnnotation(beanType, candidates, name, qualifier.annotationType().getName());
     }
 
     @Override
