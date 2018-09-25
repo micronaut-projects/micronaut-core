@@ -1162,22 +1162,20 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         Flowable<?> resultEmitter;
         if (isReactiveReturnType) {
             // if the return type is reactive, execute the action and obtain the Observable
-            RouteMatch<?> routeMatch = finalRoute;
-            if (!routeMatch.isExecutable()) {
-                routeMatch = requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, requestReference.get(), true);
-            }
             try {
                 if (isSingleResult) {
                     // for a single result we are fine as is
                     resultEmitter = Flowable.defer(() -> {
-                        Object result = finalRoute.execute();
+                        final RouteMatch<?> routeMatch = !finalRoute.isExecutable() ? requestArgumentSatisfier.fulfillArgumentRequirements(finalRoute, requestReference.get(), true) : finalRoute;
+                        Object result = routeMatch.execute();
                         return Publishers.convertPublisher(result, Publisher.class);
                     });
                 } else {
                     // for a streaming response we wrap the result on an HttpResponse so that a single result is received
                     // then the result can be streamed chunk by chunk
                     resultEmitter = Flowable.create((emitter) -> {
-                        Object result = finalRoute.execute();
+                        final RouteMatch<?> routeMatch = !finalRoute.isExecutable() ? requestArgumentSatisfier.fulfillArgumentRequirements(finalRoute, requestReference.get(), true) : finalRoute;
+                        Object result = routeMatch.execute();
                         MutableHttpResponse<Object> chunkedResponse = HttpResponse.ok(result);
                         chunkedResponse.header(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
                         emitter.onNext(chunkedResponse);
@@ -1186,7 +1184,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     }, BackpressureStrategy.ERROR);
                 }
             } catch (Throwable e) {
-                resultEmitter = Flowable.error(new InternalServerException("Error executing route [" + routeMatch + "]: " + e.getMessage(), e));
+                resultEmitter = Flowable.error(new InternalServerException("Error executing route [" + finalRoute + "]: " + e.getMessage(), e));
             }
         } else {
             // for non-reactive results we build flowable that executes the
