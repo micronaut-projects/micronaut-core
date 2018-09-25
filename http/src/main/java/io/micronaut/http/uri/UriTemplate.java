@@ -30,6 +30,7 @@ import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * <p>A Fast Implementation of URI Template specification. See https://tools.ietf.org/html/rfc6570 and
@@ -101,7 +102,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                 this.templateString = templateAsString;
                 String scheme = matcher.group(2);
                 if (scheme != null) {
-                    segments.add((parameters, previousHasContent, anyPreviousHasOperator) -> scheme + "://");
+                    segments.add(new UriTemplateParser.RawPathSegment(false, scheme + "://"));
                 }
                 String userInfo = matcher.group(5);
                 String host = matcher.group(6);
@@ -198,7 +199,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
     @Override
     public String toString() {
-        return templateString;
+        return segments.stream().collect(Collectors.joining(""));
     }
 
     @Override
@@ -318,7 +319,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                 return uri + nestedStr;
                             }
                         default:
-                            if (uri.endsWith("/")) {
+                            if (!uri.endsWith("/")) {
                                 return uri + "/" + nestedStr;
                             } else {
                                 return uri + nestedStr;
@@ -417,7 +418,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
     /**
      * Represents an expandable path segment.
      */
-    protected interface PathSegment {
+    protected interface PathSegment extends CharSequence{
         /**
          * @return Whether this segment is part of the query string
          */
@@ -448,8 +449,8 @@ public class UriTemplate implements Comparable<UriTemplate> {
         private static final int STATE_VAR_NEXT_MODIFIER = 13; // within a variable modifier of a next variable ie. {var, var2:1}
         String templateText;
         private int state = STATE_TEXT;
-        private char operator = '0';
-        private char modifier = '0';
+        private char operator = '0'; // zero means no operator
+        private char modifier = '0'; // zero means no modifier
         private String varDelimiter;
         private boolean isQuerySegment = false;
 
@@ -756,6 +757,21 @@ public class UriTemplate implements Comparable<UriTemplate> {
             }
 
             @Override
+            public int length() {
+                return value.length();
+            }
+
+            @Override
+            public char charAt(int index) {
+                return value.charAt(index);
+            }
+
+            @Override
+            public CharSequence subSequence(int start, int end) {
+                return value.subSequence(start, end);
+            }
+
+            @Override
             public String toString() {
                 return value;
             }
@@ -800,8 +816,35 @@ public class UriTemplate implements Comparable<UriTemplate> {
             }
 
             @Override
+            public int length() {
+                return toString().length();
+            }
+
+            @Override
+            public char charAt(int index) {
+                return toString().charAt(index);
+            }
+
+            @Override
+            public CharSequence subSequence(int start, int end) {
+                return toString().subSequence(start, end);
+            }
+
+            @Override
             public String toString() {
-                return variable;
+                StringBuilder builder = new StringBuilder("{");
+                if ('0' != operator) {
+                    builder.append(operator);
+                }
+                builder.append(variable);
+                if (modifierChar != '0') {
+                    builder.append(modifierChar);
+                    if (null != modifierStr) {
+                        builder.append(modifierStr);
+                    }
+                }
+                builder.append('}');
+                return builder.toString();
             }
 
             @Override
