@@ -35,7 +35,10 @@ class BinaryWebSocketSpec extends Specification{
         fred.topic == 'stuff'
         fred.username == 'fred'
         bob.username == 'bob'
-
+        conditions.eventually {
+            fred.replies.contains("[bob] Joined!")
+            fred.replies.size() == 1
+        }
 
 
         when:"A message is sent"
