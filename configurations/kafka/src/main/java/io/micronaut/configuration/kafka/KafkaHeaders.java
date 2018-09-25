@@ -18,6 +18,7 @@ package io.micronaut.configuration.kafka;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.messaging.MessageHeaders;
 
 import java.nio.charset.StandardCharsets;
@@ -49,7 +50,12 @@ public class KafkaHeaders implements MessageHeaders {
 
     @Override
     public List<String> getAll(CharSequence name) {
-        return null;
+        if (name != null) {
+            List<Header> headers = CollectionUtils.iterableToList(this.headers.headers(name.toString()));
+            return headers.stream().map(h -> new String(h.value(), StandardCharsets.UTF_8)).collect(Collectors.toList());
+        } else {
+            return Collections.emptyList();
+        }
     }
 
     @Override

@@ -198,4 +198,31 @@ public class CollectionUtils {
         }
         return builder.toString();
     }
+
+    /**
+     * Converts an {@link Iterable} to a {@link List}
+     * @param iterable The iterable
+     * @param <T> The generic type
+     * @return The list
+     */
+    public static <T> List<T> iterableToList(Iterable<T> iterable) {
+        if (iterable == null) {
+            return Collections.emptyList();
+        } else {
+            if (iterable instanceof List) {
+                return (List<T>) iterable;
+            } else {
+                Iterator<T> i = iterable.iterator();
+                if (i.hasNext()) {
+                    List<T> list = new ArrayList<>();
+                    while (i.hasNext()) {
+                        list.add(i.next());
+                    }
+                    return list;
+                } else {
+                    return Collections.emptyList();
+                }
+            }
+        }
+    }
 }

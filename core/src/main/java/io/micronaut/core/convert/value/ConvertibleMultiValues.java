@@ -21,6 +21,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
 
+import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
@@ -53,7 +54,7 @@ public interface ConvertibleMultiValues<V> extends ConvertibleValues<List<V>> {
      * @return The raw value or null
      * @see #getFirst(CharSequence)
      */
-    V get(CharSequence name);
+    @Nullable V get(CharSequence name);
 
     /**
      * @return Whether this values is empty
