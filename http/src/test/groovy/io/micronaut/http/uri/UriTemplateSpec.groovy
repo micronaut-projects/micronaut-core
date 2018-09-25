@@ -63,6 +63,8 @@ class UriTemplateSpec extends Specification {
 
         where:
         template       | nested                         | result
+        '/city'        | '/'                            | '/city'
+        '/city'        | ''                             | '/city'
         '/city'        | 'country/{name}'               | '/city/country/{name}'
         '/city/'       | 'country/{name}'               | '/city/country/{name}'
         '/city/'       | '/country/{name}'              | '/city/country/{name}'

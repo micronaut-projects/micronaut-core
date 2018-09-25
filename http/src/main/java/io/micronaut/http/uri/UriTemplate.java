@@ -405,17 +405,23 @@ public class UriTemplate implements Comparable<UriTemplate> {
                 querySegments.add(segment);
             }
         }
+
+
         String templateString = uriTemplate.toString();
         if (shouldPrependSlash(templateString, len)) {
             templateString = SLASH_OPERATOR + templateString;
         } else if (!segments.isEmpty() && templateString.startsWith(SLASH_STRING)) {
-            PathSegment last = segments.get(segments.size() - 1);
-            if (last instanceof UriTemplateParser.RawPathSegment) {
-                String v = ((UriTemplateParser.RawPathSegment) last).value;
-                if (v.endsWith(SLASH_STRING)) {
-                    templateString = templateString.substring(1);
-                } else {
-                    templateString = normalizeNested(SLASH_STRING, templateString.substring(1));
+            if (len == 1 && uriTemplate.charAt(0) == SLASH_OPERATOR) {
+                templateString = "";
+            } else {
+                PathSegment last = segments.get(segments.size() - 1);
+                if (last instanceof UriTemplateParser.RawPathSegment) {
+                    String v = ((UriTemplateParser.RawPathSegment) last).value;
+                    if (v.endsWith(SLASH_STRING)) {
+                        templateString = templateString.substring(1);
+                    } else {
+                        templateString = normalizeNested(SLASH_STRING, templateString.substring(1));
+                    }
                 }
             }
         }
