@@ -14,19 +14,15 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.server.netty.types;
+package io.micronaut.core.type;
 
-import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.core.convert.value.ConvertibleMultiValues;
 
 /**
- * A special type for files specific to Netty.
+ * Common interface for all headers types.
  *
- * @author James Kleeh
+ * @author graemerocher
  * @since 1.0
  */
-@Internal
-@Experimental
-public interface NettyFileCustomizableResponseType extends FileCustomizableResponseType, NettyCustomizableResponseType {
+public interface Headers extends ConvertibleMultiValues<String>  {
 }

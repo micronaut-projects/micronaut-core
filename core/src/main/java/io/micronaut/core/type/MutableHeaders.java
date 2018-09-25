@@ -14,19 +14,31 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.server.netty.types;
+package io.micronaut.core.type;
 
-import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 
 /**
- * A special type for files specific to Netty.
+ * Common interface for all mutable header types.
  *
- * @author James Kleeh
+ * @author graemerocher
  * @since 1.0
  */
-@Internal
-@Experimental
-public interface NettyFileCustomizableResponseType extends FileCustomizableResponseType, NettyCustomizableResponseType {
+public interface MutableHeaders extends Headers {
+
+    /**
+     * Add a header for the given name and value.
+     *
+     * @param header The head name
+     * @param value  The value
+     * @return This headers object
+     */
+    MutableHeaders add(CharSequence header, CharSequence value);
+
+    /**
+     * Removes a header.
+     *
+     * @param header The header to remove
+     * @return These headers
+     */
+    MutableHeaders remove(CharSequence header);
 }

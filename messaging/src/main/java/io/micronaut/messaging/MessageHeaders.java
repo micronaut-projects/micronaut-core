@@ -16,7 +16,7 @@
 
 package io.micronaut.messaging;
 
-import io.micronaut.core.convert.value.ConvertibleMultiValues;
+import io.micronaut.core.type.MutableHeaders;
 
 /**
  * Generic container object for message headers.
@@ -24,5 +24,5 @@ import io.micronaut.core.convert.value.ConvertibleMultiValues;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MessageHeaders extends ConvertibleMultiValues<String> {
+public interface MessageHeaders extends MutableHeaders {
 }

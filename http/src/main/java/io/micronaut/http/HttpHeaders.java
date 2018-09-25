@@ -16,7 +16,7 @@
 
 package io.micronaut.http;
 
-import io.micronaut.core.convert.value.ConvertibleMultiValues;
+import io.micronaut.core.type.Headers;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface HttpHeaders extends ConvertibleMultiValues<String> {
+public interface HttpHeaders extends Headers {
 
     /**
      * {@code "Accept"}.

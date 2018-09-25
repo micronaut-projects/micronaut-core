@@ -16,6 +16,7 @@
 
 package io.micronaut.http.server.types.files;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.server.types.CustomizableResponseType;
 
 /**
@@ -24,6 +25,7 @@ import io.micronaut.http.server.types.CustomizableResponseType;
  * @author James Kleeh
  * @since 1.0
  */
+@Experimental
 public interface FileCustomizableResponseType extends CustomizableResponseType {
 
     /**

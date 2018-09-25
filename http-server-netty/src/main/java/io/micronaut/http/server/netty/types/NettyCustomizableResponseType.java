@@ -16,6 +16,8 @@
 
 package io.micronaut.http.server.netty.types;
 
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.server.types.CustomizableResponseType;
@@ -27,6 +29,8 @@ import io.netty.channel.ChannelHandlerContext;
  * @author James Kleeh
  * @since 1.0
  */
+@Internal
+@Experimental
 public interface NettyCustomizableResponseType extends CustomizableResponseType {
 
     /**
