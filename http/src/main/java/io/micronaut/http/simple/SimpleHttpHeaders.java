@@ -93,7 +93,8 @@ public class SimpleHttpHeaders implements MutableHttpHeaders {
     }
 
     @Override
-    public void remove(CharSequence header) {
+    public MutableHttpHeaders remove(CharSequence header) {
         headers.remove(header.toString());
+        return this;
     }
 }

@@ -16,6 +16,8 @@
 
 package io.micronaut.http;
 
+import io.micronaut.core.type.MutableHeaders;
+
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -34,7 +36,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface MutableHttpHeaders extends HttpHeaders {
+public interface MutableHttpHeaders extends MutableHeaders, HttpHeaders  {
 
     /**
      * Add a header for the given name and value.
@@ -43,7 +45,11 @@ public interface MutableHttpHeaders extends HttpHeaders {
      * @param value  The value
      * @return This headers object
      */
+    @Override
     MutableHttpHeaders add(CharSequence header, CharSequence value);
+
+    @Override
+    MutableHttpHeaders remove(CharSequence header);
 
     /**
      * Set the allowed HTTP methods.
@@ -245,10 +251,5 @@ public interface MutableHttpHeaders extends HttpHeaders {
         return this;
     }
 
-    /**
-     * Removes the header for the given name.
-     *
-     * @param header The header name
-     */
-    void remove(CharSequence header);
+
 }
