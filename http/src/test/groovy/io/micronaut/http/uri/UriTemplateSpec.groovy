@@ -50,7 +50,7 @@ class UriTemplateSpec extends Specification {
     }
 
     @Unroll
-    void "Test nest template #template toString() with path #nested and #arguments"() {
+    void "Test nest template #template toString() with path #nested"() {
         given:
         UriTemplate uriTemplate = new UriTemplate(template)
 
@@ -59,6 +59,9 @@ class UriTemplateSpec extends Specification {
 
         where:
         template       | nested                         | result
+        '/foo'         | '/find?{x,empty}'              | '/foo/find?{x,empty}'
+        '/foo'         | '/find{?x,empty}'              | '/foo/find{?x,empty}'
+        '/foo'         | '{/list*,path:4}'              | '/foo{/list*,path:4}'
         '/person'      | '/{fred}'                      | '/person/{fred}'
         '/books'       | '{/id}'                        | '/books{/id}'
         '/books/'      | '{/id}'                        | '/books{/id}'
@@ -75,6 +78,8 @@ class UriTemplateSpec extends Specification {
         '{var}'        | '/{var2}'                      | '{var}/{var2}'
         '{var}{?q}'    | '/{var2}'                      | '{var}/{var2}{?q}'
         '{var}{#hash}' | '{var2}'                       | '{var}/{var2}{#hash}'
+        '/foo'         | '/find{?year*}'                | '/foo/find{?year*}'
+
 
     }
 

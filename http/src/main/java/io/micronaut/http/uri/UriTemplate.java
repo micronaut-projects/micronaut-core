@@ -62,6 +62,12 @@ public class UriTemplate implements Comparable<UriTemplate> {
     private static final char SLASH_OPERATOR = '/';
     private static final char HASH_OPERATOR = '#';
     private static final char EXPAND_MODIFIER = '*';
+    private static final char OPERATOR_NONE = '0';
+    private static final char VAR_START = '{';
+    private static final char VAR_END = '}';
+    private static final char AND_OPERATOR = '&';
+    private static final String SLASH_STRING = "/";
+    private static final char DOT_OPERATOR = '.';
 
     private final String templateString;
     private final List<PathSegment> segments = new ArrayList<>();
@@ -88,7 +94,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
         }
 
         String templateAsString = templateString.toString();
-        if (templateAsString.endsWith("/")) {
+        if (templateAsString.endsWith(SLASH_STRING)) {
             int len = templateAsString.length();
             if (len > 1) {
                 templateAsString = templateAsString.substring(0, len - 1);
@@ -199,7 +205,46 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
     @Override
     public String toString() {
-        return segments.stream().collect(Collectors.joining(""));
+        StringBuilder builder = new StringBuilder();
+        UriTemplateParser.VariablePathSegment previousVariable = null;
+        for (PathSegment segment : segments) {
+            boolean isVar = segment instanceof UriTemplateParser.VariablePathSegment;
+            if (previousVariable != null && isVar) {
+                UriTemplateParser.VariablePathSegment varSeg = (UriTemplateParser.VariablePathSegment) segment;
+                if (varSeg.operator == previousVariable.operator) {
+                    builder.append(varSeg.delimiter);
+                } else {
+                    builder.append(VAR_END);
+                    builder.append(VAR_START);
+                    char op = varSeg.operator;
+                    if (OPERATOR_NONE != op) {
+                        builder.append(op);
+                    }
+                }
+                builder.append(segment.toString());
+                previousVariable = varSeg;
+            } else {
+                if (isVar) {
+                    previousVariable = (UriTemplateParser.VariablePathSegment) segment;
+                    builder.append(VAR_START);
+                    char op = previousVariable.operator;
+                    if (OPERATOR_NONE != op) {
+                        builder.append(op);
+                    }
+                    builder.append(segment.toString());
+                } else {
+                    if (previousVariable != null) {
+                        builder.append(VAR_END);
+                        previousVariable = null;
+                    }
+                    builder.append(segment.toString());
+                }
+            }
+        }
+        if (previousVariable != null) {
+            builder.append(VAR_END);
+        }
+        return builder.toString();
     }
 
     @Override
@@ -306,21 +351,21 @@ public class UriTemplate implements Comparable<UriTemplate> {
         }
 
         switch (firstNested) {
-            case '{':
+            case VAR_START:
                 if (len > 1) {
                     switch (nested.charAt(1)) {
                         case SLASH_OPERATOR:
                         case HASH_OPERATOR:
                         case QUERY_OPERATOR:
-                        case '&':
-                            if (uri.endsWith("/")) {
+                        case AND_OPERATOR:
+                            if (uri.endsWith(SLASH_STRING)) {
                                 return uri.substring(0, uri.length() - 1) + nestedStr;
                             } else {
                                 return uri + nestedStr;
                             }
                         default:
-                            if (!uri.endsWith("/")) {
-                                return uri + "/" + nestedStr;
+                            if (!uri.endsWith(SLASH_STRING)) {
+                                return uri + SLASH_STRING + nestedStr;
                             } else {
                                 return uri + nestedStr;
                             }
@@ -329,16 +374,16 @@ public class UriTemplate implements Comparable<UriTemplate> {
                     return uri;
                 }
             case SLASH_OPERATOR:
-                if (uri.endsWith("/")) {
+                if (uri.endsWith(SLASH_STRING)) {
                     return uri + nestedStr.substring(1);
                 } else {
                     return uri + nestedStr;
                 }
             default:
-                if (uri.endsWith("/")) {
+                if (uri.endsWith(SLASH_STRING)) {
                     return uri + nestedStr;
                 } else {
-                    return uri + "/" + nestedStr;
+                    return uri + SLASH_STRING + nestedStr;
                 }
         }
     }
@@ -363,14 +408,14 @@ public class UriTemplate implements Comparable<UriTemplate> {
         String templateString = uriTemplate.toString();
         if (shouldPrependSlash(templateString, len)) {
             templateString = SLASH_OPERATOR + templateString;
-        } else if (!segments.isEmpty() && templateString.startsWith("/")) {
+        } else if (!segments.isEmpty() && templateString.startsWith(SLASH_STRING)) {
             PathSegment last = segments.get(segments.size() - 1);
             if (last instanceof UriTemplateParser.RawPathSegment) {
                 String v = ((UriTemplateParser.RawPathSegment) last).value;
-                if (v.endsWith("/")) {
+                if (v.endsWith(SLASH_STRING)) {
                     templateString = templateString.substring(1);
                 } else {
-                    templateString = normalizeNested("/", templateString.substring(1));
+                    templateString = normalizeNested(SLASH_STRING, templateString.substring(1));
                 }
             }
         }
@@ -400,7 +445,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
     private boolean isAdditionalPathVar(String templateString, int len) {
         if (len > 1) {
-            boolean isVar = templateString.charAt(0) == '{';
+            boolean isVar = templateString.charAt(0) == VAR_START;
             if (isVar) {
                 switch (templateString.charAt(1)){
                     case SLASH_OPERATOR:
@@ -449,8 +494,8 @@ public class UriTemplate implements Comparable<UriTemplate> {
         private static final int STATE_VAR_NEXT_MODIFIER = 13; // within a variable modifier of a next variable ie. {var, var2:1}
         String templateText;
         private int state = STATE_TEXT;
-        private char operator = '0'; // zero means no operator
-        private char modifier = '0'; // zero means no modifier
+        private char operator = OPERATOR_NONE; // zero means no operator
+        private char modifier = OPERATOR_NONE; // zero means no modifier
         private String varDelimiter;
         private boolean isQuerySegment = false;
 
@@ -474,7 +519,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
             for (char c : chars) {
                 switch (state) {
                     case STATE_TEXT:
-                        if (c == '{') {
+                        if (c == VAR_START) {
                             if (buff.length() > 0) {
                                 String val = buff.toString();
                                 addRawContentSegment(segments, val, isQuerySegment);
@@ -508,7 +553,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                 continue;
                             case ',': // arrived to new variable
                                 state = STATE_VAR_NEXT;
-                            case '}': // arrived to variable end
+                            case VAR_END: // arrived to variable end
 
                                 if (buff.length() > 0) {
                                     String val = buff.toString();
@@ -529,7 +574,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                             prefix = String.valueOf(operator);
                                             delimiter = ",";
                                             break;
-                                        case '.':
+                                        case DOT_OPERATOR:
                                             encode = true;
                                             repeatPrefix = varCount < 1;
                                             prefix = String.valueOf(operator);
@@ -548,11 +593,11 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                             delimiter = modifier == EXPAND_MODIFIER ? prefix : ",";
                                             break;
                                         case QUERY_OPERATOR:
-                                        case '&':
+                                        case AND_OPERATOR:
                                             encode = true;
                                             repeatPrefix = true;
                                             prefix = varCount < 1 ? String.valueOf(operator) + val + '=' : val + "=";
-                                            delimiter = modifier == EXPAND_MODIFIER ? '&' + val + '=' : ",";
+                                            delimiter = modifier == EXPAND_MODIFIER ? AND_OPERATOR + val + '=' : ",";
                                             break;
                                         default:
                                             repeatPrefix = varCount < 1;
@@ -565,7 +610,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                     String previous = state == STATE_VAR_NEXT || state == STATE_VAR_NEXT_MODIFIER ? this.varDelimiter : null;
                                     addVariableSegment(segments, val, prefix, delimiter, encode, repeatPrefix, modifierStr, modifierChar, operator, previous, isQuerySegment);
                                 }
-                                boolean hasAnotherVar = state == STATE_VAR_NEXT && c != '}';
+                                boolean hasAnotherVar = state == STATE_VAR_NEXT && c != VAR_END;
                                 if (hasAnotherVar) {
                                     String delimiter;
                                     switch (operator) {
@@ -573,10 +618,10 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                             delimiter = null;
                                             break;
                                         case QUERY_OPERATOR:
-                                        case '&':
+                                        case AND_OPERATOR:
                                             delimiter = "&";
                                             break;
-                                        case '.':
+                                        case DOT_OPERATOR:
                                         case SLASH_OPERATOR:
                                             delimiter = String.valueOf(operator);
                                             break;
@@ -591,7 +636,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                 state = hasAnotherVar ? STATE_VAR_NEXT : STATE_TEXT;
                                 modBuff.delete(0, modBuff.length());
                                 buff.delete(0, buff.length());
-                                modifier = '0';
+                                modifier = OPERATOR_NONE;
 
                                 continue;
                             default:
@@ -613,11 +658,11 @@ public class UriTemplate implements Comparable<UriTemplate> {
                                 continue;
                             case ';':
                             case QUERY_OPERATOR:
-                            case '&':
+                            case AND_OPERATOR:
                             case HASH_OPERATOR:
                                 isQuerySegment = true;
                             case '+':
-                            case '.':
+                            case DOT_OPERATOR:
                             case SLASH_OPERATOR:
                                 operator = c;
                                 state = STATE_VAR_CONTENT;
@@ -832,18 +877,14 @@ public class UriTemplate implements Comparable<UriTemplate> {
 
             @Override
             public String toString() {
-                StringBuilder builder = new StringBuilder("{");
-                if ('0' != operator) {
-                    builder.append(operator);
-                }
+                StringBuilder builder = new StringBuilder();
                 builder.append(variable);
-                if (modifierChar != '0') {
+                if (modifierChar != OPERATOR_NONE) {
                     builder.append(modifierChar);
                     if (null != modifierStr) {
                         builder.append(modifierStr);
                     }
                 }
-                builder.append('}');
                 return builder.toString();
             }
 
@@ -887,10 +928,10 @@ public class UriTemplate implements Comparable<UriTemplate> {
                         if (modifierChar == EXPAND_MODIFIER) {
 
                             switch (UriTemplateParser.this.operator) {
-                                case '&':
+                                case AND_OPERATOR:
                                 case QUERY_OPERATOR:
                                     prefixToUse = String.valueOf(UriTemplateParser.this.operator);
-                                    joiner = new StringJoiner(String.valueOf('&'));
+                                    joiner = new StringJoiner(String.valueOf(AND_OPERATOR));
                                     break;
                                 case ';':
                                     prefixToUse = String.valueOf(UriTemplateParser.this.operator);
