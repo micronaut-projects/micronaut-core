@@ -44,9 +44,9 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
     }
 
     Map<String, Object> getConfiguration() {
-        ['micronaut.router.static.resources.paths':
+        ['micronaut.router.static-resources.default.paths':
                  ['classpath:public', 'file:' + tempFile.parent],
-         'micronaut.router.static.resources.enabled': true]
+         'micronaut.router.static-resources.default.enabled': true]
     }
 
     void cleanupSpec() {
@@ -110,9 +110,9 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
     void "test resources with configured mapping"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'micronaut.router.static.resources.paths': ['classpath:public', 'file:' + tempFile.parent],
-                'micronaut.router.static.resources.enabled': true,
-                'micronaut.router.static.resources.mapping': '/static/**'], 'test')
+                'micronaut.router.static-resources.default.paths': ['classpath:public', 'file:' + tempFile.parent],
+                'micronaut.router.static-resources.default.enabled': true,
+                'micronaut.router.static-resources.default.mapping': '/static/**'], 'test')
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
 
@@ -136,12 +136,58 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         embeddedServer.stop()
     }
 
+    void "test resources with multiple configured mappings"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.router.static-resources.cp.paths': ['classpath:public', 'file:' + tempFile.parent],
+                'micronaut.router.static-resources.cp.enabled': true,
+                'micronaut.router.static-resources.cp.mapping': '/static/**',
+                'micronaut.router.static-resources.file.paths': ['file:' + tempFile.parent],
+                'micronaut.router.static-resources.file.enabled': true,
+                'micronaut.router.static-resources.file.mapping': '/file/**'], 'test')
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+
+        when:
+        def response = rxClient.exchange(
+                HttpRequest.GET("/static/index.html"), String
+        ).blockingFirst()
+        File file = Paths.get(StaticResourceResolutionSpec.classLoader.getResource("public/index.html").toURI()).toFile()
+
+        then:
+        file.exists()
+        response.code() == HttpStatus.OK.code
+        response.header(CONTENT_TYPE) == "text/html"
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.header(CACHE_CONTROL) == "private, max-age=60"
+        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(file.lastModified()), ZoneId.of("GMT")).truncatedTo(ChronoUnit.SECONDS)
+        response.body() == "<html><head></head><body>HTML Page from resources</body></html>"
+
+        when:
+        response = rxClient.exchange(
+                HttpRequest.GET('/file/'+tempFile.getName()), String
+        ).blockingFirst()
+
+        then:
+        response.status == HttpStatus.OK
+        response.header(CONTENT_TYPE) == "text/html"
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.header(CACHE_CONTROL) == "private, max-age=60"
+        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(tempFile.lastModified()), ZoneId.of("GMT")).truncatedTo(ChronoUnit.SECONDS)
+        response.body() == "<html><head></head><body>HTML Page from static file</body></html>"
+
+        cleanup:
+        embeddedServer.stop()
+    }
+
     void "test resources with configured mapping automatically resolves index.html"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'micronaut.router.static.resources.paths': ['classpath:public', 'file:' + tempFile.parent],
-                'micronaut.router.static.resources.enabled': true,
-                'micronaut.router.static.resources.mapping': '/static/**'], 'test')
+                'micronaut.router.static-resources.default.paths': ['classpath:public', 'file:' + tempFile.parent],
+                'micronaut.router.static-resources.default.enabled': true,
+                'micronaut.router.static-resources.default.mapping': '/static/**'], 'test')
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
 
@@ -169,9 +215,9 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
     void "test resources with configured mapping automatically resolves index.html in path"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'micronaut.router.static.resources.paths': ['classpath:foo'],
-                'micronaut.router.static.resources.enabled': true,
-                'micronaut.router.static.resources.mapping': '/static/**'], 'test')
+                'micronaut.router.static-resources.default.paths': ['classpath:foo'],
+                'micronaut.router.static-resources.default.enabled': true,
+                'micronaut.router.static-resources.default.mapping': '/static/**'], 'test')
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
 
@@ -199,9 +245,9 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
     void "test its not possible to configure a path with 'classpath:'"() {
         when:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'micronaut.router.static.resources.paths': ['classpath:'],
-                'micronaut.router.static.resources.enabled': true,
-                'micronaut.router.static.resources.mapping': '/static/**'], Environment.TEST)
+                'micronaut.router.static-resources.default.paths': ['classpath:'],
+                'micronaut.router.static-resources.default.enabled': true,
+                'micronaut.router.static-resources.default.mapping': '/static/**'], Environment.TEST)
 
         then:
         thrown(DependencyInjectionException)

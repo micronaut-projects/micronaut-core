@@ -16,7 +16,7 @@
 
 package io.micronaut.web.router.resource;
 
-import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
@@ -35,13 +35,13 @@ import java.util.Optional;
  * @author James Kleeh
  * @since 1.0
  */
-@ConfigurationProperties(StaticResourceConfiguration.PREFIX)
+@EachProperty(StaticResourceConfiguration.PREFIX)
 public class StaticResourceConfiguration implements Toggleable {
 
     /**
      * The prefix for static resources configuration.
      */
-    public static final String PREFIX = "micronaut.router.static.resources";
+    public static final String PREFIX = "micronaut.router.static-resources";
 
     /**
      * The default enable value.
