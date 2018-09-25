@@ -14,15 +14,31 @@
  * limitations under the License.
  */
 
-package io.micronaut.messaging;
+package io.micronaut.core.type;
 
-import io.micronaut.core.type.MutableHeaders;
 
 /**
- * Generic container object for message headers.
+ * Common interface for all mutable header types.
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-public interface MessageHeaders extends MutableHeaders {
+public interface MutableHeaders extends Headers {
+
+    /**
+     * Add a header for the given name and value.
+     *
+     * @param header The head name
+     * @param value  The value
+     * @return This headers object
+     */
+    MutableHeaders add(CharSequence header, CharSequence value);
+
+    /**
+     * Removes a header.
+     *
+     * @param header The header to remove
+     * @return These headers
+     */
+    MutableHeaders remove(CharSequence header);
 }

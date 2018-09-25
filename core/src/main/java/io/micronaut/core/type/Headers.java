@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package io.micronaut.messaging;
+package io.micronaut.core.type;
 
-import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.core.convert.value.ConvertibleMultiValues;
 
 /**
- * Generic container object for message headers.
+ * Common interface for all headers types.
  *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-public interface MessageHeaders extends MutableHeaders {
+public interface Headers extends ConvertibleMultiValues<String>  {
 }

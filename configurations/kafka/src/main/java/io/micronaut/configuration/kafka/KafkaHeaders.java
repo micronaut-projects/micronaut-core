@@ -20,6 +20,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.messaging.MessageHeaders;
 
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -84,5 +85,21 @@ public class KafkaHeaders implements MessageHeaders {
             return ConversionService.SHARED.convert(v, conversionContext);
         }
         return Optional.empty();
+    }
+
+    @Override
+    public KafkaHeaders add(CharSequence header, CharSequence value) {
+        if (header != null && value != null) {
+            this.headers.add(header.toString(), value.toString().getBytes(StandardCharsets.UTF_8));
+        }
+        return this;
+    }
+
+    @Override
+    public KafkaHeaders remove(CharSequence header) {
+        if (header != null) {
+            this.headers.remove(header.toString());
+        }
+        return this;
     }
 }
