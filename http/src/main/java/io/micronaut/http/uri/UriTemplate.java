@@ -455,6 +455,8 @@ public class UriTemplate implements Comparable<UriTemplate> {
                     default:
                         return true;
                 }
+            } else {
+                return templateString.charAt(0) != SLASH_OPERATOR;
             }
         }
         return false;
