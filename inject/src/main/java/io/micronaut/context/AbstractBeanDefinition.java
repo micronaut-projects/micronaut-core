@@ -850,8 +850,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @SuppressWarnings("WeakerAccess")
     @Internal
     protected final Collection getBeansOfTypeForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, MethodInjectionPoint injectionPoint, Argument argument) {
-        return resolveBeanWithGenericsFromMethodArgument(resolutionContext, injectionPoint, argument, (beanType, qualifier) ->
-                {
+        return resolveBeanWithGenericsFromMethodArgument(resolutionContext, injectionPoint, argument, (beanType, qualifier) -> {
                     boolean hasNoGenerics = !argument.getType().isArray() && argument.getTypeVariables().isEmpty();
                     if (hasNoGenerics) {
                         return ((DefaultBeanContext) context).getBean(resolutionContext, beanType, qualifier);
@@ -1062,8 +1061,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @SuppressWarnings("WeakerAccess")
     @Internal
     protected final Collection getBeansOfTypeForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, @SuppressWarnings("unused") ConstructorInjectionPoint<T> constructorInjectionPoint, Argument argument) {
-        return resolveBeanWithGenericsFromConstructorArgument(resolutionContext, argument, (beanType, qualifier) ->
-                {
+        return resolveBeanWithGenericsFromConstructorArgument(resolutionContext, argument, (beanType, qualifier) -> {
                     boolean hasNoGenerics = !argument.getType().isArray() && argument.getTypeVariables().isEmpty();
                     if (hasNoGenerics) {
                         return ((DefaultBeanContext) context).getBean(resolutionContext, beanType, qualifier);
@@ -1378,8 +1376,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @SuppressWarnings("WeakerAccess")
     @Internal
     protected final Collection getBeansOfTypeForField(BeanResolutionContext resolutionContext, BeanContext context, FieldInjectionPoint injectionPoint) {
-        return resolveBeanWithGenericsForField(resolutionContext, injectionPoint, (beanType, qualifier) ->
-                {
+        return resolveBeanWithGenericsForField(resolutionContext, injectionPoint, (beanType, qualifier) -> {
                     boolean hasNoGenerics = !injectionPoint.getType().isArray() && injectionPoint.asArgument().getTypeVariables().isEmpty();
                     if (hasNoGenerics) {
                         return ((DefaultBeanContext) context).getBean(resolutionContext, beanType, qualifier);
