@@ -102,7 +102,7 @@ class ParameterBindingSpec extends AbstractMicronautSpec {
     @Controller("/poetry")
     static class PoetryController {
 
-        @Get("/{?max}")
+        @Get("{?max}")
         HttpStatus index(@Nullable Integer max) {
             return HttpStatus.OK
         }

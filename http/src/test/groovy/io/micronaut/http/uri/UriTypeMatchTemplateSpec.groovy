@@ -25,6 +25,31 @@ import spock.lang.Unroll
 class UriTypeMatchTemplateSpec extends Specification {
 
     @Unroll
+    void "Test nest template #template with path #nested and #arguments"() {
+        given:
+        UriTypeMatchTemplate uriTemplate = new UriTypeMatchTemplate(template)
+
+        expect:
+        uriTemplate.nest(nested).expand(arguments) == result
+
+        where:
+        template       | nested               | arguments                               | result
+        '/poetry'      | '/{?max}'            | [max: '10']                             | '/poetry?max=10'
+        '/poetry'      | '{?max}'             | [max: '10']                             | '/poetry?max=10'
+        '/'            | '/hello/{name}'      | [name: 'Fred']                          | '/hello/Fred'
+        ''             | '/hello/{name}'      | [name: 'Fred']                          | '/hello/Fred'
+        '/test/'       | '/hello/{name}'      | [name: 'Fred']                          | '/test/hello/Fred'
+        '{var}'        | '{var2}'             | [var: 'foo', var2: 'bar']               | 'foo/bar'
+        '/book{/id}'   | '/author{/authorId}' | [id: 'foo', authorId: 'bar']            | '/book/foo/author/bar'
+        '{var}/'       | '{var2}'             | [var: 'foo', var2: 'bar']               | 'foo/bar'
+        '{var}'        | '/{var2}'            | [var: 'foo', var2: 'bar']               | 'foo/bar'
+        '{var}{?q}'    | '/{var2}'            | [var: 'foo', var2: 'bar', q: 'test']    | 'foo/bar?q=test'
+        '{var}{?q}'    | '{var2}'             | [var: 'foo', var2: 'bar', q: 'test']    | 'foo/bar?q=test'
+        '{var}{#hash}' | '{var2}'             | [var: 'foo', var2: 'bar', hash: 'test'] | 'foo/bar#test'
+
+    }
+
+    @Unroll
     void "Test URI template #template matches #uri when nested with #nested"() {
         given:
         UriTypeMatchTemplate matchTemplate = new UriTypeMatchTemplate(template, types as Class[])
