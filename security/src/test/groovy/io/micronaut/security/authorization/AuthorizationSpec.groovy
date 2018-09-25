@@ -73,6 +73,30 @@ class AuthorizationSpec extends Specification {
         response.body() == 'You are valid'
     }
 
+    void "Authentication Argument Binders binds Principal if return type is Single"() {
+        expect:
+        embeddedServer.applicationContext.getBean(PrincipalArgumentBinder.class)
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/argumentbinder/singleprincipal")
+                .basicAuth("valid", "password"), String)
+
+        then:
+        response.body() == 'You are valid'
+    }
+
+    void "Authentication Argument Binders binds Authentication if return type is Single"() {
+        expect:
+        embeddedServer.applicationContext.getBean(PrincipalArgumentBinder.class)
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.GET("/argumentbinder/singleauthentication")
+                .basicAuth("valid", "password"), String)
+
+        then:
+        response.body() == 'You are valid'
+    }
+
     void "test accessing the url map controller without authentication"() {
         when:
         client.toBlocking().exchange(HttpRequest.GET("/urlMap/authenticated"))
