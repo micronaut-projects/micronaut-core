@@ -76,11 +76,6 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
         if (response instanceof NettyMutableHttpResponse) {
             FullHttpResponse nettyResponse = ((NettyMutableHttpResponse) response).getNativeResponse();
 
-            //The streams codec prevents non full responses from being written
-            Optional
-                .ofNullable(context.pipeline().get(NettyHttpServer.HTTP_STREAMS_CODEC))
-                .ifPresent(handler -> context.pipeline().replace(handler, "chunked-handler", new ChunkedWriteHandler()));
-
             // Write the request data
             context.write(new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), nettyResponse.headers()), context.voidPromise());
             context.writeAndFlush(new HttpChunkedInput(new ChunkedStream(getInputStream())));

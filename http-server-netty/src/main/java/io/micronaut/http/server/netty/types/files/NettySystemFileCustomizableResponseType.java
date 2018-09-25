@@ -112,11 +112,6 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
 
             FullHttpResponse nettyResponse = ((NettyMutableHttpResponse) response).getNativeResponse();
 
-            //The streams codec prevents non full responses from being written
-            Optional
-                .ofNullable(context.pipeline().get(NettyHttpServer.HTTP_STREAMS_CODEC))
-                .ifPresent(handler -> context.pipeline().replace(handler, "chunked-handler", new ChunkedWriteHandler()));
-
             // Write the request data
             HttpHeaders headers = nettyResponse.headers();
             context.write(new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), headers), context.voidPromise());
@@ -124,12 +119,6 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
             // Write the content.
             if (context.pipeline().get(SslHandler.class) == null && SmartHttpContentCompressor.shouldSkip(headers)) {
                 // SSL not enabled - can use zero-copy file transfer.
-                // Remove the content compressor to prevent incorrect behavior with zero-copy
-                HttpContentCompressor compressor = context.pipeline().get(HttpContentCompressor.class);
-                if (compressor != null) {
-                    context.pipeline().remove(HttpContentCompressor.class);
-                }
-
                 context.write(new DefaultFileRegion(raf.getChannel(), 0, getLength()), context.newProgressivePromise());
                 context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
             } else {
