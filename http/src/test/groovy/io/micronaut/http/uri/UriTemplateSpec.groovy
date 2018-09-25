@@ -34,6 +34,10 @@ class UriTemplateSpec extends Specification {
 
         where:
         template       | nested               | arguments                               | result
+        '/city'        | 'country/{name}'     | [name: 'Fred']                          | '/city/country/Fred'
+        '/city/'       | 'country/{name}'     | [name: 'Fred']                          | '/city/country/Fred'
+        '/city/'       | '/country/{name}'    | [name: 'Fred']                          | '/city/country/Fred'
+        '/city'        | '/country/{name}'    | [name: 'Fred']                          | '/city/country/Fred'
         '/poetry'      | '/{?max}'            | [max: '10']                             | '/poetry?max=10'
         '/poetry'      | '{?max}'             | [max: '10']                             | '/poetry?max=10'
         '/'            | '/hello/{name}'      | [name: 'Fred']                          | '/hello/Fred'
@@ -59,6 +63,10 @@ class UriTemplateSpec extends Specification {
 
         where:
         template       | nested                         | result
+        '/city'        | 'country/{name}'               | '/city/country/{name}'
+        '/city/'       | 'country/{name}'               | '/city/country/{name}'
+        '/city/'       | '/country/{name}'              | '/city/country/{name}'
+        '/city'        | '/country/{name}'              | '/city/country/{name}'
         '/foo'         | '/find?{x,empty}'              | '/foo/find?{x,empty}'
         '/foo'         | '/find{?x,empty}'              | '/foo/find{?x,empty}'
         '/foo'         | '{/list*,path:4}'              | '/foo{/list*,path:4}'
