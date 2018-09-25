@@ -171,11 +171,10 @@ Micronaut supports validating route arguments at compile time with the validatio
 [source,groovy]
 .build.gradle
 ----
-annotationProcessor "io.micronaut:validation" // for Java only
+annotationProcessor "io.micronaut:validation" // Java only
+kapt "io.micronaut:validation" // Kotlin only
 compile "io.micronaut:validation"
 ----
-
-NOTE: For Java this `validation` dependency will also need to be added to the `annotationProcessor` scope and for Kotlin the dependency will need to be added to to `kapt` scope.
 
 With the correct dependency on your classpath, route arguments will automatically be checked at compile time. The compilation will fail if any of the following conditions are met:
 
@@ -187,3 +186,4 @@ An optional variable is one that will allow the route to match a URI even if the
 * {blank}
  The URI template contains a variable that is missing from the method arguments.
 
+NOTE: To disable route compile time validation, set the system property `-Dmicronaut.route.validation=false`. For Java and Kotlin users using Gradle, the same effect can be achieved by removing the `validation` dependency from the `annotationProcessor`/`kapt` scope.
