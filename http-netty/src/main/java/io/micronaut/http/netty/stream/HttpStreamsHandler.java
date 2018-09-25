@@ -405,6 +405,22 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     }
 
     /**
+     * @param msg The message
+     * @return True if the handler should write the message
+     */
+    protected boolean isValidOutMessage(Object msg) {
+        return outClass.isInstance(msg);
+    }
+
+    /**
+     * @param msg The message
+     * @return True if the handler should read the message
+     */
+    protected boolean isValidInMessage(Object msg) {
+        return inClass.isInstance(msg);
+    }
+
+    /**
      * The outgoing class.
      */
     class Outgoing {
@@ -421,19 +437,4 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
         }
     }
 
-    /**
-     * @param msg The message
-     * @return True if the handler should write the message
-     */
-    protected boolean isValidOutMessage(Object msg) {
-        return outClass.isInstance(msg);
-    }
-
-    /**
-     * @param msg The message
-     * @return True if the handler should read the message
-     */
-    protected boolean isValidInMessage(Object msg) {
-        return inClass.isInstance(msg);
-    }
 }
