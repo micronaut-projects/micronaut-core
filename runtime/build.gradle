@@ -49,6 +49,7 @@ shadowJar {
             }
         }
         exclude(project(":core"))
+        exclude(dependency('javax.annotation:.*:.*'))
         exclude(dependency("com.fasterxml.*:.*:.*"))
         exclude(dependency(dependencyVersion("slf4j")))
         exclude(dependency(dependencyVersion("snakeyaml")))

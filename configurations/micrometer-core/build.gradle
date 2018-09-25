@@ -29,7 +29,7 @@ shadowJar {
         exclude(project(":http"))
         exclude(project(":inject"))
         exclude(project(":aop"))
-
+        exclude(dependency('javax.annotation:.*:.*'))
         exclude(dependency(dependencyVersion("snakeyaml")))
         exclude(dependency("com.fasterxml.*:.*:.*"))
         exclude(dependency("javax.validation:.*:.*"))

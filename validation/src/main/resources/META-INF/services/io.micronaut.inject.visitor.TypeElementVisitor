@@ -1,2 +1,3 @@
-io.micronaut.validation.visitor.WebSocketVisitor
-io.micronaut.validation.visitor.AsyncTypeElementVisitor
+io.micronaut.validation.websocket.WebSocketVisitor
+io.micronaut.validation.async.AsyncTypeElementVisitor
+io.micronaut.validation.routes.RouteValidationVisitor

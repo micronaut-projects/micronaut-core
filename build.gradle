@@ -72,6 +72,11 @@ ext {
                     group:'io.jaegertracing',
                     name:'jaeger-core'
             ],
+            'javax.annotation-api': [
+                    version: javaxAnnotationApiVersion,
+                    group:'javax.annotation',
+                    name:'javax.annotation-api'
+            ],
             jsr305:[
                     version:jsr305Version,
                     group:'com.google.code.findbugs',
@@ -153,6 +158,12 @@ ext {
                 version: spockVersion,
                 group:'org.spockframework',
                 name: 'spock-core'
+            ],
+            swagger: [
+                version: '2.0.4',
+                group: 'io.swagger.core.v3',
+                name: 'swagger-core',
+                modules: ['swagger-models', 'swagger-annotations']
             ],
             'reactive.streams':[
                 version:reactiveStreamsVersion,

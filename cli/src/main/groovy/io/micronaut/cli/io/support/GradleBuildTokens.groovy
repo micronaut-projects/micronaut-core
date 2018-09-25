@@ -15,6 +15,7 @@
  */
 package io.micronaut.cli.io.support
 
+import groovy.transform.InheritConstructors
 import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.repository.MavenProfileRepository
@@ -25,6 +26,7 @@ import org.eclipse.aether.graph.Dependency
  * @author James Kleeh
  * @sicen 1.0
  */
+@InheritConstructors
 class GradleBuildTokens extends BuildTokens {
 
     static final SCOPE_MAP = [
@@ -35,6 +37,8 @@ class GradleBuildTokens extends BuildTokens {
 
     Map getTokens(Profile profile, List<Feature> features) {
         Map tokens = [:]
+        tokens.put("testFramework", testFramework)
+        tokens.put("sourceLanguage", sourceLanguage)
 
         def ln = System.getProperty("line.separator")
 

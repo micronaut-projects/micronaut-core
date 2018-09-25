@@ -84,6 +84,22 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
         return str;
     }
 
+    /**
+     * Resolves a replacement for the given expression. Returning true if the replacement was resolved.
+     *
+     * @param builder The builder
+     * @param str The full string
+     * @param expr The current expression
+     * @return True if a placeholder was resolved
+     */
+    protected boolean resolveReplacement(StringBuilder builder, String str, String expr) {
+        if (environment.containsProperty(expr)) {
+            builder.append(environment.getProperty(expr, String.class).orElseThrow(() -> new ConfigurationException("Could not resolve placeholder ${" + expr + "} in value: " + str)));
+            return true;
+        }
+        return false;
+    }
+
     private String resolvePlaceholders(String str, int startIndex) {
         StringBuilder builder = new StringBuilder(str.substring(0, startIndex));
         String restOfString = str.substring(startIndex + 2);
@@ -124,9 +140,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             }
         }
 
-        if (environment.containsProperty(expr)) {
-            String finalExpr = expr;
-            builder.append(environment.getProperty(expr, String.class).orElseThrow(() -> new ConfigurationException("Could not resolve placeholder ${" + finalExpr + "} in value: " + str)));
+        if (resolveReplacement(builder, str, expr)) {
             return;
         }
         if (ENVIRONMENT_VAR_SEQUENCE.matcher(expr).matches()) {

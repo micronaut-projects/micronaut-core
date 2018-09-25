@@ -29,7 +29,7 @@ public class BookController {
 
     @Post(value = "/book/{title}", consumes = {MediaType.APPLICATION_JSON, MediaType.APPLICATION_FORM_URLENCODED})
     @Status(HttpStatus.CREATED)
-    Book save(@Body Book book) {
-        return book;
+    Book save(String title) {
+        return new Book(title);
     }
 }

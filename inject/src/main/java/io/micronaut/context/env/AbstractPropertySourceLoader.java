@@ -20,6 +20,8 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.util.Toggleable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -37,10 +39,13 @@ import java.util.Set;
  */
 public abstract class AbstractPropertySourceLoader implements PropertySourceLoader, Toggleable, Ordered {
 
+
     /**
      * Default position for the property source loader.
      */
     public static final int DEFAULT_POSITION = EnvironmentPropertySource.POSITION - 100;
+
+    private static final Logger LOG = LoggerFactory.getLogger(AbstractPropertySourceLoader.class);
 
     @Override
     public int getOrder() {
@@ -84,10 +89,17 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
     private Map<String, Object> loadProperties(ResourceLoader resourceLoader, String qualifiedName, String fileName) {
         Optional<InputStream> config = readInput(resourceLoader, fileName);
         if (config.isPresent()) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Found PropertySource for file name: " + fileName);
+            }
             try (InputStream input = config.get()) {
                 return read(qualifiedName, input);
             } catch (IOException e) {
                 throw new ConfigurationException("I/O exception occurred reading [" + fileName + "]: " + e.getMessage(), e);
+            }
+        } else {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("No PropertySource found for file name: " + fileName);
             }
         }
         return Collections.emptyMap();

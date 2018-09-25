@@ -11,7 +11,7 @@ The built-in <<login, Login Controller>> uses every available authentication pro
 
 
 Micronaut ships with link:{api}/io/micronaut/security/authentication/providers/DelegatingAuthenticationProvider.html[DelegatingAuthenticationProvider] which can be typically used
-in environments such as the one described in the next diagramm.
+in environments such as the one described in the following diagram.
 
 image::delegating_authentication_provider.svg[]
 

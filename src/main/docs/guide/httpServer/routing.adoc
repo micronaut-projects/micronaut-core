@@ -163,3 +163,27 @@ include::{testsuite}/server/routes/MyRoutes.java[tags=class, indent=0]
 <3> Use methods such as link:{api}/io/micronaut/web/router/RouteBuilder.html#GET-java.lang.String-java.lang.Class-java.lang.String-java.lang.Class...-[GET] to route to controller methods
 
 TIP: Unfortunately due to type erasure a Java method lambda reference cannot be used with the API. For Groovy there is a `GroovyRouteBuilder` class which can be subclassed that allows passing Groovy method references.
+
+== Route Compile Time Validation
+
+Micronaut supports validating route arguments at compile time with the validation library. To get started simply add the `validation` dependency to your build:
+
+[source,groovy]
+.build.gradle
+----
+annotationProcessor "io.micronaut:validation" // for Java only
+compile "io.micronaut:validation"
+----
+
+NOTE: For Java this `validation` dependency will also need to be added to the `annotationProcessor` scope and for Kotlin the dependency will need to be added to to `kapt` scope.
+
+With the correct dependency on your classpath, route arguments will automatically be checked at compile time. The compilation will fail if any of the following conditions are met:
+
+* {blank}
+ The URI template contains a variable that is optional, but the method parameter is not annotated with `@Nullable` or is an `java.util.Optional`.
+
+An optional variable is one that will allow the route to match a URI even if the value is not present. For example `/foo{/bar}` will match requests to `/foo` and `/foo/abc`. The non optional variant would be `/foo/{bar}`. See the <<_uri_path_variables, URI Path Variables>> section for more information.
+
+* {blank}
+ The URI template contains a variable that is missing from the method arguments.
+

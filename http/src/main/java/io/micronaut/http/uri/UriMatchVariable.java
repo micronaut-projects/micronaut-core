@@ -61,6 +61,9 @@ public class UriMatchVariable {
     }
 
     /**
+     * An optional variable is one that will allow the route to match
+     * if it is not present.
+     *
      * @return True if the variable is optional
      */
     public boolean isOptional() {
