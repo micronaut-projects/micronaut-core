@@ -16,6 +16,9 @@
 
 package io.micronaut.http.server.netty.types;
 
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
+
 import java.util.Optional;
 
 /**
@@ -25,6 +28,8 @@ import java.util.Optional;
  * @author James Kleeh
  * @since 1.0
  */
+@Internal
+@Experimental
 public interface NettyCustomizableResponseTypeHandlerRegistry {
 
     /**
