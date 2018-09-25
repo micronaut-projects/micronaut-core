@@ -23,6 +23,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 
+import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.Optional;
 
@@ -63,19 +64,33 @@ public abstract class AbstractAnnotatedArgumentBinder<A extends Annotation, T, S
         ConvertibleValues<?> values,
         String annotationValue) {
 
+        return doConvert(doResolve(context, values, annotationValue), context);
+    }
+
+    /**
+     * Do resolve.
+     *
+     * @param context         context
+     * @param values          values
+     * @param annotationValue annotationValue
+     * @return result
+     */
+    @SuppressWarnings("unchecked")
+    protected @Nullable Object doResolve(
+            ArgumentConversionContext<T> context,
+            ConvertibleValues<?> values,
+            String annotationValue) {
+
         Object value = resolveValue(context, values, annotationValue);
         if (value == null) {
             String fallbackName = getFallbackFormat(context.getArgument());
             if (!annotationValue.equals(fallbackName)) {
                 annotationValue = fallbackName;
                 value = resolveValue(context, values, annotationValue);
-                if (value == null) {
-                    return BindingResult.EMPTY;
-                }
             }
         }
 
-        return doConvert(value, context);
+        return value;
     }
 
     /**
