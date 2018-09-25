@@ -135,4 +135,38 @@ class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
             }
         );
     }
+
+    /**
+     * @param <BT>           Bean type
+     * @param beanType       The bean type
+     * @param candidates     The candidates
+     * @param annotationName The annotation name
+     * @return A stream
+     */
+    protected <BT extends BeanType<T>> Stream<BT> reduceByName(Class<T> beanType, Stream<BT> candidates, String annotationName) {
+        return candidates.filter(candidate -> {
+                    String candidateName;
+                    if (candidate.isPrimary() && Primary.class.getSimpleName().equals(annotationName)) {
+                        return true;
+                    }
+                    if (candidate instanceof NameResolver) {
+                        candidateName = ((NameResolver) candidate).resolveName().orElse(candidate.getBeanType().getSimpleName());
+                    } else {
+                        Optional<String> annotation = candidate.getAnnotationMetadata().getValue(Named.class, String.class);
+                        candidateName = annotation.orElse(candidate.getBeanType().getSimpleName());
+                    }
+
+                    if (candidateName.equalsIgnoreCase(annotationName)) {
+                        return true;
+                    } else {
+
+                        String qualified = annotationName + beanType.getSimpleName();
+                        if (qualified.equals(candidateName)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+        );
+    }
 }

@@ -65,11 +65,12 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
         String v = annotationMetadata.getValue(Named.class, String.class).orElse(null);
         if (StringUtils.isNotEmpty(v)) {
             name = Character.toUpperCase(v.charAt(0)) + v.substring(1);
+            return reduceByName(beanType, candidates, name);
         } else {
             name = getName();
+            return reduceByAnnotation(beanType, candidates, name, qualifiedName);
         }
 
-        return reduceByAnnotation(beanType, candidates, name, qualifiedName);
     }
 
     @Override
