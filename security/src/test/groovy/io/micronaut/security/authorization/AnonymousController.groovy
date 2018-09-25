@@ -18,6 +18,8 @@ package io.micronaut.security.authorization
 import io.micronaut.context.annotation.Requires
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.security.authentication.Authentication
+import io.reactivex.Single
 
 import javax.annotation.Nullable
 import java.security.Principal
