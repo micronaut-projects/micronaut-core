@@ -16,6 +16,8 @@
 
 package io.micronaut.http.server.netty.types;
 
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
@@ -28,6 +30,8 @@ import io.netty.channel.ChannelHandlerContext;
  * @author James Kleeh
  * @since 1.0
  */
+@Internal
+@Experimental
 public interface NettyCustomizableResponseTypeHandler<T> extends Ordered {
 
     /**
