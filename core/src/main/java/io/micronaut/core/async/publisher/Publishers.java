@@ -24,11 +24,7 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -45,29 +41,36 @@ import java.util.function.Supplier;
 public class Publishers {
 
     @SuppressWarnings("ConstantName")
-    static final List<Class<?>> reactiveTypes = new ArrayList<>(3);
+    private static final List<Class<?>> REACTIVE_TYPES = new ArrayList<>(3);
     @SuppressWarnings("ConstantName")
-    static final List<Class<?>> singleTypes = new ArrayList<>(3);
+    private static final List<Class<?>> SINGLE_TYPES = new ArrayList<>(3);
 
     static {
         ClassLoader classLoader = Publishers.class.getClassLoader();
-        Publishers.singleTypes.add(CompletableFuturePublisher.class);
-        Publishers.singleTypes.add(JustPublisher.class);
+        Publishers.SINGLE_TYPES.add(CompletableFuturePublisher.class);
+        Publishers.SINGLE_TYPES.add(JustPublisher.class);
         List<String> typeNames = Arrays.asList(
             "io.reactivex.Observable",
             "reactor.core.publisher.Flux"
         );
         for (String name : typeNames) {
             Optional<Class> aClass = ClassUtils.forName(name, classLoader);
-            aClass.ifPresent(Publishers.reactiveTypes::add);
+            aClass.ifPresent(Publishers.REACTIVE_TYPES::add);
         }
         for (String name : Arrays.asList("io.reactivex.Single", "reactor.core.publisher.Mono", "io.reactivex.Maybe")) {
             Optional<Class> aClass = ClassUtils.forName(name, classLoader);
             aClass.ifPresent(aClass1 -> {
-                Publishers.singleTypes.add(aClass1);
-                Publishers.reactiveTypes.add(aClass1);
+                Publishers.SINGLE_TYPES.add(aClass1);
+                Publishers.REACTIVE_TYPES.add(aClass1);
             });
         }
+    }
+
+    /**
+     * @return A list of known reactive types.
+     */
+    public static List<Class<?>> getKnownReactiveTypes() {
+        return Collections.unmodifiableList(REACTIVE_TYPES);
     }
 
     /**
@@ -244,7 +247,7 @@ public class Publishers {
         if (Publisher.class.isAssignableFrom(type)) {
             return true;
         } else {
-            for (Class<?> reactiveType : reactiveTypes) {
+            for (Class<?> reactiveType : REACTIVE_TYPES) {
                 if (reactiveType.isAssignableFrom(type)) {
                     return true;
                 }
@@ -299,7 +302,7 @@ public class Publishers {
      * @return True it does
      */
     public static boolean isSingle(Class<?> type) {
-        for (Class<?> reactiveType : singleTypes) {
+        for (Class<?> reactiveType : SINGLE_TYPES) {
             if (reactiveType.isAssignableFrom(type)) {
                 return true;
             }

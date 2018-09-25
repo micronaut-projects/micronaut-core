@@ -10,7 +10,7 @@ GORM supports the following different multitenancy modes:
 
 - `DISCRIMINATOR` - The same database is used with a discriminator used to partition and isolate data.
 
-In order to use GORM - Multitenancy you will need to configure the next properties: `grails.gorm.multiTenancy.mode` and `grails.gorm.multiTenancy.tenantResolverClass`.
+In order to use GORM - Multitenancy you will need to configure the following properties: `grails.gorm.multiTenancy.mode` and `grails.gorm.multiTenancy.tenantResolverClass`.
 
 Micronaut support for Multi-tenancy integrates with GORM.
 

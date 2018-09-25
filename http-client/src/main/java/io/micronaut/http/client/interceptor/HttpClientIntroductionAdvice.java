@@ -21,6 +21,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.context.BeanContext;
@@ -356,9 +359,23 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                         request, publisherArgument
                                 );
                             } else {
-                                publisher = streamingHttpClient.dataStream(
+                                Publisher<ByteBuffer<?>> byteBufferPublisher = streamingHttpClient.dataStream(
                                         request
                                 );
+                                if (argumentType == ByteBuffer.class) {
+                                    publisher = byteBufferPublisher;
+                                } else {
+                                    if (ConversionService.SHARED.canConvert(ByteBuffer.class, argumentType)) {
+                                        // It would be nice if we could capture the TypeConverter here
+                                        publisher = Flowable.fromPublisher(byteBufferPublisher)
+                                                .map(value -> ConversionService.SHARED.convert(value, argumentType).get());
+                                    } else {
+                                        throw new ConfigurationException("Cannot create the generated HTTP client's " +
+                                                "required return type, since no TypeConverter from ByteBuffer to " +
+                                                argumentType + " is registered");
+                                    }
+                                }
+
                             }
                         }
                     }

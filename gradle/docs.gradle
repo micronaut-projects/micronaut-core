@@ -161,6 +161,7 @@ task publishGuide(type: grails.doc.gradle.PublishGuide) {
             'source-highlighter':'highlightjs',
             'version': project.version,
             'subtitle': project.projectDesc,
+            'github': 'https://github.com/micronaut-projects/micronaut-core',
             'api': '../api',
             'sourceDir':rootProject.projectDir.absolutePath,
             'sourcedir':rootProject.projectDir.absolutePath,

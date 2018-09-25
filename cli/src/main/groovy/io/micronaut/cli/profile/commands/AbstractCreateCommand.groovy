@@ -114,6 +114,13 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             def profile = createCommand.profileRepository.getProfile(createCommand.profile ?: createCommand.getDefaultProfile())
             def featureNames = profile.features.collect() { Feature f -> f.name }
 
+            if (createCommand instanceof AbstractCreateAppCommand) {
+                String lang = createCommand.lang?.name() ?: 'java'
+                Collection<SupportedLanguage> otherLangs = SupportedLanguage.values().findAll() { it.name() != lang}
+                for(o in otherLangs) {
+                    featureNames.removeIf({String n -> n.contains("-${o.name()}")})
+                }
+            }
             // if no feature specified, show all features for the selected profile
             if (!createCommand.features) {
                 return featureNames.iterator()
@@ -390,38 +397,38 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
     protected void replaceBuildTokens(String build, Profile profile, List<Feature> features, File targetDirectory) {
         AntBuilder ant = new ConsoleAntBuilder()
 
+        List<String> requestedFeatureNames = features.findAll { it.requested }*.name
+        List<String> allFeatureNames = features*.name
+        String testFramework = null
+        String sourceLanguage = null
+
+        if (profile.name != "profile") {
+
+            if (requestedFeatureNames) {
+                testFramework = evaluateTestFramework(requestedFeatureNames)
+                sourceLanguage = evaluateSourceLanguage(requestedFeatureNames)
+            }
+
+            if (!testFramework) {
+                testFramework = evaluateTestFramework(allFeatureNames)
+            }
+
+            if (!sourceLanguage) {
+                sourceLanguage = evaluateSourceLanguage(allFeatureNames)
+            }
+
+        }
+
         Map tokens
         if (build == "gradle") {
-            tokens = new GradleBuildTokens().getTokens(profile, features)
+            tokens = new GradleBuildTokens(sourceLanguage, testFramework).getTokens(profile, features)
         }
         if (build == "maven") {
-            tokens = new MavenBuildTokens().getTokens(profile, features)
+            tokens = new MavenBuildTokens(sourceLanguage, testFramework).getTokens(profile, features)
         }
 
-        if (tokens) {
-            List<String> requestedFeatureNames = features.findAll { it.requested }*.name
-            List<String> allFeatureNames = features*.name
-
-            if (profile.name != "profile") {
-                String testFramework = null
-                String sourceLanguage = null
-
-                if (requestedFeatureNames) {
-                    testFramework = evaluateTestFramework(requestedFeatureNames)
-                    sourceLanguage = evaluateSourceLanguage(requestedFeatureNames)
-                }
-
-                if (!testFramework) {
-                    testFramework = evaluateTestFramework(allFeatureNames)
-                }
-
-                if (!sourceLanguage) {
-                    sourceLanguage = evaluateSourceLanguage(allFeatureNames)
-                }
-
-                tokens.put("testFramework", testFramework)
-                tokens.put("sourceLanguage", sourceLanguage)
-            }
+        if (tokens == null) {
+            return
         }
 
         ant.replace(dir: targetDirectory) {

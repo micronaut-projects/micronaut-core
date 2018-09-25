@@ -45,15 +45,10 @@ public class TenantPropagationConfigurationProperties implements TenantPropagati
     public static final String DEFAULT_PATH = "/**";
 
     private boolean enabled = DEFAULT_ENABLED;
-
     private String serviceIdRegex;
-
     private String uriRegex;
-
-    Pattern serviceIdPattern;
-
-    Pattern uriPattern;
-
+    private Pattern serviceIdPattern;
+    private Pattern uriPattern;
     private String path = DEFAULT_PATH;
 
     /**

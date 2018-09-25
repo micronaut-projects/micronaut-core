@@ -46,10 +46,8 @@ class LoadedVisitor {
     private final TypeElementVisitor visitor
     private final String classAnnotation
     private final String elementAnnotation
-    private final GroovyVisitorContext visitorContext
 
-    LoadedVisitor(TypeElementVisitor visitor, GroovyVisitorContext visitorContext) {
-        this.visitorContext = visitorContext
+    LoadedVisitor(TypeElementVisitor visitor) {
         this.visitor = visitor
         ClassNode classNode = ClassHelper.make(visitor.getClass())
         ClassNode definition = classNode.getAllInterfaces().find {
@@ -64,9 +62,6 @@ class LoadedVisitor {
         visitor
     }
 
-    GroovyVisitorContext getVisitorContext() {
-        visitorContext
-    }
 
     boolean equals(o) {
         if (this.is(o)) return true
@@ -115,8 +110,9 @@ class LoadedVisitor {
      *
      * @param annotatedNode The node to visit
      * @param annotationMetadata The annotation data for the node
+     * @param visitorContext the Groovy visitor context
      */
-    void visit(AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
+    void visit(AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata, GroovyVisitorContext visitorContext) {
         switch (annotatedNode.getClass()) {
             case FieldNode:
             case PropertyNode:
@@ -139,11 +135,11 @@ class LoadedVisitor {
         }
     }
 
-    void start() {
+    void start(GroovyVisitorContext visitorContext) {
         visitor.start(visitorContext)
     }
 
-    void finish() {
+    void finish(GroovyVisitorContext visitorContext) {
         visitor.finish(visitorContext)
     }
 }

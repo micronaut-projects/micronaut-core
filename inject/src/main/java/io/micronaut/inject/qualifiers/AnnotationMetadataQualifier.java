@@ -35,6 +35,7 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
 
     private final AnnotationMetadata annotationMetadata;
     private final Class<? extends Annotation> annotationType;
+    private final String qualifiedName;
 
     /**
      * @param metadata The annotation metadata
@@ -44,6 +45,7 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
         super(name);
         this.annotationMetadata = metadata;
         this.annotationType = null;
+        this.qualifiedName = null;
     }
 
     /**
@@ -54,6 +56,7 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
         super(annotationType.getSimpleName());
         this.annotationMetadata = metadata;
         this.annotationType = annotationType;
+        this.qualifiedName = annotationType.getName();
     }
 
     @Override
@@ -66,7 +69,7 @@ class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
             name = getName();
         }
 
-        return reduceByAnnotation(beanType, candidates, name);
+        return reduceByAnnotation(beanType, candidates, name, qualifiedName);
     }
 
     @Override

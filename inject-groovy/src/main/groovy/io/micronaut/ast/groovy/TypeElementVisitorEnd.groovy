@@ -18,6 +18,7 @@ package io.micronaut.ast.groovy
 
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstMessageUtils
+import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.control.CompilePhase
@@ -42,7 +43,7 @@ class TypeElementVisitorEnd implements ASTTransformation {
         if (loadedVisitors != null) {
             for(loadedVisitor in loadedVisitors.values()) {
                 try {
-                    loadedVisitor.finish()
+                    loadedVisitor.finish(new GroovyVisitorContext(source))
                 } catch (Throwable e) {
                     AstMessageUtils.error(
                             source,

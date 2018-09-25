@@ -31,6 +31,7 @@ import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
 
+import java.util.Collections;
 import java.util.Optional;
 
 /**
@@ -75,13 +76,24 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
                         .findFirst()
                         .map(UriMatchVariable::isExploded)).orElse(false);
 
+
         BindingResult<T> result;
         // if the annotation is present or the HTTP method doesn't allow a request body
         // attempt to bind from request parameters. This avoids allowing the request URI to
         // be manipulated to override POST or JSON variables
         if (hasAnnotation || !permitsRequestBody) {
             if (bindAll) {
-                result = doConvert(parameters.asMap(), context);
+                Object value;
+                // Only maps and POJOs will "bindAll", lists work like normal
+                if (Iterable.class.isAssignableFrom(argument.getType())) {
+                    value = doResolve(context, parameters, parameterName);
+                    if (value == null) {
+                        value = Collections.emptyList();
+                    }
+                } else {
+                    value = parameters.asMap();
+                }
+                result = doConvert(value, context);
             } else {
                 result = doBind(context, parameters, parameterName);
             }
