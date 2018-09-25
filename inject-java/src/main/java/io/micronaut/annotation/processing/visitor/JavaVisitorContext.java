@@ -66,7 +66,7 @@ public class JavaVisitorContext extends MutableConvertibleValuesMap<Object> impl
     }
 
     @Override
-    public void info(String message, io.micronaut.inject.visitor.Element element) {
+    public void info(String message, io.micronaut.inject.ast.Element element) {
         if (StringUtils.isNotEmpty(message)) {
             Element el = (Element) element.getNativeType();
             messager.printMessage(Diagnostic.Kind.NOTE, message, el);
@@ -81,13 +81,13 @@ public class JavaVisitorContext extends MutableConvertibleValuesMap<Object> impl
     }
 
     @Override
-    public void fail(String message, io.micronaut.inject.visitor.Element element) {
+    public void fail(String message, io.micronaut.inject.ast.Element element) {
         Element el = (Element) element.getNativeType();
         messager.printMessage(Diagnostic.Kind.ERROR, message, el);
     }
 
     @Override
-    public void warn(String message, io.micronaut.inject.visitor.Element element) {
+    public void warn(String message, io.micronaut.inject.ast.Element element) {
         Element el = (Element) element.getNativeType();
         messager.printMessage(Diagnostic.Kind.WARNING, message, el);
     }

@@ -17,7 +17,7 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.inject.visitor.FieldElement;
+import io.micronaut.inject.ast.FieldElement;
 import org.codehaus.groovy.ast.Variable;
 
 import java.lang.reflect.Modifier;

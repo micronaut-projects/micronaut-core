@@ -17,13 +17,10 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.PublicMethodVisitor;
-import io.micronaut.annotation.processing.SuperclassAwareTypeVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.inject.visitor.ClassElement;
-import io.micronaut.inject.visitor.Element;
-import io.micronaut.inject.visitor.PropertyElement;
-import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.PropertyElement;
 
 import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
@@ -205,32 +202,6 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
             return Collections.unmodifiableMap(map);
         }
         return Collections.emptyMap();
-    }
-
-    @Override
-    public List<Element> getElements(VisitorContext visitorContext) {
-        List<Element> elements = new ArrayList<>();
-        JavaVisitorContext ctx = (JavaVisitorContext) visitorContext;
-
-        classElement.asType().accept(new SuperclassAwareTypeVisitor<Object, Object>() {
-            @Override
-            protected boolean isAcceptable(javax.lang.model.element.Element element) {
-                return true;
-            }
-
-            @Override
-            protected void accept(DeclaredType type, javax.lang.model.element.Element element, Object o) {
-                AnnotationMetadata metadata = ctx.getAnnotationUtils().getAnnotationMetadata(element);
-                if (element.getKind() == ElementKind.FIELD) {
-                    elements.add(new JavaFieldElement((VariableElement) element, metadata));
-                }
-                if (element.getKind() == ElementKind.METHOD) {
-                    elements.add(new JavaMethodElement((ExecutableElement) element, metadata, ctx));
-                }
-            }
-        }, null);
-
-        return elements;
     }
 
     /**

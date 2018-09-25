@@ -2,6 +2,7 @@ package io.micronaut.inject.visitor
 
 import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
+import io.micronaut.inject.ast.EnumElement
 
 class ClassElementSpec extends AbstractBeanDefinitionSpec {
 

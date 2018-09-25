@@ -16,6 +16,11 @@
 
 package io.micronaut.inject.visitor;
 
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MethodElement;
+
 import javax.inject.Inject;
 import java.util.*;
 

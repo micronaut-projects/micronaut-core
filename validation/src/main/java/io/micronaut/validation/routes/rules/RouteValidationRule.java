@@ -17,7 +17,7 @@
 package io.micronaut.validation.routes.rules;
 
 import io.micronaut.http.uri.UriMatchTemplate;
-import io.micronaut.inject.visitor.ParameterElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.validation.routes.RouteValidationResult;
 
 /**

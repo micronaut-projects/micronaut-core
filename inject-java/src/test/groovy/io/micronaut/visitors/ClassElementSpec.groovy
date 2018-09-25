@@ -1,7 +1,7 @@
 package io.micronaut.visitors
 
 import io.micronaut.inject.AbstractTypeElementSpec
-import io.micronaut.inject.visitor.EnumElement
+import io.micronaut.inject.ast.EnumElement
 
 class ClassElementSpec extends AbstractTypeElementSpec {
 

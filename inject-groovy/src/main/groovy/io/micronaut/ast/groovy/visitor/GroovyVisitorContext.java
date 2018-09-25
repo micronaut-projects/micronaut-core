@@ -17,7 +17,7 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.inject.visitor.Element;
+import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;

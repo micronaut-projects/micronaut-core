@@ -14,27 +14,22 @@
  * limitations under the License.
  */
 
-package io.micronaut.inject.visitor;
+package io.micronaut.inject.ast;
 
-import javax.annotation.Nullable;
+import java.util.List;
 
 /**
- * A property element represents a JavaBean property on a {@link ClassElement}.
+ * Models an enum type.
  *
  * @author graemerocher
  * @since 1.0
  */
-public interface PropertyElement extends Element {
-    /**
-     * @return The type of the property
-     */
-    @Nullable
-    ClassElement getType();
+public interface EnumElement extends ClassElement {
 
     /**
-     * Return true only if the property has a getter but no setter.
+     * The values that make up this enum.
      *
-     * @return True if the property is read only.
+     * @return The values
      */
-    boolean isReadOnly();
+    List<String> values();
 }

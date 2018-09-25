@@ -21,7 +21,7 @@ import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.http.annotation.HttpMethodMapping;
 import io.micronaut.http.uri.UriMatchTemplate;
-import io.micronaut.inject.visitor.MethodElement;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.validation.routes.rules.MissingParameterRule;

@@ -18,7 +18,7 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
-import io.micronaut.inject.visitor.ClassElement;
+import io.micronaut.inject.ast.ClassElement;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -34,7 +34,7 @@ import java.util.Locale;
  * @author James Kleeh
  * @since 1.0
  */
-public abstract class AbstractJavaElement implements io.micronaut.inject.visitor.Element, AnnotationMetadataDelegate {
+public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Element, AnnotationMetadataDelegate {
 
     private final Element element;
     private final AnnotationMetadata annotationMetadata;

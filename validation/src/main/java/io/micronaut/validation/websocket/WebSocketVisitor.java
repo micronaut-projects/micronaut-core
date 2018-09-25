@@ -19,6 +19,9 @@ package io.micronaut.validation.websocket;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.*;
 import io.micronaut.websocket.annotation.*;
 

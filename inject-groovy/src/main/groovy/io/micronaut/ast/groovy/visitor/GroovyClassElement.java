@@ -22,12 +22,9 @@ import io.micronaut.ast.groovy.utils.AstGenericUtils;
 import io.micronaut.ast.groovy.utils.PublicMethodVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.inject.visitor.ClassElement;
-import io.micronaut.inject.visitor.Element;
-import io.micronaut.inject.visitor.PropertyElement;
-import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.PropertyElement;
 import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.FieldNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.PropertyNode;
 import java.lang.reflect.Modifier;
@@ -223,35 +220,6 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
     @Override
     public boolean isAssignable(String type) {
         return AstClassUtils.isSubclassOf(classNode, type);
-    }
-
-    @Override
-    public List<Element> getElements(VisitorContext visitorContext) {
-        List<Element> elements = new ArrayList<>();
-        new PublicMethodVisitor(((GroovyVisitorContext) visitorContext).getSourceUnit()) {
-
-            private final Set<String> processed = new HashSet<>();
-
-            protected boolean isAcceptable(MethodNode node) {
-                return true;
-            }
-
-            public void visitField(FieldNode node) {
-                super.visitField(node);
-                String key = node.getText();
-                if (!processed.contains(key)) {
-                    processed.add(key);
-                    elements.add(new GroovyFieldElement(node, AstAnnotationUtils.getAnnotationMetadata(node)));
-                }
-            }
-
-            @Override
-            public void accept(ClassNode classNode, MethodNode methodNode) {
-                elements.add(new GroovyMethodElement(methodNode, AstAnnotationUtils.getAnnotationMetadata(methodNode)));
-            }
-        }.accept(classNode);
-
-        return elements;
     }
 
     /**

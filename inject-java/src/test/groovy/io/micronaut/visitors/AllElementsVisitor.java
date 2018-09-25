@@ -17,10 +17,10 @@
 package io.micronaut.visitors;
 
 import io.micronaut.http.annotation.Controller;
-import io.micronaut.inject.visitor.ClassElement;
-import io.micronaut.inject.visitor.Element;
-import io.micronaut.inject.visitor.FieldElement;
-import io.micronaut.inject.visitor.MethodElement;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 

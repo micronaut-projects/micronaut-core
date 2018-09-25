@@ -16,6 +16,11 @@
 
 package io.micronaut.inject.visitor;
 
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.MethodElement;
+
 /**
  * Provides a hook into the compilation process to allow user defined functionality to be created at compile time.
  *
