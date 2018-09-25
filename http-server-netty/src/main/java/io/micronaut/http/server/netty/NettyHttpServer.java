@@ -69,6 +69,7 @@ import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.netty.handler.flow.FlowControlHandler;
 import io.netty.handler.logging.LoggingHandler;
 import io.netty.handler.ssl.SslContext;
+import io.netty.handler.stream.ChunkedWriteHandler;
 import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GlobalEventExecutor;
@@ -104,6 +105,7 @@ import java.util.function.BiConsumer;
 @Singleton
 public class NettyHttpServer implements EmbeddedServer, WebSocketSessionRepository {
     public static final String HTTP_STREAMS_CODEC = "http-streams-codec";
+    public static final String HTTP_CHUNKED_HANDLER = "http-chunked-handler";
     @SuppressWarnings("WeakerAccess")
     public static final String HTTP_CODEC = "http-codec";
     @SuppressWarnings("WeakerAccess")
@@ -260,6 +262,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                         pipeline.addLast(HTTP_KEEP_ALIVE_HANDLER, new HttpServerKeepAliveHandler());
                         pipeline.addLast(HTTP_COMPRESSOR, new SmartHttpContentCompressor());
                         pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
+                        pipeline.addLast(HTTP_CHUNKED_HANDLER, new ChunkedWriteHandler());
                         pipeline.addLast(HttpRequestDecoder.ID, new HttpRequestDecoder(
                                 NettyHttpServer.this,
                                 environment,
