@@ -51,7 +51,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
         config.multipart.maxFileSize == 2048
         config.childOptions.size() == 1
         config.childOptions.keySet().first() instanceof ChannelOption
-        !config.host.isPresent()
+        config.host.get() == "localhost"
         config.parent.numOfThreads == 8
         config.worker.numOfThreads == 8
 
@@ -61,6 +61,36 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
         then:
         server != null
+
+        cleanup:
+        beanContext.close()
+    }
+
+    void "test all host netty server configuration"() {
+        given:
+        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        beanContext.environment.addPropertySource(PropertySource.of("test",
+                ['micronaut.server.netty.childOptions.autoRead':'true',
+                 'micronaut.server.netty.worker.threads':8,
+                 'micronaut.server.netty.parent.threads':8,
+                 'micronaut.server.multipart.maxFileSize':2048,
+                 'micronaut.server.maxRequestSize':'2MB',
+                 'micronaut.server.host':'*']
+
+        ))
+        beanContext.start()
+
+        when:
+        NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
+
+        then:
+        config.maxRequestSize == 2097152
+        config.multipart.maxFileSize == 2048
+        config.childOptions.size() == 1
+        config.childOptions.keySet().first() instanceof ChannelOption
+        !config.host.isPresent()
+        config.parent.numOfThreads == 8
+        config.worker.numOfThreads == 8
 
         cleanup:
         beanContext.close()
