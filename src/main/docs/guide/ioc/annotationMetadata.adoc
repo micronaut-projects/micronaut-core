@@ -23,7 +23,7 @@ for(BeanDefinition definition : definitions) {
 
 The above example will find all api:inject.BeanDefinition[] annotated with `@Controller` regardless whether `@Controller` is used directly or inherited via an annotation stereotype.
 
-Note that the `getAnnotation` method and the variations of the method return a api:core.annotation.AnnotationValue[] type and not a Java annotation. This is by design, and you should generally try to work with this API when reading annotation values.
+Note that the `getAnnotation` method and the variations of the method return a api:core.annotation.AnnotationValue[] type and not a Java annotation. This is by design, and you should generally try to work with this API when reading annotation values, the reason being that synthesizing a proxy implementation is worse from a performance and memory consumption perspective.
 
 If you absolutely require a reference to an annotation instance you can use the `synthesize` method, which will create a runtime proxy that implements the annotation interface:
 
@@ -35,5 +35,42 @@ Controller controllerAnn = definition.synthesize(Controller.class);
 
 This approach is not recommended however, as it requires reflection and increases memory consumption due to the use of runtime created proxies and should be used as a last resort (for example if you need to an instance of the annotation to integrate with a third party library).
 
-Like Spring, Micronaut also supports an link:{api}/io/micronaut/context/annotation/AliasFor.html[@AliasFor] annotation that allows an annotation member to represent the value of another annotation member.
+=== Aliasing / Mapping Annotations
 
+There are times when you may want to alias the value one of annotation member to the value of annotation annotation member. To do this you can use the ann:io.micronaut.context.annotation.AliasFor[] annotation to alias the value of one member to the value of another.
+
+A common use case is for example when an annotation defines `value()` member, but also supports other members. For example the ann:io.micronaut.http.client.annotation.Client[] annotation:
+
+.The @Client Annotation
+[source,java]
+----
+include::http-client/src/main/java/io/micronaut/http/client/annotation/Client.java[tag=value]
+}
+----
+
+<1> The `value` member also sets the `id` member
+<2> The `id` member also sets the `value` member
+
+With these aliases in place, regardless whether you define `@Client("foo")` or `@Client(id="foo")` both the `value` and `id` members are always set, making it much easier to parse and deal with the annotation.
+
+
+If you do not have control over the annotation then another approach is to use a api:io.micronaut.inject.annotation.AnnotationMapper[]. To create a `AnnotationMapper` you must following the following steps:
+
+* Implement the api:io.micronaut.inject.annotation.AnnotationMapper[] interface
+* Define a `META-INF/services/io.micronaut.inject.annotation.AnnotationMapper` file referencing the implementation class
+* Add the JAR file containing the implementation to the `annotationProcessor` classpath (`kapt` for Kotlin)
+
+NOTE: Because `AnnotationMapper` implementations need to be on the annotation processor classpath they should generally be in a project that includes few external dependencies to avoid polluting the annotation processor classpath.
+
+As an example the the `AnnotationMapper` that maps the `javax.annotation.security.PermitAll` standard Java annotation to the internal Micronaut `Secured` annotation looks like the following:
+
+.PermitAllAnnotationMapper Mapper Example
+[source,java]
+----
+include::security/src/main/java/io/micronaut/security/annotation/PermitAllAnnotationMapper.java[tag=clazz]
+----
+
+<1> The annotation type to be mapped is specified as a generic type argument.
+<2> The `map` method receives a api:io.micronaut.core.annotation.AnnotationValue[] with the values for the annotation.
+<3> One or more annotations can be returned, in this case `@Secured`.
+<4> Annotations values can be provided.

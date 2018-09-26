@@ -44,20 +44,21 @@ import java.lang.annotation.Retention;
 @Type(HttpClientIntroductionAdvice.class)
 @Recoverable
 @Singleton
+// tag::value[]
 public @interface Client {
 
     /**
      * @return The URL or service ID of the remote service
      */
-    @AliasFor(member = "id")
+    @AliasFor(member = "id") // <1>
     String value() default "";
 
     /**
      * @return The ID of the client
      */
-    @AliasFor(member = "value")
+    @AliasFor(member = "value") // <2>
     String id() default "";
-
+// end::value[]
     /**
      * The base URI for the client.
      *
