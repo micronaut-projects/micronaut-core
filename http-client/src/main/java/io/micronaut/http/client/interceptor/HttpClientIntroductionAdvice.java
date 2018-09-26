@@ -293,7 +293,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             if (body != null) {
                 request.body(body);
 
-                MediaType[] contentTypes = context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
+                MediaType[] contentTypes = context.getValue(Consumes.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
                 if (ArrayUtils.isNotEmpty(contentTypes)) {
                     request.contentType(contentTypes[0]);
                 }
@@ -314,7 +314,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             cookies.forEach(request::cookie);
 
-            MediaType[] acceptTypes = context.getValue(Consumes.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
+            MediaType[] acceptTypes = context.getValue(Produces.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
 
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
             final Class<?> methodDeclaringType = declaringType;
