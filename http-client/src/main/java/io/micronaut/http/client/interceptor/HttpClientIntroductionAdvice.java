@@ -76,12 +76,7 @@ import java.io.Closeable;
 import java.lang.annotation.Annotation;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
@@ -639,10 +634,15 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     sb.append('&');
                 }
 
-                for (Map.Entry<String, String> entry: queryParams.entrySet()) {
+                Iterator<Map.Entry<String, String>> iterator = queryParams.entrySet().iterator();
+                while (iterator.hasNext()) {
+                    Map.Entry<String, String> entry = iterator.next();
                     sb.append(entry.getKey());
                     sb.append('=');
                     sb.append(entry.getValue());
+                    if (iterator.hasNext()) {
+                        sb.append('&');
+                    }
                 }
 
                 return new URI(oldUri.getScheme(), oldUri.getAuthority(), oldUri.getPath(),
