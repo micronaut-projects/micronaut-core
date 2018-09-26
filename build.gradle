@@ -70,7 +70,7 @@ ext {
             jaeger: [
                     version: jaegerVersion,
                     group:'io.jaegertracing',
-                    name:'jaeger-core'
+                    name:'jaeger-thrift'
             ],
             'javax.annotation-api': [
                     version: javaxAnnotationApiVersion,

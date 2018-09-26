@@ -38,7 +38,7 @@ To send tracing spans to Jaeger the minimal configuration requires you add the f
 .Adding Jaeger Dependencies
 [source,groovy]
 ----
-compile 'io.jaegertracing:jaeger-core:0.27.0'
+compile 'io.jaegertracing:jaeger-thrift:0.31.0'
 ----
 
 Then you need to enable Jaeger tracing in your configuration (potentially only your production configuration):
