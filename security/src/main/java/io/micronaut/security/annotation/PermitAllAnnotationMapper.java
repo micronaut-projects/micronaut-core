@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package io.micronaut.security;
+package io.micronaut.security.annotation;
 
-import io.micronaut.core.annotation.AnnotationMapper;
+import io.micronaut.inject.annotation.AnnotationMapper;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.security.annotation.Secured;
+import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.security.rules.SecurityRule;
 
 import javax.annotation.security.PermitAll;
@@ -38,7 +38,7 @@ public class PermitAllAnnotationMapper implements AnnotationMapper<PermitAll> {
     }
 
     @Override
-    public List<AnnotationValue<?>> map(AnnotationValue<PermitAll> annotation) {
+    public List<AnnotationValue<?>> map(AnnotationValue<PermitAll> annotation, VisitorContext visitorContext) {
         List<AnnotationValue<?>> annotationValues = new ArrayList<>(1);
         annotationValues.add(
                 AnnotationValue.builder(Secured.class)

@@ -119,10 +119,11 @@ import java.lang.reflect.Modifier
 class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
     CompilationUnit unit
-    ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder = new GroovyConfigurationMetadataBuilder()
+    ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder
 
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
+        configurationMetadataBuilder = new GroovyConfigurationMetadataBuilder(source)
         ModuleNode moduleNode = source.getAST()
         Map<AnnotatedNode, BeanDefinitionVisitor> beanDefinitionWriters = [:]
         File classesDir = source.configuration.targetDirectory
@@ -134,8 +135,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             ClassNode classNode = classes[0]
             if (classNode.nameWithoutPackage == 'package-info') {
                 PackageNode packageNode = classNode.getPackage()
-                if (AstAnnotationUtils.hasStereotype(packageNode, Configuration)) {
-                    BeanConfigurationWriter writer = new BeanConfigurationWriter(classNode.packageName, AstAnnotationUtils.getAnnotationMetadata(packageNode))
+                if (AstAnnotationUtils.hasStereotype(source, packageNode, Configuration)) {
+                    BeanConfigurationWriter writer = new BeanConfigurationWriter(classNode.packageName, AstAnnotationUtils.getAnnotationMetadata(source, packageNode))
                     try {
                         writer.accept(outputVisitor)
                         outputVisitor.finish()
@@ -153,7 +154,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 continue
             } else {
                 if (classNode.isInterface()) {
-                    if (AstAnnotationUtils.hasStereotype(classNode, InjectVisitor.INTRODUCTION_TYPE)) {
+                    if (AstAnnotationUtils.hasStereotype(source, classNode, InjectVisitor.INTRODUCTION_TYPE)) {
                         InjectVisitor injectVisitor = new InjectVisitor(source, classNode, configurationMetadataBuilder)
                         injectVisitor.visitClass(classNode)
                         beanDefinitionWriters.putAll(injectVisitor.beanDefinitionWriters)
@@ -192,7 +193,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 )
 
                 beanReferenceWriter.setRequiresMethodProcessing(beanDefWriter.requiresMethodProcessing())
-                beanReferenceWriter.setContextScope(AstAnnotationUtils.hasStereotype(beanClassNode, Context))
+                beanReferenceWriter.setContextScope(AstAnnotationUtils.hasStereotype(source, beanClassNode, Context))
                 beanDefWriter.visitBeanDefinitionEnd()
                 if (classesDir != null) {
                     beanReferenceWriter.accept(outputVisitor)
@@ -303,7 +304,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             this.sourceUnit = sourceUnit
             this.configurationMetadataBuilder = configurationMetadataBuilder
             this.concreteClass = targetClassNode
-            def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(targetClassNode)
+            def annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, targetClassNode)
             this.annotationMetadata = annotationMetadata
             this.isFactoryClass = annotationMetadata.hasStereotype(Factory)
             this.isAopProxyType = annotationMetadata.hasStereotype(AROUND_TYPE) && !targetClassNode.isAbstract()
@@ -341,7 +342,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         @Override
         void visitClass(ClassNode node) {
-            AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(node)
+            AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, node)
             if (annotationMetadata.hasStereotype(INTRODUCTION_TYPE)) {
                 String packageName = node.packageName
                 String beanClassName = node.nameWithoutPackage
@@ -414,7 +415,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                             }
                         }
                     }
-                } else if (AstAnnotationUtils.hasStereotype(ann.classNode, Introduction)) {
+                } else if (AstAnnotationUtils.hasStereotype(sourceUnit, ann.classNode, Introduction)) {
                     populateIntroducedInterfaces(ann.classNode.annotations, interfacesToVisit)
                 }
             }
@@ -449,7 +450,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                     AnnotationMetadata annotationMetadata
                     if (AstAnnotationUtils.isAnnotated(methodNode) || AstAnnotationUtils.hasAnnotation(methodNode, Override)) {
-                        annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(node, methodNode)
+                        annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, node, methodNode)
                     } else {
                         annotationMetadata = new AnnotationMetadataReference(
                                 aopProxyWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
@@ -496,9 +497,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
             String methodName = methodNode.name
             ClassNode declaringClass = methodNode.declaringClass
-            AnnotationMetadata methodAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(methodNode)
+            AnnotationMetadata methodAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, methodNode)
             if (isFactoryClass && !isConstructor && methodAnnotationMetadata.hasDeclaredStereotype(Bean, Scope)) {
-                methodAnnotationMetadata = new GroovyAnnotationMetadataBuilder().buildForMethod(methodNode)
+                methodAnnotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit).buildForMethod(methodNode)
                 ClassNode producedType = methodNode.returnType
                 String beanDefinitionPackage = concreteClass.packageName
                 String upperCaseMethodName = NameUtils.capitalize(methodNode.getName())
@@ -589,7 +590,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 targetMethodGenericTypeMap)
                             AnnotationMetadata annotationMetadata
                             if (AstAnnotationUtils.isAnnotated(methodNode)) {
-                                annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(methodNode, targetBeanMethodNode)
+                                annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, methodNode, targetBeanMethodNode)
                             } else {
                                 annotationMetadata = new AnnotationMetadataReference(
                                         beanMethodWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
@@ -656,7 +657,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         boolean packagesDiffer = overriddenMethod.declaringClass.packageName != declaringClass.packageName
                         boolean isPackagePrivateAndPackagesDiffer = overridden && packagesDiffer && isPackagePrivate
                         boolean requiresReflection = isPrivate || isPackagePrivateAndPackagesDiffer
-                        boolean overriddenInjected = overridden && AstAnnotationUtils.hasStereotype(overriddenMethod, Inject)
+                        boolean overriddenInjected = overridden && AstAnnotationUtils.hasStereotype(sourceUnit, overriddenMethod, Inject)
 
                         if (isParent && isPackagePrivate && !isPackagePrivateAndPackagesDiffer && overriddenInjected) {
                             // bail out if the method has been overridden by another method annotated with @INject
@@ -811,7 +812,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 resolveParameterType(parameter),
                                 methodNode.name,
                                 resolveGenericTypes(parameter),
-                                AstAnnotationUtils.getAnnotationMetadata(parameter),
+                                AstAnnotationUtils.getAnnotationMetadata(sourceUnit, parameter),
                                 true
                         )
                     }
@@ -867,7 +868,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                           constructorArgumentMetadata,
                                           constructorGenericTypeMap)
                     proxyWriter.visitBeanDefinitionConstructor(
-                            AstAnnotationUtils.getAnnotationMetadata(constructorNode),
+                            AstAnnotationUtils.getAnnotationMetadata(sourceUnit, constructorNode),
                             constructorNode.isPrivate(),
                             constructorParamsToType,
                             constructorArgumentMetadata,
@@ -895,7 +896,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 return
             }
             ClassNode declaringClass = fieldNode.declaringClass
-            AnnotationMetadata fieldAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(fieldNode)
+            AnnotationMetadata fieldAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, fieldNode)
             if (Modifier.isFinal(modifiers) && !fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder)) {
                 return
             }
@@ -1003,7 +1004,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             if (Modifier.isStatic(modifiers)) {
                 return
             }
-            AnnotationMetadata fieldAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(fieldNode)
+            AnnotationMetadata fieldAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, fieldNode)
             if (Modifier.isFinal(modifiers) && !fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder)) {
                 return
             }
@@ -1100,7 +1101,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     Map<String, Object> resolvedArguments =
                             [(propertyName): propertyType]
 
-                    AnnotationMetadata fieldMetadata = AstAnnotationUtils.getAnnotationMetadata(propertyNode.field)
+                    AnnotationMetadata fieldMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, propertyNode.field)
 
                     Map<String, AnnotationMetadata> resolvedAnnotationMetadata
                     def emptyMap = Collections.emptyMap()
@@ -1179,7 +1180,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             if (!beanDefinitionWriters.containsKey(classNode)) {
                 ClassNode providerGenericType = AstGenericUtils.resolveInterfaceGenericType(classNode, Provider)
                 boolean isProvider = providerGenericType != null
-                AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(classNode)
+                AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, classNode)
 
                 if (annotationMetadata.hasStereotype(groovy.lang.Singleton)) {
                     addError("Class annotated with groovy.lang.Singleton instead of javax.inject.Singleton. Import javax.inject.Singleton to use Micronaut Dependency Injection.", classNode)
@@ -1235,7 +1236,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                         Map<String, Map<String, Object>> genericTypeMap = [:]
                         populateParameterData(constructorNode, paramsToType, qualifierTypes, genericTypeMap)
                         beanWriter.visitBeanDefinitionConstructor(
-                                AstAnnotationUtils.getAnnotationMetadata(constructorNode),
+                                AstAnnotationUtils.getAnnotationMetadata(sourceUnit, constructorNode),
                                 constructorNode.isPrivate(),
                                 paramsToType,
                                 qualifierTypes,
@@ -1380,7 +1381,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 )
 
 
-                                String qualifier = AstAnnotationUtils.getAnnotationMetadata(concreteClass).getValue(Named.class, String.class).orElse(null)
+                                String qualifier = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, concreteClass).getValue(Named.class, String.class).orElse(null)
                                 if (StringUtils.isNotEmpty(qualifier)) {
                                     values.put(Adapter.InternalAttributes.ADAPTED_QUALIFIER, qualifier)
                                 }
@@ -1497,7 +1498,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                 paramsToType.put(parameterName, resolveParameterType(param))
 
-                anntationMetadata.put(parameterName, AstAnnotationUtils.getAnnotationMetadata(new ExtendedParameter(methodNode, param)))
+                anntationMetadata.put(parameterName, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, new ExtendedParameter(methodNode, param)))
 
                 genericTypeMap.put(parameterName, resolveGenericTypes(param))
             }
@@ -1568,7 +1569,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 @Override
                 protected boolean isAcceptable(MethodNode node) {
                     // ignore deprecated methods
-                    if (AstAnnotationUtils.hasStereotype(node, Deprecated.class)) {
+                    if (AstAnnotationUtils.hasStereotype(sourceUnit, node, Deprecated.class)) {
                         return false
                     }
                     int paramCount = node.getParameters().size()

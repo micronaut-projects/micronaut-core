@@ -23,7 +23,7 @@ import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
-import io.micronaut.inject.annotation.JavaAnnotationMetadataBuilder
+import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import spock.lang.Specification
 

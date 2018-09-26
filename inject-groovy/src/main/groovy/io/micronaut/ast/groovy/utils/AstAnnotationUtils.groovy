@@ -27,6 +27,7 @@ import org.codehaus.groovy.ast.AnnotationNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.expr.Expression
+import org.codehaus.groovy.control.SourceUnit
 
 import java.lang.annotation.Annotation
 
@@ -49,21 +50,22 @@ class AstAnnotationUtils {
      * @param annotatedNode The node
      * @return The metadata
      */
-    static AnnotationMetadata getAnnotationMetadata(AnnotatedNode annotatedNode) {
+    static AnnotationMetadata getAnnotationMetadata(SourceUnit sourceUnit, AnnotatedNode annotatedNode) {
         return annotationMetadataCache.get(annotatedNode, { AnnotatedNode annotatedNode1 ->
-            new GroovyAnnotationMetadataBuilder().build(annotatedNode1)
+            new GroovyAnnotationMetadataBuilder(sourceUnit).build(annotatedNode1)
         })
     }
 
     /**
      * Get the {@link AnnotationMetadata} for the given annotated node
      *
+     * @param sourceUnit the source unit
      * @param parent the parent
      * @param annotatedNode The node
      * @return The metadata
      */
-    static AnnotationMetadata getAnnotationMetadata(AnnotatedNode parent, AnnotatedNode annotatedNode) {
-        new GroovyAnnotationMetadataBuilder().buildForParent(parent, annotatedNode)
+    static AnnotationMetadata getAnnotationMetadata(SourceUnit sourceUnit, AnnotatedNode parent, AnnotatedNode annotatedNode) {
+        new GroovyAnnotationMetadataBuilder(sourceUnit).buildForParent(parent, annotatedNode)
     }
 
     /**
@@ -81,8 +83,8 @@ class AstAnnotationUtils {
      * @param stereotype The stereotype
      * @return True if it does
      */
-    static boolean hasStereotype(AnnotatedNode annotatedNode, String stereotype) {
-        return getAnnotationMetadata(annotatedNode).hasStereotype(stereotype)
+    static boolean hasStereotype(SourceUnit sourceUnit, AnnotatedNode annotatedNode, String stereotype) {
+        return getAnnotationMetadata(sourceUnit, annotatedNode).hasStereotype(stereotype)
     }
     /**
      * Return whether the given annotated node has the given stereotype
@@ -91,8 +93,8 @@ class AstAnnotationUtils {
      * @param stereotype The stereotype
      * @return True if it does
      */
-    static boolean hasStereotype(AnnotatedNode annotatedNode, Class<? extends Annotation> stereotype) {
-        return hasStereotype(annotatedNode, stereotype.getName())
+    static boolean hasStereotype(SourceUnit sourceUnit, AnnotatedNode annotatedNode, Class<? extends Annotation> stereotype) {
+        return hasStereotype(sourceUnit, annotatedNode, stereotype.getName())
     }
 
     /**
@@ -102,11 +104,11 @@ class AstAnnotationUtils {
      * @param stereotypes The stereotypes
      * @return True if it is
      */
-    static boolean hasStereotype(AnnotatedNode annotatedNode, List<String> stereotypes) {
+    static boolean hasStereotype(SourceUnit sourceUnit, AnnotatedNode annotatedNode, List<String> stereotypes) {
         if (annotatedNode == null) {
             return false
         }
-        AnnotationMetadata annotationMetadata = getAnnotationMetadata(annotatedNode)
+        AnnotationMetadata annotationMetadata = getAnnotationMetadata(sourceUnit, annotatedNode)
         for (String stereotype : stereotypes) {
             if (annotationMetadata.hasStereotype(stereotype)) {
                 return true

@@ -48,6 +48,20 @@ public interface ClassElement extends Element {
     }
 
     /**
+     * @return Whether the class element is abstract
+     */
+    default boolean isAbstract() {
+        return false;
+    }
+
+    /**
+     * @return Whether the class element is an interface
+     */
+    default boolean isInterface() {
+        return false;
+    }
+
+    /**
      * Returns whether the class element is an array.
      *
      * @return True if this class element is an array

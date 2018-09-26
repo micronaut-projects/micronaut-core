@@ -25,6 +25,7 @@ import io.micronaut.inject.ast.ParameterElement;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
+import org.codehaus.groovy.control.SourceUnit;
 
 import java.util.Arrays;
 import java.util.function.Function;
@@ -37,15 +38,18 @@ import java.util.function.Function;
  */
 public class GroovyMethodElement extends AbstractGroovyElement implements MethodElement {
 
+    private final SourceUnit sourceUnit;
     private final MethodNode methodNode;
 
     /**
+     * @param sourceUnit The source unit
      * @param methodNode         The {@link MethodNode}
      * @param annotationMetadata The annotation metadata
      */
-    GroovyMethodElement(MethodNode methodNode, AnnotationMetadata annotationMetadata) {
+    GroovyMethodElement(SourceUnit sourceUnit, MethodNode methodNode, AnnotationMetadata annotationMetadata) {
         super(annotationMetadata);
         this.methodNode = methodNode;
+        this.sourceUnit = sourceUnit;
     }
 
     @Override
@@ -92,9 +96,9 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     public ClassElement getReturnType() {
         ClassNode returnType = methodNode.getReturnType();
         if (returnType.isEnum()) {
-            return new GroovyEnumElement(returnType, AstAnnotationUtils.getAnnotationMetadata(returnType));
+            return new GroovyEnumElement(sourceUnit, returnType, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, returnType));
         } else {
-            return new GroovyClassElement(returnType, AstAnnotationUtils.getAnnotationMetadata(returnType));
+            return new GroovyClassElement(sourceUnit, returnType, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, returnType));
         }
     }
 
@@ -102,7 +106,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
     public ParameterElement[] getParameters() {
         Parameter[] parameters = methodNode.getParameters();
         return Arrays.stream(parameters).map((Function<Parameter, ParameterElement>) parameter ->
-                new GroovyParameterElement(parameter, AstAnnotationUtils.getAnnotationMetadata(new ExtendedParameter(methodNode, parameter)))
+                new GroovyParameterElement(sourceUnit, parameter, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, new ExtendedParameter(methodNode, parameter)))
         ).toArray(ParameterElement[]::new);
     }
 }

@@ -37,7 +37,6 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
-import io.micronaut.inject.annotation.JavaAnnotationMetadataBuilder;
 import io.micronaut.inject.configuration.ConfigurationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
 import io.micronaut.inject.configuration.PropertyMetadata;
@@ -116,7 +115,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     @Override
     public final synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
-        this.metadataBuilder = new JavaConfigurationMetadataBuilder(elementUtils, typeUtils);
+        this.metadataBuilder = new JavaConfigurationMetadataBuilder(elementUtils, typeUtils, annotationUtils);
         this.beanDefinitionWriters = new LinkedHashMap<>();
     }
 
@@ -644,7 +643,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             final String beanMethodName = beanMethod.getSimpleName().toString();
             final Map<String, Object> beanMethodParameters = beanMethodParams.getParameters();
             final Object beanMethodDeclaringType = modelUtils.resolveTypeReference(beanMethod.getEnclosingElement());
-            AnnotationMetadata methodAnnotationMetadata = new JavaAnnotationMetadataBuilder(elementUtils).buildForMethod(beanMethod);
+            AnnotationMetadata methodAnnotationMetadata = annotationUtils.newAnnotationBuilder().buildForMethod(beanMethod);
             beanMethodWriter.visitBeanFactoryMethod(
 
                     beanMethodDeclaringType,
