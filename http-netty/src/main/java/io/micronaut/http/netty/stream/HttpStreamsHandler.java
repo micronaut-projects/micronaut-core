@@ -173,7 +173,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     @Override
     public void channelRead(final ChannelHandlerContext ctx, Object msg) throws Exception {
 
-        if (inClass.isInstance(msg)) {
+        if (isValidInMessage(msg)) {
 
             receivedInMessage(ctx);
             final In inMsg = inClass.cast(msg);
@@ -279,7 +279,7 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
 
     @Override
     public void write(final ChannelHandlerContext ctx, Object msg, final ChannelPromise promise) throws Exception {
-        if (outClass.isInstance(msg)) {
+        if (isValidOutMessage(msg)) {
 
             Outgoing out = new Outgoing(outClass.cast(msg), promise);
             receivedOutMessage(ctx);
@@ -405,6 +405,22 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
     }
 
     /**
+     * @param msg The message
+     * @return True if the handler should write the message
+     */
+    protected boolean isValidOutMessage(Object msg) {
+        return outClass.isInstance(msg);
+    }
+
+    /**
+     * @param msg The message
+     * @return True if the handler should read the message
+     */
+    protected boolean isValidInMessage(Object msg) {
+        return inClass.isInstance(msg);
+    }
+
+    /**
      * The outgoing class.
      */
     class Outgoing {
@@ -420,4 +436,5 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             this.promise = promise;
         }
     }
+
 }

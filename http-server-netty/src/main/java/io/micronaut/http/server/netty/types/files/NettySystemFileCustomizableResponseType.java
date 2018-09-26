@@ -19,7 +19,6 @@ package io.micronaut.http.server.netty.types.files;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.server.netty.SmartHttpContentCompressor;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
@@ -29,12 +28,10 @@ import io.netty.channel.DefaultFileRegion;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
-import io.netty.handler.codec.http.HttpContentCompressor;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedFile;
-import io.netty.handler.stream.ChunkedWriteHandler;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -112,11 +109,6 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
 
             FullHttpResponse nettyResponse = ((NettyMutableHttpResponse) response).getNativeResponse();
 
-            //The streams codec prevents non full responses from being written
-            Optional
-                .ofNullable(context.pipeline().get(NettyHttpServer.HTTP_STREAMS_CODEC))
-                .ifPresent(handler -> context.pipeline().replace(handler, "chunked-handler", new ChunkedWriteHandler()));
-
             // Write the request data
             HttpHeaders headers = nettyResponse.headers();
             context.write(new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), headers), context.voidPromise());
@@ -124,12 +116,6 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
             // Write the content.
             if (context.pipeline().get(SslHandler.class) == null && SmartHttpContentCompressor.shouldSkip(headers)) {
                 // SSL not enabled - can use zero-copy file transfer.
-                // Remove the content compressor to prevent incorrect behavior with zero-copy
-                HttpContentCompressor compressor = context.pipeline().get(HttpContentCompressor.class);
-                if (compressor != null) {
-                    context.pipeline().remove(HttpContentCompressor.class);
-                }
-
                 context.write(new DefaultFileRegion(raf.getChannel(), 0, getLength()), context.newProgressivePromise());
                 context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
             } else {
