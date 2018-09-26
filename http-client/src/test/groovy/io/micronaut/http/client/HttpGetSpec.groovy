@@ -296,6 +296,8 @@ class HttpGetSpec extends Specification {
 
         expect:
         client.queryParam('{"service":["test"]}') == '{"service":["test"]}'
+        client.queryParam('foo', 'bar') == 'foo-bar'
+        client.queryParam('foo%', 'bar') == 'foo%-bar'
     }
 
     void "test body availability"() {
@@ -394,6 +396,11 @@ class HttpGetSpec extends Specification {
             return foo
         }
 
+        @Get("/multipleQueryParam")
+        String queryParam(@QueryValue String foo, @QueryValue String bar) {
+            return foo + '-' + bar
+        }
+
         @Get("/empty")
         Optional<String> empty() {
             return Optional.empty()
@@ -427,6 +434,9 @@ class HttpGetSpec extends Specification {
 
         @Get("/queryParam")
         String queryParam(@QueryValue String foo)
+
+        @Get("/multipleQueryParam")
+        String queryParam(@QueryValue String foo, @QueryValue String bar)
     }
 
     @javax.inject.Singleton
