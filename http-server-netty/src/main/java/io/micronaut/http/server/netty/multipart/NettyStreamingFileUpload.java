@@ -87,7 +87,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
 
     @Override
     public long getSize() {
-        return fileUpload.definedLength();
+        return fileUpload.length();
     }
 
     @Override
