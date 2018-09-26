@@ -30,6 +30,7 @@ import org.codehaus.groovy.ast.GenericsType
 import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.PropertyNode
 import org.codehaus.groovy.ast.Variable
+import org.codehaus.groovy.control.SourceUnit
 
 /**
  * Used to store a reference to an underlying {@link TypeElementVisitor} and
@@ -43,11 +44,13 @@ import org.codehaus.groovy.ast.Variable
 @CompileStatic
 class LoadedVisitor {
 
+    private final SourceUnit sourceUnit
     private final TypeElementVisitor visitor
     private final String classAnnotation
     private final String elementAnnotation
 
-    LoadedVisitor(TypeElementVisitor visitor) {
+    LoadedVisitor( SourceUnit source, TypeElementVisitor visitor) {
+        this.sourceUnit = source
         this.visitor = visitor
         ClassNode classNode = ClassHelper.make(visitor.getClass())
         ClassNode definition = classNode.getAllInterfaces().find {
@@ -90,7 +93,7 @@ class LoadedVisitor {
         if (classAnnotation == ClassHelper.OBJECT) {
             return true
         }
-        AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(classNode)
+        AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, classNode)
         return annotationMetadata.hasStereotype(classAnnotation)
     }
 
@@ -119,17 +122,17 @@ class LoadedVisitor {
                 visitor.visitField(new GroovyFieldElement((Variable) annotatedNode, annotationMetadata), visitorContext)
                 break
             case ConstructorNode:
-                visitor.visitConstructor(new GroovyConstructorElement((ConstructorNode) annotatedNode, annotationMetadata), visitorContext)
+                visitor.visitConstructor(new GroovyConstructorElement(sourceUnit, (ConstructorNode) annotatedNode, annotationMetadata), visitorContext)
                 break
             case MethodNode:
-                visitor.visitMethod(new GroovyMethodElement((MethodNode) annotatedNode, annotationMetadata), visitorContext)
+                visitor.visitMethod(new GroovyMethodElement(sourceUnit, (MethodNode) annotatedNode, annotationMetadata), visitorContext)
                 break
             case ClassNode:
                 ClassNode cn = (ClassNode) annotatedNode
                 if (cn.isEnum()) {
 
                 } else {
-                    visitor.visitClass(new GroovyClassElement(cn, annotationMetadata), visitorContext)
+                    visitor.visitClass(new GroovyClassElement(sourceUnit, cn, annotationMetadata), visitorContext)
                 }
                 break
         }

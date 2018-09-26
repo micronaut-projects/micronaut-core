@@ -20,10 +20,12 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.scheduling.TaskExceptionHandler;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.TaskScheduler;
 import io.micronaut.scheduling.annotation.Scheduled;
@@ -35,6 +37,7 @@ import javax.inject.Qualifier;
 import javax.inject.Singleton;
 import java.io.Closeable;
 import java.time.Duration;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Queue;
@@ -60,15 +63,18 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
     private final BeanContext beanContext;
     private final ConversionService<?> conversionService;
     private final Queue<ScheduledFuture<?>> scheduledTasks = new ConcurrentLinkedDeque<>();
+    private final TaskExceptionHandler<?, ?> taskExceptionHandler;
 
     /**
      * @param beanContext       The bean context for DI of beans annotated with {@link javax.inject.Inject}
      * @param conversionService To convert one type to another
+     * @param taskExceptionHandler The default task exception handler
      */
     @SuppressWarnings("OptionalUsedAsFieldOrParameterType")
-    public ScheduledMethodProcessor(BeanContext beanContext, Optional<ConversionService<?>> conversionService) {
+    public ScheduledMethodProcessor(BeanContext beanContext, Optional<ConversionService<?>> conversionService, TaskExceptionHandler<?, ?> taskExceptionHandler) {
         this.beanContext = beanContext;
         this.conversionService = conversionService.orElse(ConversionService.SHARED);
+        this.taskExceptionHandler = taskExceptionHandler;
     }
 
     @SuppressWarnings("unchecked")
@@ -99,8 +105,23 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
 
                 Class<Object> beanType = (Class<Object>) beanDefinition.getBeanType();
                 Object bean = beanContext.getBean(beanType, qualifer);
-                if (method.getArguments().length == 0) {
-                    ((ExecutableMethod) method).invoke(bean);
+                try {
+                    if (method.getArguments().length == 0) {
+                        ((ExecutableMethod) method).invoke(bean);
+                    }
+                } catch (Throwable e) {
+                    io.micronaut.context.Qualifier<TaskExceptionHandler> qualifier = Qualifiers.byTypeArguments(beanType, e.getClass());
+                    Collection<BeanDefinition<TaskExceptionHandler>> definitions = beanContext.getBeanDefinitions(TaskExceptionHandler.class, qualifier);
+                    Optional<BeanDefinition<TaskExceptionHandler>> mostSpecific = definitions.stream().filter(def -> {
+                        List<Argument<?>> typeArguments = def.getTypeArguments(TaskExceptionHandler.class);
+                        if (typeArguments.size() == 2) {
+                            return typeArguments.get(0).getType() == beanType && typeArguments.get(1).getType() == e.getClass();
+                        }
+                        return false;
+                    }).findFirst();
+
+                    TaskExceptionHandler finalHandler = mostSpecific.map(bd -> beanContext.getBean(bd.getBeanType(), qualifier)).orElse(this.taskExceptionHandler);
+                    finalHandler.handle(bean, e);
                 }
             };
 

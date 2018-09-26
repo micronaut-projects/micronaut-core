@@ -22,8 +22,9 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.context.BeanContext;
@@ -76,12 +77,7 @@ import java.io.Closeable;
 import java.lang.annotation.Annotation;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
@@ -198,12 +194,21 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             List<NettyCookie> cookies = new ArrayList<>();
             List<Argument> bodyArguments = new ArrayList<>();
+            ConversionService<?> conversionService = ConversionService.SHARED;
             for (Argument argument : arguments) {
                 String argumentName = argument.getName();
                 AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
                 MutableArgumentValue<?> value = parameters.get(argumentName);
                 Object definedValue = value.getValue();
 
+                if (paramMap.containsKey(argumentName)) {
+                    if (annotationMetadata.hasStereotype(Format.class)) {
+                        final Object v = paramMap.get(argumentName);
+                        if (v != null) {
+                            paramMap.put(argumentName, conversionService.convert(v, ConversionContext.of(String.class).with(argument.getAnnotationMetadata())));
+                        }
+                    }
+                }
                 if (definedValue == null) {
                     definedValue = argument.getAnnotationMetadata().getValue(Bindable.class, "defaultValue", String.class).orElse(null);
                 }
@@ -223,7 +228,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         headerName = NameUtils.hyphenate(argumentName);
                     }
                     String finalHeaderName = headerName;
-                    ConversionService.SHARED.convert(definedValue, String.class)
+                    conversionService.convert(definedValue, String.class)
                         .ifPresent(o -> headers.put(finalHeaderName, o));
                 } else if (annotationMetadata.isAnnotationPresent(CookieValue.class)) {
                     String cookieName = annotationMetadata.getValue(CookieValue.class, String.class).orElse(null);
@@ -232,12 +237,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     }
                     String finalCookieName = cookieName;
 
-                    ConversionService.SHARED.convert(definedValue, String.class)
+                    conversionService.convert(definedValue, String.class)
                         .ifPresent(o -> cookies.add(new NettyCookie(finalCookieName, o)));
 
                 } else if (annotationMetadata.isAnnotationPresent(QueryValue.class)) {
                     String parameterName = annotationMetadata.getValue(QueryValue.class, String.class).orElse(null);
-                    ConversionService.SHARED.convert(definedValue, String.class).ifPresent(o -> {
+                    conversionService.convert(definedValue, ConversionContext.of(String.class).with(annotationMetadata)).ifPresent(o -> {
                         if (!StringUtils.isEmpty(parameterName)) {
                             paramMap.put(parameterName, o);
                             queryParams.put(parameterName, o);
@@ -365,10 +370,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                 if (argumentType == ByteBuffer.class) {
                                     publisher = byteBufferPublisher;
                                 } else {
-                                    if (ConversionService.SHARED.canConvert(ByteBuffer.class, argumentType)) {
+                                    if (conversionService.canConvert(ByteBuffer.class, argumentType)) {
                                         // It would be nice if we could capture the TypeConverter here
                                         publisher = Flowable.fromPublisher(byteBufferPublisher)
-                                                .map(value -> ConversionService.SHARED.convert(value, argumentType).get());
+                                                .map(value -> conversionService.convert(value, argumentType).get());
                                     } else {
                                         throw new ConfigurationException("Cannot create the generated HTTP client's " +
                                                 "required return type, since no TypeConverter from ByteBuffer to " +
@@ -440,7 +445,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     });
                     return future;
                 } else {
-                    Object finalPublisher = ConversionService.SHARED.convert(publisher, javaReturnType).orElseThrow(() ->
+                    Object finalPublisher = conversionService.convert(publisher, javaReturnType).orElseThrow(() ->
                         new HttpClientException("Cannot convert response publisher to Reactive type (Unsupported Reactive type): " + javaReturnType)
                     );
                     for (ReactiveClientResultTransformer transformer : transformers) {
@@ -639,10 +644,15 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     sb.append('&');
                 }
 
-                for (Map.Entry<String, String> entry: queryParams.entrySet()) {
+                Iterator<Map.Entry<String, String>> iterator = queryParams.entrySet().iterator();
+                while (iterator.hasNext()) {
+                    Map.Entry<String, String> entry = iterator.next();
                     sb.append(entry.getKey());
                     sb.append('=');
                     sb.append(entry.getValue());
+                    if (iterator.hasNext()) {
+                        sb.append('&');
+                    }
                 }
 
                 return new URI(oldUri.getScheme(), oldUri.getAuthority(), oldUri.getPath(),

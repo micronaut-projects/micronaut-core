@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
-package io.micronaut.core.annotation;
+package io.micronaut.inject.annotation;
+
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.inject.visitor.VisitorContext;
 
 import java.lang.annotation.Annotation;
 import java.util.List;
@@ -45,7 +48,8 @@ public interface AnnotationMapper<T extends Annotation> {
      * The map method will be called for each instances of the annotation returned via the {@link #annotationType()} method.
      *
      * @param annotation The annotation values
+     * @param visitorContext The context that is being visited
      * @return A list of zero or many annotations and values to map to
      */
-    List<AnnotationValue<?>> map(AnnotationValue<T> annotation);
+    List<io.micronaut.core.annotation.AnnotationValue<?>> map(AnnotationValue<T> annotation, VisitorContext visitorContext);
 }

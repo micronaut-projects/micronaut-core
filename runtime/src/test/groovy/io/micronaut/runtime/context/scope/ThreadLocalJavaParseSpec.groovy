@@ -1,11 +1,10 @@
 package io.micronaut.runtime.context.scope
 
 import io.micronaut.inject.BeanDefinition
-import io.micronaut.support.AbstractTypeElementSpec
 
 import javax.inject.Scope
 
-class ThreadLocalJavaParseSpec extends AbstractTypeElementSpec {
+class ThreadLocalJavaParseSpec extends io.micronaut.annotation.processing.test.AbstractTypeElementSpec {
 
     void "test parse bean definition data"() {
         when:

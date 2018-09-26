@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-package io.micronaut.security;
+package io.micronaut.security.annotation;
 
-import io.micronaut.core.annotation.AnnotationMapper;
+import io.micronaut.inject.annotation.AnnotationMapper;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.security.annotation.Secured;
+import io.micronaut.inject.visitor.VisitorContext;
 
 import javax.annotation.security.RolesAllowed;
 import java.util.ArrayList;
@@ -37,7 +37,7 @@ public class RolesAllowedAnnotationMapper implements AnnotationMapper<RolesAllow
     }
 
     @Override
-    public List<AnnotationValue<?>> map(AnnotationValue<RolesAllowed> annotation) {
+    public List<AnnotationValue<?>> map(AnnotationValue<RolesAllowed> annotation, VisitorContext visitorContext) {
         String[] values = annotation.get("value", String[].class).orElse(new String[0]);
 
         List<AnnotationValue<?>> annotationValues = new ArrayList<>(1);

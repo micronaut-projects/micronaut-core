@@ -23,6 +23,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.Parameter;
+import org.codehaus.groovy.control.SourceUnit;
 
 import javax.annotation.Nullable;
 
@@ -35,17 +36,19 @@ import javax.annotation.Nullable;
 @Internal
 public class GroovyParameterElement extends AbstractGroovyElement implements ParameterElement {
 
+    private final SourceUnit sourceUnit;
     private final Parameter parameter;
-
     /**
      * Default constructor.
      *
+     * @param sourceUnit The source unit
      * @param parameter The parameter
      * @param annotationMetadata The annotation metadata
      */
-    GroovyParameterElement(Parameter parameter, AnnotationMetadata annotationMetadata) {
+    GroovyParameterElement(SourceUnit sourceUnit, Parameter parameter, AnnotationMetadata annotationMetadata) {
         super(annotationMetadata);
         this.parameter = parameter;
+        this.sourceUnit = sourceUnit;
     }
 
     @Override
@@ -73,9 +76,9 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
     public ClassElement getType() {
         ClassNode t = parameter.getType();
         if (t.isEnum()) {
-            return new GroovyEnumElement(t, AstAnnotationUtils.getAnnotationMetadata(t));
+            return new GroovyEnumElement(sourceUnit, t, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, t));
         } else {
-            return new GroovyClassElement(t, AstAnnotationUtils.getAnnotationMetadata(t));
+            return new GroovyClassElement(sourceUnit, t, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, t));
         }
     }
 }

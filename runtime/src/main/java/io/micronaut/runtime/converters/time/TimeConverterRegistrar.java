@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.util.StringUtils;
@@ -31,6 +32,7 @@ import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.time.temporal.TemporalAccessor;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -99,7 +101,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
             }
         );
 
-        // CharSequence -> LocalDataTime
+        // CharSequence -> LocalDateTime
         conversionService.addConverter(
             CharSequence.class,
             LocalDateTime.class,
@@ -113,6 +115,22 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                     return Optional.empty();
                 }
             }
+        );
+
+        // TemporalAccessor - CharSequence
+        final TypeConverter<TemporalAccessor, CharSequence> temporalConverter = (object, targetType, context) -> {
+            try {
+                DateTimeFormatter formatter = resolveFormatter(context);
+                return Optional.of(formatter.format(object));
+            } catch (DateTimeParseException e) {
+                context.reject(object, e);
+                return Optional.empty();
+            }
+        };
+        conversionService.addConverter(
+                TemporalAccessor.class,
+                CharSequence.class,
+                temporalConverter
         );
 
         // CharSequence -> LocalDate
@@ -130,6 +148,7 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                 }
             }
         );
+
 
         // CharSequence -> ZonedDateTime
         conversionService.addConverter(
