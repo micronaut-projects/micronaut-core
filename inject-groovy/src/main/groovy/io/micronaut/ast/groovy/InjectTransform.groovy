@@ -423,7 +423,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         protected void visitIntroductionTypePublicMethods(AopProxyWriter aopProxyWriter, ClassNode node) {
             AnnotationMetadata typeAnnotationMetadata = aopProxyWriter.getAnnotationMetadata()
-            PublicMethodVisitor publicMethodVisitor = new PublicAbstractMethodVisitor(sourceUnit) {
+            SourceUnit source = this.sourceUnit
+            PublicMethodVisitor publicMethodVisitor = new PublicAbstractMethodVisitor(source) {
 
                 @Override
                 void accept(ClassNode classNode, MethodNode methodNode) {
@@ -450,7 +451,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                     AnnotationMetadata annotationMetadata
                     if (AstAnnotationUtils.isAnnotated(methodNode) || AstAnnotationUtils.hasAnnotation(methodNode, Override)) {
-                        annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, node, methodNode)
+                        annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(source, node, methodNode)
                     } else {
                         annotationMetadata = new AnnotationMetadataReference(
                                 aopProxyWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
@@ -568,8 +569,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     } else {
                         populateProxyWriterConstructor(producedType, proxyWriter)
                     }
-
-                    new PublicMethodVisitor(sourceUnit) {
+                    SourceUnit source = this.sourceUnit
+                    new PublicMethodVisitor(source) {
                         @Override
                         void accept(ClassNode classNode, MethodNode targetBeanMethodNode) {
                             Map<String, Object> targetMethodParamsToType = [:]
@@ -590,7 +591,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 targetMethodGenericTypeMap)
                             AnnotationMetadata annotationMetadata
                             if (AstAnnotationUtils.isAnnotated(methodNode)) {
-                                annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, methodNode, targetBeanMethodNode)
+                                annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(source, methodNode, targetBeanMethodNode)
                             } else {
                                 annotationMetadata = new AnnotationMetadataReference(
                                         beanMethodWriter.getBeanDefinitionName() + BeanDefinitionReferenceWriter.REF_SUFFIX,
@@ -1301,7 +1302,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     }
 
                     InjectVisitor thisVisitor = this
-                    PublicAbstractMethodVisitor visitor = new PublicAbstractMethodVisitor(sourceUnit) {
+                    SourceUnit source = this.sourceUnit
+                    PublicAbstractMethodVisitor visitor = new PublicAbstractMethodVisitor(source) {
                         boolean first = true;
 
                         @Override
@@ -1381,7 +1383,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 )
 
 
-                                String qualifier = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, concreteClass).getValue(Named.class, String.class).orElse(null)
+                                String qualifier = AstAnnotationUtils.getAnnotationMetadata(source, concreteClass).getValue(Named.class, String.class).orElse(null)
                                 if (StringUtils.isNotEmpty(qualifier)) {
                                     values.put(Adapter.InternalAttributes.ADAPTED_QUALIFIER, qualifier)
                                 }
@@ -1521,7 +1523,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             Set<String> includes = annotationMetadata.getValue(ConfigurationBuilder.class, "includes", Set.class).orElse(Collections.emptySet())
             Set<String> excludes = annotationMetadata.getValue(ConfigurationBuilder.class, "excludes", Set.class).orElse(Collections.emptySet())
 
-            PublicMethodVisitor visitor = new PublicMethodVisitor(sourceUnit) {
+            SourceUnit source = this.sourceUnit
+            PublicMethodVisitor visitor = new PublicMethodVisitor(source) {
                 @Override
                 void accept(ClassNode cn, MethodNode method) {
                     String name = method.getName()
@@ -1569,7 +1572,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 @Override
                 protected boolean isAcceptable(MethodNode node) {
                     // ignore deprecated methods
-                    if (AstAnnotationUtils.hasStereotype(sourceUnit, node, Deprecated.class)) {
+                    if (AstAnnotationUtils.hasStereotype(source, node, Deprecated.class)) {
                         return false
                     }
                     int paramCount = node.getParameters().size()
