@@ -11,6 +11,7 @@ To use the Micronaut's security capabilities you must have the `security` depend
 .build.gradle
 [source,groovy]
 ----
+annotationProcessor "io.micronaut:security"
 compile "io.micronaut:security"
 ----
 

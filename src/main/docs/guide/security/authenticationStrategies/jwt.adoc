@@ -19,6 +19,7 @@ To use the Micronaut's JWT based authentication capabilities you must have the `
 .build.gradle
 [source,groovy]
 ----
+annotationProcessor "io.micronaut:security"
 compile "io.micronaut:security-jwt"
 ----
 
