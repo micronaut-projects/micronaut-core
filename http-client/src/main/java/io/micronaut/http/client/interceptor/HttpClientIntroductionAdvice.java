@@ -25,7 +25,6 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.context.BeanContext;
