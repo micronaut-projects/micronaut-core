@@ -25,8 +25,10 @@ import javax.annotation.Nullable;
  *
  * @author James Kleeh
  * @author Graeme Rocher
+ * @since 1.0
  */
 public interface ClassPathResourceLoader extends ResourceLoader {
+
     /**
      * @return The underlying classloader used by this {@link ClassPathResourceLoader}
      */
