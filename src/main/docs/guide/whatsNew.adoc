@@ -3,24 +3,56 @@ Apart from https://github.com/micronaut-projects/micronaut-core/milestone/5?clos
 
 === Support for GraalVM Native Images
 
-TODO
+Micronaut now includes experimental support for compiling down to https://www.graalvm.org[GraalVM] native images using the `nativeimage` tool shipped as part of Graal (1.0.0 RC6 and above).
+
+This is possible due to to Micronaut's reflection-free approach to Dependency Injection and AOP.
+
+See the section on <<graal, GraalVM support>> in the user guide for more information.
 
 === Swagger / OpenAPI Documentation Support
 
-TODO
+Micronaut now includes the ability to generate Swagger (OpenAPI) YAML at compile time using the language neutral visitor API and the interfaces defined by the pkg:io.micronaut.inject.ast[] package.
+
+See the section on <<openapi, OpenAPI / Swagger Support>> in the user guide for more information.
 
 === Native WebSocket Support
 
-TODO
+Built-in support for WebSocket for both the client and the server has been added. The following example is a simple server chat implementation:
+
+.WebSocket Chat Example
+[source,java]
+----
+include::{testswebsocket}/ChatServerWebSocket.java[]
+----
+
+See the section on <<websocket, WebSocket Support>> in the user guide for more information.
 
 === Compilation Time Validation
 
-TODO
+The `validation` module can now be added to the `annotationProcessor` classpath and which will result in additional compile time checks, ensuring that users are using the framework correctly. For example, the following route method:
+
+[source,java]
+----
+@Get("/hello/{name}")
+public Single<String> hello(@NotBlank String na) {
+     return Single.just("Hello " + na + "!");
+}
+----
+
+Will produce the following error at compile time:
+
+[source]
+----
+hello-world-java/src/main/java/example/HelloController.java:34: error: The route declares a uri variable named [name], but no corresponding method argument is present
+    public Single<String> hello(@NotBlank String na) {
+                          ^
+----
+
+This lessons the need for IDE support designed specifically for Micronaut.
 
 === Experimental JMX Support for Endpoints
 
-TODO
-
+Experimental support for exposing <<endpoints, management endpoints>> over JMX has been added via the `jmx` module. See the section on <<jmx, JMX Support>> for more information on how to use this feaure.
 
 === Documentation Improvements
 
