@@ -54,6 +54,10 @@ This lessons the need for IDE support designed specifically for Micronaut.
 
 Experimental support for exposing <<endpoints, management endpoints>> over JMX has been added via the `jmx` module. See the section on <<jmx, JMX Support>> for more information on how to use this feaure.
 
+=== Multitenancy support
+
+Latest release includes <<multitenancy,Multitenancy>> integration into the framework. Features includes tenant resolution, propagation and integration with <<multitenancyGorm,GORM>> which supports discriminator, table and schema multitenancy modes.
+
 === Documentation Improvements
 
 The documentation you are reading has been improved with a new configuration reference button at the top that contains a reference produced at compile time of all the available configuration options in Micronaut.
