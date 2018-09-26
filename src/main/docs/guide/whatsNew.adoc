@@ -27,6 +27,20 @@ include::{testswebsocket}/ChatServerWebSocket.java[]
 
 See the section on <<websocket, WebSocket Support>> in the user guide for more information.
 
+==== CLI Commands for WebSockets
+
+The Micronaut CLI now includes two new commands for generating WebSocket clients and servers.
+
+[source,bash]
+----
+$ mn create-websocket-server MyChat
+| Rendered template WebsocketServer.java to destination src/main/java/example/MyChatServer.java
+$ mn create-websocket-client MyChat
+| Rendered template WebsocketClient.java to destination src/main/java/example/MyChatClient.java
+----
+
+----
+
 === Compilation Time Validation
 
 The `validation` module can now be added to the `annotationProcessor` classpath and which will result in additional compile time checks, ensuring that users are using the framework correctly. For example, the following route method:

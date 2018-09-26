@@ -143,6 +143,56 @@ $ mn create-client Book
 | Rendered template Client.java to destination src/main/java/example/BookClient.java
 ----
 
+=== Create-Websocket-Server
+
+.Create-Websocket-Server Flags
+|===
+|Flag|Description|Example
+
+|`-l`, `--lang`
+|The language used for the server
+|`--lang groovy`
+
+|`-f`, `--force`
+|Whether to overwrite existing files
+|`--force`
+
+|
+|===
+
+The `create-websocket-server` command generates a simple api:websocket.WebSocketServer[] class. It follows a `*Server` convention for generating the class name. It does not create an associated test.
+
+[source,bash]
+----
+$ mn create-websocket-server MyChat
+| Rendered template WebsocketServer.java to destination src/main/java/example/MyChatServer.java
+----
+
+
+=== Create-Websocket-Client
+
+.Create-Websocket-Client Flags
+|===
+|Flag|Description|Example
+
+|`-l`, `--lang`
+|The language used for the client
+|`--lang groovy`
+
+|`-f`, `--force`
+|Whether to overwrite existing files
+|`--force`
+
+|
+|===
+
+The `create-websocket-client` command generates a simple api:websocket.WebSocketClient[] abstract class. It follows a `*Client` convention for generating the class name. It does not create an associated test.
+
+[source,bash]
+----
+$ mn create-websocket-client MyChat
+| Rendered template WebsocketClient.java to destination src/main/java/example/MyChatClient.java
+----
 
 == CLI Profile Commands
 

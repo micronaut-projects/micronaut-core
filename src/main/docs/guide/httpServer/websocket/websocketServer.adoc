@@ -57,3 +57,14 @@ If you define the `@ServerWebSocket` as `@Singleton` it should be noted that ext
 The api:websocket.WebSocketSession[] is by default backed by an in-memory map. If you add the the `session` module you can however share <<sessions,sessions>> between the HTTP server and the WebSocket server.
 
 NOTE: When sessions are backed by a persistent store such as Redis then after each message is processed the session is updated to the backing store.
+
+[TIP]
+.Using the CLI
+====
+If you have created your project using the Micronaut CLI and the default (`service`) profile, you can use the `create-websocket-server` command to create a class with api:websocket.WebSocketServer[].
+
+----
+$ mn create-websocket-server MyChat
+| Rendered template WebsocketServer.java to destination src/main/java/example/MyChatServer.java
+----
+====
