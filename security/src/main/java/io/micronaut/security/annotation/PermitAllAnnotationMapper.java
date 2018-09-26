@@ -31,20 +31,22 @@ import java.util.List;
  * @author Sergio del Amo
  * @since 1.0
  */
-public class PermitAllAnnotationMapper implements AnnotationMapper<PermitAll> {
+// tag::clazz[]
+public class PermitAllAnnotationMapper implements AnnotationMapper<PermitAll> { // <1>
     @Override
     public Class<PermitAll> annotationType() {
         return PermitAll.class;
     }
 
     @Override
-    public List<AnnotationValue<?>> map(AnnotationValue<PermitAll> annotation, VisitorContext visitorContext) {
+    public List<AnnotationValue<?>> map(AnnotationValue<PermitAll> annotation, VisitorContext visitorContext) { // <2>
         List<AnnotationValue<?>> annotationValues = new ArrayList<>(1);
         annotationValues.add(
-                AnnotationValue.builder(Secured.class)
-                                .value(SecurityRule.IS_ANONYMOUS)
+                AnnotationValue.builder(Secured.class) // <3>
+                                .value(SecurityRule.IS_ANONYMOUS) // <4>
                                 .build()
         );
         return annotationValues;
     }
 }
+// end::clazz[]
