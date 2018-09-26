@@ -75,6 +75,14 @@ class QueryParametersSpec extends Specification {
         flavour << [ "pojo", "singlePojo", "list", "map" ]
     }
 
+    @Unroll
+    void "test client mappping URL parameters appended through a POJO with a list (served through #flavour)"() {
+        expect:
+        client.searchExplodedPojo(flavour, new SearchParamsAsList(term: ["Tool", "Agnes Obel"])).albums.size() == 4
+        where:
+        flavour << [ "pojo", "list", "map" ]
+    }
+
     void "test query value with default value"() {
         given:
         RxHttpClient lowLevelClient = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL())
@@ -196,6 +204,9 @@ class QueryParametersSpec extends Specification {
 
         @Get("/search-exploded/{flavour}{?params*}")
         SearchResult searchExplodedSinglePojo(String flavour, SearchParams params)
+
+        @Get("/search-exploded/{flavour}{?params*}")
+        SearchResult searchExplodedPojo(String flavour, SearchParamsAsList params)
 
         @Get("/search-default")
         SearchResult searchDefault(@QueryValue(defaultValue = "Tool") String term)
