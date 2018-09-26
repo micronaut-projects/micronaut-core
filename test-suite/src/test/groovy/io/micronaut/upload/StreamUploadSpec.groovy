@@ -49,7 +49,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
         then:
         response.code() == HttpStatus.OK.code
-        result == "Uploaded"
+        result == "Uploaded ${data.size()}"
     }
 
     void "test upload big FileUpload object via transferTo"() {
@@ -79,7 +79,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
         then:
         response.code() == HttpStatus.OK.code
-        result == "Uploaded"
+        result == "Uploaded ${data.size()}"
         file.exists()
         file.text == data
     }
