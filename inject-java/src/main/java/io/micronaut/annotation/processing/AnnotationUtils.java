@@ -60,7 +60,7 @@ public class AnnotationUtils {
      * @param modelUtils   The model utils
      * @param filer        The filer
      */
-    AnnotationUtils(Elements elementUtils, Messager messager, Types types, ModelUtils modelUtils, Filer filer) {
+    protected AnnotationUtils(Elements elementUtils, Messager messager, Types types, ModelUtils modelUtils, Filer filer) {
         this.elementUtils = elementUtils;
         this.messager = messager;
         this.types = types;
