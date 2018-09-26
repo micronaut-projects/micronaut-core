@@ -1,6 +1,6 @@
-Multi-Tenancy, as it relates to software developments, is when a single instance of an application is used to service multiple clients (tenants) in a way that each tenants' data is isolated from the other.
+Multi-Tenancy, as it relates to software development, is when a single instance of an application is used to service multiple clients (tenants) in a way that each tenants' data is isolated from the other.
 
-A common requirement for supporting Multi-tenancy is the ability to resolve the current tenant. Micronaut ships with the following built-in api:multitenancy.tenantresolver.TenantResolver[]s:
+A common requirement for supporting Multi-Tenancy is the ability to resolve the current tenant. Micronaut ships with the following built-in api:multitenancy.tenantresolver.TenantResolver[] implementations:
 
 |===
 | name|description
