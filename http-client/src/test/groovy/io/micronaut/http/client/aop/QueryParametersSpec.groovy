@@ -38,15 +38,47 @@ class QueryParametersSpec extends Specification {
     @Unroll
     void "test client mappping URL parameters appended through a Map (served through #flavour)"() {
         expect:
-            client.searchExplodedMap(flavour, [term: "Riverside"]).albums.size() == 2
+        client.searchExplodedMap(flavour, [term: "Riverside"]).albums.size() == 2
         where:
-            flavour << [ "pojo", "list", "map" ]
+        flavour << [ "pojo", "singlePojo", "list", "map" ]
+    }
+
+    @Unroll
+    void "test client mappping multiple URL parameters appended through a Map (served through #flavour)"() {
+        expect:
+        client.searchExplodedMap(flavour, [term: ["Tool", 'Agnes Obel']]).albums.size() == 4
+        where:
+        flavour << [ "pojo", "list", "map" ]
     }
 
     @Unroll
     void "test client mappping URL parameters appended through a List (served through #flavour)"() {
         expect:
+        client.searchExplodedList(flavour, ["Tool", 'Riverside']).albums.size() == 3
+        where:
+        flavour << [ "pojo", "list", "map" ]
+    }
+
+    @Unroll
+    void "test client mappping URL parameters through singleton list (served through #flavour)"() {
+        expect:
         client.searchExplodedList(flavour, ["Tool"]).albums.size() == 1
+        where:
+        flavour << [ "pojo", "singlePojo", "list", "map" ]
+    }
+
+    @Unroll
+    void "test client mappping URL parameters appended through a POJO (served through #flavour)"() {
+        expect:
+        client.searchExplodedSinglePojo(flavour, new SearchParams(term: "Agnes Obel")).albums.size() == 3
+        where:
+        flavour << [ "pojo", "singlePojo", "list", "map" ]
+    }
+
+    @Unroll
+    void "test client mappping URL parameters appended through a POJO with a list (served through #flavour)"() {
+        expect:
+        client.searchExplodedPojo(flavour, new SearchParamsAsList(term: ["Tool", "Agnes Obel"])).albums.size() == 4
         where:
         flavour << [ "pojo", "list", "map" ]
     }
@@ -86,7 +118,11 @@ class QueryParametersSpec extends Specification {
     }
 
     static class SearchParamsAsList {
-        List<String> term // Yes, this is silly - but POJOs can't bind request params to simple fields
+        List<String> term // POJO parameters can bind request params to list fields
+    }
+
+    static class SearchParams {
+        String term // Now, POJO parameters can bind request params to simple fields, too.
     }
 
     @Controller('/itunes')
@@ -108,7 +144,7 @@ class QueryParametersSpec extends Specification {
         SearchResult searchExploded1(@QueryValue Map<String, List<?>> params) {
             // Exploded parameters from query params come in as a map of lists (to accomodate "url?a=1&a=2")
             // We only use the first one
-            def albums = artists.get(params.term?.getAt(0) ?: 'Unknown')
+            def albums = (params.term ?: []).collectMany { artists.get(it) }
             if(albums) {
                 return new SearchResult(albums: albums)
             }
@@ -117,7 +153,7 @@ class QueryParametersSpec extends Specification {
         @Get("/search-exploded/list{?term*}")
         SearchResult searchExploded2(@QueryValue List term) {
             // Yes, we get a list of terms, but we only use the first one
-            def albums = artists.get(term?.getAt(0) ?: 'Unknown')
+            def albums = (term ?: []).collectMany { artists.get(it) }
             if(albums) {
                 return new SearchResult(albums: albums)
             }
@@ -126,8 +162,17 @@ class QueryParametersSpec extends Specification {
         @Get("/search-exploded/pojo{?params*}")
         SearchResult searchExploded3(@QueryValue SearchParamsAsList params) {
             // We get a POJO with a list of terms, but we only use the first one
-            def albums = artists.get(params.term?.get(0) ?: 'Unknown')
-            if(albums) {
+            def albums = (params.term ?: []).collectMany { artists.getOrDefault(it, []) }
+            if (albums) {
+                return new SearchResult(albums: albums)
+            }
+        }
+
+        @Get("/search-exploded/singlePojo{?params*}")
+        SearchResult searchExploded4(@QueryValue SearchParams params) {
+            // We get a POJO with a list of terms, but we only use the first one
+            def albums = params.term?.with { artists.get(it) }
+            if (albums) {
                 return new SearchResult(albums: albums)
             }
         }
@@ -152,10 +197,16 @@ class QueryParametersSpec extends Specification {
         SearchResult searchTwo(@QueryValue String term)
 
         @Get("/search-exploded/{flavour}{?params*}")
-        SearchResult searchExplodedMap(String flavour, Map params)
+        SearchResult searchExplodedMap(String flavour, Map<String, ?> params)
 
         @Get("/search-exploded/{flavour}{?term*}")
-        SearchResult searchExplodedList(String flavour, List term)
+        SearchResult searchExplodedList(String flavour, List<String> term)
+
+        @Get("/search-exploded/{flavour}{?params*}")
+        SearchResult searchExplodedSinglePojo(String flavour, SearchParams params)
+
+        @Get("/search-exploded/{flavour}{?params*}")
+        SearchResult searchExplodedPojo(String flavour, SearchParamsAsList params)
 
         @Get("/search-default")
         SearchResult searchDefault(@QueryValue(defaultValue = "Tool") String term)
