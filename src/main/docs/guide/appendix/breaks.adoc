@@ -3,6 +3,32 @@ This section will document breaking changes that may happen during milestone or 
 ==== 1.0.0.RC1
 
 * The default port if no port is specified is now port 8080 instead of a random port, except in the test environment. A random port can be obtained by setting the port to -1.
+* The configuration for static resource has been changed to allow multiple mappings, each with their own set of paths. This will allow accessing resources at multiple URLs. Previously the configuration might have looked like:
++
+  micronaut:
+      router:
+          static:
+              resources:
+                  enabled: true
+                  mapping: /static/**
+                  paths:
+                    - classpath:static
++
+And now the equivalent configuration would be:
++
+  micronaut:
+      router:
+          static-resources:
+              default:
+                  enabled: true
+                  mapping: /static/**
+                  paths:
+                    - classpath:static
++
+The word `default` in that example is arbitrary and can be replaced with any name that is appropriate to describe the category of resources that will be served.
++
+NOTE: Notice the change from `static.resources` to `static-resources`.
++
 * The CLI feature for Netflix Archaius was incorrectly named `netflix-archius`. The feature has now been renamed to reflect the correct name, `netflix-archaius`.
 * The intercept url map security rule now no longer considers the query part of the request when determining if the request matches. Previously `/?value=true` would *not* match `/`.
 * Several APIs surrounding route URI matching and template parsing have changed to allow more information to be retrieved from the parsing process.

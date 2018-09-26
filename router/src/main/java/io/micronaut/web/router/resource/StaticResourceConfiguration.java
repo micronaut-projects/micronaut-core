@@ -16,7 +16,7 @@
 
 package io.micronaut.web.router.resource;
 
-import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
@@ -35,19 +35,19 @@ import java.util.Optional;
  * @author James Kleeh
  * @since 1.0
  */
-@ConfigurationProperties(StaticResourceConfiguration.PREFIX)
+@EachProperty(StaticResourceConfiguration.PREFIX)
 public class StaticResourceConfiguration implements Toggleable {
 
     /**
      * The prefix for static resources configuration.
      */
-    public static final String PREFIX = "micronaut.router.static.resources";
+    public static final String PREFIX = "micronaut.router.static-resources";
 
     /**
      * The default enable value.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final boolean DEFAULT_ENABLED = false;
+    public static final boolean DEFAULT_ENABLED = true;
 
     /**
      * The default mapping value.
@@ -107,7 +107,7 @@ public class StaticResourceConfiguration implements Toggleable {
     }
 
     /**
-     * Sets whether static resources are enabled. Default value ({@value #DEFAULT_ENABLED}).
+     * Sets whether this specific mapping is enabled. Default value ({@value #DEFAULT_ENABLED}).
      *
      * @param enabled True if they are enabled.
      */
@@ -116,7 +116,8 @@ public class StaticResourceConfiguration implements Toggleable {
     }
 
     /**
-     * Sets the paths to the static resources.
+     * A list of paths either starting with `classpath:` or `file:`. You can serve files from anywhere on disk or the classpath. For example to serve static resources from `src/main/resources/public`, you would use `classpath:public` as the path.
+     *
      * @param paths The paths
      */
     public void setPaths(List<String> paths) {
@@ -126,7 +127,7 @@ public class StaticResourceConfiguration implements Toggleable {
     }
 
     /**
-     * Sets default mapping. Default value ({@value #DEFAULT_MAPPING}).
+     * The path resources should be served from. Uses ant path matching. Default value ({@value #DEFAULT_MAPPING}).
      *
      * @param mapping The mapping
      */
