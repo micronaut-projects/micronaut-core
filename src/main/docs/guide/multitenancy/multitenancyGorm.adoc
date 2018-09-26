@@ -1,5 +1,13 @@
 http://gorm.grails.org[GORM] supports Multi-tenancy and integrates with Micronaut.
 
+To use Micronaut and GORM multitenancy capabilities you must have the `multitenancy-gorm` dependency on your classpath. For example in `build.gradle`:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut.configuration:multitenancy-gorm"
+----
+
 GORM is a powerful Groovy-based data access toolkit for the JVM with implementations several data access technologies (Hibernate, Neo4j, MongoDB, GraphQL ...).
 
 GORM supports the following different multitenancy modes:

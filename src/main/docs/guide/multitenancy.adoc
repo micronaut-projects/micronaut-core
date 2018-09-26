@@ -1,6 +1,14 @@
 Multi-Tenancy, as it relates to software development, is when a single instance of an application is used to service multiple clients (tenants) in a way that each tenants' data is isolated from the other.
 
-A common requirement for supporting Multi-Tenancy is the ability to resolve the current tenant. Micronaut ships with the following built-in api:multitenancy.tenantresolver.TenantResolver[] implementations:
+To use the Micronaut's multitenancy capabilities you must have the `multitenancy` dependency on your classpath. For example in `build.gradle`:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut:multitenancy"
+----
+
+A common requirement for supporting Multi-tenancy is the ability to resolve the current tenant. Micronaut ships with the following built-in api:multitenancy.tenantresolver.TenantResolver[]s:
 
 |===
 | name|description
