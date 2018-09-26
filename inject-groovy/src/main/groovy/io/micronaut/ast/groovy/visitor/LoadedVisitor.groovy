@@ -50,7 +50,7 @@ class LoadedVisitor {
     private final String elementAnnotation
 
     LoadedVisitor( SourceUnit source, TypeElementVisitor visitor) {
-        this.sourceUnit = sourceUnit;
+        this.sourceUnit = source
         this.visitor = visitor
         ClassNode classNode = ClassHelper.make(visitor.getClass())
         ClassNode definition = classNode.getAllInterfaces().find {
