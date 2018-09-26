@@ -20,10 +20,13 @@ import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.util.AntPathMatcher;
 import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.hateos.Resource;
 
 import javax.inject.Singleton;
 import java.net.URL;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -36,17 +39,21 @@ import java.util.Optional;
 public class StaticResourceResolver {
 
     private static final String INDEX_PAGE = "index.html";
-    private final String mapping;
-    private final List<ResourceLoader> loaders;
     private final AntPathMatcher pathMatcher;
+    private final Map<String, List<ResourceLoader>> resourceMappings = new LinkedHashMap<>();
 
     /**
-     * @param configuration The configuration as {@link StaticResourceConfiguration}
+     * Default constructor.
+     *
+     * @param configurations The static resource configurations
      */
-    StaticResourceResolver(StaticResourceConfiguration configuration) {
-        this.loaders = configuration.getResourceLoaders();
+    StaticResourceResolver(StaticResourceConfiguration[] configurations) {
         this.pathMatcher = PathMatcher.ANT;
-        this.mapping = configuration.getMapping();
+        for (StaticResourceConfiguration config: configurations) {
+            if (config.isEnabled()) {
+                this.resourceMappings.put(config.getMapping(), config.getResourceLoaders());
+            }
+        }
     }
 
     /**
@@ -56,33 +63,38 @@ public class StaticResourceResolver {
      * @return The optional URL
      */
     public Optional<URL> resolve(String path) {
-        if (!loaders.isEmpty() && pathMatcher.matches(mapping, path)) {
-            path = pathMatcher.extractPathWithinPattern(mapping, path);
-            //A request to the root of the mapping
-            if (StringUtils.isEmpty(path)) {
-                path = INDEX_PAGE;
-            }
-            if (path.startsWith("/")) {
-                path = path.substring(1);
-            }
-            for (ResourceLoader loader : loaders) {
-                Optional<URL> resource = loader.getResource(path);
-                if (resource.isPresent()) {
-                    return resource;
-                } else {
-                    if (path.indexOf('.') == -1) {
-                        if (!path.endsWith("/")) {
-                            path = path + "/";
-                        }
-                        path += INDEX_PAGE;
-                        resource = loader.getResource(path);
-                        if (resource.isPresent()) {
-                            return resource;
+        for (Map.Entry<String, List<ResourceLoader>> entry : resourceMappings.entrySet()) {
+            List<ResourceLoader> loaders = entry.getValue();
+            String mapping = entry.getKey();
+            if (!loaders.isEmpty() && pathMatcher.matches(mapping, path)) {
+                path = pathMatcher.extractPathWithinPattern(mapping, path);
+                //A request to the root of the mapping
+                if (StringUtils.isEmpty(path)) {
+                    path = INDEX_PAGE;
+                }
+                if (path.startsWith("/")) {
+                    path = path.substring(1);
+                }
+                for (ResourceLoader loader : loaders) {
+                    Optional<URL> resource = loader.getResource(path);
+                    if (resource.isPresent()) {
+                        return resource;
+                    } else {
+                        if (path.indexOf('.') == -1) {
+                            if (!path.endsWith("/")) {
+                                path = path + "/";
+                            }
+                            path += INDEX_PAGE;
+                            resource = loader.getResource(path);
+                            if (resource.isPresent()) {
+                                return resource;
+                            }
                         }
                     }
                 }
             }
         }
+
         return Optional.empty();
     }
 }
