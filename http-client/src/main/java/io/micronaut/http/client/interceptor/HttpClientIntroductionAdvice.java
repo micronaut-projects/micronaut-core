@@ -23,7 +23,6 @@ import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.context.BeanContext;

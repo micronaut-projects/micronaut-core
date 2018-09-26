@@ -17,6 +17,7 @@
 package io.micronaut.http.uri;
 
 import io.micronaut.core.beans.BeanMap;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.io.UnsupportedEncodingException;
@@ -30,7 +31,6 @@ import java.util.Optional;
 import java.util.StringJoiner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 /**
  * <p>A Fast Implementation of URI Template specification. See https://tools.ietf.org/html/rfc6570 and
@@ -453,7 +453,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
         if (len > 1) {
             boolean isVar = templateString.charAt(0) == VAR_START;
             if (isVar) {
-                switch (templateString.charAt(1)){
+                switch (templateString.charAt(1)) {
                     case SLASH_OPERATOR:
                     case QUERY_OPERATOR:
                     case HASH_OPERATOR:
@@ -471,7 +471,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
     /**
      * Represents an expandable path segment.
      */
-    protected interface PathSegment extends CharSequence{
+    protected interface PathSegment extends CharSequence {
         /**
          * @return Whether this segment is part of the query string
          */
@@ -914,6 +914,11 @@ public class UriTemplate implements Comparable<UriTemplate> {
                         found = Arrays.asList((Object[]) found);
                     }
                     boolean isQuery = UriTemplateParser.this.operator == QUERY_OPERATOR;
+                    
+                    if (modifierChar == EXPAND_MODIFIER) {
+                        found = expandPOJO(found); // Turn POJO into a Map
+                    }
+                    
                     if (found instanceof Iterable) {
                         Iterable iter = ((Iterable) found);
                         if (iter instanceof Collection && ((Collection) iter).isEmpty()) {
@@ -952,19 +957,21 @@ public class UriTemplate implements Comparable<UriTemplate> {
                             joiner = new StringJoiner(delimiter);
                         }
 
-                        map.forEach((key, value) -> {
+                        map.forEach((key, some) -> {
                             String ks = key.toString();
-                            String vs = value == null ? "" : value.toString();
-                            String ek = encode ? encode(ks, isQuery) : escape(ks);
-                            String ev = encode ? encode(vs, isQuery) : escape(vs);
-                            if (modifierChar == EXPAND_MODIFIER) {
-                                String finalValue = ek + '=' + ev;
-                                joiner.add(finalValue);
-
-                            } else {
-                                joiner.add(ek);
-                                joiner.add(ev);
-                            }
+                            Iterable<?> values = (some instanceof Iterable) ? (Iterable) some : Arrays.asList(some);
+                            values.forEach(value -> {
+                                String vs = value == null ? "" : value.toString();
+                                String ek = encode ? encode(ks, isQuery) : escape(ks);
+                                String ev = encode ? encode(vs, isQuery) : escape(vs);
+                                if (modifierChar == EXPAND_MODIFIER) {
+                                    String finalValue = ek + '=' + ev;
+                                    joiner.add(finalValue);
+                                } else {
+                                    joiner.add(ek);
+                                    joiner.add(ev);
+                                }
+                            });
                         });
                         result = joiner.toString();
                     } else {
@@ -1006,6 +1013,19 @@ public class UriTemplate implements Comparable<UriTemplate> {
                 }
 
 
+            }
+
+            private Object expandPOJO(Object found) {
+                // Check for common expanded types, such as list or Map
+                if (found instanceof Iterable || found instanceof Map) {
+                    return found;
+                }
+                // If a simple value, just use that
+                if (found == null || ClassUtils.isJavaLangType(found.getClass())) {
+                    return found;
+                }
+                // Otherwise, expand the object into properties (after all, the user asked for an expanded parameter)
+                return BeanMap.of(found);
             }
         }
     }
