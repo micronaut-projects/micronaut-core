@@ -16,6 +16,7 @@
 
 package io.micronaut.context.env;
 
+import io.micronaut.context.annotation.Property;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -340,7 +341,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
      */
     protected Map<String, Object> resolveSubMap(String name, Map<String, Object> entries, ArgumentConversionContext<?> conversionContext) {
         // special handling for maps for resolving sub keys
-        Map<String, Object> subMap = new LinkedHashMap<>();
+        Map<String, Object> subMap = new LinkedHashMap<>(entries.size());
         AnnotationMetadata annotationMetadata = conversionContext.getAnnotationMetadata();
         StringConvention keyConvention = annotationMetadata.getValue(MapFormat.class, "keyFormat", StringConvention.class).orElse(StringConvention.RAW);
         String prefix = name + '.';
@@ -352,7 +353,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                         MapFormat.class,
                         "transformation",
                         MapFormat.MapTransformation.class)
-                        .orElse(MapFormat.MapTransformation.NESTED);
+                        .orElse(conversionContext.isAnnotationPresent(Property.class) ? MapFormat.MapTransformation.FLAT : MapFormat.MapTransformation.NESTED);
 
                 if (transformation == MapFormat.MapTransformation.FLAT) {
                     subMapKey = keyConvention.format(subMapKey);
@@ -369,10 +370,16 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                         if (!subMap.containsKey(mapKey)) {
                             subMap.put(mapKey, new LinkedHashMap<>());
                         }
-                        Map<String, Object> nestedMap = (Map<String, Object>) subMap.get(mapKey);
-                        String nestedKey = subMapKey.substring(index + 1);
-                        keyConvention.format(nestedKey);
-                        nestedMap.put(nestedKey, value);
+                        final Object v = subMap.get(mapKey);
+                        if (v instanceof Map) {
+
+                            Map<String, Object> nestedMap = (Map<String, Object>) v;
+                            String nestedKey = subMapKey.substring(index + 1);
+                            keyConvention.format(nestedKey);
+                            nestedMap.put(nestedKey, value);
+                        } else {
+                            subMap.put(mapKey, v);
+                        }
                     }
                 }
             }
