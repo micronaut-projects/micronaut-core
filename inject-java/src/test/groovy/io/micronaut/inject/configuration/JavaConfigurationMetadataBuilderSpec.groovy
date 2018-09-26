@@ -17,9 +17,12 @@ package io.micronaut.inject.configuration
 
 import com.sun.tools.javac.model.JavacElements
 import com.sun.tools.javac.model.JavacTypes
+import com.sun.tools.javac.processing.JavacProcessingEnvironment
 import com.sun.tools.javac.util.Context
 import groovy.json.JsonSlurper
+import io.micronaut.annotation.processing.AnnotationUtils
 import io.micronaut.annotation.processing.JavaConfigurationMetadataBuilder
+import io.micronaut.annotation.processing.ModelUtils
 import io.micronaut.inject.AbstractTypeElementSpec
 
 import javax.lang.model.element.TypeElement
@@ -466,10 +469,15 @@ class GrandParentProperties {
         context.put(JavaFileManager, compiler.getStandardFileManager(diagnosticCollector, Locale.getDefault(), UTF_8))
         def elements = JavacElements.instance(context)
         def types = JavacTypes.instance(context)
+        def env = JavacProcessingEnvironment.instance(new Context())
+        ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
+        AnnotationUtils annotationUtils = new AnnotationUtils(elements, env.messager, env.typeUtils, modelUtils, env.filer) {
+        }
 
         JavaConfigurationMetadataBuilder builder = new JavaConfigurationMetadataBuilder(
                 elements,
-                types
+                types,
+                new AnnotationUtils(elements, env.messager, env.typeUtils, modelUtils, env.filer)
         )
         builder
     }

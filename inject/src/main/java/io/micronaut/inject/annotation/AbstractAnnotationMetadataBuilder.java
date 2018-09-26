@@ -19,7 +19,6 @@ package io.micronaut.inject.annotation;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Aliases;
 import io.micronaut.context.annotation.DefaultScope;
-import io.micronaut.core.annotation.AnnotationMapper;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -27,6 +26,7 @@ import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.OptionalValues;
+import io.micronaut.inject.visitor.VisitorContext;
 
 import javax.annotation.Nullable;
 import javax.inject.Scope;
@@ -42,20 +42,28 @@ import java.util.*;
  */
 public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
-    private Map<String, List<AnnotationMapper>> annotationMapperMap = new HashMap<>();
+    private static final Map<String, List<AnnotationMapper>> ANNOTATION_MAPPERS = new HashMap<>();
+
+    static {
+        SoftServiceLoader<AnnotationMapper> serviceLoader = SoftServiceLoader.load(AnnotationMapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader());
+        for (ServiceDefinition<AnnotationMapper> definition : serviceLoader) {
+            if (definition.isPresent()) {
+                AnnotationMapper mapper = definition.load();
+                try {
+                    Class annotationType = mapper.annotationType();
+                    ANNOTATION_MAPPERS.computeIfAbsent(annotationType.getName(), s -> new ArrayList<>()).add(mapper);
+                } catch (Throwable e) {
+                    // mapper, missing dependencies, continue
+                }
+            }
+        }
+    }
 
     /**
      * Default constructor.
      */
     protected AbstractAnnotationMetadataBuilder() {
-        SoftServiceLoader<AnnotationMapper> serviceLoader = SoftServiceLoader.load(AnnotationMapper.class, getClass().getClassLoader());
-        for (ServiceDefinition<AnnotationMapper> definition : serviceLoader) {
-            if (definition.isPresent()) {
-                AnnotationMapper mapper = definition.load();
-                Class annotationType = mapper.annotationType();
-                annotationMapperMap.computeIfAbsent(annotationType.getName(), s -> new ArrayList<>()).add(mapper);
-            }
-        }
+
     }
 
     /**
@@ -305,11 +313,12 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 }
             }
         }
-        List<AnnotationMapper> mappers = annotationMapperMap.get(annotationName);
+        List<AnnotationMapper> mappers = ANNOTATION_MAPPERS.get(annotationName);
         if (mappers != null) {
             AnnotationValue<?> annotationValue = new AnnotationValue(annotationName, annotationValues);
+            VisitorContext visitorContext = createVisitorContext();
             for (AnnotationMapper mapper : mappers) {
-                List mapped = mapper.map(annotationValue);
+                List mapped = mapper.map(annotationValue, visitorContext);
                 if (mapped != null) {
                     for (Object o : mapped) {
                         if (o instanceof AnnotationValue) {
@@ -342,6 +351,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
         return annotationValues;
     }
+
+    /**
+     * Creates the visitor context for this implementation.
+     *
+     * @return The visitor context
+     */
+    protected abstract VisitorContext createVisitorContext();
 
     private void processAnnotationAlias(
             DefaultAnnotationMetadata metadata,

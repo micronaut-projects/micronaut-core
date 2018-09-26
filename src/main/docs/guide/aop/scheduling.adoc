@@ -79,3 +79,9 @@ micronaut:
 ----
 
 include::{includedir}configurationProperties/io.micronaut.scheduling.executor.UserExecutorConfiguration.adoc[]
+
+== Handling Exceptions
+
+By default Micronaut includes a api:io.micronaut.scheduling.DefaultTaskExceptionHandler[] bean that implements the api:io.micronaut.scheduling.TaskExceptionHandler[] and simply logs the exception if an error occurs invoking a scheduled task.
+
+If you have custom requirements you can replace this bean with a custom implementation (for example if you wish to send an email or shutdown context to fail fast). To do so simply write your own api:io.micronaut.scheduling.TaskExceptionHandler[] and annotated it with `@Replaces(DefaultTaskExceptionHandler.class)`.
