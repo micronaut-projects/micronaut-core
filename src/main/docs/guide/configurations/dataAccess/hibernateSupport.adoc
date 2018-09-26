@@ -28,7 +28,12 @@ And that is it. For each registered SQL `DataSource`, Micronaut will configure t
 
 ==== Injecting an EntityManager or Hibernate Session
 
-You can use the `javax.persistence.PersistenceContext` annotation to inject an `EntityManager` (or Hibernate `Session`):
+You can use the `javax.persistence.PersistenceContext` annotation to inject an `EntityManager` (or Hibernate `Session`). To do so you need to make sure the JPA annotations are on the `annotationProcessor` path in your build:
+
+.Adding the JPA dependency to `annotationProcessor` in Gradle
+----
+annotationProcessor "javax.persistence:javax.persistence-api:2.2"
+----
 
 .Using `@PersistenceContext`
 ----
@@ -41,7 +46,7 @@ EntityManager otherManager;
 
 Micronaut will inject a compile time scoped proxy that retrieves the `EntityManager` associated with the current transaction when using ann:spring.tx.annotation.Transactional[] (see "Using Spring Transaction Management" below).
 
-Note the examples above use field injection, the `@PersistenceContext` annotation does not support declaration on a parameter of a constructor or method argument. Therefore if you wish to instead use constructor or method injection you must use the ann:configuration.hibernate.jpa.scope.CurrentSession[] instead:
+Note the examples above use field injection, since the `@PersistenceContext` annotation does not support declaration on a parameter of a constructor or method argument. Therefore if you wish to instead use constructor or method injection you must use the ann:configuration.hibernate.jpa.scope.CurrentSession[] instead:
 
 .Using `@CurrentSession` for constructor injection
 ----

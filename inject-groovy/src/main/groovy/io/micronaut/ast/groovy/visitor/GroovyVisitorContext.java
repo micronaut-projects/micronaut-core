@@ -16,12 +16,18 @@
 
 package io.micronaut.ast.groovy.visitor;
 
+import groovy.lang.GroovyClassLoader;
+import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
+import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.ClassHelper;
+import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.control.ErrorCollector;
 import org.codehaus.groovy.control.Janitor;
 import org.codehaus.groovy.control.SourceUnit;
@@ -29,6 +35,7 @@ import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
 import java.io.File;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -52,13 +59,37 @@ public class GroovyVisitorContext extends MutableConvertibleValuesMap<Object> im
     }
 
     @Override
+    public Optional<ClassElement> getClassElement(String name) {
+        if (name == null) {
+            return Optional.empty();
+        }
+        List<ClassNode> classes = sourceUnit.getAST().getClasses();
+        for (ClassNode aClass : classes) {
+            if (name.equals(aClass.getName())) {
+                return Optional.of(new GroovyClassElement(sourceUnit, aClass, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, aClass)));
+            }
+        }
+
+        GroovyClassLoader classLoader = sourceUnit.getClassLoader();
+        if (classLoader != null) {
+            return ClassUtils.forName(name, classLoader).map(aClass -> {
+                ClassNode cn = ClassHelper.make(aClass);
+                return new GroovyClassElement(sourceUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, cn));
+            });
+        }
+        return Optional.empty();
+    }
+
+    @Override
     public void info(String message, Element element) {
-        // no-op
+        ASTNode expr = (ASTNode) element.getNativeType();
+        final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
+        System.err.println("Note: " + message + "\n\n" + sample);
     }
 
     @Override
     public void info(String message) {
-        // no-op
+        System.out.println("Note: " + message);
     }
 
     @Override

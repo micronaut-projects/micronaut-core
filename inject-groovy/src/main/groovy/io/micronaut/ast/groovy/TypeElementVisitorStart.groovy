@@ -57,7 +57,7 @@ class TypeElementVisitorStart implements ASTTransformation {
                 if (definition.isPresent()) {
                     TypeElementVisitor visitor = definition.load()
                     try {
-                        LoadedVisitor newLoadedVisitor = new LoadedVisitor(visitor)
+                        LoadedVisitor newLoadedVisitor = new LoadedVisitor(source, visitor)
                         loadedVisitors.put(definition.getName(), newLoadedVisitor)
                     } catch (TypeNotPresentException e) {
                         // skip, all classes not on classpath
@@ -75,7 +75,7 @@ class TypeElementVisitorStart implements ASTTransformation {
                 for (v in val.split(",")) {
                     def visitor = InstantiationUtils.tryInstantiate(v, source.classLoader).orElse(null)
                     if (visitor instanceof TypeElementVisitor) {
-                        LoadedVisitor newLoadedVisitor = new LoadedVisitor(visitor)
+                        LoadedVisitor newLoadedVisitor = new LoadedVisitor(source, visitor)
                         loadedVisitors.put(visitor.getClass().getName(), newLoadedVisitor)
                     }
                 }

@@ -19,7 +19,6 @@ package io.micronaut.http.server.netty.types.files;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.netty.channel.ChannelHandlerContext;
@@ -27,11 +26,9 @@ import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
 import io.netty.handler.stream.ChunkedStream;
-import io.netty.handler.stream.ChunkedWriteHandler;
 
 import java.io.InputStream;
 import java.net.URL;
-import java.util.Optional;
 
 /**
  * Writes an {@link InputStream} to the Netty context.
@@ -75,11 +72,6 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
     public void write(HttpRequest<?> request, MutableHttpResponse<?> response, ChannelHandlerContext context) {
         if (response instanceof NettyMutableHttpResponse) {
             FullHttpResponse nettyResponse = ((NettyMutableHttpResponse) response).getNativeResponse();
-
-            //The streams codec prevents non full responses from being written
-            Optional
-                .ofNullable(context.pipeline().get(NettyHttpServer.HTTP_STREAMS_CODEC))
-                .ifPresent(handler -> context.pipeline().replace(handler, "chunked-handler", new ChunkedWriteHandler()));
 
             // Write the request data
             context.write(new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), nettyResponse.headers()), context.voidPromise());

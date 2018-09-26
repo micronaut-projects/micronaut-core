@@ -21,16 +21,20 @@ import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.annotation.processing.ModelUtils;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
 
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
+import java.util.Collections;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * The visitor context when visiting Java code.
@@ -63,6 +67,14 @@ public class JavaVisitorContext extends MutableConvertibleValuesMap<Object> impl
         this.types = types;
         this.modelUtils = modelUtils;
         this.outputVisitor = new AnnotationProcessingOutputVisitor(filer);
+    }
+
+    @Override
+    public Optional<ClassElement> getClassElement(String name) {
+        TypeElement typeElement = elements.getTypeElement(name);
+        return Optional.ofNullable(typeElement).map(typeElement1 ->
+                new JavaClassElement(typeElement1, annotationUtils.getAnnotationMetadata(typeElement1), this, Collections.emptyList())
+        );
     }
 
     @Override

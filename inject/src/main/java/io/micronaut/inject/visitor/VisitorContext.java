@@ -18,6 +18,7 @@ package io.micronaut.inject.visitor;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.writer.GeneratedFile;
 
@@ -81,4 +82,27 @@ public interface VisitorContext extends MutableConvertibleValues<Object> {
      */
     @Experimental
     Optional<GeneratedFile> visitGeneratedFile(String path);
+
+    /**
+     * This method will lookup another class element by name. If it cannot be found an empty optional will be returned.
+     *
+     * @param name The name
+     * @return The class element
+     */
+    default Optional<ClassElement> getClassElement(String name) {
+        return Optional.empty();
+    }
+
+    /**
+     * This method will lookup another class element by name. If it cannot be found an empty optional will be returned.
+     *
+     * @param type The name
+     * @return The class element
+     */
+    default Optional<ClassElement> getClassElement(Class<?> type) {
+        if (type != null) {
+            return getClassElement(type.getName());
+        }
+        return Optional.empty();
+    }
 }

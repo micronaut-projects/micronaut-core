@@ -269,6 +269,16 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             }
         );
 
+        // Date -> CharSequence
+        addConverter(
+                Date.class,
+                CharSequence.class,
+                (object, targetType, context) -> {
+                    SimpleDateFormat format = resolveFormat(context);
+                    return Optional.of(format.format(object));
+                }
+        );
+
         // String -> Integer
         addConverter(CharSequence.class, Integer.class, (CharSequence object, Class<Integer> targetType, ConversionContext context) -> {
             try {

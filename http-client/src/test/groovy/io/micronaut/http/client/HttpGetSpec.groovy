@@ -16,6 +16,7 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.convert.format.Format
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -33,6 +34,9 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
+
+import java.time.LocalDate
+import java.time.LocalDateTime
 
 /**
  * @author Graeme Rocher
@@ -296,6 +300,8 @@ class HttpGetSpec extends Specification {
 
         expect:
         client.queryParam('{"service":["test"]}') == '{"service":["test"]}'
+        client.queryParam('foo', 'bar') == 'foo-bar'
+        client.queryParam('foo%', 'bar') == 'foo%-bar'
     }
 
     void "test body availability"() {
@@ -361,6 +367,19 @@ class HttpGetSpec extends Specification {
         client.close()
     }
 
+    void 'test format dates with @Format'() {
+        given:
+        MyGetClient client = embeddedServer.applicationContext.getBean(MyGetClient)
+        Date d = new Date(2018, 10, 20)
+        LocalDate dt = LocalDate.now()
+
+        expect:
+        client.formatDate(d) == d.toString()
+        client.formatDateQuery(d) == d.toString()
+        client.formatDateTime(dt) == dt.toString()
+        client.formatDateTimeQuery(dt) == dt.toString()
+    }
+
     @Controller("/get")
     static class GetController {
 
@@ -394,9 +413,34 @@ class HttpGetSpec extends Specification {
             return foo
         }
 
+        @Get("/multipleQueryParam")
+        String queryParam(@QueryValue String foo, @QueryValue String bar) {
+            return foo + '-' + bar
+        }
+
         @Get("/empty")
         Optional<String> empty() {
             return Optional.empty()
+        }
+
+        @Get("/date/{myDate}")
+        String formatDate(@Format('yyyy-MM-dd') Date myDate) {
+            return myDate.toString()
+        }
+
+        @Get("/dateTime/{myDate}")
+        String formatDateTime(@Format('yyyy-MM-dd') LocalDate myDate) {
+            return myDate.toString()
+        }
+
+        @Get("/dateQuery")
+        String formatDateQuery(@QueryValue @Format('yyyy-MM-dd') Date myDate) {
+            return myDate.toString()
+        }
+
+        @Get("/dateTimeQuery")
+        String formatDateTimeQuery(@QueryValue @Format('yyyy-MM-dd') LocalDate myDate) {
+            return myDate.toString()
         }
     }
 
@@ -427,6 +471,22 @@ class HttpGetSpec extends Specification {
 
         @Get("/queryParam")
         String queryParam(@QueryValue String foo)
+
+        @Get("/multipleQueryParam")
+        String queryParam(@QueryValue String foo, @QueryValue String bar)
+
+        @Get("/date/{myDate}")
+        String formatDate(@Format('yyyy-MM-dd') Date myDate)
+
+        @Get("/dateTime/{myDate}")
+        String formatDateTime(@Format('yyyy-MM-dd') LocalDate myDate)
+
+        @Get("/dateQuery")
+        String formatDateQuery(@QueryValue @Format('yyyy-MM-dd') Date myDate)
+
+        @Get("/dateTimeQuery")
+        String formatDateTimeQuery(@QueryValue @Format('yyyy-MM-dd') LocalDate myDate)
+
     }
 
     @javax.inject.Singleton
