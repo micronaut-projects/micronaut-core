@@ -1,0 +1,2 @@
+io.micronaut.security.annotation.PermitAllAnnotationMapper
+io.micronaut.security.annotation.RolesAllowedAnnotationMapper

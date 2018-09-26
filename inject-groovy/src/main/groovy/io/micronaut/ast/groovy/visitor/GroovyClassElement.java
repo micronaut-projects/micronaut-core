@@ -27,6 +27,8 @@ import io.micronaut.inject.ast.PropertyElement;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.PropertyNode;
+import org.codehaus.groovy.control.SourceUnit;
+
 import java.lang.reflect.Modifier;
 import java.util.*;
 
@@ -38,15 +40,18 @@ import java.util.*;
  */
 public class GroovyClassElement extends AbstractGroovyElement implements ClassElement {
 
+    private final SourceUnit sourceUnit;
     private final ClassNode classNode;
 
     /**
+     * @param sourceUnit         The source unit
      * @param classNode          The {@link ClassNode}
      * @param annotationMetadata The annotation metadata
      */
-    GroovyClassElement(ClassNode classNode, AnnotationMetadata annotationMetadata) {
+    GroovyClassElement(SourceUnit sourceUnit, ClassNode classNode, AnnotationMetadata annotationMetadata) {
         super(annotationMetadata);
         this.classNode = classNode;
+        this.sourceUnit = sourceUnit;
     }
 
     @Override
@@ -58,9 +63,9 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                 ClassNode cn = entry.getValue();
                 GroovyClassElement classElement;
                 if (cn.isEnum()) {
-                    classElement = new GroovyEnumElement(cn, AstAnnotationUtils.getAnnotationMetadata(cn));
+                    classElement = new GroovyEnumElement(sourceUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, cn));
                 } else {
-                    classElement = new GroovyClassElement(cn, AstAnnotationUtils.getAnnotationMetadata(cn));
+                    classElement = new GroovyClassElement(sourceUnit, cn, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, cn));
                 }
                 map.put(entry.getKey(), classElement);
             }
@@ -78,8 +83,8 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
             if (propertyNode.isPublic() && !propertyNode.isStatic()) {
                 groovyProps.add(propertyNode.getName());
                 GroovyPropertyElement groovyPropertyElement = new GroovyPropertyElement(
-                        AstAnnotationUtils.getAnnotationMetadata(propertyNode.getField()),
-                        new GroovyClassElement(propertyNode.getType(),
+                        AstAnnotationUtils.getAnnotationMetadata(sourceUnit, propertyNode.getField()),
+                        new GroovyClassElement(sourceUnit, propertyNode.getType(),
                                 AnnotationMetadata.EMPTY_METADATA),
                         propertyNode.getName(),
                         false,
@@ -118,14 +123,14 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                             if (groovyProps.contains(propertyName)) {
                                 return;
                             }
-                            ClassElement getterReturnType = new GroovyClassElement(node.getReturnType(), AnnotationMetadata.EMPTY_METADATA);
+                            ClassElement getterReturnType = new GroovyClassElement(sourceUnit, node.getReturnType(), AnnotationMetadata.EMPTY_METADATA);
 
                             GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
                             getterAndSetter.type = getterReturnType;
                             getterAndSetter.getter = node;
                             if (getterAndSetter.setter != null) {
                                 ClassNode typeMirror = getterAndSetter.setter.getParameters()[0].getType();
-                                ClassElement setterParameterType = new GroovyClassElement(typeMirror, AnnotationMetadata.EMPTY_METADATA);
+                                ClassElement setterParameterType = new GroovyClassElement(sourceUnit, typeMirror, AnnotationMetadata.EMPTY_METADATA);
                                 if (!setterParameterType.getName().equals(getterReturnType.getName())) {
                                     getterAndSetter.setter = null; // not a compatible setter
                                 }
@@ -136,7 +141,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                                 return;
                             }
                             ClassNode typeMirror = node.getParameters()[0].getType();
-                            ClassElement setterParameterType = new GroovyClassElement(typeMirror, AnnotationMetadata.EMPTY_METADATA);
+                            ClassElement setterParameterType = new GroovyClassElement(sourceUnit, typeMirror, AnnotationMetadata.EMPTY_METADATA);
 
                             GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
                             ClassElement propertyType = getterAndSetter.type;
@@ -155,7 +160,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                 String propertyName = entry.getKey();
                 GetterAndSetter value = entry.getValue();
                 if (value.getter != null) {
-                    GroovyPropertyElement propertyElement = new GroovyPropertyElement(AstAnnotationUtils.getAnnotationMetadata(value.getter), value.type, propertyName, value.setter == null, value.getter);
+                    GroovyPropertyElement propertyElement = new GroovyPropertyElement(AstAnnotationUtils.getAnnotationMetadata(sourceUnit, value.getter), value.type, propertyName, value.setter == null, value.getter);
                     propertyElements.add(propertyElement);
                 }
             }

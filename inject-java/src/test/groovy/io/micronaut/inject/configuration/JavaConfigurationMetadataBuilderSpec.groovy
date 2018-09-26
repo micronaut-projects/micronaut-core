@@ -469,7 +469,7 @@ class GrandParentProperties {
 
         JavaConfigurationMetadataBuilder builder = new JavaConfigurationMetadataBuilder(
                 elements,
-                types
+                types, annotationUtils
         )
         builder
     }

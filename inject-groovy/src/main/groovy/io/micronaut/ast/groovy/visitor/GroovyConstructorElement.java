@@ -19,6 +19,7 @@ package io.micronaut.ast.groovy.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ConstructorElement;
 import org.codehaus.groovy.ast.ConstructorNode;
+import org.codehaus.groovy.control.SourceUnit;
 
 /**
  * A {@link ConstructorElement} for Groovy.
@@ -28,10 +29,11 @@ import org.codehaus.groovy.ast.ConstructorNode;
  */
 public class GroovyConstructorElement extends GroovyMethodElement implements ConstructorElement {
     /**
+     * @param sourceUnit         The source unit
      * @param methodNode         The {@link ConstructorNode}
      * @param annotationMetadata The annotation metadata
      */
-    GroovyConstructorElement(ConstructorNode methodNode, AnnotationMetadata annotationMetadata) {
-        super(methodNode, annotationMetadata);
+    GroovyConstructorElement(SourceUnit sourceUnit, ConstructorNode methodNode, AnnotationMetadata annotationMetadata) {
+        super(sourceUnit, methodNode, annotationMetadata);
     }
 }

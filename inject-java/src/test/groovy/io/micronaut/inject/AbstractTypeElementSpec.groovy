@@ -20,7 +20,7 @@ import com.sun.tools.javac.util.Context
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
-import io.micronaut.inject.annotation.JavaAnnotationMetadataBuilder
+import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import io.micronaut.support.Parser
 import spock.lang.Specification
