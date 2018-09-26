@@ -1537,12 +1537,15 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
             valString = valueAnnStr;
         } else {
             valString = annotationMetadata.getValue(Property.class, "name", String.class)
-                    .orElseThrow(() ->
-                            new DependencyInjectionException(
-                                    resolutionContext,
-                                    argument,
-                                    "Value resolution attempted but @Value annotation is missing"
-                            )
+                    .orElseGet(() ->
+                            argument.getAnnotationMetadata().getValue(Property.class, "name", String.class)
+                                    .orElseThrow(() ->
+                                            new DependencyInjectionException(
+                                                    resolutionContext,
+                                                    argument,
+                                                    "Value resolution attempted but @Value annotation is missing"
+                                            )
+                                    )
                     );
 
             valString = substituteWildCards(resolutionContext, valString);
