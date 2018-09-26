@@ -53,7 +53,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         this.elementUtils = processingEnv.getElementUtils();
         this.typeUtils = processingEnv.getTypeUtils();
         this.modelUtils = new ModelUtils(elementUtils, typeUtils);
-        this.annotationUtils = new AnnotationUtils(elementUtils);
+        this.annotationUtils = new AnnotationUtils(elementUtils,  messager, typeUtils, modelUtils, filer);
         this.genericUtils = new GenericUtils(elementUtils, typeUtils, modelUtils);
     }
 

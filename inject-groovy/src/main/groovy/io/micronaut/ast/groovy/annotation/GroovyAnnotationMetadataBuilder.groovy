@@ -17,11 +17,13 @@ package io.micronaut.ast.groovy.annotation
 
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.ExtendedParameter
+import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.util.StringUtils
 import io.micronaut.core.value.OptionalValues
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
+import io.micronaut.inject.visitor.VisitorContext
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.AnnotationNode
 import org.codehaus.groovy.ast.ClassHelper
@@ -36,6 +38,7 @@ import org.codehaus.groovy.ast.expr.ListExpression
 import org.codehaus.groovy.ast.expr.PropertyExpression
 import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.Statement
+import org.codehaus.groovy.control.SourceUnit
 
 import java.lang.annotation.Repeatable
 import java.lang.reflect.Array
@@ -50,6 +53,17 @@ import java.lang.reflect.Array
 class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<AnnotatedNode, AnnotationNode> {
     public static Map<String, Map<? extends AnnotatedNode, Expression>> ANNOTATION_DEFAULTS = new LinkedHashMap<>()
     public static final ClassNode ANN_OVERRIDE = ClassHelper.make(Override.class)
+
+    final SourceUnit sourceUnit
+
+    GroovyAnnotationMetadataBuilder(SourceUnit sourceUnit) {
+        this.sourceUnit = sourceUnit
+    }
+
+    @Override
+    protected VisitorContext createVisitorContext() {
+        return new GroovyVisitorContext(sourceUnit)
+    }
 
     @Override
     protected AnnotatedNode getTypeForAnnotation(AnnotationNode annotationMirror) {

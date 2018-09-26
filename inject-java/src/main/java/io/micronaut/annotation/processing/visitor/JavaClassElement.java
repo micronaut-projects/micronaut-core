@@ -68,6 +68,16 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     }
 
     @Override
+    public boolean isAbstract() {
+        return classElement.getModifiers().contains(Modifier.ABSTRACT);
+    }
+
+    @Override
+    public boolean isInterface() {
+        return classElement.getKind() == ElementKind.INTERFACE;
+    }
+
+    @Override
     public List<PropertyElement> getBeanProperties() {
         Map<String, GetterAndSetter> props = new LinkedHashMap<>();
 

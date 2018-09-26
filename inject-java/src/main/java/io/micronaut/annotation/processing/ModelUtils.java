@@ -69,7 +69,7 @@ public class ModelUtils {
      * @param elementUtils The {@link Elements}
      * @param typeUtils    The {@link Types}
      */
-    ModelUtils(Elements elementUtils, Types typeUtils) {
+    protected ModelUtils(Elements elementUtils, Types typeUtils) {
         this.elementUtils = elementUtils;
         this.typeUtils = typeUtils;
     }

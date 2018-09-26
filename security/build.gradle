@@ -1,7 +1,3 @@
-ext {
-    javaxAnnotationApiVersion='1.3.2'
-}
-
 dependencies {
     compileOnly project(":inject-java")
     compile project(":runtime")
@@ -11,7 +7,6 @@ dependencies {
     testCompile project(":http-client")
     testCompile project(":inject-java")
     compile project(':configurations:hibernate-validator')
-    compile "javax.annotation:javax.annotation-api:$javaxAnnotationApiVersion"
     testCompile project(":inject-groovy")
     testCompile project(":http-server-netty")
     testCompile project(":test-utils")

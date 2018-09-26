@@ -16,11 +16,16 @@
 package io.micronaut.inject
 
 import com.sun.tools.javac.model.JavacElements
+import com.sun.tools.javac.processing.JavacMessager
+import com.sun.tools.javac.processing.JavacProcessingEnvironment
 import com.sun.tools.javac.util.Context
+import groovy.transform.CompileStatic
+import io.micronaut.annotation.processing.AnnotationUtils
+import io.micronaut.annotation.processing.ModelUtils
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
-import io.micronaut.inject.annotation.JavaAnnotationMetadataBuilder
+import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import io.micronaut.support.Parser
 import spock.lang.Specification
@@ -36,17 +41,20 @@ import javax.tools.JavaFileObject
  * @since 1.0
  */
 abstract class AbstractTypeElementSpec extends Specification {
+    @CompileStatic
     AnnotationMetadata buildTypeAnnotationMetadata(String cls) {
         Element element = buildTypeElement(cls)
-        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(JavacElements.instance(new Context()))
+        JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = element != null ? builder.build(element) : null
         return metadata
     }
 
+
+
     AnnotationMetadata buildMethodAnnotationMetadata(String cls, String methodName) {
         TypeElement element = buildTypeElement(cls)
         Element method = element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
-        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(JavacElements.instance(new Context()))
+        JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = method != null ? builder.build(method) : null
         return metadata
     }
@@ -55,7 +63,7 @@ abstract class AbstractTypeElementSpec extends Specification {
         TypeElement element = buildTypeElement(cls)
         ExecutableElement method = (ExecutableElement)element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
         VariableElement argument = method.parameters.find() { it.simpleName.toString() == fieldName }
-        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(JavacElements.instance(new Context()))
+        JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = argument != null ? builder.build(argument) : null
         return metadata
     }
@@ -127,5 +135,15 @@ abstract class AbstractTypeElementSpec extends Specification {
 
         AnnotationMetadata metadata = (AnnotationMetadata) classLoader.loadClass(className).newInstance()
         return metadata
+    }
+
+    private static JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
+        def env = JavacProcessingEnvironment.instance(new Context())
+        def elements = JavacElements.instance(new Context())
+        ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
+        AnnotationUtils annotationUtils = new AnnotationUtils(elements, env.messager, env.typeUtils, modelUtils, env.filer) {
+        }
+        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils, env.typeUtils, modelUtils, env.filer)
+        return builder
     }
 }

@@ -17,14 +17,18 @@
 package io.micronaut.annotation.processing.test
 
 import com.sun.tools.javac.model.JavacElements
+import com.sun.tools.javac.processing.JavacProcessingEnvironment
 import com.sun.tools.javac.util.Context
+import groovy.transform.CompileStatic
+import io.micronaut.annotation.processing.AnnotationUtils
+import io.micronaut.annotation.processing.ModelUtils
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.BeanConfiguration
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
-import io.micronaut.inject.annotation.JavaAnnotationMetadataBuilder
+import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import spock.lang.Specification
 
@@ -47,9 +51,10 @@ abstract class AbstractTypeElementSpec extends Specification {
      * @param cls The class string
      * @return The annotation metadata for the class
      */
+    @CompileStatic
     AnnotationMetadata buildTypeAnnotationMetadata(String cls) {
         Element element = buildTypeElement(cls)
-        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(JavacElements.instance(new Context()))
+        JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = element != null ? builder.build(element) : null
         return metadata
     }
@@ -59,10 +64,11 @@ abstract class AbstractTypeElementSpec extends Specification {
      * @param methodName The method name
      * @return The annotation metadata for the method
      */
+    @CompileStatic
     AnnotationMetadata buildMethodAnnotationMetadata(String cls, String methodName) {
         TypeElement element = buildTypeElement(cls)
         Element method = element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
-        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(JavacElements.instance(new Context()))
+        JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = method != null ? builder.build(method) : null
         return metadata
     }
@@ -73,11 +79,12 @@ abstract class AbstractTypeElementSpec extends Specification {
      * @param fieldName The field name
      * @return The annotation metadata for the field
      */
+    @CompileStatic
     AnnotationMetadata buildFieldAnnotationMetadata(String cls, String methodName, String fieldName) {
         TypeElement element = buildTypeElement(cls)
         ExecutableElement method = (ExecutableElement)element.getEnclosedElements().find() { it.simpleName.toString() == methodName }
         VariableElement argument = method.parameters.find() { it.simpleName.toString() == fieldName }
-        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(JavacElements.instance(new Context()))
+        JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = argument != null ? builder.build(argument) : null
         return metadata
     }
@@ -148,5 +155,16 @@ abstract class AbstractTypeElementSpec extends Specification {
 
         AnnotationMetadata metadata = (AnnotationMetadata) classLoader.loadClass(className).newInstance()
         return metadata
+    }
+
+    @CompileStatic
+    private static JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
+        def env = JavacProcessingEnvironment.instance(new Context())
+        def elements = JavacElements.instance(new Context())
+        ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
+        AnnotationUtils annotationUtils = new AnnotationUtils(elements, env.messager, env.typeUtils, modelUtils, env.filer) {
+        }
+        JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils, env.typeUtils, modelUtils, env.filer)
+        return builder
     }
 }

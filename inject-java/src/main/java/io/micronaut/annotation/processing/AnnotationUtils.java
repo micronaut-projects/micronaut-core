@@ -21,12 +21,14 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.annotation.JavaAnnotationMetadataBuilder;
 
+import javax.annotation.processing.Filer;
+import javax.annotation.processing.Messager;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.util.Elements;
+import javax.lang.model.util.Types;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.List;
@@ -44,12 +46,26 @@ public class AnnotationUtils {
     private static final Cache<Element, AnnotationMetadata> annotationMetadataCache = Caffeine.newBuilder().maximumSize(CACHE_SIZE).build();
 
     private final Elements elementUtils;
+    private final Messager messager;
+    private final Types types;
+    private final ModelUtils modelUtils;
+    private final Filer filer;
 
     /**
-     * @param elementUtils The {@link Elements}
+     * Default constructor.
+     *
+     * @param elementUtils The elements
+     * @param messager     The messager
+     * @param types        The types
+     * @param modelUtils   The model utils
+     * @param filer        The filer
      */
-    AnnotationUtils(Elements elementUtils) {
+    protected AnnotationUtils(Elements elementUtils, Messager messager, Types types, ModelUtils modelUtils, Filer filer) {
         this.elementUtils = elementUtils;
+        this.messager = messager;
+        this.types = types;
+        this.modelUtils = modelUtils;
+        this.filer = filer;
     }
 
     /**
@@ -104,7 +120,10 @@ public class AnnotationUtils {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata getAnnotationMetadata(Element element) {
-        return annotationMetadataCache.get(element, element1 -> new JavaAnnotationMetadataBuilder(elementUtils).build(element1));
+        return annotationMetadataCache.get(element, element1 ->
+                newAnnotationBuilder()
+                        .build(element1)
+        );
     }
 
     /**
@@ -115,7 +134,7 @@ public class AnnotationUtils {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata getAnnotationMetadata(Element parent, Element element) {
-        return new JavaAnnotationMetadataBuilder(elementUtils).buildForParent(parent, element);
+        return newAnnotationBuilder().buildForParent(parent, element);
     }
 
     /**
@@ -133,6 +152,20 @@ public class AnnotationUtils {
             }
         }
         return false;
+    }
+
+    /**
+     * Creates a new annotation builder.
+     * @return The builder
+     */
+    public JavaAnnotationMetadataBuilder newAnnotationBuilder() {
+        return new JavaAnnotationMetadataBuilder(
+                elementUtils,
+                messager,
+                this,
+                types,
+                modelUtils,
+                filer);
     }
 
     /**

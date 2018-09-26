@@ -14,14 +14,19 @@
  * limitations under the License.
  */
 
-package io.micronaut.inject.annotation;
+package io.micronaut.annotation.processing;
 
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.processing.JavaModelUtils;
+import io.micronaut.inject.visitor.VisitorContext;
 
 import javax.annotation.Nullable;
+import javax.annotation.processing.Filer;
+import javax.annotation.processing.Messager;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
@@ -33,6 +38,7 @@ import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.AbstractAnnotationValueVisitor8;
 import javax.lang.model.util.Elements;
+import javax.lang.model.util.Types;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.reflect.Array;
@@ -56,12 +62,29 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     public static final Map<String, Map<Element, javax.lang.model.element.AnnotationValue>> ANNOTATION_DEFAULTS = new HashMap<>();
 
     private final Elements elementUtils;
+    private final Messager messager;
+    private final AnnotationUtils annotationUtils;
+    private final Types types;
+    private final ModelUtils modelUtils;
+    private final Filer filer;
 
     /**
-     * @param elementUtils Element utils
+     * Default constructor.
+     *
+     * @param elements The elementUtils
+     * @param messager The messager
+     * @param annotationUtils The annotation utils
+     * @param types The types
+     * @param modelUtils The model utils
+     * @param filer The filer
      */
-    public JavaAnnotationMetadataBuilder(Elements elementUtils) {
-        this.elementUtils = elementUtils;
+    public JavaAnnotationMetadataBuilder(Elements elements, Messager messager, AnnotationUtils annotationUtils, Types types, ModelUtils modelUtils, Filer filer) {
+        this.elementUtils = elements;
+        this.messager = messager;
+        this.annotationUtils = annotationUtils;
+        this.types = types;
+        this.modelUtils = modelUtils;
+        this.filer = filer;
     }
 
     @Override
@@ -95,6 +118,18 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected Optional<Element> getAnnotationMirror(String annotationName) {
         return Optional.ofNullable(elementUtils.getTypeElement(annotationName));
+    }
+
+    @Override
+    protected VisitorContext createVisitorContext() {
+        return new JavaVisitorContext(
+                messager,
+                elementUtils,
+                annotationUtils,
+                types,
+                modelUtils,
+                filer
+        );
     }
 
     @Override

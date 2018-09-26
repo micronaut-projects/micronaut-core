@@ -84,7 +84,7 @@ class TypeElementVisitorTransform implements ASTTransformation {
             this.typeElementVisitors = typeElementVisitors
             this.concreteClass = targetClassNode
             this.sourceUnit = sourceUnit
-            this.annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(targetClassNode)
+            this.annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, targetClassNode)
             this.visitorContext = new GroovyVisitorContext(sourceUnit)
         }
 
@@ -94,7 +94,7 @@ class TypeElementVisitorTransform implements ASTTransformation {
 
         @Override
         void visitClass(ClassNode node) {
-            AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(node)
+            AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, node)
             typeElementVisitors.each {
                 it.visit(node, annotationMetadata, visitorContext)
             }
@@ -116,7 +116,7 @@ class TypeElementVisitorTransform implements ASTTransformation {
 
         @Override
         protected void visitConstructorOrMethod(MethodNode methodNode, boolean isConstructor) {
-            AnnotationMetadata methodAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(methodNode)
+            AnnotationMetadata methodAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, methodNode)
             typeElementVisitors.findAll { it.matches(methodAnnotationMetadata) }.each {
                 it.visit(methodNode, methodAnnotationMetadata, visitorContext)
             }
@@ -132,7 +132,7 @@ class TypeElementVisitorTransform implements ASTTransformation {
             if (fieldNode.isSynthetic() && !isPackagePrivate(fieldNode, fieldNode.modifiers)) {
                 return
             }
-            AnnotationMetadata fieldAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(fieldNode)
+            AnnotationMetadata fieldAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, fieldNode)
             typeElementVisitors.findAll { it.matches(fieldAnnotationMetadata) }.each {
                 it.visit(fieldNode, fieldAnnotationMetadata, visitorContext)
             }
@@ -146,7 +146,7 @@ class TypeElementVisitorTransform implements ASTTransformation {
             if (Modifier.isFinal(modifiers) || Modifier.isStatic(modifiers)) {
                 return
             }
-            AnnotationMetadata fieldAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(fieldNode)
+            AnnotationMetadata fieldAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, fieldNode)
             typeElementVisitors.findAll { it.matches(fieldAnnotationMetadata) }.each {
                 it.visit(fieldNode, fieldAnnotationMetadata, visitorContext)
             }
