@@ -42,6 +42,11 @@ public interface SecurityRule extends Ordered {
     String IS_AUTHENTICATED = "isAuthenticated()";
 
     /**
+     * The token to represent no security roles are allowed.
+     */
+    String DENY_ALL = "denyAll()";
+
+    /**
      * Returns a security result based on any conditions.
      * @see SecurityRuleResult
      *
