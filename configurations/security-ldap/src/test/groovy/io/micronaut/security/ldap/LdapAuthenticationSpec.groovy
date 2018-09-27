@@ -59,6 +59,59 @@ class LdapAuthenticationSpec extends InMemoryLdapSpec {
         s.shutDown(true)
     }
 
+    void "test authentication without group configuration"() {
+        given:
+        def s = createServer("basic.ldif")
+        s.startListening()
+        def ctx = ApplicationContext.run([
+                'micronaut.security.enabled': true,
+                'micronaut.security.ldap.default.enabled': true,
+                'micronaut.security.ldap.default.context.server': "ldap://localhost:${s.listenPort}",
+                'micronaut.security.ldap.default.context.managerDn': "cn=admin,dc=example,dc=com",
+                'micronaut.security.ldap.default.context.managerPassword': "password",
+                'micronaut.security.ldap.default.search.base': "dc=example,dc=com",
+        ], "test")
+
+        when:
+        LdapAuthenticationProvider authenticationProvider = ctx.getBean(LdapAuthenticationProvider)
+        AuthenticationResponse response = authenticate(authenticationProvider,"riemann")
+
+        then:
+        response.authenticated
+        ((UserDetails) response).username == "riemann"
+        ((UserDetails) response).roles.empty
+
+        cleanup:
+        ctx.close()
+        s.shutDown(true)
+    }
+
+    void "test authentication without search configuration"() {
+        given:
+        def s = createServer("basic.ldif")
+        s.startListening()
+        def ctx = ApplicationContext.run([
+                'micronaut.security.enabled': true,
+                'micronaut.security.ldap.default.enabled': true,
+                'micronaut.security.ldap.default.context.server': "ldap://localhost:${s.listenPort}",
+                'micronaut.security.ldap.default.context.managerDn': "cn=admin,dc=example,dc=com",
+                'micronaut.security.ldap.default.context.managerPassword': "password",
+        ], "test")
+
+        when:
+        LdapAuthenticationProvider authenticationProvider = ctx.getBean(LdapAuthenticationProvider)
+        AuthenticationResponse response = authenticate(authenticationProvider,"riemann")
+
+        then:
+        response.authenticated
+        ((UserDetails) response).username == "riemann"
+        ((UserDetails) response).roles.empty
+
+        cleanup:
+        ctx.close()
+        s.shutDown(true)
+    }
+
     void "test authentication and role retrieval with member"() {
         given:
         def s = createServer("member.ldif")
