@@ -10,6 +10,101 @@ class OpenApiPojoControllerSpec extends AbstractTypeElementSpec {
     def setup() {
         System.setProperty(AbstractOpenApiVisitor.ATTR_TEST_MODE, "true")
     }
+
+    void "test build OpenAPI doc for POJO type with javax.constraints"() {
+
+        given:"An API definition"
+        when:
+        buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.reactivex.*;
+import io.micronaut.http.annotation.*;
+import java.util.List;
+import io.swagger.v3.oas.annotations.media.*;
+
+/**
+ * @author graemerocher
+ * @since 1.0
+ */
+
+@Controller("/pets")
+interface PetOperations<T extends Pet> {
+
+    /**
+     * List the pets
+     *
+     * @return a list of pet names
+     */
+    @Get("/")
+    List<T> list();
+    
+    @Get("/random")
+    T random();
+
+    @Get("/vendor/{name}")
+    List<T> byVendor(String name);
+
+    /**
+     * Find a pet by a slug
+     *
+     * @param slug The slug name
+     * @return A pet or 404
+     */
+    @Get("/{slug}")
+    T find(String slug);
+
+    @Post("/")
+    T save(@Body T pet);
+}
+
+//@Schema
+class Pet {
+    @javax.validation.constraints.Min(18)
+    private int age;
+    
+    private String name;
+    
+    public void setAge(int a) {
+        age = a;
+    }
+    
+    /**
+     * The age
+     */
+    public int getAge() {
+        return age;
+    }
+    
+    public void setName(String n) {
+        name = n;
+    }
+    
+    @javax.validation.constraints.Size(max=30)
+    public String getName() {
+        return name;
+    }
+}
+@javax.inject.Singleton
+class MyBean {}
+''')
+        then:"the state is correct"
+        AbstractOpenApiVisitor.testReference != null
+
+        when:"The OpenAPI is retrieved"
+        OpenAPI openAPI = AbstractOpenApiVisitor.testReference
+        Schema petSchema = openAPI.components.schemas['Pet']
+
+        then:"the components are valid"
+        petSchema.type == 'object'
+        petSchema.properties.size() == 2
+        petSchema.properties['age'].type == 'integer'
+        petSchema.properties['age'].description == 'The age'
+        petSchema.properties['age'].minimum == 18
+        petSchema.properties['name'].type == 'string'
+        petSchema.properties['name'].maxLength == 30
+    }
+
     void "test build OpenAPI doc for POJO type with generics non-reactive"() {
 
         given:"An API definition"

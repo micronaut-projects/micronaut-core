@@ -79,12 +79,14 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
 
     @Override
     public List<PropertyElement> getBeanProperties() {
-        Map<String, GetterAndSetter> props = new LinkedHashMap<>();
+        Map<String, BeanPropertyData> props = new LinkedHashMap<>();
+        Map<String, VariableElement> fields = new LinkedHashMap<>();
 
         classElement.asType().accept(new PublicMethodVisitor<Object, Object>() {
 
             @Override
             protected boolean isAcceptable(javax.lang.model.element.Element element) {
+                if (element.getKind() == ElementKind.FIELD) return true;
                 if (element.getKind() == ElementKind.METHOD && element instanceof ExecutableElement) {
                     Set<Modifier> modifiers = element.getModifiers();
                     if (modifiers.contains(Modifier.PUBLIC) && !modifiers.contains(Modifier.STATIC) && !modifiers.contains(Modifier.ABSTRACT)) {
@@ -106,6 +108,12 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
 
             @Override
             protected void accept(DeclaredType type, javax.lang.model.element.Element element, Object o) {
+
+                if (element instanceof VariableElement) {
+                    fields.put(element.getSimpleName().toString(), (VariableElement) element);
+                    return;
+                }
+
                 ExecutableElement executableElement = (ExecutableElement) element;
                 String methodName = executableElement.getSimpleName().toString();
 
@@ -114,14 +122,14 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                     ClassElement getterReturnType = mirrorToClassElement(executableElement.getReturnType(), visitorContext);
                     if (getterReturnType != null) {
 
-                        GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
-                        getterAndSetter.type = getterReturnType;
-                        getterAndSetter.getter = executableElement;
-                        if (getterAndSetter.setter != null) {
-                            TypeMirror typeMirror = getterAndSetter.setter.getParameters().get(0).asType();
+                        BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
+                        beanPropertyData.type = getterReturnType;
+                        beanPropertyData.getter = executableElement;
+                        if (beanPropertyData.setter != null) {
+                            TypeMirror typeMirror = beanPropertyData.setter.getParameters().get(0).asType();
                             ClassElement setterParameterType = mirrorToClassElement(typeMirror, visitorContext);
                             if (setterParameterType == null || !setterParameterType.getName().equals(getterReturnType.getName())) {
-                                getterAndSetter.setter = null; // not a compatible setter
+                                beanPropertyData.setter = null; // not a compatible setter
                             }
                         }
                     }
@@ -132,26 +140,35 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
 
                     if (setterParameterType != null) {
 
-                        GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
-                        ClassElement propertyType = getterAndSetter.type;
+                        BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
+                        ClassElement propertyType = beanPropertyData.type;
                         if (propertyType != null) {
                             if (propertyType.getName().equals(setterParameterType.getName())) {
-                                getterAndSetter.setter = executableElement;
+                                beanPropertyData.setter = executableElement;
                             }
                         } else {
-                            getterAndSetter.setter = executableElement;
+                            beanPropertyData.setter = executableElement;
                         }
                     }
                 }
             }
         }, null);
+
         if (!props.isEmpty()) {
             List<PropertyElement> propertyElements = new ArrayList<>();
-            for (Map.Entry<String, GetterAndSetter> entry : props.entrySet()) {
+            for (Map.Entry<String, BeanPropertyData> entry : props.entrySet()) {
                 String propertyName = entry.getKey();
-                GetterAndSetter value = entry.getValue();
+                BeanPropertyData value = entry.getValue();
+                final VariableElement fieldElement = fields.get(propertyName);
+
                 if (value.getter != null) {
-                    JavaPropertyElement propertyElement = new JavaPropertyElement(value.getter, visitorContext.getAnnotationUtils().getAnnotationMetadata(value.getter), propertyName, value.type, value.setter == null) {
+                    final AnnotationMetadata annotationMetadata;
+                    if (fieldElement != null) {
+                        annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(fieldElement, value.getter);
+                    } else {
+                        annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(value.getter);
+                    }
+                    JavaPropertyElement propertyElement = new JavaPropertyElement(value.getter, annotationMetadata, propertyName, value.type, value.setter == null) {
                         @Override
                         public Optional<String> getDocumentation() {
                             Elements elements = visitorContext.getElements();
@@ -217,13 +234,13 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     /**
      * Internal holder class for getters and setters.
      */
-    private class GetterAndSetter {
+    private class BeanPropertyData {
         ClassElement type;
         ExecutableElement getter;
         ExecutableElement setter;
         final String propertyName;
 
-        public GetterAndSetter(String propertyName) {
+        public BeanPropertyData(String propertyName) {
             this.propertyName = propertyName;
         }
     }
