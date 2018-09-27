@@ -67,6 +67,11 @@ import java.util.stream.Collectors;
 public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements TypeElementVisitor<Controller, HttpMethodMapping> {
 
     @Override
+    public void visitClass(ClassElement element, VisitorContext context) {
+        processSecuritySchemes(element, context);
+    }
+
+    @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
         Optional<Class<? extends Annotation>> httpMethodOpt = element.getAnnotationTypeByStereotype(HttpMethodMapping.class);
 
@@ -248,10 +253,9 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
 
                     if (paramAnn != null) {
                         Map<CharSequence, Object> paramValues = toValueMap(paramAnn.getValues(), context);
-                        Object in = paramValues.get("in");
-                        if (in != null) {
-                            paramValues.put("in", in.toString().toLowerCase(Locale.ENGLISH));
-                        }
+                        normalizeEnumValues(paramValues, Collections.singletonMap(
+                                "in", ParameterIn.class
+                        ));
 
                         JsonNode jsonNode = jsonMapper.valueToTree(paramValues);
 

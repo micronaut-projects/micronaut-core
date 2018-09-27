@@ -104,6 +104,9 @@ public class OpenApiApplicationVisitor extends AbstractOpenApiVisitor implements
         );
         openAPI.setServers(servers);
 
+        // Handle Application security schemes
+        processSecuritySchemes(element, context);
+
         if (Boolean.getBoolean(ATTR_TEST_MODE)) {
             testReference = openAPI;
         }

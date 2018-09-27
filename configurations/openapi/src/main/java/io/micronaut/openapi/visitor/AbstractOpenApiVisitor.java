@@ -44,6 +44,7 @@ import io.swagger.v3.oas.annotations.links.Link;
 import io.swagger.v3.oas.annotations.links.LinkParameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.OAuthScope;
 import io.swagger.v3.oas.annotations.servers.ServerVariable;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
@@ -51,6 +52,7 @@ import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.media.ArraySchema;
 import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.reactivestreams.Publisher;
 
 import javax.annotation.Nullable;
@@ -166,15 +168,10 @@ abstract class AbstractOpenApiVisitor  {
                                 Map links = annotationValueArrayToSubmap(a, "name", context);
                                 newValues.put(key, links);
                             } else if (LinkParameter.class.getName().equals(annotationName)) {
-                                Map params = new LinkedHashMap();
-                                for (Object o : a) {
-                                    AnnotationValue<LinkParameter> sv = (AnnotationValue<LinkParameter>) o;
-                                    final Optional<String> n = sv.get("name", String.class);
-                                    final Optional<String> expr = sv.get("expression", String.class);
-                                    if (n.isPresent() && expr.isPresent()) {
-                                        params.put(n.get(), expr.get());
-                                    }
-                                }
+                                Map params = toTupleSubMap(a, "name",  "expression");
+                                newValues.put(key, params);
+                            } else if (OAuthScope.class.getName().equals(annotationName)) {
+                                Map params = toTupleSubMap(a, "name",  "description");
                                 newValues.put(key, params);
                             }
                             else if (ApiResponse.class.getName().equals(annotationName)) {
@@ -227,6 +224,19 @@ abstract class AbstractOpenApiVisitor  {
             }
         }
         return newValues;
+    }
+
+    private Map toTupleSubMap(Object[] a, String entryKey, String entryValue) {
+        Map params = new LinkedHashMap();
+        for (Object o : a) {
+            AnnotationValue<?> sv = (AnnotationValue<?>) o;
+            final Optional<String> n = sv.get(entryKey, String.class);
+            final Optional<String> expr = sv.get(entryValue, String.class);
+            if (n.isPresent() && expr.isPresent()) {
+                params.put(n.get(), expr.get());
+            }
+        }
+        return params;
     }
 
     /**
@@ -287,6 +297,21 @@ abstract class AbstractOpenApiVisitor  {
         }
         return schema;
     }
+
+    /**
+     * Resolve the components.
+     * @param openAPI The open API
+     * @return The components
+     */
+    protected Components resolveComponents(OpenAPI openAPI) {
+        Components components = openAPI.getComponents();
+        if (components == null) {
+            components = new Components();
+            openAPI.setComponents(components);
+        }
+        return components;
+    }
+
 
     /**
      * Processes a schema property
@@ -432,11 +457,7 @@ abstract class AbstractOpenApiVisitor  {
     }
 
     private Map<String, Schema> resolveSchemas(OpenAPI openAPI) {
-        Components components = openAPI.getComponents();
-        if (components == null) {
-            components = new Components();
-            openAPI.setComponents(components);
-        }
+        Components components = resolveComponents(openAPI);
         Map<String, Schema> schemas = components.getSchemas();
         if (schemas == null) {
             schemas = new LinkedHashMap<>();
@@ -478,5 +499,59 @@ abstract class AbstractOpenApiVisitor  {
                 "io.reactivex.Observable",
                 "io.reactivex.Maybe"
         ).stream().anyMatch(type::isAssignable);
+    }
+
+    /**
+     * Processes {@link io.swagger.v3.oas.annotations.security.SecurityScheme} annotations.
+     *
+     * @param element The element
+     * @param context The visitor context
+     */
+    protected void processSecuritySchemes(ClassElement element, VisitorContext context) {
+        final List<AnnotationValue<io.swagger.v3.oas.annotations.security.SecurityScheme>> values = element.getAnnotationValuesByType(io.swagger.v3.oas.annotations.security.SecurityScheme.class);
+        final OpenAPI openAPI = resolveOpenAPI(context);
+        for (AnnotationValue<io.swagger.v3.oas.annotations.security.SecurityScheme> securityRequirementAnnotationValue : values) {
+
+            final Optional<String> n = securityRequirementAnnotationValue.get("name", String.class);
+            n.ifPresent(name -> {
+
+                final Map<CharSequence, Object> map = toValueMap(securityRequirementAnnotationValue.getValues(), context);
+                normalizeEnumValues(map, CollectionUtils.mapOf(
+                        "type", SecurityScheme.Type.class, "in", SecurityScheme.In.class
+                ));
+                final JsonNode jsonNode = toJson(map, context);
+                try {
+                    final Optional<SecurityScheme> securityRequirement = Optional.of(jsonMapper.treeToValue(jsonNode, SecurityScheme.class));
+                    securityRequirement.ifPresent(securityScheme ->
+                            resolveComponents(openAPI).addSecuritySchemes(name, securityScheme)
+                    );
+                } catch (JsonProcessingException e) {
+                    context.warn("Error reading Swagger SecurityRequirement for element [" + element + "]: " + e.getMessage(), element);
+                }
+            });
+        }
+    }
+
+    /**
+     * Normalizes enum values stored in the map.
+     *
+     * @param paramValues The values
+     * @param enumTypes The enum types.
+     */
+    protected void normalizeEnumValues(Map<CharSequence, Object> paramValues, Map<String, Class<? extends Enum>> enumTypes) {
+        for (Map.Entry<String, Class<? extends Enum>> entry : enumTypes.entrySet()) {
+            final String name = entry.getKey();
+            final Class<? extends Enum> enumType = entry.getValue();
+            Object in = paramValues.get(name);
+            if (in != null) {
+                try {
+                    final Enum enumInstance = Enum.valueOf(enumType, in.toString());
+                    paramValues.put(name, enumInstance.toString());
+                } catch (Exception e) {
+                    // ignore
+                }
+            }
+
+        }
     }
 }
