@@ -176,7 +176,7 @@ class MultipartFileUploadSpec extends Specification {
         def newFile = new File(uploadDir, "Walking The Himalayas.txt")
 
         then:
-        body == "Uploaded 9 bytes"
+        body == "Uploaded 9 bytes. File size: 9"
         newFile.exists()
         newFile.text == file.text
 
@@ -205,7 +205,7 @@ class MultipartFileUploadSpec extends Specification {
         def newFile = new File(uploadDir, "Walking The Himalayas.txt")
 
         then:
-        body == "Uploaded ${file.length()} bytes"
+        body == "Uploaded ${file.length()} bytes. File size: ${file.length()}"
         newFile.exists()
         newFile.text == file.text
 
@@ -235,7 +235,7 @@ class MultipartFileUploadSpec extends Specification {
         def newFile = new File(uploadDir, "Walking The Himalayas.txt")
 
         then:
-        body == "Uploaded ${file.length()} bytes"
+        body == "Uploaded ${file.length()} bytes. File size: ${file.length()}"
         newFile.exists()
         newFile.text == file.text
 
@@ -256,7 +256,7 @@ class MultipartFileUploadSpec extends Specification {
             File newFile = new File(uploadDir, title + ".txt")
             newFile.createNewFile()
             newFile.append(data.getInputStream())
-            return Flowable.just(HttpResponse.ok("Uploaded ${newFile.length()} bytes"))
+            return Flowable.just(HttpResponse.ok("Uploaded ${newFile.length()} bytes. File size: ${data.getSize()}"))
         }
 
         @Post(value = '/stream-file-upload', consumes = MediaType.MULTIPART_FORM_DATA)
