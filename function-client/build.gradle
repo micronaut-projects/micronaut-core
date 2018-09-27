@@ -11,5 +11,6 @@ dependencies {
     testCompile project(":function-web")
     testCompile project(":function-groovy")
     testCompile project(":inject-groovy")
+    testCompile project(":inject-java")
     testCompile group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
 }

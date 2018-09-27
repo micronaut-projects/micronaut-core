@@ -260,7 +260,11 @@ security:
       claimsGeneration: Claims Generation
       render:
         title: Token Render
-      tokenPropagation: Token Propagation
+    ldap:
+      title: LDAP Authentication
+      configuration: Configuration
+      extending: Extending Default Behavior
+  tokenPropagation: Token Propagation
   endpoints:
     title: Built-In Security Controllers
     login: Login Controller
@@ -268,10 +272,7 @@ security:
     refresh: Refresh Controller
   retrievingAuthenticatedUser: Retrieve the authenticated user
   securityEvents: Security Events
-  ldap:
-    title: LDAP Authentication
-    configuration: Configuration
-    extending: Extending Default Behavior
+
 multitenancy:
   title: Multi-Tenancy
   multitenancyGorm: Multi-Tenancy GORM

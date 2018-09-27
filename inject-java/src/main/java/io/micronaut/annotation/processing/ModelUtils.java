@@ -286,7 +286,7 @@ public class ModelUtils {
      * @return The type reference
      */
 
-    Object resolveTypeReferenceForTypeElement(TypeElement typeElement) {
+    String resolveTypeReferenceForTypeElement(TypeElement typeElement) {
         return JavaModelUtils.getClassName(typeElement);
     }
 
@@ -321,18 +321,23 @@ public class ModelUtils {
             if (componentType.getKind().isPrimitive()) {
                 result = classOfPrimitiveArrayFor(resolvePrimitiveTypeReference(componentType).getName());
             } else {
-                result = typeUtils.erasure(type).toString();
+                final TypeMirror erased = typeUtils.erasure(componentType);
+                final Element e = typeUtils.asElement(erased);
+                if (e instanceof TypeElement) {
+                    result = resolveTypeReferenceForTypeElement((TypeElement) e) + "[]";
+                }
             }
         } else if (type.getKind() != VOID && type.getKind() != ERROR) {
-            TypeElement typeElement = elementUtils.getTypeElement(typeUtils.erasure(type).toString());
-            if (typeElement != null) {
-                result = resolveTypeReferenceForTypeElement(typeElement);
-            } else if (type instanceof DeclaredType) {
-                result = resolveTypeReferenceForTypeElement((TypeElement) ((DeclaredType) type).asElement());
+            final TypeMirror erased = typeUtils.erasure(type);
+            final Element element = typeUtils.asElement(erased);
+            if (element instanceof TypeElement) {
+                TypeElement te = (TypeElement) element;
+                result = resolveTypeReferenceForTypeElement(te);
             }
         }
         return result;
     }
+
 
     /**
      * Returns whether an element is package private.

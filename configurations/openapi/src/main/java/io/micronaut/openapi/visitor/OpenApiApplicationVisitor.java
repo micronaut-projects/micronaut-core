@@ -18,6 +18,7 @@ package io.micronaut.openapi.visitor;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
+import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.util.CollectionUtils;
@@ -103,6 +104,9 @@ public class OpenApiApplicationVisitor extends AbstractOpenApiVisitor implements
         );
         openAPI.setServers(servers);
 
+        // Handle Application security schemes
+        processSecuritySchemes(element, context);
+
         if (Boolean.getBoolean(ATTR_TEST_MODE)) {
             testReference = openAPI;
         }
@@ -118,7 +122,7 @@ public class OpenApiApplicationVisitor extends AbstractOpenApiVisitor implements
 
             }
             for (AnnotationValue<A> tag : annotations) {
-                JsonNode jsonNode = toJson(tag.getValues());
+                JsonNode jsonNode = toJson(tag.getValues(), context);
                 try {
                     T t = jsonMapper.treeToValue(jsonNode, modelType);
                     if (t != null) {
@@ -134,7 +138,7 @@ public class OpenApiApplicationVisitor extends AbstractOpenApiVisitor implements
 
     private OpenAPI readOpenAPI(ClassElement element, VisitorContext context) {
         return element.findAnnotation(OpenAPIDefinition.class).flatMap(o -> {
-                    JsonNode jsonNode = toJson(o.getValues());
+                    JsonNode jsonNode = toJson(o.getValues(), context);
 
                     try {
                         return Optional.of(jsonMapper.treeToValue(jsonNode, OpenAPI.class));
@@ -168,12 +172,14 @@ public class OpenApiApplicationVisitor extends AbstractOpenApiVisitor implements
                     String fileName = "swagger.yml";
                     Info info = openAPI.getInfo();
                     if (info != null) {
+                        String title = Optional.ofNullable(info.getTitle()).orElse(Environment.DEFAULT_NAME);
+                        title = title.toLowerCase().replace(' ', '-');
                         String version = info.getVersion();
                         if (version != null) {
-                            fileName = "swagger-" + version + ".yml";
+                            fileName = title + "-" + version + ".yml";
                         }
                     }
-                    Optional<GeneratedFile> generatedFile = visitorContext.visitGeneratedFile(fileName);
+                    Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile("swagger/" + fileName);
                     if (generatedFile.isPresent()) {
                         GeneratedFile f = generatedFile.get();
                         try {

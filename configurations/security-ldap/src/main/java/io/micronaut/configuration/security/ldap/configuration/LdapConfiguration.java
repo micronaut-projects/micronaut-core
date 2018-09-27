@@ -39,9 +39,9 @@ public class LdapConfiguration implements Toggleable {
     private static final boolean DEFAULT_ENABLED = true;
 
     private boolean enabled = DEFAULT_ENABLED;
-    private ContextConfiguration context;
-    private SearchConfiguration search;
-    private GroupConfiguration group;
+    private ContextConfiguration context = new ContextConfiguration();
+    private SearchConfiguration search = new SearchConfiguration();
+    private GroupConfiguration group = new GroupConfiguration();
     private final String name;
 
     /**
