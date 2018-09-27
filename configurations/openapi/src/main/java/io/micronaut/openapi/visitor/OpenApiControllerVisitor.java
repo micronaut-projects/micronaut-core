@@ -17,15 +17,12 @@
 package io.micronaut.openapi.visitor;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
@@ -37,15 +34,14 @@ import io.micronaut.inject.ast.*;
 import io.micronaut.inject.visitor.*;
 import io.micronaut.openapi.javadoc.JavadocDescription;
 import io.micronaut.openapi.javadoc.JavadocParser;
-import io.swagger.v3.core.util.PrimitiveType;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.callbacks.Callback;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
-import io.swagger.v3.oas.models.media.ArraySchema;
 import io.swagger.v3.oas.models.media.Content;
 import io.swagger.v3.oas.models.media.ObjectSchema;
 import io.swagger.v3.oas.models.media.Schema;
@@ -55,13 +51,11 @@ import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.servers.Server;
-import org.reactivestreams.Publisher;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.util.*;
-import java.util.concurrent.Future;
 import java.util.stream.Collectors;
 
 /**
@@ -72,6 +66,11 @@ import java.util.stream.Collectors;
  */
 @Experimental
 public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements TypeElementVisitor<Controller, HttpMethodMapping> {
+
+    @Override
+    public void visitClass(ClassElement element, VisitorContext context) {
+        processSecuritySchemes(element, context);
+    }
 
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
@@ -89,12 +88,13 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
             PathItem pathItem = resolvePathItem(context, matchTemplate);
             OpenAPI openAPI = resolveOpenAPI(context);
 
-            io.swagger.v3.oas.models.Operation swaggerOperation = element.findAnnotation(Operation.class).flatMap(o -> {
-                JsonNode jsonNode = toJson(o.getValues());
+            final Optional<AnnotationValue<Operation>> operationAnnotation = element.findAnnotation(Operation.class);
+            io.swagger.v3.oas.models.Operation swaggerOperation = operationAnnotation.flatMap(o -> {
+                JsonNode jsonNode = toJson(o.getValues(), context);
 
                 try {
                     return Optional.of(jsonMapper.treeToValue(jsonNode, io.swagger.v3.oas.models.Operation.class));
-                } catch (JsonProcessingException e) {
+                } catch (Exception e) {
                     context.warn("Error reading Swagger Operation for element [" + element + "]: " + e.getMessage(), element);
                     return Optional.empty();
                 }
@@ -107,6 +107,10 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
 
             readApiResponses(element, context, swaggerOperation);
 
+            readServers(element, context, swaggerOperation);
+
+            readCallbacks(element, context, swaggerOperation);
+
             HttpMethod httpMethod = HttpMethod.valueOf(httpMethodClass.getSimpleName().toUpperCase(Locale.ENGLISH));
             JavadocDescription javadocDescription = element.getDocumentation().map(s -> new JavadocParser().parse(s)).orElse(null);
 
@@ -114,35 +118,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 swaggerOperation.setDescription(javadocDescription.getMethodDescription());
             }
 
-            switch (httpMethod) {
-                case GET:
-                    pathItem.get(swaggerOperation);
-                break;
-                case POST:
-                    pathItem.post(swaggerOperation);
-                break;
-                case PUT:
-                    pathItem.put(swaggerOperation);
-                break;
-                case PATCH:
-                    pathItem.patch(swaggerOperation);
-                break;
-                case DELETE:
-                    pathItem.delete(swaggerOperation);
-                break;
-                case HEAD:
-                    pathItem.head(swaggerOperation);
-                break;
-                case OPTIONS:
-                    pathItem.options(swaggerOperation);
-                break;
-                case TRACE:
-                    pathItem.trace(swaggerOperation);
-                break;
-                default:
-                    // unprocessable
-                    return;
-            }
+            setOperationOnPathItem(pathItem, swaggerOperation, httpMethod);
 
             if (element.isAnnotationPresent(Deprecated.class)) {
                 swaggerOperation.setDeprecated(true);
@@ -230,7 +206,10 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                     UriMatchVariable var = pathVariables.get(parameterName);
                     newParameter = new Parameter();
                     newParameter.setIn(ParameterIn.PATH.toString());
-                    newParameter.setExplode(var.isExploded());
+                    final boolean exploded = var.isExploded();
+                    if (exploded) {
+                        newParameter.setExplode(exploded);
+                    }
                 } else if (parameter.isAnnotationPresent(Header.class)) {
                     String headerName = parameter.getValue(Header.class, "name", String.class).orElseGet(() -> NameUtils.hyphenate(parameterName));
                     newParameter = new Parameter();
@@ -252,18 +231,17 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                     AnnotationValue<io.swagger.v3.oas.annotations.Parameter> paramAnn = parameter.findAnnotation(io.swagger.v3.oas.annotations.Parameter.class).orElse(null);
 
                     if (paramAnn != null) {
-                        Map<CharSequence, Object> paramValues = toValueMap(paramAnn.getValues());
-                        Object in = paramValues.get("in");
-                        if (in != null) {
-                            paramValues.put("in", in.toString().toLowerCase(Locale.ENGLISH));
-                        }
+                        Map<CharSequence, Object> paramValues = toValueMap(paramAnn.getValues(), context);
+                        normalizeEnumValues(paramValues, Collections.singletonMap(
+                                "in", ParameterIn.class
+                        ));
 
                         JsonNode jsonNode = jsonMapper.valueToTree(paramValues);
 
                         if (newParameter == null) {
                             try {
                                 newParameter = jsonMapper.treeToValue(jsonNode, Parameter.class);
-                            } catch (JsonProcessingException e) {
+                            } catch (Exception e) {
                                 context.warn("Error reading Swagger Parameter for element [" + parameter + "]: " + e.getMessage(), parameter);
                             }
                         } else {
@@ -314,10 +292,11 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
 
                     Schema schema = newParameter.getSchema();
                     if (schema == null) {
-                        schema = resolveSchema(parameterType, consumesMediaType, openAPI, context);
+                        schema = resolveSchema(openAPI, parameterType, context, consumesMediaType);
                     }
 
                     if (schema != null) {
+                        bindSchemaForElement(context, parameter, parameter.getType(), schema);
                         newParameter.setSchema(schema);
                     }
                 }
@@ -335,9 +314,9 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                         if (parameter.isAnnotationPresent(JsonIgnore.class) || parameter.isAnnotationPresent(Hidden.class)) {
                             continue;
                         }
-                        Schema propertySchema = resolveSchema(parameter.getType(), consumesMediaType, openAPI, context);
+                        Schema propertySchema = resolveSchema(openAPI, parameter.getType(), context, consumesMediaType);
 
-                        processSchemaProperty(context, parameter, schema, propertySchema);
+                        processSchemaProperty(context, parameter, parameter.getType(), schema, propertySchema);
 
                         propertySchema.setNullable(parameter.isAnnotationPresent(Nullable.class));
                         if (javadocDescription != null && StringUtils.isEmpty(propertySchema.getDescription())) {
@@ -358,20 +337,51 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
         });
     }
 
+    private void setOperationOnPathItem(PathItem pathItem, io.swagger.v3.oas.models.Operation swaggerOperation, HttpMethod httpMethod) {
+        switch (httpMethod) {
+            case GET:
+                pathItem.get(swaggerOperation);
+            break;
+            case POST:
+                pathItem.post(swaggerOperation);
+            break;
+            case PUT:
+                pathItem.put(swaggerOperation);
+            break;
+            case PATCH:
+                pathItem.patch(swaggerOperation);
+            break;
+            case DELETE:
+                pathItem.delete(swaggerOperation);
+            break;
+            case HEAD:
+                pathItem.head(swaggerOperation);
+            break;
+            case OPTIONS:
+                pathItem.options(swaggerOperation);
+            break;
+            case TRACE:
+                pathItem.trace(swaggerOperation);
+            break;
+            default:
+                // unprocessable
+        }
+    }
+
     private void readApiResponses(MethodElement element, VisitorContext context, io.swagger.v3.oas.models.Operation swaggerOperation) {
         List<AnnotationValue<io.swagger.v3.oas.annotations.responses.ApiResponse>> responseAnnotations = element.getAnnotationValuesByType(io.swagger.v3.oas.annotations.responses.ApiResponse.class);
         if (CollectionUtils.isNotEmpty(responseAnnotations)) {
             ApiResponses apiResponses = new ApiResponses();
             for (AnnotationValue<io.swagger.v3.oas.annotations.responses.ApiResponse> r : responseAnnotations) {
 
-                JsonNode jn = toJson(r.getValues());
+                JsonNode jn = toJson(r.getValues(), context);
                 try {
                     Optional<ApiResponse> newResponse = Optional.of(jsonMapper.treeToValue(jn, ApiResponse.class));
                     newResponse.ifPresent(apiResponse -> {
                         String name = r.get("responseCode", String.class).orElse("default");
                         apiResponses.put(name, apiResponse);
                     });
-                } catch (JsonProcessingException e) {
+                } catch (Exception e) {
                     context.warn("Error reading Swagger ApiResponses for element [" + element + "]: " + e.getMessage(), element);
                 }
             }
@@ -383,11 +393,11 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
         List<AnnotationValue<io.swagger.v3.oas.annotations.security.SecurityRequirement>> securityAnnotations = element.getAnnotationValuesByType(io.swagger.v3.oas.annotations.security.SecurityRequirement.class);
         if (CollectionUtils.isNotEmpty(securityAnnotations)) {
             for (AnnotationValue<io.swagger.v3.oas.annotations.security.SecurityRequirement> r : securityAnnotations) {
-                JsonNode jn = toJson(r.getValues());
+                JsonNode jn = toJson(r.getValues(), context);
                 try {
                     Optional<SecurityRequirement> newRequirement = Optional.of(jsonMapper.treeToValue(jn, SecurityRequirement.class));
                     newRequirement.ifPresent(swaggerOperation::addSecurityItem);
-                } catch (JsonProcessingException e) {
+                } catch (Exception e) {
                     context.warn("Error reading Swagger SecurityRequirement for element [" + element + "]: " + e.getMessage(), element);
                 }
             }
@@ -398,15 +408,80 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
         List<AnnotationValue<io.swagger.v3.oas.annotations.servers.Server>> serverAnnotations = element.getAnnotationValuesByType(io.swagger.v3.oas.annotations.servers.Server.class);
         if (CollectionUtils.isNotEmpty(serverAnnotations)) {
             for (AnnotationValue<io.swagger.v3.oas.annotations.servers.Server> r : serverAnnotations) {
-                JsonNode jn = toJson(r.getValues());
+                JsonNode jn = toJson(r.getValues(), context);
                 try {
                     Optional<Server> newRequirement = Optional.of(jsonMapper.treeToValue(jn, Server.class));
                     newRequirement.ifPresent(swaggerOperation::addServersItem);
-                } catch (JsonProcessingException e) {
+                } catch (Exception e) {
                     context.warn("Error reading Swagger Server for element [" + element + "]: " + e.getMessage(), element);
                 }
             }
         }
+    }
+
+    private void readCallbacks(MethodElement element, VisitorContext context, io.swagger.v3.oas.models.Operation swaggerOperation) {
+        List<AnnotationValue<Callback>> callbackAnnotations = element.getAnnotationValuesByType(Callback.class);
+        if (CollectionUtils.isNotEmpty(callbackAnnotations)) {
+            for (AnnotationValue<Callback> callbackAnn : callbackAnnotations) {
+                final Optional<String> n = callbackAnn.get("name", String.class);
+                n.ifPresent(callbackName -> {
+
+                    final Optional<String> expr = callbackAnn.get("callbackUrlExpression", String.class);
+                    if (expr.isPresent()) {
+
+                        final String callbackUrl = expr.get();
+
+                        final List<AnnotationValue<Operation>> operations = callbackAnn.getAnnotations("operation", Operation.class);
+                        if (CollectionUtils.isEmpty(operations)) {
+                            Map<String, io.swagger.v3.oas.models.callbacks.Callback> callbacks = initCallbacks(swaggerOperation);
+                            final io.swagger.v3.oas.models.callbacks.Callback c = new io.swagger.v3.oas.models.callbacks.Callback();
+                            c.addPathItem(callbackUrl, new PathItem());
+                            callbacks.put(callbackName, c);
+                        } else {
+                            final PathItem pathItem = new PathItem();
+                            for (AnnotationValue<Operation> operation : operations) {
+                                final Optional<HttpMethod> operationMethod = operation.get("method", HttpMethod.class);
+                                operationMethod.ifPresent(httpMethod -> {
+                                    JsonNode jsonNode = toJson(operation.getValues(), context);
+
+                                    try {
+                                        final Optional<io.swagger.v3.oas.models.Operation> op = Optional.of(jsonMapper.treeToValue(jsonNode, io.swagger.v3.oas.models.Operation.class));
+                                        op.ifPresent(operation1 -> setOperationOnPathItem(pathItem, operation1, httpMethod));
+                                    } catch (Exception e) {
+                                        context.warn("Error reading Swagger Operation for element [" + element + "]: " + e.getMessage(), element);
+                                    }
+                                });
+                            }
+                            Map<String, io.swagger.v3.oas.models.callbacks.Callback> callbacks = initCallbacks(swaggerOperation);
+                            final io.swagger.v3.oas.models.callbacks.Callback c = new io.swagger.v3.oas.models.callbacks.Callback();
+                            c.addPathItem(callbackUrl, pathItem);
+                            callbacks.put(callbackName, c);
+
+                        }
+
+                    } else {
+                        final Components components = resolveComponents(resolveOpenAPI(context));
+                        final Map<String, io.swagger.v3.oas.models.callbacks.Callback> callbackComponents = components.getCallbacks();
+                        if (callbackComponents != null && callbackComponents.containsKey(callbackName)) {
+                            Map<String, io.swagger.v3.oas.models.callbacks.Callback> callbacks = initCallbacks(swaggerOperation);
+                            final io.swagger.v3.oas.models.callbacks.Callback callbackRef = new io.swagger.v3.oas.models.callbacks.Callback();
+                            callbackRef.set$ref("#/components/callbacks/" + callbackName);
+                            callbacks.put(callbackName, callbackRef);
+                        }
+                    }
+                });
+
+            }
+        }
+    }
+
+    private Map<String, io.swagger.v3.oas.models.callbacks.Callback> initCallbacks(io.swagger.v3.oas.models.Operation swaggerOperation) {
+        Map<String, io.swagger.v3.oas.models.callbacks.Callback> callbacks = swaggerOperation.getCallbacks();
+        if (callbacks == null) {
+            callbacks = new LinkedHashMap<>();
+            swaggerOperation.setCallbacks(callbacks);
+        }
+        return callbacks;
     }
 
     private void readTags(MethodElement element, io.swagger.v3.oas.models.Operation swaggerOperation) {
@@ -421,209 +496,9 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
     private Content buildContent(ClassElement type, String mediaType, OpenAPI openAPI, VisitorContext context) {
         Content content = new Content();
         io.swagger.v3.oas.models.media.MediaType mt = new io.swagger.v3.oas.models.media.MediaType();
-        mt.setSchema(resolveSchema(type, mediaType, openAPI, context));
+        mt.setSchema(resolveSchema(openAPI, type, context, mediaType));
         content.addMediaType(mediaType, mt);
         return content;
-    }
-
-    private Schema resolveSchema(ClassElement type, String mediaType, OpenAPI openAPI, VisitorContext context) {
-        Schema schema = null;
-
-        if (type instanceof EnumElement) {
-            schema = getSchemaDefinition(mediaType, openAPI, context, type);
-        } else {
-
-            boolean isPublisher = false;
-
-            if (isContainerType(type)) {
-                isPublisher = type.isAssignable(Publisher.class.getName()) && !type.isAssignable("reactor.core.publisher.Mono");
-                type = type.getFirstTypeArgument().orElse(null);
-            }
-
-            if (type != null) {
-
-                String typeName = type.getName();
-                if (ClassUtils.isJavaLangType(typeName)) {
-                    schema = getPrimitiveType(typeName);
-                } else if (type.isIterable()) {
-                    Optional<ClassElement> componentType = type.getFirstTypeArgument();
-                    if (componentType.isPresent()) {
-                        schema = getPrimitiveType(componentType.get().getName());
-                    } else {
-                        schema = getPrimitiveType(Object.class.getName());
-                    }
-
-                    if (schema != null) {
-                        schema = arraySchema(schema);
-                    } else if (componentType.isPresent()) {
-                        ClassElement componentElement = componentType.get();
-                        // we must have a POJO so let's create a component
-                        schema = getSchemaDefinition(mediaType, openAPI, context, componentElement);
-                    }
-                } else {
-                    schema = getSchemaDefinition(mediaType, openAPI, context, type);
-                }
-
-            }
-
-            if (schema != null) {
-                boolean isStream = MediaType.TEXT_EVENT_STREAM.equals(mediaType) || MediaType.APPLICATION_JSON_STREAM.equals(mediaType);
-                if ((!isStream && isPublisher) || type.isIterable()) {
-                    schema = arraySchema(schema);
-                }
-            }
-        }
-        return schema;
-    }
-
-    private Schema getSchemaDefinition(String mediaType, OpenAPI openAPI, VisitorContext context, Element type) {
-        Schema schema;
-        AnnotationValue<io.swagger.v3.oas.annotations.media.Schema> schemaValue = type.getAnnotation(io.swagger.v3.oas.annotations.media.Schema.class);
-        Map<String, Schema> schemas = resolveSchemas(openAPI);
-        if (schemaValue != null) {
-            String schemaName = schemaValue.get("name", String.class).orElse(NameUtils.getSimpleName(type.getName()));
-            schema = schemas.get(schemaName);
-            if (schema == null) {
-                JsonNode schemaJson = toJson(schemaValue.getValues());
-                try {
-                    schema = jsonMapper.treeToValue(schemaJson, Schema.class);
-
-                    if (schema != null) {
-                        if (type instanceof EnumElement) {
-                            schema.setType("string");
-                            schema.setEnum(((EnumElement) type).values());
-                        } else {
-                            populateSchemaProperties(mediaType, openAPI, context, type, schema);
-                        }
-                        schema.setName(schemaName);
-                        schemas.put(schemaName, schema);
-                    }
-                } catch (JsonProcessingException e) {
-                    context.warn("Error reading Swagger Parameter for element [" + type + "]: " + e.getMessage(), type);
-                }
-            }
-        } else {
-            String schemaName = NameUtils.getSimpleName(type.getName());
-            schema = schemas.get(schemaName);
-            if (schema == null) {
-                schema = new Schema();
-                if (type instanceof EnumElement) {
-                    schema.setType("string");
-                    schema.setEnum(((EnumElement) type).values());
-                } else {
-                    schema.setType("object");
-                    populateSchemaProperties(mediaType, openAPI, context, type, schema);
-                }
-                schema.setName(schemaName);
-                schemas.put(schemaName, schema);
-            }
-        }
-        if (schema != null) {
-            Schema schemaRef = new Schema();
-            schemaRef.set$ref("#/components/schemas/" + schema.getName());
-            return schemaRef;
-        }
-        return null;
-    }
-
-    private void populateSchemaProperties(String mediaType, OpenAPI openAPI, VisitorContext context, Element type, Schema schema) {
-        ClassElement classElement = null;
-        if (type instanceof ClassElement) {
-            classElement = (ClassElement) type;
-        } else if (type instanceof PropertyElement) {
-            classElement = ((PropertyElement) type).getType();
-        } else if (type instanceof ParameterElement) {
-            classElement = ((ParameterElement) type).getType();
-        }
-        if (classElement != null) {
-            List<PropertyElement> beanProperties = classElement.getBeanProperties();
-            for (PropertyElement beanProperty : beanProperties) {
-                if (beanProperty.isAnnotationPresent(JsonIgnore.class) || beanProperty.isAnnotationPresent(Hidden.class)) {
-                    continue;
-                }
-                Schema propertySchema = resolveSchema(beanProperty.getType(), mediaType, openAPI, context);
-
-                processSchemaProperty(context, beanProperty, schema, propertySchema);
-
-            }
-        }
-    }
-
-    private void processSchemaProperty(VisitorContext context, Element element, Schema parentSchema, Schema propertySchema) {
-        if (propertySchema != null) {
-            AnnotationValue<io.swagger.v3.oas.annotations.media.Schema> schemaAnn = element.getAnnotation(io.swagger.v3.oas.annotations.media.Schema.class);
-            if (schemaAnn != null) {
-                JsonNode schemaJson = toJson(schemaAnn.getValues());
-                try {
-                    propertySchema = jsonMapper.readerForUpdating(propertySchema).readValue(schemaJson);
-                } catch (IOException e) {
-                    context.warn("Error reading Swagger Schema for element [" + element + "]: " + e.getMessage(), element);
-                }
-            }
-
-            Optional<String> documentation = element.getDocumentation();
-            if (StringUtils.isEmpty(propertySchema.getDescription())) {
-                String doc = documentation.orElse(null);
-                if (doc != null) {
-                    JavadocDescription desc = new JavadocParser().parse(doc);
-                    propertySchema.setDescription(desc.getMethodDescription());
-                }
-            }
-            if (element.isAnnotationPresent(Deprecated.class)) {
-                propertySchema.setDeprecated(true);
-            }
-            propertySchema.setNullable(element.isAnnotationPresent(Nullable.class));
-            parentSchema.addProperties(element.getName(), propertySchema);
-        }
-    }
-
-    private Map<String, Schema> resolveSchemas(OpenAPI openAPI) {
-        Components components = openAPI.getComponents();
-        if (components == null) {
-            components = new Components();
-            openAPI.setComponents(components);
-        }
-        Map<String, Schema> schemas = components.getSchemas();
-        if (schemas == null) {
-            schemas = new LinkedHashMap<>();
-            components.setSchemas(schemas);
-        }
-        return schemas;
-    }
-
-    private ArraySchema arraySchema(Schema schema) {
-        if (schema == null) {
-            return null;
-        }
-        ArraySchema arraySchema = new ArraySchema();
-        arraySchema.setItems(schema);
-        return arraySchema;
-    }
-
-    private Schema getPrimitiveType(String typeName) {
-        Schema schema = null;
-        Optional<Class> aClass = ClassUtils.forName(typeName, getClass().getClassLoader());
-        if (aClass.isPresent()) {
-            Class concreteType = aClass.get();
-            Class wrapperType = ReflectionUtils.getWrapperType(concreteType);
-
-            PrimitiveType primitiveType = PrimitiveType.fromType(wrapperType);
-            if (primitiveType != null) {
-                schema = primitiveType.createProperty();
-            }
-        }
-        return schema;
-    }
-
-    private boolean isContainerType(ClassElement type) {
-        return CollectionUtils.setOf(
-                Optional.class.getName(),
-                Future.class.getName(),
-                Publisher.class.getName(),
-                "io.reactivex.Single",
-                "io.reactivex.Observable",
-                "io.reactivex.Maybe"
-        ).stream().anyMatch(type::isAssignable);
     }
 
 }

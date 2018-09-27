@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.enums.ParameterIn
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.Operation
 import io.swagger.v3.oas.models.PathItem
+import io.swagger.v3.oas.models.parameters.Parameter
 
 class OpenApiControllerVisitorSpec extends AbstractTypeElementSpec {
 
@@ -163,6 +164,184 @@ class MyBean {}
         operation.parameters[0].schema.type == 'string'
         operation.parameters[0].schema.format == 'uuid'
         operation.parameters[0].schema.description == 'the generated UUID'
+
+    }
+
+    void "test parse javax.validation constraints for String"() {
+        given:
+        buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.swagger.v3.oas.annotations.*;
+import io.swagger.v3.oas.annotations.media.*;
+import io.swagger.v3.oas.annotations.enums.*;
+import io.micronaut.http.annotation.*;
+import java.util.List;
+import javax.validation.constraints.*;
+
+@Controller("/")
+class MyController {
+
+    @Get("/subscription/{subscriptionId}")
+    public String getSubscription( @NotBlank @Max(10) @Min(5) @Pattern(regexp="xxxxx") @Size(min=10, max=20) String subscriptionId) { 
+        return null;                               
+     }
+}
+
+@javax.inject.Singleton
+class MyBean {}
+''')
+        when:
+        Operation operation = AbstractOpenApiVisitor.testReference?.paths?.get("/subscription/{subscriptionId}")?.get
+
+        then:
+        operation != null
+        operation.operationId == 'getSubscription'
+        operation.parameters.size() == 1
+
+
+        when:
+        def parameter = operation.parameters[0]
+
+        then:
+        parameter.in == 'path'
+        parameter.schema.maxLength == 20
+        parameter.schema.minLength == 10
+        parameter.schema.format == 'xxxxx'
+        parameter.schema.maximum == 10
+        parameter.schema.minimum == 5
+
+    }
+
+    void "test parse javax.validation constraints for String[]"() {
+        given:
+        buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.swagger.v3.oas.annotations.*;
+import io.swagger.v3.oas.annotations.media.*;
+import io.swagger.v3.oas.annotations.enums.*;
+import io.micronaut.http.annotation.*;
+import java.util.List;
+import javax.validation.constraints.*;
+
+@Controller("/")
+class MyController {
+
+    @Get("/subscription/{subscriptionId}")
+    public String getSubscription( @Size(min=10, max=20) String[] subscriptionId) { 
+        return null;                               
+     }
+}
+
+@javax.inject.Singleton
+class MyBean {}
+''')
+        when:
+        Operation operation = AbstractOpenApiVisitor.testReference?.paths?.get("/subscription/{subscriptionId}")?.get
+
+        then:
+        operation != null
+        operation.operationId == 'getSubscription'
+        operation.parameters.size() == 1
+
+
+        when:
+        def parameter = operation.parameters[0]
+
+        then:
+        parameter.in == 'path'
+        parameter.schema.maxLength == null
+        parameter.schema.minLength == null
+        parameter.schema.minItems == 10
+        parameter.schema.maxItems == 20
+
+    }
+
+    void "test parse javax.validation constraints for List"() {
+        given:
+        buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.swagger.v3.oas.annotations.*;
+import io.swagger.v3.oas.annotations.media.*;
+import io.swagger.v3.oas.annotations.enums.*;
+import io.micronaut.http.annotation.*;
+import java.util.List;
+import javax.validation.constraints.*;
+
+@Controller("/")
+class MyController {
+
+    @Get("/subscription/{subscriptionId}")
+    public String getSubscription( @Size(min=10, max=20) java.util.List<String> subscriptionId) { 
+        return null;                               
+     }
+}
+
+@javax.inject.Singleton
+class MyBean {}
+''')
+        when:
+        Operation operation = AbstractOpenApiVisitor.testReference?.paths?.get("/subscription/{subscriptionId}")?.get
+
+        then:
+        operation != null
+        operation.operationId == 'getSubscription'
+        operation.parameters.size() == 1
+
+
+        when:
+        def parameter = operation.parameters[0]
+
+        then:
+        parameter.in == 'path'
+        parameter.schema.maxLength == null
+        parameter.schema.minLength == null
+        parameter.schema.minItems == 10
+        parameter.schema.maxItems == 20
+
+    }
+
+    void "test parse javax.validation.NotEmpty constraint for List"() {
+        given:
+        buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.swagger.v3.oas.annotations.*;
+import io.swagger.v3.oas.annotations.media.*;
+import io.swagger.v3.oas.annotations.enums.*;
+import io.micronaut.http.annotation.*;
+import java.util.List;
+import javax.validation.constraints.*;
+
+@Controller("/")
+class MyController {
+
+    @Get("/subscription/{subscriptionId}")
+    public String getSubscription( @NotEmpty java.util.List<String> subscriptionId) { 
+        return null;                               
+     }
+}
+
+@javax.inject.Singleton
+class MyBean {}
+''')
+        when:
+        Operation operation = AbstractOpenApiVisitor.testReference?.paths?.get("/subscription/{subscriptionId}")?.get
+
+        then:
+        operation != null
+        operation.operationId == 'getSubscription'
+        operation.parameters.size() == 1
+
+
+        when:
+        def parameter = operation.parameters[0]
+
+        then:
+        parameter.in == 'path'
+        parameter.schema.minItems == 1
 
     }
 

@@ -39,8 +39,6 @@ $ mn create-websocket-client MyChat
 | Rendered template WebsocketClient.java to destination src/main/java/example/MyChatClient.java
 ----
 
-----
-
 === Compilation Time Validation
 
 The `validation` module can now be added to the `annotationProcessor` classpath and which will result in additional compile time checks, ensuring that users are using the framework correctly. For example, the following route method:
@@ -72,6 +70,14 @@ Experimental support for exposing <<endpoints, management endpoints>> over JMX h
 
 Latest release includes <<multitenancy,Multitenancy>> integration into the framework. Features includes tenant resolution, propagation and integration with <<multitenancyGorm,GORM>> which supports discriminator, table and schema multitenancy modes.
 
+=== Token Propagation
+
+Latest release includes <<tokenPropagation,Token Propagation>> capabilities into the security module of the the framework. It enables the propagation of valid tokens to outgoing requests triggered by the original request in a transparent way.
+
+=== Ldap Authentication
+
+Latest release supports <<ldap,authentication with LDAP>> out of the box. Moreover, the LDAP authentication in Micronaut supports configuration of one or more LDAP servers to authenticate with.
+
 === Documentation Improvements
 
 The documentation you are reading has been improved with a new configuration reference button at the top that contains a reference produced at compile time of all the available configuration options in Micronaut.
@@ -90,3 +96,7 @@ The following dependency upgrades occurred in this release:
 - Reactor `3.1.8` -> `3.2.0`
 - SnakeYAML `1.20` -> `1.23`
 - Jaeger `0.30.4` -> `0.31.0`
+
+=== Amazon Route 53 Service Discovery and AWS Systems Manager Parameter Store Support
+
+Use Amazon Route 53 Service Discovery directly for service discovery instead of running an instance of tools like Consul. You can also use AWS Systems Manager Parameter Store for shared configuration between nodes.
