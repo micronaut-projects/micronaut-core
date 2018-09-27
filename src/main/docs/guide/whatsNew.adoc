@@ -96,3 +96,7 @@ The following dependency upgrades occurred in this release:
 - Reactor `3.1.8` -> `3.2.0`
 - SnakeYAML `1.20` -> `1.23`
 - Jaeger `0.30.4` -> `0.31.0`
+
+=== Amazon Route 53 Service Discovery and AWS Systems Manager Parameter Store Support
+
+Use Amazon Route 53 Service Discovery directly for service discovery instead of running an instance of tools like Consul. You can also use AWS Systems Manager Parameter Store for shared configuration between nodes.
