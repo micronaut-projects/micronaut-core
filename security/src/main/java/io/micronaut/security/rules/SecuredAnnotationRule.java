@@ -26,6 +26,7 @@ import javax.inject.Singleton;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Optional;
+import java.util.List;
 
 /**
  * Security rule implementation for the {@link Secured} annotation.
@@ -65,7 +66,11 @@ public class SecuredAnnotationRule extends AbstractSecurityRule {
             if (methodRoute.hasAnnotation(Secured.class)) {
                 Optional<String[]> optionalValue = methodRoute.getValue(Secured.class, String[].class);
                 if (optionalValue.isPresent()) {
-                    return compareRoles(Arrays.asList(optionalValue.get()), getRoles(claims));
+                    List<String> values = Arrays.asList(optionalValue.get());
+                    if (values.contains(SecurityRule.DENY_ALL)) {
+                        return SecurityRuleResult.REJECTED;
+                    }
+                    return compareRoles(values, getRoles(claims));
                 }
             }
         }
