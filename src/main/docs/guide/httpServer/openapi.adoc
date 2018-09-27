@@ -29,7 +29,7 @@ import io.swagger.v3.oas.annotations.info.*;
 
 @OpenAPIDefinition(
     info = @Info(
-            title = "the title",
+            title = "Hello World",
             version = "0.0",
             description = "My API",
             license = @License(name = "Apache 2.0", url = "http://foo.bar"),
@@ -44,32 +44,8 @@ public class Application {
 }
 ----
 
-With that in place you compile your project and a Swagger YAML file will be generated. Note that depending on which language and build tool you use the location will differ. The following table summarizes this.
+With that in place you compile your project and a Swagger YAML file will be generated to the `META-INF/swagger` directory of your project's class output. For example the above configuration for Java will be generated to `build/classes/java/main/META-INF/swagger/hello-world-0.0.yml`.
 
-
-.Swagger Generation Location
-|===
-|Language |Build Tool|Location
-
-|Java
-|Gradle
-| `build/generated/source/apt/main/swagger-0.0.yml`
-
-|Java
-|Maven
-| `target/generated-sources/annotations/swagger-0.0.yml`
-
-|Kotlin
-|Gradle
-| `build/generated/source/kapt/main/swagger-0.0.yml`
-
-|Groovy
-|Gradle
-| `build/classes/groovy/generated/swagger-0.0.yml`
-
-|===
-
-Micronaut cannot unfortunately normalize the generation location as each Annotation Processing API for each language and build tool abstract away the concrete location.
 
 The previously defined annotations will produce YAML like the following:
 
@@ -90,7 +66,22 @@ info:
   version: "0.0"
 ----
 
-TIP: If you wish to expose the generated YAML as part of your deployed application you can copy the YAML to the `src/main/resources/public` directory and enable <<staticResources,Static Resources>> in your router configuration.
+=== Exposing Swagger Output
+
+If you wish to expose the generated Swagger output from your running application you can simply add the necessary static resource configuration. For example:
+
+.Exposing Swagger YAML
+[source,yaml]
+----
+micronaut:
+    router:
+        static-resources:
+            swagger:
+                paths: classpath:META-INF/swagger
+                mapping: /swagger/**
+----
+
+With the above configuration in place when you run your application you can access your Swagger documentation at `http://localhost:8080/swagger/the-title-0.0.yml`.
 
 === Controllers and Swagger Annotations
 
