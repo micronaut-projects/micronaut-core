@@ -206,7 +206,10 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                     UriMatchVariable var = pathVariables.get(parameterName);
                     newParameter = new Parameter();
                     newParameter.setIn(ParameterIn.PATH.toString());
-                    newParameter.setExplode(var.isExploded());
+                    final boolean exploded = var.isExploded();
+                    if (exploded) {
+                        newParameter.setExplode(exploded);
+                    }
                 } else if (parameter.isAnnotationPresent(Header.class)) {
                     String headerName = parameter.getValue(Header.class, "name", String.class).orElseGet(() -> NameUtils.hyphenate(parameterName));
                     newParameter = new Parameter();

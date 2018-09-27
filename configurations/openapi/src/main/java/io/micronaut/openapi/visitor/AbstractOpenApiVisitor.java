@@ -64,7 +64,6 @@ import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.Future;
-import java.util.function.Consumer;
 
 /**
  * Abstract base class for OpenAPI visitors.
@@ -382,7 +381,7 @@ abstract class AbstractOpenApiVisitor  {
             if ("string".equals(finalSchemaToBind.getType())) {
                 element.getValue(Size.class, "min", Integer.class).ifPresent(finalSchemaToBind::setMinLength);
                 element.getValue(Size.class, "max", Integer.class).ifPresent(finalSchemaToBind::setMaxLength);
-                if (element.isAnnotationPresent(NotEmpty.class)) {
+                if (element.isAnnotationPresent(NotEmpty.class) || element.isAnnotationPresent(NotBlank.class)) {
                     finalSchemaToBind.setMinLength(1);
                 }
             }
