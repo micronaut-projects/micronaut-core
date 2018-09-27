@@ -4,6 +4,9 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.inject.AbstractTypeElementSpec
 import spock.lang.Specification
 
+import javax.annotation.Nullable
+import javax.validation.constraints.NotBlank
+
 class PropertyElementSpec extends AbstractTypeElementSpec {
 
 
@@ -18,6 +21,7 @@ import javax.inject.Inject;
 public class TestController {
     
     private int age;
+    @javax.annotation.Nullable
     private String name;
     
     
@@ -33,6 +37,7 @@ public class TestController {
         return name;
     }
     
+    @javax.validation.constraints.NotBlank
     public void setName(String n) {
         name = n;
     }
@@ -46,6 +51,7 @@ public class TestController {
         AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].type.name == 'int'
         AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].isReadOnly()
         AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[1].name == 'name'
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[1].isAnnotationPresent(Nullable)
         AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[1].type.name == 'java.lang.String'
         !AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[1].isReadOnly()
     }
