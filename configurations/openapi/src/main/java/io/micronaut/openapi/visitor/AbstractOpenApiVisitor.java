@@ -59,7 +59,9 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.reactivestreams.Publisher;
 
 import javax.annotation.Nullable;
+import javax.validation.constraints.*;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.Future;
 import java.util.function.Consumer;
@@ -333,16 +335,16 @@ abstract class AbstractOpenApiVisitor  {
 
 
     /**
-     * Processes a schema property
-     *
-     * @param context The visitor context
+     * Processes a schema property.
+     *  @param context The visitor context
      * @param element The element
+     * @param elementType The elemen type
      * @param parentSchema The parent schema
      * @param propertySchema The property schema
      */
-    protected void processSchemaProperty(VisitorContext context, Element element, Schema parentSchema, Schema propertySchema) {
+    protected void processSchemaProperty(VisitorContext context, Element element, ClassElement elementType, Schema parentSchema, Schema propertySchema) {
         if (propertySchema != null) {
-            propertySchema = bindSchemaForElement(context, element, propertySchema);
+            propertySchema = bindSchemaForElement(context, element, elementType, propertySchema);
             parentSchema.addProperties(element.getName(), propertySchema);
         }
     }
@@ -352,10 +354,11 @@ abstract class AbstractOpenApiVisitor  {
      *
      * @param context The context
      * @param element The element
+     * @param elementType The element type
      * @param schemaToBind The schema to bind
      * @return The bound schema
      */
-    protected Schema bindSchemaForElement(VisitorContext context, Element element, Schema schemaToBind) {
+    protected Schema bindSchemaForElement(VisitorContext context, Element element, ClassElement elementType, Schema schemaToBind) {
         AnnotationValue<io.swagger.v3.oas.annotations.media.Schema> schemaAnn = element.getAnnotation(io.swagger.v3.oas.annotations.media.Schema.class);
         if (schemaAnn != null) {
             JsonNode schemaJson = toJson(schemaAnn.getValues(), context);
@@ -365,6 +368,49 @@ abstract class AbstractOpenApiVisitor  {
                 context.warn("Error reading Swagger Schema for element [" + element + "]: " + e.getMessage(), element);
             }
         }
+
+        Schema finalSchemaToBind = schemaToBind;
+        final boolean isIterableOrMap = elementType.isIterable() || elementType.isAssignable(Map.class);
+
+        if (isIterableOrMap) {
+            element.getValue(Size.class, "min", Integer.class).ifPresent(finalSchemaToBind::setMinItems);
+            element.getValue(Size.class, "max", Integer.class).ifPresent(finalSchemaToBind::setMaxItems);
+            if (element.isAnnotationPresent(NotEmpty.class)) {
+                finalSchemaToBind.setMinItems(1);
+            }
+        } else {
+            if ("string".equals(finalSchemaToBind.getType())) {
+                element.getValue(Size.class, "min", Integer.class).ifPresent(finalSchemaToBind::setMinLength);
+                element.getValue(Size.class, "max", Integer.class).ifPresent(finalSchemaToBind::setMaxLength);
+                if (element.isAnnotationPresent(NotEmpty.class)) {
+                    finalSchemaToBind.setMinLength(1);
+                }
+            }
+
+            if (element.isAnnotationPresent(Negative.class)) {
+                finalSchemaToBind.setMaximum(new BigDecimal(0));
+            }
+            if (element.isAnnotationPresent(NegativeOrZero.class)) {
+                finalSchemaToBind.setMaximum(new BigDecimal(1));
+            }
+            if (element.isAnnotationPresent(Positive.class)) {
+                finalSchemaToBind.setMinimum(new BigDecimal(0));
+            }
+            if (element.isAnnotationPresent(PositiveOrZero.class)) {
+                finalSchemaToBind.setMinimum(new BigDecimal(1));
+            }
+            element.getValue(Max.class, BigDecimal.class).ifPresent(finalSchemaToBind::setMaximum);
+            element.getValue(Min.class, BigDecimal.class).ifPresent(finalSchemaToBind::setMinimum);
+            element.getValue(DecimalMax.class, BigDecimal.class).ifPresent(finalSchemaToBind::setMaximum);
+            element.getValue(DecimalMin.class, BigDecimal.class).ifPresent(finalSchemaToBind::setMinimum);
+            if (element.isAnnotationPresent(Email.class)) {
+                finalSchemaToBind.setFormat("email");
+            }
+
+            element.findAnnotation(Pattern.class).flatMap((p) -> p.get("regexp", String.class)).ifPresent(finalSchemaToBind::setFormat);
+        }
+
+
 
         Optional<String> documentation = element.getDocumentation();
         if (StringUtils.isEmpty(schemaToBind.getDescription())) {
@@ -482,7 +528,7 @@ abstract class AbstractOpenApiVisitor  {
                 }
                 Schema propertySchema = resolveSchema(openAPI, beanProperty.getType(), context, mediaType);
 
-                processSchemaProperty(context, beanProperty, schema, propertySchema);
+                processSchemaProperty(context, beanProperty, beanProperty.getType(), schema, propertySchema);
 
             }
         }

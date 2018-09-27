@@ -56,7 +56,6 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.util.*;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -294,9 +293,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                     }
 
                     if (schema != null) {
-                        if (parameter.isAnnotationPresent(io.swagger.v3.oas.annotations.media.Schema.class)) {
-                            bindSchemaForElement(context, parameter, schema);
-                        }
+                        bindSchemaForElement(context, parameter, parameter.getType(), schema);
                         newParameter.setSchema(schema);
                     }
                 }
@@ -316,7 +313,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                         }
                         Schema propertySchema = resolveSchema(openAPI, parameter.getType(), context, consumesMediaType);
 
-                        processSchemaProperty(context, parameter, schema, propertySchema);
+                        processSchemaProperty(context, parameter, parameter.getType(), schema, propertySchema);
 
                         propertySchema.setNullable(parameter.isAnnotationPresent(Nullable.class));
                         if (javadocDescription != null && StringUtils.isEmpty(propertySchema.getDescription())) {
