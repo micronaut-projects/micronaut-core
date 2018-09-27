@@ -5,3 +5,5 @@ Micronaut supports authentication with LDAP out of the box. To get started, add 
 ----
 compile "io.micronaut.configuration:security-ldap"
 ----
+
+TIP: Read the http://guides.micronaut.io/micronaut-database-authentication-provider-groovy/guide/index.html#securityLdap[LDAP and Database authentication providers] to see an example.
