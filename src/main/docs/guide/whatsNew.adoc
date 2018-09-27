@@ -39,8 +39,6 @@ $ mn create-websocket-client MyChat
 | Rendered template WebsocketClient.java to destination src/main/java/example/MyChatClient.java
 ----
 
-----
-
 === Compilation Time Validation
 
 The `validation` module can now be added to the `annotationProcessor` classpath and which will result in additional compile time checks, ensuring that users are using the framework correctly. For example, the following route method:
@@ -71,6 +69,10 @@ Experimental support for exposing <<endpoints, management endpoints>> over JMX h
 === Multitenancy support
 
 Latest release includes <<multitenancy,Multitenancy>> integration into the framework. Features includes tenant resolution, propagation and integration with <<multitenancyGorm,GORM>> which supports discriminator, table and schema multitenancy modes.
+
+=== Token Propagation
+
+Latest release includes <<tokenPropagation,Token Propagation>> capabilities into the security module of the the framework. It enables the propagation of valid tokens to outgoing requests triggered by the original request in a transparent way.
 
 === Documentation Improvements
 
