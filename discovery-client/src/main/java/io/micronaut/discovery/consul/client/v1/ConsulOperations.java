@@ -42,8 +42,7 @@ public interface ConsulOperations {
      * @param value The value as a String
      * @return A {@link Publisher} that emits a boolean if the operation succeeded
      */
-    @Put(value = "/kv/{+key}", consumes = MediaType.TEXT_PLAIN)
-    @Produces(value = MediaType.TEXT_PLAIN, single = true)
+    @Put(value = "/kv/{+key}", processes = MediaType.TEXT_PLAIN, single = true)
     Publisher<Boolean> putValue(String key, @Body String value);
 
     /**
@@ -52,8 +51,7 @@ public interface ConsulOperations {
      * @param key The key to read
      * @return A {@link Publisher} that emits a list of {@link KeyValue}
      */
-    @Get("/kv/{+key}?recurse")
-    @Produces(single = true)
+    @Get(uri = "/kv/{+key}?recurse", single = true)
     Publisher<List<KeyValue>> readValues(String key);
 
     /**
@@ -65,8 +63,7 @@ public interface ConsulOperations {
      * @param seperator  The separator to use
      * @return A {@link Publisher} that emits a list of {@link KeyValue}
      */
-    @Get("/kv/{+key}?recurse=true{&dc}{&raw}{&seperator}")
-    @Produces(single = true)
+    @Get(uri = "/kv/{+key}?recurse=true{&dc}{&raw}{&seperator}", single = true)
     @Retryable(
         attempts = AbstractConsulClient.EXPR_CONSUL_CONFIG_RETRY_COUNT,
         delay = AbstractConsulClient.EXPR_CONSUL_CONFIG_RETRY_DELAY
@@ -110,8 +107,7 @@ public interface ConsulOperations {
     /**
      * @return The current leader address
      */
-    @Get("/status/leader")
-    @Produces(single = true)
+    @Get(uri = "/status/leader", single = true)
     Publisher<String> status();
 
     /**
@@ -120,8 +116,7 @@ public interface ConsulOperations {
      * @param entry The entry to register
      * @return A {@link Publisher} that emits a boolean true if the operation was successful
      */
-    @Put("/catalog/register")
-    @Produces(single = true)
+    @Put(uri = "/catalog/register", single = true)
     Publisher<Boolean> register(@NotNull @Body CatalogEntry entry);
 
     /**
@@ -130,8 +125,7 @@ public interface ConsulOperations {
      * @param entry The entry to register
      * @return A {@link Publisher} that emits a boolean true if the operation was successful
      */
-    @Put("/catalog/deregister")
-    @Produces(single = true)
+    @Put(uri = "/catalog/deregister", single = true)
     Publisher<Boolean> deregister(@NotNull @Body CatalogEntry entry);
 
     /**
@@ -165,8 +159,7 @@ public interface ConsulOperations {
      *
      * @return The {@link NewServiceEntry} instances
      */
-    @Get("/agent/services")
-    @Produces(single = true)
+    @Get(uri = "/agent/services", single = true)
     Publisher<Map<String, ServiceEntry>> getServices();
 
     /**
@@ -178,8 +171,7 @@ public interface ConsulOperations {
      * @param dc      The dc
      * @return The {@link HealthEntry} instances
      */
-    @Get("/health/service/{service}{?passing,tag,dc}")
-    @Produces(single = true)
+    @Get(uri = "/health/service/{service}{?passing,tag,dc}", single = true)
     Publisher<List<HealthEntry>> getHealthyServices(
         @NotNull String service,
         @Nullable Boolean passing,
@@ -191,8 +183,7 @@ public interface ConsulOperations {
      *
      * @return All the nodes
      */
-    @Get("/catalog/nodes")
-    @Produces(single = true)
+    @Get(uri = "/catalog/nodes", single = true)
     Publisher<List<CatalogEntry>> getNodes();
 
     /**
@@ -201,8 +192,7 @@ public interface ConsulOperations {
      * @param datacenter The data center
      * @return A publisher that emits the nodes
      */
-    @Get("/catalog/nodes?dc={datacenter}")
-    @Produces(single = true)
+    @Get(uri = "/catalog/nodes?dc={datacenter}", single = true)
     Publisher<List<CatalogEntry>> getNodes(@NotNull String datacenter);
 
     /**
@@ -210,8 +200,7 @@ public interface ConsulOperations {
      *
      * @return A Map where the keys are service names and the values are service tags
      */
-    @Get("/catalog/services")
-    @Produces(single = true)
+    @Get(uri = "/catalog/services", single = true)
     Publisher<Map<String, List<String>>> getServiceNames();
 
     /**
