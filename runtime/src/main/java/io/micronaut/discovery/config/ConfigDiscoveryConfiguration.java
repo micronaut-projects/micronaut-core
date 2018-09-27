@@ -46,6 +46,7 @@ public abstract class ConfigDiscoveryConfiguration implements Toggleable {
 
     private boolean enabled = DEFAULT_ENABLED;
     private String path;
+    private boolean full_path = false;
     private Format format = Format.NATIVE;
 
     /**
@@ -93,6 +94,17 @@ public abstract class ConfigDiscoveryConfiguration implements Toggleable {
             this.format = format;
         }
     }
+
+    /**
+     *
+     * @return Return whether the given path is full or not
+     */
+    public boolean getFullPath() { return full_path; }
+
+    /**
+     * @param full_path The given path is full
+     */
+    public void setFullPath(boolean full_path) { this.full_path = full_path; }
 
     /**
      * The format the configuration is stored in.
