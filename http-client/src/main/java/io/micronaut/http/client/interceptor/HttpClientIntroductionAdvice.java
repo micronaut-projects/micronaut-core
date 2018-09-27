@@ -72,6 +72,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import javax.annotation.PreDestroy;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.Closeable;
 import java.lang.annotation.Annotation;
@@ -102,7 +103,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private final int HEADERS_INITIAL_CAPACITY = 3;
     private final BeanContext beanContext;
     private final Map<String, HttpClient> clients = new ConcurrentHashMap<>();
-    private final ReactiveClientResultTransformer[] transformers;
+    private final List<ReactiveClientResultTransformer> transformers;
     private final LoadBalancerResolver loadBalancerResolver;
     private final JsonMediaTypeCodec jsonMediaTypeCodec;
 
@@ -119,13 +120,28 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         JsonMediaTypeCodec jsonMediaTypeCodec,
         LoadBalancerResolver loadBalancerResolver,
         ReactiveClientResultTransformer... transformers) {
+       this(beanContext, jsonMediaTypeCodec, loadBalancerResolver, Arrays.asList(transformers));
+    }
+
+    /**
+     * Constructor for advice class to setup things like Headers, Cookies, Parameters for Clients.
+     *
+     * @param beanContext          context to resolve beans
+     * @param jsonMediaTypeCodec The JSON media type codec
+     * @param loadBalancerResolver load balancer resolver
+     * @param transformers         transformation classes
+     */
+    @Inject public HttpClientIntroductionAdvice(
+            BeanContext beanContext,
+            JsonMediaTypeCodec jsonMediaTypeCodec,
+            LoadBalancerResolver loadBalancerResolver,
+            List<ReactiveClientResultTransformer> transformers) {
 
         this.jsonMediaTypeCodec = jsonMediaTypeCodec;
         this.beanContext = beanContext;
         this.loadBalancerResolver = loadBalancerResolver;
-        this.transformers = transformers != null ? transformers : new ReactiveClientResultTransformer[0];
+        this.transformers = transformers != null ? transformers : Collections.emptyList();
     }
-
     /**
      * Interceptor to apply headers, cookies, parameter and body arguements.
      *
