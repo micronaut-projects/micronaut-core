@@ -86,6 +86,15 @@ The following table summarizes the supported interfaces:
 
 In addition, functions have an input and/or an output. The input is represented by the accepted argument and represents the body consumed by the function and the output is represented by the return value of the function. The input and the output should be either a Java primitive or simple type (`int`, `String` etc.) or a POJO.
 
+Often, you want to accept a POJO and return a POJO. Use `java.util.function.Function` to accept a single argument and return a single result.
+
+[source,java]
+----
+include::{testsfunctionclient}/IsbnValidatorFunction.java[tags=imports]
+
+include::{testsfunctionclient}/IsbnValidatorFunction.java[tags=clazz]
+----
+
 A single project can define multiple functions, however only a single function should be configured for execution by the application. This can be configured using the `micronaut.function.name` property in `application.yml`:
 
 .Configuring the Function Name to Execute
