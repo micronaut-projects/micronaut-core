@@ -39,6 +39,9 @@ import io.micronaut.openapi.util.Yaml;
 import io.swagger.v3.core.util.Json;
 import io.swagger.v3.core.util.PrimitiveType;
 import io.swagger.v3.oas.annotations.Hidden;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
+import io.swagger.v3.oas.annotations.enums.ParameterStyle;
 import io.swagger.v3.oas.annotations.headers.Header;
 import io.swagger.v3.oas.annotations.links.Link;
 import io.swagger.v3.oas.annotations.links.LinkParameter;
@@ -59,6 +62,7 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.Future;
+import java.util.function.Consumer;
 
 /**
  * Abstract base class for OpenAPI visitors.
@@ -149,8 +153,7 @@ abstract class AbstractOpenApiVisitor  {
 
             if (value instanceof AnnotationValue) {
                 AnnotationValue<?> av = (AnnotationValue<?>) value;
-                final Map<CharSequence, Object> valueMap = toValueMap(av.getValues(), context);
-                bindSchemaIfNeccessary(context, av, valueMap);
+                final Map<CharSequence, Object> valueMap = resolveAnnotationValues(context, av);
                 newValues.put(key, valueMap);
             } else if (value != null) {
                 if (value.getClass().isArray()) {
@@ -173,8 +176,7 @@ abstract class AbstractOpenApiVisitor  {
                             } else if (OAuthScope.class.getName().equals(annotationName)) {
                                 Map params = toTupleSubMap(a, "name",  "description");
                                 newValues.put(key, params);
-                            }
-                            else if (ApiResponse.class.getName().equals(annotationName)) {
+                            } else if (ApiResponse.class.getName().equals(annotationName)) {
                                 Map responses = new LinkedHashMap();
                                 for (Object o : a) {
                                     AnnotationValue<ApiResponse> sv = (AnnotationValue<ApiResponse>) o;
@@ -200,13 +202,17 @@ abstract class AbstractOpenApiVisitor  {
                                 newValues.put(key, variables);
                             } else {
                                 if (a.length == 1) {
-                                    newValues.put(key, toValueMap(((AnnotationValue<?>) a[0]).getValues(), context));
+                                    final AnnotationValue<?> av = (AnnotationValue<?>) a[0];
+                                    final Map<CharSequence, Object> valueMap = resolveAnnotationValues(context, av);
+                                    newValues.put(key, toValueMap(valueMap, context));
                                 } else {
 
                                     List list = new ArrayList();
                                     for (Object o : a) {
                                         if (o instanceof AnnotationValue) {
-                                            list.add(toValueMap(((AnnotationValue<?>) o).getValues(), context));
+                                            final AnnotationValue<?> av = (AnnotationValue<?>) o;
+                                            final Map<CharSequence, Object> valueMap = resolveAnnotationValues(context, av);
+                                            list.add(valueMap);
                                         } else {
                                             list.add(o);
                                         }
@@ -224,6 +230,19 @@ abstract class AbstractOpenApiVisitor  {
             }
         }
         return newValues;
+    }
+
+    private Map<CharSequence, Object> resolveAnnotationValues(VisitorContext context, AnnotationValue<?> av) {
+        final Map<CharSequence, Object> valueMap = toValueMap(av.getValues(), context);
+        bindSchemaIfNeccessary(context, av, valueMap);
+        final String annotationName = av.getAnnotationName();
+        if (Parameter.class.getName().equals(annotationName)) {
+            normalizeEnumValues(valueMap, CollectionUtils.mapOf(
+                    "in", ParameterIn.class,
+                    "style", ParameterStyle.class
+            ));
+        }
+        return valueMap;
     }
 
     private Map toTupleSubMap(Object[] a, String entryKey, String entryValue) {
@@ -323,30 +342,43 @@ abstract class AbstractOpenApiVisitor  {
      */
     protected void processSchemaProperty(VisitorContext context, Element element, Schema parentSchema, Schema propertySchema) {
         if (propertySchema != null) {
-            AnnotationValue<io.swagger.v3.oas.annotations.media.Schema> schemaAnn = element.getAnnotation(io.swagger.v3.oas.annotations.media.Schema.class);
-            if (schemaAnn != null) {
-                JsonNode schemaJson = toJson(schemaAnn.getValues(), context);
-                try {
-                    propertySchema = jsonMapper.readerForUpdating(propertySchema).readValue(schemaJson);
-                } catch (IOException e) {
-                    context.warn("Error reading Swagger Schema for element [" + element + "]: " + e.getMessage(), element);
-                }
-            }
-
-            Optional<String> documentation = element.getDocumentation();
-            if (StringUtils.isEmpty(propertySchema.getDescription())) {
-                String doc = documentation.orElse(null);
-                if (doc != null) {
-                    JavadocDescription desc = new JavadocParser().parse(doc);
-                    propertySchema.setDescription(desc.getMethodDescription());
-                }
-            }
-            if (element.isAnnotationPresent(Deprecated.class)) {
-                propertySchema.setDeprecated(true);
-            }
-            propertySchema.setNullable(element.isAnnotationPresent(Nullable.class));
+            propertySchema = bindSchemaForElement(context, element, propertySchema);
             parentSchema.addProperties(element.getName(), propertySchema);
         }
+    }
+
+    /**
+     * Binds the schema for the given element.
+     *
+     * @param context The context
+     * @param element The element
+     * @param schemaToBind The schema to bind
+     * @return The bound schema
+     */
+    protected Schema bindSchemaForElement(VisitorContext context, Element element, Schema schemaToBind) {
+        AnnotationValue<io.swagger.v3.oas.annotations.media.Schema> schemaAnn = element.getAnnotation(io.swagger.v3.oas.annotations.media.Schema.class);
+        if (schemaAnn != null) {
+            JsonNode schemaJson = toJson(schemaAnn.getValues(), context);
+            try {
+                schemaToBind = jsonMapper.readerForUpdating(schemaToBind).readValue(schemaJson);
+            } catch (IOException e) {
+                context.warn("Error reading Swagger Schema for element [" + element + "]: " + e.getMessage(), element);
+            }
+        }
+
+        Optional<String> documentation = element.getDocumentation();
+        if (StringUtils.isEmpty(schemaToBind.getDescription())) {
+            String doc = documentation.orElse(null);
+            if (doc != null) {
+                JavadocDescription desc = new JavadocParser().parse(doc);
+                schemaToBind.setDescription(desc.getMethodDescription());
+            }
+        }
+        if (element.isAnnotationPresent(Deprecated.class)) {
+            schemaToBind.setDeprecated(true);
+        }
+        schemaToBind.setNullable(element.isAnnotationPresent(Nullable.class));
+        return schemaToBind;
     }
 
     private Map annotationValueArrayToSubmap(Object[] a, String classifier, VisitorContext context) {

@@ -17,7 +17,6 @@
 package io.micronaut.openapi.visitor;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
@@ -37,8 +36,10 @@ import io.micronaut.openapi.javadoc.JavadocDescription;
 import io.micronaut.openapi.javadoc.JavadocParser;
 import io.swagger.v3.oas.annotations.Hidden;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.callbacks.Callback;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.media.Content;
@@ -55,6 +56,7 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 /**
@@ -87,12 +89,13 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
             PathItem pathItem = resolvePathItem(context, matchTemplate);
             OpenAPI openAPI = resolveOpenAPI(context);
 
-            io.swagger.v3.oas.models.Operation swaggerOperation = element.findAnnotation(Operation.class).flatMap(o -> {
+            final Optional<AnnotationValue<Operation>> operationAnnotation = element.findAnnotation(Operation.class);
+            io.swagger.v3.oas.models.Operation swaggerOperation = operationAnnotation.flatMap(o -> {
                 JsonNode jsonNode = toJson(o.getValues(), context);
 
                 try {
                     return Optional.of(jsonMapper.treeToValue(jsonNode, io.swagger.v3.oas.models.Operation.class));
-                } catch (JsonProcessingException e) {
+                } catch (Exception e) {
                     context.warn("Error reading Swagger Operation for element [" + element + "]: " + e.getMessage(), element);
                     return Optional.empty();
                 }
@@ -107,6 +110,8 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
 
             readServers(element, context, swaggerOperation);
 
+            readCallbacks(element, context, swaggerOperation);
+
             HttpMethod httpMethod = HttpMethod.valueOf(httpMethodClass.getSimpleName().toUpperCase(Locale.ENGLISH));
             JavadocDescription javadocDescription = element.getDocumentation().map(s -> new JavadocParser().parse(s)).orElse(null);
 
@@ -114,35 +119,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 swaggerOperation.setDescription(javadocDescription.getMethodDescription());
             }
 
-            switch (httpMethod) {
-                case GET:
-                    pathItem.get(swaggerOperation);
-                break;
-                case POST:
-                    pathItem.post(swaggerOperation);
-                break;
-                case PUT:
-                    pathItem.put(swaggerOperation);
-                break;
-                case PATCH:
-                    pathItem.patch(swaggerOperation);
-                break;
-                case DELETE:
-                    pathItem.delete(swaggerOperation);
-                break;
-                case HEAD:
-                    pathItem.head(swaggerOperation);
-                break;
-                case OPTIONS:
-                    pathItem.options(swaggerOperation);
-                break;
-                case TRACE:
-                    pathItem.trace(swaggerOperation);
-                break;
-                default:
-                    // unprocessable
-                    return;
-            }
+            setOperationOnPathItem(pathItem, swaggerOperation, httpMethod);
 
             if (element.isAnnotationPresent(Deprecated.class)) {
                 swaggerOperation.setDeprecated(true);
@@ -262,7 +239,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                         if (newParameter == null) {
                             try {
                                 newParameter = jsonMapper.treeToValue(jsonNode, Parameter.class);
-                            } catch (JsonProcessingException e) {
+                            } catch (Exception e) {
                                 context.warn("Error reading Swagger Parameter for element [" + parameter + "]: " + e.getMessage(), parameter);
                             }
                         } else {
@@ -317,6 +294,9 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                     }
 
                     if (schema != null) {
+                        if (parameter.isAnnotationPresent(io.swagger.v3.oas.annotations.media.Schema.class)) {
+                            bindSchemaForElement(context, parameter, schema);
+                        }
                         newParameter.setSchema(schema);
                     }
                 }
@@ -357,6 +337,37 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
         });
     }
 
+    private void setOperationOnPathItem(PathItem pathItem, io.swagger.v3.oas.models.Operation swaggerOperation, HttpMethod httpMethod) {
+        switch (httpMethod) {
+            case GET:
+                pathItem.get(swaggerOperation);
+            break;
+            case POST:
+                pathItem.post(swaggerOperation);
+            break;
+            case PUT:
+                pathItem.put(swaggerOperation);
+            break;
+            case PATCH:
+                pathItem.patch(swaggerOperation);
+            break;
+            case DELETE:
+                pathItem.delete(swaggerOperation);
+            break;
+            case HEAD:
+                pathItem.head(swaggerOperation);
+            break;
+            case OPTIONS:
+                pathItem.options(swaggerOperation);
+            break;
+            case TRACE:
+                pathItem.trace(swaggerOperation);
+            break;
+            default:
+                // unprocessable
+        }
+    }
+
     private void readApiResponses(MethodElement element, VisitorContext context, io.swagger.v3.oas.models.Operation swaggerOperation) {
         List<AnnotationValue<io.swagger.v3.oas.annotations.responses.ApiResponse>> responseAnnotations = element.getAnnotationValuesByType(io.swagger.v3.oas.annotations.responses.ApiResponse.class);
         if (CollectionUtils.isNotEmpty(responseAnnotations)) {
@@ -370,7 +381,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                         String name = r.get("responseCode", String.class).orElse("default");
                         apiResponses.put(name, apiResponse);
                     });
-                } catch (JsonProcessingException e) {
+                } catch (Exception e) {
                     context.warn("Error reading Swagger ApiResponses for element [" + element + "]: " + e.getMessage(), element);
                 }
             }
@@ -386,7 +397,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 try {
                     Optional<SecurityRequirement> newRequirement = Optional.of(jsonMapper.treeToValue(jn, SecurityRequirement.class));
                     newRequirement.ifPresent(swaggerOperation::addSecurityItem);
-                } catch (JsonProcessingException e) {
+                } catch (Exception e) {
                     context.warn("Error reading Swagger SecurityRequirement for element [" + element + "]: " + e.getMessage(), element);
                 }
             }
@@ -401,11 +412,76 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 try {
                     Optional<Server> newRequirement = Optional.of(jsonMapper.treeToValue(jn, Server.class));
                     newRequirement.ifPresent(swaggerOperation::addServersItem);
-                } catch (JsonProcessingException e) {
+                } catch (Exception e) {
                     context.warn("Error reading Swagger Server for element [" + element + "]: " + e.getMessage(), element);
                 }
             }
         }
+    }
+
+    private void readCallbacks(MethodElement element, VisitorContext context, io.swagger.v3.oas.models.Operation swaggerOperation) {
+        List<AnnotationValue<Callback>> callbackAnnotations = element.getAnnotationValuesByType(Callback.class);
+        if (CollectionUtils.isNotEmpty(callbackAnnotations)) {
+            for (AnnotationValue<Callback> callbackAnn : callbackAnnotations) {
+                final Optional<String> n = callbackAnn.get("name", String.class);
+                n.ifPresent(callbackName -> {
+
+                    final Optional<String> expr = callbackAnn.get("callbackUrlExpression", String.class);
+                    if (expr.isPresent()) {
+
+                        final String callbackUrl = expr.get();
+
+                        final List<AnnotationValue<Operation>> operations = callbackAnn.getAnnotations("operation", Operation.class);
+                        if (CollectionUtils.isEmpty(operations)) {
+                            Map<String, io.swagger.v3.oas.models.callbacks.Callback> callbacks = initCallbacks(swaggerOperation);
+                            final io.swagger.v3.oas.models.callbacks.Callback c = new io.swagger.v3.oas.models.callbacks.Callback();
+                            c.addPathItem(callbackUrl, new PathItem());
+                            callbacks.put(callbackName, c);
+                        } else {
+                            final PathItem pathItem = new PathItem();
+                            for (AnnotationValue<Operation> operation : operations) {
+                                final Optional<HttpMethod> operationMethod = operation.get("method", HttpMethod.class);
+                                operationMethod.ifPresent(httpMethod -> {
+                                    JsonNode jsonNode = toJson(operation.getValues(), context);
+
+                                    try {
+                                        final Optional<io.swagger.v3.oas.models.Operation> op = Optional.of(jsonMapper.treeToValue(jsonNode, io.swagger.v3.oas.models.Operation.class));
+                                        op.ifPresent(operation1 -> setOperationOnPathItem(pathItem, operation1, httpMethod));
+                                    } catch (Exception e) {
+                                        context.warn("Error reading Swagger Operation for element [" + element + "]: " + e.getMessage(), element);
+                                    }
+                                });
+                            }
+                            Map<String, io.swagger.v3.oas.models.callbacks.Callback> callbacks = initCallbacks(swaggerOperation);
+                            final io.swagger.v3.oas.models.callbacks.Callback c = new io.swagger.v3.oas.models.callbacks.Callback();
+                            c.addPathItem(callbackUrl, pathItem);
+                            callbacks.put(callbackName, c);
+
+                        }
+
+                    } else {
+                        final Components components = resolveComponents(resolveOpenAPI(context));
+                        final Map<String, io.swagger.v3.oas.models.callbacks.Callback> callbackComponents = components.getCallbacks();
+                        if (callbackComponents != null && callbackComponents.containsKey(callbackName)) {
+                            Map<String, io.swagger.v3.oas.models.callbacks.Callback> callbacks = initCallbacks(swaggerOperation);
+                            final io.swagger.v3.oas.models.callbacks.Callback callbackRef = new io.swagger.v3.oas.models.callbacks.Callback();
+                            callbackRef.set$ref("#/components/callbacks/" + callbackName);
+                            callbacks.put(callbackName, callbackRef);
+                        }
+                    }
+                });
+
+            }
+        }
+    }
+
+    private Map<String, io.swagger.v3.oas.models.callbacks.Callback> initCallbacks(io.swagger.v3.oas.models.Operation swaggerOperation) {
+        Map<String, io.swagger.v3.oas.models.callbacks.Callback> callbacks = swaggerOperation.getCallbacks();
+        if (callbacks == null) {
+            callbacks = new LinkedHashMap<>();
+            swaggerOperation.setCallbacks(callbacks);
+        }
+        return callbacks;
     }
 
     private void readTags(MethodElement element, io.swagger.v3.oas.models.Operation swaggerOperation) {
