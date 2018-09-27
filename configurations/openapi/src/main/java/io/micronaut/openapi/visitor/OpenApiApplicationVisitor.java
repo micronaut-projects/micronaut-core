@@ -119,7 +119,7 @@ public class OpenApiApplicationVisitor extends AbstractOpenApiVisitor implements
 
             }
             for (AnnotationValue<A> tag : annotations) {
-                JsonNode jsonNode = toJson(tag.getValues());
+                JsonNode jsonNode = toJson(tag.getValues(), context);
                 try {
                     T t = jsonMapper.treeToValue(jsonNode, modelType);
                     if (t != null) {
@@ -135,7 +135,7 @@ public class OpenApiApplicationVisitor extends AbstractOpenApiVisitor implements
 
     private OpenAPI readOpenAPI(ClassElement element, VisitorContext context) {
         return element.findAnnotation(OpenAPIDefinition.class).flatMap(o -> {
-                    JsonNode jsonNode = toJson(o.getValues());
+                    JsonNode jsonNode = toJson(o.getValues(), context);
 
                     try {
                         return Optional.of(jsonMapper.treeToValue(jsonNode, OpenAPI.class));
