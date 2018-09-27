@@ -372,18 +372,18 @@ abstract class AbstractOpenApiVisitor  {
         final boolean isIterableOrMap = elementType.isIterable() || elementType.isAssignable(Map.class);
 
         if (isIterableOrMap) {
-            element.getValue(Size.class, "min", Integer.class).ifPresent(finalSchemaToBind::setMinItems);
-            element.getValue(Size.class, "max", Integer.class).ifPresent(finalSchemaToBind::setMaxItems);
             if (element.isAnnotationPresent(NotEmpty.class)) {
                 finalSchemaToBind.setMinItems(1);
             }
+            element.getValue(Size.class, "min", Integer.class).ifPresent(finalSchemaToBind::setMinItems);
+            element.getValue(Size.class, "max", Integer.class).ifPresent(finalSchemaToBind::setMaxItems);
         } else {
             if ("string".equals(finalSchemaToBind.getType())) {
-                element.getValue(Size.class, "min", Integer.class).ifPresent(finalSchemaToBind::setMinLength);
-                element.getValue(Size.class, "max", Integer.class).ifPresent(finalSchemaToBind::setMaxLength);
                 if (element.isAnnotationPresent(NotEmpty.class) || element.isAnnotationPresent(NotBlank.class)) {
                     finalSchemaToBind.setMinLength(1);
                 }
+                element.getValue(Size.class, "min", Integer.class).ifPresent(finalSchemaToBind::setMinLength);
+                element.getValue(Size.class, "max", Integer.class).ifPresent(finalSchemaToBind::setMaxLength);
             }
 
             if (element.isAnnotationPresent(Negative.class)) {
