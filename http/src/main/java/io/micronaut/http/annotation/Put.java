@@ -69,4 +69,13 @@ public @interface Put {
     @AliasFor(annotation = Produces.class, member = "value")
     @AliasFor(annotation = Consumes.class, member = "value")
     String[] processes() default {};
+
+    /**
+     * Shortcut that allows setting both the {@link Consumes} and {@link Produces} single settings.
+     *
+     * @return Whether a single or multiple items are produced/consumed
+     */
+    @AliasFor(annotation = Produces.class, member = "single")
+    @AliasFor(annotation = Consumes.class, member = "single")
+    boolean single() default false;
 }

@@ -335,7 +335,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
             final Class<?> methodDeclaringType = declaringType;
             if (Publishers.isConvertibleToPublisher(javaReturnType) || isFuture) {
-                boolean isSingle = Publishers.isSingle(javaReturnType) || isFuture || context.getValue(Produces.class, "single", Boolean.class).orElse(false);
+                boolean isSingle = Publishers.isSingle(javaReturnType) || isFuture || context.getValue(Consumes.class, "single", Boolean.class).orElse(false);
                 Argument<?> publisherArgument = returnType.asArgument().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
 
 
