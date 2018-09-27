@@ -39,8 +39,6 @@ $ mn create-websocket-client MyChat
 | Rendered template WebsocketClient.java to destination src/main/java/example/MyChatClient.java
 ----
 
-----
-
 === Compilation Time Validation
 
 The `validation` module can now be added to the `annotationProcessor` classpath and which will result in additional compile time checks, ensuring that users are using the framework correctly. For example, the following route method:
