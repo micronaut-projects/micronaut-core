@@ -21,4 +21,4 @@ micronaut:
 <3> Number of netty worker threads
 <4> Auto read request body
 
-All the available options are described within the javadoc of api:http.server.netty.configuration.NettyHttpServerConfiguration[].
+include::{includedir}configurationProperties/io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration.adoc[]
