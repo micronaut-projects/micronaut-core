@@ -16,6 +16,8 @@
 
 package io.micronaut.inject;
 
+import io.micronaut.core.annotation.Internal;
+
 import java.util.Objects;
 
 /**
@@ -24,6 +26,7 @@ import java.util.Objects;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 class DefaultBeanIdentifier implements BeanIdentifier {
 
     private final String id;

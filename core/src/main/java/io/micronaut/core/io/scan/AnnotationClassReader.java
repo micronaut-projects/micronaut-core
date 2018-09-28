@@ -30,6 +30,7 @@
 
 package io.micronaut.core.io.scan;
 
+import io.micronaut.core.annotation.Internal;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.Handle;
@@ -51,6 +52,7 @@ import java.io.InputStream;
  * @author Graeme Rocher
  */
 @SuppressWarnings("MagicNumber")
+@Internal
 class AnnotationClassReader {
 
     /**

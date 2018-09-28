@@ -17,6 +17,7 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -35,6 +36,7 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 public class PersistenceContextAnnotationMapper implements NamedAnnotationMapper {
 
     private static final String TARGET_ANNOTATION = "io.micronaut.configuration.hibernate.jpa.scope.CurrentSession";

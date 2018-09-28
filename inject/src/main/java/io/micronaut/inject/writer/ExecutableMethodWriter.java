@@ -21,6 +21,7 @@ import static io.micronaut.inject.writer.BeanDefinitionWriter.pushBuildArguments
 
 import io.micronaut.context.AbstractExecutableMethod;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
@@ -42,6 +43,7 @@ import java.util.*;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter implements Opcodes {
 
     /**

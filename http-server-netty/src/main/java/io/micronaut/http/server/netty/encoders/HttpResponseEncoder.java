@@ -17,6 +17,7 @@
 package io.micronaut.http.server.netty.encoders;
 
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.http.*;
@@ -47,6 +48,7 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 public class HttpResponseEncoder extends MessageToMessageEncoder<MutableHttpResponse<?>> {
     public static final String ID = "micronaut-http-encoder";
     private static final Logger LOG = LoggerFactory.getLogger(HttpResponseEncoder.class);

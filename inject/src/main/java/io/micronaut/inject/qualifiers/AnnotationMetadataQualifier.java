@@ -17,6 +17,7 @@
 package io.micronaut.inject.qualifiers;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanType;
 
@@ -31,6 +32,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class AnnotationMetadataQualifier<T> extends NameQualifier<T> {
 
     private final AnnotationMetadata annotationMetadata;

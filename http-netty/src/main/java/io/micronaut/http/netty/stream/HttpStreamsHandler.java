@@ -16,6 +16,7 @@
 
 package io.micronaut.http.netty.stream;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.reactive.HandlerPublisher;
 import io.micronaut.http.netty.reactive.HandlerSubscriber;
 import io.netty.channel.*;
@@ -39,6 +40,7 @@ import java.util.Queue;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessage> extends ChannelDuplexHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(HttpStreamsHandler.class);

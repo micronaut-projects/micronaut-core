@@ -19,6 +19,7 @@ package io.micronaut.context;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.condition.Failure;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.Internal;
 
 import javax.annotation.Nonnull;
 import java.util.ArrayList;
@@ -32,6 +33,7 @@ import java.util.List;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class DefaultConditionContext<T extends AnnotationMetadataProvider> implements ConditionContext<T> {
 
     private final BeanContext beanContext;

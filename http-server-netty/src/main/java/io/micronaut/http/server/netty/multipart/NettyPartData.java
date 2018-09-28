@@ -16,6 +16,7 @@
 
 package io.micronaut.http.server.netty.multipart;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.PartData;
 import io.netty.buffer.ByteBuf;
@@ -34,6 +35,7 @@ import java.util.Optional;
  * @author James Kleeh
  * @since 1.0
  */
+@Internal
 public class NettyPartData implements PartData {
 
     private final FileUpload fileUpload;

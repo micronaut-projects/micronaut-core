@@ -19,6 +19,7 @@ package io.micronaut.inject.annotation;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -37,6 +38,7 @@ import java.util.stream.Collectors;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 class EnvironmentConvertibleValuesMap<V> extends ConvertibleValuesMap<V> {
 
     private final Environment environment;

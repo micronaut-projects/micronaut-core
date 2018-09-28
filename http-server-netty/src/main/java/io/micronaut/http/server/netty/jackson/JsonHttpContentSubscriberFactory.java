@@ -17,6 +17,7 @@
 package io.micronaut.http.server.netty.jackson;
 
 import com.fasterxml.jackson.core.JsonFactory;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.server.HttpServerConfiguration;
@@ -35,6 +36,7 @@ import java.util.Optional;
  */
 @Consumes(MediaType.APPLICATION_JSON)
 @Singleton
+@Internal
 public class JsonHttpContentSubscriberFactory implements HttpContentSubscriberFactory {
 
     private final HttpServerConfiguration httpServerConfiguration;

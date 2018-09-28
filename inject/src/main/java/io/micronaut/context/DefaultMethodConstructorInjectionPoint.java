@@ -17,6 +17,7 @@
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ConstructorInjectionPoint;
@@ -29,6 +30,7 @@ import javax.annotation.Nullable;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 class DefaultMethodConstructorInjectionPoint extends DefaultMethodInjectionPoint implements ConstructorInjectionPoint {
 
     /**

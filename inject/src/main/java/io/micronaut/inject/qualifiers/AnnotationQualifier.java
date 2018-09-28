@@ -16,6 +16,7 @@
 
 package io.micronaut.inject.qualifiers;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
 
 import javax.inject.Named;
@@ -29,6 +30,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class AnnotationQualifier<T> extends NameQualifier<T> {
 
     private final Annotation qualifier;

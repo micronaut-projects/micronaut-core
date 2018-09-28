@@ -16,6 +16,8 @@
 
 package io.micronaut.inject.writer;
 
+import io.micronaut.core.annotation.Internal;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -35,6 +37,7 @@ import java.nio.file.Files;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 class FileBackedGeneratedFile implements GeneratedFile {
     private final File file;
 

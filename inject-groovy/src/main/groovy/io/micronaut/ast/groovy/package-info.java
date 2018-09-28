@@ -15,13 +15,13 @@
  */
 
 /**
- * This package contains the Annotation processors that power Micronaut. Classes within this package
+ * This package contains the AST transforms for Groovy that power Micronaut. Classes within this package
  * are considered internal and should not be referenced from application code.
  *
  * @author graemerocher
  * @since 1.0
  */
 @Internal
-package io.micronaut.annotation.processing;
+package io.micronaut.ast.groovy;
 
 import io.micronaut.core.annotation.Internal;

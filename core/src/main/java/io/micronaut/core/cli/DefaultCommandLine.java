@@ -16,6 +16,8 @@
 
 package io.micronaut.core.cli;
 
+import io.micronaut.core.annotation.Internal;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
@@ -30,6 +32,7 @@ import java.util.Properties;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class DefaultCommandLine implements CommandLine {
 
     private Properties systemProperties = new Properties();

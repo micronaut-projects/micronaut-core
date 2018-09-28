@@ -16,6 +16,7 @@
 
 package io.micronaut.http.client.websocket;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.bind.BoundExecutable;
 import io.micronaut.core.bind.DefaultExecutableBinder;
@@ -64,6 +65,7 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 public class NettyWebSocketClientHandler<T> extends AbstractNettyWebSocketHandler {
     private final WebSocketClientHandshaker handshaker;
     private final WebSocketBean<T> webSocketBean;

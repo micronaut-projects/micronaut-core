@@ -16,6 +16,7 @@
 
 package io.micronaut.http.netty.stream;
 
+import io.micronaut.core.annotation.Internal;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.http.*;
@@ -29,6 +30,7 @@ import io.netty.util.ReferenceCounted;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class EmptyHttpResponse extends DelegateHttpResponse implements FullHttpResponse {
 
     /**

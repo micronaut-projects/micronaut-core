@@ -16,6 +16,7 @@
 
 package io.micronaut.http.client;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequestFactory;
@@ -30,6 +31,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class NettyClientHttpRequestFactory implements HttpRequestFactory {
 
     @Override

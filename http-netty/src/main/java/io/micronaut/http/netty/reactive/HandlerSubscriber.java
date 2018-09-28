@@ -24,6 +24,7 @@ import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.NO_SUBSCR
 import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.NO_SUBSCRIPTION_OR_CONTEXT;
 import static io.micronaut.http.netty.reactive.HandlerSubscriber.State.RUNNING;
 
+import io.micronaut.core.annotation.Internal;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -42,6 +43,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @since 1.0
  */
 @SuppressWarnings("SubscriberImplementation")
+@Internal
 public class HandlerSubscriber<T> extends ChannelDuplexHandler implements Subscriber<T> {
 
     private final EventExecutor executor;

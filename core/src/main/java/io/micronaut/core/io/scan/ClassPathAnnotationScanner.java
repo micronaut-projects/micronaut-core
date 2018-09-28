@@ -16,6 +16,7 @@
 
 package io.micronaut.core.io.scan;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +47,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class ClassPathAnnotationScanner implements AnnotationScanner {
 
     private static final Logger LOG = LoggerFactory.getLogger(ClassPathAnnotationScanner.class);

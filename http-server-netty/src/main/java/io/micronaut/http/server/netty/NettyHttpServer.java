@@ -16,6 +16,7 @@
 
 package io.micronaut.http.server.netty;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanLocator;
@@ -103,6 +104,7 @@ import java.util.function.BiConsumer;
  * @since 1.0
  */
 @Singleton
+@Internal
 public class NettyHttpServer implements EmbeddedServer, WebSocketSessionRepository {
     public static final String HTTP_STREAMS_CODEC = "http-streams-codec";
     public static final String HTTP_CHUNKED_HANDLER = "http-chunked-handler";

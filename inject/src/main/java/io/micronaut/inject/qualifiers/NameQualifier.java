@@ -21,6 +21,7 @@ import static io.micronaut.core.util.ArgumentUtils.check;
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.inject.BeanType;
 
@@ -36,6 +37,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class NameQualifier<T> implements Qualifier<T>, io.micronaut.core.naming.Named {
 
     private final String name;

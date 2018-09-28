@@ -18,6 +18,7 @@ package io.micronaut.core.beans;
 
 import static io.micronaut.core.naming.NameUtils.decapitalize;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 
@@ -36,6 +37,7 @@ import java.util.Set;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 class SimpleBeanInfo implements BeanInfo {
     private static final Set<String> EXCLUDED_PROPERTIES = CollectionUtils.setOf("class", "metaClass");
 

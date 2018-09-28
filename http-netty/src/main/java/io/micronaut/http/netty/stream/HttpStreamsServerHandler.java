@@ -16,6 +16,7 @@
 
 package io.micronaut.http.netty.stream;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.reactive.CancelledSubscriber;
 import io.micronaut.http.netty.reactive.HandlerPublisher;
 import io.micronaut.http.netty.reactive.HandlerSubscriber;
@@ -54,6 +55,7 @@ import java.util.NoSuchElementException;
  * @author jroper
  * @author Graeme Rocher
  */
+@Internal
 public class HttpStreamsServerHandler extends HttpStreamsHandler<HttpRequest, HttpResponse> {
 
     private HttpRequest lastRequest = null;

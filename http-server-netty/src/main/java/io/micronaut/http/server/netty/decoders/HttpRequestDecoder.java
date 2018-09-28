@@ -16,6 +16,7 @@
 
 package io.micronaut.http.server.netty.decoders;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.http.server.HttpServerConfiguration;
@@ -39,6 +40,7 @@ import java.util.List;
  * @since 1.0
  */
 @ChannelHandler.Sharable
+@Internal
 public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> implements Ordered {
 
     /**

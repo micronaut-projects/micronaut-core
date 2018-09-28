@@ -17,6 +17,7 @@
 package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
 
 import java.util.Arrays;
@@ -30,6 +31,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class CompositeQualifier<T> implements Qualifier<T> {
 
     private final Qualifier[] qualifiers;

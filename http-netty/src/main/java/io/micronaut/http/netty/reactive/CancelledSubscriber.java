@@ -16,6 +16,7 @@
 
 package io.micronaut.http.netty.reactive;
 
+import io.micronaut.core.annotation.Internal;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -26,6 +27,7 @@ import org.reactivestreams.Subscription;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public final class CancelledSubscriber<T> implements Subscriber<T> {
 
     @Override

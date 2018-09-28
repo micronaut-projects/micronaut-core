@@ -16,6 +16,7 @@
 
 package io.micronaut.http.netty.stream;
 
+import io.micronaut.core.annotation.Internal;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
@@ -32,6 +33,7 @@ import org.reactivestreams.Subscription;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class DefaultWebSocketHttpResponse extends DefaultHttpResponse implements WebSocketHttpResponse {
 
     private final Processor<WebSocketFrame, WebSocketFrame> processor;
