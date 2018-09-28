@@ -56,6 +56,7 @@ import java.util.concurrent.Future;
  * @since 1.0
  */
 @Singleton
+@Requires(classes = com.amazonaws.services.servicediscovery.AWSServiceDiscovery.class)
 @Requires(env = Environment.AMAZON_EC2)
 @Requires(beans = {Route53AutoRegistrationConfiguration.class})
 @Requires(property = Route53AutoNamingRegistrationClient.ENABLED, value = "true", defaultValue = "false")

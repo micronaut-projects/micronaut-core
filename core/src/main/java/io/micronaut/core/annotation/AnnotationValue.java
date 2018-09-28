@@ -22,6 +22,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.value.ValueResolver;
 
 import javax.annotation.Nonnull;
@@ -327,7 +328,11 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
      * @return The instance
      */
     private ConvertibleValues<Object> newConvertibleValues(Map<CharSequence, Object> values) {
-        return ConvertibleValues.of(values);
+        if (CollectionUtils.isEmpty(values)) {
+            return ConvertibleValues.EMPTY;
+        } else {
+            return ConvertibleValues.of(values);
+        }
     }
 
 }

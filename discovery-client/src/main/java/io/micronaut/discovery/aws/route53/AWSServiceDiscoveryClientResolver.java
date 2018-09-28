@@ -30,6 +30,7 @@ import javax.inject.Singleton;
  * @author Ryan
  * @author graemerocher
  */
+@Requires(classes = AWSServiceDiscoveryAsync.class)
 @Requires(env = Environment.AMAZON_EC2)
 @Singleton
 public class AWSServiceDiscoveryClientResolver implements AWSServiceDiscoveryResolver {
