@@ -237,6 +237,7 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
             List<AnnotationValue<T>> list = new ArrayList<>(values.length);
             String typeName = type.getName();
             for (AnnotationValue value : values) {
+                if (value == null) continue;
                 if (value.getAnnotationName().equals(typeName)) {
                     //noinspection unchecked
                     list.add(value);
@@ -245,6 +246,19 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
             return list;
         }
         return Collections.emptyList();
+    }
+
+    /**
+     * Gets a list of {@link AnnotationValue} for the given member.
+     *
+     * @param member The member
+     * @param type The type
+     * @param <T> The type
+     * @throws IllegalStateException If no member is available that conforms to the given name and type
+     * @return The result
+     */
+    public @Nonnull final <T extends Annotation> Optional<AnnotationValue<T>> getAnnotation(String member, Class<T> type) {
+        return getAnnotations(member, type).stream().findFirst();
     }
 
     @Override

@@ -16,6 +16,7 @@
 
 package io.micronaut.context.annotation;
 
+import java.lang.annotation.Annotation;
 import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -35,10 +36,31 @@ public @interface Replaces {
     /**
      * @return The bean type that this bean replaces
      */
+    @AliasFor(member = "bean")
     Class value() default void.class;
+
+    /**
+     * @return The bean type that this bean replaces
+     */
+    @AliasFor(member = "value")
+    Class bean() default void.class;
 
     /**
      * @return The declaring bean type
      */
     Class factory() default void.class;
+
+    /**
+     * The name of the qualifiers of the bean that should be replaced.
+     *
+     * @return The qualifier
+     */
+    Class<? extends Annotation>[] qualifier() default {};
+
+    /**
+     * The name of the qualifiers of the bean that should be replaced.
+     *
+     * @return The qualifier
+     */
+    String named() default "";
 }

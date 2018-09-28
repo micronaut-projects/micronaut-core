@@ -39,7 +39,21 @@ class ReplacesSpec extends Specification {
         b.a instanceof A2
     }
 
-    void "test that introduction advice can be replaced"() {
+    void "test that named beans can be replaced"() {
+        given:
+        BeanContext context = BeanContext.run()
+
+        expect:
+        context.containsBean(E1Replacement)
+        context.containsBean(E2)
+        context.containsBean(E)
+        context.getBeansOfType(E).size() == 2
+        context.getBeansOfType(E).contains(context.getBean(E1Replacement))
+        context.getBeansOfType(E).contains(context.getBean(E2))
+//        !context.containsBean(E1)
+    }
+
+    void "test that introduction advice can be replaced with inheritance"() {
         given:
         def ctx = ApplicationContext.run()
 
@@ -49,6 +63,22 @@ class ReplacesSpec extends Specification {
         then:
         ops instanceof IntroductionReplacement
         ctx.getBeansOfType(IntroductionOperations).size() == 1
+
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "test that introduction advice can be replaced"() {
+        given:
+        def ctx = ApplicationContext.run()
+
+        when:
+        IntroductionB ops = ctx.getBean(IntroductionB)
+
+        then:
+        ops instanceof AnotherIntroductionReplacement
+        ctx.getBeansOfType(IntroductionB).size() == 1
 
 
         cleanup:
