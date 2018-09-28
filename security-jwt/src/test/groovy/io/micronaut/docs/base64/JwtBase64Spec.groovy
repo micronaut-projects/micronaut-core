@@ -46,7 +46,7 @@ micronaut:
             generator: 
               secret: 'cGxlYXNlQ2hhbmdlVGhpc1NlY3JldEZvckFOZXdPbmU=' #<1>
               base64: true #<2>
-              jwsAlgorithm: HS256
+              jws-algorithm: HS256
 #end::yamlconfig[]
 """
 
@@ -63,7 +63,7 @@ micronaut:
                                                         'generator': [
                                                                 'secret': 'cGxlYXNlQ2hhbmdlVGhpc1NlY3JldEZvckFOZXdPbmU=',
                                                                 'base64': true,
-                                                                'jwsAlgorithm': 'HS256'
+                                                                'jws-algorithm': 'HS256'
                                                         ]
                                                 ]
                                         ]

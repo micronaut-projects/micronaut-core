@@ -44,7 +44,7 @@ micronaut:
                     secret:
                         generator:
                             secret: "pleaseChangeThisSecretForANewOne"
-                            jwsAlgorithm: HS256                
+                            jws-algorithm: HS256                
             writer:
                 header:
                     enabled: true
@@ -52,7 +52,7 @@ micronaut:
                     prefix: "Bearer "
             propagation:
                 enabled: true
-                serviceIdRegex: "http://localhost:(8083|8081|8082)"                            
+                service-id-regex: "http://localhost:(8083|8081|8082)"                            
 '''//end::yamlconfig[]
 
 
@@ -74,7 +74,7 @@ micronaut:
                                                     'secret': [
                                                         'generator': [
                                                                 'secret': "pleaseChangeThisSecretForANewOne",
-                                                                'jwsAlgorithm': 'HS256'
+                                                                'jws-algorithm': 'HS256'
                                                         ]
                                                     ]
                                             ]
@@ -88,7 +88,7 @@ micronaut:
                                     ],
                                     'propagation': [
                                             'enabled': true,
-                                            'serviceIdRegex': 'http://localhost:(8083|8081|8082)'
+                                            'service-id-regex': 'http://localhost:(8083|8081|8082)'
                                     ]
                             ]
                     ]
