@@ -16,8 +16,6 @@
 
 package io.micronaut.core.annotation;
 
-import io.micronaut.core.util.StringUtils;
-
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.HashMap;
@@ -69,9 +67,38 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param i The integer
      * @return This builder
      */
-    public AnnotationValueBuilder<T>  value(int i) {
-        values.put(AnnotationMetadata.VALUE_MEMBER, i);
-        return this;
+    public AnnotationValueBuilder<T> value(int i) {
+        return member(AnnotationMetadata.VALUE_MEMBER, i);
+    }
+
+    /**
+     * Sets the value member to the given integer[] value.
+     *
+     * @param ints The integer[]
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T> values(int... ints) {
+        return member(AnnotationMetadata.VALUE_MEMBER, ints);
+    }
+
+    /**
+     * Sets the value member to the given long value.
+     *
+     * @param i The long
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T> value(long i) {
+        return member(AnnotationMetadata.VALUE_MEMBER, i);
+    }
+
+    /**
+     * Sets the value member to the given long[] value.
+     *
+     * @param longs The long[]
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T> values(long... longs) {
+        return member(AnnotationMetadata.VALUE_MEMBER, longs);
     }
 
     /**
@@ -80,24 +107,18 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param str The string
      * @return This builder
      */
-    public AnnotationValueBuilder<T>  value(@Nullable String str) {
-        if (StringUtils.isNotEmpty(str)) {
-            values.put(AnnotationMetadata.VALUE_MEMBER, str);
-        }
-        return this;
+    public AnnotationValueBuilder<T> value(@Nullable String str) {
+        return member(AnnotationMetadata.VALUE_MEMBER, str);
     }
 
     /**
      * Sets the value member to the given String[] values.
      *
-     * @param values The String[]
+     * @param strings The String[]
      * @return This builder
      */
-    public AnnotationValueBuilder<T>  values(@Nullable String[] values) {
-        if (values != null && values.length > 0) {
-            this.values.put(AnnotationMetadata.VALUE_MEMBER, values);
-        }
-        return this;
+    public AnnotationValueBuilder<T> values(@Nullable String... strings) {
+        return member(AnnotationMetadata.VALUE_MEMBER, strings);
     }
 
     /**
@@ -106,9 +127,8 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param bool The boolean
      * @return This builder
      */
-    public AnnotationValueBuilder<T>  value(boolean bool) {
-        values.put(AnnotationMetadata.VALUE_MEMBER, bool);
-        return this;
+    public AnnotationValueBuilder<T> value(boolean bool) {
+        return member(AnnotationMetadata.VALUE_MEMBER, bool);
     }
 
     /**
@@ -118,10 +138,17 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @return This builder
      */
     public AnnotationValueBuilder<T> value(@Nullable Enum<?> enumObj) {
-        if (enumObj != null) {
-            values.put(AnnotationMetadata.VALUE_MEMBER, enumObj);
-        }
-        return this;
+        return member(AnnotationMetadata.VALUE_MEMBER, enumObj);
+    }
+
+    /**
+     * Sets the value member to the given enum objects.
+     *
+     * @param enumObjs The enum[]
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T> values(@Nullable Enum<?>... enumObjs) {
+        return member(AnnotationMetadata.VALUE_MEMBER, enumObjs);
     }
 
     /**
@@ -130,11 +157,38 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param type The type
      * @return This builder
      */
-    public AnnotationValueBuilder<T>  value(@Nullable Class<?> type) {
-        if (type != null) {
-            values.put(AnnotationMetadata.VALUE_MEMBER, type);
-        }
-        return this;
+    public AnnotationValueBuilder<T> value(@Nullable Class<?> type) {
+        return member(AnnotationMetadata.VALUE_MEMBER, type);
+    }
+
+    /**
+     * Sets the value member to the given type objects.
+     *
+     * @param types The type[]
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T> values(@Nullable Class<?>... types) {
+        return member(AnnotationMetadata.VALUE_MEMBER, types);
+    }
+
+    /**
+     * Sets the value member to the given annotation value.
+     *
+     * @param annotation The annotation
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T> value(@Nullable AnnotationValue<?> annotation) {
+        return member(AnnotationMetadata.VALUE_MEMBER, annotation);
+    }
+
+    /**
+     * Sets the value member to the given annotation values.
+     *
+     * @param annotations The annotation[]
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T> values(@Nullable AnnotationValue<?>... annotations) {
+        return member(AnnotationMetadata.VALUE_MEMBER, annotations);
     }
 
     /**
@@ -144,8 +198,48 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param i The integer
      * @return This builder
      */
-    public AnnotationValueBuilder<T>  member(String name, int i) {
+    public AnnotationValueBuilder<T> member(String name, int i) {
         values.put(name, i);
+        return this;
+    }
+
+    /**
+     * Sets the value member to the given integer[] value.
+     *
+     * @param name The name of the member
+     * @param ints The integer[]
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T> member(String name, int... ints) {
+        if (ints != null) {
+            values.put(name, ints);
+        }
+        return this;
+    }
+
+    /**
+     * Sets the value member to the given long value.
+     *
+     * @param name The name of the member
+     * @param i The long
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T> member(String name, long i) {
+        values.put(name, i);
+        return this;
+    }
+
+    /**
+     * Sets the value member to the given long[] value.
+     *
+     * @param name The name of the member
+     * @param longs The long[]
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T> member(String name, long... longs) {
+        if (longs != null) {
+            values.put(name, longs);
+        }
         return this;
     }
 
@@ -156,9 +250,23 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param str The string
      * @return This builder
      */
-    public AnnotationValueBuilder<T>  member(String name, String str) {
-        if (StringUtils.isNotEmpty(str)) {
+    public AnnotationValueBuilder<T> member(String name, String str) {
+        if (str != null) {
             values.put(name, str);
+        }
+        return this;
+    }
+
+    /**
+     * Sets the value member to the given String[] values.
+     *
+     * @param name The name of the member
+     * @param strings The String[]
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T> member(String name, String... strings) {
+        if (strings != null) {
+            values.put(name, strings);
         }
         return this;
     }
@@ -170,7 +278,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      * @param bool The boolean
      * @return This builder
      */
-    public AnnotationValueBuilder<T>  member(String name, boolean bool) {
+    public AnnotationValueBuilder<T> member(String name, boolean bool) {
         values.put(name, bool);
         return this;
     }
@@ -190,15 +298,71 @@ public class AnnotationValueBuilder<T extends Annotation> {
     }
 
     /**
+     * Sets the value member to the given enum objects.
+     *
+     * @param name The name of the member
+     * @param enumObjs The enum[]
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T> member(String name, @Nullable Enum<?>... enumObjs) {
+        if (enumObjs != null) {
+            values.put(name, enumObjs);
+        }
+        return this;
+    }
+
+    /**
      * Sets the value member to the given type object.
      *
      * @param name The name of the member
      * @param type The type
      * @return This builder
      */
-    public AnnotationValueBuilder<T>  member(String name, @Nullable Class<?> type) {
+    public AnnotationValueBuilder<T> member(String name, @Nullable Class<?> type) {
         if (type != null) {
             values.put(name, type);
+        }
+        return this;
+    }
+
+    /**
+     * Sets the value member to the given type objects.
+     *
+     * @param name The name of the member
+     * @param types The type[]
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T> member(String name, @Nullable Class<?>... types) {
+        if (types != null) {
+            values.put(name, types);
+        }
+        return this;
+    }
+
+    /**
+     * Sets the value member to the given annotation value.
+     *
+     * @param name The name of the member
+     * @param annotation The annotation
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T> member(String name, @Nullable AnnotationValue<?> annotation) {
+        if (annotation != null) {
+            values.put(name, annotation);
+        }
+        return this;
+    }
+
+    /**
+     * Sets the value member to the given annotation values.
+     *
+     * @param name The name of the member
+     * @param annotations The annotation[]
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T> member(String name, @Nullable AnnotationValue<?>... annotations) {
+        if (annotations != null) {
+            values.put(name, annotations);
         }
         return this;
     }
