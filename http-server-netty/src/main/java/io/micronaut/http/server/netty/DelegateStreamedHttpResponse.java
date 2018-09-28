@@ -16,6 +16,7 @@
 
 package io.micronaut.http.server.netty;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpResponse;
@@ -28,6 +29,7 @@ import org.reactivestreams.Subscriber;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 final class DelegateStreamedHttpResponse extends DelegateHttpResponse implements StreamedHttpResponse {
 
     private final Publisher<HttpContent> stream;
@@ -36,7 +38,7 @@ final class DelegateStreamedHttpResponse extends DelegateHttpResponse implements
      * @param response The {@link HttpResponse}
      * @param stream The {@link Publisher} for {@link HttpContent}
      */
-    public DelegateStreamedHttpResponse(HttpResponse response, Publisher<HttpContent> stream) {
+    DelegateStreamedHttpResponse(HttpResponse response, Publisher<HttpContent> stream) {
         super(response);
         this.stream = stream;
     }

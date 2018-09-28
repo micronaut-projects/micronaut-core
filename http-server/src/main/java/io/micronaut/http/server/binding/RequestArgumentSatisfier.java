@@ -16,6 +16,7 @@
 
 package io.micronaut.http.server.binding;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
@@ -44,6 +45,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
+@Internal
 public class RequestArgumentSatisfier {
 
     private final RequestBinderRegistry binderRegistry;

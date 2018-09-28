@@ -16,6 +16,7 @@
 
 package io.micronaut.http.netty.stream;
 
+import io.micronaut.core.annotation.Internal;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.http.*;
 
@@ -26,6 +27,7 @@ import io.netty.handler.codec.http.*;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class DelegateHttpMessage implements HttpMessage {
     protected final HttpMessage message;
 

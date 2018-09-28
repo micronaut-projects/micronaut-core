@@ -16,6 +16,8 @@
 
 package io.micronaut.core.naming.conventions;
 
+import io.micronaut.core.annotation.Experimental;
+
 import java.util.Locale;
 import java.util.Optional;
 
@@ -25,6 +27,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Experimental
 public enum MethodConvention {
 
     /**

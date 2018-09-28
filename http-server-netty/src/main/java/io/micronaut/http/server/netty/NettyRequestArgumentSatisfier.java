@@ -17,6 +17,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.annotation.Primary;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
@@ -36,6 +37,7 @@ import java.util.Optional;
  */
 @Primary
 @Singleton
+@Internal
 public class NettyRequestArgumentSatisfier extends RequestArgumentSatisfier {
 
     /**

@@ -16,6 +16,8 @@
 
 package io.micronaut.inject.writer;
 
+import io.micronaut.core.annotation.Internal;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -28,6 +30,7 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutputVisitor {
 
     private final File targetDir;

@@ -16,6 +16,7 @@
 
 package io.micronaut.core.naming.conventions;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.naming.NameUtils;
 
 import java.util.Locale;
@@ -26,6 +27,7 @@ import java.util.Locale;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Experimental
 public enum TypeConvention {
     CONTROLLER,
     SERVICE,

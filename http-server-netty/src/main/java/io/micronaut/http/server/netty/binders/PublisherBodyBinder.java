@@ -16,6 +16,7 @@
 
 package io.micronaut.http.server.netty.binders;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.core.async.subscriber.TypedSubscriber;
@@ -48,6 +49,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
+@Internal
 public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> implements NonBlockingBodyArgumentBinder<Publisher> {
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);

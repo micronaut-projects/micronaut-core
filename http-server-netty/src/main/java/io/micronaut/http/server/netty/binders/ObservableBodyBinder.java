@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -41,6 +42,7 @@ import java.util.Optional;
  */
 @Singleton
 @Requires(classes = Observable.class)
+@Internal
 public class ObservableBodyBinder extends DefaultBodyAnnotationBinder<Observable> implements NonBlockingBodyArgumentBinder<Observable> {
 
     public static final Argument<Observable> TYPE = Argument.of(Observable.class);

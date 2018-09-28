@@ -60,6 +60,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements HttpRequest<T> {
 
     private static final AttributeKey<NettyHttpRequest> KEY = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());

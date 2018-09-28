@@ -30,11 +30,14 @@
 
 package io.micronaut.core.io.scan;
 
+import io.micronaut.core.annotation.Internal;
+
 /**
  * Information about a class being parsed in a {@link org.objectweb.asm.ClassReader}.
  *
  * @author Eric Bruneton
  */
+@Internal
 class Context {
 
     /**

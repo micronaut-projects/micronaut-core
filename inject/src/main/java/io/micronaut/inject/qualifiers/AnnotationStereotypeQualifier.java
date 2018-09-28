@@ -17,6 +17,7 @@
 package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
 
 import java.lang.annotation.Annotation;
@@ -29,6 +30,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
 
     private final Class<? extends Annotation> stereotype;

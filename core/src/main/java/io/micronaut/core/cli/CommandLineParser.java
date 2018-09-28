@@ -16,6 +16,7 @@
 
 package io.micronaut.core.cli;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.cli.exceptions.ParseException;
 import io.micronaut.core.util.StringUtils;
 
@@ -34,6 +35,7 @@ import java.util.StringTokenizer;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
 
     private static final String DEFAULT_PADDING = "        ";

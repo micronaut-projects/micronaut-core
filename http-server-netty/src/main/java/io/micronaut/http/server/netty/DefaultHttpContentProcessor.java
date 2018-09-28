@@ -16,6 +16,7 @@
 
 package io.micronaut.http.server.netty;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.netty.stream.StreamedHttpMessage;
 import io.micronaut.core.async.processor.SingleThreadedBufferingProcessor;
 import io.micronaut.core.async.subscriber.SingleThreadedBufferingSubscriber;
@@ -35,6 +36,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class DefaultHttpContentProcessor extends SingleThreadedBufferingProcessor<ByteBufHolder, ByteBufHolder> implements HttpContentProcessor<ByteBufHolder> {
 
     protected final NettyHttpRequest nettyHttpRequest;

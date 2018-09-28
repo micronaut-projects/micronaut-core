@@ -18,6 +18,7 @@ package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
 import io.micronaut.context.annotation.Type;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
 
 import javax.annotation.Nullable;
@@ -34,6 +35,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class TypeAnnotationQualifier<T> implements Qualifier<T> {
 
     private final List<Class> types;

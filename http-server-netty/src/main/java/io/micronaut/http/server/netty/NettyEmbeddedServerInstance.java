@@ -19,6 +19,7 @@ package io.micronaut.http.server.netty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Prototype;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
@@ -41,6 +42,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Prototype
+@Internal
 class NettyEmbeddedServerInstance implements EmbeddedServerInstance {
 
     private final String id;

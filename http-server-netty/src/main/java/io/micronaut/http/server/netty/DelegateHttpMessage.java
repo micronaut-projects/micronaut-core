@@ -16,6 +16,7 @@
 
 package io.micronaut.http.server.netty;
 
+import io.micronaut.core.annotation.Internal;
 import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.HttpMessage;
@@ -27,6 +28,7 @@ import io.netty.handler.codec.http.HttpVersion;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class DelegateHttpMessage implements HttpMessage {
 
     protected final HttpMessage message;
@@ -34,7 +36,7 @@ class DelegateHttpMessage implements HttpMessage {
     /**
      * @param message The message
      */
-    public DelegateHttpMessage(HttpMessage message) {
+    DelegateHttpMessage(HttpMessage message) {
         this.message = message;
     }
 

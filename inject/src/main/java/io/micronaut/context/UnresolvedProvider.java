@@ -16,6 +16,8 @@
 
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.Internal;
+
 import javax.inject.Provider;
 
 /**
@@ -25,6 +27,7 @@ import javax.inject.Provider;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class UnresolvedProvider<T> implements Provider<T> {
 
     private final Class<T> beanType;

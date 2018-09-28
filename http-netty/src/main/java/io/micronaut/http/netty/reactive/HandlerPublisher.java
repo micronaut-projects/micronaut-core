@@ -18,6 +18,7 @@ package io.micronaut.http.netty.reactive;
 
 import static io.micronaut.http.netty.reactive.HandlerPublisher.State.*;
 
+import io.micronaut.core.annotation.Internal;
 import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContent;
@@ -62,6 +63,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publisher<T> {
     private static final Logger LOG = LoggerFactory.getLogger(HandlerPublisher.class);
     /**

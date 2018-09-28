@@ -18,6 +18,7 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 
 import java.lang.annotation.Annotation;
 
@@ -28,6 +29,7 @@ import java.lang.annotation.Annotation;
  * @since 1.0
  * @param <A> The annotation type
  */
+@Internal
 class EnvironmentAnnotationValue<A extends Annotation> extends AnnotationValue<A> {
 
     /**

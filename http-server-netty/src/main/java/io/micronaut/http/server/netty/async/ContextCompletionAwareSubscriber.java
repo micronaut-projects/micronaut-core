@@ -16,6 +16,7 @@
 
 package io.micronaut.http.server.netty.async;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.http.netty.reactive.HandlerPublisher;
 import io.netty.channel.ChannelHandlerContext;
@@ -29,6 +30,7 @@ import org.reactivestreams.Subscription;
  * @author James Kleeh
  * @since 1.0
  */
+@Internal
 public abstract class ContextCompletionAwareSubscriber<T> extends CompletionAwareSubscriber<T> {
 
     private final ChannelHandlerContext context;
@@ -38,7 +40,7 @@ public abstract class ContextCompletionAwareSubscriber<T> extends CompletionAwar
     /**
      * @param context The channel handler context
      */
-    public ContextCompletionAwareSubscriber(ChannelHandlerContext context) {
+    protected ContextCompletionAwareSubscriber(ChannelHandlerContext context) {
         this.context = context;
     }
 

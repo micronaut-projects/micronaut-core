@@ -16,12 +16,15 @@
 
 package io.micronaut.inject;
 
+import io.micronaut.core.annotation.Internal;
+
 /**
  * @param <T> The type
  * @param <R> The result type
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 class DefaultBeanDefinitionMethodReference<T, R> implements BeanDefinitionMethodReference<T, R>, DelegatingExecutableMethod<T, R> {
 
     private final BeanDefinition<T> definition;

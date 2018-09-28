@@ -17,6 +17,7 @@
 package io.micronaut.http.client.reactor;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.ReactiveClientResultTransformer;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
@@ -33,6 +34,7 @@ import javax.inject.Singleton;
  */
 @Singleton
 @Requires(classes = Mono.class)
+@Internal
 public class ReactorReactiveClientResultTransformer implements ReactiveClientResultTransformer {
 
     @Override

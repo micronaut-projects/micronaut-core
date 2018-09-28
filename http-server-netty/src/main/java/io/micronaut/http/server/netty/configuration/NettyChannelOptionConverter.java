@@ -16,6 +16,7 @@
 
 package io.micronaut.http.server.netty.configuration;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.naming.NameUtils;
@@ -32,6 +33,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
+@Internal
 public class NettyChannelOptionConverter implements TypeConverter<CharSequence, ChannelOption> {
 
     @Override

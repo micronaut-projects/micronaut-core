@@ -18,6 +18,7 @@ package io.micronaut.context;
 
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.lang.annotation.Annotation;
@@ -31,6 +32,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class DefaultCustomScopeRegistry implements CustomScopeRegistry {
 
     private final BeanLocator beanLocator;

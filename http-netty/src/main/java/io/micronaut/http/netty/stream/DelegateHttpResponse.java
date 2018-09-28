@@ -16,6 +16,7 @@
 
 package io.micronaut.http.netty.stream;
 
+import io.micronaut.core.annotation.Internal;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
@@ -27,6 +28,7 @@ import io.netty.handler.codec.http.HttpVersion;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class DelegateHttpResponse extends DelegateHttpMessage implements HttpResponse {
 
     protected final HttpResponse response;

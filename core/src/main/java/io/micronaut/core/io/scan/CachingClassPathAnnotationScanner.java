@@ -18,6 +18,7 @@ package io.micronaut.core.io.scan;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.micronaut.core.annotation.Internal;
 
 import java.io.Serializable;
 import java.util.List;
@@ -29,6 +30,7 @@ import java.util.concurrent.TimeUnit;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class CachingClassPathAnnotationScanner extends ClassPathAnnotationScanner {
 
     private static final int CACHE_MAX = 5;

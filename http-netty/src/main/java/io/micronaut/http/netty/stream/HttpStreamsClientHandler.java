@@ -16,6 +16,7 @@
 
 package io.micronaut.http.netty.stream;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.netty.reactive.CancelledSubscriber;
 import io.netty.channel.ChannelHandlerContext;
@@ -54,6 +55,7 @@ import org.reactivestreams.Subscription;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class HttpStreamsClientHandler extends HttpStreamsHandler<HttpResponse, HttpRequest> {
 
     private int inFlight = 0;

@@ -37,6 +37,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class NettyHttpResponseFactory implements HttpResponseFactory {
 
     private static final AttributeKey<NettyMutableHttpResponse> KEY = AttributeKey.valueOf(NettyMutableHttpResponse.class.getSimpleName());

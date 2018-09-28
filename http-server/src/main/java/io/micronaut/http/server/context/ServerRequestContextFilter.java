@@ -16,6 +16,7 @@
 
 package io.micronaut.http.server.context;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
@@ -34,6 +35,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Filter("/**")
+@Internal
 public final class ServerRequestContextFilter implements HttpServerFilter {
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {

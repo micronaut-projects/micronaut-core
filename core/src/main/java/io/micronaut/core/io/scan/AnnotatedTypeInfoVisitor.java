@@ -17,6 +17,7 @@
 package io.micronaut.core.io.scan;
 
 import io.micronaut.core.annotation.AnnotatedTypeInfo;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassVisitor;
@@ -32,6 +33,7 @@ import java.util.Set;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class AnnotatedTypeInfoVisitor extends ClassVisitor implements AnnotatedTypeInfo {
     private Set<String> annotations = new HashSet<>();
     private String className;

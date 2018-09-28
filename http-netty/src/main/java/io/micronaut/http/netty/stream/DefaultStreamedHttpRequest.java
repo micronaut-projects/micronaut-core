@@ -16,6 +16,7 @@
 
 package io.micronaut.http.netty.stream;
 
+import io.micronaut.core.annotation.Internal;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.HttpMethod;
@@ -30,6 +31,7 @@ import org.reactivestreams.Subscriber;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class DefaultStreamedHttpRequest extends DefaultHttpRequest implements StreamedHttpRequest {
 
     private final Publisher<HttpContent> stream;

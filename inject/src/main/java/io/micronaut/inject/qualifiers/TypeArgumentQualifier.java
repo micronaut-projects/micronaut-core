@@ -17,6 +17,7 @@
 package io.micronaut.inject.qualifiers;
 
 import io.micronaut.context.Qualifier;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
@@ -38,6 +39,7 @@ import java.util.stream.Stream;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class TypeArgumentQualifier<T> implements Qualifier<T> {
 
     private static final Logger LOG = LoggerFactory.getLogger(TypeArgumentQualifier.class);
@@ -46,7 +48,7 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
     /**
      * @param typeArguments The type arguments
      */
-    public TypeArgumentQualifier(Class... typeArguments) {
+    TypeArgumentQualifier(Class... typeArguments) {
         this.typeArguments = typeArguments;
     }
 

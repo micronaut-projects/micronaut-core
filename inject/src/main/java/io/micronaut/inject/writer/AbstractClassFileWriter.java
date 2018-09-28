@@ -16,6 +16,7 @@
 
 package io.micronaut.inject.writer;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -42,6 +43,7 @@ import java.util.Map;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public abstract class AbstractClassFileWriter implements Opcodes {
 
     protected static final String CONSTRUCTOR_NAME = "<init>";

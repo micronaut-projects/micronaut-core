@@ -30,6 +30,7 @@ import java.util.Set;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class EmptyAnnotationMetadata implements AnnotationMetadata {
     @Override
     public boolean hasDeclaredAnnotation(String annotation) {

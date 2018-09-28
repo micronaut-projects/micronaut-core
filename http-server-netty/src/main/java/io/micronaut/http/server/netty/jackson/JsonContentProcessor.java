@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.jackson;
 
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.databind.JsonNode;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.async.subscriber.TypedSubscriber;
@@ -42,6 +43,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode> {
 
     private final JsonFactory jsonFactory;

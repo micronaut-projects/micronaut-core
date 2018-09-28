@@ -16,6 +16,7 @@
 
 package io.micronaut.core.beans;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ReflectionUtils;
 
@@ -33,6 +34,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class ReflectionBeanMap<T> implements BeanMap<T> {
 
     private final BeanInfo<T> beanInfo;

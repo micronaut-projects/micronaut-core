@@ -30,6 +30,7 @@
 
 package io.micronaut.core.io.scan;
 
+import io.micronaut.core.annotation.Internal;
 import org.objectweb.asm.Label;
 
 /**
@@ -38,6 +39,7 @@ import org.objectweb.asm.Label;
  * @author Eric Bruneton
  * @author Eugene Kuleshov
  */
+@Internal
 class Attribute {
 
     /**

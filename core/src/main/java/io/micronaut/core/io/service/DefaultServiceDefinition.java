@@ -16,6 +16,7 @@
 
 package io.micronaut.core.io.service;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.InstantiationUtils;
 
 import java.util.Optional;
@@ -29,6 +30,7 @@ import java.util.function.Supplier;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 class DefaultServiceDefinition<S> implements ServiceDefinition<S> {
     private final String name;
     private final Optional<Class<S>> loadedClass;

@@ -17,6 +17,7 @@
 package io.micronaut.http.client.rxjava2;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.ReactiveClientResultTransformer;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
@@ -33,6 +34,7 @@ import javax.inject.Singleton;
  */
 @Singleton
 @Requires(classes = Flowable.class)
+@Internal
 public class RxReactiveClientResultTransformer implements ReactiveClientResultTransformer {
 
     @Override

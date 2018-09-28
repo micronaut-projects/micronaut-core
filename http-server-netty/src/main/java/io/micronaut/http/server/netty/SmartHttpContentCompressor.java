@@ -16,6 +16,7 @@
 
 package io.micronaut.http.server.netty;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContentCompressor;
@@ -34,6 +35,7 @@ import java.util.List;
  * @author James Kleeh
  * @since 1.0
  */
+@Internal
 public class SmartHttpContentCompressor extends HttpContentCompressor {
 
     private static final int LENGTH_1KB = 1024;

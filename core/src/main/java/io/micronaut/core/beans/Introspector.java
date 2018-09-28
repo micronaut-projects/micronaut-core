@@ -16,6 +16,8 @@
 
 package io.micronaut.core.beans;
 
+import io.micronaut.core.annotation.Internal;
+
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -25,6 +27,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public final class Introspector {
 
     /* The cache to store Bean Info objects that have been found or created */
@@ -71,7 +74,7 @@ public final class Introspector {
      * @return the <code>BeanInfo</code> of the bean class.
      */
     @SuppressWarnings("unchecked")
-    public static <T> BeanInfo<T> getBeanInfo(Class<T> beanClass) {
+    static <T> BeanInfo<T> getBeanInfo(Class<T> beanClass) {
         BeanInfo beanInfo = theCache.get(beanClass);
         if (beanInfo == null) {
             beanInfo = new SimpleBeanInfo(beanClass);
