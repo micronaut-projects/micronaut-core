@@ -34,7 +34,6 @@ import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 import java.util.Collections;
 import java.util.Optional;
-import java.util.function.Function;
 
 /**
  * The visitor context when visiting Java code.
