@@ -16,8 +16,8 @@
 
 package io.micronaut.security.annotation;
 
-import io.micronaut.inject.annotation.AnnotationMapper;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.inject.annotation.TypedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import javax.annotation.security.RolesAllowed;
@@ -30,7 +30,7 @@ import java.util.List;
  * @author Sergio del Amo
  * @since 1.0
  */
-public class RolesAllowedAnnotationMapper implements AnnotationMapper<RolesAllowed> {
+public class RolesAllowedAnnotationMapper implements TypedAnnotationMapper<RolesAllowed> {
     @Override
     public Class<RolesAllowed> annotationType() {
         return RolesAllowed.class;

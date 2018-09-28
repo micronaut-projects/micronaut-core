@@ -17,7 +17,7 @@
 package io.micronaut.security.annotation;
 
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.inject.annotation.AnnotationMapper;
+import io.micronaut.inject.annotation.TypedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.security.rules.SecurityRule;
 
@@ -31,7 +31,7 @@ import java.util.List;
  * @author Sergio del Amo
  * @since 1.0
  */
-public class DenyAllAnnotationMapper implements AnnotationMapper<DenyAll> {
+public class DenyAllAnnotationMapper implements TypedAnnotationMapper<DenyAll> {
     @Override
     public Class<DenyAll> annotationType() {
         return DenyAll.class;

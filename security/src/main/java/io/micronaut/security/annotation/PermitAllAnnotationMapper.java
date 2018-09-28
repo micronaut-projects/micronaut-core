@@ -16,8 +16,8 @@
 
 package io.micronaut.security.annotation;
 
-import io.micronaut.inject.annotation.AnnotationMapper;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.inject.annotation.TypedAnnotationMapper;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.security.rules.SecurityRule;
 
@@ -32,7 +32,7 @@ import java.util.List;
  * @since 1.0
  */
 // tag::clazz[]
-public class PermitAllAnnotationMapper implements AnnotationMapper<PermitAll> { // <1>
+public class PermitAllAnnotationMapper implements TypedAnnotationMapper<PermitAll> { // <1>
     @Override
     public Class<PermitAll> annotationType() {
         return PermitAll.class;

@@ -29,23 +29,19 @@ import java.util.List;
  *
  * <p>For example to support the JPA spec you may wish to map the {@code PersistenceContext} annotation to one or many other internal annotations with relying specifically on the JPA specification.</p>
  *
- * <p>AnnotationMapper instances can be registered with the service loader pattern via {@code META-INF/services} and will be picked up at compile time</p>
+ * <p>AnnotationMapper instances can be registered with the service loader pattern via {@code META-INF/services} and will be picked up at compile time and should implement
+ * either {@link NamedAnnotationMapper} or {@link TypedAnnotationMapper}</p>
  *
  * @author graemerocher
  * @since 1.0
  * @param <T> The annotation type
+ * @see NamedAnnotationMapper
+ * @see TypedAnnotationMapper
  */
 public interface AnnotationMapper<T extends Annotation> {
 
     /**
-     * The annotation type to be mapped.
-     *
-     * @return The annotation type
-     */
-    Class<T> annotationType();
-
-    /**
-     * The map method will be called for each instances of the annotation returned via the {@link #annotationType()} method.
+     * The map method will be called for each instances of the annotation returned via this method.
      *
      * @param annotation The annotation values
      * @param visitorContext The context that is being visited

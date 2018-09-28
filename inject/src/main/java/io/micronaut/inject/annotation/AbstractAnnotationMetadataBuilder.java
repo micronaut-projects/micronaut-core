@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -50,8 +51,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             if (definition.isPresent()) {
                 AnnotationMapper mapper = definition.load();
                 try {
-                    Class annotationType = mapper.annotationType();
-                    ANNOTATION_MAPPERS.computeIfAbsent(annotationType.getName(), s -> new ArrayList<>()).add(mapper);
+                    String name = null;
+                    if (mapper instanceof TypedAnnotationMapper) {
+                        name = ((TypedAnnotationMapper) mapper).annotationType().getName();
+                    } else if (mapper instanceof NamedAnnotationMapper) {
+                        name = ((NamedAnnotationMapper) mapper).getName();
+                    }
+                    if (StringUtils.isNotEmpty(name)) {
+                        ANNOTATION_MAPPERS.computeIfAbsent(name, s -> new ArrayList<>()).add(mapper);
+                    }
                 } catch (Throwable e) {
                     // mapper, missing dependencies, continue
                 }
