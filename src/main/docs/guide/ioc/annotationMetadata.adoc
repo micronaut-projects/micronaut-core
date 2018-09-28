@@ -74,3 +74,5 @@ include::security/src/main/java/io/micronaut/security/annotation/PermitAllAnnota
 <2> The `map` method receives a api:io.micronaut.core.annotation.AnnotationValue[] with the values for the annotation.
 <3> One or more annotations can be returned, in this case `@Secured`.
 <4> Annotations values can be provided.
+
+NOTE: The example above implements the api:io.micronaut.inject.annotation.TypedAnnotationMapper[] interface which requires the annotation class itself to be on the annotation processor classpath. If that is undesirable (such as for projects that mix annotations with runtime code) then you should use api:io.micronaut.inject.annotation.NamedAnnotationMapper[] instead.
