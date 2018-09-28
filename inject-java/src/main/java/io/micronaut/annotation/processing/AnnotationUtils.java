@@ -120,10 +120,12 @@ public class AnnotationUtils {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata getAnnotationMetadata(Element element) {
-        return annotationMetadataCache.get(element, element1 ->
-                newAnnotationBuilder()
-                        .build(element1)
-        );
+        AnnotationMetadata metadata = annotationMetadataCache.getIfPresent(element);
+        if (metadata == null) {
+            metadata = newAnnotationBuilder().build(element);
+            annotationMetadataCache.put(element, metadata);
+        }
+        return metadata;
     }
 
     /**
