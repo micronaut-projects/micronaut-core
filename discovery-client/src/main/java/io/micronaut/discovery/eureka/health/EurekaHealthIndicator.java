@@ -34,8 +34,8 @@ import java.util.List;
  * @since 1.0
  */
 @Singleton
-@Requires(beans = EurekaClient.class)
 @Requires(classes = HealthIndicator.class)
+@Requires(beans = EurekaClient.class)
 public class EurekaHealthIndicator implements HealthIndicator {
     private final EurekaClient eurekaClient;
 

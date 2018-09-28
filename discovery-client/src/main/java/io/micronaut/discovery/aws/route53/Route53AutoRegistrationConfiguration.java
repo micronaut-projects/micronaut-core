@@ -27,8 +27,9 @@ import io.micronaut.runtime.ApplicationConfiguration;
  * @author Rvanderwerf
  * @since 1.0
  */
-@ConfigurationProperties("aws.route53.registration")
+
 @Requires(property = ApplicationConfiguration.APPLICATION_NAME)
+@ConfigurationProperties("aws.route53.registration")
 public class Route53AutoRegistrationConfiguration extends RegistrationConfiguration {
 
     private String awsServiceId; //ID of the service - REQUIRED

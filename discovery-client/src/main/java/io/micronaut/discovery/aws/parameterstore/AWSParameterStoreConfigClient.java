@@ -54,6 +54,7 @@ import java.util.concurrent.Future;
  * @since 1.0
  */
 @Singleton
+@Requires(classes = {AWSSimpleSystemsManagementAsyncClient.class, AWSClientConfiguration.class})
 @Requires(env = Environment.AMAZON_EC2)
 @Requires(beans = AWSParameterStoreConfiguration.class)
 public class AWSParameterStoreConfigClient implements ConfigurationClient {

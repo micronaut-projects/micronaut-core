@@ -19,6 +19,7 @@ package io.micronaut.configuration.aws;
 import com.amazonaws.ClientConfiguration;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Requires;
 
 /**
  * Configuration options for AWS client.
@@ -27,6 +28,7 @@ import io.micronaut.context.annotation.ConfigurationProperties;
  * @since 1.0
  */
 @ConfigurationProperties("client")
+@Requires(classes = com.amazonaws.ClientConfiguration.class)
 public class AWSClientConfiguration extends AWSConfiguration {
 
     @ConfigurationBuilder

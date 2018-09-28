@@ -34,8 +34,8 @@ import java.util.Collections;
  * @since 1.0
  */
 @Singleton
-@Requires(beans = ConsulClient.class)
 @Requires(classes = HealthIndicator.class)
+@Requires(beans = ConsulClient.class)
 public class ConsulHealthIndicator implements HealthIndicator {
 
     private final ConsulClient client;

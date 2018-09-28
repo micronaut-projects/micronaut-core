@@ -123,6 +123,10 @@ public class RequiresCondition implements Condition {
             return;
         }
 
+        if (!matchesEnvironment(context, requirements)) {
+            return;
+        }
+
         if (!matchesPresenceOfEntities(context, requirements)) {
             return;
         }
@@ -135,9 +139,6 @@ public class RequiresCondition implements Condition {
             return;
         }
 
-        if (!matchesEnvironment(context, requirements)) {
-            return;
-        }
 
         if (!matchesConfiguration(context, requirements)) {
             return;
@@ -397,8 +398,13 @@ public class RequiresCondition implements Condition {
                     // environment.isPresent(..) caches results, so we use it for efficiency
                     for (String name : names) {
                         if (!environment.isPresent(name)) {
-                            reportMissingClass(context);
                             context.fail("Class [" + name + "] is not present");
+                            if (ClassLoadingReporter.isReportingEnabled()) {
+                                for (String n : names) {
+                                    ClassLoadingReporter.reportMissing(n);
+                                }
+                                reportMissingClass(context);
+                            }
                             return false;
                         }
                     }
@@ -407,7 +413,12 @@ public class RequiresCondition implements Condition {
                     ClassLoader classLoader = context.getBeanContext().getClassLoader();
                     for (String name : names) {
                         if (!ClassUtils.forName(name, classLoader).isPresent()) {
-                            reportMissingClass(context);
+                            if (ClassLoadingReporter.isReportingEnabled()) {
+                                for (String n : names) {
+                                    ClassLoadingReporter.reportMissing(n);
+                                }
+                                reportMissingClass(context);
+                            }
                             context.fail("Class [" + name + "] is not present");
                             return false;
                         }
