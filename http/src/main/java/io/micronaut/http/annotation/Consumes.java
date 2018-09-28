@@ -16,6 +16,8 @@
 
 package io.micronaut.http.annotation;
 
+import io.micronaut.http.MediaType;
+
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import java.lang.annotation.Documented;
@@ -40,5 +42,16 @@ public @interface Consumes {
     /**
      * @return The {@link io.micronaut.http.MediaType} values that this component is able to consume
      */
-    String[] value();
+    String[] value() default MediaType.APPLICATION_JSON;
+
+    /**
+     * <p>Applies to clients that return reactive types.</p>
+     * <p>
+     * <p>This member indicates whether the response handling should stream or wait until
+     * the full response is read. Normally this annotation is unnecessary unless the declared type doesn't indicate
+     * how many items are emitted.</p>
+     *
+     * @return True if only a single result is emitted
+     */
+    boolean single() default false;
 }
