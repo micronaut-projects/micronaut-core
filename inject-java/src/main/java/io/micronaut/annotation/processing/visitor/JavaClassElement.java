@@ -86,7 +86,9 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
 
             @Override
             protected boolean isAcceptable(javax.lang.model.element.Element element) {
-                if (element.getKind() == ElementKind.FIELD) return true;
+                if (element.getKind() == ElementKind.FIELD) {
+                    return true;
+                }
                 if (element.getKind() == ElementKind.METHOD && element instanceof ExecutableElement) {
                     Set<Modifier> modifiers = element.getModifiers();
                     if (modifiers.contains(Modifier.PUBLIC) && !modifiers.contains(Modifier.STATIC) && !modifiers.contains(Modifier.ABSTRACT)) {
