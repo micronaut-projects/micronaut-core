@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.aop
 
+import io.micronaut.http.annotation.Consumes
 import io.micronaut.http.annotation.Produces
 import io.reactivex.Flowable
 import io.reactivex.Maybe
@@ -100,6 +101,7 @@ class PublisherCrudSpec extends Specification {
 
     @Client('/publisher/books')
     static interface BookClient extends BookApi {
+
     }
 
     @Controller("/publisher/books")
@@ -142,24 +144,19 @@ class PublisherCrudSpec extends Specification {
 
     static interface BookApi {
 
-        @Get("/{id}")
-        @Produces(single = true)
+        @Get(uri = "/{id}", single = true)
         Publisher<Book> get(Long id)
 
-        @Get
-        @Produces(single = true)
+        @Get(single = true)
         Publisher<List<Book>> list()
 
-        @Delete("/{id}")
-        @Produces(single = true)
+        @Delete(uri = "/{id}", single = true)
         Publisher<Book> delete(Long id)
 
-        @Post
-        @Produces(single = true)
+        @Post(single = true)
         Publisher<Book> save(String title)
 
-        @Patch("/{id}")
-        @Produces(single = true)
+        @Patch(uri = "/{id}", single = true)
         Publisher<Book> update(Long id, String title)
     }
 
