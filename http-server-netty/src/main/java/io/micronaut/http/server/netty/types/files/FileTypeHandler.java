@@ -131,10 +131,17 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
 
         // Add cache headers
         LocalDateTime cacheSeconds = now.plus(configuration.getCacheSeconds(), ChronoUnit.SECONDS);
-        headers.expires(cacheSeconds);
+        if (response.header(HttpHeaders.EXPIRES) == null) {
+            headers.expires(cacheSeconds);
+        }
 
-        response.header(HttpHeaders.CACHE_CONTROL, "private, max-age=" + configuration.getCacheSeconds());
-        headers.lastModified(lastModified);
+        if (response.header(HttpHeaders.CACHE_CONTROL) == null) {
+            response.header(HttpHeaders.CACHE_CONTROL, "private, max-age=" + configuration.getCacheSeconds());
+        }
+
+        if (response.header(HttpHeaders.LAST_MODIFIED) == null) {
+            headers.lastModified(lastModified);
+        }
     }
 
     /**
