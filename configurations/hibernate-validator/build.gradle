@@ -2,7 +2,7 @@ dependencies {
     compileOnly project(":inject-java")
     compile project(":inject")
     compile project(":validation")
-    compile 'org.hibernate:hibernate-validator:6.0.2.Final'
+    compile 'org.hibernate:hibernate-validator:6.0.13.Final'
     compileOnly 'org.glassfish.web:el-impl:2.2.1-b05'
     compileOnly project(":router")
 
