@@ -18,6 +18,7 @@ package io.micronaut.web.router.resource;
 
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.util.AntPathMatcher;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.hateos.Resource;
@@ -47,11 +48,15 @@ public class StaticResourceResolver {
      *
      * @param configurations The static resource configurations
      */
-    StaticResourceResolver(StaticResourceConfiguration[] configurations) {
+    StaticResourceResolver(List<StaticResourceConfiguration> configurations) {
         this.pathMatcher = PathMatcher.ANT;
-        for (StaticResourceConfiguration config: configurations) {
-            if (config.isEnabled()) {
-                this.resourceMappings.put(config.getMapping(), config.getResourceLoaders());
+
+        if (CollectionUtils.isNotEmpty(configurations)) {
+
+            for (StaticResourceConfiguration config: configurations) {
+                if (config.isEnabled()) {
+                    this.resourceMappings.put(config.getMapping(), config.getResourceLoaders());
+                }
             }
         }
     }
