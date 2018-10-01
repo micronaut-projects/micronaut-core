@@ -54,7 +54,7 @@ public class Authenticator {
      * @param credentials The credentials to authenticate with
      * @return A publisher that emits {@link AuthenticationResponse} objects
      */
-    public Publisher<AuthenticationResponse> authenticate(UsernamePasswordCredentials credentials) {
+    public Publisher<AuthenticationResponse> authenticate(AuthenticationRequest credentials) {
         if (this.authenticationProviders == null) {
             return Flowable.empty();
         }
@@ -72,7 +72,7 @@ public class Authenticator {
     }
 
     private Flowable<AuthenticationResponse> attemptAuthenticationRequest(
-        UsernamePasswordCredentials credentials,
+            AuthenticationRequest credentials,
         Iterator<AuthenticationProvider> providerIterator,
         Flowable<AuthenticationProvider> providerFlowable, AtomicReference<AuthenticationResponse> lastFailure) {
 
