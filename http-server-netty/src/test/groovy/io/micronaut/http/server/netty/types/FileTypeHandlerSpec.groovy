@@ -76,6 +76,17 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         response.header(DATE)
     }
 
+    void "test cache control can be overridden"() {
+        when:
+        MutableHttpRequest<?> request = HttpRequest.GET('/test/custom-cache-control')
+        def response = rxClient.exchange(request, String).blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.getHeaders().getAll(CACHE_CONTROL).size() == 1
+        response.header(CACHE_CONTROL) == "public, immutable, max-age=31556926"
+    }
+
     void "test what happens when a file isn't found"() {
         when:
         rxClient.exchange('/test/not-found', String).blockingFirst()
@@ -170,6 +181,12 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         @Get('/download')
         AttachedFile download() {
             new AttachedFile(tempFile)
+        }
+
+        @Get('/custom-cache-control')
+        HttpResponse<File> cacheControl() {
+            HttpResponse.ok(tempFile)
+                        .header(CACHE_CONTROL, "public, immutable, max-age=31556926")
         }
 
         @Get('/different-name')

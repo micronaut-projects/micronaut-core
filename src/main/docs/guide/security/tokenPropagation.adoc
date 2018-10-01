@@ -20,7 +20,7 @@ If you use <<serviceDiscovery, Service Discovery>> features, you can use the ser
 
 [source, bash]
 ----
-micronaut.security.token.propagation.serviceIdRegex="catalogue|recommendations|inventory"
+micronaut.security.token.propagation.service-id-regex="catalogue|recommendations|inventory"
 ----
 
 TIP: Read the http://guides.micronaut.io/micronaut-token-propagation/guide/index.html[Token Propagation tutorial] to learn more.

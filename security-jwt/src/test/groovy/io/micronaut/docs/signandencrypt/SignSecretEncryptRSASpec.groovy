@@ -51,7 +51,7 @@ micronaut:
           secret:
             generator: 
               secret: pleaseChangeThisSecretForANewOne #<1>
-              jwsAlgorithm: HS256 # <2>
+              jws-algorithm: HS256 # <2>
 #end::yamlconfig[]
 """
 
@@ -70,7 +70,7 @@ micronaut:
                                                 'secret': [
                                                         'generator': [
                                                                 'secret': 'pleaseChangeThisSecretForANewOne',
-                                                                'jwsAlgorithm': 'HS256'
+                                                                'jws-algorithm': 'HS256'
                                                         ]
                                                 ]
                                         ]
