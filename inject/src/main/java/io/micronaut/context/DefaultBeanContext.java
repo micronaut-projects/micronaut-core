@@ -1557,16 +1557,22 @@ public class DefaultBeanContext implements BeanContext {
     private <T> T getScopedBeanForDefinition(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier, boolean throwNoSuchBean, BeanDefinition<T> definition) {
         boolean isProxy = definition.isProxy();
         Optional<BeanResolutionContext.Segment> currentSegment = resolutionContext.getPath().currentSegment();
-        Optional<Class<? extends Annotation>> scope = Optional.empty();
+        Optional<CustomScope> registeredScope = Optional.empty();
         if (currentSegment.isPresent()) {
             Argument argument = currentSegment.get().getArgument();
-            scope = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Scope.class);
+            Optional<Class<? extends Annotation>> scope = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Scope.class);
+            registeredScope = scope.flatMap(customScopeRegistry::findScope);
         }
-        if (!scope.isPresent()) {
-            scope = isProxy ? Optional.empty() : definition.getScope();
+        if (!isProxy && definition.hasStereotype(SCOPED_PROXY_ANN) && !registeredScope.isPresent()) {
+            final List<Class<? extends Annotation>> scopeHierarchy = definition.getAnnotationTypesByStereotype(Scope.class);
+            for (Class<? extends Annotation> aClass : scopeHierarchy) {
+                registeredScope = customScopeRegistry.findScope(aClass);
+                if (registeredScope.isPresent()) {
+                    break;
+                }
+            }
         }
 
-        Optional<CustomScope> registeredScope = scope.flatMap(customScopeRegistry::findScope);
         if (registeredScope.isPresent()) {
             CustomScope customScope = registeredScope.get();
             if (isProxy) {
