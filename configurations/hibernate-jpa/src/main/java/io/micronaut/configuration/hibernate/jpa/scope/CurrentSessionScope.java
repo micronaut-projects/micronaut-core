@@ -66,40 +66,41 @@ public class CurrentSessionScope implements CustomScope<CurrentSession> {
     @SuppressWarnings("unchecked")
     @Override
     public <T> T get(BeanResolutionContext resolutionContext, BeanDefinition<T> beanDefinition, BeanIdentifier identifier, Provider<T> provider) {
-        return (T) proxyBeans.computeIfAbsent(identifier, beanIdentifier -> {
-            BeanResolutionContext.Segment segment = resolutionContext.getPath().currentSegment().orElseThrow(() ->
-                    new IllegalStateException("@CurrentSession used in invalid location")
-            );
-            Argument argument = segment.getArgument();
-            AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-            io.micronaut.context.Qualifier<Session> qualifier = annotationMetadata.getAnnotationNameByStereotype(Qualifier.class)
-                    .map((Function<String, io.micronaut.context.Qualifier<Session>>) s -> Qualifiers.byAnnotation(annotationMetadata, s)).orElse(null);
+        BeanResolutionContext.Segment segment = resolutionContext.getPath().currentSegment().orElse(null);
+        if (segment != null) {
+            return (T) proxyBeans.computeIfAbsent(identifier, beanIdentifier -> {
+                Argument argument = segment.getArgument();
+                AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+                io.micronaut.context.Qualifier<Session> qualifier = annotationMetadata.getAnnotationNameByStereotype(Qualifier.class)
+                        .map((Function<String, io.micronaut.context.Qualifier<Session>>) s -> Qualifiers.byAnnotation(annotationMetadata, s)).orElse(null);
 
-            Optional<BeanDefinition<Session>> proxyBean = beanContext.getBeanDefinitions(Session.class, qualifier)
-                    .stream()
-                    .filter(BeanDefinition::isProxy)
-                    .findFirst();
+                Optional<BeanDefinition<Session>> proxyBean = beanContext.getBeanDefinitions(Session.class, qualifier)
+                        .stream()
+                        .filter(BeanDefinition::isProxy)
+                        .findFirst();
 
-            if (proxyBean.isPresent()) {
-                BeanDefinition<Session> beanDef = proxyBean.get();
-                BeanFactory<Session> beanFactory = (BeanFactory<Session>) beanDef;
-                Session sessionProxy = beanFactory.build(
-                        resolutionContext,
-                        beanContext,
-                        beanDef
-                );
-
-                if (qualifier != null && sessionProxy instanceof InterceptedProxy) {
-                    ((InterceptedProxy) sessionProxy).$withBeanQualifier(
-                            qualifier
+                if (proxyBean.isPresent()) {
+                    BeanDefinition<Session> beanDef = proxyBean.get();
+                    BeanFactory<Session> beanFactory = (BeanFactory<Session>) beanDef;
+                    Session sessionProxy = beanFactory.build(
+                            resolutionContext,
+                            beanContext,
+                            beanDef
                     );
+
+                    if (qualifier != null && sessionProxy instanceof InterceptedProxy) {
+                        ((InterceptedProxy) sessionProxy).$withBeanQualifier(
+                                qualifier
+                        );
+                    }
+
+                    return sessionProxy;
                 }
-
-                return sessionProxy;
-            }
-            throw new NoSuchBeanException(Session.class, qualifier);
-        });
-
+                throw new NoSuchBeanException(Session.class, qualifier);
+            });
+        } else {
+            return provider.get();
+        }
     }
 
     @Override

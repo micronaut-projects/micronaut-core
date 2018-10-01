@@ -100,7 +100,7 @@ public class DefaultBeanContext implements BeanContext {
 
     private final ClassLoader classLoader;
     private final Set<Class> thisInterfaces = ReflectionUtils.getAllInterfaces(getClass());
-    private final CustomScopeRegistry customScopeRegistry = new DefaultCustomScopeRegistry(this);
+    private final CustomScopeRegistry customScopeRegistry;
     private final ResourceLoader resourceLoader;
     private Collection<BeanRegistration<BeanCreatedEventListener>> beanCreationEventListeners;
 
@@ -128,6 +128,7 @@ public class DefaultBeanContext implements BeanContext {
     public DefaultBeanContext(ClassPathResourceLoader resourceLoader) {
         this.classLoader = resourceLoader.getClassLoader();
         this.resourceLoader = resourceLoader;
+        this.customScopeRegistry = new DefaultCustomScopeRegistry(this, classLoader);
     }
 
     @Override
@@ -547,8 +548,14 @@ public class DefaultBeanContext implements BeanContext {
         Collection<BeanDefinition> candidates = findBeanCandidatesForInstance(instance);
         if (candidates.size() == 1) {
             BeanDefinition<T> beanDefinition = candidates.stream().findFirst().get();
+            final DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(this, beanDefinition);
+            final BeanKey<T> beanKey = new BeanKey<>(beanDefinition.getBeanType(), null);
+            resolutionContext.addInFlightBean(
+                    beanKey,
+                    instance
+            );
             doInject(
-                    new DefaultBeanResolutionContext(this, beanDefinition),
+                    resolutionContext,
                     instance,
                     beanDefinition
             );
@@ -1484,10 +1491,15 @@ public class DefaultBeanContext implements BeanContext {
             return (T) this;
         }
 
-        BeanKey beanKey = new BeanKey(beanType, qualifier);
+        BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
 
         if (LOG.isTraceEnabled()) {
             LOG.trace("Looking up existing bean for key: {}", beanKey);
+        }
+
+        T inFlightBean = resolutionContext != null ? resolutionContext.getInFlightBean(beanKey) : null;
+        if (inFlightBean != null) {
+            return inFlightBean;
         }
 
         BeanRegistration<T> beanRegistration = singletonObjects.get(beanKey);
@@ -1555,18 +1567,20 @@ public class DefaultBeanContext implements BeanContext {
 
     @SuppressWarnings("unchecked")
     private <T> T getScopedBeanForDefinition(BeanResolutionContext resolutionContext, Class<T> beanType, Qualifier<T> qualifier, boolean throwNoSuchBean, BeanDefinition<T> definition) {
-        boolean isProxy = definition.isProxy();
+        final boolean isProxy = definition.isProxy();
         Optional<BeanResolutionContext.Segment> currentSegment = resolutionContext.getPath().currentSegment();
         Optional<CustomScope> registeredScope = Optional.empty();
+
         if (currentSegment.isPresent()) {
             Argument argument = currentSegment.get().getArgument();
-            Optional<Class<? extends Annotation>> scope = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Scope.class);
+            Optional<String> scope = argument.getAnnotationMetadata().getAnnotationNameByStereotype(Scope.class);
             registeredScope = scope.flatMap(customScopeRegistry::findScope);
         }
+
         if (!isProxy && definition.hasStereotype(SCOPED_PROXY_ANN) && !registeredScope.isPresent()) {
-            final List<Class<? extends Annotation>> scopeHierarchy = definition.getAnnotationTypesByStereotype(Scope.class);
-            for (Class<? extends Annotation> aClass : scopeHierarchy) {
-                registeredScope = customScopeRegistry.findScope(aClass);
+            final List<String> scopeHierarchy = definition.getAnnotationNamesByStereotype(Scope.class);
+            for (String scope : scopeHierarchy) {
+                registeredScope = customScopeRegistry.findScope(scope);
                 if (registeredScope.isPresent()) {
                     break;
                 }
@@ -2292,6 +2306,7 @@ public class DefaultBeanContext implements BeanContext {
     static final class BeanKey<T> implements BeanIdentifier {
         private final Class beanType;
         private final Qualifier qualifier;
+        private final int hashCode;
 
         /**
          * @param beanType  The bean type
@@ -2300,6 +2315,10 @@ public class DefaultBeanContext implements BeanContext {
         BeanKey(Class<T> beanType, Qualifier<T> qualifier) {
             this.beanType = beanType;
             this.qualifier = qualifier;
+            int result = beanType.hashCode();
+            result = 31 * result + (qualifier != null ? qualifier.hashCode() : 0);
+            this.hashCode = result;
+
         }
 
         @Override
@@ -2341,9 +2360,7 @@ public class DefaultBeanContext implements BeanContext {
 
         @Override
         public int hashCode() {
-            int result = beanType.hashCode();
-            result = 31 * result + (qualifier != null ? qualifier.hashCode() : 0);
-            return result;
+            return hashCode;
         }
 
         @Override
