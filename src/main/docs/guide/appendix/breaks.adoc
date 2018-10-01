@@ -1,5 +1,15 @@
 This section will document breaking changes that may happen during milestone or release candidate releases, as well as major releases eg (1.x.x -> 2.x.x).
 
+==== 1.0.0.RC2
+
+* `io.micronaut.security.authentication.Authenticator::authenticate` method signature has changed from:
+
+`public Publisher<AuthenticationResponse> authenticate(UsernamePasswordCredentials credentials)`
+
+to:
+
+`public Publisher<AuthenticationResponse> authenticate(AuthenticationRequest authenticationRequest)`
+
 ==== 1.0.0.RC1
 
 * The default port if no port is specified is now port 8080 instead of a random port, except in the test environment. A random port can be obtained by setting the port to -1.
