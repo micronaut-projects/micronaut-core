@@ -563,7 +563,8 @@ public class DefaultBeanContext implements BeanContext {
             );
 
         } else if (!candidates.isEmpty()) {
-            throw new BeanContextException("Multiple possible bean candidates found for injection: " + candidates);
+            final Iterator iterator = candidates.iterator();
+            throw new NonUniqueBeanException(instance.getClass(), iterator);
         }
         return instance;
     }
