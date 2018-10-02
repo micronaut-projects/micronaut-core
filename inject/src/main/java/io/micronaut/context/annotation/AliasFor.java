@@ -35,13 +35,6 @@ import java.lang.annotation.*;
 public @interface AliasFor {
 
     /**
-     * Used to declare aliases of members within the current annotation.
-     *
-     * @return The alias
-     */
-    String value() default "";
-
-    /**
      * @return The name of the member that <code>this</code> member is an alias for
      */
     String member() default "";
