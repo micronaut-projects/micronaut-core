@@ -18,10 +18,13 @@ package io.micronaut.http.client
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Post
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
+import io.reactivex.Single
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
@@ -29,6 +32,9 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
+
+import java.util.concurrent.Semaphore
+import java.util.concurrent.TimeUnit
 
 /**
  * Created by graemerocher on 19/01/2018.
@@ -42,6 +48,8 @@ class JsonStreamSpec  extends Specification {
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+
+    static Semaphore signal
 
     void "test read JSON stream demand all"() {
         given:
@@ -118,6 +126,26 @@ class JsonStreamSpec  extends Specification {
         }
 
     }
+
+    void "that that we can stream books to the server"() {
+        given:
+        RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient, embeddedServer.getURL())
+        signal = new Semaphore(1)
+        when:
+        // Funny request flow which required the server to relase the semaphore so we can keep sending stuff
+        def stream = client.jsonStream(HttpRequest.POST(
+                '/jsonstream/books/count',
+                Flowable.fromCallable {
+                    JsonStreamSpec.signal.acquire()
+                    new Book(title: "Micronaut for dummies")
+                }
+                .repeat(10)
+                ).contentType(MediaType.APPLICATION_JSON_STREAM_TYPE).accept(MediaType.APPLICATION_JSON_STREAM_TYPE))
+
+        then:
+        stream.timeout(5, TimeUnit.SECONDS).blockingSingle().bookCount == 10
+    }
+
     @Controller("/jsonstream/books")
     static class BookController {
 
@@ -125,11 +153,27 @@ class JsonStreamSpec  extends Specification {
         Publisher<Book> list() {
             return Flowable.just(new Book(title: "The Stand"), new Book(title: "The Shining"))
         }
-    }
 
+        // Funny controller which signals the semaphone, causing the the client to send more
+        @Post(uri = "/count", processes = MediaType.APPLICATION_JSON_STREAM)
+        Single<LibraryStats> count(@Body Flowable<Book> theBooks) {
+            theBooks.map {
+                Book b ->
+                    JsonStreamSpec.signal.release()
+                    b.title
+            }.count().map {
+                bookCount -> new LibraryStats(bookCount: bookCount)
+            }
+        }
+    }
 
     static class Book {
         String title
     }
+
+    static class LibraryStats {
+        Integer bookCount
+    }
+
 }
 
