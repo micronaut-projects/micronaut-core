@@ -14,25 +14,26 @@
  * limitations under the License.
  */
 
-package io.micronaut.aop;
+package io.micronaut.inject.qualifiers;
 
-import io.micronaut.inject.qualifiers.Qualified;
+import io.micronaut.context.Qualifier;
+import io.micronaut.core.annotation.Internal;
 
 /**
- * A {@link Intercepted} that proxies another instance.
+ * Internal interface used by generated code to propagate qualifiers.
  *
- * @param <T> The declaring type
- *
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
+ * @param <T> The qualifier type
  */
-public interface InterceptedProxy<T> extends Intercepted, Qualified<T> {
-
+@Internal
+public interface Qualified<T> {
     /**
-     * This method will return the target object being proxied.
+     * Override the bean qualifier.
      *
-     * @return The proxy target
+     * @param qualifier The bean qualifier to use
      */
-    T interceptedTarget();
-
+    @Internal
+    @SuppressWarnings("MethodName")
+    void $withBeanQualifier(Qualifier<T> qualifier);
 }
