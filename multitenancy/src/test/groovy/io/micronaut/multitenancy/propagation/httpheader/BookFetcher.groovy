@@ -1,5 +1,7 @@
 package io.micronaut.multitenancy.propagation.httpheader
 
+import io.reactivex.Flowable
+
 interface BookFetcher {
-    List<String> findAll()
+    Flowable<Book> findAll()
 }
