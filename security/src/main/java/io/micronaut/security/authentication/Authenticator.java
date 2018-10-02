@@ -51,10 +51,10 @@ public class Authenticator {
     /**
      * Authenticates the user with the provided credentials.
      *
-     * @param credentials The credentials to authenticate with
+     * @param authenticationRequest Represents a request to authenticate.
      * @return A publisher that emits {@link AuthenticationResponse} objects
      */
-    public Publisher<AuthenticationResponse> authenticate(UsernamePasswordCredentials credentials) {
+    public Publisher<AuthenticationResponse> authenticate(AuthenticationRequest authenticationRequest) {
         if (this.authenticationProviders == null) {
             return Flowable.empty();
         }
@@ -65,19 +65,19 @@ public class Authenticator {
         if (providerIterator.hasNext()) {
             Flowable<AuthenticationProvider> providerFlowable = Flowable.just(providerIterator.next());
             AtomicReference<AuthenticationResponse> lastFailure = new AtomicReference<>();
-            return attemptAuthenticationRequest(credentials, providerIterator, providerFlowable, lastFailure);
+            return attemptAuthenticationRequest(authenticationRequest, providerIterator, providerFlowable, lastFailure);
         } else {
             return Flowable.empty();
         }
     }
 
     private Flowable<AuthenticationResponse> attemptAuthenticationRequest(
-        UsernamePasswordCredentials credentials,
+        AuthenticationRequest authenticationRequest,
         Iterator<AuthenticationProvider> providerIterator,
         Flowable<AuthenticationProvider> providerFlowable, AtomicReference<AuthenticationResponse> lastFailure) {
 
         return providerFlowable.switchMap(authenticationProvider -> {
-            Flowable<AuthenticationResponse> responseFlowable = Flowable.fromPublisher(authenticationProvider.authenticate(credentials));
+            Flowable<AuthenticationResponse> responseFlowable = Flowable.fromPublisher(authenticationProvider.authenticate(authenticationRequest));
             Flowable<AuthenticationResponse> authenticationAttemptFlowable = responseFlowable.switchMap(authenticationResponse -> {
                 if (authenticationResponse.isAuthenticated()) {
                     return Flowable.just(authenticationResponse);
@@ -85,7 +85,7 @@ public class Authenticator {
                     lastFailure.set(authenticationResponse);
                     // recurse
                     return attemptAuthenticationRequest(
-                        credentials,
+                        authenticationRequest,
                         providerIterator,
                         Flowable.just(providerIterator.next()),
                         lastFailure);
@@ -101,7 +101,7 @@ public class Authenticator {
                 if (providerIterator.hasNext()) {
                     // recurse
                     return attemptAuthenticationRequest(
-                        credentials,
+                        authenticationRequest,
                         providerIterator,
                         Flowable.just(providerIterator.next()),
                         lastFailure);
