@@ -1424,6 +1424,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         nettyRequest = clientHttpRequest.getStreamedRequest(
                                 requestBodyPublisher
                         );
+                        try {
+                            nettyRequest.setUri(requestURI.toURL().getFile());
+                        } catch (MalformedURLException e) {
+                            //should never happen
+                        }
                         return new NettyRequestWriter(nettyRequest, null);
                     } else if (bodyValue instanceof CharSequence) {
                         bodyContent = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
