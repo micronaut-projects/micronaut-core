@@ -22,6 +22,7 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import io.reactivex.Single
@@ -48,6 +49,9 @@ class JsonStreamSpec  extends Specification {
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+
+    @Shared
+    BookClient bookClient = embeddedServer.getApplicationContext().getBean(BookClient)
 
     static Semaphore signal
 
@@ -127,7 +131,7 @@ class JsonStreamSpec  extends Specification {
 
     }
 
-    void "that that we can stream books to the server"() {
+    void "we can stream books to the server"() {
         given:
         RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient, embeddedServer.getURL())
         signal = new Semaphore(1)
@@ -144,6 +148,37 @@ class JsonStreamSpec  extends Specification {
 
         then:
         stream.timeout(5, TimeUnit.SECONDS).blockingSingle().bookCount == 10
+    }
+
+    void "we can stream data from the server through the generated client"() {
+        when:
+        List<Book> books = Flowable.fromPublisher(bookClient.list()).toList().blockingGet()
+        then:
+        books.size() == 2
+        books*.title == ['The Stand', 'The Shining']
+    }
+
+    void "we can use a generated client to stream books to the server"() {
+        given:
+        signal = new Semaphore(1)
+        when:
+        Single<LibraryStats> result = bookClient.count(
+                Flowable.fromCallable {
+                    JsonStreamSpec.signal.acquire()
+                    new Book(title: "Micronaut for dummies, volume 2")
+                }
+                .repeat(7))
+        then:
+        result.timeout(10, TimeUnit.SECONDS).blockingGet().bookCount == 7
+    }
+
+    @Client("/jsonstream/books")
+    static interface BookClient {
+        @Get(consumes = MediaType.APPLICATION_JSON_STREAM)
+        Publisher<Book> list();
+
+        @Post(uri = "/count", processes = MediaType.APPLICATION_JSON_STREAM)
+        Single<LibraryStats> count(@Body Flowable<Book> theBooks)
     }
 
     @Controller("/jsonstream/books")
