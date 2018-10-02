@@ -20,6 +20,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 
+import javax.annotation.Nullable;
 import java.util.Optional;
 import java.util.function.Predicate;
 
@@ -33,6 +34,7 @@ public interface StatusRoute extends MethodBasedRoute {
     /**
      * @return The type the exception originates from. Null if the error route is global.
      */
+    @Nullable
     Class<?> originatingType();
 
     /**
