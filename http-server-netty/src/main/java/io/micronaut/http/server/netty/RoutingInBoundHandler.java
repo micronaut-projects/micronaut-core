@@ -255,7 +255,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
 
         if (errorRoute != null) {
-            logException(cause);
 
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Found matching exception handler for exception [{}]: {}", cause.getMessage(), errorRoute);
@@ -285,6 +284,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         filteredPublisher
                 );
 
+                if (serverConfiguration.isLogHandledExceptions()) {
+                    logException(cause);
+                }
+
             } catch (Throwable e) {
                 if (LOG.isErrorEnabled()) {
                     LOG.error("Exception occurred executing error handler. Falling back to default error handling: " + e.getMessage(), e);
@@ -292,6 +295,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 writeDefaultErrorResponse(ctx, nettyHttpRequest, e);
             }
         } else {
+
             Optional<ExceptionHandler> exceptionHandler = beanLocator
                     .findBean(ExceptionHandler.class, Qualifiers.byTypeArguments(cause.getClass(), Object.class));
 
@@ -319,6 +323,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             requestReference,
                             filteredPublisher
                     );
+
+                    if (serverConfiguration.isLogHandledExceptions()) {
+                        logException(cause);
+                    }
                 } catch (Throwable e) {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Exception occurred executing error handler. Falling back to default error handling.");
