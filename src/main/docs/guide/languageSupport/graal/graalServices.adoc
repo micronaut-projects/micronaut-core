@@ -40,7 +40,7 @@ Once the `reflect.json` file is ready you can run the `build-native-image.sh` sc
 .The `native-image` command
 [source,bash]
 ----
-native-image --class-path target/hello-world-0.1.jar \ # <1>
+native-image --class-path target/hello-world-0.1-all.jar \ # <1>
 			 -H:ReflectionConfigurationFiles=target/reflect.json \ # <2>
 			 -H:EnableURLProtocols=http \ # <3>
 			 -H:IncludeResources="logback.xml|application.yml|META-INF/services/*.*" \ # <4>
