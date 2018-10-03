@@ -37,11 +37,15 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Utility methods for reflection related tasks.
+ * Utility methods for reflection related tasks. Micronaut tries to avoid using reflection wherever possible,
+ * this class is therefore considered an internal class and covers edge cases needed by Micronaut, often at compile time.
+ *
+ * Do not use in application code.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public class ReflectionUtils {
     public static final Class[] EMPTY_CLASS_ARRAY = new Class[0];
     private static final Map<Class<?>, Class<?>> PRIMITIVES_TO_WRAPPERS =

@@ -16,10 +16,8 @@
 
 package io.micronaut.inject.annotation;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.*;
 import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -105,6 +103,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * @param annotationsByStereotype The annotations by stereotype
      */
     @Internal
+    @UsedByGeneratedCode
     public DefaultAnnotationMetadata(
         @Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations,
         @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes,
@@ -448,6 +447,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @SuppressWarnings("unused")
     @Internal
+    @UsedByGeneratedCode
     protected static boolean areAnnotationDefaultsRegistered(String annotation) {
         return AnnotationMetadataSupport.hasDefaultValues(annotation);
     }
@@ -460,6 +460,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      */
     @SuppressWarnings("unused")
     @Internal
+    @UsedByGeneratedCode
     protected static void registerAnnotationDefaults(String annotation, Map<String, Object> defaultValues) {
         AnnotationMetadataSupport.registerDefaultValues(annotation, defaultValues);
     }

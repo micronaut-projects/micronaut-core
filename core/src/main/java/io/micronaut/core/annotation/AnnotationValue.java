@@ -53,6 +53,7 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
      * @param values         The values
      */
     @SuppressWarnings("unchecked")
+    @UsedByGeneratedCode
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values) {
         this.annotationName = annotationName.intern();
         this.convertibleValues = newConvertibleValues(values);
@@ -77,6 +78,7 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
      * @param annotationName The annotation name
      */
     @SuppressWarnings("unchecked")
+    @UsedByGeneratedCode
     public AnnotationValue(String annotationName) {
         this.annotationName = annotationName.intern();
         this.convertibleValues = ConvertibleValues.EMPTY;

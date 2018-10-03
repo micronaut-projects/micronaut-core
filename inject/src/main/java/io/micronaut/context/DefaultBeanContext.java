@@ -27,6 +27,7 @@ import io.micronaut.context.scope.CustomScopeRegistry;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.ResourceLoader;
@@ -857,6 +858,7 @@ public class DefaultBeanContext implements BeanContext {
      * @param <T>               The bean type parameter
      * @return The found bean
      */
+    @UsedByGeneratedCode
     public <T> T getBean(BeanResolutionContext resolutionContext, Class<T> beanType) {
         return getBeanInternal(resolutionContext, beanType, null, true, true);
     }
