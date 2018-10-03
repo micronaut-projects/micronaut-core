@@ -40,14 +40,15 @@ Once the `reflect.json` file is ready you can run the `build-native-image.sh` sc
 .The `native-image` command
 [source,bash]
 ----
-native-image --class-path target/hello-world-0.1.jar \ # <1>
-			 -H:ReflectionConfigurationFiles=target/reflect.json \ # <2>
+native-image --class-path build/libs/hello-world-0.1-all.jar \ # <1>
+			 -H:ReflectionConfigurationFiles=build/reflect.json \ # <2>
 			 -H:EnableURLProtocols=http \ # <3>
 			 -H:IncludeResources="logback.xml|application.yml|META-INF/services/*.*" \ # <4>
 			 -H:Name=hello-world \ # <5>
 			 -H:Class=hello.world.Application \ # <6>
 			 -H:+ReportUnsupportedElementsAtRuntime \ # <7>
-			 --delay-class-initialization-to-runtime=io.netty.handler.codec.http.HttpObjectEncoder # <8>
+			 -H:+AllowVMInspection \
+			 --delay-class-initialization-to-runtime=io.netty.handler.codec.http.HttpObjectEncoder,io.netty.handler.codec.http.websocketx.WebSocket00FrameEncoder  # <8>
 ----
 
 <1> The `class-path` argument is used to refer to the Micronaut shaded JAR
@@ -55,9 +56,9 @@ native-image --class-path target/hello-world-0.1.jar \ # <1>
 <3> Micronaut uses the JVM's default URL connection classes. The `-H:EnableURLProtocols` allows using them in GraalVM `nativeimage`.
 <4> The `-H:IncludeResources` argument specifies a regex to dictate which static resources should be included in the image.
 <5> The `-H:Name` argument specifies the name of the native image to be built
-<5> The `-H:Class` argument specifies the Java main class that is the entry point of the application.
-<6> The `-H:+ReportUnsupportedElementsAtRuntime` tells GraalVM to report any `ClassNotFoundException` errors at runtime instead of at build time.
-<7> The `--delay-class-initialization-to-runtime` specifies which classes static initializers should be delayed until runtime. GraalVM by default runs static initializers at build time. That is undesirable is certain cases (particularly with Netty).
+<6> The `-H:Class` argument specifies the Java main class that is the entry point of the application.
+<7> The `-H:+ReportUnsupportedElementsAtRuntime` tells GraalVM to report any `ClassNotFoundException` errors at runtime instead of at build time.
+<8> The `--delay-class-initialization-to-runtime` specifies which classes static initializers should be delayed until runtime. GraalVM by default runs static initializers at build time. That is undesirable is certain cases (particularly with Netty).
 
 
 Once the image has been built you can run the application using the native image name:
