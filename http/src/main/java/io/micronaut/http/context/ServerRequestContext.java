@@ -78,11 +78,18 @@ public final class ServerRequestContext {
      * @return The return value of the callable
      */
     public static <T> T with(HttpRequest request, Supplier<T> callable) {
+        HttpRequest existing = REQUEST.get();
+        boolean isSet = false;
         try {
-            REQUEST.set(request);
+            if (existing == null) {
+                isSet = true;
+                REQUEST.set(request);
+            }
             return callable.get();
         } finally {
-            REQUEST.remove();
+            if (isSet) {
+                REQUEST.remove();
+            }
         }
     }
 
@@ -96,11 +103,18 @@ public final class ServerRequestContext {
      * @throws Exception If the callable throws an exception
      */
     public static <T> T with(HttpRequest request, Callable<T> callable) throws Exception {
+        HttpRequest existing = REQUEST.get();
+        boolean isSet = false;
         try {
-            REQUEST.set(request);
+            if (existing == null) {
+                isSet = true;
+                REQUEST.set(request);
+            }
             return callable.call();
         } finally {
-            REQUEST.remove();
+            if (isSet) {
+                REQUEST.remove();
+            }
         }
     }
 

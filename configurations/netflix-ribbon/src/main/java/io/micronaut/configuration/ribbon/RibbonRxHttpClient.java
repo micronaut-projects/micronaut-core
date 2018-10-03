@@ -34,6 +34,7 @@ import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.ssl.NettyClientSslBuilder;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.reactivex.Flowable;
 import rx.Observable;
@@ -117,12 +118,13 @@ public class RibbonRxHttpClient extends DefaultHttpClient {
     @Override
     public <I, O, E> Flowable<HttpResponse<O>> exchange(HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
         if (loadBalancer != null) {
+            final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
             LoadBalancerCommand<HttpResponse<O>> loadBalancerCommand = buildLoadBalancerCommand();
             Observable<HttpResponse<O>> requestOperation = loadBalancerCommand.submit(server -> {
                 URI newURI = loadBalancer.getLoadBalancerContext().reconstructURIWithServer(server, resolveRequestURI(request.getUri()));
                 return RxJavaInterop.toV1Observable(
                         Flowable.fromPublisher(Publishers.just(newURI))
-                                .switchMap(super.buildExchangePublisher(request, bodyType, errorType))
+                                .switchMap(super.buildExchangePublisher(parentRequest, request, bodyType, errorType))
                 );
             });
 
