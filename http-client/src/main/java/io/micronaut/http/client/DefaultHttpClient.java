@@ -43,6 +43,7 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.client.exceptions.*;
+import io.micronaut.http.client.filters.ClientServerContextFilter;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.sse.RxSseClient;
 import io.micronaut.http.client.ssl.NettyClientSslBuilder;
@@ -50,6 +51,8 @@ import io.micronaut.http.client.websocket.NettyWebSocketClientHandler;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.context.ServerRequestContext;
+import io.micronaut.http.context.ServerRequestTracingPublisher;
 import io.micronaut.http.filter.ClientFilterChain;
 import io.micronaut.http.filter.HttpClientFilter;
 import io.micronaut.http.multipart.MultipartException;
@@ -126,6 +129,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 /**
  * Default implementation of the {@link HttpClient} interface based on Netty.
@@ -669,8 +673,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
     @Override
     public <I, O> Flowable<O> jsonStream(io.micronaut.http.HttpRequest<I> request, io.micronaut.core.type.Argument<O> type) {
+        final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         return Flowable.fromPublisher(resolveRequestURI(request))
-                .flatMap(buildJsonStreamPublisher(request, type));
+                .flatMap(buildJsonStreamPublisher(parentRequest, request, type));
     }
 
     @SuppressWarnings("unchecked")
@@ -687,9 +692,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
     @Override
     public <I, O, E> Flowable<io.micronaut.http.HttpResponse<O>> exchange(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
+        final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         Publisher<URI> uriPublisher = resolveRequestURI(request);
         return Flowable.fromPublisher(uriPublisher)
-                .switchMap(buildExchangePublisher(request, bodyType, errorType));
+                .switchMap(buildExchangePublisher(parentRequest, request, bodyType, errorType));
     }
 
     @Override
@@ -804,8 +810,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @return A {@link Function}
      */
     protected <I> Function<URI, Flowable<io.micronaut.http.HttpResponse<ByteBuffer<?>>>> buildExchangeStreamPublisher(io.micronaut.http.HttpRequest<I> request) {
+        final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         return requestURI -> {
-            Flowable<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = buildStreamExchange(request, requestURI);
+            Flowable<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = buildStreamExchange(parentRequest, request, requestURI);
             return streamResponsePublisher.switchMap(response -> {
                 if (!(response instanceof NettyStreamedHttpResponse)) {
                     throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
@@ -827,15 +834,16 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     /**
+     * @param parentRequest The parent request
      * @param request The request
      * @param type    The type
      * @param <I>     The input type
      * @param <O>     The output type
      * @return A {@link Function}
      */
-    protected <I, O> Function<URI, Flowable<O>> buildJsonStreamPublisher(io.micronaut.http.HttpRequest<I> request, io.micronaut.core.type.Argument<O> type) {
+    protected <I, O> Function<URI, Flowable<O>> buildJsonStreamPublisher(io.micronaut.http.HttpRequest<?> parentRequest, io.micronaut.http.HttpRequest<I> request, io.micronaut.core.type.Argument<O> type) {
         return requestURI -> {
-            Flowable<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = buildStreamExchange(request, requestURI);
+            Flowable<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = buildStreamExchange(parentRequest, request, requestURI);
             return streamResponsePublisher.switchMap(response -> {
                 if (!(response instanceof NettyStreamedHttpResponse)) {
                     throw new IllegalStateException("Response has been wrapped in non streaming type. Do not wrap the response in client filters for stream requests");
@@ -880,8 +888,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @return A {@link Function}
      */
     protected <I> Function<URI, Flowable<ByteBuffer<?>>> buildDataStreamPublisher(io.micronaut.http.HttpRequest<I> request) {
+        final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
         return requestURI -> {
-            Flowable<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = buildStreamExchange(request, requestURI);
+            Flowable<io.micronaut.http.HttpResponse<Object>> streamResponsePublisher = buildStreamExchange(parentRequest, request, requestURI);
             Function<HttpContent, ByteBuffer<?>> contentMapper = message -> {
                 ByteBuf byteBuf = message.content();
                 return byteBufferFactory.wrap(byteBuf);
@@ -898,13 +907,17 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     /**
+     * @param parentRequest The parent request
      * @param request    The request
      * @param requestURI The request URI
      * @param <I>        The input type
      * @return A {@link Flowable}
      */
     @SuppressWarnings("MagicNumber")
-    protected <I> Flowable<io.micronaut.http.HttpResponse<Object>> buildStreamExchange(io.micronaut.http.HttpRequest<I> request, URI requestURI) {
+    protected <I> Flowable<io.micronaut.http.HttpResponse<Object>> buildStreamExchange(
+            io.micronaut.http.HttpRequest<?> parentRequest,
+            io.micronaut.http.HttpRequest<I> request,
+            URI requestURI) {
         SslContext sslContext = buildSslContext(requestURI);
 
         AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request);
@@ -921,7 +934,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                 if (f.isSuccess()) {
                                     Channel channel = f.channel();
 
-                                    streamRequestThroughChannel(requestURI, requestWrapper, emitter, channel);
+                                    streamRequestThroughChannel(parentRequest, requestURI, requestWrapper, emitter, channel);
                                 } else {
                                     Throwable cause = f.cause();
                                     emitter.onError(
@@ -931,9 +944,10 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             });
                 }, BackpressureStrategy.BUFFER
         );
+
         // apply filters
         streamResponsePublisher = Flowable.fromPublisher(
-                applyFilterToResponsePublisher(request, requestURI, requestWrapper, streamResponsePublisher)
+                applyFilterToResponsePublisher(parentRequest, request, requestURI, requestWrapper, streamResponsePublisher)
         );
 
         return streamResponsePublisher.subscribeOn(scheduler);
@@ -943,12 +957,17 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @param <I>       The input type
      * @param <O>       The output type
      * @param <E>       The error type
+     * @param parentRequest The parent request
      * @param request   The request
      * @param bodyType  The body type
      * @param errorType The error type
      * @return A {@link Function}
      */
-    protected <I, O, E> Function<URI, Publisher<? extends io.micronaut.http.HttpResponse<O>>> buildExchangePublisher(io.micronaut.http.HttpRequest<I> request, Argument<O> bodyType, Argument<E> errorType) {
+    protected <I, O, E> Function<URI, Publisher<? extends io.micronaut.http.HttpResponse<O>>> buildExchangePublisher(
+            io.micronaut.http.HttpRequest<?> parentRequest,
+            io.micronaut.http.HttpRequest<I> request,
+            Argument<O> bodyType,
+            Argument<E> errorType) {
         AtomicReference<io.micronaut.http.HttpRequest> requestWrapper = new AtomicReference<>(request);
         return requestURI -> {
             Flowable<io.micronaut.http.HttpResponse<O>> responsePublisher = Flowable.create(emitter -> {
@@ -1010,7 +1029,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
             }, BackpressureStrategy.ERROR);
 
-            Publisher<io.micronaut.http.HttpResponse<O>> finalPublisher = applyFilterToResponsePublisher(request, requestURI, requestWrapper, responsePublisher);
+            Publisher<io.micronaut.http.HttpResponse<O>> finalPublisher = applyFilterToResponsePublisher(parentRequest, request, requestURI, requestWrapper, responsePublisher);
             Flowable<io.micronaut.http.HttpResponse<O>> finalFlowable;
             if (finalPublisher instanceof Flowable) {
                 finalFlowable = (Flowable<io.micronaut.http.HttpResponse<O>>) finalPublisher;
@@ -1218,12 +1237,20 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     /**
      * Resolve the filters for the request path.
      *
+     *
+     * @param parentRequest The parent request
      * @param request    The path
      * @param requestURI The URI of the request
      * @return The filters
      */
-    protected List<HttpClientFilter> resolveFilters(io.micronaut.http.HttpRequest<?> request, URI requestURI) {
+    protected List<HttpClientFilter> resolveFilters(
+            @Nullable io.micronaut.http.HttpRequest<?> parentRequest,
+            io.micronaut.http.HttpRequest<?> request,
+            URI requestURI) {
         List<HttpClientFilter> filterList = new ArrayList<>();
+        if (parentRequest != null) {
+            filterList.add(new ClientServerContextFilter(parentRequest));
+        }
         String requestPath = requestURI.getPath();
         io.micronaut.http.HttpMethod method = request.getMethod();
         for (HttpClientFilter filter : filters) {
@@ -1300,6 +1327,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     /**
+     * @param parentRequest     The parent request
      * @param request           The request
      * @param requestURI        The URI of the request
      * @param requestWrapper    The request wrapper
@@ -1309,22 +1337,30 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
      * @return The {@link Publisher} for the response
      */
     protected <I, O> Publisher<io.micronaut.http.HttpResponse<O>> applyFilterToResponsePublisher(
+            io.micronaut.http.HttpRequest<?> parentRequest,
             io.micronaut.http.HttpRequest<I> request,
             URI requestURI,
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
             Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher) {
+
         if (CollectionUtils.isNotEmpty(filters)) {
-            List<HttpClientFilter> httpClientFilters = resolveFilters(request, requestURI);
+            List<HttpClientFilter> httpClientFilters = resolveFilters(parentRequest, request, requestURI);
             OrderUtil.reverseSort(httpClientFilters);
-            httpClientFilters.add((req, chain) -> responsePublisher);
+            Publisher<io.micronaut.http.HttpResponse<O>> finalResponsePublisher = responsePublisher;
+            httpClientFilters.add((req, chain) -> finalResponsePublisher);
 
             ClientFilterChain filterChain = buildChain(requestWrapper, httpClientFilters);
-            return (Publisher<io.micronaut.http.HttpResponse<O>>) httpClientFilters.get(0)
-                    .doFilter(request, filterChain);
-        } else {
-
-            return responsePublisher;
+            if (parentRequest != null) {
+                responsePublisher = ServerRequestContext.with(parentRequest, (Supplier<Publisher<io.micronaut.http.HttpResponse<O>>>) () ->
+                        (Publisher<io.micronaut.http.HttpResponse<O>>) httpClientFilters.get(0)
+                                                                                        .doFilter(request, filterChain));
+            } else {
+                responsePublisher = (Publisher<io.micronaut.http.HttpResponse<O>>) httpClientFilters.get(0)
+                        .doFilter(request, filterChain);
+            }
         }
+
+        return responsePublisher;
     }
 
     /**
@@ -1502,6 +1538,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     private void streamRequestThroughChannel(
+            io.micronaut.http.HttpRequest<?> parentRequest,
             URI requestURI,
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
             FlowableEmitter<io.micronaut.http.HttpResponse<Object>> emitter,
@@ -1537,7 +1574,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         try {
                             MutableHttpRequest<Object> redirectRequest = io.micronaut.http.HttpRequest.GET(location);
                             redirectedExchange = Flowable.fromPublisher(resolveRequestURI(redirectRequest))
-                                    .flatMap(uri -> buildStreamExchange(redirectRequest, uri));
+                                    .flatMap(uri -> buildStreamExchange(parentRequest, redirectRequest, uri));
 
                             //noinspection SubscriberImplementation
                             redirectedExchange.subscribe(new Subscriber<io.micronaut.http.HttpResponse<Object>>() {

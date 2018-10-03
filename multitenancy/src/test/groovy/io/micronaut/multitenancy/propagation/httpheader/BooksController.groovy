@@ -6,6 +6,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.security.annotation.Secured
 import io.micronaut.security.rules.SecurityRule
+import io.reactivex.Flowable
 
 @Requires(property = 'spec.name', value = 'multitenancy.httpheader.gorm')
 @CompileStatic
@@ -20,8 +21,7 @@ class BooksController {
 
     @Secured(SecurityRule.IS_AUTHENTICATED)
     @Get("/books")
-    List<String> books() {
-        List<Book> books = bookService.list()
-        books*.title
+    Flowable<Book> books() {
+        Flowable.fromIterable(bookService.list())
     }
 }
