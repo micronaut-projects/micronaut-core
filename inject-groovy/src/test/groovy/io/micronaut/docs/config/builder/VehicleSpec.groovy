@@ -26,7 +26,7 @@ class VehicleSpec extends Specification {
         ApplicationContext applicationContext = ApplicationContext.run(
                 ['my.engine.cylinders':'4',
                  'my.engine.manufacturer': 'Subaru',
-                 'my.engine.crankShaft.rodLength': 4],
+                 'my.engine.crank-shaft.rod-length': 4],
                 "test"
         )
 
