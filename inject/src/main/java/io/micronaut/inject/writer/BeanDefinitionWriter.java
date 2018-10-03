@@ -64,7 +64,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
 
 /**
  * <p>Responsible for building {@link BeanDefinition} instances at compile time. Uses ASM build the class definition.</p>
@@ -1034,7 +1033,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             ConfigurationMetadataBuilder<?> metadataBuilder = currentConfigBuilderState.getMetadataBuilder();
             GeneratorAdapter injectMethodVisitor = this.injectMethodVisitor;
 
-            String propertyName = NameUtils.decapitalize(methodName.substring(prefix.length()));
+            String propertyName = NameUtils.hyphenate(NameUtils.decapitalize(methodName.substring(prefix.length())), true);
             // at some point we may want to support nested builders, hence the arrays and property path resolution
             String[] propertyPath;
             if (StringUtils.isNotEmpty(configurationPrefix)) {
@@ -1048,7 +1047,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             // visit the property metadata
             metadataBuilder.visitProperty(
                 paramTypeRef != null ? paramTypeRef.getClassName() : Boolean.class.getName(),
-                Arrays.stream(propertyPath).collect(Collectors.joining(".")),
+                    String.join(".", propertyPath),
                 null,
                 null
             );
@@ -1063,16 +1062,14 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             ));
             injectMethodVisitor.push(false);
             injectMethodVisitor.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.EQ, ifEnd);
-            injectMethodVisitor.visitLabel(new Label());
-
-            injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
-
-            if (isResolveBuilderViaMethodCall) {
-                String desc = builderType.getClassName() + " " + builderName + "()";
-                injectMethodVisitor.invokeVirtual(beanType, org.objectweb.asm.commons.Method.getMethod(desc));
-            } else {
-                injectMethodVisitor.getField(beanType, builderName, builderType);
+            if (zeroArgs) {
+                pushOptionalGet(injectMethodVisitor);
+                pushCastToType(injectMethodVisitor, boolean.class);
+                injectMethodVisitor.push(false);
+                injectMethodVisitor.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.EQ, ifEnd);
             }
+
+            injectMethodVisitor.visitLabel(new Label());
 
             String methodDescriptor;
             if (zeroArgs) {
@@ -1082,29 +1079,32 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             } else {
                 methodDescriptor = getMethodDescriptor(returnType, Collections.singleton(paramType));
             }
-            injectMethodVisitor.visitVarInsn(ALOAD, optionalInstanceIndex);
-            // get the value: optional.get()
-            injectMethodVisitor.invokeVirtual(Type.getType(Optional.class), org.objectweb.asm.commons.Method.getMethod(
-                ReflectionUtils.getRequiredMethod(Optional.class, "get")
-            ));
-            pushCastToType(injectMethodVisitor, !zeroArgs ? paramType : boolean.class);
 
             Label tryStart = new Label();
             Label tryEnd = new Label();
             Label exceptionHandler = new Label();
+            injectMethodVisitor.visitTryCatchBlock(tryStart, tryEnd, exceptionHandler, Type.getInternalName(NoSuchMethodError.class));
 
             injectMethodVisitor.visitLabel(tryStart);
+
+            injectMethodVisitor.visitVarInsn(ALOAD, injectInstanceIndex);
+            if (isResolveBuilderViaMethodCall) {
+                String desc = builderType.getClassName() + " " + builderName + "()";
+                injectMethodVisitor.invokeVirtual(beanType, org.objectweb.asm.commons.Method.getMethod(desc));
+            } else {
+                injectMethodVisitor.getField(beanType, builderName, builderType);
+            }
+
+            if (!zeroArgs) {
+                pushOptionalGet(injectMethodVisitor);
+                pushCastToType(injectMethodVisitor, paramType);
+            }
+
             if (zeroArgs) {
-                Label zeroArgsEnd = new Label();
-                injectMethodVisitor.push(false);
-                injectMethodVisitor.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.EQ, zeroArgsEnd);
-                injectMethodVisitor.visitLabel(new Label());
                 injectMethodVisitor.invokeVirtual(
                     builderType,
                     new org.objectweb.asm.commons.Method(methodName, methodDescriptor)
                 );
-
-                injectMethodVisitor.visitLabel(zeroArgsEnd);
             } else if (isDurationWithTimeUnit) {
                 injectMethodVisitor.invokeVirtual(Type.getType(Duration.class), org.objectweb.asm.commons.Method.getMethod(
                     ReflectionUtils.getRequiredMethod(Duration.class, "toMillis")
@@ -1128,23 +1128,33 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             injectMethodVisitor.visitJumpInsn(GOTO, tryEnd);
             injectMethodVisitor.visitLabel(exceptionHandler);
             injectMethodVisitor.pop();
-            injectMethodVisitor.loadThis();
-            injectMethodVisitor.push(builderType);
-            injectMethodVisitor.push(methodName);
-            injectMethodVisitor.push(propertyName);
-            pushInvokeMethodOnSuperClass(injectMethodVisitor, ReflectionUtils.getRequiredInternalMethod(
-                AbstractBeanDefinition.class,
-                "warnMissingProperty",
-                Class.class,
-                String.class,
-                String.class
-            ));
+
+//          Ignore the exception, currently if the property has been removed from the builder makes no sense to set it
+//          it would be good to log the exception, but unfortunately, this hits a Graal limitation
+//            injectMethodVisitor.push(builderType);
+//            injectMethodVisitor.push(methodName);
+//            injectMethodVisitor.push(propertyName);
+//            injectMethodVisitor.invokeStatic(
+//                    Type.getType(RuntimeUtils.class),
+//                    org.objectweb.asm.commons.Method.getMethod(ReflectionUtils.getRequiredInternalMethod(
+//                            RuntimeUtils.class,
+//                            "warnMissingProperty",
+//                            Class.class,
+//                            String.class,
+//                            String.class
+//                    )));
 
             injectMethodVisitor.visitLabel(tryEnd);
-            injectMethodVisitor.visitTryCatchBlock(tryStart, tryEnd, exceptionHandler, Type.getInternalName(NoSuchMethodError.class));
-
             injectMethodVisitor.visitLabel(ifEnd);
         }
+    }
+
+    private void pushOptionalGet(GeneratorAdapter injectMethodVisitor) {
+        injectMethodVisitor.visitVarInsn(ALOAD, optionalInstanceIndex);
+        // get the value: optional.get()
+        injectMethodVisitor.invokeVirtual(Type.getType(Optional.class), org.objectweb.asm.commons.Method.getMethod(
+                ReflectionUtils.getRequiredMethod(Optional.class, "get")
+        ));
     }
 
     private void pushGetValueForPathCall(GeneratorAdapter injectMethodVisitor, Object propertyType, String propertyName, String[] propertyPath, boolean zeroArgs, Map<String, Object> generics) {

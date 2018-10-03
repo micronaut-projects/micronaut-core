@@ -18,6 +18,7 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -205,6 +206,7 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
      * @param <T>            The generic type
      * @return The argument instance
      */
+    @UsedByGeneratedCode
     static <T> Argument<T> of(
         Class<T> type,
         String name,
@@ -222,6 +224,7 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
      * @param <T>                The generic type
      * @return The argument instance
      */
+    @UsedByGeneratedCode
     static <T> Argument<T> of(
         Class<T> type,
         String name,
@@ -238,6 +241,7 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
      * @param <T>  The generic type
      * @return The argument instance
      */
+    @UsedByGeneratedCode
     static <T> Argument<T> of(
         Class<T> type,
         String name) {
@@ -252,6 +256,7 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
      * @param <T>            The generic type
      * @return The argument instance
      */
+    @UsedByGeneratedCode
     static <T> Argument<T> of(
         Class<T> type, @Nullable Argument... typeParameters) {
         return new DefaultArgument<>(type, type.getSimpleName(), AnnotationMetadata.EMPTY_METADATA, typeParameters);
@@ -264,6 +269,7 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
      * @param <T>  The generic type
      * @return The argument instance
      */
+    @UsedByGeneratedCode
     static <T> Argument<T> of(
         Class<T> type) {
         return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), AnnotationMetadata.EMPTY_METADATA, Argument.ZERO_ARGUMENTS);
@@ -277,6 +283,7 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
      * @param <T>            The generic type
      * @return The argument instance
      */
+    @UsedByGeneratedCode
     static <T> Argument<T> of(Class<T> type, @Nullable Class<?>... typeParameters) {
         if (typeParameters == null) {
             return of(type);

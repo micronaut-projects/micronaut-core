@@ -16,6 +16,7 @@
 
 package io.micronaut.core.util;
 
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.convert.ConversionService;
 
 import javax.annotation.Nullable;
@@ -106,6 +107,7 @@ public class CollectionUtils {
      * @param values The values
      * @return The created map
      */
+    @UsedByGeneratedCode
     public static Map mapOf(Object... values) {
         int len = values.length;
         if (len % 2 != 0) {
