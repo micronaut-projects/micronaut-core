@@ -1030,7 +1030,7 @@ public class MicronautConsole implements ConsoleLogger {
     private Ansi ansiPrompt(String prompt) {
         return ansi()
             .a(Ansi.Attribute.INTENSITY_BOLD)
-            .fg(BLUE)
+            .fgBright(BLUE)
             .a(prompt)
             .a(Ansi.Attribute.INTENSITY_BOLD_OFF)
             .fg(DEFAULT);
@@ -1079,7 +1079,7 @@ public class MicronautConsole implements ConsoleLogger {
     private Ansi outputCategory(Ansi ansi, String categoryName) {
         return ansi
             .a(Ansi.Attribute.INTENSITY_BOLD)
-            .fg(BLUE)
+            .fgBright(BLUE)
             .a(categoryName)
             .a(SPACE)
             .a(Ansi.Attribute.INTENSITY_BOLD_OFF);

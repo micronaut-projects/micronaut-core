@@ -40,6 +40,7 @@ import io.micronaut.web.router.exceptions.RoutingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import javax.inject.Qualifier;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -193,7 +194,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     @Override
     public StatusRoute status(HttpStatus status, Class type, String method, Class[] parameterTypes) {
         // do not allow multiple @Error global routes defined for one status
-        if (this.statusRoutes.stream().anyMatch((route) -> route.status() == status)) {
+        if (this.statusRoutes.stream().anyMatch((route) -> route.status() == status && route.originatingType() == null)) {
             throw new RoutingException("Attempted to register multiple global routes for http status " + String.valueOf(status.getCode()));
         }
         Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
@@ -209,6 +210,9 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public ErrorRoute error(Class originatingClass, Class<? extends Throwable> error, Class type, String method, Class[] parameterTypes) {
+        if (this.errorRoutes.stream().anyMatch((route) -> route.exceptionType() == error && route.originatingType() == originatingClass)) {
+            throw new RoutingException("Attempted to register multiple local error routes for exception " + error.getName());
+        }
         Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
@@ -222,6 +226,9 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public ErrorRoute error(Class<? extends Throwable> error, Class type, String method, Class[] parameterTypes) {
+        if (this.errorRoutes.stream().anyMatch((route) -> route.exceptionType() == error && route.originatingType() == null)) {
+            throw new RoutingException("Attempted to register multiple global error routes for exception " + error.getName());
+        }
         Optional<MethodExecutionHandle<?, Object>> executionHandle = executionHandleLocator.findExecutionHandle(type, method, parameterTypes);
 
         MethodExecutionHandle<?, Object> executableHandle = executionHandle.orElseThrow(() ->
@@ -511,6 +518,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
+        @Nullable
         public Class<?> originatingType() {
             return originatingClass;
         }
@@ -643,6 +651,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
+        @Nullable
         public Class<?> originatingType() {
             return originatingClass;
         }

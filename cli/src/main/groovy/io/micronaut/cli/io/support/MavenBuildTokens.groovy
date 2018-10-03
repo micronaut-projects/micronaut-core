@@ -146,7 +146,11 @@ class MavenBuildTokens extends BuildTokens {
             annotationProcessorPathsXml."$methodToCall" {
                 groupId(artifact.groupId)
                 artifactId(artifact.artifactId)
-                version("\${micronaut.version}")
+                if (artifact.groupId.startsWith("io.micronaut")) {
+                    version("\${micronaut.version}")
+                } else {
+                    version(artifact.version)
+                }
             }
         }
 
