@@ -49,12 +49,12 @@ public @interface Write {
     /**
      * @return The produced MediaType values. Defaults to application/json
      */
-    @AliasFor(annotation = Produces.class, value = "value")
+    @AliasFor(annotation = Produces.class, member = "value")
     String[] produces() default MediaType.APPLICATION_JSON;
 
     /**
      * @return The consumed MediaType for request bodies Defaults to application/json
      */
-    @AliasFor(annotation = Consumes.class, value = "value")
+    @AliasFor(annotation = Consumes.class, member = "value")
     String[] consumes() default MediaType.APPLICATION_JSON;
 }
