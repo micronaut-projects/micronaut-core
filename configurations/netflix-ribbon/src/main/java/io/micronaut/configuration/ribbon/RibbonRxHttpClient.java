@@ -172,12 +172,13 @@ public class RibbonRxHttpClient extends DefaultHttpClient {
     @Override
     public <I, O> Flowable<O> jsonStream(HttpRequest<I> request, Argument<O> type) {
         if (loadBalancer != null) {
+            final io.micronaut.http.HttpRequest<Object> parentRequest = ServerRequestContext.currentRequest().orElse(null);
             LoadBalancerCommand<O> loadBalancerCommand = buildLoadBalancerCommand();
             Observable<O> requestOperation = loadBalancerCommand.submit(server -> {
                 URI newURI = loadBalancer.getLoadBalancerContext().reconstructURIWithServer(server, resolveRequestURI(request.getUri()));
                 return RxJavaInterop.toV1Observable(
                     Flowable.fromPublisher(Publishers.just(newURI))
-                        .switchMap(super.buildJsonStreamPublisher(request, type))
+                        .switchMap(super.buildJsonStreamPublisher(parentRequest, request, type))
                 );
             });
             return RxJavaInterop.toV2Flowable(requestOperation);
