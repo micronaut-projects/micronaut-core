@@ -142,7 +142,7 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     }
 
     @Override
-    public List<String> getDeclaredAnnotationNamesTypeByStereotype(String stereotype) {
+    public List<String> getDeclaredAnnotationNamesByStereotype(String stereotype) {
         return annotationMetadata.getAnnotationNamesByStereotype(stereotype);
     }
 

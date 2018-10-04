@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
+import java.lang.annotation.Annotation;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -46,6 +47,15 @@ class DefaultCustomScopeRegistry implements CustomScopeRegistry {
     DefaultCustomScopeRegistry(BeanLocator beanLocator, ClassLoader classLoader) {
         this.beanLocator = beanLocator;
         this.classLoader = classLoader;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public Optional<CustomScope> findScope(Class<? extends Annotation> scopeAnnotation) {
+        return scopes.computeIfAbsent(scopeAnnotation.getName(), s -> {
+            final Qualifier qualifier = Qualifiers.byTypeArguments(scopeAnnotation);
+            return beanLocator.findBean(CustomScope.class, qualifier);
+        });
     }
 
     @SuppressWarnings("unchecked")
