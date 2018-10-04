@@ -50,7 +50,14 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
      */
     public static final String GRAAL_CLASS_ANALYSIS = "graalvm.class.analysis";
 
-    private static final String NETTY_TYPE = "io.netty.channel.socket.nio.NioServerSocketChannel";
+    // a list of known types that are defined in META-INF/services and loaded dynamically
+    // future versions of Graal may support META-INF/services and this can be removed
+    private static final List<String> KNOWN_TYPES = Arrays.asList(
+            "io.netty.channel.socket.nio.NioServerSocketChannel",
+            "io.micronaut.http.netty.cookies.NettyCookieFactory",
+            "io.micronaut.http.client.NettyClientHttpRequestFactory",
+            "io.micronaut.http.server.netty.NettyHttpResponseFactory"
+    );
     private final Set<String> classes = new ConcurrentSkipListSet<>();
     private final Set<String> beans = new ConcurrentSkipListSet<>();
     private final Set<String> arrays = new ConcurrentSkipListSet<>();
@@ -59,7 +66,7 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
      * Default constructor.
      */
     public GraalClassLoadingReporter() {
-        classes.add(NETTY_TYPE);
+        classes.addAll(KNOWN_TYPES);
         List<Class<?>> knownReactiveTypes = Publishers.getKnownReactiveTypes();
         for (Class<?> knownReactiveType : knownReactiveTypes) {
             classes.add(knownReactiveType.getName());
@@ -142,8 +149,10 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
         if (!file.exists()) {
             ClassLoader cls = GraalClassLoadingReporter.class.getClassLoader();
 
-            if (!ClassUtils.isPresent(NETTY_TYPE, cls)) {
-                classes.remove(NETTY_TYPE);
+            for (String knownType : KNOWN_TYPES) {
+                if (!ClassUtils.isPresent(knownType, cls)) {
+                    classes.remove(knownType);
+                }
             }
 
             if (ClassUtils.isPresent("io.netty.channel.socket.nio.NioSocketChannel", cls)) {
@@ -155,9 +164,9 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
             }
 
             List<Map> json = classes.stream().map(s -> {
-                if (s.equals(NETTY_TYPE)) {
+                if (s.equals(KNOWN_TYPES)) {
                     return CollectionUtils.mapOf(
-                            "name", NETTY_TYPE,
+                            "name", KNOWN_TYPES,
                             "methods", Arrays.asList(
                                     CollectionUtils.mapOf(
                                             "name", "<init>",

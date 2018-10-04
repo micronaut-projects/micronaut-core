@@ -74,7 +74,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             ReflectionUtils.getRequiredInternalMethod(
                     DefaultAnnotationMetadata.class,
                     "registerAnnotationDefaults",
-                    String.class,
+                    AnnotationClassValue.class,
                     Map.class
             )
     );
@@ -124,6 +124,25 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
 
     private final String className;
     private final DefaultAnnotationMetadata annotationMetadata;
+    private final boolean writeAnnotationDefaults;
+
+    /**
+     * Constructs a new writer for the given class name and metadata.
+     *
+     * @param className          The class name for which the metadata relates
+     * @param annotationMetadata The annotation metadata
+     * @param writeAnnotationDefaults Whether annotations defaults should be written
+     */
+    public AnnotationMetadataWriter(String className, AnnotationMetadata annotationMetadata, boolean writeAnnotationDefaults) {
+        this.className = className + AnnotationMetadata.CLASS_NAME_SUFFIX;
+        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+            this.annotationMetadata = (DefaultAnnotationMetadata) annotationMetadata;
+        } else {
+            throw new ClassGenerationException("Compile time metadata required to generate class: " + className);
+        }
+        this.writeAnnotationDefaults = writeAnnotationDefaults;
+    }
+
 
     /**
      * Constructs a new writer for the given class name and metadata.
@@ -132,14 +151,8 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
      * @param annotationMetadata The annotation metadata
      */
     public AnnotationMetadataWriter(String className, AnnotationMetadata annotationMetadata) {
-        this.className = className + AnnotationMetadata.CLASS_NAME_SUFFIX;
-        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
-            this.annotationMetadata = (DefaultAnnotationMetadata) annotationMetadata;
-        } else {
-            throw new ClassGenerationException("Compile time metadata required to generate class: " + className);
-        }
+        this(className, annotationMetadata, false);
     }
-
     /**
      * @return The class name that this metadata will generate
      */
@@ -198,12 +211,12 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
      * @param loadTypeMethods      Generated methods that load types
      */
     @Internal
-    private static void pushAnnotationAttributes(Type declaringType, ClassVisitor declaringClassWriter, GeneratorAdapter generatorAdapter, Map<CharSequence, Object> annotationData, Map<String, GeneratorAdapter> loadTypeMethods) {
+    private static void pushAnnotationAttributes(Type declaringType, ClassVisitor declaringClassWriter, GeneratorAdapter generatorAdapter, Map<? extends CharSequence, Object> annotationData, Map<String, GeneratorAdapter> loadTypeMethods) {
         int totalSize = annotationData.size() * 2;
         // start a new array
         pushNewArray(generatorAdapter, Object.class, totalSize);
         int i = 0;
-        for (Map.Entry<CharSequence, Object> entry : annotationData.entrySet()) {
+        for (Map.Entry<? extends CharSequence, Object> entry : annotationData.entrySet()) {
             // use the property name as the key
             String memberName = entry.getKey().toString();
             pushStoreStringInArray(generatorAdapter, i++, totalSize, memberName);
@@ -259,13 +272,13 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         constructor.visitMaxs(1, 1);
         constructor.visitEnd();
 
-        Map<String, Map<CharSequence, Object>> annotationDefaultValues = annotationMetadata.annotationDefaultValues;
-        if (annotationDefaultValues != null) {
+        final Map<String, Map<String, Object>> annotationDefaultValues = AnnotationMetadataSupport.ANNOTATION_DEFAULTS;
+        if (writeAnnotationDefaults && !annotationDefaultValues.isEmpty()) {
 
             MethodVisitor si = classWriter.visitMethod(ACC_STATIC, "<clinit>", "()V", null, null);
             GeneratorAdapter staticInit = new GeneratorAdapter(si, ACC_STATIC, "<clinit>", "()V");
 
-            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationDefaultValues.entrySet()) {
+            for (Map.Entry<String, Map<String, Object>> entry : annotationDefaultValues.entrySet()) {
                 String annotationName = entry.getKey();
 
                 Label falseCondition = new Label();
@@ -276,8 +289,9 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 staticInit.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.EQ, falseCondition);
                 staticInit.visitLabel(new Label());
 
-                staticInit.push(annotationName);
-                pushAnnotationAttributes(owningType, classWriter, staticInit, entry.getValue(), loadTypeMethods);
+                invokeLoadClassValueMethod(owningType, classWriter, staticInit, loadTypeMethods, new AnnotationClassValue(annotationName));
+                final Map<String, Object> value = entry.getValue();
+                pushAnnotationAttributes(owningType, classWriter, staticInit, value, loadTypeMethods);
                 staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_ANNOTATION_DEFAULTS);
                 staticInit.visitLabel(falseCondition);
             }
@@ -285,6 +299,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
 
             staticInit.visitMaxs(1, 1);
             staticInit.visitEnd();
+            annotationDefaultValues.clear();
         }
         for (GeneratorAdapter adapter : loadTypeMethods.values()) {
             adapter.visitMaxs(3, 1);
@@ -376,56 +391,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             methodVisitor.push(value.toString());
         } else if (value instanceof AnnotationClassValue) {
             AnnotationClassValue acv = (AnnotationClassValue) value;
-            final String typeName = acv.getName();
-            final String desc = getMethodDescriptor(AnnotationClassValue.class, Collections.emptyList());
-            final GeneratorAdapter loadTypeGeneratorMethod = loadTypeMethods.computeIfAbsent(typeName, type -> {
-                final String methodName = "$micronaut_load_class_value_" + loadTypeMethods.size();
-                final GeneratorAdapter loadTypeGenerator = new GeneratorAdapter(declaringClassWriter.visitMethod(
-                        ACC_STATIC,
-                        methodName,
-                        desc,
-                        null,
-                        null
-
-                ), ACC_STATIC, methodName, desc);
-
-                Label tryStart = new Label();
-                Label tryEnd = new Label();
-                Label exceptionHandler = new Label();
-
-                // This logic will generate a method such as the following, allowing non dynamic classloading:
-                //
-                // AnnotationClassValue $micronaut_load_class_value_0() {
-                //     try {
-                //          return new AnnotationClassValue(test.MyClass.class);
-                //     } catch(Throwable e) {
-                //          return new AnnotationClassValue("test.MyClass");
-                //     }
-                // }
-
-                loadTypeGenerator.visitTryCatchBlock(tryStart, tryEnd, exceptionHandler, Type.getInternalName(Throwable.class));
-                loadTypeGenerator.visitLabel(tryStart);
-                loadTypeGenerator.visitTypeInsn(NEW, TYPE_ANNOTATION_CLASS_VALUE.getInternalName());
-                loadTypeGenerator.visitInsn(DUP);
-                loadTypeGenerator.push(getTypeReferenceForName(value.toString()));
-                loadTypeGenerator.invokeConstructor(TYPE_ANNOTATION_CLASS_VALUE, CONSTRUCTOR_CLASS_VALUE_WITH_CLASS);
-                loadTypeGenerator.visitLabel(tryEnd);
-                loadTypeGenerator.returnValue();
-                loadTypeGenerator.visitLabel(exceptionHandler);
-                // Try load the class
-
-                // fallback to return a class value that is just a string
-                loadTypeGenerator.visitVarInsn(ASTORE, 0);
-                loadTypeGenerator.visitTypeInsn(NEW, TYPE_ANNOTATION_CLASS_VALUE.getInternalName());
-                loadTypeGenerator.visitInsn(DUP);
-                loadTypeGenerator.push(value.toString());
-                loadTypeGenerator.invokeConstructor(TYPE_ANNOTATION_CLASS_VALUE, CONSTRUCTOR_CLASS_VALUE);
-                loadTypeGenerator.returnValue();
-
-                return loadTypeGenerator;
-            });
-
-            methodVisitor.visitMethodInsn(Opcodes.INVOKESTATIC, declaringType.getInternalName(), loadTypeGeneratorMethod.getName(), desc, false);
+            invokeLoadClassValueMethod(declaringType, declaringClassWriter, methodVisitor, loadTypeMethods, acv);
         } else if (value instanceof Enum) {
             Enum enumObject = (Enum) value;
             Class declaringClass = enumObject.getDeclaringClass();
@@ -488,5 +454,63 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         } else {
             methodVisitor.visitInsn(ACONST_NULL);
         }
+    }
+
+    private static void invokeLoadClassValueMethod(
+            Type declaringType,
+            ClassVisitor declaringClassWriter,
+            GeneratorAdapter methodVisitor,
+            Map<String, GeneratorAdapter> loadTypeMethods,
+            AnnotationClassValue acv) {
+        final String typeName = acv.getName();
+        final String desc = getMethodDescriptor(AnnotationClassValue.class, Collections.emptyList());
+        final GeneratorAdapter loadTypeGeneratorMethod = loadTypeMethods.computeIfAbsent(typeName, type -> {
+            final String methodName = "$micronaut_load_class_value_" + loadTypeMethods.size();
+            final GeneratorAdapter loadTypeGenerator = new GeneratorAdapter(declaringClassWriter.visitMethod(
+                    ACC_STATIC,
+                    methodName,
+                    desc,
+                    null,
+                    null
+
+            ), ACC_STATIC, methodName, desc);
+
+            Label tryStart = new Label();
+            Label tryEnd = new Label();
+            Label exceptionHandler = new Label();
+
+            // This logic will generate a method such as the following, allowing non dynamic classloading:
+            //
+            // AnnotationClassValue $micronaut_load_class_value_0() {
+            //     try {
+            //          return new AnnotationClassValue(test.MyClass.class);
+            //     } catch(Throwable e) {
+            //          return new AnnotationClassValue("test.MyClass");
+            //     }
+            // }
+
+            loadTypeGenerator.visitTryCatchBlock(tryStart, tryEnd, exceptionHandler, Type.getInternalName(Throwable.class));
+            loadTypeGenerator.visitLabel(tryStart);
+            loadTypeGenerator.visitTypeInsn(NEW, TYPE_ANNOTATION_CLASS_VALUE.getInternalName());
+            loadTypeGenerator.visitInsn(DUP);
+            loadTypeGenerator.push(getTypeReferenceForName(typeName));
+            loadTypeGenerator.invokeConstructor(TYPE_ANNOTATION_CLASS_VALUE, CONSTRUCTOR_CLASS_VALUE_WITH_CLASS);
+            loadTypeGenerator.visitLabel(tryEnd);
+            loadTypeGenerator.returnValue();
+            loadTypeGenerator.visitLabel(exceptionHandler);
+            // Try load the class
+
+            // fallback to return a class value that is just a string
+            loadTypeGenerator.visitVarInsn(ASTORE, 0);
+            loadTypeGenerator.visitTypeInsn(NEW, TYPE_ANNOTATION_CLASS_VALUE.getInternalName());
+            loadTypeGenerator.visitInsn(DUP);
+            loadTypeGenerator.push(typeName);
+            loadTypeGenerator.invokeConstructor(TYPE_ANNOTATION_CLASS_VALUE, CONSTRUCTOR_CLASS_VALUE);
+            loadTypeGenerator.returnValue();
+
+            return loadTypeGenerator;
+        });
+
+        methodVisitor.visitMethodInsn(Opcodes.INVOKESTATIC, declaringType.getInternalName(), loadTypeGeneratorMethod.getName(), desc, false);
     }
 }
