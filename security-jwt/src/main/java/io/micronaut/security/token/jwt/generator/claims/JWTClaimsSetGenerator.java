@@ -17,13 +17,15 @@
 package io.micronaut.security.token.jwt.generator.claims;
 
 import com.nimbusds.jwt.JWTClaimsSet;
-import io.micronaut.context.annotation.Value;
+import io.micronaut.context.env.Environment;
+import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.security.authentication.UserDetails;
 import io.micronaut.security.token.config.TokenConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -45,9 +47,24 @@ public class JWTClaimsSetGenerator implements ClaimsGenerator {
     private final TokenConfiguration tokenConfiguration;
     private final JwtIdGenerator jwtIdGenerator;
     private final ClaimsAudienceProvider claimsAudienceProvider;
+    private final String appName;
 
-    @Value("${micronaut.application.name:micronaut}")
-    private String appName;
+    /**
+     * @param tokenConfiguration       Token Configuration
+     * @param jwtIdGenerator           Generator which creates unique JWT ID
+     * @param claimsAudienceProvider   Provider which identifies the recipients that the JWT is intended for.
+     * @param applicationConfiguration The application configuration
+     */
+    @Inject
+    public JWTClaimsSetGenerator(TokenConfiguration tokenConfiguration,
+                                 @Nullable JwtIdGenerator jwtIdGenerator,
+                                 @Nullable ClaimsAudienceProvider claimsAudienceProvider,
+                                 @Nullable ApplicationConfiguration applicationConfiguration) {
+        this.tokenConfiguration = tokenConfiguration;
+        this.jwtIdGenerator = jwtIdGenerator;
+        this.claimsAudienceProvider = claimsAudienceProvider;
+        this.appName = applicationConfiguration != null ? applicationConfiguration.getName().orElse(Environment.MICRONAUT) : Environment.MICRONAUT;
+    }
 
     /**
      * @param tokenConfiguration     Token Configuration
@@ -57,9 +74,7 @@ public class JWTClaimsSetGenerator implements ClaimsGenerator {
     public JWTClaimsSetGenerator(TokenConfiguration tokenConfiguration,
                                  @Nullable JwtIdGenerator jwtIdGenerator,
                                  @Nullable ClaimsAudienceProvider claimsAudienceProvider) {
-        this.tokenConfiguration = tokenConfiguration;
-        this.jwtIdGenerator = jwtIdGenerator;
-        this.claimsAudienceProvider = claimsAudienceProvider;
+        this(tokenConfiguration, jwtIdGenerator, claimsAudienceProvider, null);
     }
 
     /**
@@ -185,9 +200,9 @@ public class JWTClaimsSetGenerator implements ClaimsGenerator {
         JWTClaimsSet.Builder builder = new JWTClaimsSet.Builder();
         List<String> excludedClaims = Arrays.asList(JwtClaims.EXPIRATION_TIME, JwtClaims.ISSUED_AT, JwtClaims.NOT_BEFORE);
         for (String k : oldClaims.keySet()
-            .stream()
-            .filter(p -> !excludedClaims.contains(p))
-            .collect(Collectors.toList())) {
+                .stream()
+                .filter(p -> !excludedClaims.contains(p))
+                .collect(Collectors.toList())) {
             builder.claim(k, oldClaims.get(k));
         }
         populateExp(builder, expiration);
