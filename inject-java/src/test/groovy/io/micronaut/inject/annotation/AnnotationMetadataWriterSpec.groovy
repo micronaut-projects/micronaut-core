@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Type
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.retry.annotation.Recoverable
 
@@ -182,7 +183,7 @@ class Test {
         metadata.getValue(Requirements).get()[0] instanceof io.micronaut.core.annotation.AnnotationValue
         metadata.getValue(Requirements).get()[0].values.get('property') == 'blah'
         metadata.getValue(Requirements).get()[1] instanceof io.micronaut.core.annotation.AnnotationValue
-        metadata.getValue(Requirements).get()[1].values.get('classes') == ['test.Test'] as Object[]
+        metadata.getValue(Requirements).get()[1].values.get('classes') == [new AnnotationClassValue<>('test.Test')] as AnnotationClassValue[]
 
         when:
         Requires[] requires = metadata.synthesize(Requirements).value()
@@ -272,8 +273,8 @@ class Test {
         metadata != null
         metadata.hasAnnotation(Trace)
         metadata.getValue(Trace, "type").isPresent()
-        metadata.getValue(Trace, "type").get() == 'test.Test'
-        metadata.getValue(Trace, "types").get() == ['test.Test'] as Object[]
+        metadata.getValue(Trace, "type").get() == new AnnotationClassValue('test.Test')
+        metadata.getValue(Trace, "types").get() == [new AnnotationClassValue<>('test.Test')] as AnnotationClassValue[]
         metadata.hasStereotype(Trace)
         metadata.hasDeclaredAnnotation(Trace)
         metadata.hasStereotype(Around)
@@ -315,8 +316,8 @@ interface ITest {
         metadata != null
         metadata.hasAnnotation(Trace)
         metadata.getValue(Trace, "type").isPresent()
-        metadata.getValue(Trace, "type").get() == 'test.Test'
-        metadata.getValue(Trace, "types").get() == ['test.Test'] as Object[]
+        metadata.getValue(Trace, "type").get() == new AnnotationClassValue('test.Test')
+        metadata.getValue(Trace, "types").get() == [new AnnotationClassValue<>('test.Test')] as AnnotationClassValue[]
         metadata.hasStereotype(Trace)
         !metadata.hasDeclaredAnnotation(Trace)
         metadata.hasStereotype(Around)

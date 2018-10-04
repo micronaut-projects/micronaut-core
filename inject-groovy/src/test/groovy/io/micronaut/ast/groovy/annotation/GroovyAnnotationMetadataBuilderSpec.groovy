@@ -16,6 +16,7 @@
 package io.micronaut.ast.groovy.annotation
 
 import io.micronaut.context.annotation.ConfigurationReader
+import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.annotation.MultipleAlias
 import org.codehaus.groovy.ast.ASTNode
@@ -179,7 +180,7 @@ class Test {
         metadata.getValue(Requirements).get()[0] instanceof AnnotationValue
         metadata.getValue(Requirements).get()[0].values.get('property') == 'blah'
         metadata.getValue(Requirements).get()[1] instanceof AnnotationValue
-        metadata.getValue(Requirements).get()[1].values.get('classes') == ['test.Test'] as Object[]
+        metadata.getValue(Requirements).get()[1].values.get('classes') == [new AnnotationClassValue('test.Test')] as AnnotationClassValue[]
     }
 
     void "test parse first level stereotype data"() {
@@ -237,8 +238,8 @@ class Test {
         metadata != null
         metadata.hasAnnotation(Trace)
         metadata.getValue(Trace, "type").isPresent()
-        metadata.getValue(Trace, "type").get() == 'test.Test'
-        metadata.getValue(Trace, "types").get() == ['test.Test'] as Object[]
+        metadata.getValue(Trace, "type").get() == new AnnotationClassValue('test.Test')
+        metadata.getValue(Trace, "types").get() == [new AnnotationClassValue('test.Test')] as AnnotationClassValue[]
         metadata.hasStereotype(Trace)
         metadata.hasDeclaredAnnotation(Trace)
         metadata.hasStereotype(Around)
@@ -274,8 +275,8 @@ interface ITest {
         metadata != null
         metadata.hasAnnotation(Trace)
         metadata.getValue(Trace, "type").isPresent()
-        metadata.getValue(Trace, "type").get() == 'test.Test'
-        metadata.getValue(Trace, "types").get() == ['test.Test'] as Object[]
+        metadata.getValue(Trace, "type").get() == new AnnotationClassValue('test.Test')
+        metadata.getValue(Trace, "types").get() == [new AnnotationClassValue('test.Test')] as AnnotationClassValue[]
         metadata.hasStereotype(Trace)
         !metadata.hasDeclaredAnnotation(Trace)
         !metadata.hasDeclaredStereotype(Trace)
@@ -313,8 +314,8 @@ class SuperTest {
         metadata != null
         metadata.hasAnnotation(Trace)
         metadata.getValue(Trace, "type").isPresent()
-        metadata.getValue(Trace, "type").get() == 'test.SuperTest'
-        metadata.getValue(Trace, "types").get() == ['test.SuperTest'] as Object[]
+        metadata.getValue(Trace, "type").get() == new AnnotationClassValue('test.SuperTest')
+        metadata.getValue(Trace, "types").get() == [new AnnotationClassValue('test.SuperTest')] as AnnotationClassValue[]
         metadata.hasStereotype(Trace)
         !metadata.hasDeclaredAnnotation(Trace)
         !metadata.hasDeclaredStereotype(Trace)
@@ -352,8 +353,8 @@ class SuperTest {
         metadata != null
         metadata.hasAnnotation(Trace)
         metadata.getValue(Trace, "type").isPresent()
-        metadata.getValue(Trace, "type").get() == 'test.Test'
-        metadata.getValue(Trace, "types").get() == ['test.Test'] as Object[]
+        metadata.getValue(Trace, "type").get() == new AnnotationClassValue('test.Test')
+        metadata.getValue(Trace, "types").get() == [new AnnotationClassValue('test.Test')] as AnnotationClassValue[]
         metadata.hasStereotype(Trace)
         metadata.hasDeclaredStereotype(Trace)
         metadata.hasDeclaredAnnotation(Trace)
@@ -392,8 +393,8 @@ interface ITest {
         metadata != null
         metadata.hasAnnotation(Trace)
         metadata.getValue(Trace, "type").isPresent()
-        metadata.getValue(Trace, "type").get() == 'test.Test'
-        metadata.getValue(Trace, "types").get() == ['test.Test'] as Object[]
+        metadata.getValue(Trace, "type").get() == new AnnotationClassValue('test.Test')
+        metadata.getValue(Trace, "types").get() == [new AnnotationClassValue('test.Test')] as AnnotationClassValue[]
         metadata.hasStereotype(Trace)
         !metadata.hasDeclaredStereotype(Trace)
         !metadata.hasDeclaredAnnotation(Trace)

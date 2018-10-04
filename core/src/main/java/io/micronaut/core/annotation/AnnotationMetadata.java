@@ -272,9 +272,18 @@ public interface AnnotationMetadata extends AnnotationSource {
     @SuppressWarnings("unchecked")
     default Optional<Class<? extends Annotation>> getDeclaredAnnotationTypeByStereotype(String stereotype) {
         return getDeclaredAnnotationNameTypeByStereotype(stereotype).flatMap(name -> {
-            Optional<Class> opt = ClassUtils.forName(name, getClass().getClassLoader());
+            Optional<Class> opt = getAnnotationType(name);
             return opt.map(aClass -> (Class<? extends Annotation>) aClass);
         });
+    }
+
+    /**
+     * Gets the type for a given annotation if it is present on the classpath. Subclasses can potentially override to provide optimized loading.
+     * @param name The type name
+     * @return The type if present
+     */
+    default Optional<Class> getAnnotationType(String name) {
+        return ClassUtils.forName(name, getClass().getClassLoader());
     }
 
     /**
@@ -286,7 +295,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     @SuppressWarnings("unchecked")
     default Optional<Class<? extends Annotation>> getAnnotationTypeByStereotype(String stereotype) {
         return getAnnotationNameByStereotype(stereotype).flatMap(name -> {
-            Optional<Class> opt = ClassUtils.forName(name, getClass().getClassLoader());
+            Optional<Class> opt = getAnnotationType(name);
             return opt.map(aClass -> (Class<? extends Annotation>) aClass);
         });
     }
@@ -332,7 +341,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     @SuppressWarnings("unchecked")
     default List<Class<? extends Annotation>> getAnnotationTypesByStereotype(Class<? extends Annotation> stereotype) {
         List<String> names = getAnnotationNamesByStereotype(stereotype.getName());
-        return names.stream().map(name -> ClassUtils.forName(name, AnnotationMetadata.class.getClassLoader()))
+        return names.stream().map(name -> getAnnotationType(name))
             .filter(Optional::isPresent)
             .map(opt -> (Class<? extends Annotation>) opt.get())
             .collect(Collectors.toList());

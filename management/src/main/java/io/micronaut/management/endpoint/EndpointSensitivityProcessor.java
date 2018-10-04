@@ -17,15 +17,13 @@
 package io.micronaut.management.endpoint;
 
 import io.micronaut.context.processor.ExecutableMethodProcessor;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 
 import javax.inject.Singleton;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Finds any sensitive endpoints.
@@ -36,7 +34,7 @@ import java.util.Optional;
 @Singleton
 public class EndpointSensitivityProcessor implements ExecutableMethodProcessor<Endpoint> {
 
-    private final EndpointConfiguration[] endpointConfigurations;
+    private final List<EndpointConfiguration> endpointConfigurations;
     private final EndpointDefaultConfiguration defaultConfiguration;
     private Map<ExecutableMethod, Boolean> endpointMethods = new HashMap<>();
 
@@ -47,9 +45,9 @@ public class EndpointSensitivityProcessor implements ExecutableMethodProcessor<E
      * @param endpointConfigurations The endpoint configurations
      * @param defaultConfiguration   The default endpoint configuration
      */
-    public EndpointSensitivityProcessor(EndpointConfiguration[] endpointConfigurations,
+    public EndpointSensitivityProcessor(List<EndpointConfiguration> endpointConfigurations,
                                         EndpointDefaultConfiguration defaultConfiguration) {
-        this.endpointConfigurations = endpointConfigurations;
+        this.endpointConfigurations = CollectionUtils.unmodifiableList(endpointConfigurations);
         this.defaultConfiguration = defaultConfiguration;
     }
 
@@ -66,8 +64,7 @@ public class EndpointSensitivityProcessor implements ExecutableMethodProcessor<E
         Optional<String> optionalId = beanDefinition.getValue(Endpoint.class, String.class);
         optionalId.ifPresent((id) -> {
 
-            EndpointConfiguration configuration = Arrays
-                .stream(endpointConfigurations)
+            EndpointConfiguration configuration = endpointConfigurations.stream()
                 .filter((c) -> c.getId().equals(id))
                 .findFirst()
                 .orElseGet(() -> new EndpointConfiguration(id, defaultConfiguration));

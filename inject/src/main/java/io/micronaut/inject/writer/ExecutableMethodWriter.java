@@ -63,6 +63,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     private final boolean isInterface;
     private String outerClassName = null;
     private boolean isStatic = false;
+    private final Map<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
 
     /**
      * @param beanFullClassName    The bean full class name
@@ -203,11 +204,13 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         if (hasArgs) {
             // 4th argument: the generic types
             pushBuildArgumentsForMethod(
+                getTypeReferenceForName(getClassName()),
+                classWriter,
                 constructorWriter,
                 argumentTypes,
                 argumentAnnotationMetadata,
-                genericTypes
-            );
+                genericTypes,
+                loadTypeMethods);
             // now invoke super(..) if no arg constructor
             invokeConstructor(
                 executorMethodConstructor,
@@ -242,6 +245,11 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         );
 
         buildInvokeMethod(declaringTypeObject, methodName, returnType, argumentTypeClasses, invokeMethod);
+
+        for (GeneratorAdapter method : loadTypeMethods.values()) {
+            method.visitMaxs(3, 1);
+            method.visitEnd();
+        }
     }
 
     /**
