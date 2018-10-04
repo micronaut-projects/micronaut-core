@@ -242,7 +242,9 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
             List<AnnotationValue<T>> list = new ArrayList<>(values.length);
             String typeName = type.getName();
             for (AnnotationValue value : values) {
-                if (value == null) continue;
+                if (value == null) {
+                    continue;
+                }
                 if (value.getAnnotationName().equals(typeName)) {
                     //noinspection unchecked
                     list.add(value);

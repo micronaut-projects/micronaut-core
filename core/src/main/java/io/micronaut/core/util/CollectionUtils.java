@@ -203,7 +203,7 @@ public class CollectionUtils {
     }
 
     /**
-     * Converts an {@link Iterable} to a {@link List}
+     * Converts an {@link Iterable} to a {@link List}.
      *
      * @param iterable The iterable
      * @param <T>      The generic type
@@ -231,7 +231,7 @@ public class CollectionUtils {
     }
 
     /**
-     * Null safe version of {@link Collections#unmodifiableList(List)}
+     * Null safe version of {@link Collections#unmodifiableList(List)}.
      *
      * @param list The list
      * @param <T> The generic type
