@@ -18,7 +18,9 @@ package io.micronaut.core.convert;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.format.FormattingTypeConverter;
 import io.micronaut.core.convert.format.ReadableBytesTypeConverter;
@@ -185,6 +187,9 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             }
             return ClassUtils.forName(object.toString(), classLoader);
         });
+
+        // AnnotationClassValue -> Class
+        addConverter(AnnotationClassValue.class, Class.class, (object, targetType, context) -> object.getType());
 
         // URI -> URL
         addConverter(URI.class, URL.class, uri -> {
@@ -438,18 +443,25 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
         // String -> Array
         addConverter(CharSequence.class, Object[].class, (CharSequence object, Class<Object[]> targetType, ConversionContext context) -> {
-            String str = object.toString();
-            String[] strings = str.split(",");
-            Class<?> componentType = ReflectionUtils.getWrapperType(targetType.getComponentType());
-            Object newArray = Array.newInstance(componentType, strings.length);
-            for (int i = 0; i < strings.length; i++) {
-                String string = strings[i];
-                Optional<?> converted = convert(string, componentType);
-                if (converted.isPresent()) {
-                    Array.set(newArray, i, converted.get());
+            if (object instanceof AnnotationClassValue && targetType.equals(AnnotationClassValue[].class)) {
+                AnnotationClassValue[] array = new AnnotationClassValue[1];
+                array[0] = (AnnotationClassValue) object;
+                return Optional.of(array);
+            } else {
+
+                String str = object.toString();
+                String[] strings = str.split(",");
+                Class<?> componentType = ReflectionUtils.getWrapperType(targetType.getComponentType());
+                Object newArray = Array.newInstance(componentType, strings.length);
+                for (int i = 0; i < strings.length; i++) {
+                    String string = strings[i];
+                    Optional<?> converted = convert(string, componentType);
+                    if (converted.isPresent()) {
+                        Array.set(newArray, i, converted.get());
+                    }
                 }
+                return Optional.of((Object[]) newArray);
             }
-            return Optional.of((Object[]) newArray);
         });
 
         // String -> Int Array
