@@ -19,6 +19,7 @@ package io.micronaut.core.util;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.convert.ConversionService;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.lang.reflect.Constructor;
 import java.util.*;
@@ -202,9 +203,10 @@ public class CollectionUtils {
     }
 
     /**
-     * Converts an {@link Iterable} to a {@link List}
+     * Converts an {@link Iterable} to a {@link List}.
+     *
      * @param iterable The iterable
-     * @param <T> The generic type
+     * @param <T>      The generic type
      * @return The list
      */
     public static <T> List<T> iterableToList(Iterable<T> iterable) {
@@ -226,5 +228,19 @@ public class CollectionUtils {
                 }
             }
         }
+    }
+
+    /**
+     * Null safe version of {@link Collections#unmodifiableList(List)}.
+     *
+     * @param list The list
+     * @param <T> The generic type
+     * @return A non-null unmodifiable list
+     */
+    public static @Nonnull <T> List<T> unmodifiableList(@Nullable List<T> list) {
+        if (isEmpty(list)) {
+            return Collections.emptyList();
+        }
+        return Collections.unmodifiableList(list);
     }
 }

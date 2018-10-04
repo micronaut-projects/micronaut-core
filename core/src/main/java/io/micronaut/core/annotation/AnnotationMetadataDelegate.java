@@ -101,8 +101,8 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default Optional<String> getDeclaredAnnotationNameTypeByStereotype(String stereotype) {
-        return getAnnotationMetadata().getDeclaredAnnotationNameTypeByStereotype(stereotype);
+    default Optional<String> getDeclaredAnnotationNameByStereotype(String stereotype) {
+        return getAnnotationMetadata().getDeclaredAnnotationNameByStereotype(stereotype);
     }
 
     @Override
@@ -251,6 +251,11 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
+    default Optional<Class<? extends Annotation>> getAnnotationType(String name) {
+        return getAnnotationMetadata().getAnnotationType(name);
+    }
+
+    @Override
     default boolean hasAnnotation(@Nullable Class<? extends Annotation> annotation) {
         return getAnnotationMetadata().hasAnnotation(annotation);
     }
@@ -326,8 +331,8 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default List<String> getDeclaredAnnotationNamesTypeByStereotype(String stereotype) {
-        return getAnnotationMetadata().getDeclaredAnnotationNamesTypeByStereotype(stereotype);
+    default List<String> getDeclaredAnnotationNamesByStereotype(String stereotype) {
+        return getAnnotationMetadata().getDeclaredAnnotationNamesByStereotype(stereotype);
     }
 
     @Override

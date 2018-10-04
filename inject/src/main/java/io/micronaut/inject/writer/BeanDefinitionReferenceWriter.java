@@ -56,7 +56,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
      * @param annotationMetadata The annotation metadata
      */
     public BeanDefinitionReferenceWriter(String beanTypeName, String beanDefinitionName, AnnotationMetadata annotationMetadata) {
-        super(beanDefinitionName + REF_SUFFIX, annotationMetadata);
+        super(beanDefinitionName + REF_SUFFIX, annotationMetadata, true);
         this.beanTypeName = beanTypeName;
         this.beanDefinitionName = beanDefinitionName;
         this.beanDefinitionReferenceClassName = beanDefinitionName + REF_SUFFIX;

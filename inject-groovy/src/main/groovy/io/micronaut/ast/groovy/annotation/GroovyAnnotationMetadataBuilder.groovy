@@ -18,6 +18,7 @@ package io.micronaut.ast.groovy.annotation
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.ExtendedParameter
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
+import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.util.StringUtils
@@ -235,7 +236,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
                 }
             }
         } else if (annotationValue instanceof ClassExpression) {
-            return ((ClassExpression) annotationValue).type.name
+            return new AnnotationClassValue(((ClassExpression) annotationValue).type.name)
         } else if (annotationValue instanceof ListExpression) {
             ListExpression le = (ListExpression) annotationValue
             List converted = []
@@ -256,8 +257,8 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
                         converted.add(value)
                     }
                 } else if (exp instanceof ClassExpression) {
-                    arrayType = String
-                    converted.add(((ClassExpression) exp).type.name)
+                    arrayType = AnnotationClassValue
+                    converted.add(new AnnotationClassValue<>(((ClassExpression) exp).type.name))
                 }
             }
             // for some reason this is necessary to produce correct array type in Groovy

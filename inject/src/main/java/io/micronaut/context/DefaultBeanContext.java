@@ -1602,7 +1602,7 @@ public class DefaultBeanContext implements BeanContext {
 
             if (currentSegment.isPresent()) {
                 Argument argument = currentSegment.get().getArgument();
-                Optional<String> scope = argument.getAnnotationMetadata().getAnnotationNameByStereotype(Scope.class);
+                final Optional<Class<? extends Annotation>> scope = argument.getAnnotationMetadata().getAnnotationTypeByStereotype(Scope.class);
                 registeredScope = scope.flatMap(customScopeRegistry::findScope);
             }
 
