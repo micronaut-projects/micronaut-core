@@ -56,7 +56,8 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
             "io.netty.channel.socket.nio.NioServerSocketChannel",
             "io.micronaut.http.netty.cookies.NettyCookieFactory",
             "io.micronaut.http.client.NettyClientHttpRequestFactory",
-            "io.micronaut.http.server.netty.NettyHttpResponseFactory"
+            "io.micronaut.http.server.netty.NettyHttpResponseFactory",
+            "org.hibernate.validator.HibernateValidator"
     );
     private final Set<String> classes = new ConcurrentSkipListSet<>();
     private final Set<String> beans = new ConcurrentSkipListSet<>();

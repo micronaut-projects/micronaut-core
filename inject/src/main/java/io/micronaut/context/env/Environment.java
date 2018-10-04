@@ -57,6 +57,11 @@ import java.util.stream.Stream;
 public interface Environment extends PropertyResolver, LifeCycle<Environment>, ConversionService<Environment>, ResourceLoader {
 
     /**
+     * Constant for the the name micronaut.
+     */
+    String MICRONAUT = "micronaut";
+
+    /**
      * The test environment.
      */
     String TEST = "test";
