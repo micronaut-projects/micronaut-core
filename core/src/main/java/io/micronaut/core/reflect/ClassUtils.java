@@ -166,7 +166,8 @@ public class ClassUtils {
     }
 
     /**
-     * Attempt to load a class for the given name from the given class loader.
+     * Attempt to load a class for the given name from the given class loader. This method should be used
+     * as a last resort, and note that any usage of this method will create complications on GraalVM.
      *
      * @param name        The name of the class
      * @param classLoader The classloader. If null will fallback to attempt the thread context loader, otherwise the system loader

@@ -67,6 +67,7 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
      * @param defaultValues The default values
      */
     @SuppressWarnings("unchecked")
+    @UsedByGeneratedCode
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<String, Object> defaultValues) {
         this.annotationName = annotationName.intern();
         this.convertibleValues = newConvertibleValues(values);
@@ -106,6 +107,7 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
      * @param convertibleValues The convertible values
      */
     @Internal
+    @UsedByGeneratedCode
     protected AnnotationValue(AnnotationValue<A> target, Map<String, Object> defaultValues, ConvertibleValues<Object> convertibleValues) {
         this.annotationName = target.annotationName;
         this.defaultValues = defaultValues != null ? defaultValues : target.defaultValues;
@@ -240,7 +242,9 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
             List<AnnotationValue<T>> list = new ArrayList<>(values.length);
             String typeName = type.getName();
             for (AnnotationValue value : values) {
-                if (value == null) continue;
+                if (value == null) {
+                    continue;
+                }
                 if (value.getAnnotationName().equals(typeName)) {
                     //noinspection unchecked
                     list.add(value);

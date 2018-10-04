@@ -47,13 +47,14 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
     /**
      * @param className          The class name
      * @param annotationMetadata The annotation metadata
+     * @param writeAnnotationDefaults Whether to write annotation defaults
      */
-    protected AbstractAnnotationMetadataWriter(String className, AnnotationMetadata annotationMetadata) {
+    protected AbstractAnnotationMetadataWriter(String className, AnnotationMetadata annotationMetadata, boolean writeAnnotationDefaults) {
         this.targetClassType = getTypeReference(className);
         if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
             this.annotationMetadataWriter = null;
         } else {
-            this.annotationMetadataWriter = annotationMetadata instanceof AnnotationMetadataReference ? null : new AnnotationMetadataWriter(className, annotationMetadata);
+            this.annotationMetadataWriter = annotationMetadata instanceof AnnotationMetadataReference ? null : new AnnotationMetadataWriter(className, annotationMetadata, writeAnnotationDefaults);
         }
         this.annotationMetadata = annotationMetadata;
     }

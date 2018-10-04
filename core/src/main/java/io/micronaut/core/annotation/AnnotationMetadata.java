@@ -23,6 +23,7 @@ import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -122,7 +123,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param stereotype The stereotype
      * @return The declared annotations
      */
-    List<String> getDeclaredAnnotationNamesTypeByStereotype(String stereotype);
+    List<String> getDeclaredAnnotationNamesByStereotype(String stereotype);
 
     /**
      * Get all of the values for the given annotation and type of the underlying values.
@@ -239,8 +240,8 @@ public interface AnnotationMetadata extends AnnotationSource {
      * @param stereotype The stereotype
      * @return The annotation name
      */
-    default Optional<String> getDeclaredAnnotationNameTypeByStereotype(String stereotype) {
-        return getDeclaredAnnotationNamesTypeByStereotype(stereotype).stream().findFirst();
+    default Optional<String> getDeclaredAnnotationNameByStereotype(String stereotype) {
+        return getDeclaredAnnotationNamesByStereotype(stereotype).stream().findFirst();
     }
 
     /**
@@ -271,9 +272,22 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     @SuppressWarnings("unchecked")
     default Optional<Class<? extends Annotation>> getDeclaredAnnotationTypeByStereotype(String stereotype) {
-        return getDeclaredAnnotationNameTypeByStereotype(stereotype).flatMap(name -> {
-            Optional<Class> opt = ClassUtils.forName(name, getClass().getClassLoader());
-            return opt.map(aClass -> (Class<? extends Annotation>) aClass);
+        return getDeclaredAnnotationNameByStereotype(stereotype).flatMap(this::getAnnotationType);
+    }
+
+    /**
+     * Gets the type for a given annotation if it is present on the classpath. Subclasses can potentially override to provide optimized loading.
+     * @param name The type name
+     * @return The type if present
+     */
+    default Optional<Class<? extends Annotation>> getAnnotationType(String name) {
+        final Optional<Class> aClass = ClassUtils.forName(name, getClass().getClassLoader());
+        return aClass.flatMap((Function<Class, Optional<Class<? extends Annotation>>>) aClass1 -> {
+            if (Annotation.class.isAssignableFrom(aClass1)) {
+                //noinspection unchecked
+                return Optional.of(aClass1);
+            }
+            return Optional.empty();
         });
     }
 
@@ -285,10 +299,7 @@ public interface AnnotationMetadata extends AnnotationSource {
      */
     @SuppressWarnings("unchecked")
     default Optional<Class<? extends Annotation>> getAnnotationTypeByStereotype(String stereotype) {
-        return getAnnotationNameByStereotype(stereotype).flatMap(name -> {
-            Optional<Class> opt = ClassUtils.forName(name, getClass().getClassLoader());
-            return opt.map(aClass -> (Class<? extends Annotation>) aClass);
-        });
+        return getAnnotationNameByStereotype(stereotype).flatMap(this::getAnnotationType);
     }
 
     /**
@@ -332,7 +343,7 @@ public interface AnnotationMetadata extends AnnotationSource {
     @SuppressWarnings("unchecked")
     default List<Class<? extends Annotation>> getAnnotationTypesByStereotype(Class<? extends Annotation> stereotype) {
         List<String> names = getAnnotationNamesByStereotype(stereotype.getName());
-        return names.stream().map(name -> ClassUtils.forName(name, AnnotationMetadata.class.getClassLoader()))
+        return names.stream().map(this::getAnnotationType)
             .filter(Optional::isPresent)
             .map(opt -> (Class<? extends Annotation>) opt.get())
             .collect(Collectors.toList());

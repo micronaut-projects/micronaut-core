@@ -63,6 +63,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
     private final boolean isInterface;
     private String outerClassName = null;
     private boolean isStatic = false;
+    private final Map<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
 
     /**
      * @param beanFullClassName    The bean full class name
@@ -72,7 +73,7 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      * @param annotationMetadata   The annotation metadata
      */
     public ExecutableMethodWriter(String beanFullClassName, String methodClassName, String methodProxyShortName, boolean isInterface, AnnotationMetadata annotationMetadata) {
-        super(methodClassName, annotationMetadata);
+        super(methodClassName, annotationMetadata, false);
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         this.beanFullClassName = beanFullClassName;
         this.methodProxyShortName = methodProxyShortName;
@@ -203,11 +204,13 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         if (hasArgs) {
             // 4th argument: the generic types
             pushBuildArgumentsForMethod(
+                getTypeReferenceForName(getClassName()),
+                classWriter,
                 constructorWriter,
                 argumentTypes,
                 argumentAnnotationMetadata,
-                genericTypes
-            );
+                genericTypes,
+                loadTypeMethods);
             // now invoke super(..) if no arg constructor
             invokeConstructor(
                 executorMethodConstructor,
@@ -242,6 +245,11 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
         );
 
         buildInvokeMethod(declaringTypeObject, methodName, returnType, argumentTypeClasses, invokeMethod);
+
+        for (GeneratorAdapter method : loadTypeMethods.values()) {
+            method.visitMaxs(3, 1);
+            method.visitEnd();
+        }
     }
 
     /**
