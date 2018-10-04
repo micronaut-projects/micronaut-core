@@ -93,8 +93,12 @@ public final class AnnotationClassValue<T> implements CharSequence, Named {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
         AnnotationClassValue<?> that = (AnnotationClassValue<?>) o;
         return Objects.equals(name, that.name);
     }

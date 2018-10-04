@@ -20,7 +20,6 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.format.FormattingTypeConverter;
 import io.micronaut.core.convert.format.ReadableBytesTypeConverter;
@@ -718,7 +717,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         // Micronaut ByteBuffer -> byte for streamed results from HTTP clients
         addConverter(io.micronaut.core.io.buffer.ByteBuffer.class, byte[].class, (object, targetType, context) -> {
             byte[] result = object.toByteArray();
-            ((ReferenceCounted)object).release();
+            ((ReferenceCounted) object).release();
             return Optional.of(result);
         });
 

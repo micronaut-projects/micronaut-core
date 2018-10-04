@@ -34,6 +34,7 @@ public interface BeanExceptionHandler<T, E extends Throwable> extends BiConsumer
      * @param throwable The error
      */
     void handle(T bean, E throwable);
+
     /**
      * Handles the exception.
      *
