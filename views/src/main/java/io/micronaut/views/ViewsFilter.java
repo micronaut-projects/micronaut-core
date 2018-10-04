@@ -18,14 +18,12 @@ package io.micronaut.views;
 
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.io.Writable;
-import io.micronaut.http.HttpAttributes;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.*;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.inject.MethodExecutionHandle;
@@ -46,7 +44,7 @@ import java.util.Optional;
  */
 @Requires(beans = ViewsRenderer.class)
 @Filter("/**")
-public class ViewsFilter extends OncePerRequestHttpServerFilter {
+public class ViewsFilter implements HttpServerFilter {
 
     private static final Logger LOG = LoggerFactory.getLogger(ViewsFilter.class);
 
@@ -75,51 +73,48 @@ public class ViewsFilter extends OncePerRequestHttpServerFilter {
     }
 
     @Override
-    protected final Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request,
-                                                                   ServerFilterChain chain) {
+    public final Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request,
+                                                            ServerFilterChain chain) {
 
-        Optional<MethodExecutionHandle> routeMatch = request.getAttribute(HttpAttributes.ROUTE_MATCH,
-                MethodExecutionHandle.class);
-        if (routeMatch.isPresent()) {
-            MethodExecutionHandle route = routeMatch.get();
+        return Flowable.fromPublisher(chain.proceed(request))
+            .switchMap(response -> {
+                Optional<AnnotationMetadata> routeMatch = response.getAttribute(HttpAttributes.ROUTE_MATCH,
+                        AnnotationMetadata.class);
+                if (routeMatch.isPresent()) {
+                    AnnotationMetadata route = routeMatch.get();
 
-            return Flowable.fromPublisher(chain.proceed(request))
-                    .switchMap(response -> {
-                        Object body = response.body();
-                        Optional<String> optionalView = resolveView(route, body);
+                    Object body = response.body();
+                    Optional<String> optionalView = resolveView(route, body);
 
-                        if (!optionalView.isPresent()) {
-                            return Flowable.just(response);
-                        }
+                    if (optionalView.isPresent()) {
 
                         MediaType type = route.getValue(Produces.class, MediaType.class)
                                 .orElse((route.getValue(View.class).isPresent() || body instanceof ModelAndView) ? MediaType.TEXT_HTML_TYPE : MediaType.APPLICATION_JSON_TYPE);
                         Optional<ViewsRenderer> optionalViewsRenderer = beanLocator.findBean(ViewsRenderer.class,
                                 new ProducesMediaTypeQualifier<>(type));
 
-                        if (!optionalViewsRenderer.isPresent()) {
-                            return Flowable.just(response);
-                        }
+                        if (optionalViewsRenderer.isPresent()) {
+                            ViewsRenderer viewsRenderer = optionalViewsRenderer.get();
 
-                        ViewsRenderer viewsRenderer = optionalViewsRenderer.get();
-
-                        String view = optionalView.get();
-                        if (!viewsRenderer.exists(view)) {
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("view {} not found ", view);
+                            String view = optionalView.get();
+                            if (viewsRenderer.exists(view)) {
+                                Object model = resolveModel(body);
+                                Writable writable = viewsRenderer.render(view, model);
+                                response.contentType(type);
+                                ((MutableHttpResponse<Object>) response).body(writable);
+                                return Flowable.just(response);
+                            } else {
+                                if (LOG.isDebugEnabled()) {
+                                    LOG.debug("view {} not found ", view);
+                                }
+                                return Flowable.just(HttpResponse.notFound());
                             }
-                            response.status(HttpStatus.NOT_FOUND);
-                            return Flowable.just(response);
                         }
+                    }
+                }
 
-                        Object model = resolveModel(body);
-                        Writable writable = viewsRenderer.render(view, model);
-                        response.contentType(type);
-                        ((MutableHttpResponse<Object>) response).body(writable);
-                        return Flowable.just(response);
-                    });
-        }
-        return chain.proceed(request);
+                return Flowable.just(response);
+            });
     }
 
     /**
@@ -144,7 +139,7 @@ public class ViewsFilter extends OncePerRequestHttpServerFilter {
      * @return view name to be rendered
      */
     @SuppressWarnings("WeakerAccess")
-    protected Optional<String> resolveView(MethodExecutionHandle route, Object responseBody) {
+    protected Optional<String> resolveView(AnnotationMetadata route, Object responseBody) {
         Optional optionalViewName = route.getValue(View.class);
         if (optionalViewName.isPresent()) {
             return Optional.of((String) optionalViewName.get());
