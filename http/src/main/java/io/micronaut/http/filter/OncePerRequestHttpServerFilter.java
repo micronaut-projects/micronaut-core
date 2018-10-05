@@ -22,7 +22,8 @@ import io.micronaut.http.MutableHttpResponse;
 import org.reactivestreams.Publisher;
 
 /**
- * A filter that is only executed once per request.
+ * A filter that is only executed once per request. A filter may be executed more
+ * than once per request if the original route throws an exception.
  *
  * @author Graeme Rocher
  * @since 1.0

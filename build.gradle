@@ -118,7 +118,12 @@ ext {
                 version: nettyVersion,
                 group:'io.netty',
                 name:'netty-codec-http',
-                modules:['netty-handler','netty-handler-proxy']
+                modules: ['netty-buffer', 'netty-codec', 'netty-codec-dns', 'netty-codec-haproxy', 
+                          'netty-codec-http2', 'netty-codec-memcache', 'netty-codec-mqtt', 
+                          'netty-codec-redis', 'netty-codec-smtp', 'netty-codec-socks', 'netty-codec-stomp', 
+                          'netty-codec-xml', 'netty-common', 'netty-dev-tools', 'netty-handler', 
+                          'netty-handler-proxy', 'netty-resolver', 'netty-resolver-dns', 'netty-transport', 
+                          'netty-transport-rxtx', 'netty-transport-sctp', 'netty-transport-udt', 'netty-example']
             ],
             opentracing: [
                 version: '0.31.0',

@@ -2,6 +2,7 @@ package io.micronaut.docs
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.NoSuchBeanException
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
@@ -137,5 +138,48 @@ class ThymeleafViewRendererSpec extends Specification {
         then:
         body
         rsp.body().contains("<h1>You are not logged in</h1>")
+    }
+
+    void "invoking /notFound renders the view defined on the error handler"() {
+        when:
+        client.toBlocking().exchange(HttpRequest.POST('/views/error', [status: true, exception: false, global: false]), String)
+
+        then:
+        def e = thrown(HttpClientResponseException)
+
+        and:
+        e.status == HttpStatus.NOT_FOUND
+        e.response.getBody(String).get().contains("<h1>I'm sorry, <span>sdelamo</span>! You've reached a dead end. Status: <span>404</span>. Exception: <span></span></h1>")
+
+        when:
+        client.toBlocking().exchange(HttpRequest.POST('/views/error', [status: true, exception: false, global: true]), String)
+
+        then:
+        e = thrown(HttpClientResponseException)
+
+        and:
+        e.status == HttpStatus.NOT_FOUND
+        e.response.getBody(String).get().contains("<h1>I'm sorry, <span>sdelamo</span>! You've reached a dead end. Status: <span>420</span>. Exception: <span></span></h1>")
+
+        when:
+        client.toBlocking().exchange(HttpRequest.POST('/views/error', [status: false, exception: true, global: false]), String)
+
+        then:
+        e = thrown(HttpClientResponseException)
+
+        and:
+        e.status == HttpStatus.NOT_FOUND
+        e.response.getBody(String).get().contains("<h1>I'm sorry, <span>sdelamo</span>! You've reached a dead end. Status: <span></span>. Exception: <span>local</span></h1>")
+
+        when:
+        client.toBlocking().exchange(HttpRequest.POST('/views/error', [status: false, exception: true, global: true]), String)
+
+        then:
+        e = thrown(HttpClientResponseException)
+
+        and:
+        e.status == HttpStatus.NOT_FOUND
+        e.response.getBody(String).get().contains("<h1>I'm sorry, <span>sdelamo</span>! You've reached a dead end. Status: <span></span>. Exception: <span>global</span></h1>")
+        
     }
 }

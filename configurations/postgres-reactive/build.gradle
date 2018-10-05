@@ -3,10 +3,10 @@ dependencies {
     compile dependencyVersion("reactive.pg.client")
     compileOnly project(":management")
     compileOnly project(":inject-java")
-    compile "io.vertx:vertx-rx-java2:3.5.1", {
+    compile "io.vertx:vertx-rx-java2:3.5.3", {
         exclude module: "vertx-core"
     }
-    compile "io.vertx:vertx-codegen:3.5.1", {
+    compile "io.vertx:vertx-codegen:3.5.3", {
         exclude module: "vertx-core"
     }
 
@@ -15,10 +15,10 @@ dependencies {
     testCompile project(":management")
     testCompile "org.testcontainers:spock:1.8.0"
     testCompile "org.testcontainers:postgresql:1.8.0"
-    testCompile "io.vertx:vertx-rx-java2:3.5.1", {
+    testCompile "io.vertx:vertx-rx-java2:3.5.3", {
         exclude module: "vertx-core"
     }
-    testCompile "io.vertx:vertx-codegen:3.5.1", {
+    testCompile "io.vertx:vertx-codegen:3.5.3", {
         exclude module: "vertx-core"
     }
 }
