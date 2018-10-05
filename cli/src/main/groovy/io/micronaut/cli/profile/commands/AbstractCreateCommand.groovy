@@ -291,6 +291,11 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
 
             File projectTargetDirectory = cmd.inplace ? new File(".").canonicalFile : appFullDirectory.toAbsolutePath().normalize().toFile()
 
+            if (projectTargetDirectory.exists() && !cmd.inplace) {
+                MicronautConsole.instance.error("Cannot create the project because the target directory already exists")
+                return false
+            }
+
             def profiles = profileRepository.getProfileAndDependencies(profileInstance)
 
             Map<Profile, File> targetDirs = [:]
