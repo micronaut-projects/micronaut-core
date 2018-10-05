@@ -1,0 +1,13 @@
+
+To configure the CLI to use an HTTP proxy there are two steps. Configuration options can be passed to the cli through the `MN_OPTS` environment variable.
+
+For example on *nix systems:
+
+[source,bash]
+----
+export MN_OPTS="-Dhttps.proxyHost=127.0.0.1 -Dhttps.proxyPort=3128 -Dhttp.proxyUser=test -Dhttp.proxyPassword=test"
+----
+
+The profile dependencies are resolved over HTTPS so the proxy port and host are configured with `https.`, however the user and password are specified with `http.`.
+
+For Windows systems the environment variable can be configured under `My Computer/Advanced/Environment Variables`.
