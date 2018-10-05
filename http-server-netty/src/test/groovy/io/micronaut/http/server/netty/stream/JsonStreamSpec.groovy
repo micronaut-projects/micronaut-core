@@ -49,6 +49,19 @@ class JsonStreamSpec extends Specification {
         response.header("Date")
     }
 
+    void "test json stream response content type with a response return"() {
+        given:
+        RxStreamingHttpClient streamingHttpClient = embeddedServer.applicationContext.createBean(RxStreamingHttpClient, embeddedServer.getURL())
+
+        HttpResponse response = streamingHttpClient.exchangeStream(HttpRequest.GET('/json/stream/custom')).blockingFirst()
+
+        expect:
+        response.contentType.isPresent()
+        response.contentType.get() == MediaType.APPLICATION_JSON_STREAM_TYPE
+        response.header("Server") == "JsonStreamSpec"
+        response.header("Date")
+    }
+
     @Controller("/json/stream")
     static class StreamController {
 
@@ -56,6 +69,12 @@ class JsonStreamSpec extends Specification {
         Flowable<Book> stream() {
             return Flowable.just(new Book(title: "The Stand"), new Book(title: "The Shining"))
         }
+
+        @Get(uri = "/custom", produces = MediaType.APPLICATION_JSON_STREAM)
+        HttpResponse<Flowable<Book>> streamResponse() {
+            return HttpResponse.ok(Flowable.just(new Book(title: "The Stand"), new Book(title: "The Shining")))
+        }
+
     }
 
     static class Book {
