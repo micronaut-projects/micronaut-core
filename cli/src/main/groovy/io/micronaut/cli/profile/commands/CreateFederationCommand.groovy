@@ -65,32 +65,32 @@ class CreateFederationCommand extends AbstractCreateCommand {
         final File serviceDir = inplace ? new File('.').canonicalFile : new File(executionContext.baseDir, federationName)
         final String profileName = evaluateProfileName()
 
-        for (String service : services) {
-            final CreateServiceCommandObject cmd = new CreateServiceCommandObject(
-                appName: service,
-                baseDir: serviceDir,
-                profileName: profileName,
+        final CreateServiceCommandObject parent = new CreateServiceCommandObject(
+                appName: federationName,
+                baseDir: executionContext.baseDir,
+                profileName: 'federation',
                 micronautVersion: micronautVersion,
                 features: featureSet,
-                inplace: false,
+                inplace: this.inplace,
                 build: this.build.toString(),
-                console: executionContext.console,
-                skeletonExclude: ["gradle*", "gradle/", ".mvn/", "mvnw*"]
-            )
-            super.handle(cmd)
-        }
-
-        final CreateServiceCommandObject parent = new CreateServiceCommandObject(
-            appName: federationName,
-            baseDir: executionContext.baseDir,
-            profileName: 'federation',
-            micronautVersion: micronautVersion,
-            features: featureSet,
-            inplace: this.inplace,
-            build: this.build.toString(),
-            console: executionContext.console
+                console: executionContext.console
         )
-        super.handle(parent)
+        if (super.handle(parent)) {
+            for (String service : services) {
+                final CreateServiceCommandObject cmd = new CreateServiceCommandObject(
+                        appName: service,
+                        baseDir: serviceDir,
+                        profileName: profileName,
+                        micronautVersion: micronautVersion,
+                        features: featureSet,
+                        inplace: false,
+                        build: this.build.toString(),
+                        console: executionContext.console,
+                        skeletonExclude: ["gradle*", "gradle/", ".mvn/", "mvnw*"]
+                )
+                super.handle(cmd)
+            }
+        }
     }
 
     @Override
