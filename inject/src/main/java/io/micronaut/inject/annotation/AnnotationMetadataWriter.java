@@ -121,6 +121,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
 
     private static final Type EMPTY_MAP_TYPE = Type.getType(Map.class);
     private static final String EMPTY_MAP = "EMPTY_MAP";
+    private static final String LOAD_CLASS_PREFIX = "$micronaut_load_class_value_";
 
     private final String className;
     private final DefaultAnnotationMetadata annotationMetadata;
@@ -153,6 +154,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     public AnnotationMetadataWriter(String className, AnnotationMetadata annotationMetadata) {
         this(className, annotationMetadata, false);
     }
+
     /**
      * @return The class name that this metadata will generate
      */
@@ -171,6 +173,13 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             ClassWriter classWriter = generateClassBytes();
             outputStream.write(classWriter.toByteArray());
         }
+    }
+
+    /**
+     * Clears the annotation defaults.
+     */
+    public void clearDefaults() {
+        AnnotationMetadataSupport.ANNOTATION_DEFAULTS.clear();
     }
 
     /**
@@ -299,7 +308,6 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
 
             staticInit.visitMaxs(1, 1);
             staticInit.visitEnd();
-            annotationDefaultValues.clear();
         }
         for (GeneratorAdapter adapter : loadTypeMethods.values()) {
             adapter.visitMaxs(3, 1);
@@ -465,15 +473,15 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         final String typeName = acv.getName();
         final String desc = getMethodDescriptor(AnnotationClassValue.class, Collections.emptyList());
         final GeneratorAdapter loadTypeGeneratorMethod = loadTypeMethods.computeIfAbsent(typeName, type -> {
-            final String methodName = "$micronaut_load_class_value_" + loadTypeMethods.size();
+            final String methodName = LOAD_CLASS_PREFIX + loadTypeMethods.size();
             final GeneratorAdapter loadTypeGenerator = new GeneratorAdapter(declaringClassWriter.visitMethod(
-                    ACC_STATIC,
+                    ACC_STATIC | ACC_SYNTHETIC,
                     methodName,
                     desc,
                     null,
                     null
 
-            ), ACC_STATIC, methodName, desc);
+            ), ACC_STATIC | ACC_SYNTHETIC, methodName, desc);
 
             Label tryStart = new Label();
             Label tryEnd = new Label();

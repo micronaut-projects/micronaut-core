@@ -1,3 +1,5 @@
 dependencies {
+    compileOnly project(":http-client")
+    compileOnly project(":inject-java")
     compile project(":runtime")
 }

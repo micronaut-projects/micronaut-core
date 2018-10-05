@@ -34,6 +34,7 @@ class JWTClaimsSetGeneratorSpec extends Specification {
                                            JwtClaims.ISSUED_AT,
                                            JwtClaims.EXPIRATION_TIME,
                                            JwtClaims.NOT_BEFORE,
+                                            JwtClaims.ISSUER,
                                            "roles"]
         then:
         claims

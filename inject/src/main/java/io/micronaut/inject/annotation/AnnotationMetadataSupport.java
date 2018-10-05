@@ -112,7 +112,7 @@ class AnnotationMetadataSupport {
      * @param defaultValues The default values
      */
     static void registerDefaultValues(String annotation, Map<String, Object> defaultValues) {
-        if (StringUtils.isNotEmpty(annotation) && CollectionUtils.isNotEmpty(defaultValues)) {
+        if (StringUtils.isNotEmpty(annotation)) {
             ANNOTATION_DEFAULTS.put(annotation.intern(), defaultValues);
         }
     }

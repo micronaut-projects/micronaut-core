@@ -8,11 +8,11 @@ NOTE: Use of GraalVM's `nativeimage` tool is only supported in Java or Kotlin pr
 
 To start using GraalVM you should first install the GraalVM SDK via the https://www.graalvm.org/docs/getting-started/[Getting Started] instructions or using SDKman:
 
-.Installing GraalVM 1.0.0-rc6 with SDKman
+.Installing GraalVM 1.0.0-rc7 with SDKman
 [source,bash]
 ----
-$ sdk install java 1.0.0-rc6-graal
-$ sdk use java 1.0.0-rc6-graal
+$ sdk install java 1.0.0-rc7-graal
+$ sdk use java 1.0.0-rc7-graal
 ----
 
 Note the above commands install the `1.0.0-rc6` version, and may need to be altered depending on the current release available.
@@ -27,6 +27,6 @@ Once you have installed the SDK you should make the `svm` dependency available v
 $ mvn install:install-file -Dfile=${JAVA_HOME}/jre/lib/svm/builder/svm.jar \
                            -DgroupId=com.oracle.substratevm \
                            -DartifactId=svm \
-                           -Dversion=GraalVM-1.0.0-rc6 \
+                           -Dversion=GraalVM-1.0.0-rc7 \
                            -Dpackaging=jar
 ----

@@ -48,7 +48,8 @@ native-image --class-path build/libs/hello-world-0.1-all.jar \ # <1>
 			 -H:Class=hello.world.Application \ # <6>
 			 -H:+ReportUnsupportedElementsAtRuntime \ # <7>
 			 -H:+AllowVMInspection \
-			 --delay-class-initialization-to-runtime=io.netty.handler.codec.http.HttpObjectEncoder,io.netty.handler.codec.http.websocketx.WebSocket00FrameEncoder  # <8>
+			 --rerun-class-initialization-at-runtime='sun.security.jca.JCAUtil$CachedSecureRandomHolder,javax.net.ssl.SSLContext' \
+			 --delay-class-initialization-to-runtime=io.netty.handler.codec.http.HttpObjectEncoder,io.netty.handler.codec.http.websocketx.WebSocket00FrameEncoder,io.netty.handler.ssl.util.ThreadLocalInsecureRandom <8>
 ----
 
 <1> The `class-path` argument is used to refer to the Micronaut shaded JAR

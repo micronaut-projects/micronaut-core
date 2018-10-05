@@ -200,9 +200,7 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
                 }
             }
 
-            if (!defaultValues.isEmpty()) {
-                defaults.put(annotationName, defaultValues)
-            }
+            defaults.put(annotationName, defaultValues)
         }
 
         return defaults.get(annotationName)
