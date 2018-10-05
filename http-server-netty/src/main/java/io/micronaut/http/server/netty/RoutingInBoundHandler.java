@@ -265,6 +265,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 Object result = errorRoute.execute();
                 io.micronaut.http.MutableHttpResponse<?> response = errorResultToResponse(result);
                 MethodBasedRouteMatch<?, ?> methodBasedRoute = (MethodBasedRouteMatch) errorRoute;
+                response.setAttribute(HttpAttributes.ROUTE_MATCH, errorRoute);
+
                 AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(nettyHttpRequest);
                 Flowable<MutableHttpResponse<?>> routePublisher = buildRoutePublisher(
                         methodBasedRoute.getDeclaringType(),
@@ -848,11 +850,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             // here we transform the result of the controller action into a MutableHttpResponse
             Flowable<MutableHttpResponse<?>> routePublisher = resultEmitter.map((message) -> {
-                HttpResponse<?> response = messageToResponse(finalRoute, message);
+                RouteMatch<?> routeMatch = finalRoute;
+                HttpResponse<?> response = messageToResponse(routeMatch, message);
                 MutableHttpResponse<?> finalResponse = (MutableHttpResponse<?>) response;
                 HttpStatus status = finalResponse.getStatus();
+
                 if (status.getCode() >= HttpStatus.BAD_REQUEST.getCode()) {
-                    Class declaringType = ((MethodBasedRouteMatch) finalRoute).getDeclaringType();
+                    Class declaringType = ((MethodBasedRouteMatch) routeMatch).getDeclaringType();
                     // handle re-mapping of errors
                     Optional<RouteMatch<Object>> statusRoute = Optional.empty();
                     // if declaringType is not null, this means its a locally marked method handler
@@ -865,21 +869,24 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     io.micronaut.http.HttpRequest<?> httpRequest = requestReference.get();
 
                     if (statusRoute.isPresent()) {
-                        RouteMatch<Object> newRoute = statusRoute.get();
-                        requestArgumentSatisfier.fulfillArgumentRequirements(newRoute, httpRequest, true);
+                        routeMatch = statusRoute.get();
+                        httpRequest.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
 
-                        if (newRoute.isExecutable()) {
+                        requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, httpRequest, true);
+
+                        if (routeMatch.isExecutable()) {
                             Object result;
                             try {
-                                result = newRoute.execute();
-                                finalResponse = messageToResponse(newRoute, result);
+                                result = routeMatch.execute();
+                                finalResponse = messageToResponse(routeMatch, result);
                             } catch (Throwable e) {
-                                throw new InternalServerException("Error executing status route [" + newRoute + "]: " + e.getMessage(), e);
+                                throw new InternalServerException("Error executing status route [" + routeMatch + "]: " + e.getMessage(), e);
                             }
                         }
                     }
 
                 }
+                finalResponse.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
                 return finalResponse;
             });
 
@@ -896,8 +903,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     routePublisher,
                     executor
             );
-
-
 
             boolean isStreaming = isReactiveReturnType && !isSingle;
 
@@ -990,6 +995,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     } else {
                         response = newNotFoundError(httpRequest);
                     }
+                    response.setAttribute(HttpAttributes.ROUTE_MATCH, statusRoute);
                 } else {
                     response = newNotFoundError(httpRequest);
                 }
