@@ -79,7 +79,7 @@ public interface Profile {
     /**
      * @return The oneOf features for this profile
      */
-    Iterable<OneOfFeature> getOneOfFeatures();
+    Iterable<OneOfFeatureGroup> getOneOfFeatures();
 
     /**
      * @return The required features for this profile

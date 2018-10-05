@@ -21,6 +21,7 @@ import groovy.transform.CompileStatic
 import io.micronaut.cli.MicronautCli
 import io.micronaut.cli.console.logging.ConsoleAntBuilder
 import io.micronaut.cli.console.logging.MicronautConsole
+import io.micronaut.cli.io.support.BuildTokens
 import io.micronaut.cli.io.support.GradleBuildTokens
 import io.micronaut.cli.io.support.MavenBuildTokens
 import io.micronaut.cli.profile.ExecutionContext
@@ -104,18 +105,10 @@ class CreateFederationCommand extends AbstractCreateCommand {
 
     @Override
     @CompileDynamic
-    protected void replaceBuildTokens(String build, Profile profile, List features, File targetDirectory) {
-        super.replaceBuildTokens(build, profile, features, targetDirectory)
-
+    protected void withTokens(BuildTokens buildTokens) {
         final AntBuilder ant = new ConsoleAntBuilder()
 
-        Map tokens = [:]
-        if (build == "gradle") {
-            tokens = new GradleBuildTokens().getTokens(services)
-        }
-        if (build == "maven") {
-            tokens = new MavenBuildTokens().getTokens(services)
-        }
+        Map tokens = buildTokens.getTokens(services)
 
         ant.replace(dir: targetDirectory) {
             tokens.each { k, v ->
@@ -125,7 +118,6 @@ class CreateFederationCommand extends AbstractCreateCommand {
                 }
             }
         }
-
     }
 
 }
