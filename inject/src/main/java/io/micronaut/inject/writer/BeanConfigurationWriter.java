@@ -63,6 +63,7 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
         AnnotationMetadataWriter annotationMetadataWriter = getAnnotationMetadataWriter();
         if (annotationMetadataWriter != null) {
             annotationMetadataWriter.accept(classWriterOutputVisitor);
+            annotationMetadataWriter.clearDefaults();
         }
         try (OutputStream outputStream = classWriterOutputVisitor.visitClass(configurationClassName)) {
             ClassWriter classWriter = generateClassBytes();

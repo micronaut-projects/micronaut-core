@@ -45,8 +45,8 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
     protected final AnnotationMetadata annotationMetadata;
 
     /**
-     * @param className          The class name
-     * @param annotationMetadata The annotation metadata
+     * @param className               The class name
+     * @param annotationMetadata      The annotation metadata
      * @param writeAnnotationDefaults Whether to write annotation defaults
      */
     protected AbstractAnnotationMetadataWriter(String className, AnnotationMetadata annotationMetadata, boolean writeAnnotationDefaults) {
@@ -92,10 +92,11 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
     /**
      * Returns the generator adaptor for the method that resolves the annotation metadata.
      *
-     * @param classWriter  The class writer
+     * @param classWriter The class writer
      * @return The generator adapter
      */
-    protected @Nonnull GeneratorAdapter beginAnnotationMetadataMethod(ClassWriter classWriter) {
+    protected @Nonnull
+    GeneratorAdapter beginAnnotationMetadataMethod(ClassWriter classWriter) {
         return startPublicMethod(classWriter, "getAnnotationMetadata", AnnotationMetadata.class.getName());
     }
 
