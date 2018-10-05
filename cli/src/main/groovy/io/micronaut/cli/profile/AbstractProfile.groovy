@@ -69,7 +69,7 @@ abstract class AbstractProfile implements Profile {
     protected List<Feature> features = []
     protected Set<String> defaultFeaturesNames = []
     protected Set<String> requiredFeatureNames = []
-    protected List<Map> oneOfFeatureMaps = []
+    protected List<OneOfFeatureGroup> oneOfFeatureGroups = []
     protected String parentTargetFolder
     protected final ClassLoader classLoader
     protected ExclusionDependencySelector exclusionDependencySelector = new ExclusionDependencySelector()
@@ -148,7 +148,7 @@ abstract class AbstractProfile implements Profile {
             def featureList = (List) featureMap.get("provided") ?: Collections.emptyList()
             def defaultFeatures = (List) featureMap.get("defaults") ?: Collections.emptyList()
             def requiredFeatures = (List) featureMap.get("required") ?: Collections.emptyList()
-            def oneOfFeaturesMap = (List) featureMap.get("oneOf") ?: Collections.emptyList()
+            def oneOfFeaturesMap = (Map) featureMap.get("oneOf") ?: Collections.emptyMap()
             for (fn in featureList) {
                 def featureData = profileDir.createRelative("features/${fn}/feature.yml")
                 if (featureData.exists()) {
@@ -157,15 +157,22 @@ abstract class AbstractProfile implements Profile {
                 }
             }
 
-            for (entry in (List) oneOfFeaturesMap) {
-                if (entry instanceof Map) {
-                    String feature = (String) entry.feature
-                    Integer priority = (Integer) entry.priority
+            for (Map.Entry<Object, Object> entry: oneOfFeaturesMap.entrySet()) {
+                List<Map> oneOfFeatures = []
+                def group = new OneOfFeatureGroup(name: entry.getKey().toString(), oneOfFeaturesData: oneOfFeatures)
+                if (entry.getValue() instanceof List) {
+                    for (feature in (List) entry.getValue()) {
+                        if (feature instanceof Map) {
+                            String name = (String) feature.feature
+                            Integer priority = (Integer) feature.priority
 
-                    oneOfFeatureMaps.add([name: feature, priority: priority])
-
+                            oneOfFeatures.add([name: name, priority: priority])
+                        }
+                    }
                 }
+                oneOfFeatureGroups.add(group)
             }
+
 
             defaultFeaturesNames.addAll(defaultFeatures)
             requiredFeatureNames.addAll(requiredFeatures)
@@ -257,17 +264,14 @@ abstract class AbstractProfile implements Profile {
 
     @Override
     @CompileStatic(TypeCheckingMode.SKIP)
-    Iterable<OneOfFeature> getOneOfFeatures() {
+    Iterable<OneOfFeatureGroup> getOneOfFeatures() {
         List<Feature> features = getFeatures().toList()
-        List<OneOfFeature> oneOfFeatures = []
-        for (Map<String, Object> map: oneOfFeatureMaps) {
-            Feature f = features.find { it.name == map.name }
-            if (f) {
-                oneOfFeatures.add(new OneOfFeature(feature: f, priority: (Integer) map.priority))
-            }
+
+        oneOfFeatureGroups.each {
+            it.initialize(features)
         }
-        //descending
-        oneOfFeatures.sort { a, b -> a.priority <=> b.priority}
+
+        oneOfFeatureGroups
     }
 
     @Override

@@ -16,10 +16,18 @@
 
 package io.micronaut.cli.io.support
 
-class BuildTokens {
+import io.micronaut.cli.profile.Feature
+import io.micronaut.cli.profile.Profile
+
+abstract class BuildTokens {
     final String sourceLanguage, testFramework
+
     BuildTokens(String sourceLanguage, String testFramework) {
         this.sourceLanguage = sourceLanguage
         this.testFramework = testFramework
     }
+
+    abstract Map getTokens(Profile profile, List<Feature> features)
+
+    abstract Map getTokens(List<String> services)
 }
