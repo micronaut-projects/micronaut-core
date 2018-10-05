@@ -29,6 +29,7 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.NettyHttpHeaders;
@@ -224,7 +225,14 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
                 Optional<MediaTypeCodec> foundCodec = mediaTypeCodecRegistry.findCodec(contentType.get());
                 if (foundCodec.isPresent()) {
                     MediaTypeCodec codec = foundCodec.get();
-                    return Optional.of(codec.decode(type, byteBufferFactory.wrap(content)));
+                    try {
+                        return Optional.of(codec.decode(type, byteBufferFactory.wrap(content)));
+                    } catch (CodecException e) {
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("Unable to decode response body using codec " + codec.getClass().getSimpleName() + ":" + e.getMessage(), e);
+                        }
+                        return Optional.empty();
+                    }
                 }
             }
         } else if (!hasContentType && LOG.isTraceEnabled()) {
