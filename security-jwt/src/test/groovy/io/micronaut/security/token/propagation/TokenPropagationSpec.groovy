@@ -7,6 +7,7 @@ import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.security.authentication.UsernamePasswordCredentials
@@ -16,6 +17,8 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Stepwise
+
+import java.time.Duration
 
 @Stepwise
 class TokenPropagationSpec extends Specification {
@@ -135,8 +138,11 @@ class TokenPropagationSpec extends Specification {
         then:
         noExceptionThrown()
 
+
         when:
-        gatewayClient = gatewayEmbeddedServer.applicationContext.createBean(RxHttpClient, gatewayEmbeddedServer.getURL())
+        def configuration = new DefaultHttpClientConfiguration()
+        configuration.setReadTimeout(Duration.ofSeconds(30))
+        gatewayClient = gatewayEmbeddedServer.applicationContext.createBean(RxHttpClient, gatewayEmbeddedServer.getURL(), configuration)
 
         then:
         noExceptionThrown()
