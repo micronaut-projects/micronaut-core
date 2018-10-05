@@ -162,6 +162,11 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     String HEROKU = "heroku";
 
     /**
+     * The key used to load additional property sources.
+     */
+    String PROPERTY_SOURCES_KEY = "micronaut.config.files";
+
+    /**
      * Should respect the order as provided.
      *
      * @return The active environment names

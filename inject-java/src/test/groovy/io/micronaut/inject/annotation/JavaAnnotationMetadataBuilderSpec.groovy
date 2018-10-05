@@ -52,6 +52,7 @@ class Test {
         metadata.getAnnotationNameByStereotype(Scope).get() == ScopeTwo.name
     }
 
+
     void "test annotation names by stereotype"() {
         given:
         AnnotationMetadata metadata = buildTypeAnnotationMetadata('''\

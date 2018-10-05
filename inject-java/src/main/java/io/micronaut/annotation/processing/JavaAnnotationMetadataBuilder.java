@@ -251,9 +251,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                                 defaultValues.put(executableElement, executableElement.getDefaultValue())
                         );
 
-                if (!defaultValues.isEmpty()) {
-                    defaults.put(annotationName, defaultValues);
-                }
+                defaults.put(annotationName, defaultValues);
             }
         }
         return ANNOTATION_DEFAULTS.get(getAnnotationTypeName(annotationMirror));

@@ -611,6 +611,9 @@ public class DefaultBeanContext implements BeanContext {
     protected <T> T doCreateBean(BeanResolutionContext resolutionContext, BeanDefinition<T> definition, Class<T> beanType, Qualifier<T> qualifier, Object... args) {
         Map<String, Object> argumentValues;
         if (definition instanceof ParametrizedBeanFactory) {
+            if (LOG.isTraceEnabled()) {
+                LOG.trace("Creating bean for parameters: {}", ArrayUtils.toString(args));
+            }
             Argument[] requiredArguments = ((ParametrizedBeanFactory) definition).getRequiredArguments();
             argumentValues = new LinkedHashMap<>(requiredArguments.length);
             BeanResolutionContext.Path path = resolutionContext.getPath();
@@ -648,6 +651,10 @@ public class DefaultBeanContext implements BeanContext {
             }
         } else {
             argumentValues = Collections.emptyMap();
+        }
+
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("Computed bean argument values: {}", argumentValues);
         }
         T createdBean = doCreateBean(resolutionContext, definition, qualifier, false, argumentValues);
         if (createdBean == null) {
