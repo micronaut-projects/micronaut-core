@@ -16,12 +16,15 @@
 
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.ValueResolver;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.MethodInjectionPoint;
 
+import javax.annotation.Nullable;
 import java.util.Deque;
 import java.util.Map;
 import java.util.Optional;
@@ -32,6 +35,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 public interface BeanResolutionContext extends Map<String, Object>, ValueResolver<CharSequence> {
 
     /**
@@ -48,6 +52,22 @@ public interface BeanResolutionContext extends Map<String, Object>, ValueResolve
      * @return The path that this resolution has taken so far
      */
     Path getPath();
+
+    /**
+     * Adds a bean that is created as part of the resolution. This is used to store references to instances passed to {@link BeanContext#inject(Object)}
+     * @param beanIdentifier The bean identifier
+     * @param instance The instance
+     * @param <T> THe instance type
+     */
+    <T> void addInFlightBean(BeanIdentifier beanIdentifier, T instance);
+
+    /**
+     * Obtains an inflight bean for the given identifier
+     * @param beanIdentifier The bean identifier
+     * @param <T> The bean type
+     * @return The bean
+     */
+    @Nullable <T> T getInFlightBean(BeanIdentifier beanIdentifier);
 
     /**
      * Represents a path taken to resolve a bean definitions dependencies.

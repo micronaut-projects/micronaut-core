@@ -75,6 +75,11 @@ interface Feature {
     Iterable<Feature> getDependentFeatures(Profile profile)
 
     /**
+     * @return The default feature names
+     */
+    Iterable<Feature> getDefaultFeatures(Profile profile)
+
+    /**
      * @param Whether the feature was requested on the command line
      */
     void setRequested(Boolean requested)

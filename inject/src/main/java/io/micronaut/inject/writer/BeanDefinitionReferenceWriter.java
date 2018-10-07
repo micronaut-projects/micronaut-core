@@ -56,7 +56,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
      * @param annotationMetadata The annotation metadata
      */
     public BeanDefinitionReferenceWriter(String beanTypeName, String beanDefinitionName, AnnotationMetadata annotationMetadata) {
-        super(beanDefinitionName + REF_SUFFIX, annotationMetadata);
+        super(beanDefinitionName + REF_SUFFIX, annotationMetadata, true);
         this.beanTypeName = beanTypeName;
         this.beanDefinitionName = beanDefinitionName;
         this.beanDefinitionReferenceClassName = beanDefinitionName + REF_SUFFIX;
@@ -73,6 +73,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     public void accept(ClassWriterOutputVisitor outputVisitor) throws IOException {
         if (annotationMetadataWriter != null) {
             annotationMetadataWriter.accept(outputVisitor);
+            annotationMetadataWriter.clearDefaults();
         }
         try (OutputStream outputStream = outputVisitor.visitClass(getBeanDefinitionQualifiedClassName())) {
             ClassWriter classWriter = generateClassBytes();

@@ -18,6 +18,8 @@ package io.micronaut.scheduling.executor;
 
 import io.micronaut.core.annotation.NonBlocking;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.scheduling.TaskExecutors;
 
@@ -54,10 +56,23 @@ public class DefaultExecutorSelector implements ExecutorSelector {
             return Optional.empty();
         } else {
             Class returnType = method.getReturnType().getType();
-            if (Publishers.isConvertibleToPublisher(returnType) || CompletableFuture.class.isAssignableFrom(returnType)) {
+            if (isNonBlocking(returnType)) {
                 return Optional.empty();
+            }
+            if (HttpResponse.class.isAssignableFrom(returnType)) {
+                Optional<Argument<?>> generic = method.getReturnType().getFirstTypeVariable();
+                if (generic.isPresent()) {
+                    Class argumentType = generic.get().getType();
+                    if (isNonBlocking(argumentType)) {
+                        return Optional.empty();
+                    }
+                }
             }
         }
         return Optional.of(ioExecutor);
+    }
+
+    private boolean isNonBlocking(Class type) {
+        return Publishers.isConvertibleToPublisher(type) || CompletableFuture.class.isAssignableFrom(type);
     }
 }

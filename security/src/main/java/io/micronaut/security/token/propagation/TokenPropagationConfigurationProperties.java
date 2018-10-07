@@ -50,9 +50,9 @@ public class TokenPropagationConfigurationProperties implements TokenPropagation
 
     private String uriRegex;
 
-    Pattern serviceIdPattern;
+    private Pattern serviceIdPattern;
 
-    Pattern uriPattern;
+    private Pattern uriPattern;
 
     private String path = DEFAULT_PATH;
 

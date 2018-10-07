@@ -21,6 +21,7 @@ import groovy.transform.CompileStatic
 import io.micronaut.cli.MicronautCli
 import io.micronaut.cli.console.logging.ConsoleAntBuilder
 import io.micronaut.cli.console.logging.MicronautConsole
+import io.micronaut.cli.io.support.BuildTokens
 import io.micronaut.cli.io.support.GradleBuildTokens
 import io.micronaut.cli.io.support.MavenBuildTokens
 import io.micronaut.cli.profile.ExecutionContext
@@ -64,32 +65,32 @@ class CreateFederationCommand extends AbstractCreateCommand {
         final File serviceDir = inplace ? new File('.').canonicalFile : new File(executionContext.baseDir, federationName)
         final String profileName = evaluateProfileName()
 
-        for (String service : services) {
-            final CreateServiceCommandObject cmd = new CreateServiceCommandObject(
-                appName: service,
-                baseDir: serviceDir,
-                profileName: profileName,
+        final CreateServiceCommandObject parent = new CreateServiceCommandObject(
+                appName: federationName,
+                baseDir: executionContext.baseDir,
+                profileName: 'federation',
                 micronautVersion: micronautVersion,
                 features: featureSet,
-                inplace: false,
+                inplace: this.inplace,
                 build: this.build.toString(),
-                console: executionContext.console,
-                skeletonExclude: ["gradle*", "gradle/", ".mvn/", "mvnw*"]
-            )
-            super.handle(cmd)
-        }
-
-        final CreateServiceCommandObject parent = new CreateServiceCommandObject(
-            appName: federationName,
-            baseDir: executionContext.baseDir,
-            profileName: 'federation',
-            micronautVersion: micronautVersion,
-            features: featureSet,
-            inplace: this.inplace,
-            build: this.build.toString(),
-            console: executionContext.console
+                console: executionContext.console
         )
-        super.handle(parent)
+        if (super.handle(parent)) {
+            for (String service : services) {
+                final CreateServiceCommandObject cmd = new CreateServiceCommandObject(
+                        appName: service,
+                        baseDir: serviceDir,
+                        profileName: profileName,
+                        micronautVersion: micronautVersion,
+                        features: featureSet,
+                        inplace: false,
+                        build: this.build.toString(),
+                        console: executionContext.console,
+                        skeletonExclude: ["gradle*", "gradle/", ".mvn/", "mvnw*"]
+                )
+                super.handle(cmd)
+            }
+        }
     }
 
     @Override
@@ -104,18 +105,10 @@ class CreateFederationCommand extends AbstractCreateCommand {
 
     @Override
     @CompileDynamic
-    protected void replaceBuildTokens(String build, Profile profile, List features, File targetDirectory) {
-        super.replaceBuildTokens(build, profile, features, targetDirectory)
-
+    protected void withTokens(BuildTokens buildTokens) {
         final AntBuilder ant = new ConsoleAntBuilder()
 
-        Map tokens = [:]
-        if (build == "gradle") {
-            tokens = new GradleBuildTokens().getTokens(services)
-        }
-        if (build == "maven") {
-            tokens = new MavenBuildTokens().getTokens(services)
-        }
+        Map tokens = buildTokens.getTokens(services)
 
         ant.replace(dir: targetDirectory) {
             tokens.each { k, v ->
@@ -125,7 +118,6 @@ class CreateFederationCommand extends AbstractCreateCommand {
                 }
             }
         }
-
     }
 
 }

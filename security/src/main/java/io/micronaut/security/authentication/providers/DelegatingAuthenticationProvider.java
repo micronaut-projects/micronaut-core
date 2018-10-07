@@ -27,6 +27,7 @@ import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
+import java.util.List;
 
 /**
  * AuthenticationProvider typically used with a persistence mechanism such as a DB.
@@ -63,12 +64,8 @@ public class DelegatingAuthenticationProvider implements AuthenticationProvider 
      */
     @Override
     public Publisher<AuthenticationResponse> authenticate(AuthenticationRequest authenticationRequest) {
-        final String username = authenticationRequest.getIdentity().toString();
 
-        Flowable<UserState> userState = Flowable.fromPublisher(userFetcher.findByUsername(username));
-
-        // TODO: handle exception?
-        return userState.switchMap(user -> {
+        return Flowable.fromPublisher(fetchUserState(authenticationRequest)).switchMap(user -> {
             if (!user.isEnabled()) {
                 return Flowable.just(new AuthenticationFailed(AuthenticationFailureReason.USER_DISABLED));
             }
@@ -84,10 +81,44 @@ public class DelegatingAuthenticationProvider implements AuthenticationProvider 
             if (!passwordEncoder.matches(authenticationRequest.getSecret().toString(), user.getPassword())) {
                 return Flowable.just(new AuthenticationFailed(AuthenticationFailureReason.CREDENTIALS_DO_NOT_MATCH));
             }
-            return Flowable
-                .fromPublisher(authoritiesFetcher.findAuthoritiesByUsername(username))
-                .map(authorities -> new UserDetails(username, authorities));
+            return createSuccessfulAuthenticationResponse(authenticationRequest, user);
         }).switchIfEmpty(Flowable.just(new AuthenticationFailed(AuthenticationFailureReason.USER_NOT_FOUND)));
+    }
 
+    /**
+     *
+     * @param authenticationRequest The authentication request data
+     * @return {@link io.micronaut.security.authentication.providers.UserState}. A representation of the state of a user after authentication.
+     */
+    protected Publisher<UserState> fetchUserState(AuthenticationRequest authenticationRequest) {
+        final String username = authenticationRequest.getIdentity().toString();
+        return userFetcher.findByUsername(username);
+    }
+
+    /**
+     * Create a successful {@link io.micronaut.security.authentication.AuthenticationResponse}.
+     *
+     * @param authenticationRequest The authentication request data
+     * @param user A representation of the state of a user after authentication.
+     * @return An AuthenticationResponse object which encapsulates a successful authentication result.
+     */
+    protected Publisher<AuthenticationResponse> createSuccessfulAuthenticationResponse(AuthenticationRequest authenticationRequest, UserState user) {
+        return Flowable
+                .fromPublisher(authoritiesFetcher.findAuthoritiesByUsername(user.getUsername()))
+                .map(authorities -> createSuccessfulAuthenticationResponse(authenticationRequest, user, authorities));
+    }
+
+    /**
+     * Create a successful {@link io.micronaut.security.authentication.AuthenticationResponse}.
+     *
+     * @param authenticationRequest The authentication request data
+     * @param user A representation of the state of a user after authentication.
+     * @param authorities A list of authorities granted to authenticated user.
+     * @return An AuthenticationResponse object which encapsulates a successful authentication result.
+     */
+    protected AuthenticationResponse createSuccessfulAuthenticationResponse(AuthenticationRequest authenticationRequest,
+                                                                 UserState user,
+                                                                 List<String> authorities) {
+        return new UserDetails(user.getUsername(), authorities);
     }
 }

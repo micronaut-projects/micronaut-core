@@ -37,24 +37,29 @@ public class JavaModelUtils {
      */
     public static String getClassName(TypeElement typeElement) {
         Name qualifiedName = typeElement.getQualifiedName();
-        NestingKind nestingKind = typeElement.getNestingKind();
-        if (nestingKind == NestingKind.MEMBER) {
-            TypeElement enclosingElement = typeElement;
-            StringBuilder builder = new StringBuilder();
-            while (nestingKind == NestingKind.MEMBER) {
-                builder.insert(0, '$').insert(1, enclosingElement.getSimpleName());
-                Element enclosing = enclosingElement.getEnclosingElement();
+        NestingKind nestingKind = null;
+        try {
+            nestingKind = typeElement.getNestingKind();
+            if (nestingKind == NestingKind.MEMBER) {
+                TypeElement enclosingElement = typeElement;
+                StringBuilder builder = new StringBuilder();
+                while (nestingKind == NestingKind.MEMBER) {
+                    builder.insert(0, '$').insert(1, enclosingElement.getSimpleName());
+                    Element enclosing = enclosingElement.getEnclosingElement();
 
-                if (enclosing instanceof TypeElement) {
-                    enclosingElement = (TypeElement) enclosing;
-                    nestingKind = enclosingElement.getNestingKind();
-                } else {
-                    break;
+                    if (enclosing instanceof TypeElement) {
+                        enclosingElement = (TypeElement) enclosing;
+                        nestingKind = enclosingElement.getNestingKind();
+                    } else {
+                        break;
+                    }
                 }
+                Name enclosingName = enclosingElement.getQualifiedName();
+                return enclosingName.toString() + builder;
+            } else {
+                return qualifiedName.toString();
             }
-            Name enclosingName = enclosingElement.getQualifiedName();
-            return enclosingName.toString() + builder;
-        } else {
+        } catch (RuntimeException e) {
             return qualifiedName.toString();
         }
     }

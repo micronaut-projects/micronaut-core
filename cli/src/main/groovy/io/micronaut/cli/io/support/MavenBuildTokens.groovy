@@ -42,6 +42,7 @@ class MavenBuildTokens extends BuildTokens {
         scopeConversions.put("testCompileOnly", "test")
     }
 
+    @Override
     Map getTokens(Profile profile, List<Feature> features) {
         Map tokens = [:]
         tokens.put("testFramework", testFramework)
@@ -146,7 +147,11 @@ class MavenBuildTokens extends BuildTokens {
             annotationProcessorPathsXml."$methodToCall" {
                 groupId(artifact.groupId)
                 artifactId(artifact.artifactId)
-                version("\${micronaut.version}")
+                if (artifact.groupId.startsWith("io.micronaut")) {
+                    version("\${micronaut.version}")
+                } else {
+                    version(artifact.version)
+                }
             }
         }
 
@@ -160,6 +165,7 @@ class MavenBuildTokens extends BuildTokens {
         tokens
     }
 
+    @Override
     Map getTokens(List<String> services) {
         final StringWriter modulesWriter = new StringWriter()
         MarkupBuilder modulesXml = new MarkupBuilder(modulesWriter)

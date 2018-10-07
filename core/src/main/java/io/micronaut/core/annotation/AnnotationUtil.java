@@ -93,6 +93,7 @@ public class AnnotationUtil {
      * @return A unmodifiable, pooled set of strings
      */
     @SuppressWarnings({"unused", "unchecked"})
+    @UsedByGeneratedCode
     public static List<String> internListOf(Object... objects) {
         if (objects == null || objects.length == 0) {
             return Collections.EMPTY_LIST;
@@ -113,6 +114,7 @@ public class AnnotationUtil {
      * @see io.micronaut.core.util.CollectionUtils#mapOf(Object...)
      */
     @SuppressWarnings("unused")
+    @UsedByGeneratedCode
     public static Map<String, Object> internMapOf(Object... values) {
         if (values == null || values.length == 0) {
             return Collections.emptyMap();

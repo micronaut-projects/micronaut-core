@@ -16,9 +16,11 @@
 
 package io.micronaut.inject.annotation;
 
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -35,6 +37,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * Support method for {@link io.micronaut.core.annotation.AnnotationMetadata}.
@@ -45,8 +49,10 @@ import java.util.concurrent.ConcurrentHashMap;
 @Internal
 class AnnotationMetadataSupport {
 
+    static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
+
     private static final Map<Class<? extends Annotation>, Optional<Constructor<InvocationHandler>>> ANNOTATION_PROXY_CACHE = new ConcurrentHashMap<>(20);
-    private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
+    private static final Map<String, Class<? extends Annotation>> ANNOTATION_TYPES = new ConcurrentHashMap<>(20);
 
     /**
      * @param annotation The annotation
@@ -55,6 +61,29 @@ class AnnotationMetadataSupport {
     @SuppressWarnings("unchecked")
     static Map<String, Object> getDefaultValues(String annotation) {
         return ANNOTATION_DEFAULTS.computeIfAbsent(annotation, s -> Collections.EMPTY_MAP);
+    }
+
+    /**
+     * Gets a registered annotation type.
+     *
+     * @param name The name of the annotation type
+     * @return The annotation
+     */
+    static Optional<Class<? extends Annotation>> getAnnotationType(String name) {
+        final Class<? extends Annotation> type = ANNOTATION_TYPES.get(name);
+        if (type != null) {
+            return Optional.of(type);
+        } else {
+            // last resort, try dynamic load, shouldn't normally happen.
+            final Optional<Class> aClass = ClassUtils.forName(name, AnnotationMetadataSupport.class.getClassLoader());
+            return aClass.flatMap((Function<Class, Optional<Class<? extends Annotation>>>) aClass1 -> {
+                if (Annotation.class.isAssignableFrom(aClass1)) {
+                    //noinspection unchecked
+                    return Optional.of(aClass1);
+                }
+                return Optional.empty();
+            });
+        }
     }
 
     /**
@@ -83,8 +112,37 @@ class AnnotationMetadataSupport {
      * @param defaultValues The default values
      */
     static void registerDefaultValues(String annotation, Map<String, Object> defaultValues) {
-        if (StringUtils.isNotEmpty(annotation) && CollectionUtils.isNotEmpty(defaultValues)) {
+        if (StringUtils.isNotEmpty(annotation)) {
             ANNOTATION_DEFAULTS.put(annotation.intern(), defaultValues);
+        }
+    }
+
+    /**
+     * Registers default values for the given annotation and values.
+     *
+     * @param annotation The annotation
+     * @param defaultValues The default values
+     */
+    static void registerDefaultValues(AnnotationClassValue<?> annotation, Map<String, Object> defaultValues) {
+        registerDefaultValues(annotation.getName(), defaultValues);
+        registerAnnotationType(annotation);
+    }
+
+
+    /**
+     * Registers a annotation type.
+     *
+     * @param annotationClassValue the annotation class value
+     */
+    @SuppressWarnings("unchecked")
+    private static void registerAnnotationType(AnnotationClassValue<?> annotationClassValue) {
+        final String name = annotationClassValue.getName();
+        if (!ANNOTATION_TYPES.containsKey(name)) {
+            annotationClassValue.getType().ifPresent((Consumer<Class<?>>) aClass -> {
+                if (Annotation.class.isAssignableFrom(aClass)) {
+                    ANNOTATION_TYPES.put(name, (Class<? extends Annotation>) aClass);
+                }
+            });
         }
     }
 

@@ -18,6 +18,7 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
@@ -42,13 +43,7 @@ import javax.lang.model.util.Types;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.reflect.Array;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Stream;
 
 /**
@@ -59,7 +54,7 @@ import java.util.stream.Stream;
  */
 public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<Element, AnnotationMirror> {
 
-    public static final Map<String, Map<Element, javax.lang.model.element.AnnotationValue>> ANNOTATION_DEFAULTS = new HashMap<>();
+    private static final Map<String, Map<Element, javax.lang.model.element.AnnotationValue>> ANNOTATION_DEFAULTS = new HashMap<>();
 
     private final Elements elementUtils;
     private final Messager messager;
@@ -256,9 +251,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                                 defaultValues.put(executableElement, executableElement.getDefaultValue())
                         );
 
-                if (!defaultValues.isEmpty()) {
-                    defaults.put(annotationName, defaultValues);
-                }
+                defaults.put(annotationName, defaultValues);
             }
         }
         return ANNOTATION_DEFAULTS.get(getAnnotationTypeName(annotationMirror));
@@ -459,7 +452,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                 Element typeElement = ((DeclaredType) t).asElement();
                 if (typeElement instanceof TypeElement) {
                     String className = JavaModelUtils.getClassName((TypeElement) typeElement);
-                    annotationValues.put(memberName, className);
+                    annotationValues.put(memberName, new AnnotationClassValue<>(className));
                 }
             }
             return null;
@@ -572,11 +565,12 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
             @Override
             public Object visitType(TypeMirror t, Object o) {
-                arrayType = String.class;
+                arrayType = AnnotationClassValue.class;
                 if (t instanceof DeclaredType) {
                     Element typeElement = ((DeclaredType) t).asElement();
                     if (typeElement instanceof TypeElement) {
-                        values.add(JavaModelUtils.getClassName((TypeElement) typeElement));
+                        final String className = JavaModelUtils.getClassName((TypeElement) typeElement);
+                        values.add(new AnnotationClassValue<>(className));
                     }
                 }
                 return null;

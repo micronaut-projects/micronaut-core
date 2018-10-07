@@ -19,6 +19,7 @@ import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.context.annotation.Primary
 import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationMetadata
 
 import javax.inject.Named
@@ -154,7 +155,7 @@ class Test {
         metadata.getValue(Requirements).get()[0] instanceof io.micronaut.core.annotation.AnnotationValue
         metadata.getValue(Requirements).get()[0].values.get('property') == 'blah'
         metadata.getValue(Requirements).get()[1] instanceof io.micronaut.core.annotation.AnnotationValue
-        metadata.getValue(Requirements).get()[1].values.get('classes') == ['test.Test'] as Object[]
+        metadata.getValue(Requirements).get()[1].values.get('classes') == [new AnnotationClassValue('test.Test')] as AnnotationClassValue[]
 
         when:
         Requires[] requires = metadata.synthesize(Requirements).value()

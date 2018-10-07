@@ -33,5 +33,15 @@ public interface CustomScopeRegistry {
      * @param scopeAnnotation The scope annotation
      * @return The custom scope
      */
-    Optional<CustomScope> findScope(Class<? extends Annotation> scopeAnnotation);
+    Optional<CustomScope> findScope(String scopeAnnotation);
+
+    /**
+     * Find a custom scope for the given annotation.
+     *
+     * @param scopeAnnotation The scope annotation
+     * @return The custom scope
+     */
+    default Optional<CustomScope> findScope(Class<? extends Annotation> scopeAnnotation) {
+        return findScope(scopeAnnotation.getName());
+    }
 }

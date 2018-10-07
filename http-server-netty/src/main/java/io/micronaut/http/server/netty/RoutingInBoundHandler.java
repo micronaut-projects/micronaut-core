@@ -255,7 +255,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         }
 
         if (errorRoute != null) {
-            logException(cause);
 
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Found matching exception handler for exception [{}]: {}", cause.getMessage(), errorRoute);
@@ -266,6 +265,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 Object result = errorRoute.execute();
                 io.micronaut.http.MutableHttpResponse<?> response = errorResultToResponse(result);
                 MethodBasedRouteMatch<?, ?> methodBasedRoute = (MethodBasedRouteMatch) errorRoute;
+                response.setAttribute(HttpAttributes.ROUTE_MATCH, errorRoute);
+
                 AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(nettyHttpRequest);
                 Flowable<MutableHttpResponse<?>> routePublisher = buildRoutePublisher(
                         methodBasedRoute.getDeclaringType(),
@@ -285,6 +286,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         filteredPublisher
                 );
 
+                if (serverConfiguration.isLogHandledExceptions()) {
+                    logException(cause);
+                }
+
             } catch (Throwable e) {
                 if (LOG.isErrorEnabled()) {
                     LOG.error("Exception occurred executing error handler. Falling back to default error handling: " + e.getMessage(), e);
@@ -292,6 +297,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 writeDefaultErrorResponse(ctx, nettyHttpRequest, e);
             }
         } else {
+
             Optional<ExceptionHandler> exceptionHandler = beanLocator
                     .findBean(ExceptionHandler.class, Qualifiers.byTypeArguments(cause.getClass(), Object.class));
 
@@ -319,6 +325,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             requestReference,
                             filteredPublisher
                     );
+
+                    if (serverConfiguration.isLogHandledExceptions()) {
+                        logException(cause);
+                    }
                 } catch (Throwable e) {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Exception occurred executing error handler. Falling back to default error handling.");
@@ -819,6 +829,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             ReturnType<?> genericReturnType = finalRoute.getReturnType();
             Class<?> javaReturnType = genericReturnType.getType();
 
+            if (HttpResponse.class.isAssignableFrom(javaReturnType)) {
+                Optional<Argument<?>> generic = genericReturnType.getFirstTypeVariable();
+                if (generic.isPresent()) {
+                    javaReturnType = generic.get().getType();
+                }
+            }
+
             AtomicReference<io.micronaut.http.HttpRequest<?>> requestReference = new AtomicReference<>(request);
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
             boolean isReactiveReturnType = Publishers.isConvertibleToPublisher(javaReturnType) || isFuture;
@@ -840,11 +857,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             // here we transform the result of the controller action into a MutableHttpResponse
             Flowable<MutableHttpResponse<?>> routePublisher = resultEmitter.map((message) -> {
-                HttpResponse<?> response = messageToResponse(finalRoute, message);
+                RouteMatch<?> routeMatch = finalRoute;
+                HttpResponse<?> response = messageToResponse(routeMatch, message);
                 MutableHttpResponse<?> finalResponse = (MutableHttpResponse<?>) response;
                 HttpStatus status = finalResponse.getStatus();
+
                 if (status.getCode() >= HttpStatus.BAD_REQUEST.getCode()) {
-                    Class declaringType = ((MethodBasedRouteMatch) finalRoute).getDeclaringType();
+                    Class declaringType = ((MethodBasedRouteMatch) routeMatch).getDeclaringType();
                     // handle re-mapping of errors
                     Optional<RouteMatch<Object>> statusRoute = Optional.empty();
                     // if declaringType is not null, this means its a locally marked method handler
@@ -857,21 +876,24 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     io.micronaut.http.HttpRequest<?> httpRequest = requestReference.get();
 
                     if (statusRoute.isPresent()) {
-                        RouteMatch<Object> newRoute = statusRoute.get();
-                        requestArgumentSatisfier.fulfillArgumentRequirements(newRoute, httpRequest, true);
+                        routeMatch = statusRoute.get();
+                        httpRequest.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
 
-                        if (newRoute.isExecutable()) {
+                        requestArgumentSatisfier.fulfillArgumentRequirements(routeMatch, httpRequest, true);
+
+                        if (routeMatch.isExecutable()) {
                             Object result;
                             try {
-                                result = newRoute.execute();
-                                finalResponse = messageToResponse(newRoute, result);
+                                result = routeMatch.execute();
+                                finalResponse = messageToResponse(routeMatch, result);
                             } catch (Throwable e) {
-                                throw new InternalServerException("Error executing status route [" + newRoute + "]: " + e.getMessage(), e);
+                                throw new InternalServerException("Error executing status route [" + routeMatch + "]: " + e.getMessage(), e);
                             }
                         }
                     }
 
                 }
+                finalResponse.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
                 return finalResponse;
             });
 
@@ -888,8 +910,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     routePublisher,
                     executor
             );
-
-
 
             boolean isStreaming = isReactiveReturnType && !isSingle;
 
@@ -982,6 +1002,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     } else {
                         response = newNotFoundError(httpRequest);
                     }
+                    response.setAttribute(HttpAttributes.ROUTE_MATCH, statusRoute);
                 } else {
                     response = newNotFoundError(httpRequest);
                 }

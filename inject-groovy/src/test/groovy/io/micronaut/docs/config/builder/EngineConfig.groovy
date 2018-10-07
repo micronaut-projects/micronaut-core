@@ -34,7 +34,7 @@ class EngineConfig {
     @ConfigurationBuilder(prefixes = "with") // <2>
     EngineImpl.Builder builder = EngineImpl.builder()
 
-    @ConfigurationBuilder(prefixes = "with", configurationPrefix = "crankShaft") // <3>
+    @ConfigurationBuilder(prefixes = "with", configurationPrefix = "crank-shaft") // <3>
     CrankShaft.Builder crankShaft = CrankShaft.builder()
 }
 // end::class[]

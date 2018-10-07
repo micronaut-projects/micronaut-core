@@ -116,17 +116,23 @@ public class RefreshScope implements CustomScope<Refreshable>, LifeCycle<Refresh
 
     @Override
     public void onApplicationEvent(RefreshEvent event) {
-        executorService.execute(() -> {
-            Map<String, Object> changes = event.getSource();
-            if (changes == RefreshEvent.ALL_KEYS) {
-                disposeOfAllBeans();
-                refreshAllConfigurationProperties();
-            } else {
-                disposeOfBeanSubset(changes.keySet());
-                refreshSubsetOfConfigurationProperties(changes.keySet());
-            }
-        });
+        executorService.execute(() -> onRefreshEvent(event));
+    }
 
+    /**
+     * Handle a {@link RefreshEvent} synchronously. This method blocks unlike {@link #onApplicationEvent(RefreshEvent)}.
+     *
+     * @param event The event
+     */
+    public final void onRefreshEvent(RefreshEvent event) {
+        Map<String, Object> changes = event.getSource();
+        if (changes == RefreshEvent.ALL_KEYS) {
+            disposeOfAllBeans();
+            refreshAllConfigurationProperties();
+        } else {
+            disposeOfBeanSubset(changes.keySet());
+            refreshSubsetOfConfigurationProperties(changes.keySet());
+        }
     }
 
     @Override
