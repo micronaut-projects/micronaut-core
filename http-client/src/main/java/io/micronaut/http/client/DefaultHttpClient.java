@@ -2053,7 +2053,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
                     if (evt instanceof IdleStateEvent) {
                         // close the connection if it is idle for too long
-                        close(ctx, ctx.voidPromise());
+                        ctx.close();
                     } else {
                         super.userEventTriggered(ctx, evt);
                     }
