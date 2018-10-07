@@ -52,7 +52,7 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
      * @param annotationMetadata The annotation metadata
      */
     public BeanConfigurationWriter(String packageName, AnnotationMetadata annotationMetadata) {
-        super(packageName + '.' + CLASS_SUFFIX, annotationMetadata);
+        super(packageName + '.' + CLASS_SUFFIX, annotationMetadata, true);
         this.packageName = packageName;
         this.configurationClassName = targetClassType.getClassName();
         this.configurationClassInternalName = targetClassType.getInternalName();
@@ -63,6 +63,7 @@ public class BeanConfigurationWriter extends AbstractAnnotationMetadataWriter {
         AnnotationMetadataWriter annotationMetadataWriter = getAnnotationMetadataWriter();
         if (annotationMetadataWriter != null) {
             annotationMetadataWriter.accept(classWriterOutputVisitor);
+            annotationMetadataWriter.clearDefaults();
         }
         try (OutputStream outputStream = classWriterOutputVisitor.visitClass(configurationClassName)) {
             ClassWriter classWriter = generateClassBytes();

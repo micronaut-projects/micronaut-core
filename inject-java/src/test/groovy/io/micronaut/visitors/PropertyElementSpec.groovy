@@ -32,13 +32,22 @@ public class TestController {
     public int getAge() {
         return age;
     }
+    
+        
+    /**
+     * The age
+     */
+    @Get("/getMethod/{person}")
+    public int getAge( @javax.validation.constraints.NotBlank int age) {
+        return age;
+    }
 
     public String getName() {
         return name;
     }
     
     @javax.validation.constraints.NotBlank
-    public void setName(String n) {
+    public void setName(@javax.validation.constraints.NotBlank String n) {
         name = n;
     }
 }

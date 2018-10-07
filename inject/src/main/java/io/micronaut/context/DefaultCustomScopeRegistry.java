@@ -19,6 +19,7 @@ package io.micronaut.context;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.lang.annotation.Annotation;
@@ -36,17 +37,38 @@ import java.util.concurrent.ConcurrentHashMap;
 class DefaultCustomScopeRegistry implements CustomScopeRegistry {
 
     private final BeanLocator beanLocator;
-    private final Map<Class, Optional<CustomScope>> scopes = new ConcurrentHashMap<>(1);
+    private final Map<String, Optional<CustomScope>> scopes = new ConcurrentHashMap<>(2);
+    private final ClassLoader classLoader;
 
     /**
      * @param beanLocator The bean locator
+     * @param classLoader The class loader
      */
-    DefaultCustomScopeRegistry(BeanLocator beanLocator) {
+    DefaultCustomScopeRegistry(BeanLocator beanLocator, ClassLoader classLoader) {
         this.beanLocator = beanLocator;
+        this.classLoader = classLoader;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public Optional<CustomScope> findScope(Class<? extends Annotation> scopeAnnotation) {
-        return scopes.computeIfAbsent(scopeAnnotation, type -> beanLocator.findBean(CustomScope.class, Qualifiers.byTypeArguments(type)));
+        return scopes.computeIfAbsent(scopeAnnotation.getName(), s -> {
+            final Qualifier qualifier = Qualifiers.byTypeArguments(scopeAnnotation);
+            return beanLocator.findBean(CustomScope.class, qualifier);
+        });
     }
+
+    @SuppressWarnings("unchecked")
+    @Override
+    public Optional<CustomScope> findScope(String scopeAnnotation) {
+        return scopes.computeIfAbsent(scopeAnnotation, type -> {
+            final Optional<Class> scopeClass = ClassUtils.forName(type, classLoader);
+            if (scopeClass.isPresent()) {
+                final Qualifier qualifier = Qualifiers.byTypeArguments(scopeClass.get());
+                return beanLocator.findBean(CustomScope.class, qualifier);
+            }
+            return Optional.empty();
+        });
+    }
+
 }

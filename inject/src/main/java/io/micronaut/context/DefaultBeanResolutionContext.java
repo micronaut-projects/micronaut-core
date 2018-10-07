@@ -20,17 +20,10 @@ import io.micronaut.context.exceptions.CircularDependencyException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
-import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ConstructorInjectionPoint;
-import io.micronaut.inject.FieldInjectionPoint;
-import io.micronaut.inject.MethodInjectionPoint;
-import io.micronaut.inject.ProxyBeanDefinition;
+import io.micronaut.inject.*;
 
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.Optional;
+import javax.annotation.Nullable;
+import java.util.*;
 
 /**
  * Default implementation of the {@link BeanResolutionContext} interface.
@@ -44,6 +37,7 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
     private final BeanContext context;
     private final BeanDefinition rootDefinition;
     private final Path path;
+    private final Map<BeanIdentifier, Object> inFlightBeans = new HashMap<>(2);
 
     /**
      * @param context        The bean context
@@ -69,6 +63,18 @@ public class DefaultBeanResolutionContext extends LinkedHashMap<String, Object> 
     @Override
     public Path getPath() {
         return path;
+    }
+
+    @Override
+    public <T> void addInFlightBean(BeanIdentifier beanIdentifier, T instance) {
+        inFlightBeans.put(beanIdentifier, instance);
+    }
+
+    @SuppressWarnings("unchecked")
+    @Nullable
+    @Override
+    public <T> T getInFlightBean(BeanIdentifier beanIdentifier) {
+        return (T) inFlightBeans.get(beanIdentifier);
     }
 
     @Override

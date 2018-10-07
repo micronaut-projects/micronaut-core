@@ -51,7 +51,7 @@ public class DefaultReactiveMongoConfiguration extends AbstractReactiveMongoConf
     @ConfigurationBuilder(prefixes = "", configurationPrefix = "server")
     protected ServerSettings.Builder serverSettings = ServerSettings.builder();
 
-    @ConfigurationBuilder(prefixes = "", configurationPrefix = "connectionPool")
+    @ConfigurationBuilder(prefixes = "", configurationPrefix = "connection-pool")
     protected ConnectionPoolSettings.Builder poolSettings = ConnectionPoolSettings.builder();
 
     @ConfigurationBuilder(prefixes = "", configurationPrefix = "socket")

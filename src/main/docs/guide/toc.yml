@@ -290,6 +290,7 @@ cli:
     springloaded: Spring-Loaded
     gradleReload: Reloading with Gradle
     ideReload: Reloading with an IDE
+  proxy: Proxy Configuration
 appendix:
   title: Appendices
   faq: Frequently Asked Questions (FAQ)

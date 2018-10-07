@@ -57,6 +57,11 @@ import java.util.stream.Stream;
 public interface Environment extends PropertyResolver, LifeCycle<Environment>, ConversionService<Environment>, ResourceLoader {
 
     /**
+     * Constant for the the name micronaut.
+     */
+    String MICRONAUT = "micronaut";
+
+    /**
      * The test environment.
      */
     String TEST = "test";
@@ -155,6 +160,11 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      * Running on Heroku.
      */
     String HEROKU = "heroku";
+
+    /**
+     * The key used to load additional property sources.
+     */
+    String PROPERTY_SOURCES_KEY = "micronaut.config.files";
 
     /**
      * Should respect the order as provided.

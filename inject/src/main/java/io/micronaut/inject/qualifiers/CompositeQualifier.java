@@ -47,9 +47,19 @@ class CompositeQualifier<T> implements Qualifier<T> {
     public <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates) {
         Stream<BT> reduced = candidates;
         for (Qualifier qualifier : qualifiers) {
-            reduced = qualifier.reduce(beanType, candidates);
+            reduced = qualifier.reduce(beanType, reduced);
         }
         return reduced;
+    }
+
+    @Override
+    public boolean contains(Qualifier<T> qualifier) {
+        for (Qualifier q : qualifiers) {
+            if (q.equals(qualifier)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

@@ -30,9 +30,9 @@ import org.eclipse.aether.graph.Dependency
 class GradleBuildTokens extends BuildTokens {
 
     static final SCOPE_MAP = [
-            compile: 'implementation',
-            runtime: 'runtimeOnly',
-            testCompile: 'testImplementation',
+            compile: 'compile',
+            runtime: 'runtime',
+            testCompile: 'testCompile',
     ]
 
     Map getTokens(Profile profile, List<Feature> features) {

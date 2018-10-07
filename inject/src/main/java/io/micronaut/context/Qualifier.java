@@ -42,6 +42,15 @@ public interface Qualifier<T> {
     <BT extends BeanType<T>> Stream<BT> reduce(Class<T> beanType, Stream<BT> candidates);
 
     /**
+     * Whether this qualifier contains the given qualifier.
+     * @param qualifier The qualifier
+     * @return True it does
+     */
+    default boolean contains(Qualifier<T> qualifier) {
+        return equals(qualifier);
+    }
+
+    /**
      * Qualify the candidate from the stream of candidates.
      *
      * @param beanType   The bean type

@@ -89,6 +89,12 @@ public class HttpServerConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final long DEFAULT_IDLETIME_SECONDS = 60;
 
+    /**
+     * The default value for log handled exceptions.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_LOGHANDLEDEXCEPTIONS = false;
+
     private Integer port;
     private String host;
     private Integer readTimeout;
@@ -100,6 +106,7 @@ public class HttpServerConfiguration {
     private CorsConfiguration cors = new CorsConfiguration();
     private String serverHeader;
     private boolean dateHeader = DEFAULT_DATEHEADER;
+    private boolean logHandledExceptions = DEFAULT_LOGHANDLEDEXCEPTIONS;
 
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
@@ -222,6 +229,14 @@ public class HttpServerConfiguration {
     }
 
     /**
+     * @return True if exceptions handled by either an error
+     * route or exception handler should be logged
+     */
+    public boolean isLogHandledExceptions() {
+        return logHandledExceptions;
+    }
+
+    /**
      * Sets the port to bind to. Default value ({@value #DEFAULT_RANDOM_PORT})
      *
      * @param port The port
@@ -316,6 +331,16 @@ public class HttpServerConfiguration {
      */
     public void setDateHeader(boolean dateHeader) {
         this.dateHeader = dateHeader;
+    }
+
+    /**
+     * Sets whether exceptions handled by either an error route or exception handler
+     * should still be logged. Default value ({@value #DEFAULT_LOGHANDLEDEXCEPTIONS }).
+     *
+     * @param logHandledExceptions True if exceptions should be logged
+     */
+    public void setLogHandledExceptions(boolean logHandledExceptions) {
+        this.logHandledExceptions = logHandledExceptions;
     }
 
     /**

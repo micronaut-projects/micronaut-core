@@ -52,7 +52,7 @@ The following table summarizes the constants provided by the api:context.env.Env
 
 |===
 
-Note that it may be that case that you have multiple active environment names since you may run Kubernetes on AWS for example.
+Note that it may be the case that you have multiple active environment names since you may run Kubernetes on AWS for example.
 
 In addition, using the value of the constants defined in the table above you can create environment specific configuration files. For example if you create a `src/main/resources/application-gcp.yml` file then that configuration will only be loaded when running on Google Compute.
 
@@ -64,7 +64,7 @@ TIP: Any configuration property in the api:context.env.Environment[] can also be
 
 When Micronaut detects it is running on Google Compute or AWS EC2, upon startup Micronaut will populate the interface api:discovery.cloud.ComputeInstanceMetadata[].
 
-TIP: Depending the environment you are running in the backing implementation will be either api:io.micronaut.discovery.cloud.gcp.GoogleComputeInstanceMetadata[] or api:io.micronaut.discovery.cloud.aws.AmazonEC2InstanceMetadata[] with metadata found from Google or Amazon's metadata services.
+TIP: Depending on the environment you are running in the backing implementation will be either api:io.micronaut.discovery.cloud.gcp.GoogleComputeInstanceMetadata[] or api:io.micronaut.discovery.cloud.aws.AmazonEC2InstanceMetadata[] with metadata found from Google or Amazon's metadata services.
 
 All of this data is merged together into the `metadata` property for the running api:discovery.ServiceInstance[].
 

@@ -60,3 +60,30 @@ include::{testsuite}/server/json/PersonController.java[tags=statusError, indent=
 IMPORTANT: A few things to note about the api:http.annotation.Error[] annotation. Two identical `@Error` annotations that are
 global cannot be declared. Two identical `@Error` annotations that are non-global cannot be declared in the same controller.
 If an `@Error` annotation with the same parameter exists as global and another as a local, the local one will take precedence.
+
+== ExceptionHandler
+
+Additionally you can implement a api:http.server.exceptions.ExceptionHandler[]; a generic hook for handling exceptions that occurs during the execution of an HTTP request.
+
+Imagine your e-commerce app throws an `OutOfStockException` when a book is out of stock:
+
+[source,java]
+----
+include::{testshttpservernetty}/http/server/exception/OutOfStockException.java[tags=clazz, indent=0]
+----
+
+[source,java]
+----
+include::{testshttpservernetty}/http/server/exception/BookController.java[tags=clazz, indent=0]
+----
+
+If you don't handle the exception the server returns a 500 (Internal Server Error) status code.
+
+If you want to respond 200 OK with 0 (stock level) as the response body when the `OutOfStockException` is thrown, you could register a `ExceptionHandler`:
+
+[source,java]
+----
+include::{testshttpservernetty}/http/server/exception/OutOfStockExceptionHandler.java[tags=clazz, indent=0]
+----
+
+IMPORTANT: An `@Error` annotation capturing an exception has precedence over an implementation of `ExceptionHandler` capturing the same exception.

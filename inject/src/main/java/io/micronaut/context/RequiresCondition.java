@@ -22,6 +22,7 @@ import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.context.condition.TrueCondition;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -388,40 +389,19 @@ public class RequiresCondition implements Condition {
 
     private boolean matchesPresenceOfClasses(ConditionContext context, AnnotationValue<Requires> requirements, String attr) {
         if (requirements.contains(attr)) {
-            Optional<String[]> classNames = requirements.get(attr, String[].class);
+            Optional<AnnotationClassValue[]> classNames = requirements.get(attr, AnnotationClassValue[].class);
             if (classNames.isPresent()) {
-                String[] names = classNames.get();
-                if (context instanceof ApplicationContext) {
-                    ApplicationContext ac = (ApplicationContext) context;
-                    Environment environment = ac.getEnvironment();
-
-                    // environment.isPresent(..) caches results, so we use it for efficiency
-                    for (String name : names) {
-                        if (!environment.isPresent(name)) {
-                            context.fail("Class [" + name + "] is not present");
-                            if (ClassLoadingReporter.isReportingEnabled()) {
-                                for (String n : names) {
-                                    ClassLoadingReporter.reportMissing(n);
-                                }
-                                reportMissingClass(context);
+                AnnotationClassValue[] classValues = classNames.get();
+                for (AnnotationClassValue classValue : classValues) {
+                    if (!classValue.getType().isPresent()) {
+                        context.fail("Class [" + classValue.getName() + "] is not present");
+                        if (ClassLoadingReporter.isReportingEnabled()) {
+                            for (AnnotationClassValue cv : classValues) {
+                                ClassLoadingReporter.reportMissing(cv.getName());
                             }
-                            return false;
+                            reportMissingClass(context);
                         }
-                    }
-                } else {
-
-                    ClassLoader classLoader = context.getBeanContext().getClassLoader();
-                    for (String name : names) {
-                        if (!ClassUtils.forName(name, classLoader).isPresent()) {
-                            if (ClassLoadingReporter.isReportingEnabled()) {
-                                for (String n : names) {
-                                    ClassLoadingReporter.reportMissing(n);
-                                }
-                                reportMissingClass(context);
-                            }
-                            context.fail("Class [" + name + "] is not present");
-                            return false;
-                        }
+                        return false;
                     }
                 }
             }

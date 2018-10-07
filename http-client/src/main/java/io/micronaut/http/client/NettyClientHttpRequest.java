@@ -213,4 +213,9 @@ class NettyClientHttpRequest<B> implements MutableHttpRequest<B> {
         }
         return uri.toString();
     }
+
+    @Override
+    public String toString() {
+        return getMethod() + " " + uri;
+    }
 }

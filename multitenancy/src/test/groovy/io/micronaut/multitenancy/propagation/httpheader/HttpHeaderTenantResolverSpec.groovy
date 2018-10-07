@@ -14,6 +14,7 @@ import io.micronaut.multitenancy.tenantresolver.TenantResolver
 import io.micronaut.multitenancy.writer.HttpHeaderTenantWriter
 import io.micronaut.multitenancy.writer.TenantWriter
 import io.micronaut.runtime.server.EmbeddedServer
+import io.reactivex.Flowable
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -107,40 +108,40 @@ class HttpHeaderTenantResolverSpec extends Specification {
     def "fetch books for watson and sherlock directly from the books microservice, the tenantId is in the HTTP Header. They get only their books"() {
         when:
         HttpResponse rsp = gormClient.toBlocking().exchange(HttpRequest.GET('/api/books')
-                .header("tenantId", "sherlock"), Argument.of(List, String))
+                .header("tenantId", "sherlock"), Argument.of(List, Book))
 
         then:
         rsp.status() == HttpStatus.OK
         rsp.body().size() == 1
-        ['Sherlock diary'] == rsp.body()
+        ['Sherlock diary'] == rsp.body()*.title
 
         when:
         rsp = gormClient.toBlocking().exchange(HttpRequest.GET('/api/books')
-                .header("tenantId", "watson"), Argument.of(List, String))
+                .header("tenantId", "watson"), Argument.of(List, Book))
 
         then:
         rsp.status() == HttpStatus.OK
         rsp.body().size() == 1
-        ['Watson diary'] == rsp.body()
+        ['Watson diary'] == rsp.body()*.title
     }
 
     def "fetch books for watson and sherlock, since the tenant ID is in the HTTP header and its propagated. They get only their books"() {
         when:
         HttpResponse rsp = gatewayClient.toBlocking().exchange(HttpRequest.GET('/')
-                .header("tenantId", "sherlock"), Argument.of(List, String))
+                .header("tenantId", "sherlock"), Argument.of(List, Book))
 
         then:
         rsp.status() == HttpStatus.OK
-        rsp.body().size() == 1
-        ['Sherlock diary'] == rsp.body()
+        rsp.body()
+        ['Sherlock diary'] == rsp.body()*.title
 
         when:
         rsp = gatewayClient.toBlocking().exchange(HttpRequest.GET('/')
-                .header("tenantId", "watson"), Argument.of(List, String))
+                .header("tenantId", "watson"), Argument.of(List, Book))
 
         then:
         rsp.status() == HttpStatus.OK
         rsp.body().size() == 1
-        ['Watson diary'] == rsp.body()
+        ['Watson diary'] == rsp.body()*.title
     }
 }

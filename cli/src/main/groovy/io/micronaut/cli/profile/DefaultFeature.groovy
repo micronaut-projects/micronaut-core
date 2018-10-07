@@ -46,6 +46,7 @@ class DefaultFeature implements Feature {
     final List<String> buildPlugins
     final List<String> jvmArgs
     final List<String> dependentFeatures = []
+    final List<String> defaultFeatures = []
     private Boolean requested = false
     final Integer minJava
     final Integer maxJava
@@ -58,7 +59,13 @@ class DefaultFeature implements Feature {
         def featureConfig = (Map<String, Object>) new Yaml().loadAs(featureYml.getInputStream(), Map)
         configuration.merge(featureConfig)
         def dependencyMap = configuration.get("dependencies")
-        dependentFeatures.addAll((List) configuration.get("dependentFeatures", Collections.emptyList()))
+        Map featureMap = (Map) configuration.get("features", Collections.emptyMap())
+        if (featureMap.containsKey("dependent")) {
+            dependentFeatures.addAll((List) featureMap.get("dependent", Collections.emptyList()))
+        }
+        if (featureMap.containsKey("default")) {
+            defaultFeatures.addAll((List) featureMap.get("default", Collections.emptyList()))
+        }
 
         if (dependencyMap instanceof List) {
 
@@ -101,6 +108,11 @@ class DefaultFeature implements Feature {
     @Override
     Iterable<Feature> getDependentFeatures(io.micronaut.cli.profile.Profile profile) {
         profile.getFeatures().findAll { Feature f -> dependentFeatures.contains(f.name) }
+    }
+
+    @Override
+    Iterable<Feature> getDefaultFeatures(io.micronaut.cli.profile.Profile profile) {
+        profile.getFeatures().findAll { Feature f -> defaultFeatures.contains(f.name) }
     }
 
     @Override

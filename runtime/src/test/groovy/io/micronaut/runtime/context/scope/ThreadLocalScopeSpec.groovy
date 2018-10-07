@@ -23,6 +23,12 @@ import io.micronaut.support.AbstractBeanDefinitionSpec
 
 import javax.inject.Scope
 import javax.inject.Singleton
+import java.lang.annotation.Documented
+import java.lang.annotation.ElementType
+import java.lang.annotation.Retention
+import java.lang.annotation.Target
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME
 
 /**
  * @author Graeme Rocher
@@ -63,6 +69,28 @@ class ThreadLocalBean {
         given:
         ApplicationContext applicationContext = ApplicationContext.run("test")
         B b = applicationContext.getBean(B)
+
+        when:
+        b.a.num = 2
+
+        boolean isolated = false
+        Thread.start {
+            isolated = b.a.total() == 0
+            b.a.setNum(4)
+            assert b.a.total() == 4
+        }.join()
+
+
+        then:
+        b.a.total() == 2
+        isolated
+
+    }
+
+    void "test thread local scope on class with meta annotation"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run("test")
+        ScopeOnMetaAnnotationB b = applicationContext.getBean(ScopeOnMetaAnnotationB)
 
         when:
         b.a.num = 2
@@ -149,6 +177,28 @@ class B {
     }
 }
 
+@MyAnn
+class ScopeOnMetaAnnotationA {
+    int num
+
+    int total() {
+        return num
+    }
+}
+
+@Singleton
+class ScopeOnMetaAnnotationB {
+    private ScopeOnMetaAnnotationA a
+
+    ScopeOnMetaAnnotationB(ScopeOnMetaAnnotationA a) {
+        this.a = a
+    }
+
+    ScopeOnMetaAnnotationA getA() {
+        return a
+    }
+}
+
 interface IA {
     void setNum(int num)
 
@@ -211,4 +261,10 @@ class BAndFactory {
     IA2 getA() {
         return a
     }
+}
+
+@ThreadLocal
+@Retention(RUNTIME)
+@Target([ ElementType.TYPE, ElementType.METHOD])
+public @interface MyAnn {
 }

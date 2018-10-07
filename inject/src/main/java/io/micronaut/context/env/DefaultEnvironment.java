@@ -67,7 +67,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     private static final String EC2_LINUX_HYPERVISOR_FILE = "/sys/hypervisor/uuid";
     private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
-    private static final String PROPERTY_SOURCES_KEY = "micronaut.config.files";
     private static final String FILE_SEPARATOR = ",";
     private static final Logger LOG = LoggerFactory.getLogger(DefaultEnvironment.class);
     private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST";
@@ -350,7 +349,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     protected void readPropertySources(String name) {
         List<PropertySource> propertySources = readPropertySourceList(name);
         propertySources.addAll(this.propertySources.values());
-        propertySources.addAll(readPropertySourceListFromFiles(System.getProperty(PROPERTY_SOURCES_KEY)));
+        propertySources.addAll(readPropertySourceListFromFiles(System.getProperty(Environment.PROPERTY_SOURCES_KEY)));
         propertySources.addAll(readPropertySourceListFromFiles(
             readPropertySourceListKeyFromEnvironment())
         );
@@ -369,7 +368,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @return The comma-separated list of files
      */
     protected String readPropertySourceListKeyFromEnvironment() {
-        return System.getenv(StringUtils.convertDotToUnderscore(PROPERTY_SOURCES_KEY));
+        return System.getenv(StringUtils.convertDotToUnderscore(Environment.PROPERTY_SOURCES_KEY));
     }
 
     /**

@@ -50,7 +50,29 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
      */
     public static final String GRAAL_CLASS_ANALYSIS = "graalvm.class.analysis";
 
-    private static final String NETTY_TYPE = "io.netty.channel.socket.nio.NioServerSocketChannel";
+    private static final String NIO_SOCKET_CHANNEL = "io.netty.channel.socket.nio.NioServerSocketChannel";
+    // a list of known types that are defined in META-INF/services and loaded dynamically
+    // future versions of Graal may support META-INF/services and this can be removed
+    private static final List<String> KNOWN_TYPES = Arrays.asList(
+            NIO_SOCKET_CHANNEL,
+            "sun.security.ssl.SSLContextImpl$TLSContext",
+            "io.netty.channel.socket.nio.NioSocketChannel",
+            "io.micronaut.http.netty.cookies.NettyCookieFactory",
+            "io.micronaut.http.client.NettyClientHttpRequestFactory",
+            "io.micronaut.http.server.netty.NettyHttpResponseFactory",
+            "org.hibernate.validator.HibernateValidator",
+            "com.fasterxml.jackson.databind.PropertyNamingStrategy$UpperCamelCaseStrategy",
+            "com.fasterxml.jackson.datatype.jdk8.Jdk8Module",
+            "com.fasterxml.jackson.datatype.jsr310.JSR310Module",
+            "io.micronaut.context.annotation.Parameter",
+            "io.micronaut.context.annotation.Property",
+            "io.micronaut.context.annotation.Value"
+    );
+
+    private static final List<String> KNOWN_BEANS = Arrays.asList(
+            JsonError.class.getName(), "io.micronaut.http.hateos.DefaultLink"
+    );
+
     private final Set<String> classes = new ConcurrentSkipListSet<>();
     private final Set<String> beans = new ConcurrentSkipListSet<>();
     private final Set<String> arrays = new ConcurrentSkipListSet<>();
@@ -59,7 +81,8 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
      * Default constructor.
      */
     public GraalClassLoadingReporter() {
-        classes.add(NETTY_TYPE);
+        classes.addAll(KNOWN_TYPES);
+        beans.addAll(KNOWN_BEANS);
         List<Class<?>> knownReactiveTypes = Publishers.getKnownReactiveTypes();
         for (Class<?> knownReactiveType : knownReactiveTypes) {
             classes.add(knownReactiveType.getName());
@@ -141,37 +164,10 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
 
         if (!file.exists()) {
             ClassLoader cls = GraalClassLoadingReporter.class.getClassLoader();
-
-            if (!ClassUtils.isPresent(NETTY_TYPE, cls)) {
-                classes.remove(NETTY_TYPE);
-            }
-
-            if (ClassUtils.isPresent("io.netty.channel.socket.nio.NioSocketChannel", cls)) {
-                classes.add("io.netty.channel.socket.nio.NioSocketChannel");
-            }
-
-            if (ClassUtils.isPresent("sun.security.ssl.SSLContextImpl$TLSContext", cls)) {
-                classes.add("sun.security.ssl.SSLContextImpl$TLSContext");
-            }
-
-            List<Map> json = classes.stream().map(s -> {
-                if (s.equals(NETTY_TYPE)) {
-                    return CollectionUtils.mapOf(
-                            "name", NETTY_TYPE,
-                            "methods", Arrays.asList(
-                                    CollectionUtils.mapOf(
-                                            "name", "<init>",
-                                            "parameterTypes", Collections.emptyList()
-                                    )
-                            )
-                    );
-                } else {
-                    return CollectionUtils.mapOf(
-                            "name", s,
-                            "allDeclaredConstructors", true
-                    );
-                }
-            }).collect(Collectors.toList());
+            List<Map> json = classes.stream().filter(s -> ClassUtils.isPresent(s, cls)).map(s -> CollectionUtils.mapOf(
+                    "name", s,
+                    "allDeclaredConstructors", true
+            )).collect(Collectors.toList());
 
             for (String array : arrays) {
                 json.add(CollectionUtils.mapOf(
@@ -180,7 +176,6 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
                 ));
             }
 
-            beans.addAll(Arrays.asList(JsonError.class.getName(), "io.micronaut.http.hateos.DefaultLink"));
 
             for (String bean : beans) {
                 json.add(CollectionUtils.mapOf(
@@ -189,17 +184,6 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
                         "allDeclaredConstructors", true
                 ));
             }
-
-            json.add(CollectionUtils.mapOf(
-                    "name", "com.fasterxml.jackson.datatype.jdk8.Jdk8Module",
-                    "allDeclaredConstructors", true
-            ));
-
-            json.add(CollectionUtils.mapOf(
-                    "name", "com.fasterxml.jackson.datatype.jsr310.JSR310Module",
-                    "allDeclaredConstructors", true
-            ));
-
 
             ObjectMapper mapper = new ObjectMapper();
             ObjectWriter writer = mapper.writer(new DefaultPrettyPrinter());
