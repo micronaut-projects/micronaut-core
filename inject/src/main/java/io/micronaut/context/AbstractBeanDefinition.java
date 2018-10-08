@@ -1721,6 +1721,13 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                 Optional<Qualifier> optional = resolutionContext.get(javax.inject.Qualifier.class.getName(), Map.class)
                         .map(map -> (Qualifier) map.get(argument));
                 qualifier = optional.orElse(null);
+                if (qualifier == null && isIterable() && argument.isAnnotationPresent(Parameter.class)) {
+
+                    qualifier = optional.orElseGet(() -> {
+                        final Optional<String> n = resolutionContext.get(Named.class.getName(), String.class);
+                        return n.map(Qualifiers::byName).orElse(null);
+                    });
+                }
             }
         }
         return qualifier;

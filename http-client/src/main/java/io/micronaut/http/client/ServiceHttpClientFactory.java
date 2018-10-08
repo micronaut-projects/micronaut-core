@@ -19,6 +19,7 @@ package io.micronaut.http.client;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.discovery.ServiceInstanceList;
 import io.micronaut.discovery.StaticServiceInstanceList;
@@ -85,7 +86,9 @@ public class ServiceHttpClientFactory {
      */
     @EachBean(ServiceHttpClientConfiguration.class)
     @Requires(condition = ServiceHttpClientCondition.class)
-    DefaultHttpClient serviceHttpClient(ServiceHttpClientConfiguration configuration, ServiceInstanceList instanceList) {
+    DefaultHttpClient serviceHttpClient(
+            @Parameter ServiceHttpClientConfiguration configuration,
+            @Parameter ServiceInstanceList instanceList) {
         List<URI> originalURLs = configuration.getUrls();
         Collection<URI> loadBalancedURIs = new ConcurrentLinkedQueue<>(originalURLs);
         boolean isHealthCheck = configuration.isHealthCheck();

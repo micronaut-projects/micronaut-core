@@ -407,9 +407,17 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         if (!SocketUtils.isTcpPortAvailable(serverPort) && !isRandomPort) {
             throw new ServerStartupException("Unable to start Micronaut server on port: " + serverPort, new BindException("Address already in use"));
         }
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Binding server to port: {}", serverPort);
+        Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
+        if (applicationName.isPresent()) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Binding {} server to port: {}", applicationName.get(), serverPort);
+            }
+        } else {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Binding server to port: {}", serverPort);
+            }
         }
+
         try {
             if (host != null) {
                 serverBootstrap.bind(host, serverPort).sync();
@@ -418,7 +426,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             }
 
             applicationContext.publishEvent(new ServerStartupEvent(this));
-            Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
             applicationName.ifPresent(id -> {
                 this.serviceInstance = applicationContext.createBean(NettyEmbeddedServerInstance.class, id, this);
                 applicationContext.publishEvent(new ServiceStartedEvent(serviceInstance));
