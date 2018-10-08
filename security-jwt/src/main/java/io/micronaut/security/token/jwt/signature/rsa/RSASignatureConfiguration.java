@@ -16,9 +16,6 @@
 
 package io.micronaut.security.token.jwt.signature.rsa;
 
-import com.nimbusds.jose.JWSAlgorithm;
-
-import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 
 /**
@@ -33,15 +30,4 @@ public interface RSASignatureConfiguration {
      * @return The RSA public Key
      */
     RSAPublicKey getPublicKey();
-
-    /**
-     *
-     * @return The RSA private Key
-     */
-    RSAPrivateKey getPrivateKey();
-
-    /**
-     * @return The JWS Algorithm
-     */
-    JWSAlgorithm getJwsAlgorithm();
 }

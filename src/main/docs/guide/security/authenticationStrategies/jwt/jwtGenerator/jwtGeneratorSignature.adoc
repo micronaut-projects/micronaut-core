@@ -1,9 +1,15 @@
 Micronaut security capabilities use signed JWT’s as specified by the
 https://tools.ietf.org/html/rfc7515[JSON Web Signature] specification.
 
-To enable a JWT signature in token generation, you need to have in your app a bean of type link:{api}/io/micronaut/security/token/jwt/signature/rsa/RSASignatureConfiguration.html[RSASignatureConfiguration],
-link:{api}/io/micronaut/security/token/jwt/signature/ec/ECSignatureConfiguration.html[ECSignatureConfiguration],
+To enable a JWT signature in token generation, you need to have in your app a bean of type link:{api}/io/micronaut/security/token/jwt/signature/rsa/RSASignatureGeneratorConfiguration.html[RSASignatureGeneratorConfiguration],
+link:{api}/io/micronaut/security/token/jwt/signature/ec/ECSignatureGeneratorConfiguration.html[ECSignatureGeneratorConfiguration],
 link:{api}/io/micronaut/security/token/jwt/signature/secret/SecretSignatureConfiguration.html[SecretSignatureConfiguration] qualified with name `generator`.
+
+To verify signed JWT tokens, you need to have in your app a bean of type link:{api}/io/micronaut/security/token/jwt/signature/rsa/RSASignatureConfiguration.html[RSASignatureConfiguration],
+link:{api}/io/micronaut/security/token/jwt/signature/rsa/RSASignatureGeneratorConfiguration.html[RSASignatureGeneratorConfiguration],
+link:{api}/io/micronaut/security/token/jwt/signature/ec/ECSignatureGeneratorConfiguration.html[ECSignatureGeneratorConfiguration],
+link:{api}/io/micronaut/security/token/jwt/signature/ec/ECSignatureConfiguration.html[ECSignatureConfiguration], or
+link:{api}/io/micronaut/security/token/jwt/signature/secret/SecretSignatureConfiguration.html[SecretSignatureConfiguration].
 
 You can setup a `SecretSignatureConfiguration` named `generator` easily via configuration properties:
 
