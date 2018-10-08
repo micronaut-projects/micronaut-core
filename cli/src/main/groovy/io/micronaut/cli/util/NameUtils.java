@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 /**
  * Utility methods for converting between different name types,
@@ -35,7 +36,19 @@ public final class NameUtils {
     private static final String PROPERTY_SET_PREFIX = "set";
     private static final String PROPERTY_GET_PREFIX = "get";
 
+    private static final Pattern SERVICE_ID_REGEX = Pattern.compile("[\\p{javaLowerCase}\\d-]+");
+
     private NameUtils() {
+    }
+
+    /**
+     * Checks whether the given name is a valid service identifier.
+     *
+     * @param name The name
+     * @return True if it is
+     */
+    public static boolean isValidServiceId(String name) {
+        return name != null && name.length() > 0 && SERVICE_ID_REGEX.matcher(name).matches() && Character.isLetter(name.charAt(0));
     }
 
     /**

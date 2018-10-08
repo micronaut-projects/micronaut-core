@@ -16,6 +16,8 @@
 
 package io.micronaut.core.naming;
 
+import io.micronaut.core.util.StringUtils;
+
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -34,6 +36,17 @@ public class NameUtils {
     private static final int IS_LENTGH = 2;
 
     private static final Pattern DOT_UPPER = Pattern.compile("\\.[A-Z\\$]");
+    private static final Pattern SERVICE_ID_REGEX = Pattern.compile("[\\p{javaLowerCase}\\d-]+");
+
+    /**
+     * Checks whether the given name is a valid service identifier.
+     *
+     * @param name The name
+     * @return True if it is
+     */
+    public static boolean isHyphenatedLowerCase(String name) {
+        return StringUtils.isNotEmpty(name) && SERVICE_ID_REGEX.matcher(name).matches() && Character.isLetter(name.charAt(0));
+    }
 
     /**
      * Converts class name to property name using JavaBean decapitalization.
@@ -100,8 +113,12 @@ public class NameUtils {
      * @return The hyphenated string
      */
     public static String hyphenate(String name, boolean lowerCase) {
-        char separatorChar = '-';
-        return separateCamelCase(name.replace('_', '-'), lowerCase, separatorChar);
+        if (isHyphenatedLowerCase(name)) {
+            return name.replace('_', '-');
+        } else {
+            char separatorChar = '-';
+            return separateCamelCase(name.replace('_', '-'), lowerCase, separatorChar);
+        }
     }
 
     /**

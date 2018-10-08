@@ -24,6 +24,23 @@ import spock.lang.Unroll
  * @since 1.0
  */
 class NameUtilsSpec extends Specification {
+
+    @Unroll
+    void "test is valid service ID #name"() {
+        expect:
+        NameUtils.isHyphenatedLowerCase(name) == result
+
+        where:
+        name        | result
+        "foo-bar"   | true
+        "foobar"    | true
+        "foo1-bar"  | true
+        "Foo-bar"   | false
+        "foo1-bar"  | true
+        "1foo1-bar" | false
+        "Foo1Bar"   | false
+    }
+
     void "test simple name"() {
         expect:
         NameUtils.getSimpleName(value) == result
@@ -62,6 +79,7 @@ class NameUtilsSpec extends Specification {
         "FooBBar"                         | 'foo-bbar'
         "FOO_BAR"                         | 'foo-bar'
         "fooBBar"                         | 'foo-bbar'
+        'gr8crm-notification-service '    | 'gr8crm-notification-service '
     }
 
     @Unroll
@@ -174,12 +192,12 @@ class NameUtilsSpec extends Specification {
         NameUtils.isGetterName(name) == getter
 
         where:
-        name                       | getter
-        "foo"                      | false
-        "isFoo"                    | true
-        "isfoo"                    | false
-        "getFoo"                   | true
-        "getfoo"                   | false
-        "a"                        | false
+        name     | getter
+        "foo"    | false
+        "isFoo"  | true
+        "isfoo"  | false
+        "getFoo" | true
+        "getfoo" | false
+        "a"      | false
     }
 }
