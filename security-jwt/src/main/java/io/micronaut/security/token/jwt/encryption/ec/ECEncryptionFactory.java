@@ -37,7 +37,6 @@ public class ECEncryptionFactory {
      * @return The {@link EncryptionConfiguration}
      */
     @EachBean(ECEncryptionConfiguration.class)
-    @Singleton
     public EncryptionConfiguration encryptionConfiguration(ECEncryptionConfiguration configuration) {
         return new ECEncryption(configuration);
     }

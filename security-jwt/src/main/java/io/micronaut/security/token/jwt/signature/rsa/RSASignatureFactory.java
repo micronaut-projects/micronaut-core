@@ -36,7 +36,6 @@ public class RSASignatureFactory {
      * @return The {@link SignatureConfiguration}
      */
     @EachBean(RSASignatureConfiguration.class)
-    @Singleton
     public SignatureConfiguration signatureConfiguration(RSASignatureConfiguration configuration) {
         return new RSASignature(configuration);
     }
