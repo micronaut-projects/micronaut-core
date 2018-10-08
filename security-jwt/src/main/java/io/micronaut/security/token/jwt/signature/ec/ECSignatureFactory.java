@@ -20,8 +20,6 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.security.token.jwt.signature.SignatureConfiguration;
 
-import javax.inject.Singleton;
-
 /**
  * Creates {@link SignatureConfiguration} for each {@link ECSignatureConfiguration} bean.
  *

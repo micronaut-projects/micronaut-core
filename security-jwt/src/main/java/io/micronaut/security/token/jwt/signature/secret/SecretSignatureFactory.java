@@ -20,8 +20,6 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.security.token.jwt.signature.SignatureConfiguration;
 
-import javax.inject.Singleton;
-
 /**
  * @author Sergio del Amo
  * @since 1.0

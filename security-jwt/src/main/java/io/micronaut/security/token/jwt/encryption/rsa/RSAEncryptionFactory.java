@@ -20,8 +20,6 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.security.token.jwt.encryption.EncryptionConfiguration;
 
-import javax.inject.Singleton;
-
 /**
  * Creates {@link EncryptionConfiguration} for each {@link RSAEncryptionConfiguration} bean.
  *
