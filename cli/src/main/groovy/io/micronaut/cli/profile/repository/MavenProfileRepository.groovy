@@ -111,7 +111,7 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
                     module: art.artifactId,
                     version: art.version ?: null)
         } catch (ArtifactNotFoundException | DependencyResolutionFailedException e) {
-            MicronautConsole.instance.updateStatus("Profile $art could be resolved remotely. Searching Maven local...")
+            MicronautConsole.instance.addStatus("Profile $art could not be resolved remotely. Searching maven local...")
             def localData = new File(mavenLocal, "/${art.groupId.replace('.', '/')}/$art.artifactId/maven-metadata-local.xml")
             if (localData.exists()) {
                 def currentVersion = parseCurrentVersion(localData)
@@ -183,7 +183,7 @@ class MavenProfileRepository extends AbstractJarProfileRepository {
                 if (Boolean.getBoolean("micronaut.verbose")) {
                     MicronautConsole.instance.warn("Ignoring error: " + e)
                 }
-                MicronautConsole.instance.updateStatus("No profiles could be resolved remotely. Searching Maven local...")
+                MicronautConsole.instance.addStatus("No profiles could be resolved remotely. Searching Maven local...")
                 def localData = new File(mavenLocal, "/io/micronaut/profiles")
                 if (localData.exists()) {
                     localData.eachDir { File dir ->

@@ -25,6 +25,7 @@ import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.io.IOUtils
 import io.micronaut.cli.io.support.*
 import io.micronaut.cli.profile.Feature
+import io.micronaut.cli.profile.OneOfFeatureGroup
 import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.profile.ProfileRepository
 import io.micronaut.cli.profile.ProfileRepositoryAware
@@ -290,6 +291,11 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
 
             File projectTargetDirectory = cmd.inplace ? new File(".").canonicalFile : appFullDirectory.toAbsolutePath().normalize().toFile()
 
+            if (projectTargetDirectory.exists() && !cmd.inplace) {
+                MicronautConsole.instance.error("Cannot create the project because the target directory already exists")
+                return false
+            }
+
             def profiles = profileRepository.getProfileAndDependencies(profileInstance)
 
             Map<Profile, File> targetDirs = [:]
@@ -419,13 +425,16 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
 
         }
 
-        Map tokens
+        BuildTokens buildTokens
         if (build == "gradle") {
-            tokens = new GradleBuildTokens(sourceLanguage, testFramework).getTokens(profile, features)
+            buildTokens = new GradleBuildTokens(sourceLanguage, testFramework)
+        } else if (build == "maven") {
+            buildTokens = new MavenBuildTokens(sourceLanguage, testFramework)
+        } else {
+            return
         }
-        if (build == "maven") {
-            tokens = new MavenBuildTokens(sourceLanguage, testFramework).getTokens(profile, features)
-        }
+
+        Map tokens = buildTokens.getTokens(profile, features)
 
         if (tokens == null) {
             return
@@ -449,6 +458,12 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                 }
             }
         }
+
+        withTokens(buildTokens)
+    }
+
+    protected void withTokens(BuildTokens buildTokens) {
+        //no-op
     }
 
     protected static String evaluateTestFramework(List<String> features) {
@@ -483,23 +498,24 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
     protected static Iterable<Feature> evaluateFeatures(Profile profile, Set<String> requestedFeatures, String lang) {
 
         def (Set<Feature> features, List<String> validRequestedFeatureNames) = populateFeatures(profile, requestedFeatures, lang)
+        features = addDependentFeatures(profile, features)
+
         features = pruneOneOfFeatures(profile, features)
 
         String language = getLanguage(features)?.capitalize()
         if (language) {
-            MicronautConsole.getInstance().updateStatus "Generating ${language} project..."
+            MicronautConsole.getInstance().addStatus "Generating ${language} project..."
         }
 
         List<String> removedFeatures = validRequestedFeatureNames.findAll { !features*.name.contains(it) }
 
         if (removedFeatures) {
-            StringBuilder warning = new StringBuilder("The following features are incompatible with your language selection and have been removed from the project")
+            StringBuilder warning = new StringBuilder("The following features are incompatible with other feature selections and have been removed from the project")
             warning.append(System.getProperty('line.separator'))
             warning.append("| ${removedFeatures.join(", ")}")
             MicronautConsole.getInstance().warn(warning.toString())
         }
 
-        features = addDependentFeatures(profile, features)
         features
     }
 
@@ -561,18 +577,20 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
 
     protected static Set<Feature> pruneOneOfFeatures(Profile profile, Set<Feature> features) {
         if (!profile.oneOfFeatures.empty) {
-            Set<Feature> toRemove = features.findAll { profile.oneOfFeatures*.feature.contains(it) }
+            profile.oneOfFeatures.each { OneOfFeatureGroup group ->
+                Set<Feature> toRemove = features.findAll { group.oneOfFeatures*.feature.contains(it) }
 
-            Feature requestedOneOf = toRemove.find { it.requested }
-            if (requestedOneOf) {
-                toRemove.remove(requestedOneOf)
-            } else {
-                toRemove.remove(toRemove[0])
-            }
+                Feature requestedOneOf = toRemove.find { it.requested }
+                if (requestedOneOf) {
+                    toRemove.remove(requestedOneOf)
+                } else {
+                    toRemove.remove(toRemove[0])
+                }
 
-            if (!toRemove.isEmpty()) {
-                features.removeAll(toRemove)
-                features = features.findAll { !it.getDependentFeatures(profile).any { toRemove.contains(it) } }
+                if (!toRemove.isEmpty()) {
+                    features.removeAll(toRemove)
+                    features = features.findAll { !it.getDependentFeatures(profile).any { toRemove.contains(it) } }
+                }
             }
         }
         features
@@ -582,14 +600,18 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         Integer javaVersion = VersionInfo.getJavaVersion()
         features = features.findAll { it.isSupported(javaVersion) }
 
+        List<String> oneOfFeatureNames = []
+        profile.oneOfFeatures.each { g ->
+            oneOfFeatureNames.addAll(g.oneOfFeatures*.feature*.name)
+        }
+
         for (int i = 0; i < features.size(); i++) {
             Feature feature = features[i]
 
-            Iterator<Feature> dependents = feature.getDependentFeatures(profile).iterator()
-            while (dependents.hasNext()) {
-                Feature d = dependents.next()
+            List<Feature> dependents = feature.getDependentFeatures(profile).toList() + feature.getDefaultFeatures(profile).toList()
+            for (Feature d: dependents) {
 
-                if (!oneOfOnly || profile.oneOfFeatures*.feature*.name?.contains(d.name)) {
+                if (!oneOfOnly || oneOfFeatureNames.contains(d.name)) {
                     if (d.isSupported(javaVersion)) {
                         if (feature.requested) {
                             d.requested = true
