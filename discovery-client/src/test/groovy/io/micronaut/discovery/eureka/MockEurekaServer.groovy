@@ -23,6 +23,8 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Produces
+import io.micronaut.http.annotation.Put
+import io.micronaut.http.annotation.QueryValue
 import org.reactivestreams.Publisher
 
 import javax.validation.Valid
@@ -109,8 +111,9 @@ class MockEurekaServer implements EurekaOperations{
     }
 
     @Override
+    @Put("/apps/{appId}/{instanceId}/status")
     Publisher<HttpStatus> updateStatus(
-            @NotBlank String appId, @NotBlank String instanceId, @NotNull InstanceInfo.Status status) {
+            @NotBlank String appId, @NotBlank String instanceId, @NotNull @QueryValue("value") InstanceInfo.Status status) {
         instances.computeIfAbsent(appId, { String id -> new ConcurrentHashMap<>()})
                 .get(instanceId)?.status = status
         return Publishers.just(HttpStatus.OK)
