@@ -829,13 +829,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             ReturnType<?> genericReturnType = finalRoute.getReturnType();
             Class<?> javaReturnType = genericReturnType.getType();
 
-            if (HttpResponse.class.isAssignableFrom(javaReturnType)) {
-                Optional<Argument<?>> generic = genericReturnType.getFirstTypeVariable();
-                if (generic.isPresent()) {
-                    javaReturnType = generic.get().getType();
-                }
-            }
-
             AtomicReference<io.micronaut.http.HttpRequest<?>> requestReference = new AtomicReference<>(request);
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
             boolean isReactiveReturnType = Publishers.isConvertibleToPublisher(javaReturnType) || isFuture;
@@ -913,11 +906,23 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             boolean isStreaming = isReactiveReturnType && !isSingle;
 
+            if (!isStreaming) {
+                if (HttpResponse.class.isAssignableFrom(javaReturnType)) {
+                    Optional<Argument<?>> generic = genericReturnType.getFirstTypeVariable();
+                    if (generic.isPresent()) {
+                        Class genericType = generic.get().getType();
+                        isStreaming = Publishers.isConvertibleToPublisher(genericType) && !Publishers.isSingle(genericType);
+                    }
+                }
+            }
+
+
+            boolean finalIsStreaming = isStreaming;
             filteredPublisher  = filteredPublisher.switchMap((response) -> {
                 Optional<?> responseBody = response.getBody();
                 if (responseBody.isPresent()) {
                     Object body = responseBody.get();
-                    if (isStreaming) {
+                    if (finalIsStreaming) {
                         // handled downstream
                         return Flowable.just(response);
                     } else if (Publishers.isConvertibleToPublisher(body)) {

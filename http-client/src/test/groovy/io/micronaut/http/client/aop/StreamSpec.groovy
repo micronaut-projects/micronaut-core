@@ -19,6 +19,8 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.core.io.buffer.ReferenceCounted
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
@@ -26,6 +28,7 @@ import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
+import io.reactivex.Single
 import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -46,6 +49,28 @@ class StreamSpec extends Specification {
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+
+    void "test that the server can return a header value to us"() {
+        given:
+        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+        when:
+        HttpResponse<String> response = myClient.echoWithHeaders(2, "Hello!")
+        then:
+        response.status == HttpStatus.OK
+        response.header('X-MyHeader') == "42"
+        response.body() == "Hello!Hello!"
+    }
+
+    void "test that the server can return a header value to us with a single"() {
+        given:
+        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+        when:
+        HttpResponse<String> response = myClient.echoWithHeadersSingle( "Hello!")
+        then:
+        response.status == HttpStatus.OK
+        response.header('X-MyHeader') == "42"
+        response.body() == "Hello!"
+    }
 
     void "test send and receive parameter"() {
         given:
@@ -109,6 +134,12 @@ class StreamSpec extends Specification {
 
         @Get(value = "/echo{?n,data}", consumes = MediaType.TEXT_PLAIN)
         Flowable<Elephant> echoAsElephant(@QueryValue @Nullable int n, @QueryValue @Nullable String data);
+
+        @Get(value = "/echoWithHeaders{?n,data}", consumes = MediaType.TEXT_PLAIN)
+        HttpResponse<String> echoWithHeaders(@QueryValue @Nullable int n, @QueryValue @Nullable String data);
+
+        @Get(value = "/echoWithHeadersSingle{?data}", consumes = MediaType.TEXT_PLAIN)
+        HttpResponse<String> echoWithHeadersSingle(@QueryValue @Nullable String data);
     }
 
     static class Elephant {
@@ -122,6 +153,16 @@ class StreamSpec extends Specification {
         @Get(value = "/echo{?n,data}", produces = MediaType.TEXT_PLAIN)
         Flowable<byte[]> postStream(@QueryValue @Nullable int n,  @QueryValue @Nullable String data) {
             return Flowable.just(data.getBytes(StandardCharsets.UTF_8)).repeat(n)
+        }
+
+        @Get(value = "/echoWithHeaders{?n,data}", produces = MediaType.TEXT_PLAIN)
+        HttpResponse<Flowable<byte[]>> echoWithHeaders(@QueryValue @Nullable int n, @QueryValue @Nullable String data) {
+            return HttpResponse.ok(Flowable.just(data.getBytes(StandardCharsets.UTF_8)).repeat(n)).header("X-MyHeader", "42")
+        }
+
+        @Get(value = "/echoWithHeadersSingle{?data}", produces = MediaType.TEXT_PLAIN)
+        HttpResponse<Single<byte[]>> echoWithHeadersSingle(@QueryValue @Nullable String data) {
+            return HttpResponse.ok(Single.just(data.getBytes(StandardCharsets.UTF_8))).header("X-MyHeader", "42")
         }
     }
 
