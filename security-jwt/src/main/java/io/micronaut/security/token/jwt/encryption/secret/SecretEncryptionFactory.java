@@ -36,7 +36,6 @@ public class SecretEncryptionFactory {
      * @return The {@link EncryptionConfiguration}
      */
     @EachBean(SecretEncryptionConfiguration.class)
-    @Singleton
     public EncryptionConfiguration encryptionConfiguration(SecretEncryptionConfiguration configuration) {
         return new SecretEncryption(configuration);
     }

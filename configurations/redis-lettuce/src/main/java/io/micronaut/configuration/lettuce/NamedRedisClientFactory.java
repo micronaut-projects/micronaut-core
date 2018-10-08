@@ -32,12 +32,10 @@ import javax.inject.Singleton;
  * @since 1.0
  */
 @Factory
-@Singleton
 public class NamedRedisClientFactory extends AbstractRedisClientFactory {
 
     @Bean(preDestroy = "shutdown")
     @EachBean(NamedRedisServersConfiguration.class)
-    @Singleton
     @Override
     public RedisClient redisClient(AbstractRedisConfiguration config) {
         return super.redisClient(config);
@@ -45,7 +43,6 @@ public class NamedRedisClientFactory extends AbstractRedisClientFactory {
 
     @Override
     @Bean(preDestroy = "close")
-    @Singleton
     @EachBean(NamedRedisServersConfiguration.class)
     public StatefulRedisConnection<String, String> redisConnection(RedisClient client) {
         return super.redisConnection(client);
@@ -53,7 +50,6 @@ public class NamedRedisClientFactory extends AbstractRedisClientFactory {
 
     @Override
     @Bean(preDestroy = "close")
-    @Singleton
     @EachBean(NamedRedisServersConfiguration.class)
     public StatefulRedisPubSubConnection<String, String> redisPubSubConnection(RedisClient redisClient) {
         return super.redisPubSubConnection(redisClient);
