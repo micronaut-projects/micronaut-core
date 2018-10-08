@@ -19,8 +19,11 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.discovery.DiscoveryClient
+import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.eureka.client.v2.EurekaClient
 import io.micronaut.discovery.eureka.client.v2.InstanceInfo
+import io.micronaut.health.HealthStatus
+import io.micronaut.health.HeartbeatEvent
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import spock.lang.Specification
@@ -69,6 +72,27 @@ class EurekaMockAutoRegistrationSpec extends Specification {
             InstanceInfo instanceInfo = MockEurekaServer.instances[NameUtils.hyphenate(serviceId)].values().first()
             instanceInfo.status == InstanceInfo.Status.UP
         }
+
+        when:'the application reports down'
+        ServiceInstance instance = Mock(ServiceInstance)
+        instance.getId() >> 'myService'
+        application.applicationContext.publishEvent(new HeartbeatEvent(instance, HealthStatus.DOWN))
+
+        then:"The status is reported as down"
+        conditions.eventually {
+            InstanceInfo instanceInfo = MockEurekaServer.instances[NameUtils.hyphenate(serviceId)].values().first()
+            instanceInfo.status == InstanceInfo.Status.DOWN
+        }
+
+        when:"it comes back up"
+        application.applicationContext.publishEvent(new HeartbeatEvent(instance, HealthStatus.UP))
+
+        then:"The status is reported as up"
+        conditions.eventually {
+            InstanceInfo instanceInfo = MockEurekaServer.instances[NameUtils.hyphenate(serviceId)].values().first()
+            instanceInfo.status == InstanceInfo.Status.UP
+        }
+
 
         when: "The application is stopped"
         application?.stop()
