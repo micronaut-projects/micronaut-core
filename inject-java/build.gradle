@@ -34,8 +34,8 @@ dependencies {
     testCompile project(":aop")
     testCompile project(":runtime")
     testCompile dependencyVersion("rxjava2")
-    testCompile "org.hibernate:hibernate-core:5.1.5.Final"
-    testCompile 'org.hibernate:hibernate-validator:5.4.1.Final'
+    testCompile "org.hibernate:hibernate-core:5.3.6.Final"
+    testCompile 'org.hibernate:hibernate-validator:6.0.13.Final'
     testRuntime 'org.glassfish.web:el-impl:2.2.1-b05'
     testCompile "junit:junit:4.7"
     testCompile "com.google.testing.compile:compile-testing:0.12"
