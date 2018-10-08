@@ -36,7 +36,6 @@ public class SecretSignatureFactory {
      * @return The {@link SignatureConfiguration}
      */
     @EachBean(SecretSignatureConfiguration.class)
-    @Singleton
     public SignatureConfiguration signatureConfiguration(SecretSignatureConfiguration configuration) {
         return new SecretSignature(configuration);
     }

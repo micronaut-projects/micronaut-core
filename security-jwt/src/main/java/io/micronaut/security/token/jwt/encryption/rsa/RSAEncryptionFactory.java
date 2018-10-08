@@ -37,7 +37,6 @@ public class RSAEncryptionFactory {
      * @return The {@link EncryptionConfiguration}
      */
     @EachBean(RSAEncryptionConfiguration.class)
-    @Singleton
     public EncryptionConfiguration encryptionConfiguration(RSAEncryptionConfiguration configuration) {
         return new RSAEncryption(configuration);
     }

@@ -37,7 +37,6 @@ public class ECSignatureFactory {
      * @return The {@link SignatureConfiguration}
      */
     @EachBean(ECSignatureConfiguration.class)
-    @Singleton
     public SignatureConfiguration signatureConfiguration(ECSignatureConfiguration configuration) {
         return new ECSignature(configuration);
     }

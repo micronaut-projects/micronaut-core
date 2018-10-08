@@ -93,7 +93,6 @@ public class EntityManagerFactoryBean {
      * @param dataSource     The data source
      * @return The {@link StandardServiceRegistry}
      */
-    @Singleton
     @EachBean(DataSource.class)
     protected StandardServiceRegistry hibernateStandardServiceRegistry(
         @Parameter String dataSourceName,
@@ -118,7 +117,6 @@ public class EntityManagerFactoryBean {
      * @param standardServiceRegistry The standard service registry
      * @return The {@link MetadataSources}
      */
-    @Singleton
     @EachBean(StandardServiceRegistry.class)
     @Requires(entities = Entity.class)
     protected MetadataSources hibernateMetadataSources(
@@ -145,7 +143,6 @@ public class EntityManagerFactoryBean {
      * @param validatorFactory The {@link ValidatorFactory}
      * @return The {@link SessionFactoryBuilder}
      */
-    @Singleton
     @EachBean(MetadataSources.class)
     @Requires(beans = MetadataSources.class)
     protected SessionFactoryBuilder hibernateSessionFactoryBuilder(
