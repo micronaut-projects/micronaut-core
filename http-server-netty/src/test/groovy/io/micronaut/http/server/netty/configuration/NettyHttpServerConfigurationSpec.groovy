@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.server.netty.configuration
 
+import io.micronaut.http.client.HttpClientConfiguration
+import io.micronaut.http.server.HttpServerConfiguration
 import io.netty.channel.ChannelOption
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
@@ -23,6 +25,9 @@ import io.micronaut.http.HttpMethod
 import io.micronaut.http.server.cors.CorsOriginConfiguration
 import io.micronaut.http.server.netty.NettyHttpServer
 import spock.lang.Specification
+import spock.lang.Unroll
+
+import java.time.Duration
 
 /**
  * @author Graeme Rocher
@@ -30,15 +35,38 @@ import spock.lang.Specification
  */
 class NettyHttpServerConfigurationSpec extends Specification {
 
+    @Unroll
+    void "test config for #key"() {
+        given:
+        def ctx = ApplicationContext.run(
+                ("micronaut.server.$key".toString()): value
+        )
+        HttpServerConfiguration config = ctx.getBean(HttpServerConfiguration)
+
+
+        expect:
+        config[property] == expected
+
+        cleanup:
+        ctx.close()
+
+        where:
+        key                  | property           | value | expected
+        'idle-timeout'       | 'idleTimeout'      | '15s' | Duration.ofSeconds(15)
+        'read-idle-timeout'  | 'readIdleTimeout'  | '15s' | Duration.ofSeconds(15)
+        'write-idle-timeout' | 'writeIdleTimeout' | '15s' | Duration.ofSeconds(15)
+        'idle-timeout'       | 'idleTimeout'      | '-1s' | Duration.ofSeconds(-1)
+    }
+
     void "test netty server configuration"() {
         given:
         ApplicationContext beanContext = new DefaultApplicationContext("test")
         beanContext.environment.addPropertySource(PropertySource.of("test",
-                ['micronaut.server.netty.childOptions.autoRead':'true',
-                'micronaut.server.netty.worker.threads':8,
-                'micronaut.server.netty.parent.threads':8,
-                'micronaut.server.multipart.maxFileSize':2048,
-                'micronaut.server.maxRequestSize':'2MB']
+                ['micronaut.server.netty.childOptions.autoRead': 'true',
+                 'micronaut.server.netty.worker.threads'       : 8,
+                 'micronaut.server.netty.parent.threads'       : 8,
+                 'micronaut.server.multipart.maxFileSize'      : 2048,
+                 'micronaut.server.maxRequestSize'             : '2MB']
 
         ))
         beanContext.start()
@@ -70,15 +98,15 @@ class NettyHttpServerConfigurationSpec extends Specification {
         given:
         ApplicationContext beanContext = new DefaultApplicationContext("test")
         beanContext.environment.addPropertySource(PropertySource.of("test",
-                ['micronaut.server.cors.enabled': true,
-                'micronaut.server.cors.configurations.foo.allowedOrigins': ['foo.com'],
-                'micronaut.server.cors.configurations.foo.allowedMethods': ['GET'],
-                'micronaut.server.cors.configurations.foo.maxAge': -1,
-                'micronaut.server.cors.configurations.bar.allowedOrigins': ['bar.com'],
-                'micronaut.server.cors.configurations.bar.allowedHeaders': ['Content-Type', 'Accept'],
-                'micronaut.server.cors.configurations.bar.exposedHeaders': ['x', 'y'],
-                'micronaut.server.cors.configurations.bar.maxAge': 150,
-                'micronaut.server.cors.configurations.bar.allowCredentials': false]
+                ['micronaut.server.cors.enabled'                            : true,
+                 'micronaut.server.cors.configurations.foo.allowedOrigins'  : ['foo.com'],
+                 'micronaut.server.cors.configurations.foo.allowedMethods'  : ['GET'],
+                 'micronaut.server.cors.configurations.foo.maxAge'          : -1,
+                 'micronaut.server.cors.configurations.bar.allowedOrigins'  : ['bar.com'],
+                 'micronaut.server.cors.configurations.bar.allowedHeaders'  : ['Content-Type', 'Accept'],
+                 'micronaut.server.cors.configurations.bar.exposedHeaders'  : ['x', 'y'],
+                 'micronaut.server.cors.configurations.bar.maxAge'          : 150,
+                 'micronaut.server.cors.configurations.bar.allowCredentials': false]
 
         ))
         beanContext.start()

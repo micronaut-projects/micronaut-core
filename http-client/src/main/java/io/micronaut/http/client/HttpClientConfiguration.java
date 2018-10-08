@@ -48,31 +48,31 @@ public abstract class HttpClientConfiguration {
      * The default read timeout in seconds.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final long DEFAULT_READTIMEOUT_SECONDS = 10;
+    public static final long DEFAULT_READ_TIMEOUT_SECONDS = 10;
 
     /**
-     * The default read timeout in seconds.
+     * The default read idle timeout in minutes.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final long DEFAULT_READIDLETIMEOUT_SECONDS = 60;
-
-    /**
-     * The default shutdown timeout in millis.
-     */
-    @SuppressWarnings("WeakerAccess")
-    public static final long DEFAULT_SHUTDOWNTIMEOUT_MILLISECONDS = 100;
+    public static final long DEFAULT_READ_IDLE_TIMEOUT_MINUTES = 5;
 
     /**
      * The default shutdown timeout in millis.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final int DEFAULT_MAXCONTENTLENGTH = 1024 * 1024 * 10; // 10MB;
+    public static final long DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS = 100;
+
+    /**
+     * The default shutdown timeout in millis.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_MAX_CONTENT_LENGTH = 1024 * 1024 * 10; // 10MB;
 
     /**
      * The default follow redirects value.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final boolean DEFAULT_FOLLOWREDIRECTS = true;
+    public static final boolean DEFAULT_FOLLOW_REDIRECTS = true;
 
     private Map<ChannelOption, Object> channelOptions = Collections.emptyMap();
 
@@ -85,13 +85,13 @@ public abstract class HttpClientConfiguration {
 
     private Duration connectTimeout;
 
-    private Duration readTimeout = Duration.ofSeconds(DEFAULT_READTIMEOUT_SECONDS);
+    private Duration readTimeout = Duration.ofSeconds(DEFAULT_READ_TIMEOUT_SECONDS);
 
-    private Duration readIdleTime = Duration.of(DEFAULT_READIDLETIMEOUT_SECONDS, ChronoUnit.SECONDS);
+    private Duration readIdleTimeout = Duration.of(DEFAULT_READ_IDLE_TIMEOUT_MINUTES, ChronoUnit.MINUTES);
 
-    private Duration shutdownTimeout = Duration.ofMillis(DEFAULT_SHUTDOWNTIMEOUT_MILLISECONDS);
+    private Duration shutdownTimeout = Duration.ofMillis(DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS);
 
-    private int maxContentLength = DEFAULT_MAXCONTENTLENGTH;
+    private int maxContentLength = DEFAULT_MAX_CONTENT_LENGTH;
 
     private Proxy.Type proxyType = Proxy.Type.DIRECT;
 
@@ -103,7 +103,7 @@ public abstract class HttpClientConfiguration {
 
     private Charset defaultCharset = StandardCharsets.UTF_8;
 
-    private boolean followRedirects = DEFAULT_FOLLOWREDIRECTS;
+    private boolean followRedirects = DEFAULT_FOLLOW_REDIRECTS;
 
     private SslConfiguration sslConfiguration = new ClientSslConfiguration();
 
@@ -171,7 +171,7 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets whether redirects should be followed. Default value ({@link io.micronaut.http.client.HttpClientConfiguration#DEFAULT_FOLLOWREDIRECTS}).
+     * Sets whether redirects should be followed. Default value ({@link io.micronaut.http.client.HttpClientConfiguration#DEFAULT_FOLLOW_REDIRECTS}).
      *
      * @param followRedirects Whether redirects should be followed
      */
@@ -225,10 +225,9 @@ public abstract class HttpClientConfiguration {
      *
      * @return The default amount of time to allow read operation connections  to remain idle
      */
-    public Optional<Duration> getReadIdleTime() {
-        return Optional.ofNullable(readIdleTime);
+    public Optional<Duration> getReadIdleTimeout() {
+        return Optional.ofNullable(readIdleTimeout);
     }
-
 
     /**
      * @return The default connect timeout. Defaults to Netty default.
@@ -247,7 +246,7 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets the amount of time to wait for shutdown of client thread pools. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_SHUTDOWNTIMEOUT_MILLISECONDS} milliseconds).
+     * Sets the amount of time to wait for shutdown of client thread pools. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_SHUTDOWN_TIMEOUT_MILLISECONDS} milliseconds).
      *
      * @param shutdownTimeout The shutdown time
      */
@@ -256,7 +255,7 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets the read timeout. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_READTIMEOUT_SECONDS} seconds).
+     * Sets the read timeout. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_READ_TIMEOUT_SECONDS} seconds).
      *
      * @param readTimeout The read timeout
      */
@@ -265,12 +264,12 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets the max read idle time for streaming requests. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_READIDLETIMEOUT_SECONDS} seconds).
+     * Sets the max read idle time for streaming requests. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_READ_IDLE_TIMEOUT_MINUTES} seconds).
      *
-     * @param readIdleTime The read idle time
+     * @param readIdleTimeout The read idle time
      */
-    public void setReadIdleTime(@Nullable Duration readIdleTime) {
-        this.readIdleTime = readIdleTime;
+    public void setReadIdleTimeout(@Nullable Duration readIdleTimeout) {
+        this.readIdleTimeout = readIdleTimeout;
     }
 
     /**
@@ -322,7 +321,7 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
-     * Sets the maximum content length the client can consume. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_MAXCONTENTLENGTH} => 10MB).
+     * Sets the maximum content length the client can consume. Default value ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_MAX_CONTENT_LENGTH} => 10MB).
      *
      * @param maxContentLength The maximum content length the client can consume
      */

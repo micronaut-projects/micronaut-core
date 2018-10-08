@@ -66,16 +66,16 @@ public class HttpServerConfiguration {
     public static final long DEFAULT_MAX_REQUEST_SIZE = 1024 * 1024 * 10; // 10MB
 
     /**
-     * The default read idle time.
+     * The default read idle time in minutes.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final long DEFAULT_READIDLETIME_SECONDS = 60;
+    public static final long DEFAULT_READ_IDLE_TIME_MINUTES = 5;
 
     /**
-     * The default write idle time.
+     * The default write idle time in minutes.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final long DEFAULT_WRITEIDLETIME_SECONDS = 60;
+    public static final long DEFAULT_WRITE_IDLE_TIME_MINUTES = 5;
 
     /**
      * The default date header.
@@ -87,26 +87,26 @@ public class HttpServerConfiguration {
      * The default idle time.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final long DEFAULT_IDLETIME_SECONDS = 60;
+    public static final long DEFAULT_IDLE_TIME_MINUTES = 5;
 
     /**
      * The default value for log handled exceptions.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final boolean DEFAULT_LOGHANDLEDEXCEPTIONS = false;
+    public static final boolean DEFAULT_LOG_HANDLED_EXCEPTIONS = false;
 
     private Integer port;
     private String host;
     private Integer readTimeout;
     private long maxRequestSize = DEFAULT_MAX_REQUEST_SIZE;
-    private Duration readIdleTime = Duration.of(DEFAULT_READIDLETIME_SECONDS, ChronoUnit.SECONDS);
-    private Duration writeIdleTime = Duration.of(DEFAULT_WRITEIDLETIME_SECONDS, ChronoUnit.SECONDS);
-    private Duration idleTime = Duration.of(DEFAULT_IDLETIME_SECONDS, ChronoUnit.SECONDS);
+    private Duration readIdleTimeout = null;
+    private Duration writeIdleTimeout = null;
+    private Duration idleTimeout = Duration.of(DEFAULT_IDLE_TIME_MINUTES, ChronoUnit.MINUTES);
     private MultipartConfiguration multipart = new MultipartConfiguration();
     private CorsConfiguration cors = new CorsConfiguration();
     private String serverHeader;
     private boolean dateHeader = DEFAULT_DATEHEADER;
-    private boolean logHandledExceptions = DEFAULT_LOGHANDLEDEXCEPTIONS;
+    private boolean logHandledExceptions = DEFAULT_LOG_HANDLED_EXCEPTIONS;
 
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
@@ -196,22 +196,22 @@ public class HttpServerConfiguration {
     /**
      * @return The default amount of time to allow read operation connections  to remain idle
      */
-    public Duration getReadIdleTime() {
-        return readIdleTime;
+    public Duration getReadIdleTimeout() {
+        return Optional.ofNullable(readIdleTimeout).orElse(idleTimeout);
     }
 
     /**
      * @return The default amount of time to allow write operation connections to remain idle
      */
-    public Duration getWriteIdleTime() {
-        return writeIdleTime;
+    public Duration getWriteIdleTimeout() {
+        return Optional.ofNullable(writeIdleTimeout).orElse(idleTimeout);
     }
 
     /**
      * @return The time to allow an idle connection for
      */
-    public Duration getIdleTime() {
-        return idleTime;
+    public Duration getIdleTimeout() {
+        return idleTimeout;
     }
 
     /**
@@ -281,30 +281,32 @@ public class HttpServerConfiguration {
     }
 
     /**
-     * Sets the amount of time a connection can remain idle without any reads occurring. Default value ({@value #DEFAULT_READIDLETIME_SECONDS} seconds).
+     * Sets the amount of time a connection can remain idle without any reads occurring. Default value ({@value #DEFAULT_READ_IDLE_TIME_MINUTES} seconds).
      *
-     * @param readIdleTime The read idle time
+     * @param readIdleTimeout The read idle time
      */
-    public void setReadIdleTime(Duration readIdleTime) {
-        this.readIdleTime = readIdleTime;
+    public void setReadIdleTimeout(Duration readIdleTimeout) {
+        this.readIdleTimeout = readIdleTimeout;
     }
 
     /**
-     * Sets the amount of time a connection can remain idle without any writes occurring. Default value ({@value #DEFAULT_WRITEIDLETIME_SECONDS} seconds).
+     * Sets the amount of time a connection can remain idle without any writes occurring. Default value ({@value #DEFAULT_WRITE_IDLE_TIME_MINUTES} seconds).
      *
-     * @param writeIdleTime The write idle time
+     * @param writeIdleTimeout The write idle time
      */
-    public void setWriteIdleTime(Duration writeIdleTime) {
-        this.writeIdleTime = writeIdleTime;
+    public void setWriteIdleTimeout(Duration writeIdleTimeout) {
+        this.writeIdleTimeout = writeIdleTimeout;
     }
 
     /**
-     * Sets the idle time of connections for the server. Default value ({@value #DEFAULT_IDLETIME_SECONDS} seconds).
+     * Sets the idle time of connections for the server. Default value ({@value #DEFAULT_IDLE_TIME_MINUTES} seconds).
      *
-     * @param idleTime The idle time
+     * @param idleTimeout The idle time
      */
-    public void setIdleTime(Duration idleTime) {
-        this.idleTime = idleTime;
+    public void setIdleTimeout(Duration idleTimeout) {
+        if (idleTimeout != null) {
+            this.idleTimeout = idleTimeout;
+        }
     }
 
     /**
@@ -335,7 +337,7 @@ public class HttpServerConfiguration {
 
     /**
      * Sets whether exceptions handled by either an error route or exception handler
-     * should still be logged. Default value ({@value #DEFAULT_LOGHANDLEDEXCEPTIONS }).
+     * should still be logged. Default value ({@value #DEFAULT_LOG_HANDLED_EXCEPTIONS }).
      *
      * @param logHandledExceptions True if exceptions should be logged
      */

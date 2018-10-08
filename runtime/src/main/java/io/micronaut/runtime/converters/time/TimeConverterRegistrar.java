@@ -48,7 +48,7 @@ import java.util.regex.Pattern;
 @Requires(notEnv = Environment.ANDROID)
 public class TimeConverterRegistrar implements TypeConverterRegistrar {
 
-    private static final Pattern DURATION_MATCHER = Pattern.compile("^(\\d+)([s|m|h|d])(s?)$");
+    private static final Pattern DURATION_MATCHER = Pattern.compile("^(-?\\d+)([s|m|h|d])(s?)$");
     private static final int MILLIS = 3;
 
     @Override
