@@ -28,6 +28,7 @@ import io.micronaut.configuration.ribbon.RibbonLoadBalancer;
 import io.micronaut.configuration.ribbon.RibbonServer;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Replaces;
+import io.micronaut.context.env.Environment;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.ServiceInstanceList;
 import io.micronaut.http.client.LoadBalancer;
@@ -49,28 +50,53 @@ import java.util.stream.Collectors;
 public class RibbonServiceInstanceListLoadBalancerFactory extends ServiceInstanceListLoadBalancerFactory {
     private final BeanContext beanContext;
     private final IClientConfig defaultClientConfig;
+    private final Environment environment;
 
     /**
      * Constructor.
      * @param beanContext beanContext
      * @param defaultClientConfig defaultClientConfig
+     * @param environment The environment
      */
-    public RibbonServiceInstanceListLoadBalancerFactory(BeanContext beanContext, IClientConfig defaultClientConfig) {
+    public RibbonServiceInstanceListLoadBalancerFactory(BeanContext beanContext, IClientConfig defaultClientConfig, Environment environment) {
         this.beanContext = beanContext;
         this.defaultClientConfig = defaultClientConfig;
+        this.environment = environment;
     }
 
     @Override
     public LoadBalancer create(ServiceInstanceList serviceInstanceList) {
         String serviceID = serviceInstanceList.getID();
-        IClientConfig niwsClientConfig = beanContext.findBean(IClientConfig.class, Qualifiers.byName(serviceID)).orElse(defaultClientConfig);
-        IRule rule = beanContext.findBean(IRule.class, Qualifiers.byName(serviceID)).orElseGet(() -> beanContext.createBean(IRule.class));
-        IPing ping = beanContext.findBean(IPing.class, Qualifiers.byName(serviceID)).orElseGet(() -> beanContext.createBean(IPing.class));
-        ServerListFilter serverListFilter = beanContext.findBean(ServerListFilter.class, Qualifiers.byName(serviceID)).orElseGet(() -> beanContext.createBean(ServerListFilter.class));
-        ServerList<Server> serverList = beanContext.findBean(ServerList.class, Qualifiers.byName(serviceID)).orElseGet(() -> toRibbonServerList(serviceInstanceList));
+
+        // create the client config
+        IClientConfig niwsClientConfig = beanContext.findBean(IClientConfig.class, Qualifiers.byName(serviceID))
+                                                    .orElse(new StandardNameClientConfig(environment, serviceID, defaultClientConfig));
+
+        // create the rule
+        IRule rule = beanContext.findBean(IRule.class, Qualifiers.byName(serviceID))
+                                .orElseGet(() -> beanContext.createBean(IRule.class));
+
+        // create the ping
+        IPing ping = beanContext.findBean(IPing.class, Qualifiers.byName(serviceID))
+                                .orElseGet(() -> beanContext.createBean(IPing.class));
+
+        // create the server list
+        ServerListFilter serverListFilter = beanContext.findBean(
+                ServerListFilter.class,
+                Qualifiers.byName(serviceID))
+                .orElseGet(() -> beanContext.createBean(ServerListFilter.class));
+
+        ServerList<Server> serverList = beanContext.findBean(ServerList.class, Qualifiers.byName(serviceID))
+                                                   .orElseGet(() -> toRibbonServerList(serviceInstanceList));
 
         if (niwsClientConfig.getPropertyAsBoolean(CommonClientConfigKey.InitializeNFLoadBalancer, true)) {
-            return createRibbonLoadBalancer(niwsClientConfig, rule, ping, serverListFilter, serverList);
+            return createRibbonLoadBalancer(
+                    niwsClientConfig,
+                    rule,
+                    ping,
+                    serverListFilter,
+                    serverList
+            );
         } else {
             return super.create(serviceInstanceList);
         }
@@ -109,7 +135,12 @@ public class RibbonServiceInstanceListLoadBalancerFactory extends ServiceInstanc
      * @param serverList serverList
      * @return balancer
      */
-    protected RibbonLoadBalancer createRibbonLoadBalancer(IClientConfig niwsClientConfig, IRule rule, IPing ping, ServerListFilter serverListFilter, ServerList<Server> serverList) {
+    protected RibbonLoadBalancer createRibbonLoadBalancer(
+            IClientConfig niwsClientConfig,
+            IRule rule,
+            IPing ping,
+            ServerListFilter serverListFilter,
+            ServerList<Server> serverList) {
         return new RibbonLoadBalancer(
             niwsClientConfig,
             serverList,

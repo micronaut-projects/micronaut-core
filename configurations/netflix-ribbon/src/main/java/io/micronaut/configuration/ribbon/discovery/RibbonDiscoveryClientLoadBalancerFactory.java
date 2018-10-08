@@ -18,22 +18,26 @@ package io.micronaut.configuration.ribbon.discovery;
 
 import com.netflix.client.config.CommonClientConfigKey;
 import com.netflix.client.config.IClientConfig;
-import com.netflix.loadbalancer.IPing;
-import com.netflix.loadbalancer.IRule;
-import com.netflix.loadbalancer.Server;
-import com.netflix.loadbalancer.ServerList;
-import com.netflix.loadbalancer.ServerListFilter;
+import com.netflix.loadbalancer.*;
 import io.micronaut.configuration.ribbon.DiscoveryClientServerList;
 import io.micronaut.configuration.ribbon.RibbonLoadBalancer;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Replaces;
+import io.micronaut.context.env.Environment;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.loadbalance.DiscoveryClientLoadBalancerFactory;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import javax.inject.Singleton;
+import java.net.URI;
+import java.util.List;
+import java.util.Optional;
+
 
 /**
  * Replaces the default {@link DiscoveryClientLoadBalancerFactory} with one that returns {@link RibbonLoadBalancer} instances.
@@ -46,32 +50,35 @@ import javax.inject.Singleton;
 public class RibbonDiscoveryClientLoadBalancerFactory extends DiscoveryClientLoadBalancerFactory {
     private final BeanContext beanContext;
     private final IClientConfig defaultClientConfig;
+    private final Environment environment;
 
     /**
      * Constructor.
      * @param discoveryClient discoveryClient
      * @param beanContext beanContext
      * @param defaultClientConfig defaultClientConfig
+     * @param environment The environment
      */
     public RibbonDiscoveryClientLoadBalancerFactory(DiscoveryClient discoveryClient,
                                                     BeanContext beanContext,
-                                                    IClientConfig defaultClientConfig) {
+                                                    IClientConfig defaultClientConfig,
+                                                    Environment environment) {
         super(discoveryClient);
 
         this.beanContext = beanContext;
         this.defaultClientConfig = defaultClientConfig;
+        this.environment = environment;
     }
 
     @Override
     public LoadBalancer create(String serviceID) {
         serviceID = NameUtils.hyphenate(serviceID);
-        IClientConfig niwsClientConfig = beanContext.findBean(IClientConfig.class, Qualifiers.byName(serviceID)).orElse(defaultClientConfig);
+        IClientConfig niwsClientConfig = beanContext.findBean(IClientConfig.class, Qualifiers.byName(serviceID)).orElse(new StandardNameClientConfig(environment, serviceID, defaultClientConfig));
         IRule rule = beanContext.findBean(IRule.class, Qualifiers.byName(serviceID)).orElseGet(() -> beanContext.createBean(IRule.class));
         IPing ping = beanContext.findBean(IPing.class, Qualifiers.byName(serviceID)).orElseGet(() -> beanContext.createBean(IPing.class));
         ServerListFilter serverListFilter = beanContext.findBean(ServerListFilter.class, Qualifiers.byName(serviceID)).orElseGet(() -> beanContext.createBean(ServerListFilter.class));
 
-        String finalServiceID = serviceID;
-        ServerList<Server> serverList = beanContext.findBean(ServerList.class, Qualifiers.byName(serviceID)).orElseGet(() -> new DiscoveryClientServerList(getDiscoveryClient(), finalServiceID));
+        ServerList<Server> serverList = buildServerList(beanContext, serviceID, niwsClientConfig, getDiscoveryClient());
 
         if (niwsClientConfig.getPropertyAsBoolean(CommonClientConfigKey.InitializeNFLoadBalancer, true)) {
             return createRibbonLoadBalancer(niwsClientConfig, rule, ping, serverListFilter, serverList);
@@ -97,5 +104,24 @@ public class RibbonDiscoveryClientLoadBalancerFactory extends DiscoveryClientLoa
             rule,
             ping
         );
+    }
+
+    private static ServerList<Server> buildServerList(BeanContext beanContext, String serviceID, IClientConfig niwsClientConfig, DiscoveryClient discoveryClient) {
+        final Optional<List> result = ConversionService.SHARED.convert(
+                niwsClientConfig.get(CommonClientConfigKey.ListOfServers, null),
+                Argument.of(List.class, URI.class)
+        );
+
+        final List staticServerList = result.orElse(null);
+        ServerList<Server> serverList;
+        if (CollectionUtils.isNotEmpty(staticServerList)) {
+            final ConfigurationBasedServerList configList = new ConfigurationBasedServerList();
+            configList.initWithNiwsConfig(niwsClientConfig);
+            serverList = configList;
+        } else {
+            serverList = beanContext.findBean(ServerList.class, Qualifiers.byName(serviceID))
+                                    .orElseGet(() -> new DiscoveryClientServerList(discoveryClient, serviceID));
+        }
+        return serverList;
     }
 }
