@@ -127,4 +127,9 @@ public class EurekaServiceInstance implements ServiceInstance {
             return URI.create("http://" + instanceInfo.getHostName() + portStr);
         }
     }
+
+    @Override
+    public String toString() {
+        return instanceInfo.toString();
+    }
 }

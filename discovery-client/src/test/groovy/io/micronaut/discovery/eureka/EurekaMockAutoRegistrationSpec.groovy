@@ -40,6 +40,51 @@ import javax.validation.ConstraintViolationException
 @Stepwise
 class EurekaMockAutoRegistrationSpec extends Specification {
 
+    void "test that an application can be registered and de-registered with Eureka hyphenated"() {
+        given:
+        Map eurekaServerConfig = [
+                'jackson.serialization.WRAP_ROOT_VALUE': true,
+                (MockEurekaServer.ENABLED): true
+        ]
+        EmbeddedServer eurekaServer = ApplicationContext.run(EmbeddedServer, eurekaServerConfig, Environment.TEST)
+
+        when: "An application is started and eureka configured"
+        String serviceId = 'gr8crm-tag-service'
+        Map applicationConfig = ['consul.client.registration.enabled'        : false,
+                                 "micronaut.caches.discoveryClient.enabled"  : false,
+                                 'eureka.client.host'                        : eurekaServer.getHost(),
+                                 'eureka.client.port'                        : eurekaServer.getPort(),
+                                 'jackson.deserialization.UNWRAP_ROOT_VALUE' : true,
+                                 'micronaut.application.name'                : serviceId]
+        EmbeddedServer application1 = ApplicationContext.run(EmbeddedServer, applicationConfig, Environment.TEST)
+
+        Map applicationConfig2 = new HashMap(applicationConfig)
+        applicationConfig2.put('micronaut.application.name', 'gr8crm-notification-service')
+        EmbeddedServer application2 = ApplicationContext.run(EmbeddedServer, applicationConfig2, Environment.TEST)
+
+        EurekaClient eurekaClient = application1.applicationContext.getBean(EurekaClient)
+        PollingConditions conditions = new PollingConditions(timeout: 5, delay: 0.5)
+
+        then: "The application is registered"
+        conditions.eventually {
+            Flowable.fromPublisher(eurekaClient.applicationInfos).blockingFirst().size() == 2
+            Flowable.fromPublisher(eurekaClient.getApplicationVips(NameUtils.hyphenate(serviceId))).blockingFirst().size() == 2
+            Flowable.fromPublisher(eurekaClient.getInstances(NameUtils.hyphenate(serviceId))).blockingFirst().size() == 1
+            Flowable.fromPublisher(eurekaClient.getServiceIds()).blockingFirst().contains(NameUtils.hyphenate(serviceId))
+            MockEurekaServer.instances[NameUtils.hyphenate(serviceId)].size() == 1
+
+            InstanceInfo instanceInfo = MockEurekaServer.instances[NameUtils.hyphenate(serviceId)].values().first()
+            instanceInfo.status == InstanceInfo.Status.UP
+        }
+
+
+        cleanup:
+        application1?.stop()
+        application2?.stop()
+        eurekaServer?.stop()
+    }
+
+
     void "test that an application can be registered and de-registered with Eureka"() {
         given:
         Map eurekaServerConfig = [
