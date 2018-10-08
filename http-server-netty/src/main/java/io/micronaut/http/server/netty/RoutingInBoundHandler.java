@@ -829,6 +829,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             ReturnType<?> genericReturnType = finalRoute.getReturnType();
             Class<?> javaReturnType = genericReturnType.getType();
 
+            if (HttpResponse.class.isAssignableFrom(javaReturnType)) {
+                Optional<Argument<?>> generic = genericReturnType.getFirstTypeVariable();
+                if (generic.isPresent()) {
+                    javaReturnType = generic.get().getType();
+                }
+            }
+
             AtomicReference<io.micronaut.http.HttpRequest<?>> requestReference = new AtomicReference<>(request);
             boolean isFuture = CompletableFuture.class.isAssignableFrom(javaReturnType);
             boolean isReactiveReturnType = Publishers.isConvertibleToPublisher(javaReturnType) || isFuture;
