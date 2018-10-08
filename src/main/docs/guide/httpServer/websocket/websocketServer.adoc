@@ -68,3 +68,26 @@ $ mn create-websocket-server MyChat
 | Rendered template WebsocketServer.java to destination src/main/java/example/MyChatServer.java
 ----
 ====
+
+=== Connection Timeouts
+
+By default Micronaut will timeout idle connections that have no activity after 5 minutes. Normally this is not a problem as browsers will automatically reconnect WebSocket sessions, however you can control this behaviour by setting the `micronaut.server.idle-timeout` setting (a negative value will result no timeout):
+
+.Setting the Connection Timeout for the Server
+[source,yaml]
+----
+micronaut:
+    server:
+        idle-timeout: 30m # 30 minutes
+----
+
+If you are using Micronaut's WebSocket client then you may also wish to set the timeout on the client:
+
+.Setting the Connection Timeout for the Client
+[source,yaml]
+----
+micronaut:
+    http:
+        client:
+            read-idle-timeout: 30m # 30 minutes
+----

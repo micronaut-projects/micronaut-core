@@ -87,6 +87,7 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -247,10 +248,13 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                                 pipeline.addLast(new LoggingHandler(logLevel))
                         );
 
-                        pipeline.addLast(new IdleStateHandler(
-                            (int) serverConfiguration.getReadIdleTime().getSeconds(),
-                            (int) serverConfiguration.getWriteIdleTime().getSeconds(),
-                            (int) serverConfiguration.getIdleTime().getSeconds()));
+                        final Duration idleTime = serverConfiguration.getIdleTimeout();
+                        if (!idleTime.isNegative()) {
+                            pipeline.addLast(new IdleStateHandler(
+                                    (int) serverConfiguration.getReadIdleTimeout().getSeconds(),
+                                    (int) serverConfiguration.getWriteIdleTimeout().getSeconds(),
+                                    (int) idleTime.getSeconds()));
+                        }
 
                         pipeline.addLast(HTTP_CODEC, new HttpServerCodec(
                                 serverConfiguration.getMaxInitialLineLength(),
