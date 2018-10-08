@@ -26,6 +26,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.uri.UriMatchTemplate;
@@ -153,6 +154,9 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 }
 
                 ClassElement returnType = element.getReturnType();
+                if (returnType.isAssignable(HttpResponse.class)) {
+                    returnType = returnType.getFirstTypeArgument().orElse(returnType);
+                }
                 if (returnType != null) {
                     String mediaType = element.getValue(Produces.class, String.class).orElse(MediaType.APPLICATION_JSON);
                     Content content = buildContent(returnType, mediaType, openAPI, context);
