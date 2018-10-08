@@ -1,5 +1,12 @@
-Apart from https://github.com/micronaut-projects/micronaut-core/milestone/5?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features.
+Apart from https://github.com/micronaut-projects/micronaut-core/milestone/6?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features.
 
+=== Improvements from RC1 to RC2
+
+The following changes and improvements were added since the last RC:
+
+* Eureka Improvements (automatic re-registration)
+* Ribbon Improvements (use standard Ribbon configuration)
+* Support for GraalVM 1.0 RC7
 
 === Support for GraalVM Native Images
 
