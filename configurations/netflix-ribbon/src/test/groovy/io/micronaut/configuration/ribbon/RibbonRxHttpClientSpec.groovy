@@ -106,7 +106,7 @@ class RibbonRxHttpClientSpec extends Specification {
                     'consul.client.host': consulServer.host,
                     'consul.client.port': consulServer.port,
                     'ribbon.VipAddress': 'test',
-                    'ribbon.clients.messageService.VipAddress': 'bar'
+                    'messageService.ribbon.VipAddress': 'bar'
             ])
             MessageService messageClient = context.getBean(MessageService)
 
@@ -115,6 +115,51 @@ class RibbonRxHttpClientSpec extends Specification {
             messageClient.client.loadBalancer.isPresent()
             ((RibbonLoadBalancer)messageClient.client.loadBalancer.get()).clientConfig
             ((RibbonLoadBalancer)messageClient.client.loadBalancer.get()).clientConfig.get(CommonClientConfigKey.VipAddress) == 'bar'
+            messageClient.getMessage().startsWith("Server ")
+            messageClient.getMessage() != messageClient.getMessage()
+        }
+
+
+        cleanup:
+        messageServer?.stop()
+        messageServer2?.stop()
+        consulServer?.stop()
+    }
+
+    void "test basic ribbon load balancing configuration 2"() {
+
+        given:"A discovery server, two micro services and a client"
+
+        // the discovery server
+        EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer)
+
+        def serverConfig = [
+                'consul.client.host'              : consulServer.host,
+                'consul.client.port'              : consulServer.port,
+                'micronaut.application.name': 'messageService'
+        ]
+
+        // the two micro services
+        EmbeddedServer messageServer = ApplicationContext.run(EmbeddedServer, serverConfig)
+        EmbeddedServer messageServer2 = ApplicationContext.run(EmbeddedServer, serverConfig)
+
+        PollingConditions conditions = new PollingConditions(timeout: 5)
+
+        expect: "Different servers are called for each invocation of getMessage()"
+        conditions.eventually {
+            // the client
+            ApplicationContext context = ApplicationContext.run([
+                    'consul.client.host': consulServer.host,
+                    'consul.client.port': consulServer.port,
+                    'ribbon.VipAddress': 'test'
+            ])
+            MessageService messageClient = context.getBean(MessageService)
+
+            context.containsBean(RibbonRxHttpClient)
+            messageClient.client instanceof RibbonRxHttpClient
+            messageClient.client.loadBalancer.isPresent()
+            ((RibbonLoadBalancer)messageClient.client.loadBalancer.get()).clientConfig
+            ((RibbonLoadBalancer)messageClient.client.loadBalancer.get()).clientConfig.get(CommonClientConfigKey.VipAddress) == 'test'
             messageClient.getMessage().startsWith("Server ")
             messageClient.getMessage() != messageClient.getMessage()
         }
