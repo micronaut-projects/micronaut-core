@@ -63,6 +63,7 @@ class TokenPropagationSpec extends Specification {
         given:
         inventoryPort = SocketUtils.findAvailableTcpPort()
         Map inventoryConfig = [
+                'micronaut.application.name': 'inventory',
                 'micronaut.server.port'                       : inventoryPort,
                 (SPEC_NAME_PROPERTY)                          : 'tokenpropagation.inventory',
                 'micronaut.security.token.jwt.enabled'                 : true,
@@ -87,6 +88,7 @@ class TokenPropagationSpec extends Specification {
         given:
         booksPort = SocketUtils.findAvailableTcpPort()
         Map booksConfig = [
+                'micronaut.application.name': 'books',
                 'micronaut.server.port'                       : booksPort,
                 (SPEC_NAME_PROPERTY)                          : 'tokenpropagation.books',
                 'micronaut.security.token.jwt.enabled'                 : true,
@@ -111,6 +113,7 @@ class TokenPropagationSpec extends Specification {
         given:
         Map gatewayConfig = [
                 (SPEC_NAME_PROPERTY): 'tokenpropagation.gateway',
+                'micronaut.application.name': 'gateway',
                 'micronaut.security.enabled': true,
                 'micronaut.http.services.books.url': "http://localhost:${booksPort}",
                 'micronaut.http.services.inventory.url': "http://localhost:${inventoryPort}",
