@@ -26,4 +26,9 @@ class MockApplicationInfo extends ApplicationInfo {
     def MockApplicationInfo(String name, List<InstanceInfo> instances) {
         super(name, instances)
     }
+
+    @Override
+    String toString() {
+        super.toString()
+    }
 }

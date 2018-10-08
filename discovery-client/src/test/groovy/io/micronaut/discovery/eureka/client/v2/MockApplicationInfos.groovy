@@ -23,4 +23,9 @@ class MockApplicationInfos extends AbstractEurekaClient.ApplicationInfos{
     MockApplicationInfos(List<ApplicationInfo> applications) {
         super(applications)
     }
+
+    @Override
+    String toString() {
+        return applications.toString()
+    }
 }
