@@ -16,6 +16,7 @@
 package io.micronaut.security.token.jwt.endpoints
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
@@ -35,7 +36,7 @@ class OauthControllerPathConfigurableSpec extends Specification {
             'micronaut.security.token.jwt.enabled': true,
             'micronaut.security.endpoints.oauth.enabled': true,
             'micronaut.security.endpoints.oauth.path': '/newtoken',
-    ], 'test')
+    ], Environment.TEST)
 
     @Shared
     @AutoCleanup

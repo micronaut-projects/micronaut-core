@@ -1,3 +1,12 @@
+buildscript {
+    repositories {
+        maven { url "https://plugins.gradle.org/m2/" }
+    }
+    dependencies {
+        classpath "gradle.plugin.com.energizedwork.webdriver-binaries:webdriver-binaries-gradle-plugin:$webdriverBinariesVersion"
+    }
+}
+
 dependencies {
     testCompile project(":http-server-netty")
     testCompile project(":http-client")
@@ -19,6 +28,10 @@ dependencies {
     testRuntime 'com.h2database:h2:1.4.196'
     testRuntime "ch.qos.logback:logback-classic:1.2.3"
 }
+
+apply from: "${rootProject.projectDir}/gradle/geb.gradle"
+apply from: "${rootProject.projectDir}/gradle/webdriverbinaries.gradle"
+
 //tasks.withType(Test) {
 //    testLogging {
 //        showStandardStreams = true

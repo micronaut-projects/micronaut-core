@@ -16,6 +16,7 @@
 package io.micronaut.management.endpoint
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.core.util.Toggleable
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
@@ -38,7 +39,7 @@ class SimpleEndpointSpec extends Specification {
     void "test read simple endpoint"() {
         given:
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer,
-                ['endpoints.simple.myValue':'foo'], 'test')
+                ['endpoints.simple.myValue':'foo'], Environment.TEST)
         RxHttpClient rxClient = server.applicationContext.createBean(RxHttpClient, server.getURL())
 
         when:

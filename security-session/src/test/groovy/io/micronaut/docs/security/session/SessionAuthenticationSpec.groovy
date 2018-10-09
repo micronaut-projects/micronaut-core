@@ -17,6 +17,7 @@ package io.micronaut.docs.security.session
 
 import geb.spock.GebSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
@@ -71,7 +72,7 @@ micronaut:
     ApplicationContext context = ApplicationContext.run([
                     'spec.name': 'securitysession',
                     'micronaut.http.client.followRedirects': false
-            ] << flatten(configMap), 'test')
+            ] << flatten(configMap), Environment.TEST)
 
     @Shared
     @AutoCleanup
