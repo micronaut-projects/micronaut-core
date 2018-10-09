@@ -7,10 +7,6 @@ buildscript {
     }
 }
 
-ext {
-    gebVersion = '2.1'
-    seleniumVersion = '3.6.0'
-}
 
 apply plugin:"com.energizedwork.webdriver-binaries"
 
