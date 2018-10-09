@@ -64,10 +64,11 @@ class TypeElementVisitorTransform implements ASTTransformation {
 
         if (loadedVisitors == null) return
 
+        GroovyVisitorContext visitorContext = new GroovyVisitorContext(source)
         for (ClassNode classNode in classes) {
             if (!(classNode instanceof InnerClassNode && !Modifier.isStatic(classNode.getModifiers()))) {
                 Collection<LoadedVisitor> matchedVisitors = loadedVisitors.values().findAll { v -> v.matches(classNode) }
-                new ElementVisitor(source, classNode, matchedVisitors).visitClass(classNode)
+                new ElementVisitor(source, classNode, matchedVisitors, visitorContext).visitClass(classNode)
             }
         }
     }
@@ -80,12 +81,12 @@ class TypeElementVisitorTransform implements ASTTransformation {
         private final ClassNode concreteClass
         private final Collection<LoadedVisitor> typeElementVisitors
 
-        ElementVisitor(SourceUnit sourceUnit, ClassNode targetClassNode, Collection<LoadedVisitor> typeElementVisitors) {
+        ElementVisitor(SourceUnit sourceUnit, ClassNode targetClassNode, Collection<LoadedVisitor> typeElementVisitors, GroovyVisitorContext visitorContext) {
             this.typeElementVisitors = typeElementVisitors
             this.concreteClass = targetClassNode
             this.sourceUnit = sourceUnit
             this.annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, targetClassNode)
-            this.visitorContext = new GroovyVisitorContext(sourceUnit)
+            this.visitorContext = visitorContext
         }
 
         protected boolean isPackagePrivate(AnnotatedNode annotatedNode, int modifiers) {

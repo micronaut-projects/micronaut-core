@@ -48,7 +48,6 @@ class TypeElementVisitorStart implements ASTTransformation {
 
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
-
         Map<String, LoadedVisitor> loadedVisitors = TypeElementVisitorTransform.loadedVisitors
 
         if (loadedVisitors == null) {
@@ -102,9 +101,11 @@ class TypeElementVisitorStart implements ASTTransformation {
                 }
             }
 
+
+            def visitorContext = new GroovyVisitorContext(source)
             for(loadedVisitor in loadedVisitors.values()) {
                 try {
-                    loadedVisitor.start(new GroovyVisitorContext(source))
+                    loadedVisitor.start(visitorContext)
                 } catch (Throwable e) {
                     AstMessageUtils.error(
                             source,
