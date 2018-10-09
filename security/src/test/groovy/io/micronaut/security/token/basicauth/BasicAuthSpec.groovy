@@ -16,6 +16,7 @@
 package io.micronaut.security.token.basicauth
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
@@ -34,7 +35,7 @@ class BasicAuthSpec extends Specification  {
             'endpoints.beans.enabled': true,
             'endpoints.beans.sensitive': true,
             'micronaut.security.enabled': true,
-    ], 'test')
+    ], Environment.TEST)
 
     @Shared
     @AutoCleanup

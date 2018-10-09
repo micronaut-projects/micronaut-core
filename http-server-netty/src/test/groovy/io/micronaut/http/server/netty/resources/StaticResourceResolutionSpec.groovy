@@ -111,7 +111,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.router.static-resources.default.paths': ['classpath:public', 'file:' + tempFile.parent],
-                'micronaut.router.static-resources.default.mapping': '/static/**'], 'test')
+                'micronaut.router.static-resources.default.mapping': '/static/**'], Environment.TEST)
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
 
@@ -141,7 +141,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
                 'micronaut.router.static-resources.cp.paths': ['classpath:public', 'file:' + tempFile.parent],
                 'micronaut.router.static-resources.cp.mapping': '/static/**',
                 'micronaut.router.static-resources.file.paths': ['file:' + tempFile.parent],
-                'micronaut.router.static-resources.file.mapping': '/file/**'], 'test')
+                'micronaut.router.static-resources.file.mapping': '/file/**'], Environment.TEST)
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         expect:
@@ -188,7 +188,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
                 'micronaut.router.static-resources.cp.mapping': '/static/**',
                 'micronaut.router.static-resources.file.paths': ['file:' + tempFile.parent],
                 'micronaut.router.static-resources.file.enabled': false,
-                'micronaut.router.static-resources.file.mapping': '/file/**'], 'test')
+                'micronaut.router.static-resources.file.mapping': '/file/**'], Environment.TEST)
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         expect:
@@ -226,7 +226,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.router.static-resources.default.paths': ['classpath:public', 'file:' + tempFile.parent],
-                'micronaut.router.static-resources.default.mapping': '/static/**'], 'test')
+                'micronaut.router.static-resources.default.mapping': '/static/**'], Environment.TEST)
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
 
@@ -255,7 +255,7 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'micronaut.router.static-resources.default.paths': ['classpath:public'],
-                'micronaut.router.static-resources.default.mapping': '/static/**'], 'test')
+                'micronaut.router.static-resources.default.mapping': '/static/**'], Environment.TEST)
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
 

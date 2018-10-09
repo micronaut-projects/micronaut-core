@@ -1,6 +1,7 @@
 package io.micronaut.configuration.jmx
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.management.endpoint.loggers.LogLevel
 import io.micronaut.management.endpoint.loggers.LoggersEndpoint
 import spock.lang.Specification
@@ -17,7 +18,7 @@ class LoggersEndpointSpec extends Specification {
         def ctx = ApplicationContext.run([
                 'endpoints.all.enabled': true,
                 'endpoints.all.sensitive': false
-        ], 'test')
+        ], Environment.TEST)
 
         when:
         MBeanServer server = ctx.getBean(MBeanServer)

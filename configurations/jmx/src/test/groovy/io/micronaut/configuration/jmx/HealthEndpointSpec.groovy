@@ -1,6 +1,7 @@
 package io.micronaut.configuration.jmx
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.health.HealthStatus
 import io.micronaut.management.endpoint.health.HealthEndpoint
 import io.micronaut.management.health.indicator.HealthResult
@@ -19,7 +20,7 @@ class HealthEndpointSpec extends Specification {
         def ctx = ApplicationContext.run([
                 'endpoints.all.enabled': true,
                 'endpoints.all.sensitive': false
-        ], 'test')
+        ], Environment.TEST)
 
         when:
         MBeanServer server = ctx.getBean(MBeanServer)
