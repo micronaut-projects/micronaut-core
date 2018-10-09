@@ -26,6 +26,7 @@ import com.nimbusds.jwt.SignedJWT;
 import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
 import io.micronaut.security.token.jwt.signature.AbstractSignatureConfiguration;
+import io.micronaut.security.token.jwt.signature.SignatureGeneratorConfiguration;
 
 import java.util.Base64;
 
@@ -36,7 +37,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * @author Sergio del Amo
  * @since 1.0
  */
-public class SecretSignature extends AbstractSignatureConfiguration {
+public class SecretSignature extends AbstractSignatureConfiguration implements SignatureGeneratorConfiguration {
 
     private byte[] secret;
 

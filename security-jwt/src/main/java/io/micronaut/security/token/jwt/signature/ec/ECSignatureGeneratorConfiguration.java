@@ -16,25 +16,18 @@
 
 package io.micronaut.security.token.jwt.signature.ec;
 
-import com.nimbusds.jose.JWSAlgorithm;
-
-import java.security.interfaces.ECPublicKey;
+import java.security.interfaces.ECPrivateKey;
 
 /**
- * Elliptic curve signature configuration.
+ * Elliptic curve signature generation configuration.
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface ECSignatureConfiguration {
+public interface ECSignatureGeneratorConfiguration extends ECSignatureConfiguration {
 
     /**
      *
-     * @return The EC Public Key
+     * @return The EC Private Key
      */
-    ECPublicKey getPublicKey();
-
-    /**
-     * @return The JWS Algorithm
-     */
-    JWSAlgorithm getJwsAlgorithm();
+    ECPrivateKey getPrivateKey();
 }
