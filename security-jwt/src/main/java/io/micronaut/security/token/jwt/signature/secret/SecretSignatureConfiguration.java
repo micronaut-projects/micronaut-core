@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.security.token.jwt.config.JwtConfigurationProperties;
 
 /**
+ * Create a {@link io.micronaut.context.annotation.ConfigurationProperties} bean for each sub-property of micronaut.security.token.jwt.signatures.secret.*.
  * @author Sergio del Amo
  * @since 1.0
  */

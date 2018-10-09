@@ -14,24 +14,24 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.token.jwt.signature.ec;
+package io.micronaut.security.token.jwt.signature.rsa;
 
 import com.nimbusds.jose.JWSAlgorithm;
 
-import java.security.interfaces.ECPublicKey;
+import java.security.interfaces.RSAPrivateKey;
 
 /**
- * Elliptic curve signature configuration.
+ * Encapsulates RSA Signature Generation Configuration.
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface ECSignatureConfiguration {
+public interface RSASignatureGeneratorConfiguration extends RSASignatureConfiguration {
 
     /**
      *
-     * @return The EC Public Key
+     * @return The RSA private Key
      */
-    ECPublicKey getPublicKey();
+    RSAPrivateKey getPrivateKey();
 
     /**
      * @return The JWS Algorithm
