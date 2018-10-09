@@ -16,6 +16,7 @@
 
 package io.micronaut.core.annotation;
 
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.OptionalValues;
 
 import javax.annotation.Nullable;
@@ -30,6 +31,36 @@ import java.util.*;
  * @since 1.0
  */
 public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, AnnotationMetadata {
+
+    @Override
+    default <T> Optional<T> getValue(String annotation, Argument<T> requiredType) {
+        return getAnnotationMetadata().getValue(annotation, requiredType);
+    }
+
+    @Override
+    default <T> Optional<T> getValue(Class<? extends Annotation> annotation, Argument<T> requiredType) {
+        return getAnnotationMetadata().getValue(annotation, requiredType);
+    }
+
+    @Override
+    default <T> Optional<T> getValue(String annotation, String member, Argument<T> requiredType) {
+        return getAnnotationMetadata().getValue(annotation, member, requiredType);
+    }
+
+    @Override
+    default <T> Optional<T> getDefaultValue(String annotation, String member, Argument<T> requiredType) {
+        return getAnnotationMetadata().getDefaultValue(annotation, member, requiredType);
+    }
+
+    @Override
+    default <T> Optional<T> getDefaultValue(Class<? extends Annotation> annotation, String member, Argument<T> requiredType) {
+        return getAnnotationMetadata().getDefaultValue(annotation, member, requiredType);
+    }
+
+    @Override
+    default <T> Optional<T> getValue(Class<? extends Annotation> annotation, String member, Argument<T> requiredType) {
+        return getAnnotationMetadata().getDefaultValue(annotation, member, requiredType);
+    }
 
     @Override
     default <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass) {

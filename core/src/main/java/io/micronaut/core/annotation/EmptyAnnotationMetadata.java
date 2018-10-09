@@ -16,6 +16,7 @@
 
 package io.micronaut.core.annotation;
 
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.OptionalValues;
 
 import java.lang.annotation.Annotation;
@@ -85,6 +86,11 @@ class EmptyAnnotationMetadata implements AnnotationMetadata {
     @Override
     public <T> OptionalValues<T> getValues(String annotation, Class<T> valueType) {
         return OptionalValues.empty();
+    }
+
+    @Override
+    public <T> Optional<T> getDefaultValue(String annotation, String member, Argument<T> requiredType) {
+        return Optional.empty();
     }
 
     @Override
