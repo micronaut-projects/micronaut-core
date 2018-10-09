@@ -5,3 +5,10 @@ dependencies {
     testCompile "org.seleniumhq.selenium:selenium-support:$seleniumVersion"
     testCompile "org.seleniumhq.selenium:selenium-api:$seleniumVersion"
 }
+
+test {
+    systemProperty "geb.env", System.getProperty('geb.env')
+    systemProperty "webdriver.chrome.driver", System.getProperty('webdriver.chrome.driver')
+    systemProperty "webdriver.gecko.driver", System.getProperty('webdriver.gecko.driver')
+}
+
