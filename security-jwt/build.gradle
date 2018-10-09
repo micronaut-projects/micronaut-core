@@ -3,18 +3,14 @@ buildscript {
         maven { url "https://plugins.gradle.org/m2/" }
     }
     dependencies {
-        classpath "gradle.plugin.com.energizedwork.webdriver-binaries:webdriver-binaries-gradle-plugin:1.4"
+        classpath "gradle.plugin.com.energizedwork.webdriver-binaries:webdriver-binaries-gradle-plugin:$webdriverBinariesVersion"
     }
 }
 
 ext {
     nimbusJoseJwtVersion = '6.0.2'
     bouncyCastleVersion = '1.53'
-    gebVersion = '2.1'
-    seleniumVersion = '3.6.0'
 }
-
-apply plugin:"com.energizedwork.webdriver-binaries"
 
 dependencies {
     compileOnly project(":inject-java")
@@ -38,11 +34,8 @@ dependencies {
 }
 
 apply from: "${rootProject.projectDir}/gradle/geb.gradle"
+apply from: "${rootProject.projectDir}/gradle/webdriverbinaries.gradle"
 
-webdriverBinaries {
-    chromedriver "${chromedriverVersion}"
-    geckodriver "${geckodriverVersion}"
-}
 
 test {
     systemProperty "geb.env", System.getProperty('geb.env')

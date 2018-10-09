@@ -30,7 +30,7 @@ class SecurityConfigurationPropertiesSpec extends Specification {
                 'micronaut.security.enabled': true,
                 'micronaut.security.interceptUrlMap': [
                         [pattern: '/health']
-        ]], 'test')
+        ]], Environment.TEST)
 
         when:
         ctx.getBean(SecurityConfigurationProperties)

@@ -16,6 +16,7 @@
 package io.micronaut.function.groovy
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.function.FunctionBean
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -240,7 +241,7 @@ Test test(Test test) {
 
     void "test run JSON function as REST service"() {
         given:
-        ApplicationContext context = ApplicationContext.run(['math.multiplier':'2'], 'test')
+        ApplicationContext context = ApplicationContext.run(['math.multiplier':'2'], Environment.TEST)
         EmbeddedServer server = context.getBean(EmbeddedServer).start()
         def data = '{"a":10, "b":5}'
         
@@ -273,7 +274,7 @@ Test test(Test test) {
 
     void "test run function as REST service"() {
         given:
-        ApplicationContext context = ApplicationContext.run(['math.multiplier':'2'], 'test')
+        ApplicationContext context = ApplicationContext.run(['math.multiplier':'2'], Environment.TEST)
         EmbeddedServer server = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, server.getURL())
 
@@ -308,7 +309,7 @@ Test test(Test test) {
 
     void "test run supplier as REST service"() {
         given:
-        ApplicationContext context = ApplicationContext.run(['math.multiplier':'2'], 'test')
+        ApplicationContext context = ApplicationContext.run(['math.multiplier':'2'], Environment.TEST)
         EmbeddedServer server = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, server.getURL())
 
