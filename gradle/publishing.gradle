@@ -221,17 +221,23 @@ If this fails, log on to http://oss.sonatype.org/ using the centralUser credenti
 and progress through process manually -> Close -> Publish ... under staging repositories
 """
         try {
-            def client = new RESTClient('https://api.bintray.com/maven_central_sync/micronaut/core-releases-local/')
-            client.headers['Authorization'] = 'Basic ' + "$bintrayUser:$bintrayKey".getBytes('iso-8859-1').encodeBase64()
-            def body = /{}/
-            def resp = client.post(
-                    path: "$bintray.pkg.name/versions/$projectVersion",
-                    body: body,
-                    requestContentType: JSON
-            )
-            assert resp.status == 200
-            println resp.data.status
-            println resp.data.messages.join('\n')
+            try {
+                def mavenClent = new RESTClient("https://repo.maven.apache.org/maven2/")
+                mavenClent.get(path:"${project.group.replace('.','/')}/$project.name/$projectVersion/$project.name-${projectVersion}.jar")
+            } catch(groovyx.net.http.HttpResponseException e) {
+                // doesn't exist.. try sync
+                def client = new RESTClient('https://api.bintray.com/maven_central_sync/micronaut/core-releases-local/')
+                client.headers['Authorization'] = 'Basic ' + "$bintrayUser:$bintrayKey".getBytes('iso-8859-1').encodeBase64()
+                def body = /{}/
+                def resp = client.post(
+                        path: "$bintray.pkg.name/versions/$projectVersion",
+                        body: body,
+                        requestContentType: JSON
+                )
+                assert resp.status == 200
+                println resp.data.status
+                println resp.data.messages.join('\n')
+            }
         } catch (groovyx.net.http.HttpResponseException e) {
             println "Error: $e"
             println "Message: $e.message"
