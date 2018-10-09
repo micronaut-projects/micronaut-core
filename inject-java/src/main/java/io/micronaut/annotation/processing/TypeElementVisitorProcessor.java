@@ -18,11 +18,15 @@ package io.micronaut.annotation.processing;
 
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.annotation.processing.visitor.LoadedVisitor;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.version.VersionUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
+import javax.annotation.processing.Messager;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.annotation.processing.SupportedSourceVersion;
@@ -33,10 +37,13 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementScanner8;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
-import static javax.lang.model.element.ElementKind.*;
+import static javax.lang.model.element.ElementKind.FIELD;
 
 /**
  * <p>The annotation processed used to execute type element visitors.</p>
@@ -57,8 +64,9 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             return false;
         }
 
+        final Messager messager = processingEnv.getMessager();
         JavaVisitorContext visitorContext = new JavaVisitorContext(
-                processingEnv.getMessager(),
+                messager,
                 elementUtils,
                 annotationUtils,
                 typeUtils,
@@ -69,6 +77,28 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         for (ServiceDefinition<TypeElementVisitor> definition : serviceLoader) {
             if (definition.isPresent()) {
                 TypeElementVisitor visitor = definition.load();
+                if (visitor == null) {
+                    continue;
+                }
+
+                final Requires requires = visitor.getClass().getAnnotation(Requires.class);
+                if (requires != null) {
+                    final Requires.Sdk sdk = requires.sdk();
+                    if (sdk == Requires.Sdk.MICRONAUT) {
+                        final String version = requires.version();
+                        if (StringUtils.isNotEmpty(version)) {
+                            if (!VersionUtils.isAtLeastMicronautVersion(version)) {
+                                try {
+                                    warning("TypeElementVisitor [" + definition.getName() + "] will be ignored because Micronaut version [" + VersionUtils.MICRONAUT_VERSION + "] must be at least " + version);
+                                    continue;
+                                } catch (IllegalArgumentException e) {
+                                    // shouldn't happen, thrown when invalid version encountered
+                                }
+                            }
+                        }
+                    }
+                }
+
                 try {
                     loadedVisitors.put(definition.getName(), new LoadedVisitor(
                             visitor,
@@ -77,7 +107,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                             processingEnv
                     ));
                 } catch (TypeNotPresentException | NoClassDefFoundError e) {
-                    // skip, dependent classes not classpath
+                    warning("TypeElementVisitor [" + definition.getName() + "] could not be loaded. Classpath may include a conflict: " + e.getMessage());
                 }
             }
         }
@@ -117,6 +147,8 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         executed = true;
         return false;
     }
+
+
 
     /**
      * The class to visit the type elements.

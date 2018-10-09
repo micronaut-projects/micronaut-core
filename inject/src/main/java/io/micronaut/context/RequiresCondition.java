@@ -33,6 +33,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.core.version.SemanticVersion;
+import io.micronaut.core.version.VersionUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
@@ -352,10 +353,9 @@ public class RequiresCondition implements Condition {
 
                     return context.isFailing();
                 default:
-                    String micronautVersion = getClass().getPackage().getImplementationVersion();
-                    boolean versionCheck = SemanticVersion.isAtLeast(micronautVersion, version);
+                    boolean versionCheck = VersionUtils.isAtLeastMicronautVersion(version);
                     if (!versionCheck) {
-                        context.fail("Micronaut version [" + micronautVersion + "] must be at least " + version);
+                        context.fail("Micronaut version [" + VersionUtils.MICRONAUT_VERSION + "] must be at least " + version);
                     }
                     return versionCheck;
             }
