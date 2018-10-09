@@ -70,16 +70,22 @@ class NameUtilsSpec extends Specification {
         NameUtils.hyphenate(value) == result
 
         where:
-        value                             | result
-        'micronaut.config-client.enabled' | 'micronaut.config-client.enabled'
-        "com.fooBar.FooBar"               | "com.foo-bar.foo-bar"
-        "FooBar"                          | "foo-bar"
-        "com.bar.FooBar"                  | "com.bar.foo-bar"
-        "Foo"                             | 'foo'
-        "FooBBar"                         | 'foo-bbar'
-        "FOO_BAR"                         | 'foo-bar'
-        "fooBBar"                         | 'foo-bbar'
-        'gr8crm-notification-service '    | 'gr8crm-notification-service '
+        value                                       | result
+        'gr8crm-notification-service'.toUpperCase() | 'gr8crm-notification-service'
+        'gr8-notification-service'.toUpperCase()    | 'gr8-notification-service'
+        '8gr8-notification-service'.toUpperCase()   | '8gr8-notification-service'
+        '8gr8-notification-s3rv1c3'.toUpperCase()   | '8gr8-notification-s3rv1c3'
+        'gr8-7notification-service'.toUpperCase()   | 'gr8-7notification-service'
+        'micronaut.config-client.enabled'           | 'micronaut.config-client.enabled'
+        "com.fooBar.FooBar"                         | "com.foo-bar.foo-bar"
+        "FooBar"                                    | "foo-bar"
+        "com.bar.FooBar"                            | "com.bar.foo-bar"
+        "Foo"                                       | 'foo'
+        "FooBBar"                                   | 'foo-bbar'
+        "FOO_BAR"                                   | 'foo-bar'
+        "fooBBar"                                   | 'foo-bbar'
+        'gr8crm-notification-service'               | 'gr8crm-notification-service'
+
     }
 
     @Unroll
