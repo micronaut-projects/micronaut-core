@@ -17,6 +17,7 @@ package io.micronaut.security.token.jwt.cookie
 
 import geb.spock.GebSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -50,7 +51,7 @@ class JwtCookieAuthenticationSpec extends GebSpec {
                     'micronaut.security.token.jwt.cookie.enabled': true,
                     'micronaut.security.token.jwt.cookie.loginFailureTargetUrl': '/login/authFailed',
                     'micronaut.security.token.jwt.signatures.secret.generator.secret': 'qrD6h8K6S9503Q06Y6Rfk21TErImPYqa',
-            ], 'test')
+            ], Environment.TEST)
 
     @Shared
     @AutoCleanup

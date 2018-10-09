@@ -1,6 +1,7 @@
 package io.micronaut.security.token.jwt.accesstokenexpiration
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
@@ -28,7 +29,7 @@ class AccessTokenExpirationSpec extends Specification {
                     'micronaut.security.token.jwt.enabled': true,
                     'micronaut.security.token.jwt.generator.accessTokenExpiration': 5,
                     'micronaut.security.token.jwt.signatures.secret.generator.secret': 'pleaseChangeThisSecretForANewOne'
-            ], 'test')
+            ], Environment.TEST)
 
     @Shared
     @AutoCleanup

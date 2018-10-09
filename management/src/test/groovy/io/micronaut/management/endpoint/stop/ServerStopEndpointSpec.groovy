@@ -16,6 +16,7 @@
 package io.micronaut.management.endpoint.stop
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
@@ -32,7 +33,7 @@ class ServerStopEndpointSpec extends Specification {
 
     void "test the endpoint is disabled by default"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.stop.sensitive': false], 'test')
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.stop.sensitive': false], Environment.TEST)
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
@@ -49,7 +50,7 @@ class ServerStopEndpointSpec extends Specification {
 
     void "test the server is stopped after exercising the endpoint"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.stop.enabled': true, 'endpoints.stop.sensitive': false], 'test')
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ['endpoints.stop.enabled': true, 'endpoints.stop.sensitive': false], Environment.TEST)
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
         def conditions = new PollingConditions(timeout: 10, initialDelay: 3, delay: 1, factor: 1)
 
