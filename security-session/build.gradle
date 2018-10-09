@@ -7,9 +7,6 @@ buildscript {
     }
 }
 
-
-apply plugin:"com.energizedwork.webdriver-binaries"
-
 dependencies {
     compileOnly project(":inject-java")
     compile project(":runtime")
@@ -28,16 +25,7 @@ dependencies {
 }
 
 apply from: "${rootProject.projectDir}/gradle/geb.gradle"
+apply from: "${rootProject.projectDir}/gradle/webdriverbinaries.gradle"
 
-webdriverBinaries {
-    chromedriver "${chromedriverVersion}"
-    geckodriver "${geckodriverVersion}"
-}
-
-test {
-    systemProperty "geb.env", System.getProperty('geb.env')
-    systemProperty "webdriver.chrome.driver", System.getProperty('webdriver.chrome.driver')
-    systemProperty "webdriver.gecko.driver", System.getProperty('webdriver.gecko.driver')
-}
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

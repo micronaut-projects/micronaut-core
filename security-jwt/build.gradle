@@ -12,8 +12,6 @@ ext {
     bouncyCastleVersion = '1.53'
 }
 
-apply plugin:"com.energizedwork.webdriver-binaries"
-
 dependencies {
     compileOnly project(":inject-java")
     compile project(":runtime")
@@ -36,11 +34,8 @@ dependencies {
 }
 
 apply from: "${rootProject.projectDir}/gradle/geb.gradle"
+apply from: "${rootProject.projectDir}/gradle/webdriverbinaries.gradle"
 
-webdriverBinaries {
-    chromedriver "${chromedriverVersion}"
-    geckodriver "${geckodriverVersion}"
-}
 
 test {
     systemProperty "geb.env", System.getProperty('geb.env')
