@@ -14,29 +14,28 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.token.jwt.signature.rsa;
+package io.micronaut.security.token.jwt.signature.ec;
 
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
-import io.micronaut.security.token.jwt.signature.SignatureConfiguration;
+import io.micronaut.security.token.jwt.signature.SignatureGeneratorConfiguration;
 
 /**
- * Creates {@link SignatureConfiguration} for each {@link RSASignatureConfiguration} bean.
+ * Creates {@link io.micronaut.security.token.jwt.signature.SignatureGeneratorConfiguration} for each {@link ECSignatureGeneratorConfiguration} bean.
  *
  * @author Sergio del Amo
  * @since 1.0
  */
 @Factory
-public class RSASignatureFactory {
+public class ECSignatureGeneratorFactory {
 
     /**
-     * Creates {@link SignatureConfiguration} for each {@link RSASignatureConfiguration} bean.
      *
-     * @param configuration {@link RSASignatureConfiguration} bean.
-     * @return The {@link SignatureConfiguration}
+     * @param configuration {@link ECSignatureGeneratorConfiguration} bean.
+     * @return The {@link SignatureGeneratorConfiguration}
      */
-    @EachBean(RSASignatureConfiguration.class)
-    public SignatureConfiguration signatureConfiguration(RSASignatureConfiguration configuration) {
-        return new RSASignature(configuration);
+    @EachBean(ECSignatureGeneratorConfiguration.class)
+    public SignatureGeneratorConfiguration signatureGeneratorConfiguration(ECSignatureGeneratorConfiguration configuration) {
+        return new ECSignatureGenerator(configuration);
     }
 }

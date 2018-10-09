@@ -14,27 +14,26 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.token.jwt.signature.ec;
+package io.micronaut.security.token.jwt.signature;
 
-import com.nimbusds.jose.JWSAlgorithm;
-
-import java.security.interfaces.ECPublicKey;
+import com.nimbusds.jose.JOSEException;
+import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 
 /**
- * Elliptic curve signature configuration.
+ * Signature Generator configuration.
+ *
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface ECSignatureConfiguration {
+public interface SignatureGeneratorConfiguration extends SignatureConfiguration {
 
     /**
-     *
-     * @return The EC Public Key
+     * Generate a signed JWT based on claims.
+     * @throws JOSEException could be thrown while signing the JWT token
+     * @param claims the provided claims
+     * @return the signed JWT
      */
-    ECPublicKey getPublicKey();
-
-    /**
-     * @return The JWS Algorithm
-     */
-    JWSAlgorithm getJwsAlgorithm();
+    SignedJWT sign(JWTClaimsSet claims) throws JOSEException;
 }
+
