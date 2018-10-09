@@ -123,6 +123,7 @@ class JpaSetupSpec extends Specification {
 
         then:
         em.createQuery("select book from Book book").resultList.size() == 1
+        em.createNativeQuery("select * from book", Book).resultList.size() == 1
 
         when:
         MeterRegistry meterRegistry = applicationContext.getBean(MeterRegistry)
@@ -171,6 +172,7 @@ class JpaSetupSpec extends Specification {
         expect:
         bookService.testFieldInject()
         bookService.testMethodInject()
+        bookService.testNativeQuery()
     }
 }
 
