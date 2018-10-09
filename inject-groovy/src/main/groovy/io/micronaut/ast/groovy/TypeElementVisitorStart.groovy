@@ -20,9 +20,12 @@ import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.io.service.ServiceDefinition
 import io.micronaut.core.io.service.SoftServiceLoader
 import io.micronaut.core.reflect.InstantiationUtils
+import io.micronaut.core.util.StringUtils
+import io.micronaut.core.version.VersionUtils
 import io.micronaut.inject.visitor.TypeElementVisitor
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ModuleNode
@@ -56,6 +59,24 @@ class TypeElementVisitorStart implements ASTTransformation {
             for (ServiceDefinition<TypeElementVisitor> definition: serviceLoader) {
                 if (definition.isPresent()) {
                     TypeElementVisitor visitor = definition.load()
+
+                    final Requires requires = visitor.getClass().getAnnotation(Requires.class);
+                    if (requires != null) {
+                        final Requires.Sdk sdk = requires.sdk();
+                        if (sdk == Requires.Sdk.MICRONAUT) {
+                            final String version = requires.version();
+                            if (StringUtils.isNotEmpty(version)) {
+                                if (!VersionUtils.isAtLeastMicronautVersion(version)) {
+                                    try {
+                                        AstMessageUtils.warning(source, moduleNode, "TypeElementVisitor [" + definition.getName() + "] will be ignored because Micronaut version [" + VersionUtils.MICRONAUT_VERSION + "] must be at least " + version)
+                                        continue
+                                    } catch (IllegalArgumentException e) {
+                                        // shouldn't happen, thrown when invalid version encountered
+                                    }
+                                }
+                            }
+                        }
+                    }
                     try {
                         LoadedVisitor newLoadedVisitor = new LoadedVisitor(source, visitor)
                         loadedVisitors.put(definition.getName(), newLoadedVisitor)
