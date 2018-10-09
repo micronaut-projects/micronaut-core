@@ -23,9 +23,9 @@ import com.nimbusds.jwt.PlainJWT;
 import io.micronaut.security.authentication.UserDetails;
 import io.micronaut.security.token.generator.TokenGenerator;
 import io.micronaut.security.token.jwt.generator.claims.ClaimsGenerator;
+import io.micronaut.security.token.jwt.signature.SignatureGeneratorConfiguration;
 import io.micronaut.security.token.jwt.validator.JwtTokenValidator;
 import io.micronaut.security.token.jwt.encryption.EncryptionConfiguration;
-import io.micronaut.security.token.jwt.signature.SignatureConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +48,7 @@ public class JwtTokenGenerator implements TokenGenerator {
     private static final Logger LOG = LoggerFactory.getLogger(JwtTokenValidator.class);
 
     protected final ClaimsGenerator claimsGenerator;
-    protected final SignatureConfiguration signatureConfiguration;
+    protected final SignatureGeneratorConfiguration signatureConfiguration;
     protected final EncryptionConfiguration encryptionConfiguration;
 
     /**
@@ -56,7 +56,7 @@ public class JwtTokenGenerator implements TokenGenerator {
      * @param encryptionConfiguration JWT Generator encryption configuration
      * @param claimsGenerator Claims generator
      */
-    public JwtTokenGenerator(@Nullable @Named("generator") SignatureConfiguration signatureConfiguration,
+    public JwtTokenGenerator(@Nullable @Named("generator") SignatureGeneratorConfiguration signatureConfiguration,
                              @Nullable @Named("generator") EncryptionConfiguration encryptionConfiguration,
                              ClaimsGenerator claimsGenerator) {
 
@@ -67,9 +67,9 @@ public class JwtTokenGenerator implements TokenGenerator {
 
     /**
      * signatureConfiguration getter.
-     * @return Instance of {@link SignatureConfiguration}
+     * @return Instance of {@link SignatureGeneratorConfiguration}
      */
-    public SignatureConfiguration getSignatureConfiguration() {
+    public SignatureGeneratorConfiguration getSignatureConfiguration() {
         return this.signatureConfiguration;
     }
 

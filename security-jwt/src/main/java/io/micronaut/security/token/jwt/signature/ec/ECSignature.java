@@ -18,24 +18,19 @@ package io.micronaut.security.token.jwt.signature.ec;
 
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.JWSSigner;
 import com.nimbusds.jose.JWSVerifier;
-import com.nimbusds.jwt.JWTClaimsSet;
-import com.nimbusds.jwt.SignedJWT;
-import com.nimbusds.jose.crypto.ECDSASigner;
 import com.nimbusds.jose.crypto.ECDSAVerifier;
+import com.nimbusds.jwt.SignedJWT;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.security.token.jwt.signature.AbstractSignatureConfiguration;
-import io.micronaut.security.token.jwt.validator.JwtTokenValidator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import javax.validation.constraints.NotNull;
-import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 
 /**
- * Elliptic curve signature configuration.
+ * Elliptic curve signature. Adds method to verify signed JWT.
  * @see <a href="http://connect2id.com/products/nimbus-jose-jwt/examples/jwt-with-ec-signature">JSON Web Token (JWT) with EC signature</a>
  *
  * @author Sergio del Amo
@@ -43,11 +38,9 @@ import java.security.interfaces.ECPublicKey;
  */
 public class ECSignature extends AbstractSignatureConfiguration {
 
-    private static final Logger LOG = LoggerFactory.getLogger(JwtTokenValidator.class);
+    private static final Logger LOG = LoggerFactory.getLogger(ECSignature.class);
 
     private ECPublicKey publicKey;
-
-    private ECPrivateKey privateKey;
 
     /**
      *
@@ -59,7 +52,6 @@ public class ECSignature extends AbstractSignatureConfiguration {
         }
         this.algorithm = config.getJwsAlgorithm();
         this.publicKey = config.getPublicKey();
-        this.privateKey = config.getPrivateKey();
     }
 
     /**
@@ -74,18 +66,6 @@ public class ECSignature extends AbstractSignatureConfiguration {
     @Override
     public boolean supports(final JWSAlgorithm algorithm) {
         return algorithm != null && ECDSAVerifier.SUPPORTED_ALGORITHMS.contains(algorithm);
-    }
-
-    @Override
-    public SignedJWT sign(JWTClaimsSet claims) throws JOSEException {
-        return signWithPrivateKey(claims, this.privateKey);
-    }
-
-    private SignedJWT signWithPrivateKey(JWTClaimsSet claims, @NotNull ECPrivateKey privateKey) throws JOSEException {
-        final JWSSigner signer = new ECDSASigner(privateKey);
-        final SignedJWT signedJWT = new SignedJWT(new JWSHeader(algorithm), claims);
-        signedJWT.sign(signer);
-        return signedJWT;
     }
 
     @Override

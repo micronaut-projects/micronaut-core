@@ -18,21 +18,16 @@ package io.micronaut.security.token.jwt.signature.rsa;
 
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.JWSSigner;
 import com.nimbusds.jose.JWSVerifier;
-import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
-import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
-import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.security.token.jwt.signature.AbstractSignatureConfiguration;
+
 import javax.validation.constraints.NotNull;
-import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 
 /**
- * RSA signature configuration.
+ * RSA signature.
  * @see <a href="http://connect2id.com/products/nimbus-jose-jwt/examples/jwt-with-rsa-signature">JSON Web Token (JWT) with RSA signature</a>
  *
  * @author Sergio del Amo
@@ -42,19 +37,12 @@ public class RSASignature extends AbstractSignatureConfiguration {
 
     private RSAPublicKey publicKey;
 
-    private RSAPrivateKey privateKey;
-
     /**
      *
      * @param config Instance of {@link RSASignatureConfiguration}
      */
     public RSASignature(RSASignatureConfiguration config) {
-        if (!supports(config.getJwsAlgorithm())) {
-            throw new ConfigurationException(supportedAlgorithmsMessage());
-        }
-        this.algorithm = config.getJwsAlgorithm();
         this.publicKey = config.getPublicKey();
-        this.privateKey = config.getPrivateKey();
     }
 
     /**
@@ -69,18 +57,6 @@ public class RSASignature extends AbstractSignatureConfiguration {
     @Override
     public boolean supports(final JWSAlgorithm algorithm) {
         return algorithm != null && RSASSAVerifier.SUPPORTED_ALGORITHMS.contains(algorithm);
-    }
-
-    @Override
-    public SignedJWT sign(JWTClaimsSet claims) throws JOSEException {
-        return signWithPrivateKey(claims, privateKey);
-    }
-
-    private SignedJWT signWithPrivateKey(JWTClaimsSet claims, @NotNull  RSAPrivateKey privateKey) throws JOSEException {
-        final JWSSigner signer = new RSASSASigner(privateKey);
-        final SignedJWT signedJWT = new SignedJWT(new JWSHeader(algorithm), claims);
-        signedJWT.sign(signer);
-        return signedJWT;
     }
 
     @Override

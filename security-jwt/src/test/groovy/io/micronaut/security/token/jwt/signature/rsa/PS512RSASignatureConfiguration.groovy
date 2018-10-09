@@ -29,7 +29,7 @@ import java.security.interfaces.RSAPublicKey
 @Named("generator")
 @Requires(property = "spec.name", value = "signaturersa")
 @Singleton
-class PS512RSASignatureConfiguration implements RSASignatureConfiguration {
+class PS512RSASignatureConfiguration implements RSASignatureGeneratorConfiguration {
 
     private RSAPrivateKey rsaPrivateKey
     private RSAPublicKey rsaPublicKey

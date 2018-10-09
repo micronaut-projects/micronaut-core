@@ -18,7 +18,6 @@ package io.micronaut.security.token.jwt.signature;
 
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 
 /**
@@ -42,14 +41,6 @@ public interface SignatureConfiguration {
      * @return whether this signature configuration supports this algorithm
      */
     boolean supports(JWSAlgorithm algorithm);
-
-    /**
-     * Generate a signed JWT based on claims.
-     * @throws JOSEException could be thrown while signing the JWT token
-     * @param claims the provided claims
-     * @return the signed JWT
-     */
-    SignedJWT sign(JWTClaimsSet claims) throws JOSEException;
 
     /**
      * Verify a signed JWT.
