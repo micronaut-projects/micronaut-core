@@ -54,10 +54,6 @@ abstract class AbstractCreateAppCommand extends AbstractCreateCommand {
         Set<String> selectedFeatures = new HashSet<>()
         selectedFeatures.addAll(features)
 
-        if (!NameUtils.isValidServiceId(nameOfAppToCreate)) {
-            MicronautConsole.instance.error("Application name should be all lower case and separated by underscores. For example: hello-world")
-            return false
-        }
 
         CreateServiceCommandObject cmd = new CreateServiceCommandObject(
                 appName: this.nameOfAppToCreate,
