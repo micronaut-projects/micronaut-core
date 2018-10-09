@@ -13,6 +13,63 @@ class OpenApiControllerVisitorSpec extends AbstractTypeElementSpec {
         System.setProperty(AbstractOpenApiVisitor.ATTR_TEST_MODE, "true")
     }
 
+    void "test build OpenAPI doc with @Error"() {
+
+        // TODO: currently the @Error is just ignored, consider adding to OpenApi.components.responses in the future
+        given:
+        buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.swagger.v3.oas.annotations.*;
+import io.swagger.v3.oas.annotations.media.*;
+import io.swagger.v3.oas.annotations.enums.*;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.*;
+import com.fasterxml.jackson.core.*;
+import io.micronaut.http.hateos.*;
+import java.util.List;
+import javax.validation.constraints.*;
+
+@Controller("/")
+class MyController {
+
+    @Get("/subscription/{subscriptionId}")
+    public String getSubscription( @Size(min=10, max=20) java.util.List<String> subscriptionId) { 
+        return null;                               
+     }
+     
+    @io.micronaut.http.annotation.Error
+    public HttpResponse<JsonError> jsonError(HttpRequest request, JsonParseException jsonParseException) { 
+        JsonError error = new JsonError("Invalid JSON: " + jsonParseException.getMessage()) 
+                .link(Link.SELF, Link.of(request.getUri()));
+    
+        return HttpResponse.<JsonError>status(HttpStatus.BAD_REQUEST, "Fix Your JSON")
+                .body(error); 
+    }     
+}
+
+@javax.inject.Singleton
+class MyBean {}
+''')
+        when:
+        Operation operation = AbstractOpenApiVisitor.testReference?.paths?.get("/subscription/{subscriptionId}")?.get
+
+        then:
+        operation != null
+        operation.operationId == 'getSubscription'
+        operation.parameters.size() == 1
+
+
+        when:
+        def parameter = operation.parameters[0]
+
+        then:
+        parameter.in == 'path'
+        parameter.schema.maxLength == null
+        parameter.schema.minLength == null
+        parameter.schema.minItems == 10
+        parameter.schema.maxItems == 20
+    }
 
     void "test build OpenAPI doc with request and response"() {
 

@@ -82,6 +82,15 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
         }
 
         httpMethodOpt.ifPresent(httpMethodClass -> {
+            HttpMethod httpMethod = null;
+            try {
+                httpMethod = HttpMethod.valueOf(httpMethodClass.getSimpleName().toUpperCase(Locale.ENGLISH));
+            } catch (IllegalArgumentException e) {
+                // ignore
+            }
+            if (httpMethod == null) {
+                return;
+            }
 
             UriMatchTemplate matchTemplate = UriMatchTemplate.of(element.getValue(Controller.class, String.class).orElse("/"));
             matchTemplate = matchTemplate.nest(element.getValue(HttpMethodMapping.class, String.class).orElse("/"));
@@ -112,7 +121,6 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
 
             readCallbacks(element, context, swaggerOperation);
 
-            HttpMethod httpMethod = HttpMethod.valueOf(httpMethodClass.getSimpleName().toUpperCase(Locale.ENGLISH));
             JavadocDescription javadocDescription = element.getDocumentation().map(s -> new JavadocParser().parse(s)).orElse(null);
 
             if (javadocDescription != null && StringUtils.isEmpty(swaggerOperation.getDescription())) {
