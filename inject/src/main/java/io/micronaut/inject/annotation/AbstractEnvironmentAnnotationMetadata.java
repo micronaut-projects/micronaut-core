@@ -20,6 +20,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 
@@ -187,6 +188,10 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
         return annotationMetadata.getDefaultValue(annotation, member, requiredType);
     }
 
+    @Override
+    public <T> Optional<T> getDefaultValue(String annotation, String member, Argument<T> requiredType) {
+        return annotationMetadata.getDefaultValue(annotation, member, requiredType);
+    }
 
     /**
      * Resolves the {@link Environment} for this metadata.

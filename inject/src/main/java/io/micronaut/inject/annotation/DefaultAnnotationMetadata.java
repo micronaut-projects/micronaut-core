@@ -23,6 +23,7 @@ import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
@@ -142,7 +143,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public <T> Optional<T> getValue(String annotation, String member, Class<T> requiredType) {
+    public <T> Optional<T> getValue(String annotation, String member, Argument<T> requiredType) {
         Optional<T> resolved = Optional.empty();
         if (allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
             Map<CharSequence, Object> values = allAnnotations.get(annotation);
@@ -235,16 +236,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
         //noinspection unchecked
         return (T[]) AnnotationUtil.ZERO_ANNOTATIONS;
-    }
-
-    @Override
-    public <T> Optional<T> getDefaultValue(Class<? extends Annotation> annotation, String member, Class<T> requiredType) {
-        // Note this method should never reference the "annotationDefaultValues" field, which is used only at compile time
-        Map<String, Object> defaultValues = AnnotationMetadataSupport.getDefaultValues(annotation);
-        if (defaultValues.containsKey(member)) {
-            return ConversionService.SHARED.convert(defaultValues.get(member), requiredType);
-        }
-        return Optional.empty();
     }
 
     @Override
@@ -379,6 +370,16 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             }
         }
         return OptionalValues.empty();
+    }
+
+    @Override
+    public <T> Optional<T> getDefaultValue(String annotation, String member, Argument<T> requiredType) {
+        // Note this method should never reference the "annotationDefaultValues" field, which is used only at compile time
+        Map<String, Object> defaultValues = AnnotationMetadataSupport.getDefaultValues(annotation);
+        if (defaultValues.containsKey(member)) {
+            return ConversionService.SHARED.convert(defaultValues.get(member), requiredType);
+        }
+        return Optional.empty();
     }
 
     @Override
