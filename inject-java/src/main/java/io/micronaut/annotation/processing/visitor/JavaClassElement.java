@@ -82,7 +82,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         Map<String, BeanPropertyData> props = new LinkedHashMap<>();
         Map<String, VariableElement> fields = new LinkedHashMap<>();
 
-        classElement.asType().accept(new PublicMethodVisitor<Object, Object>() {
+        classElement.asType().accept(new PublicMethodVisitor<Object, Object>(visitorContext.getTypes()) {
 
             @Override
             protected boolean isAcceptable(javax.lang.model.element.Element element) {

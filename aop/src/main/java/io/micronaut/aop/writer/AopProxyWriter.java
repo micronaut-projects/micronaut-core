@@ -58,16 +58,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.lang.reflect.Constructor;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -413,7 +404,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         Type returnTypeObject = getTypeReference(returnType);
         boolean isPrimitive = isPrimitive(returnType);
         boolean isVoidReturn = isPrimitive && returnTypeObject.equals(Type.VOID_TYPE);
-        MethodRef methodKey = new MethodRef(methodName, argumentTypeList);
+        final Type declaringTypeReference = getTypeReference(declaringType);
+        MethodRef methodKey = new MethodRef(methodName, argumentTypeList, returnTypeObject);
         if (isProxyTarget) {
             // if the target class is being proxied then the method will be looked up from the parent bean definition.
             // Therefore no need to generate a bridge
@@ -478,7 +470,8 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
             for (int i = 0; i < bridgeArguments.size(); i++) {
                 bridgeGenerator.loadArg(i);
             }
-            bridgeWriter.visitMethodInsn(INVOKESPECIAL, getTypeReference(declaringType).getInternalName(), methodName, overrideDescriptor, false);
+
+            bridgeWriter.visitMethodInsn(INVOKESPECIAL, declaringTypeReference.getInternalName(), methodName, overrideDescriptor, false);
             pushReturnValue(bridgeWriter, returnType);
             bridgeWriter.visitMaxs(DEFAULT_MAX_STACK, 1);
             bridgeWriter.visitEnd();
@@ -1353,34 +1346,27 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
     private class MethodRef {
         protected final String name;
         protected final List<Object> argumentTypes;
+        protected final Type returnType;
 
-        MethodRef(String name, List<Object> argumentTypes) {
+        public MethodRef(String name, List<Object> argumentTypes, Type returnType) {
             this.name = name;
             this.argumentTypes = argumentTypes;
+            this.returnType = returnType;
         }
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (o == null || getClass() != o.getClass()) {
-                return false;
-            }
-
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
             MethodRef methodRef = (MethodRef) o;
-
-            if (!name.equals(methodRef.name)) {
-                return false;
-            }
-            return argumentTypes.equals(methodRef.argumentTypes);
+            return Objects.equals(name, methodRef.name) &&
+                    Objects.equals(argumentTypes, methodRef.argumentTypes) &&
+                    Objects.equals(returnType, methodRef.returnType);
         }
 
         @Override
         public int hashCode() {
-            int result = name.hashCode();
-            result = HASHCODE * result + argumentTypes.hashCode();
-            return result;
+            return Objects.hash(name, argumentTypes, returnType);
         }
     }
 }

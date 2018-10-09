@@ -75,6 +75,13 @@ public class ModelUtils {
     }
 
     /**
+     * @return The type utilities
+     */
+    public Types getTypeUtils() {
+        return typeUtils;
+    }
+
+    /**
      * Obtains the {@link TypeElement} for an given element.
      *
      * @param element The element

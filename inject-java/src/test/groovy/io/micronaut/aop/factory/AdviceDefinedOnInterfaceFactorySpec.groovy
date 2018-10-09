@@ -114,7 +114,6 @@ class AdviceDefinedOnInterfaceFactorySpec extends Specification {
         }
 
         then:
-        count == clazz.declaredMethods.size()  // plus the proxy methods
         sessionFactory instanceof Intercepted
     }
 
