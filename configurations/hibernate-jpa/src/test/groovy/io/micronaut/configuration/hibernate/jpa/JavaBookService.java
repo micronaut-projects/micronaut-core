@@ -35,6 +35,15 @@ public class JavaBookService {
 
     @Transactional
     public boolean testNativeQuery() {
-        return entityManager.createNativeQuery("select * from book", Book.class).getResultList().size() == 1;
+        // just testing the method can be invoked
+        entityManager.createNativeQuery("select * from book", Book.class).getResultList();
+        return true;
+    }
+
+    @Transactional
+    public boolean testClose() throws Exception {
+        // just testing the method can be invoked
+        ((AutoCloseable)entityManager).close();
+        return true;
     }
 }

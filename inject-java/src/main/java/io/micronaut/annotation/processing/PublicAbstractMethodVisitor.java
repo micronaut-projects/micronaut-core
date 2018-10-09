@@ -47,6 +47,7 @@ public abstract class PublicAbstractMethodVisitor<R, P> extends PublicMethodVisi
      * @param elementUtils The {@link Elements}
      */
     PublicAbstractMethodVisitor(TypeElement classElement, ModelUtils modelUtils, Elements elementUtils) {
+        super(modelUtils.getTypeUtils());
         this.classElement = classElement;
         this.modelUtils = modelUtils;
         this.elementUtils = elementUtils;

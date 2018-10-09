@@ -679,7 +679,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         constructorData,
                         interceptorTypes);
 
-                returnType.accept(new PublicMethodVisitor<Object, AopProxyWriter>() {
+                returnType.accept(new PublicMethodVisitor<Object, AopProxyWriter>(typeUtils) {
                     @Override
                     protected void accept(DeclaredType type, Element element, AopProxyWriter aopProxyWriter) {
                         ExecutableElement method = (ExecutableElement) element;
@@ -739,7 +739,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }, proxyWriter);
             } else if (methodAnnotationMetadata.hasStereotype(Executable.class)) {
 
-                returnType.accept(new PublicMethodVisitor<Object, BeanDefinitionWriter>() {
+                returnType.accept(new PublicMethodVisitor<Object, BeanDefinitionWriter>(typeUtils) {
                     @Override
                     protected void accept(DeclaredType type, Element element, BeanDefinitionWriter beanWriter) {
                         ExecutableElement method = (ExecutableElement) element;
@@ -1382,7 +1382,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             Set<String> includes = annotationMetadata.getValue(ConfigurationBuilder.class, "includes", Set.class).orElse(Collections.emptySet());
             Set<String> excludes = annotationMetadata.getValue(ConfigurationBuilder.class, "excludes", Set.class).orElse(Collections.emptySet());
 
-            PublicMethodVisitor visitor = new PublicMethodVisitor() {
+            PublicMethodVisitor visitor = new PublicMethodVisitor(typeUtils) {
                 @Override
                 protected void accept(DeclaredType type, Element element, Object o) {
                     ExecutableElement method = (ExecutableElement) element;

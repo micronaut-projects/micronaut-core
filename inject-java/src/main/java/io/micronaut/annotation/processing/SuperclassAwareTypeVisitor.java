@@ -18,12 +18,15 @@ package io.micronaut.annotation.processing;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
+import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.*;
 import javax.lang.model.util.AbstractTypeVisitor8;
+import javax.lang.model.util.Types;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Processes the type and its super classes.
@@ -33,6 +36,17 @@ import java.util.Set;
  */
 public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisitor8<R, P> {
     private final Set<String> processed = new HashSet<>();
+
+    private final Types types;
+
+    /**
+     * Default constructor.
+     *
+     * @param types The types instance
+     */
+    protected SuperclassAwareTypeVisitor(Types types) {
+        this.types = types;
+    }
 
     @Override
     public R visitDeclared(DeclaredType type, P p) {
@@ -44,11 +58,23 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
             for (Element enclosedElement : enclosedElements) {
                 boolean isAcceptable = isAcceptable(enclosedElement);
                 if (isAcceptable) {
-                    String qualifiedName = enclosedElement.toString();
-                    // if the method has already been processed then it is overridden so ignore
-                    if (!processed.contains(qualifiedName)) {
-                        processed.add(qualifiedName);
-                        accept(type, enclosedElement, p);
+                    if (enclosedElement instanceof ExecutableElement) {
+                        ExecutableElement ee = (ExecutableElement) enclosedElement;
+                        String qualifiedName = ee.getSimpleName().toString();
+                        qualifiedName += "(" + ee.getParameters().stream().map(variableElement -> types.erasure(variableElement.asType()).toString()).collect(Collectors.joining(",")) + ")";
+                        qualifiedName = types.erasure(ee.getReturnType()).toString() + "." + qualifiedName;
+                        // if the method has already been processed then it is overridden so ignore
+                        if (!processed.contains(qualifiedName)) {
+                            processed.add(qualifiedName);
+                            accept(type, enclosedElement, p);
+                        }
+                    } else {
+                        String qualifiedName = types.erasure(enclosedElement.asType()).toString();
+                        // if the method has already been processed then it is overridden so ignore
+                        if (!processed.contains(qualifiedName)) {
+                            processed.add(qualifiedName);
+                            accept(type, enclosedElement, p);
+                        }
                     }
                 }
             }

@@ -39,7 +39,7 @@ class ValidatedConfigurationSpec extends Specification {
 
         then:
         def e = thrown(BeanInstantiationException)
-        e.message.contains('url - may not be null')
+        e.message.contains('url - must not be null')
         e.message.contains('name - may not be empty')
     }
 

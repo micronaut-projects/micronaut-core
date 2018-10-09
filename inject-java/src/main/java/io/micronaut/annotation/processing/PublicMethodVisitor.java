@@ -19,6 +19,7 @@ package io.micronaut.annotation.processing;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.Modifier;
+import javax.lang.model.util.Types;
 import java.util.Set;
 
 /**
@@ -33,6 +34,15 @@ import java.util.Set;
  */
 public abstract class PublicMethodVisitor<R, P> extends SuperclassAwareTypeVisitor<R, P> {
 
+
+    /**
+     * Default constructor.
+     *
+     * @param types The types instance
+     */
+    protected PublicMethodVisitor(Types types) {
+        super(types);
+    }
 
     /**
      * Only accepts public non file or static methods.

@@ -1,13 +1,13 @@
 package io.micronaut.aop.factory
 
+import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.core.reflect.ReflectionUtils
-import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionVisitor
 import org.hibernate.Session
 import org.hibernate.SessionFactory
 
-class SessionProxySpec extends AbstractTypeElementSpec {
+class SessionProxySpec extends AbstractBeanDefinitionSpec {
 
     void "test create session proxy"() {
         when:
@@ -16,7 +16,7 @@ package test;
 
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
-import io.micronaut.aop.simple.Mutating;
+import io.micronaut.aop.interceptors.Mutating;
 import org.hibernate.Session;
 
 @Factory
@@ -57,7 +57,7 @@ package test;
 
 import io.micronaut.aop.introduction.*;
 import io.micronaut.context.annotation.*;
-import io.micronaut.aop.simple.Mutating;
+import io.micronaut.aop.interceptors.Mutating;
 import org.hibernate.*;
 
 @Factory
@@ -92,3 +92,4 @@ class AbstractBean {
 
     }
 }
+
