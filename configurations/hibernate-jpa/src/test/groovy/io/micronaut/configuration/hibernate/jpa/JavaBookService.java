@@ -32,4 +32,9 @@ public class JavaBookService {
         entityManager.clear();
         return true;
     }
+
+    @Transactional
+    public boolean testNativeQuery() {
+        return entityManager.createNativeQuery("select * from book", Book.class).getResultList().size() == 1;
+    }
 }
