@@ -25,8 +25,9 @@ import io.micronaut.discovery.eureka.client.v2.EurekaClient
 import io.micronaut.discovery.eureka.client.v2.InstanceInfo
 import io.micronaut.http.HttpStatus
 import io.micronaut.runtime.server.EmbeddedServer
+import org.testcontainers.containers.GenericContainer
+import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy
 import spock.lang.Specification
-import spock.lang.IgnoreIf
 import spock.lang.Stepwise
 import spock.lang.Shared
 import spock.lang.AutoCleanup
@@ -38,24 +39,43 @@ import javax.validation.ConstraintViolationException
  * @author graemerocher
  * @since 1.0
  */
-@IgnoreIf({ !env['EUREKA_HOST'] && !env['EUREKA_PORT'] })
 @Stepwise
 class EurekaClientSpec extends Specification {
 
     @Shared
-    Map<String, Object> embeddedSeverConfiguration = [
-            (EurekaConfiguration.HOST): System.getenv('EUREKA_HOST'),
-            (EurekaConfiguration.PORT): System.getenv('EUREKA_PORT'),
-            "micronaut.caches.discoveryClient.enabled": false,
-            'eureka.client.readTimeout': '5s'
-    ]
+    @AutoCleanup
+    GenericContainer eurekaContainer =
+            new GenericContainer("cloudready/spring-cloud-eureka-server:1.0.1")
+                    .withExposedPorts(8761)
+                    .waitingFor(new LogMessageWaitStrategy().withRegEx("(?s).*Started Eureka.*"))
+
+    @Shared String eurekaHost
+    @Shared int eurekaPort
+    @Shared
+    Map<String, Object> embeddedServerConfig
 
     @AutoCleanup
     @Shared
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,embeddedSeverConfiguration, Environment.TEST)
+    EmbeddedServer embeddedServer
 
-    @Shared EurekaClient client = embeddedServer.applicationContext.getBean(EurekaClient)
-    @Shared DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient)
+    @Shared EurekaClient client
+    @Shared DiscoveryClient discoveryClient
+
+
+    def setupSpec() {
+        eurekaContainer.start()
+        eurekaHost = eurekaContainer.containerIpAddress
+        eurekaPort = eurekaContainer.getMappedPort(8761)
+        embeddedServerConfig = [
+                (EurekaConfiguration.HOST): eurekaHost,
+                (EurekaConfiguration.PORT): eurekaPort,
+                "micronaut.caches.discoveryClient.enabled": false,
+                'eureka.client.readTimeout': '5s'
+        ] as Map<String, Object>
+        embeddedServer = ApplicationContext.run(EmbeddedServer, embeddedServerConfig, Environment.TEST)
+        client = embeddedServer.applicationContext.getBean(EurekaClient)
+        discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient)
+    }
 
     void "test is a discovery client"() {
         expect:

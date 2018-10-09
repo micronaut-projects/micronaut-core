@@ -26,6 +26,7 @@ import io.micronaut.discovery.consul.client.v1.*
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.runtime.server.EmbeddedServer
+import org.testcontainers.containers.GenericContainer
 import spock.lang.AutoCleanup
 import spock.lang.IgnoreIf
 import spock.lang.Shared
@@ -36,24 +37,40 @@ import spock.lang.Stepwise
  * @author graemerocher
  * @since 1.0
  */
-@IgnoreIf({ !env['CONSUL_HOST'] && !env['CONSUL_PORT'] })
 @Stepwise
 class ConsulClientSpec extends Specification {
-
     @Shared
-    Map<String, Object> embeddedServerConfig = [
-            'consul.client.host': System.getenv('CONSUL_HOST'),
-            'consul.client.port': System.getenv('CONSUL_PORT'),
-            "micronaut.caches.discoveryClient.enabled": false,
-            'consul.client.readTimeout': '5s'
-    ] as Map<String, Object>
+    @AutoCleanup
+    GenericContainer consulContainer =
+            new GenericContainer("consul:latest")
+                    .withExposedPorts(8500)
+
+    @Shared String consulHost
+    @Shared int consulPort
+    @Shared
+    Map<String, Object> embeddedServerConfig
 
     @AutoCleanup
     @Shared
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, embeddedServerConfig, Environment.TEST)
+    EmbeddedServer embeddedServer
 
-    @Shared ConsulClient client = embeddedServer.applicationContext.getBean(ConsulClient)
-    @Shared DiscoveryClient discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient)
+    @Shared ConsulClient client
+    @Shared DiscoveryClient discoveryClient
+
+    def setupSpec() {
+        consulContainer.start()
+        consulHost = consulContainer.containerIpAddress
+        consulPort = consulContainer.getMappedPort(8500)
+        embeddedServerConfig = [
+                'consul.client.host': consulHost,
+                'consul.client.port': consulPort,
+                "micronaut.caches.discoveryClient.enabled": false,
+                'consul.client.readTimeout': '5s'
+        ] as Map<String, Object>
+        embeddedServer = ApplicationContext.run(EmbeddedServer, embeddedServerConfig, Environment.TEST)
+        client = embeddedServer.applicationContext.getBean(ConsulClient)
+        discoveryClient = embeddedServer.applicationContext.getBean(DiscoveryClient)
+    }
 
     void "test is a discovery client"() {
 
