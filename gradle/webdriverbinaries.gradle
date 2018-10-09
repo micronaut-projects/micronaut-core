@@ -1,0 +1,6 @@
+apply plugin:"com.energizedwork.webdriver-binaries"
+
+webdriverBinaries {
+    chromedriver "${chromedriverVersion}"
+    geckodriver "${geckodriverVersion}"
+}

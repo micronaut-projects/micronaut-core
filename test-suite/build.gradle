@@ -19,6 +19,9 @@ dependencies {
     testRuntime 'com.h2database:h2:1.4.196'
     testRuntime "ch.qos.logback:logback-classic:1.2.3"
 }
+
+apply from: "${rootProject.projectDir}/gradle/geb.gradle"
+
 //tasks.withType(Test) {
 //    testLogging {
 //        showStandardStreams = true
