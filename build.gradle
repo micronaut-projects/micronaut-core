@@ -73,6 +73,16 @@ ext {
                     group:'io.jaegertracing',
                     name:'jaeger-thrift'
             ],
+            'zipkin.reporter': [
+                    version: zipkinReporterVersion,
+                    group:'io.zipkin.reporter2',
+                    name:'zipkin-reporter'
+            ],
+            'brave.instrumentation': [
+                    version: braveInstrumentationHttpVersion,
+                    group:'io.zipkin.brave',
+                    name:'brave-instrumentation-http'
+            ],
             'javax.annotation-api': [
                     version: javaxAnnotationApiVersion,
                     group:'javax.annotation',
@@ -348,7 +358,7 @@ subprojects { Project subproject ->
     jar {
         manifest {
             attributes('Automatic-Module-Name': "${subproject.group}.${subproject.name}".replaceAll('[^\\w\\.\\$_]', "_"))
-            attributes('Implementation-Version': micrometerVersion)
+            attributes('Implementation-Version': projectVersion)
             attributes('Implementation-Title': 'Micronaut')
         }
     }
