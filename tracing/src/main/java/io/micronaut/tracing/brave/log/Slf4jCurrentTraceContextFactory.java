@@ -17,12 +17,12 @@
 package io.micronaut.tracing.brave.log;
 
 import brave.propagation.CurrentTraceContext;
+import brave.propagation.ThreadLocalCurrentTraceContext;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
 import org.slf4j.MDC;
 
-import javax.annotation.Nullable;
 
 /**
  * Factory for the current trace context object.
@@ -36,16 +36,11 @@ public class Slf4jCurrentTraceContextFactory {
     /**
      * Current Slf4j trace context.
      *
-     * @param existing Trace context
      * @return Slf4j trace context
      */
     @Requires(classes = {MDC.class, CurrentTraceContext.class})
     @Context
-    Slf4jCurrentTraceContext currentTraceContext(@Nullable CurrentTraceContext existing) {
-        if (existing != null) {
-            return new Slf4jCurrentTraceContext(existing);
-        } else {
-            return new Slf4jCurrentTraceContext();
-        }
+    CurrentTraceContext currentTraceContext() {
+        return ThreadLocalCurrentTraceContext.newBuilder().addScopeDecorator(new Slf4jScopeDecorator()).build();
     }
 }
