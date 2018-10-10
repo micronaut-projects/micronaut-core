@@ -16,10 +16,7 @@
 
 package io.micronaut.discovery.eureka;
 
-import io.micronaut.context.annotation.ConfigurationBuilder;
-import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.annotation.Value;
+import io.micronaut.context.annotation.*;
 import io.micronaut.context.env.Environment;
 import io.micronaut.discovery.DiscoveryConfiguration;
 import io.micronaut.discovery.client.DiscoveryClientConfiguration;
@@ -34,6 +31,8 @@ import io.micronaut.runtime.server.EmbeddedServer;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Optional;
 
 /**
@@ -176,10 +175,12 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
         /**
          * Configuration name property for Eureka IP address.
          */
-        public static final String IP_ADDRESS =
-            EurekaConfiguration.PREFIX + '.' +
-                RegistrationConfiguration.PREFIX + '.' +
-                "ip-addr";
+        public static final String IP_ADDRESS = PREFIX + ".ip-addr";
+
+        /**
+         * Configuration name property for preferring Eureka IP address registration.
+         */
+        public static final String PREFER_IP_ADDRESS = PREFIX + ".prefer-ip-address";
 
         @ConfigurationBuilder
         InstanceInfo instanceInfo;
@@ -188,6 +189,7 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
         LeaseInfo.Builder leaseInfo = LeaseInfo.Builder.newBuilder();
 
         private final boolean explicitInstanceId;
+        private final boolean preferIpAddress;
 
         /**
          * @param embeddedServer           The embedded server
@@ -198,27 +200,41 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
         public EurekaRegistrationConfiguration(
             EmbeddedServer embeddedServer,
             ApplicationConfiguration applicationConfiguration,
-            @Value("${" + EurekaRegistrationConfiguration.IP_ADDRESS + "}") @Nullable String ipAddress,
+            @Property(name = EurekaRegistrationConfiguration.IP_ADDRESS) @Nullable String ipAddress,
             @Nullable DataCenterInfo dataCenterInfo) {
             String instanceId = applicationConfiguration.getInstance().getId().orElse(null);
             String applicationName = applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME);
             this.explicitInstanceId = instanceId != null;
+            this.preferIpAddress = embeddedServer.getApplicationContext().get(PREFER_IP_ADDRESS, Boolean.class).orElse(false);
+            String serverHost = embeddedServer.getHost();
+            int serverPort = embeddedServer.getPort();
             if (ipAddress != null) {
                 this.instanceInfo = new InstanceInfo(
-                    embeddedServer.getHost(),
-                    embeddedServer.getPort(),
+                    preferIpAddress ? ipAddress : serverHost,
+                        serverPort,
                     ipAddress,
                     applicationName,
                     explicitInstanceId ? instanceId : applicationName
                 );
 
             } else {
-                this.instanceInfo = new InstanceInfo(
-                    embeddedServer.getHost(),
-                    embeddedServer.getPort(),
-                    applicationName,
-                    explicitInstanceId ? instanceId : applicationName
-                );
+                if (preferIpAddress) {
+                    ipAddress = lookupIp(serverHost);
+                    this.instanceInfo = new InstanceInfo(
+                            ipAddress,
+                            serverPort,
+                            ipAddress,
+                            applicationName,
+                            explicitInstanceId ? instanceId : applicationName
+                    );
+                } else {
+                    this.instanceInfo = new InstanceInfo(
+                            serverHost,
+                            serverPort,
+                            applicationName,
+                            explicitInstanceId ? instanceId : applicationName
+                    );
+                }
             }
 
             if (dataCenterInfo != null) {
@@ -241,5 +257,14 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
             instanceInfo.setLeaseInfo(leaseInfo);
             return instanceInfo;
         }
+
+        private static String lookupIp(String host) {
+            try {
+                return InetAddress.getByName(host).getHostAddress();
+            } catch (UnknownHostException e) {
+                throw new IllegalArgumentException("Unable to lookup host IP address: " + host, e);
+            }
+        }
+
     }
 }
