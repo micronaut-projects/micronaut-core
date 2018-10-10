@@ -167,6 +167,11 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     String PROPERTY_SOURCES_KEY = "micronaut.config.files";
 
     /**
+     * The host name environment variable.
+     */
+    String HOSTNAME = "HOSTNAME";
+
+    /**
      * Should respect the order as provided.
      *
      * @return The active environment names

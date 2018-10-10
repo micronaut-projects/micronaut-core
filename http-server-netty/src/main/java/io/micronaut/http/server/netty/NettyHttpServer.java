@@ -341,7 +341,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
     @Override
     public String getHost() {
-        return serverConfiguration.getHost().orElse("localhost");
+        return serverConfiguration.getHost()
+                    .orElseGet(() -> Optional.ofNullable(System.getenv(Environment.HOSTNAME)).orElse(SocketUtils.LOCALHOST));
     }
 
     @Override
@@ -410,11 +411,11 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
         if (applicationName.isPresent()) {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Binding {} server to port: {}", applicationName.get(), serverPort);
+                LOG.debug("Binding {} server to {}:{}", applicationName.get(), host != null ? host : "*", serverPort);
             }
         } else {
             if (LOG.isDebugEnabled()) {
-                LOG.debug("Binding server to port: {}", serverPort);
+                LOG.debug("Binding server to {}:{}", host != null ? host : "*", serverPort);
             }
         }
 
