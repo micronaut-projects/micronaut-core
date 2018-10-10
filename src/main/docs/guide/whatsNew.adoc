@@ -103,6 +103,8 @@ The following dependency upgrades occurred in this release:
 - Reactor `3.1.8` -> `3.2.0`
 - SnakeYAML `1.20` -> `1.23`
 - Jaeger `0.30.4` -> `0.31.0`
+- Brave '5.2.0` -> `5.4.2`
+- Zipkin Reporter `2.7.7` -> `2.7.9`
 
 === Amazon Route 53 Service Discovery and AWS Systems Manager Parameter Store Support
 
