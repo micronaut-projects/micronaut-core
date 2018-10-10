@@ -67,7 +67,7 @@ hello-world-java/src/main/java/example/HelloController.java:34: error: The route
                           ^
 ----
 
-This lessons the need for IDE support designed specifically for Micronaut.
+This lessens the need for IDE support designed specifically for Micronaut.
 
 === Experimental JMX Support for Endpoints
 
