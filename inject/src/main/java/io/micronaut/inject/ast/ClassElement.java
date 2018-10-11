@@ -16,6 +16,9 @@
 
 package io.micronaut.inject.ast;
 
+import io.micronaut.core.naming.NameUtils;
+
+import javax.annotation.Nullable;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +31,7 @@ import java.util.Optional;
  * @author graemerocher
  * @since 1.0
  */
-public interface ClassElement extends Element {
+public interface ClassElement extends TypedElement {
 
     /**
      * Tests whether one type is assignable to another.
@@ -37,6 +40,31 @@ public interface ClassElement extends Element {
      * @return {@code true} if and only if the this type is assignable to the second
      */
     boolean isAssignable(String type);
+
+    @Nullable
+    @Override
+    default ClassElement getType() {
+        return this;
+    }
+
+    /**
+     * The simple name without the package name.
+     *
+     * @return The simple name
+     */
+    @Override
+    default String getSimpleName() {
+        return NameUtils.getSimpleName(getName());
+    }
+
+    /**
+     * The package name.
+     *
+     * @return The package name
+     */
+    default String getPackageName() {
+        return NameUtils.getPackageName(getName());
+    }
 
     /**
      * Returns the bean properties (getters and setters) for this class element.

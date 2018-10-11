@@ -18,6 +18,7 @@ package io.micronaut.http.server;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.convert.format.ReadableBytes;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.server.cors.CorsOriginConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -250,7 +251,9 @@ public class HttpServerConfiguration {
      * @param host The host
      */
     public void setHost(String host) {
-        this.host = host;
+        if (StringUtils.isNotEmpty(host)) {
+            this.host = host;
+        }
     }
 
     /**

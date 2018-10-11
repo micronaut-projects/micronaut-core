@@ -9,10 +9,10 @@ dependencies {
     // are optionally loaded and not required
     compileOnly project(":inject-java")
     compileOnly project(":configurations:netflix-hystrix")
-    compileOnly 'io.zipkin.brave:brave-instrumentation-http:5.2.0'
-    compileOnly 'io.zipkin.reporter2:zipkin-reporter:2.7.7'
+    compileOnly dependencyVersion("brave.instrumentation")
+    compileOnly dependencyVersion("zipkin.reporter")
     compileOnly 'io.zipkin.reporter:zipkin-reporter:1.1.2'
-    compileOnly 'io.opentracing.brave:brave-opentracing:0.32.0'
+    compileOnly 'io.opentracing.brave:brave-opentracing:0.33.3'
 
     compileOnly dependencyVersion("jaeger")
     compileOnly dependencyVersion("reactor")
@@ -25,8 +25,8 @@ dependencies {
     testCompile project(":http-server-netty")
 
     testCompile dependencyVersion("reactor")
-    testCompile 'io.zipkin.brave:brave-instrumentation-http:5.2.0'
-    testCompile 'io.zipkin.reporter2:zipkin-reporter:2.7.7'
-    testCompile 'io.opentracing.brave:brave-opentracing:0.32.0'
+    testCompile dependencyVersion("zipkin.reporter")
+    testCompile dependencyVersion("brave.instrumentation")
+    testCompile 'io.opentracing.brave:brave-opentracing:0.33.3'
 
 }

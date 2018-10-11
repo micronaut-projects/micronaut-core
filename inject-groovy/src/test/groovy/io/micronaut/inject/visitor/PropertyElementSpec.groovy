@@ -93,4 +93,49 @@ public class TestController<T extends CharSequence> {
         AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[1].type.name == 'java.lang.CharSequence'
         !AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[1].isReadOnly()
     }
+
+
+    void "test simple bean properties with generics on property"() {
+        buildBeanDefinition('test.TestController', '''
+package test;
+
+import io.micronaut.http.annotation.*;
+import javax.inject.Inject;
+
+@Controller("/test")
+public class TestController {
+    
+    private Response<Integer> age;
+    
+    public Response<Integer> getAge() {
+        return age;
+    }
+
+    @Put("/")
+    public Response<Integer> update() {
+        return null;
+    }
+}
+
+class Response<T> {
+    private T r;
+    public T getResult() { return r; }
+}
+''')
+        expect:
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties.size() == 1
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].name == 'age'
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].type.name == 'test.Response'
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].isReadOnly()
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].type.typeArguments.size() == 1
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].type.typeArguments.values().first().name == 'java.lang.Integer'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 2
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[1].name == 'update'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[1].returnType.name == 'test.Response'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[1].returnType.typeArguments.size() == 1
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[1].returnType.typeArguments.values().first().name == 'java.lang.Integer'
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[1].returnType.beanProperties.size() == 1
+        AllElementsVisitor.VISITED_METHOD_ELEMENTS[1].returnType.beanProperties[0].type.name == 'java.lang.Integer'
+    }
 }

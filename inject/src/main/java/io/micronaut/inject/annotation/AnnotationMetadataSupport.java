@@ -23,7 +23,6 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.lang.annotation.Annotation;
@@ -49,7 +48,8 @@ import java.util.function.Function;
 @Internal
 class AnnotationMetadataSupport {
 
-    static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
+    static final Map<String, Map<String, Object>> CURRENT_DEFAULTS = new ConcurrentHashMap<>(20);
+    private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
 
     private static final Map<Class<? extends Annotation>, Optional<Constructor<InvocationHandler>>> ANNOTATION_PROXY_CACHE = new ConcurrentHashMap<>(20);
     private static final Map<String, Class<? extends Annotation>> ANNOTATION_TYPES = new ConcurrentHashMap<>(20);
@@ -114,6 +114,7 @@ class AnnotationMetadataSupport {
     static void registerDefaultValues(String annotation, Map<String, Object> defaultValues) {
         if (StringUtils.isNotEmpty(annotation)) {
             ANNOTATION_DEFAULTS.put(annotation.intern(), defaultValues);
+            CURRENT_DEFAULTS.put(annotation.intern(), defaultValues);
         }
     }
 

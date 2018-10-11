@@ -15,29 +15,62 @@
  */
 package io.micronaut.discovery.eureka
 
+import io.micronaut.context.env.Environment
+import io.micronaut.core.naming.NameUtils
+import io.micronaut.discovery.DiscoveryClient
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.discovery.eureka.client.v2.EurekaClient
 import io.micronaut.runtime.server.EmbeddedServer
+import org.testcontainers.containers.GenericContainer
+import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy
+import spock.lang.AutoCleanup
 import spock.lang.Ignore
 import spock.lang.IgnoreIf
+import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
+
+import java.util.concurrent.TimeUnit
 
 /**
  * @author graemerocher
  * @since 1.0
  */
-@IgnoreIf({ !env['EUREKA_HOST'] && !env['EUREKA_PORT'] })
 class EurekaAutoRegistrationSpec extends Specification{
 
-    @Ignore("https://github.com/micronaut-projects/micronaut-core/issues/566")
+    @Shared
+    @AutoCleanup
+    GenericContainer eurekaContainer =
+            new GenericContainer("cloudready/spring-cloud-eureka-server:1.0.1")
+                    .withExposedPorts(8761)
+                    .waitingFor(new LogMessageWaitStrategy().withRegEx("(?s).*Started Eureka.*"))
+
+    @Shared String eurekaHost
+    @Shared int eurekaPort
+    @Shared
+    Map<String, Object> embeddedServerConfig
+
+
+
+    def setupSpec() {
+        eurekaContainer.start()
+        eurekaHost = eurekaContainer.containerIpAddress
+        eurekaPort = eurekaContainer.getMappedPort(8761)
+        embeddedServerConfig = [
+                (EurekaConfiguration.HOST): eurekaHost,
+                (EurekaConfiguration.PORT): eurekaPort,
+                "micronaut.caches.discoveryClient.enabled": false,
+                'eureka.client.readTimeout': '5s'
+        ] as Map<String, Object>
+1    }
+
     void "test that an application can be registered and de-registered with Eureka"() {
         when: "An application is started and eureka configured"
         String serviceId = 'myService'
         def eurekaConfiguration = [
-                'eureka.client.host'                       : System.getenv('EUREKA_HOST'),
-                'eureka.client.port'                       : System.getenv('EUREKA_PORT')
+                'eureka.client.host'                       : eurekaHost,
+                'eureka.client.port'                       : eurekaPort
         ]
         // run an application
         EmbeddedServer application = ApplicationContext.run(
@@ -54,21 +87,17 @@ class EurekaAutoRegistrationSpec extends Specification{
 
         then: "The application is registered"
         conditions.eventually {
-            Flowable.fromPublisher(eurekaClient.getInstances(serviceId)).blockingFirst().size() == 1
+            Flowable.fromPublisher(eurekaClient.getInstances(serviceId)).timeout(30, TimeUnit.SECONDS).blockingFirst().size() == 1
             // Eureka uses upper case for application names
-            Flowable.fromPublisher(eurekaClient.getServiceIds()).blockingFirst().contains(serviceId.toUpperCase())
+            Flowable.fromPublisher(eurekaClient.getServiceIds()).timeout(30, TimeUnit.SECONDS).blockingFirst().contains(
+                    NameUtils.hyphenate(serviceId).toUpperCase()
+            )
         }
 
 
 
-        when: "The application is stopped"
+        cleanup: "The application is stopped"
         application?.stop()
-
-        then: "The application is de-registered"
-        true
-        conditions.eventually {
-            Flowable.fromPublisher(eurekaClient.getInstances(serviceId)).blockingFirst().size() == 0
-        }
 
     }
 }

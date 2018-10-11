@@ -16,10 +16,14 @@
 
 package io.micronaut.ast.groovy.visitor;
 
+import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 import org.codehaus.groovy.ast.Variable;
+import org.codehaus.groovy.control.SourceUnit;
 
+import javax.annotation.Nullable;
 import java.lang.reflect.Modifier;
 
 /**
@@ -32,14 +36,17 @@ import java.lang.reflect.Modifier;
 public class GroovyFieldElement extends AbstractGroovyElement implements FieldElement {
 
     private final Variable variable;
+    private final SourceUnit sourceUnit;
 
     /**
+     * @param sourceUnit         the source unit
      * @param variable           The {@link Variable}
      * @param annotationMetadata The annotation medatada
      */
-    GroovyFieldElement(Variable variable, AnnotationMetadata annotationMetadata) {
+    GroovyFieldElement(SourceUnit sourceUnit, Variable variable, AnnotationMetadata annotationMetadata) {
         super(annotationMetadata);
         this.variable = variable;
+        this.sourceUnit = sourceUnit;
     }
 
     @Override
@@ -80,5 +87,11 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     @Override
     public Object getNativeType() {
         return variable;
+    }
+
+    @Nullable
+    @Override
+    public ClassElement getType() {
+        return new GroovyClassElement(sourceUnit, variable.getType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, variable.getType()));
     }
 }

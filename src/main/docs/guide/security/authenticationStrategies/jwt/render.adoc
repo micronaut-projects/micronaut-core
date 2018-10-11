@@ -20,3 +20,5 @@ Pragma: no-cache
     ],
 }
 ----
+
+If you wish to customize the previous JSON payload, you may want to provide a bean replacement for api:security.token.jwt.render.BearerTokenRenderer[]. If that is not enough, check the api:security.token.jwt.bearer.AccessRefreshTokenLoginHandler[] to accommodate it to your needs.

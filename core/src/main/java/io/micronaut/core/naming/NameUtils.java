@@ -358,7 +358,7 @@ public class NameUtils {
                     if (first) {
                         first = false;
                         newName.append(lowerCaseChar);
-                    } else if (Character.isUpperCase(last) || last == '.') {
+                    } else if (Character.isUpperCase(last) || Character.isDigit(last) || last == '.') {
                         newName.append(lowerCaseChar);
                     } else {
                         newName.append(separatorChar).append(lowerCaseChar);
