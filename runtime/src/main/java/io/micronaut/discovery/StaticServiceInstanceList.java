@@ -56,4 +56,11 @@ public class StaticServiceInstanceList implements ServiceInstanceList {
             return builder.build();
         }).collect(Collectors.toList());
     }
+
+    /**
+     * @return The URIs that are load balanced
+     */
+    public Collection<URI> getLoadBalancedURIs() {
+        return loadBalancedURIs;
+    }
 }
