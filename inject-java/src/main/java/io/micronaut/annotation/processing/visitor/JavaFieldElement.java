@@ -17,9 +17,12 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 
+import javax.annotation.Nullable;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.TypeMirror;
 
 /**
  * A field element returning data from a {@link VariableElement}.
@@ -29,15 +32,24 @@ import javax.lang.model.element.VariableElement;
  */
 class JavaFieldElement extends AbstractJavaElement implements FieldElement {
 
+    private final JavaVisitorContext visitorContext;
     private final VariableElement variableElement;
 
     /**
      * @param variableElement    The {@link VariableElement}
      * @param annotationMetadata The annotation metadata
+     * @param visitorContext     The visitor context
      */
-    JavaFieldElement(VariableElement variableElement, AnnotationMetadata annotationMetadata) {
+    JavaFieldElement(VariableElement variableElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
         super(variableElement, annotationMetadata);
         this.variableElement = variableElement;
+        this.visitorContext = visitorContext;
     }
 
+    @Nullable
+    @Override
+    public ClassElement getType() {
+        TypeMirror returnType = variableElement.asType();
+        return mirrorToClassElement(returnType, visitorContext);
+    }
 }

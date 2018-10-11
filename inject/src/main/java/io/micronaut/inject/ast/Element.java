@@ -52,6 +52,15 @@ public interface Element extends AnnotationMetadata {
     Object getNativeType();
 
     /**
+     * The simple name of the element. For a class this will be the name without the package.
+     *
+     * @return The simple name
+     */
+    default String getSimpleName() {
+        return getName();
+    }
+
+    /**
      * @return True if the element is abstract.
      */
     default boolean isAbstract() {

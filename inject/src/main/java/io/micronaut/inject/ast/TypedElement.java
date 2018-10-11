@@ -19,16 +19,19 @@ package io.micronaut.inject.ast;
 import javax.annotation.Nullable;
 
 /**
- * Represents a parameter to a method or constructor.
+ * An element that has an underlying type.
  *
  * @author graemerocher
  * @since 1.0
+ * @see PropertyElement
+ * @see ClassElement
+ * @see FieldElement
  */
-public interface ParameterElement extends TypedElement {
-
+public interface TypedElement extends Element {
     /**
-     * @return The type of the parameter
+     * @return The type of the element
      */
-    @Override
-    @Nullable ClassElement getType();
+    @Nullable
+    ClassElement getType();
+
 }

@@ -24,11 +24,12 @@ import javax.annotation.Nullable;
  * @author graemerocher
  * @since 1.0
  */
-public interface PropertyElement extends Element {
+public interface PropertyElement extends TypedElement {
     /**
      * @return The type of the property
      */
     @Nullable
+    @Override
     ClassElement getType();
 
     /**
