@@ -1,0 +1,14 @@
+Often you want to consume an endpoint and bind to a POJO if the request is successful or bind to a different POJO if an error occurs. The following example shows how to invoke `exchange` with a success and error type.
+
+[source,java]
+----
+include::{testsclient}/httpclientexceptionbody/BooksController.java[tag=clazz,indent=0]
+----
+
+[source,groovy]
+----
+include::{testsclient}/httpclientexceptionbody/BindHttpClientExceptionBodySpec.groovy[tags=test, indent=0]
+----
+
+<1> Success Type
+<1> Error Type
