@@ -173,6 +173,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract Map<? extends T, ?> readAnnotationDefaultValues(A annotationMirror);
 
     /**
+     * Read the raw default annotation values from the given annotation.
+     *
+     * @param annotationName annotation name
+     * @param annotationType the type
+     * @return The values
+     */
+    protected abstract Map<? extends T, ?> readAnnotationDefaultValues(String annotationName, T annotationType);
+
+    /**
      * Read the raw annotation values from the given annotation.
      *
      * @param annotationMirror The annotation
@@ -258,26 +267,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         boolean isDeclared) {
         String annotationName = getAnnotationTypeName(annotationMirror);
 
-        Map<? extends T, ?> elementDefaultValues = readAnnotationDefaultValues(annotationMirror);
-        if (elementDefaultValues != null) {
-            Map<CharSequence, Object> defaultValues = new LinkedHashMap<>();
-            for (Map.Entry<? extends T, ?> entry : elementDefaultValues.entrySet()) {
-                T member = entry.getKey();
-                String memberName = getAnnotationMemberName(member);
-                if (!defaultValues.containsKey(memberName)) {
-                    Object annotationValue = entry.getValue();
-                    readAnnotationRawValues(memberName, annotationValue, defaultValues);
-                }
-            }
-            metadata.addDefaultAnnotationValues(annotationName, defaultValues);
-            if (!DefaultAnnotationMetadata.areAnnotationDefaultsRegistered(annotationName)) {
-                Map<String, Object> annotationDefaults = new HashMap<>(defaultValues.size());
-                for (Map.Entry<CharSequence, Object> entry: defaultValues.entrySet()) {
-                    annotationDefaults.put(entry.getKey().toString(), entry.getValue());
-                }
-                DefaultAnnotationMetadata.registerAnnotationDefaults(annotationName, annotationDefaults);
-            }
-        }
+        processAnnotationDefaults(annotationMirror, metadata, annotationName);
 
         List<String> parentAnnotations = new ArrayList<>();
         parentAnnotations.add(annotationName);
@@ -360,6 +350,31 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return annotationValues;
     }
 
+    private void processAnnotationDefaults(A annotationMirror, DefaultAnnotationMetadata metadata, String annotationName) {
+        Map<? extends T, ?> elementDefaultValues = readAnnotationDefaultValues(annotationMirror);
+        processAnnotationDefaults(metadata, annotationName, elementDefaultValues);
+    }
+
+    private void processAnnotationDefaults(DefaultAnnotationMetadata metadata, String annotationName, Map<? extends T, ?> elementDefaultValues) {
+        if (elementDefaultValues != null) {
+            Map<CharSequence, Object> defaultValues = new LinkedHashMap<>();
+            for (Map.Entry<? extends T, ?> entry : elementDefaultValues.entrySet()) {
+                T member = entry.getKey();
+                String memberName = getAnnotationMemberName(member);
+                if (!defaultValues.containsKey(memberName)) {
+                    Object annotationValue = entry.getValue();
+                    readAnnotationRawValues(memberName, annotationValue, defaultValues);
+                }
+            }
+            metadata.addDefaultAnnotationValues(annotationName, defaultValues);
+            Map<String, Object> annotationDefaults = new HashMap<>(defaultValues.size());
+            for (Map.Entry<CharSequence, Object> entry: defaultValues.entrySet()) {
+                annotationDefaults.put(entry.getKey().toString(), entry.getValue());
+            }
+            DefaultAnnotationMetadata.registerAnnotationDefaults(annotationName, annotationDefaults);
+        }
+    }
+
     /**
      * Creates the visitor context for this implementation.
      *
@@ -384,6 +399,10 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 Object v = readAnnotationValue(aliasedMemberName, annotationValue);
                 if (v != null) {
                     Optional<T> annotationMirror = getAnnotationMirror(aliasedAnnotationName);
+                    if (annotationMirror.isPresent()) {
+                        final Map<? extends T, ?> defaultValues = readAnnotationDefaultValues(aliasedAnnotationName, annotationMirror.get());
+                        processAnnotationDefaults(metadata, aliasedAnnotationName, defaultValues);
+                    }
 
                     if (isDeclared) {
                         metadata.addDeclaredStereotype(

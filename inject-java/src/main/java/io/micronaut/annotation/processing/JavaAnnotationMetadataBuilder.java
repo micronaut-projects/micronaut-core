@@ -232,29 +232,40 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected Map<? extends Element, ?> readAnnotationDefaultValues(AnnotationMirror annotationMirror) {
-        Map<String, Map<Element, javax.lang.model.element.AnnotationValue>> defaults = JavaAnnotationMetadataBuilder.ANNOTATION_DEFAULTS;
 
+        final String annotationTypeName = getAnnotationTypeName(annotationMirror);
         Element element = annotationMirror.getAnnotationType().asElement();
-        if (element instanceof  TypeElement) {
+        return readAnnotationDefaultValues(annotationTypeName, element);
+    }
+
+    @Override
+    protected Map<? extends Element, ?> readAnnotationDefaultValues(String annotationTypeName, Element element) {
+        Map<String, Map<Element, AnnotationValue>> defaults = JavaAnnotationMetadataBuilder.ANNOTATION_DEFAULTS;
+        if (element instanceof TypeElement) {
             TypeElement annotationElement = (TypeElement) element;
             String annotationName = annotationElement.getQualifiedName().toString();
             if (!defaults.containsKey(annotationName)) {
 
                 Map<Element, AnnotationValue> defaultValues = new HashMap<>();
-                elementUtils.getAllMembers(annotationElement)
+                final List<? extends Element> allMembers = elementUtils.getAllMembers(annotationElement);
+
+                allMembers
                         .stream()
-                        .filter(member -> member.getEnclosingElement() == annotationElement)
+                        .filter(member -> member.getEnclosingElement().equals(annotationElement))
                         .filter(ExecutableElement.class::isInstance)
                         .map(ExecutableElement.class::cast)
                         .filter(this::isValidDefaultValue)
                         .forEach(executableElement ->
-                                defaultValues.put(executableElement, executableElement.getDefaultValue())
+                                {
+                                    final AnnotationValue defaultValue = executableElement.getDefaultValue();
+                                    defaultValues.put(executableElement, defaultValue);
+                                }
                         );
 
                 defaults.put(annotationName, defaultValues);
             }
         }
-        return ANNOTATION_DEFAULTS.get(getAnnotationTypeName(annotationMirror));
+        return ANNOTATION_DEFAULTS.get(annotationTypeName);
     }
 
     private boolean isValidDefaultValue(ExecutableElement executableElement) {

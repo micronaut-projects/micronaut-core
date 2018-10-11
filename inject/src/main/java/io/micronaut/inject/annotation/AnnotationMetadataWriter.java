@@ -179,7 +179,7 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
      * Clears the annotation defaults.
      */
     public void clearDefaults() {
-        AnnotationMetadataSupport.ANNOTATION_DEFAULTS.clear();
+        AnnotationMetadataSupport.CURRENT_DEFAULTS.clear();
     }
 
     /**
@@ -281,28 +281,30 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         constructor.visitMaxs(1, 1);
         constructor.visitEnd();
 
-        final Map<String, Map<String, Object>> annotationDefaultValues = AnnotationMetadataSupport.ANNOTATION_DEFAULTS;
+        final Map<String, Map<String, Object>> annotationDefaultValues = AnnotationMetadataSupport.CURRENT_DEFAULTS;
         if (writeAnnotationDefaults && !annotationDefaultValues.isEmpty()) {
 
             MethodVisitor si = classWriter.visitMethod(ACC_STATIC, "<clinit>", "()V", null, null);
             GeneratorAdapter staticInit = new GeneratorAdapter(si, ACC_STATIC, "<clinit>", "()V");
 
             for (Map.Entry<String, Map<String, Object>> entry : annotationDefaultValues.entrySet()) {
-                String annotationName = entry.getKey();
+                final Map<String, Object> annotationValues = entry.getValue();
 
-                Label falseCondition = new Label();
+                if (CollectionUtils.isNotEmpty(annotationValues)) {
+                    String annotationName = entry.getKey();
+                    Label falseCondition = new Label();
 
-                staticInit.push(annotationName);
-                staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_ARE_DEFAULTS_REGISTERED);
-                staticInit.push(true);
-                staticInit.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.EQ, falseCondition);
-                staticInit.visitLabel(new Label());
+                    staticInit.push(annotationName);
+                    staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_ARE_DEFAULTS_REGISTERED);
+                    staticInit.push(true);
+                    staticInit.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.EQ, falseCondition);
+                    staticInit.visitLabel(new Label());
 
-                invokeLoadClassValueMethod(owningType, classWriter, staticInit, loadTypeMethods, new AnnotationClassValue(annotationName));
-                final Map<String, Object> value = entry.getValue();
-                pushAnnotationAttributes(owningType, classWriter, staticInit, value, loadTypeMethods);
-                staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_ANNOTATION_DEFAULTS);
-                staticInit.visitLabel(falseCondition);
+                    invokeLoadClassValueMethod(owningType, classWriter, staticInit, loadTypeMethods, new AnnotationClassValue(annotationName));
+                    pushAnnotationAttributes(owningType, classWriter, staticInit, annotationValues, loadTypeMethods);
+                    staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_ANNOTATION_DEFAULTS);
+                    staticInit.visitLabel(falseCondition);
+                }
             }
             staticInit.visitInsn(RETURN);
 
