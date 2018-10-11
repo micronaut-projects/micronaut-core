@@ -26,6 +26,7 @@ import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.TypeVariable;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import java.util.*;
@@ -121,7 +122,21 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
 
                 if (NameUtils.isGetterName(methodName) && executableElement.getParameters().size() == 0) {
                     String propertyName = NameUtils.getPropertyNameForGetter(methodName);
-                    ClassElement getterReturnType = mirrorToClassElement(executableElement.getReturnType(), visitorContext);
+                    TypeMirror returnType = executableElement.getReturnType();
+                    ClassElement getterReturnType;
+                    if (returnType instanceof TypeVariable) {
+                        TypeVariable tv = (TypeVariable) returnType;
+                        final String tvn = tv.toString();
+                        final ClassElement classElement = getTypeArguments().get(tvn);
+                        if (classElement != null) {
+                            getterReturnType = classElement;
+                        } else {
+                            getterReturnType = mirrorToClassElement(returnType, visitorContext);
+                        }
+                    } else {
+                        getterReturnType = mirrorToClassElement(returnType, visitorContext);
+                    }
+
                     if (getterReturnType != null) {
 
                         BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);

@@ -223,3 +223,41 @@ enum PetType {
 
 <1> The `@Schema` annotation is used to customize the name of the schema
 <2> Properties can be customized too.
+
+=== Schemas and Generics
+
+If a method return type includes generics then these will included when calculating the schema name. For example the following:
+
+.Swagger returns types and generics
+[source,java]
+----
+class Response<T> {
+    private T r;
+    public T getResult() {
+        return r;
+    };
+}
+
+@Controller("/")
+class MyController {
+
+    @Put("/")
+    public Response<Pet> updatePet(Pet pet) {
+        ...
+    }
+}
+----
+
+Will result in a schema called `#/components/schemas/Response<Pet>` being generated. If you wish to alter the name of the schema you can do so with the `@Schema` annotation:
+
+.Changing the name of response schema
+[source,java]
+----
+@Put("/")
+@Schema(name="ResponseOfPet")
+public Response<Pet> updatePet(Pet pet) {
+    ...
+}
+----
+
+In the above case the generated schema will be named `#/components/schemas/ResponseOfPet`.

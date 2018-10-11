@@ -123,7 +123,19 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                             if (groovyProps.contains(propertyName)) {
                                 return;
                             }
-                            ClassElement getterReturnType = new GroovyClassElement(sourceUnit, node.getReturnType(), AnnotationMetadata.EMPTY_METADATA);
+                            ClassNode returnTypeNode = node.getReturnType();
+                            ClassElement getterReturnType;
+                            if (returnTypeNode.isGenericsPlaceHolder()) {
+                                final String placeHolderName = returnTypeNode.getUnresolvedName();
+                                final ClassElement classElement = getTypeArguments().get(placeHolderName);
+                                if (classElement != null) {
+                                    getterReturnType = classElement;
+                                } else {
+                                    getterReturnType = new GroovyClassElement(sourceUnit, returnTypeNode, AnnotationMetadata.EMPTY_METADATA);
+                                }
+                            } else {
+                                getterReturnType = new GroovyClassElement(sourceUnit, returnTypeNode, AnnotationMetadata.EMPTY_METADATA);
+                            }
 
                             GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
                             getterAndSetter.type = getterReturnType;
