@@ -116,7 +116,8 @@ public class LoadedVisitor {
             visitor.visitField(
                     new JavaFieldElement(
                             (VariableElement) element,
-                            annotationMetadata),
+                            annotationMetadata,
+                            visitorContext),
                     visitorContext
             );
         } else if (element instanceof ExecutableElement) {

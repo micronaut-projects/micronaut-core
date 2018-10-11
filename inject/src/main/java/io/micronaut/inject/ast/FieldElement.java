@@ -22,5 +22,5 @@ package io.micronaut.inject.ast;
  * @author James Kleeh
  * @since 1.0
  */
-public interface FieldElement extends Element {
+public interface FieldElement extends TypedElement {
 }

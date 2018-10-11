@@ -76,15 +76,27 @@ public class JaegerTracerFactory implements Closeable {
         this.sampler = sampler;
     }
 
+
     /**
-     * Adds a Jaeger based Open Tracing {@link Tracer}.
+     * The Jaeger configuration bean.
      *
-     * @return The {@link Tracer}
+     * @return The configuration
      */
     @Singleton
     @Primary
-    Tracer jaegerTracer() {
-        Configuration configuration = this.configuration.getConfiguration();
+    Configuration jaegerConfiguration() {
+        return this.configuration.getConfiguration();
+    }
+
+    /**
+     * The Jaeger Tracer builder bean.
+     *
+     * @param configuration The configuration
+     * @return The builder
+     */
+    @Singleton
+    @Primary
+    JaegerTracer.Builder jaegerTracerBuilder(Configuration configuration) {
         JaegerTracer.Builder tracerBuilder = resolveBuilder(configuration);
         if (this.configuration.isExpandExceptionLogs()) {
             tracerBuilder.withExpandExceptionLogs();
@@ -98,6 +110,18 @@ public class JaegerTracerFactory implements Closeable {
         if (sampler != null) {
             tracerBuilder.withSampler(sampler);
         }
+        return tracerBuilder;
+    }
+
+    /**
+     * Adds a Jaeger based Open Tracing {@link Tracer}.
+     *
+     * @param tracerBuilder The builder
+     * @return The {@link Tracer}
+     */
+    @Singleton
+    @Primary
+    Tracer jaegerTracer(JaegerTracer.Builder tracerBuilder) {
         Tracer tracer = tracerBuilder.build();
         if (!GlobalTracer.isRegistered()) {
             GlobalTracer.register(tracer);

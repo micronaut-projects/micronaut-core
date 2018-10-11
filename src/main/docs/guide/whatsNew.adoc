@@ -67,7 +67,7 @@ hello-world-java/src/main/java/example/HelloController.java:34: error: The route
                           ^
 ----
 
-This lessons the need for IDE support designed specifically for Micronaut.
+This lessens the need for IDE support designed specifically for Micronaut.
 
 === Experimental JMX Support for Endpoints
 
@@ -94,7 +94,7 @@ The documentation you are reading has been improved with a new configuration ref
 
 The following dependency upgrades occurred in this release:
 
-- Netty `4.1.28` -> `4.1.29`
+- Netty `4.1.29` -> `4.1.30`
 - RxJava `2.2.0` -> `2.2.2`
 //- Groovy `2.5.1` -> `2.5.2`
 - Hibernate Core `5.3.4` -> `5.3.6.Final`
@@ -103,6 +103,9 @@ The following dependency upgrades occurred in this release:
 - Reactor `3.1.8` -> `3.2.0`
 - SnakeYAML `1.20` -> `1.23`
 - Jaeger `0.30.4` -> `0.31.0`
+- Brave '5.2.0` -> `5.4.2`
+- Zipkin Reporter `2.7.7` -> `2.7.9`
+- Spring `5.0.8` -> `5.1.0`
 
 === Amazon Route 53 Service Discovery and AWS Systems Manager Parameter Store Support
 

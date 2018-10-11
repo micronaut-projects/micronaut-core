@@ -125,7 +125,7 @@ public class AsciiDocPropertyReferenceWriter implements ConfigurationMetadataWri
                                 }
 
                                 w.newLine();
-                                w.append("| `").append(path).append('`');
+                                w.append("| `+").append(path).append("+`");
                                 w.newLine();
                                 w.append("|").append(type);
                                 w.newLine();
