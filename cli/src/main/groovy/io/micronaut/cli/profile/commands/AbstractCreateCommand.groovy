@@ -370,6 +370,10 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             MicronautConsole.instance.error("Profile not found for name [$profileName]")
             return false
         }
+        if (profileInstance.isAbstract()) {
+            MicronautConsole.instance.error("Profile [$profileName] is designed only for extension and not direct usage")
+            return false
+        }
         return true
     }
 
