@@ -123,13 +123,13 @@ class Response<T> {
 }
 ''')
         expect:
-//        AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
-//        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties.size() == 1
-//        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].name == 'age'
-//        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].type.name == 'test.Response'
-//        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].isReadOnly()
-//        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].type.typeArguments.size() == 1
-//        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].type.typeArguments.values().first().name == 'java.lang.Integer'
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS.size() == 1
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties.size() == 1
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].name == 'age'
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].type.name == 'test.Response'
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].isReadOnly()
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].type.typeArguments.size() == 1
+        AllElementsVisitor.VISITED_CLASS_ELEMENTS[0].beanProperties[0].type.typeArguments.values().first().name == 'java.lang.Integer'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS.size() == 2
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[1].name == 'update'
         AllElementsVisitor.VISITED_METHOD_ELEMENTS[1].returnType.name == 'test.Response'
