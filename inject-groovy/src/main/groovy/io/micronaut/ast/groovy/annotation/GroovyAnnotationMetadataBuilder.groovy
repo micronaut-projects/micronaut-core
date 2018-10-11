@@ -148,62 +148,69 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
     }
 
     @Override
-    protected Map<? extends AnnotatedNode, ?> readAnnotationDefaultValues(AnnotationNode annotationMirror) {
+    protected Map<? extends AnnotatedNode, ?> readAnnotationDefaultValues(String annotationName, AnnotatedNode annotationType) {
         Map<String, Map<? extends AnnotatedNode, Expression>> defaults = ANNOTATION_DEFAULTS
-        ClassNode classNode = annotationMirror.classNode
-        String annotationName = classNode.name
+        if (annotationType instanceof ClassNode) {
+            ClassNode classNode = (ClassNode)annotationType
+            if (!defaults.containsKey(annotationName)) {
 
-        if (!defaults.containsKey(annotationName)) {
+                List<MethodNode> methods = new ArrayList<>(classNode.getMethods())
+                Map<? extends AnnotatedNode, Expression> defaultValues = new HashMap<>()
 
-            List<MethodNode> methods = new ArrayList<>(classNode.getMethods())
-            Map<? extends AnnotatedNode, Expression> defaultValues = new HashMap<>()
-
-            // TODO: Remove this branch of the code after upgrading to Groovy 3.0
-            // https://issues.apache.org/jira/browse/GROOVY-8696
-            if (classNode.isResolved()) {
-                Class resolved = classNode.getTypeClass()
-                for (MethodNode method: methods) {
-                    def defaultValue = resolved.getDeclaredMethod(method.getName()).defaultValue
-                    if (defaultValue != null) {
-                        if (defaultValue instanceof Class) {
-                            defaultValues.put(method, new ClassExpression(ClassHelper.makeCached((Class)defaultValue)))
-                        } else {
-                            if (defaultValue instanceof String) {
-                                if (StringUtils.isNotEmpty((String)defaultValue)) {
-                                    defaultValues.put(method, new ConstantExpression(defaultValue))
-                                }
+                // TODO: Remove this branch of the code after upgrading to Groovy 3.0
+                // https://issues.apache.org/jira/browse/GROOVY-8696
+                if (classNode.isResolved()) {
+                    Class resolved = classNode.getTypeClass()
+                    for (MethodNode method: methods) {
+                        def defaultValue = resolved.getDeclaredMethod(method.getName()).defaultValue
+                        if (defaultValue != null) {
+                            if (defaultValue instanceof Class) {
+                                defaultValues.put(method, new ClassExpression(ClassHelper.makeCached((Class)defaultValue)))
                             } else {
-                                defaultValues.put(method, new ConstantExpression(defaultValue))
-                            }
-                        }
-                    }
-                }
-            } else {
-                for (MethodNode method: methods) {
-                    Statement stmt = method.code
-                    if (stmt instanceof ReturnStatement) {
-                        def expression = ((ReturnStatement) stmt).expression
-                        if (expression instanceof ConstantExpression) {
-                            ConstantExpression ce = (ConstantExpression) expression
-                            def v = ce.value
-                            if (v != null) {
-                                if (v instanceof String) {
-                                    if (StringUtils.isNotEmpty((String)v)) {
-                                        defaultValues.put(method, new ConstantExpression(v))
+                                if (defaultValue instanceof String) {
+                                    if (StringUtils.isNotEmpty((String)defaultValue)) {
+                                        defaultValues.put(method, new ConstantExpression(defaultValue))
                                     }
                                 } else {
-                                    defaultValues.put(method, (Expression)expression)
+                                    defaultValues.put(method, new ConstantExpression(defaultValue))
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    for (MethodNode method: methods) {
+                        Statement stmt = method.code
+                        if (stmt instanceof ReturnStatement) {
+                            def expression = ((ReturnStatement) stmt).expression
+                            if (expression instanceof ConstantExpression) {
+                                ConstantExpression ce = (ConstantExpression) expression
+                                def v = ce.value
+                                if (v != null) {
+                                    if (v instanceof String) {
+                                        if (StringUtils.isNotEmpty((String)v)) {
+                                            defaultValues.put(method, new ConstantExpression(v))
+                                        }
+                                    } else {
+                                        defaultValues.put(method, (Expression)expression)
+                                    }
                                 }
                             }
                         }
                     }
                 }
-            }
 
-            defaults.put(annotationName, defaultValues)
+                defaults.put(annotationName, defaultValues)
+            }
         }
 
-        return defaults.get(annotationName)
+        return defaults.get(annotationName) ?: Collections.emptyMap()
+    }
+
+    @Override
+    protected Map<? extends AnnotatedNode, ?> readAnnotationDefaultValues(AnnotationNode annotationMirror) {
+        ClassNode classNode = annotationMirror.classNode
+        String annotationName = classNode.name
+        return readAnnotationDefaultValues(annotationName, classNode)
     }
 
     @Override
