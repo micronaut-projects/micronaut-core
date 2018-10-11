@@ -72,7 +72,7 @@ public class ServiceHttpClientFactory {
      */
     @EachBean(ServiceHttpClientConfiguration.class)
     @Requires(condition = ServiceHttpClientCondition.class)
-    ServiceInstanceList serviceInstanceList(ServiceHttpClientConfiguration configuration) {
+    StaticServiceInstanceList serviceInstanceList(ServiceHttpClientConfiguration configuration) {
         List<URI> originalURLs = configuration.getUrls();
         Collection<URI> loadBalancedURIs = new ConcurrentLinkedQueue<>(originalURLs);
         return new StaticServiceInstanceList(configuration.getServiceId(), loadBalancedURIs);
@@ -88,9 +88,9 @@ public class ServiceHttpClientFactory {
     @Requires(condition = ServiceHttpClientCondition.class)
     DefaultHttpClient serviceHttpClient(
             @Parameter ServiceHttpClientConfiguration configuration,
-            @Parameter ServiceInstanceList instanceList) {
+            @Parameter StaticServiceInstanceList instanceList) {
         List<URI> originalURLs = configuration.getUrls();
-        Collection<URI> loadBalancedURIs = new ConcurrentLinkedQueue<>(originalURLs);
+        Collection<URI> loadBalancedURIs = instanceList.getLoadBalancedURIs();
         boolean isHealthCheck = configuration.isHealthCheck();
 
         LoadBalancer loadBalancer = loadBalancerFactory.create(instanceList);
