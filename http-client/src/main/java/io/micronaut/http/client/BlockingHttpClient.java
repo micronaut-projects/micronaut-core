@@ -186,6 +186,35 @@ public interface BlockingHttpClient {
     }
 
     /**
+     * Perform an HTTP GET request for the given request object emitting the full HTTP response from returned
+     * {@link org.reactivestreams.Publisher} and converting the response body to the specified type.
+     *
+     * @param uri The URI
+     * @param bodyType The body type
+     * @param <O> The body generic type
+     * @return A result or null if a 404 is returned
+     * @throws HttpClientResponseException if an error status is returned
+     */
+    default <O> O retrieve(String uri, Class<O> bodyType) {
+        return retrieve(HttpRequest.GET(uri), bodyType);
+    }
+
+    /**
+     * Perform a GET request for the given request object emitting the full HTTP response from returned
+     * {@link org.reactivestreams.Publisher}.
+     *
+     * @param uri      The URI of the GET request
+     * @param <O>      The response body type
+     * @param <E>      The error type
+     * @param bodyType The body type
+     * @param errorType The error type
+     * @return The full {@link HttpResponse} object
+     */
+    default <O, E> O retrieve(String uri, Class<O> bodyType, Class<E> errorType) {
+        return retrieve(HttpRequest.GET(uri), Argument.of(bodyType), Argument.of(errorType));
+    }
+
+    /**
      * Perform a GET request for the given request object emitting the full HTTP response from returned
      * {@link org.reactivestreams.Publisher}.
      *
@@ -208,5 +237,20 @@ public interface BlockingHttpClient {
      */
     default <O> HttpResponse<O> exchange(String uri, Class<O> bodyType) {
         return exchange(HttpRequest.GET(uri), Argument.of(bodyType));
+    }
+
+    /**
+     * Perform a GET request for the given request object emitting the full HTTP response from returned
+     * {@link org.reactivestreams.Publisher}.
+     *
+     * @param uri      The URI of the GET request
+     * @param <O>      The response body type
+     * @param <E>      The error type
+     * @param bodyType The body type
+     * @param errorType The error type
+     * @return The full {@link HttpResponse} object
+     */
+    default <O, E> HttpResponse<O> exchange(String uri, Class<O> bodyType, Class<E> errorType) {
+        return exchange(HttpRequest.GET(uri), Argument.of(bodyType), Argument.of(errorType));
     }
 }
