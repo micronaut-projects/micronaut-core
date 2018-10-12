@@ -109,105 +109,109 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     }
 
     @Override
+    public boolean acceptInboundMessage(Object msg) throws Exception {
+        if (msg instanceof NettyHttpRequest) {
+            NettyHttpRequest<?> request = (NettyHttpRequest) msg;
+            HttpHeaders headers = request.getHeaders();
+            String connectValue = headers.get(HttpHeaderNames.CONNECTION, String.class).orElse("").toLowerCase(Locale.ENGLISH);
+            return connectValue.contains(HttpHeaderValues.UPGRADE) &&
+                    "WebSocket".equalsIgnoreCase(headers.get(HttpHeaderNames.UPGRADE));
+        }
+
+        return false;
+    }
+
+    @Override
     protected final void channelRead0(ChannelHandlerContext ctx, NettyHttpRequest<?> msg) {
 
-        HttpHeaders headers = msg.getHeaders();
-        String connectValue = headers.get(HttpHeaderNames.CONNECTION, String.class).orElse("").toLowerCase(Locale.ENGLISH);
-        if (connectValue.contains(HttpHeaderValues.UPGRADE) &&
-                "WebSocket".equalsIgnoreCase(headers.get(HttpHeaderNames.UPGRADE))) {
+        Optional<UriRouteMatch<Object, Object>> routeMatch = router.find(HttpMethod.GET, msg.getUri()).findFirst();
 
-            Optional<UriRouteMatch<Object, Object>> routeMatch = router.find(HttpMethod.GET, msg.getUri()).findFirst();
-
-            if (routeMatch.isPresent()) {
-                UriRouteMatch<Object, Object> rm = routeMatch.get();
-                if (rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class)) {
-                 msg.setAttribute(HttpAttributes.ROUTE_MATCH, rm);
-                    List<HttpFilter> filters = router.findFilters(msg);
-                    AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(msg);
-                    MutableHttpResponse<?> proceed = HttpResponse.ok();
-                    Publisher<MutableHttpResponse<?>> routePublisher = Flowable.create(emitter -> {
-                        emitter.onNext(proceed);
-                        emitter.onComplete();
-                    }, BackpressureStrategy.ERROR);
+        if (routeMatch.isPresent()) {
+            UriRouteMatch<Object, Object> rm = routeMatch.get();
+            if (rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class)) {
+             msg.setAttribute(HttpAttributes.ROUTE_MATCH, rm);
+                List<HttpFilter> filters = router.findFilters(msg);
+                AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(msg);
+                MutableHttpResponse<?> proceed = HttpResponse.ok();
+                Publisher<MutableHttpResponse<?>> routePublisher = Flowable.create(emitter -> {
+                    emitter.onNext(proceed);
+                    emitter.onComplete();
+                }, BackpressureStrategy.ERROR);
 
 
-                    Publisher<? extends MutableHttpResponse<?>> finalPublisher;
+                Publisher<? extends MutableHttpResponse<?>> finalPublisher;
 
-                    if (!filters.isEmpty()) {
-                        // make the action executor the last filter in the chain
-                        filters = new ArrayList<>(filters);
-                        filters.add((HttpServerFilter) (req, chain) -> routePublisher);
+                if (!filters.isEmpty()) {
+                    // make the action executor the last filter in the chain
+                    filters = new ArrayList<>(filters);
+                    filters.add((HttpServerFilter) (req, chain) -> routePublisher);
 
-                        AtomicInteger integer = new AtomicInteger();
-                        int len = filters.size();
-                        List<HttpFilter> finalFilters = filters;
-                        ServerFilterChain filterChain = new ServerFilterChain() {
-                            @SuppressWarnings("unchecked")
-                            @Override
-                            public Publisher<MutableHttpResponse<?>> proceed(io.micronaut.http.HttpRequest<?> request) {
-                                int pos = integer.incrementAndGet();
-                                if (pos > len) {
-                                    throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
-                                }
-                                HttpFilter httpFilter = finalFilters.get(pos);
-                                return (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.getAndSet(request), this);
+                    AtomicInteger integer = new AtomicInteger();
+                    int len = filters.size();
+                    List<HttpFilter> finalFilters = filters;
+                    ServerFilterChain filterChain = new ServerFilterChain() {
+                        @SuppressWarnings("unchecked")
+                        @Override
+                        public Publisher<MutableHttpResponse<?>> proceed(io.micronaut.http.HttpRequest<?> request) {
+                            int pos = integer.incrementAndGet();
+                            if (pos > len) {
+                                throw new IllegalStateException("The FilterChain.proceed(..) method should be invoked exactly once per filter execution. The method has instead been invoked multiple times by an erroneous filter definition.");
                             }
-                        };
-                        HttpFilter httpFilter = filters.get(0);
-                        Publisher<? extends HttpResponse<?>> resultingPublisher = httpFilter.doFilter(requestReference.get(), filterChain);
-                        finalPublisher = (Publisher<? extends MutableHttpResponse<?>>) resultingPublisher;
-                    } else {
-                        finalPublisher = routePublisher;
-                    }
-
-                    Channel channel = ctx.channel();
-                    Single.fromPublisher(finalPublisher).subscribeOn(Schedulers.from(channel.eventLoop())).subscribe((BiConsumer<MutableHttpResponse<?>, Throwable>) (actualResponse, throwable) -> {
-                        if (throwable != null) {
-                            ctx.fireExceptionCaught(throwable);
-                        } else if (actualResponse == proceed) {
-                            //Adding new handler to the existing pipeline to handle WebSocket Messages
-                            WebSocketBean<?> webSocketBean = webSocketBeanRegistry.getWebSocket(rm.getTarget().getClass());
-
-                            handleHandshake(ctx, msg, webSocketBean, actualResponse);
-
-                            ChannelPipeline pipeline = ctx.pipeline();
-
-                            try {
-                                // re-configure the pipeline
-                                pipeline.remove(NettyHttpServer.HTTP_STREAMS_CODEC);
-                                pipeline.remove(NettyServerWebSocketUpgradeHandler.this);
-                                NettyServerWebSocketHandler webSocketHandler = new NettyServerWebSocketHandler(
-                                        webSocketSessionRepository,
-                                        handshaker,
-                                        msg,
-                                        rm,
-                                        webSocketBean,
-                                        binderRegistry,
-                                        mediaTypeCodecRegistry,
-                                        eventPublisher,
-                                        ctx
-                                );
-                                pipeline.addAfter("wsdecoder", NettyServerWebSocketHandler.ID, webSocketHandler);
-
-                            } catch (Throwable e) {
-                                if (LOG.isErrorEnabled()) {
-                                    LOG.error("Error opening WebSocket: " + e.getMessage(), e);
-                                }
-                                ctx.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()));
-                            }
-                        } else {
-                            ctx.writeAndFlush(actualResponse);
+                            HttpFilter httpFilter = finalFilters.get(pos);
+                            return (Publisher<MutableHttpResponse<?>>) httpFilter.doFilter(requestReference.getAndSet(request), this);
                         }
-                    });
+                    };
+                    HttpFilter httpFilter = filters.get(0);
+                    Publisher<? extends HttpResponse<?>> resultingPublisher = httpFilter.doFilter(requestReference.get(), filterChain);
+                    finalPublisher = (Publisher<? extends MutableHttpResponse<?>>) resultingPublisher;
                 } else {
-                    ctx.fireExceptionCaught(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"));
+                    finalPublisher = routePublisher;
                 }
+
+                Channel channel = ctx.channel();
+                Single.fromPublisher(finalPublisher).subscribeOn(Schedulers.from(channel.eventLoop())).subscribe((BiConsumer<MutableHttpResponse<?>, Throwable>) (actualResponse, throwable) -> {
+                    if (throwable != null) {
+                        ctx.fireExceptionCaught(throwable);
+                    } else if (actualResponse == proceed) {
+                        //Adding new handler to the existing pipeline to handle WebSocket Messages
+                        WebSocketBean<?> webSocketBean = webSocketBeanRegistry.getWebSocket(rm.getTarget().getClass());
+
+                        handleHandshake(ctx, msg, webSocketBean, actualResponse);
+
+                        ChannelPipeline pipeline = ctx.pipeline();
+
+                        try {
+                            // re-configure the pipeline
+                            pipeline.remove(NettyHttpServer.HTTP_STREAMS_CODEC);
+                            pipeline.remove(NettyServerWebSocketUpgradeHandler.this);
+                            NettyServerWebSocketHandler webSocketHandler = new NettyServerWebSocketHandler(
+                                    webSocketSessionRepository,
+                                    handshaker,
+                                    msg,
+                                    rm,
+                                    webSocketBean,
+                                    binderRegistry,
+                                    mediaTypeCodecRegistry,
+                                    eventPublisher,
+                                    ctx
+                            );
+                            pipeline.addAfter("wsdecoder", NettyServerWebSocketHandler.ID, webSocketHandler);
+
+                        } catch (Throwable e) {
+                            if (LOG.isErrorEnabled()) {
+                                LOG.error("Error opening WebSocket: " + e.getMessage(), e);
+                            }
+                            ctx.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()));
+                        }
+                    } else {
+                        ctx.writeAndFlush(actualResponse);
+                    }
+                });
             } else {
                 ctx.fireExceptionCaught(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"));
             }
         } else {
-            // pass the message along
-            ctx.fireChannelRead(msg);
+            ctx.fireExceptionCaught(new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"));
         }
     }
 
