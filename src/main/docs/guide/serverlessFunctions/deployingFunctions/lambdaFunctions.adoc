@@ -7,7 +7,7 @@ For Java & Kotlin functions, support for http://aws.amazon.com[AWS Lambda] can b
 ----
 dependencies {
     ...
-    compile "io.micronaut:function-aws"
+    compile "io.micronaut:micronaut-function-aws"
     ...
 }
 ----
@@ -19,7 +19,7 @@ For Groovy functions, the `function-groovy` dependency is sufficient for AWS Lam
 ----
 dependencies {
     ...
-    compile "io.micronaut:function-groovy"
+    compile "io.micronaut:micronaut-function-groovy"
     ...
 }
 ----

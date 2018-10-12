@@ -13,8 +13,8 @@ The Micronaut `inject-java` dependency should be included in both the `annotatio
 ----
 dependencies {
     ...
-    annotationProcessor "io.micronaut:inject-java:{version}"
-    compileOnly "io.micronaut:inject-java:{version}"
+    annotationProcessor "io.micronaut:micronaut-inject-java:{version}"
+    compileOnly "io.micronaut:micronaut-inject-java:{version}"
     ...
 }
 ----

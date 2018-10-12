@@ -8,13 +8,13 @@ Additional modules exist specific to Groovy that improve the overall experience.
 |===
 |Dependency|Description
 
-|`io.micronaut:inject-groovy`
+|`io.micronaut:micronaut-inject-groovy`
 |Includes AST transformations to generate bean definitions. Should be `compileOnly` on your classpath.
 
-|`io.micronaut:runtime-groovy`
+|`io.micronaut:micronaut-runtime-groovy`
 |Adds the ability to specify configuration placed in `src/main/resources` in Groovy format (i.e. `application.groovy`)
 
-|`io.micronaut:function-groovy`
+|`io.micronaut:micronaut-function-groovy`
 |Includes AST transforms that make it easier to write <<serverlessFunctions, Functions>> for AWS Lambda
 
 |===

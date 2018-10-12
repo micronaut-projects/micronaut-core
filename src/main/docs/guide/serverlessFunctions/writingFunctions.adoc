@@ -11,10 +11,10 @@ To get started writing serverless function you must add the appropriate Micronau
 |Provider|Dependency
 
 |AWS Lambda
-| `io.micronaut:function-aws`
+| `io.micronaut:micronaut-function-aws`
 |===
 
-NOTE: If you are using Groovy, there is a single compile-time dependency to be added: `"io.micronaut:function-groovy"` Please see <<groovyFunctions,Groovy Functions>>.
+NOTE: If you are using Groovy, there is a single compile-time dependency to be added: `"io.micronaut:micronaut-function-groovy"` Please see <<groovyFunctions,Groovy Functions>>.
 
 Add the appropriate dependency to your project, For example, in `build.gradle`:
 
@@ -23,7 +23,7 @@ Add the appropriate dependency to your project, For example, in `build.gradle`:
 ----
 dependencies {
     ...
-    compile "io.micronaut:function-aws"
+    compile "io.micronaut:micronaut-function-aws"
     ...
 }
 ----

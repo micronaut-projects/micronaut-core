@@ -105,7 +105,7 @@ dependencies {
     // micrometer-registry-statsd also pulls in micrometer-core so included above to verbose example
     compile "io.micronaut.configuration:micrometer-registry-statsd"
     // Also required to enable endpoint
-    compile "io.micronaut:management"
+    compile "io.micronaut:micronaut-management"
     ...
 }
 ----

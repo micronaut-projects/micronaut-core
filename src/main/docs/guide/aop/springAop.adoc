@@ -9,7 +9,7 @@ Micronaut provides support for Spring based transaction management without requi
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut:spring"
+compile "io.micronaut:micronaut-spring"
 ----
 
 NOTE: If you use Micronaut's <<hibernateSupport,Hibernate support>> you already get this dependency and a `HibernateTransactionManager` is configured for you.

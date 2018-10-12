@@ -18,9 +18,9 @@ The Micronaut annotation processors are declared in the `kapt` scope when using 
 dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:$kotlinVersion" //<1>
     compile "org.jetbrains.kotlin:kotlin-reflect:$kotlinVersion"
-    kapt "io.micronaut:inject-java" //<2>
+    kapt "io.micronaut:micronaut-inject-java" //<2>
 
-    kaptTest "io.micronaut:inject-java" //<3>
+    kaptTest "io.micronaut:micronaut-inject-java" //<3>
     ...
 }
 ----
