@@ -17,6 +17,7 @@
 package io.micronaut.security.token.jwt.bearer;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.security.authentication.AuthenticationException;
@@ -35,7 +36,7 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(property = BearerTokenConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
+@Requires(property = BearerTokenConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 @Singleton
 public class AccessRefreshTokenLoginHandler implements LoginHandler {
 

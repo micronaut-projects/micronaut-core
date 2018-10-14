@@ -17,6 +17,8 @@
 package io.micronaut.security.token.jwt.bearer;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaderValues;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.security.token.jwt.config.JwtConfigurationProperties;
@@ -27,6 +29,7 @@ import io.micronaut.security.token.jwt.config.JwtConfigurationProperties;
  * @author Sergio del Amo
  * @since 1.0
  */
+@Requires(property = BearerTokenConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 @ConfigurationProperties(BearerTokenConfigurationProperties.PREFIX)
 public class BearerTokenConfigurationProperties implements BearerTokenConfiguration {
 

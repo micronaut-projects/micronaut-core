@@ -22,8 +22,11 @@
  */
 
 @Configuration
-@Requires(property = SecuritySessionConfigurationProperties.PREFIX + ".enabled")
+@Requires(property = SecuritySessionConfigurationProperties.PREFIX + ".enabled", value = StringUtils.TRUE)
+@Requires(property = SecurityConfigurationProperties.PREFIX + ".enabled", value = StringUtils.TRUE)
 package io.micronaut.security.session;
 
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
+import io.micronaut.security.config.SecurityConfigurationProperties;

@@ -18,11 +18,11 @@ class HttpHeaderTokenWriterDisabledSpec extends Specification {
             (SPEC_NAME_PROPERTY):getClass().simpleName
     ], Environment.TEST)
 
-    void "JwtHttpClientFilter is disabled by default"() {
+    void "HttpHeaderTokenWriter is enabled by default"() {
         when:
         context.getBean(HttpHeaderTokenWriter)
 
         then:
-        thrown(NoSuchBeanException)
+        noExceptionThrown()
     }
 }

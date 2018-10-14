@@ -21,10 +21,4 @@
  * @since 1.0
  */
 
-@Configuration
-@Requires(property = JwtConfigurationProperties.PREFIX + ".enabled")
 package io.micronaut.security.token.jwt.bearer;
-
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.security.token.jwt.config.JwtConfigurationProperties;
