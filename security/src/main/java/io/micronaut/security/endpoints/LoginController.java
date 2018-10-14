@@ -18,6 +18,7 @@ package io.micronaut.security.endpoints;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -49,7 +50,7 @@ import javax.validation.Valid;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Requires(property = LoginControllerConfigurationProperties.PREFIX + ".enabled")
+@Requires(property = LoginControllerConfigurationProperties.PREFIX + ".enabled", value = StringUtils.TRUE)
 @Controller("${" + LoginControllerConfigurationProperties.PREFIX + ".path:/login}")
 @Secured(SecurityRule.IS_ANONYMOUS)
 @Validated
