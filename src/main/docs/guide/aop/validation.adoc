@@ -13,7 +13,7 @@ To get started, first add the Hibernate Validator configuration to your applicat
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut.configuration:hibernate-validator"
+compile "io.micronaut.configuration:micronaut-hibernate-validator"
 ----
 
 Then simply add the api:validation.Validated[] annotation to any class that requires validation. For example, consider this trivial service that retrieves books by title:

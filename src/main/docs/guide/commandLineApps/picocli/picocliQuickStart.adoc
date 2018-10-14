@@ -15,7 +15,7 @@ To add support for Picocli to an existing project, you should first add the pico
 [source,groovy]
 ----
 compile "info.picocli:picocli"
-compile "io.micronaut.configuration:picocli"
+compile "io.micronaut.configuration:micronaut-picocli"
 ----
 
 Or with Maven:
