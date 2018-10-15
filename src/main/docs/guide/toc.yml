@@ -37,7 +37,7 @@ ioc:
 config:
   title: Application Configuration
   environments: The Environment
-  propertySource: PropertySources
+  propertySource: Externalized Configuration with PropertySources
   valueAnnotation: Configuration Injection
   configurationProperties: Configuration Properties
   customTypeConverter: Custom Type Converters

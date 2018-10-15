@@ -33,6 +33,8 @@ import java.lang.annotation.RetentionPolicy;
 public @interface Property {
 
     /**
+     * The name of the property in kebab case. Example: my-app.bar.
+     *
      * @return The name of the property
      */
     String name();

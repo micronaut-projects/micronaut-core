@@ -48,7 +48,7 @@ import java.util.regex.Pattern;
 @Requires(notEnv = Environment.ANDROID)
 public class TimeConverterRegistrar implements TypeConverterRegistrar {
 
-    private static final Pattern DURATION_MATCHER = Pattern.compile("^(-?\\d+)([s|m|h|d])(s?)$");
+    private static final Pattern DURATION_MATCHER = Pattern.compile("^(-?\\d+)([unsmhd])(s?)$");
     private static final int MILLIS = 3;
 
     @Override
@@ -70,7 +70,8 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                     Matcher matcher = DURATION_MATCHER.matcher(value);
                     if (matcher.find()) {
                         String amount = matcher.group(1);
-                        char type = matcher.group(2).charAt(0);
+                        final String g2 = matcher.group(2);
+                        char type = g2.charAt(0);
                         try {
                             switch (type) {
                                 case 's':
@@ -87,10 +88,16 @@ public class TimeConverterRegistrar implements TypeConverterRegistrar {
                                 case 'd':
                                     return Optional.of(Duration.ofDays(Integer.valueOf(amount)));
                                 default:
-                                    context.reject(
-                                            value,
-                                            new DateTimeParseException("Unparseable date format (" + value + "). Should either be a ISO-8601 duration or a round number followed by the unit type", value, 0));
-                                    return Optional.empty();
+                                    final String seq = g2 + matcher.group(3);
+                                    switch (seq) {
+                                        case "ns":
+                                            return Optional.of(Duration.ofNanos(Integer.valueOf(amount)));
+                                        default:
+                                            context.reject(
+                                                    value,
+                                                    new DateTimeParseException("Unparseable date format (" + value + "). Should either be a ISO-8601 duration or a round number followed by the unit type", value, 0));
+                                            return Optional.empty();
+                                    }
                             }
                         } catch (NumberFormatException e) {
                             context.reject(value, e);

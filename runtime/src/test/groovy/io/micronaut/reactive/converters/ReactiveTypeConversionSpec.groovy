@@ -43,9 +43,9 @@ class ReactiveTypeConversionSpec extends Specification {
         applicationContext?.close()
 
         where:
-        from                        | target
-        Single.just(1)              | Flowable
-        Single.just(1)              | io.reactivex.Single
+        from                            | target
+        Single.just(1)                  | Flowable
+        Single.just(1)                  | io.reactivex.Single
         Single.just(1)                  | Mono
         Single.just(1)                  | Flux
         Observable.just(1)              | io.reactivex.Observable
