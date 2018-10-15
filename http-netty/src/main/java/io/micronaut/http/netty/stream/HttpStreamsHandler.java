@@ -183,9 +183,6 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
             if (inMsg instanceof FullHttpMessage) {
 
                 // Forward as is
-                FullHttpMessage message = (FullHttpMessage) inMsg;
-                // will be released by fireChannelRead
-                message.retain();
                 ctx.fireChannelRead(inMsg);
                 consumedInMessage(ctx);
 
