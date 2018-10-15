@@ -597,7 +597,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     }
 
     private boolean isJsonFormattable(Class javaType) {
-        return !(javaType == byte[].class || ByteBuffer.class.isAssignableFrom(javaType));
+        return !(javaType == byte[].class
+                || ByteBuffer.class.isAssignableFrom(javaType)
+                || ByteBuf.class.isAssignableFrom(javaType));
     }
 
     private Subscriber<Object> buildSubscriber(NettyHttpRequest request,

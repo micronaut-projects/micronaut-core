@@ -27,6 +27,8 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
+import io.netty.buffer.ByteBuf
+import io.netty.buffer.Unpooled
 import io.reactivex.Flowable
 import io.reactivex.Single
 import reactor.core.publisher.Flux
@@ -129,7 +131,7 @@ class StreamSpec extends Specification {
         expect:
         myClient.someJson(n) == '{"key":"value"}'
         where:
-        n << [1,2]
+        n << [1, 2, 3]
     }
 
     @Unroll
@@ -200,9 +202,18 @@ class StreamSpec extends Specification {
             return HttpResponse.ok(Flowable.just('{"key":"value"}'.getBytes(StandardCharsets.UTF_8)))
         }
 
+        @Get(value = "/someJson3", produces = MediaType.APPLICATION_JSON)
+        Flowable<ByteBuf> someJson3() {
+            return Flowable.just(byteBuf('{"key":'), byteBuf('"value"}'))
+        }
+
         @Get(value = "/someJsonCollection", produces = MediaType.APPLICATION_JSON)
         HttpResponse<Flowable<String>> someJsonCollection() {
             return HttpResponse.ok(Flowable.just('{"x":1}','{"x":2}'))
+        }
+
+        private static ByteBuf byteBuf(String s) {
+            Unpooled.wrappedBuffer(s.getBytes(StandardCharsets.UTF_8))
         }
 
     }
