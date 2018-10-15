@@ -5,8 +5,8 @@ To run your function as a web application as described in this section, you will
 ----
 dependencies {
     ...
-    runtime "io.micronaut:function-web"
-    runtime "io.micronaut:http-server-netty" //<1>
+    runtime "io.micronaut:micronaut-function-web"
+    runtime "io.micronaut:micronaut-http-server-netty" //<1>
     ...
 }
 ----
@@ -65,8 +65,8 @@ Functions can also be run as part of the Micronaut application context for ease 
 ----
 dependencies {
     ...
-    testRuntime "io.micronaut:function-web"
-    testRuntime "io.micronaut:http-server-netty" //<1>
+    testRuntime "io.micronaut:micronaut-function-web"
+    testRuntime "io.micronaut:micronaut-http-server-netty" //<1>
     ...
 }
 ----

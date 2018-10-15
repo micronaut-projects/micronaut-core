@@ -14,7 +14,7 @@ Micronaut includes a configuration to automatically configure the native MongoDB
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut.configuration:mongo-reactive"
+compile "io.micronaut.configuration:micronaut-mongo-reactive"
 ----
 
 Then configure the URI of the MongoDB server in `application.yml`:
@@ -128,7 +128,7 @@ To add support for GORM for MongoDB, first configure the MongoDB connection as p
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut.configuration:mongo-gorm"
+compile "io.micronaut.configuration:micronaut-mongo-gorm"
 ----
 
 WARNING: For GORM for MongoDB you will need to configure the database name separately as the `grails.mongodb.datataseName` property in `application.yml`.

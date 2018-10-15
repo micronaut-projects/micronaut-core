@@ -18,6 +18,7 @@ package io.micronaut.security.endpoints;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
@@ -36,7 +37,7 @@ import javax.annotation.Nullable;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(property = LogoutControllerConfigurationProperties.PREFIX + ".enabled")
+@Requires(property = LogoutControllerConfigurationProperties.PREFIX + ".enabled", value = StringUtils.TRUE)
 @Controller("${" + LogoutControllerConfigurationProperties.PREFIX + ".path:/logout}")
 @Secured(SecurityRule.IS_ANONYMOUS)
 public class LogoutController {

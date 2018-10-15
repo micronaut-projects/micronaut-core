@@ -20,7 +20,6 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.security.token.jwt.signature.SignatureConfiguration;
 import io.micronaut.security.token.jwt.signature.SignatureGeneratorConfiguration;
-import io.micronaut.security.token.jwt.signature.rsa.RSASignatureConfiguration;
 
 /**
  * Creates {@link SignatureConfiguration} and {@link SignatureGeneratorConfiguration} for each {@link SecretSignatureConfiguration} beans.

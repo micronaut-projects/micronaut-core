@@ -12,7 +12,7 @@ To enable support for in-memory sessions you just need the `session` dependency:
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut:session"
+compile "io.micronaut:micronaut-session"
 ----
 
 To enable sessions with Redis you must also have the `redis-lettuce` configuration on your classpath:
@@ -21,8 +21,8 @@ To enable sessions with Redis you must also have the `redis-lettuce` configurati
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut:session"
-compile "io.micronaut.configuration:redis-lettuce"
+compile "io.micronaut:micronaut-session"
+compile "io.micronaut.configuration:micronaut-redis-lettuce"
 ----
 
 And enable Redis sessions via configuration in `application.yml`:

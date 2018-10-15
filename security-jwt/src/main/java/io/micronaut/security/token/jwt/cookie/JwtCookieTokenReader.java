@@ -16,7 +16,6 @@
 
 package io.micronaut.security.token.jwt.cookie;
 
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.security.token.reader.TokenReader;
@@ -30,7 +29,6 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(property = JwtCookieConfigurationProperties.PREFIX + ".enabled")
 @Singleton
 public class JwtCookieTokenReader implements TokenReader {
 

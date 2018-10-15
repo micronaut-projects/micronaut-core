@@ -17,6 +17,7 @@
 package io.micronaut.security.token.jwt.endpoints;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.security.config.SecurityConfigurationProperties;
 
@@ -26,6 +27,7 @@ import io.micronaut.security.config.SecurityConfigurationProperties;
  * @author Sergio del Amo
  * @since 1.0
  */
+@Requires(property = OauthControllerConfigurationProperties.PREFIX + ".enabled", value = StringUtils.TRUE)
 @ConfigurationProperties(OauthControllerConfigurationProperties.PREFIX)
 public class OauthControllerConfigurationProperties implements OauthControllerConfiguration {
 

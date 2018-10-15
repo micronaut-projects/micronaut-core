@@ -15,7 +15,7 @@ To configure the Neo4j Bolt driver you should first add the `neo4j-bolt` module 
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut.configuration:neo4j-bolt"
+compile "io.micronaut.configuration:micronaut-neo4j-bolt"
 ----
 
 You should then configure the URI of the Neo4j server you wish to communicate with in `application.yml`:
@@ -100,7 +100,7 @@ To add support for GORM for Neo4j, first configure the Neo4j connection as per i
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut.configuration:neo4j-gorm"
+compile "io.micronaut.configuration:micronaut-neo4j-gorm"
 ----
 
 The following should be noted regarding using GORM for Neo4j in Micronaut:

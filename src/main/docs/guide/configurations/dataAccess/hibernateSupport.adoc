@@ -16,7 +16,7 @@ Once you have <<sqlSupport, configured one or many DataSources>> to use Hibernat
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut.configuration:hibernate-jpa"
+compile "io.micronaut.configuration:micronaut-hibernate-jpa"
 ----
 
 And that is it. For each registered SQL `DataSource`, Micronaut will configure the following beans using api:configuration.hibernate.jpa.EntityManagerFactoryBean[]:
@@ -119,7 +119,7 @@ Rather, you only need to include the  `hibernate-gorm` dependency in your projec
 .Configuring GORM for Hibernate
 [source,groovy]
 ----
-  compile "io.micronaut.configuration:hibernate-gorm"
+  compile "io.micronaut.configuration:micronaut-hibernate-gorm"
   // Use Tomcat connection pool
   runtime 'org.apache.tomcat:tomcat-jdbc:8.0.44'
   // Use H2 database driver
