@@ -85,6 +85,8 @@ import java.lang.annotation.Target;
 public @interface EachProperty {
 
     /**
+     * Defines the property this {@link EachProperty} is driven by. Should be in kebab case form. Example: "my-app.bar".
+     *
      * @return The property that this bean is driven by
      */
     @AliasFor(annotation = ConfigurationReader.class, member = "value")

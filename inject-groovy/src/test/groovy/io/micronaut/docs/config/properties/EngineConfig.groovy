@@ -19,10 +19,11 @@ import io.micronaut.context.annotation.ConfigurationProperties
 import io.micronaut.core.convert.format.MapFormat
 
 // tag::imports[]
-import org.hibernate.validator.constraints.NotBlank
 import io.micronaut.context.annotation.ConfigurationProperties
 
 import javax.validation.constraints.Min
+import javax.validation.constraints.NotBlank
+
 // end::imports[]
 
 /**

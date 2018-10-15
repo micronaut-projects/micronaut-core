@@ -1,6 +1,7 @@
-Like Spring Boot and Grails, you can create type safe configuration by creating classes that are annotated with link:{api}/io/micronaut/context/annotation/ConfigurationProperties.html[ConfigurationProperties].
+You can create type safe configuration by creating classes that are annotated with
+ ann:io.micronaut.context.annotation.ConfigurationProperties[].
 
-Micronaut, however, will produce a reflection free `@ConfigurationProperties` bean and will also at compile time calculate the property paths to evaluate, greatly improving the speed and efficiency of loading `@ConfigurationProperties`.
+Micronaut will produce a reflection-free `@ConfigurationProperties` bean and will also at compile time calculate the property paths to evaluate, greatly improving the speed and efficiency of loading `@ConfigurationProperties`.
 
 An example of a configuration class can be seen below:
 
@@ -42,6 +43,130 @@ The above example prints: `"Ford Engine Starting V8 [rodLength=6.0]"`
 Note for more complex configurations you can structure ann:context.annotation.ConfigurationProperties[] beans through inheritance.
 
 For example creating a subclass of `EngineConfig` with `@ConfigurationProperties('bar')` will resolve all properties under the path `my.engine.bar`.
+
+== Property Type Conversion
+
+When resolving properties Micronaut will use the api:io.micronaut.core.convert.ConversionService[] bean to convert properties. You can register additional converters for types not supported by micronaut by defining beans that implement the api:io.micronaut.core.convert.TypeConverter[] interface.
+
+
+Micronaut features some built-in conversions that are useful, which are detailed below.
+
+=== Duration Conversion
+
+Durations can be specified by appending the unit with a number. Supported units are `s`, `ms`, `m` etc. The following table summarizes examples:
+
+.Duration Conversion
+|===
+|Configuration Value |Resulting Value
+
+|`10ms` | `Duration` of 10 milliseconds
+
+|`10m` | `Duration` of 10 minutes
+
+|`10s` | `Duration` of 10 seconds
+
+|`10d` | `Duration` of 10 days
+
+|`10h` | `Duration` of 10 hours
+
+|`10ns` | `Duration` of 10 nanoseconds
+
+|`PT15M` | Duration of 15 minutes using ISO-8601 format
+
+|===
+
+For example to configure the default HTTP client read timeout:
+
+.Using Duration Values
+[source,yaml]
+----
+micronaut:
+    http:
+        client:
+            read-timeout: 15s
+----
+
+=== List / Array Conversion
+
+Lists and arrays can be specified in Java properties files as comma-separated values or in YAML using native YAML lists. The generic types are used to convert the values. For example in YAML:
+
+.Specifying lists or arrays in YAML
+[source,yaml]
+----
+my:
+    app:
+        integers:
+            - 1
+            - 2
+        urls:
+            - http://foo.com
+            - http://bar.com
+----
+
+Or in Java properties file format:
+
+.Specifying lists or arrays in Java properties comma-separated
+[source,properties]
+----
+my.app.integers=1,2
+my.app.urls=http://foo.com,http://bar.com
+----
+
+Alternatively you can use an index:
+
+.Specifying lists or arrays in Java properties using index
+[source,properties]
+----
+my.app.integers[0]=1
+my.app.integers[1]=2
+----
+
+For the above example configurations you can define properties to bind to with the target type supplied via generics:
+
+[source,java]
+List<Integer> integers;
+List<URL> urls;
+
+
+=== Readable Bytes
+
+You can annotate any setter parameter with ann:io.micronaut.core.convert.format.ReadableBytes[] to allow the value to be set using a shorthand syntax for specifying bytes, kilobytes etc. For example the following is taken from api:io.micronaut.http.client.HttpClientConfiguration[]:
+
+.Using `@ReadableBytes`
+[source,java]
+----
+public void setMaxContentLength(@ReadableBytes int maxContentLength) {
+    this.maxContentLength = maxContentLength;
+}
+----
+
+With the above in place you can set `micronaut.http.client.max-content-length` using the following values:
+
+.@ReadabyeBytes Conversion
+|===
+|Configuration Value |Resulting Value
+
+|`10mb` | 10 megabytes
+
+|`10kb` | 10 kilobytes
+
+|`10gb` | 10 gigabytes
+
+|`1024` | A raw byte length
+
+|===
+
+=== Formatting Dates
+
+The ann:io.micronaut.core.convert.format.Format[] annotation can be used on any setter to allow the date format to be specified when binding `javax.time` date objects.
+
+.Using `@Format` for Dates
+[source,java]
+----
+public void setMyDate(@Format("yy-mm-dd") LocalDate date) {
+    this.myDate = date;
+}
+----
 
 == Configuration Builder
 

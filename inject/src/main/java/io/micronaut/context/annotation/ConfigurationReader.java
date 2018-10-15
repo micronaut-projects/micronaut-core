@@ -36,6 +36,8 @@ import java.lang.annotation.Target;
 public @interface ConfigurationReader {
 
     /**
+     * The prefix to use when resolving properties. The prefix should be defined in kebab case. Example: my-app.foo.
+     *
      * @return The configuration entry to read
      */
     String value() default "";

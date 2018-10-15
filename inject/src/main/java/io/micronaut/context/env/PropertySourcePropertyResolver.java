@@ -50,6 +50,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * <p>A {@link PropertyResolver} that resolves from one or many {@link PropertySource} instances.</p>
@@ -541,9 +542,24 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     private List<String> resolvePropertiesForConvention(String property, PropertySource.PropertyConvention convention) {
         switch (convention) {
             case ENVIRONMENT_VARIABLE:
-                // environment variables are converted to lower case and dot separated
-                return Collections.singletonList(property.toLowerCase(Locale.ENGLISH)
-                        .replace('_', '.'));
+                String[] tokens = property.split("_");
+                List<String> properties = new ArrayList<>(tokens.length);
+
+                StringBuilder path = new StringBuilder();
+                int len = tokens.length;
+                if (len > 1) {
+                    for (int i = 0; i < len; i++) {
+                        String token = tokens[i];
+                        if (i < (len - 1)) {
+                            path.append(token.toLowerCase(Locale.ENGLISH)).append('.');
+                            String[] subTokens = Arrays.copyOfRange(tokens, i + 1, len);
+                            properties.add(path + Arrays.stream(subTokens).map(s -> s.toLowerCase(Locale.ENGLISH)).collect(Collectors.joining("")));
+                        }
+                    }
+                    return properties;
+                } else {
+                    return Collections.singletonList(property.toLowerCase(Locale.ENGLISH));
+                }
             default:
                 return Collections.singletonList(
                         NameUtils.hyphenate(property, true)

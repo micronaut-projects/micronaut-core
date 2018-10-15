@@ -47,6 +47,8 @@ import java.lang.annotation.Target;
 public @interface ConfigurationProperties {
 
     /**
+     * The prefix to use when resolving properties. The prefix should be defined in kebab case. Example: my-app.foo.
+     *
      * @return The prefix to use to resolve the properties
      */
     @AliasFor(annotation = ConfigurationReader.class, member = "value")
