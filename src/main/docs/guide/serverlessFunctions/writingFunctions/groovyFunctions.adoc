@@ -9,7 +9,7 @@ To begin, add the `function-groovy` dependency (instead of the provider-specific
 ----
 dependencies {
     ...
-    compile "io.micronaut:function-groovy"
+    compile "io.micronaut:micronaut-function-groovy"
     ...
 }
 ----

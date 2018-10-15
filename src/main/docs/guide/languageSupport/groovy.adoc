@@ -8,18 +8,18 @@ Additional modules exist specific to Groovy that improve the overall experience.
 |===
 |Dependency|Description
 
-|`io.micronaut:inject-groovy`
+|`io.micronaut:micronaut-inject-groovy`
 |Includes AST transformations to generate bean definitions. Should be `compileOnly` on your classpath.
 
-|`io.micronaut:runtime-groovy`
+|`io.micronaut:micronaut-runtime-groovy`
 |Adds the ability to specify configuration placed in `src/main/resources` in Groovy format (i.e. `application.groovy`)
 
-|`io.micronaut:function-groovy`
+|`io.micronaut:micronaut-function-groovy`
 |Includes AST transforms that make it easier to write <<serverlessFunctions, Functions>> for AWS Lambda
 
 |===
 
-The most common module you will need is `inject-groovy`, which enables DI and AOP for classes written in Groovy.
+The most common module you will need is `micronaut-inject-groovy`, which enables DI and AOP for classes written in Groovy.
 
 == Groovy Support in the CLI
 
@@ -177,13 +177,13 @@ http://gorm.grails.org[GORM] is a data access toolkit originally created as part
 |===
 |Dependency|Description
 
-|`io.micronaut.configuration:hibernate-gorm`
+|`io.micronaut.configuration:micronaut-hibernate-gorm`
 |Configures http://gorm.grails.org/latest/hibernate/manual[GORM for Hibernate] for Groovy applications. See the <<hibernateSupport, Hibernate Support>> docs
 
-|`io.micronaut.configuration:mongo-gorm`
+|`io.micronaut.configuration:micronaut-mongo-gorm`
 |Configures http://gorm.grails.org/latest/mongodb/manual[GORM for MongoDB] for Groovy applications. See the <<mongoSupport, Mongo Support>> docs.
 
-|`io.micronaut.configuration:neo4j-gorm`
+|`io.micronaut.configuration:micronaut-neo4j-gorm`
 |Configures http://gorm.grails.org/latest/neo4j/manual[GORM for Neo4j] for Groovy applications. See the <<neo4jSupport, Neo4j Support>> docs.
 
 |===

@@ -7,7 +7,7 @@ To use the view rendering features described in this section, add the following 
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut:views"
+compile "io.micronaut:micronaut-views"
 ----
 
 Views and templates can then be placed in the `src/main/resource/views` directory of your project.

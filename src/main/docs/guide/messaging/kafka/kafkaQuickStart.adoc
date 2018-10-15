@@ -3,7 +3,7 @@ To add support for Kafka to an existing project, you should first add the Micron
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut.configuration:kafka"
+compile "io.micronaut.configuration:micronaut-kafka"
 ----
 
 Or with Maven:

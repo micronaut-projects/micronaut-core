@@ -3,8 +3,8 @@ Micronaut supports configuration sharing via AWS System Manager Parameter Store.
 .Example `build.gradle` for AWS System Manager Parameter Store
 [source,groovy]
 ----
-compile "io.micronaut:discovery-client"
-compile "io.micronaut.configuration:aws-common"
+compile "io.micronaut:micronaut-discovery-client"
+compile "io.micronaut.configuration:micronaut-aws-common"
 compile group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.308'
 ----
 

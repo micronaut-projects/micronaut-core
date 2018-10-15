@@ -61,7 +61,7 @@ To enable Lettuce, add the `redis-lettuce` dependency to your application:
 ----
 dependencies {
     ...
-    compile "io.micronaut.configuration:redis-lettuce"
+    compile "io.micronaut.configuration:micronaut-redis-lettuce"
     ...
 }
 ----
