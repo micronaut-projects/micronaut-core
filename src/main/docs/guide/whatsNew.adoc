@@ -4,7 +4,7 @@ Apart from https://github.com/micronaut-projects/micronaut-core/milestone/6?clos
 
 The following changes and improvements were added since the last RC:
 
-* All Micronaut modules have been renamed to include `micronaut-` prefix to make it easier to manage dependencies. If you are upgrading rename all references modules. Example `bom` -> `micronaut-bom`, `inject` -> `micronaut-inject` etc.
+* All Micronaut modules have been renamed to include `micronaut-` prefix to make it easier to manage dependencies. If you are upgrading rename all referenced modules. Example `bom` -> `micronaut-bom`, `inject` -> `micronaut-inject` etc.
 
 === Support for GraalVM Native Images
 
