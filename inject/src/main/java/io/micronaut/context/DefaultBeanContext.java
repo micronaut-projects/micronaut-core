@@ -1495,25 +1495,27 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     private void loadContextScopeBean(BeanDefinitionReference contextScopeBean) {
-        BeanDefinition beanDefinition = contextScopeBean.load(this);
-        if (beanDefinition.isEnabled(this)) {
+        if (contextScopeBean.isEnabled(this)) {
+            BeanDefinition beanDefinition = contextScopeBean.load(this);
+            if (beanDefinition.isEnabled(this)) {
 
-            if (beanDefinition.isIterable()) {
-                Collection<BeanDefinition> beanCandidates = findBeanCandidates(beanDefinition.getBeanType(), null);
-                for (BeanDefinition beanCandidate : beanCandidates) {
-                    DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(this, beanDefinition);
+                if (beanDefinition.isIterable()) {
+                    Collection<BeanDefinition> beanCandidates = findBeanCandidates(beanDefinition.getBeanType(), null);
+                    for (BeanDefinition beanCandidate : beanCandidates) {
+                        DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(this, beanDefinition);
 
-                    createAndRegisterSingleton(
-                            resolutionContext,
-                            beanCandidate,
-                            beanCandidate.getBeanType(),
-                            null
-                    );
+                        createAndRegisterSingleton(
+                                resolutionContext,
+                                beanCandidate,
+                                beanCandidate.getBeanType(),
+                                null
+                        );
+                    }
+
+                } else {
+
+                    createAndRegisterSingleton(new DefaultBeanResolutionContext(this, beanDefinition), beanDefinition, beanDefinition.getBeanType(), null);
                 }
-
-            } else {
-
-                createAndRegisterSingleton(new DefaultBeanResolutionContext(this, beanDefinition), beanDefinition, beanDefinition.getBeanType(), null);
             }
         }
     }
