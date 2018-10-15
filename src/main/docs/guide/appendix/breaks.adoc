@@ -2,6 +2,7 @@ This section will document breaking changes that may happen during milestone or 
 
 ==== 1.0.0.RC3
 
+* All Micronaut modules have been renamed to include `micronaut-` prefix to make it easier to manage dependencies. If you are upgrading rename all references modules. Example `bom` -> `micronaut-bom`, `inject` -> `micronaut-inject` etc.
 * Methods for JWT signature generation have been removed from link:{api}/io/micronaut/security/token/jwt/signature/rsa/RSASignatureConfiguration.html[RSASignatureConfiguration] or
 link:{api}/io/micronaut/security/token/jwt/signature/ec/ECSignatureConfiguration.html[ECSignatureConfiguration]. Those beans should be used in microservices where you need only signature verification and not generation.
 

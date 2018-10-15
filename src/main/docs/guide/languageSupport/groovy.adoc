@@ -19,7 +19,7 @@ Additional modules exist specific to Groovy that improve the overall experience.
 
 |===
 
-The most common module you will need is `inject-groovy`, which enables DI and AOP for classes written in Groovy.
+The most common module you will need is `micronaut-inject-groovy`, which enables DI and AOP for classes written in Groovy.
 
 == Groovy Support in the CLI
 

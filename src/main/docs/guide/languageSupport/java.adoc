@@ -54,7 +54,7 @@ Or when using Maven:
   </path>
   <path>
     <groupId>io.micronaut</groupId>
-    <artifactId>inject-java</artifactId>
+    <artifactId>micronaut-inject-java</artifactId>
     <version>${micronaut.version}</version>
   </path>
 </annotationProcessorPaths>
