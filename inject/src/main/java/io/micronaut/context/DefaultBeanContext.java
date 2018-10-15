@@ -1195,9 +1195,13 @@ public class DefaultBeanContext implements BeanContext {
                 List<BeanDefinition> candidates = beanDefinitionsClasses
                         .stream()
                         .filter(reference -> {
-                            Class<?> candidateType = reference.getBeanType();
+                            if (reference.isEnabled(this)) {
+                                Class<?> candidateType = reference.getBeanType();
 
-                            return candidateType != null && candidateType.isInstance(instance);
+                                return candidateType != null && candidateType.isInstance(instance);
+                            } else {
+                                return false;
+                            }
                         })
                         .map(ref -> ref.load(this))
                         .filter(candidate -> candidate.isEnabled(this))
