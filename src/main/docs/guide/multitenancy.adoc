@@ -5,7 +5,7 @@ To use the Micronaut's multitenancy capabilities you must have the `multitenancy
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut:multitenancy"
+compile "io.micronaut:micronaut-multitenancy"
 ----
 
 A common requirement for supporting Multi-tenancy is the ability to resolve the current tenant. Micronaut ships with the following built-in api:multitenancy.tenantresolver.TenantResolver[]s:

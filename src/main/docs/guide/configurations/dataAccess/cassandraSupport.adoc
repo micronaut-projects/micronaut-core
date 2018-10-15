@@ -12,7 +12,7 @@ To enable the Cassandra configuration, add the following dependency to your appl
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut.configuration:cassandra"
+compile "io.micronaut.configuration:micronaut-cassandra"
 ----
 
 Micronaut supports Cassandra configuration by using the https://docs.datastax.com/en/developer/java-driver/[Datastax Java Driver].

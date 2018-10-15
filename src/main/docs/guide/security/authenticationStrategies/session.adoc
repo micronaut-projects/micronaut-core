@@ -15,8 +15,8 @@ To use the Micronaut's session based authentication capabilities you must have t
 .build.gradle
 [source,groovy]
 ----
-annotationProcessor "io.micronaut:security"
-compile "io.micronaut:security-session"
+annotationProcessor "io.micronaut:micronaut-security"
+compile "io.micronaut:micronaut-security-session"
 ----
 
 The following sequence illustrates the authentication flow:

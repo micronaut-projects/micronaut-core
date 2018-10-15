@@ -38,7 +38,7 @@ compileOnly 'org.projectlombok:lombok:1.16.20'
 annotationProcessor "org.projectlombok:lombok:1.16.20"
 ...
 // Micronaut processor define after Lombok
-annotationProcessor "io.micronaut:inject-java"
+annotationProcessor "io.micronaut:micronaut-inject-java"
 ----
 
 Or when using Maven:
@@ -54,7 +54,7 @@ Or when using Maven:
   </path>
   <path>
     <groupId>io.micronaut</groupId>
-    <artifactId>inject-java</artifactId>
+    <artifactId>micronaut-inject-java</artifactId>
     <version>${micronaut.version}</version>
   </path>
 </annotationProcessorPaths>

@@ -14,7 +14,7 @@ Micronaut features integration with Hystrix through the `netflix-hystrix` module
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut.configuration:netflix-hystrix"
+compile "io.micronaut.configuration:micronaut-netflix-hystrix"
 ----
 
 == Using the @HystrixCommand Annotation

@@ -14,7 +14,7 @@ The goals of the Micronaut IoC container are summarized as:
 * Reduce memory footprint
 * Provide clear, understandable error handling
 
-Note that the IoC part of Micronaut can be used completely independently of Micronaut itself for whatever application type you may wish to build. To do so all you need to do is configure your build appropriately to include the `inject-java` dependency as an annotation processor. For example with Gradle:
+Note that the IoC part of Micronaut can be used completely independently of Micronaut itself for whatever application type you may wish to build. To do so all you need to do is configure your build appropriately to include the `micronaut-inject-java` dependency as an annotation processor. For example with Gradle:
 
 .Configuring Gradle
 [source,groovy,subs="attributes"]
@@ -25,8 +25,8 @@ plugins {
 
 ...
 dependencies {
-    annotationProcessor "io.micronaut:inject-java:{version}" // <2>
-    compile "io.micronaut:inject:{version}"
+    annotationProcessor "io.micronaut:micronaut-inject-java:{version}" // <2>
+    compile "io.micronaut:micronaut-inject:{version}"
     ...
 }
 
@@ -35,7 +35,7 @@ dependencies {
 <1> Apply the Annotation Processing plugin
 <2> Include the minimal dependencies required to perform dependency injection
 
-NOTE: For the Groovy language you should include `inject-groovy` in the `compileOnly` scope.
+NOTE: For the Groovy language you should include `micronaut-inject-groovy` in the `compileOnly` scope.
 
 The entry point for IoC is then the api:context.ApplicationContext[] interface, which includes a `run` method. The following example demonstrates using it:
 

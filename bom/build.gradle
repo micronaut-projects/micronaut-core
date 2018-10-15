@@ -45,7 +45,7 @@ publishing {
 
                                 mkp.dependency {
                                     mkp.groupId p.group
-                                    mkp.artifactId p.name
+                                    mkp.artifactId "micronaut-$p.name"
                                     mkp.version p.version
                                 }
                             }

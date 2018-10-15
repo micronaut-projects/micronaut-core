@@ -15,7 +15,7 @@ To configure the Reactive Postgres client you should first add `postgres-reactiv
 [source,groovy]
 .build.gradle
 ----
-compile "io.micronaut.configuration:postgres-reactive"
+compile "io.micronaut.configuration:micronaut-postgres-reactive"
 ----
 
 You should then configure the URI or https://reactiverse.io/reactive-pg-client/apidocs/index.html[`PoolOptions`] of the Postgres server you wish to communicate with in `application.yml`:

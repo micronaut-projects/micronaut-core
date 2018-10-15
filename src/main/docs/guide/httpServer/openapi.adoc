@@ -10,7 +10,7 @@ To enable this support you should add the following dependencies to your build c
 .Adding the Swagger Dependencies
 [source,groovy]
 ----
-annotationProcessor "io.micronaut.configuration:openapi" // <1>
+annotationProcessor "io.micronaut.configuration:micronaut-openapi" // <1>
 compile "io.swagger.core.v3:swagger-annotations" // <2>
 ----
 

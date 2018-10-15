@@ -13,7 +13,7 @@ To use the HTTP client you must have the `http-client` dependency on your classp
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut:http-client"
+compile "io.micronaut:micronaut-http-client"
 ----
 
 Since the higher level API is built on the low-level HTTP client, we will first introduce the low-level client.
