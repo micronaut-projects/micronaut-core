@@ -32,6 +32,8 @@ import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.io.service.ServiceDefinition;
+import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.io.service.StreamSoftServiceLoader;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
@@ -65,6 +67,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -981,7 +984,14 @@ public class DefaultBeanContext implements BeanContext {
      * @return The bean definition classes
      */
     protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-        return StreamSoftServiceLoader.loadPresentParallel(BeanDefinitionReference.class, classLoader).collect(Collectors.toList());
+        final SoftServiceLoader<BeanDefinitionReference> definitions = SoftServiceLoader.load(BeanDefinitionReference.class, classLoader);
+        List<BeanDefinitionReference> list = new ArrayList<>(300);
+        for (ServiceDefinition<BeanDefinitionReference> definition : definitions) {
+            if (definition.isPresent()) {
+                list.add(definition.load());
+            }
+        }
+        return list;
     }
 
     /**
@@ -1098,6 +1108,10 @@ public class DefaultBeanContext implements BeanContext {
             }
         }
 
+        // proactively remove bean definitions that are not enabled
+        new Thread(() ->
+                beanDefinitionsClasses.removeIf((BeanDefinitionReference beanDefinitionReference) ->
+                        !beanDefinitionReference.isEnabled(this))).start();
 
     }
 
@@ -1123,7 +1137,7 @@ public class DefaultBeanContext implements BeanContext {
                     .stream()
                     .filter(reference -> {
                         Class<?> candidateType = reference.getBeanType();
-                        return candidateType != null && (beanType.isAssignableFrom(candidateType) || beanType == candidateType);
+                        return reference.isEnabled(this) && candidateType != null && (beanType.isAssignableFrom(candidateType) || beanType == candidateType);
                     })
                     .map(ref -> {
                         BeanDefinition<T> loadedBean;
@@ -1927,9 +1941,7 @@ public class DefaultBeanContext implements BeanContext {
     private void readAllBeanDefinitionClasses() {
         List<BeanDefinitionReference> contextScopeBeans = new ArrayList<>();
         List<BeanDefinitionReference> processedBeans = new ArrayList<>();
-        List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences()
-                .stream()
-                .filter(beanDefinitionReference -> beanDefinitionReference.isEnabled(DefaultBeanContext.this)).collect(Collectors.toList());
+        List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences();
         List<BeanDefinitionReference> allReferences = new ArrayList<>(beanDefinitionReferences.size());
 
         final boolean reportingEnabled = ClassLoadingReporter.isReportingEnabled();

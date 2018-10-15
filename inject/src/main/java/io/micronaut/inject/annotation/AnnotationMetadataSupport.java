@@ -79,6 +79,7 @@ class AnnotationMetadataSupport {
             return aClass.flatMap((Function<Class, Optional<Class<? extends Annotation>>>) aClass1 -> {
                 if (Annotation.class.isAssignableFrom(aClass1)) {
                     //noinspection unchecked
+                    ANNOTATION_TYPES.put(name, aClass1);
                     return Optional.of(aClass1);
                 }
                 return Optional.empty();
