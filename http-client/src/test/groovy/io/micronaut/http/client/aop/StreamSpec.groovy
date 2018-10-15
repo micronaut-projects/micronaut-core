@@ -129,7 +129,15 @@ class StreamSpec extends Specification {
         expect:
         myClient.someJson(n) == '{"key":"value"}'
         where:
-        n << [1,2,3]
+        n << [1,2]
+    }
+
+    @Unroll
+    void "JSON can still be streamed using Flowable as container"() {
+        given:
+        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+        expect:
+        myClient.someJsonCollection() == '[{"x":1},{"x":2}]'
     }
 
     @Client('/stream')
@@ -154,6 +162,9 @@ class StreamSpec extends Specification {
 
         @Get(value = "/someJson{n}", consumes = MediaType.APPLICATION_JSON)
         String someJson(int n);
+
+        @Get(value = "/someJsonCollection", consumes = MediaType.APPLICATION_JSON)
+        String someJsonCollection();
     }
 
     static class Elephant {
@@ -185,13 +196,13 @@ class StreamSpec extends Specification {
         }
 
         @Get(value = "/someJson2", produces = MediaType.APPLICATION_JSON)
-        Flowable<String> someJson2() {
-            return Flowable.just('{"key":"value"}')
+        HttpResponse<Flowable<byte[]>> someJson2() {
+            return HttpResponse.ok(Flowable.just('{"key":"value"}'.getBytes(StandardCharsets.UTF_8)))
         }
 
-        @Get(value = "/someJson3", produces = MediaType.APPLICATION_JSON)
-        HttpResponse<Flowable<String>> someJson3() {
-            return HttpResponse.ok(Flowable.just('{"key":"value"}'))
+        @Get(value = "/someJsonCollection", produces = MediaType.APPLICATION_JSON)
+        HttpResponse<Flowable<String>> someJsonCollection() {
+            return HttpResponse.ok(Flowable.just('{"x":1}','{"x":2}'))
         }
 
     }
