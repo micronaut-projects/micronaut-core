@@ -33,6 +33,7 @@ import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import javax.annotation.Nullable
 import java.nio.charset.StandardCharsets
@@ -121,6 +122,16 @@ class StreamSpec extends Specification {
                 'ByteBuffer to class io.micronaut.http.client.aop.StreamSpec$Elephant is registered'
     }
 
+    @Unroll
+    void "JSON is still just text (variation #n)"() {
+        given:
+        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+        expect:
+        myClient.someJson(n) == '{"key":"value"}'
+        where:
+        n << [1,2,3]
+    }
+
     @Client('/stream')
     static interface StreamEchoClient {
         @Get(value = "/echo{?n,data}", consumes = MediaType.TEXT_PLAIN)
@@ -140,6 +151,9 @@ class StreamSpec extends Specification {
 
         @Get(value = "/echoWithHeadersSingle{?data}", consumes = MediaType.TEXT_PLAIN)
         HttpResponse<String> echoWithHeadersSingle(@QueryValue @Nullable String data);
+
+        @Get(value = "/someJson{n}", consumes = MediaType.APPLICATION_JSON)
+        String someJson(int n);
     }
 
     static class Elephant {
@@ -164,6 +178,22 @@ class StreamSpec extends Specification {
         HttpResponse<Single<byte[]>> echoWithHeadersSingle(@QueryValue @Nullable String data) {
             return HttpResponse.ok(Single.just(data.getBytes(StandardCharsets.UTF_8))).header("X-MyHeader", "42")
         }
+
+        @Get(value = "/someJson1", produces = MediaType.APPLICATION_JSON)
+        Flowable<byte[]> someJson1() {
+            return Flowable.just('{"key":"value"}'.getBytes(StandardCharsets.UTF_8))
+        }
+
+        @Get(value = "/someJson2", produces = MediaType.APPLICATION_JSON)
+        Flowable<String> someJson2() {
+            return Flowable.just('{"key":"value"}')
+        }
+
+        @Get(value = "/someJson3", produces = MediaType.APPLICATION_JSON)
+        HttpResponse<Flowable<String>> someJson3() {
+            return HttpResponse.ok(Flowable.just('{"key":"value"}'))
+        }
+
     }
 
 }
