@@ -76,6 +76,7 @@ abstract class AbstractProfile implements Profile {
     protected String description = ""
     protected String instructions = ""
     protected String version = VersionInfo.getVersion(CliSettings)
+    protected Boolean abstractProfile = false
 
     AbstractProfile(Resource profileDir) {
         this(profileDir, AbstractProfile.getClassLoader())
@@ -117,6 +118,7 @@ abstract class AbstractProfile implements Profile {
         name = profileConfig.get("name")?.toString()
         description = profileConfig.get("description")?.toString() ?: ''
         instructions = profileConfig.get("instructions")?.toString() ?: ''
+        abstractProfile = Boolean.valueOf(profileConfig.get("abstract")?.toString() ?: '')
 
         def parents = profileConfig.get("extends")
         if (parents) {
@@ -227,6 +229,10 @@ abstract class AbstractProfile implements Profile {
         this.skeletonExcludes = (List<String>) navigableConfig.get("skeleton.excludes", [])
         this.binaryExtensions = (List<String>) navigableConfig.get("skeleton.binaryExtensions", [])
         this.executablePatterns = (List<String>) navigableConfig.get("skeleton.executable", [])
+    }
+
+    boolean isAbstract() {
+        abstractProfile
     }
 
     String getDescription() {

@@ -17,6 +17,7 @@
 package io.micronaut.security.token.jwt.bearer;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.security.token.jwt.cookie.JwtCookieTokenReader;
 import io.micronaut.security.token.reader.HttpHeaderTokenReader;
 import io.micronaut.security.token.reader.TokenReader;
@@ -29,7 +30,7 @@ import javax.inject.Singleton;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(property = BearerTokenConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
+@Requires(property = BearerTokenConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 @Singleton
 public class BearerTokenReader extends HttpHeaderTokenReader implements TokenReader {
 

@@ -55,7 +55,9 @@ class ListProfilesCommand implements Command, ProfileRepositoryAware {
         if (!allProfiles.empty) {
             int width = Math.min(20, allProfiles.collect { it.name }.sort { it.length() }.last().length())
             for (Profile p in allProfiles) {
-                console.log("  ${p.name.padRight(width)}  ${p.description}")
+                if (!p.isAbstract()) {
+                    console.log("  ${p.name.padRight(width)}  ${p.description}")
+                }
             }
         }
         return true

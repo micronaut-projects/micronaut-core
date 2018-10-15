@@ -198,4 +198,9 @@ public interface Profile {
      * @return A list of paths to exclude from the skeleton. Used in ant fileset exclude:
      */
     List<String> getSkeletonExcludes();
+
+    /**
+     * @return True if the profile is not designed for direct use
+     */
+    boolean isAbstract();
 }

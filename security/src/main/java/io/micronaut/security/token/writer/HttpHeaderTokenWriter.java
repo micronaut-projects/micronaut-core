@@ -17,6 +17,7 @@
 package io.micronaut.security.token.writer;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MutableHttpRequest;
 
 import javax.inject.Singleton;
@@ -28,7 +29,7 @@ import javax.inject.Singleton;
  * @since 1.0
  */
 @Singleton
-@Requires(property = HttpHeaderTokenWriterConfigurationProperties.PREFIX + ".enabled")
+@Requires(property = HttpHeaderTokenWriterConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 @Requires(beans = {HttpHeaderTokenWriterConfiguration.class})
 public class HttpHeaderTokenWriter implements TokenWriter {
     protected final HttpHeaderTokenWriterConfiguration httpHeaderTokenWriterConfiguration;

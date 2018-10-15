@@ -10,7 +10,7 @@ To enable tracing you should add the `tracing` module to your `build.gradle` or 
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut:tracing"
+compile "io.micronaut:micronaut-tracing"
 ----
 
 == Tracing Annotations

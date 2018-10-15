@@ -91,7 +91,7 @@ publishing {
 
     publications {
         maven(MavenPublication) { publication ->
-            artifactId( project.name.substring(project.name.indexOf('/') + 1) )
+            artifactId( "micronaut-" + project.name.substring(project.name.indexOf('/') + 1) )
             def shadowJar = tasks.findByName("shadowJar")
             if(shadowJar) {
                 artifact(project.tasks.shadowJar) {
@@ -105,7 +105,11 @@ publishing {
                         if (! (it instanceof SelfResolvingDependency)) {
                             def dependencyNode = dependenciesNode.appendNode('dependency')
                             dependencyNode.appendNode('groupId', it.group)
-                            dependencyNode.appendNode('artifactId', it.name)
+                            if (it.group.startsWith('io.micronaut')) {
+                                dependencyNode.appendNode('artifactId', "micronaut-$it.name")
+                            } else {
+                                dependencyNode.appendNode('artifactId', it.name)
+                            }
                             dependencyNode.appendNode('version', it.version)
                             dependencyNode.appendNode('scope', 'runtime')
                         }
@@ -121,7 +125,7 @@ publishing {
                         else if(it instanceof ProjectDependency) {
                             def dependencyNode = dependenciesNode.appendNode('dependency')
                             dependencyNode.appendNode('groupId', project.group)
-                            dependencyNode.appendNode('artifactId', it.name)
+                            dependencyNode.appendNode('artifactId', "micronaut-$it.name")
                             dependencyNode.appendNode('version', project.version)
                             dependencyNode.appendNode('scope', 'compile')
 
@@ -138,7 +142,7 @@ publishing {
                         else if(it instanceof ProjectDependency) {
                             def dependencyNode = dependenciesNode.appendNode('dependency')
                             dependencyNode.appendNode('groupId', project.group)
-                            dependencyNode.appendNode('artifactId', it.name)
+                            dependencyNode.appendNode('artifactId', "micronaut-$it.name")
                             dependencyNode.appendNode('version', project.version)
                             dependencyNode.appendNode('scope', 'runtime')
 

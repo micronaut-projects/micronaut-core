@@ -15,7 +15,7 @@ To add support for Picocli to an existing project, you should first add the pico
 [source,groovy]
 ----
 compile "info.picocli:picocli"
-compile "io.micronaut.configuration:picocli"
+compile "io.micronaut.configuration:micronaut-picocli"
 ----
 
 Or with Maven:
@@ -46,10 +46,10 @@ When creating this example project with the Micronaut CLI, use the `create-cli-a
 ----
 $ mn create-cli-app example.git-star --features http-client
 ----
-This will add the `io.micronaut:http-client` dependency to the build. You can also manually add this to your `gradle.build`:
+This will add the `io.micronaut:micronaut-http-client` dependency to the build. You can also manually add this to your `gradle.build`:
 
 ----
-compile "io.micronaut:http-client"
+compile "io.micronaut:micronaut-http-client"
 ----
 
 ==== An Example HTTP Client

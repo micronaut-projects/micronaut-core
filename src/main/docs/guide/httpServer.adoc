@@ -13,7 +13,7 @@ The goal of the HTTP server is to make it as easy as possible to expose APIs tha
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut:http-server-netty"
+compile "io.micronaut:micronaut-http-server-netty"
 ----
 
 A "Hello World" server application written in Java can be seen below:

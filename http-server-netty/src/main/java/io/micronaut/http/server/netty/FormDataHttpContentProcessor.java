@@ -69,8 +69,8 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
         Subscriber<? super HttpData> subscriber = getSubscriber();
 
         if (message instanceof HttpContent) {
+            HttpContent httpContent = (HttpContent) message;
             try {
-                HttpContent httpContent = (HttpContent) message;
                 HttpPostRequestDecoder postRequestDecoder = this.decoder;
                 postRequestDecoder.offer(httpContent);
                 while (postRequestDecoder.hasNext()) {
@@ -93,8 +93,8 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
                     } finally {
                         data.release();
                     }
-
                 }
+
                 InterfaceHttpData currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
                 if (currentPartialHttpData instanceof HttpData) {
                     subscriber.onNext((HttpData) currentPartialHttpData);
@@ -103,6 +103,8 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
                 // ok, ignore
             } catch (Throwable e) {
                 onError(e);
+            } finally {
+                httpContent.release();
             }
         } else {
             message.release();

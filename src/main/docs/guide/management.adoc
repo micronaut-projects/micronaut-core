@@ -14,5 +14,5 @@ To use the `management` features described in this section, add the dependency o
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut:management"
+compile "io.micronaut:micronaut-management"
 ----

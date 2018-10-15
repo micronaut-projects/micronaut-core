@@ -17,6 +17,7 @@
 package io.micronaut.security.endpoints;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.security.config.SecurityConfigurationProperties;
 
@@ -25,6 +26,7 @@ import io.micronaut.security.config.SecurityConfigurationProperties;
  * @author Sergio del Amo
  * @since 1.0
  */
+@Requires(property = LoginControllerConfigurationProperties.PREFIX + ".enabled", value = StringUtils.TRUE)
 @ConfigurationProperties(LoginControllerConfigurationProperties.PREFIX)
 public class LoginControllerConfigurationProperties implements LoginControllerConfiguration {
     public static final String PREFIX = SecurityConfigurationProperties.PREFIX + ".endpoints.login";

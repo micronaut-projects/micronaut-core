@@ -2,7 +2,7 @@ Micronaut currently has basic support for JMX. At this time, the support is *exp
 
 [source,groovy]
 ----
-compile "io.micronaut.configuration:jmx"
+compile "io.micronaut.configuration:micronaut-jmx"
 ----
 
 The configuration will create a bean for the management bean server based on configuration.

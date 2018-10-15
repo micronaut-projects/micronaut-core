@@ -18,9 +18,9 @@ To get started, simply add a dependency to one of the JDBC configurations that c
 ----
 dependencies {
     // Choose one of the following
-    compile "io.micronaut.configuration:jdbc-tomcat"
-    compile "io.micronaut.configuration:jdbc-hikari"
-    compile "io.micronaut.configuration:jdbc-dbcp"
+    compile "io.micronaut.configuration:micronaut-jdbc-tomcat"
+    compile "io.micronaut.configuration:micronaut-jdbc-hikari"
+    compile "io.micronaut.configuration:micronaut-jdbc-dbcp"
 }
 ----
 
@@ -117,7 +117,7 @@ If you wish to use Spring-based transaction management you can add the following
 [source,groovy]
 ----
 dependencies {
-    compile "io.micronaut:spring"
+    compile "io.micronaut:micronaut-spring"
     runtime "org.springframework:spring-jdbc"
 }
 ----

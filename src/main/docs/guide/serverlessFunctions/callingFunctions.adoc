@@ -3,7 +3,7 @@ Micronaut provides support for invoking functions (either locally or deployed to
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut:function-client"
+compile "io.micronaut:micronaut-function-client"
 ----
 
 [TIP]

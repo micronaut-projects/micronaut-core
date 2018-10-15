@@ -14,7 +14,7 @@ To get started with RabbitMQ in Micronaut, add the following dependency:
 .build.gradle
 [source,groovy]
 ----
-compile "io.micronaut.configuration:rabbitmq"
+compile "io.micronaut.configuration:micronaut-rabbitmq"
 ----
 
 .pom.xml
