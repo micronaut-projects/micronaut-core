@@ -5,7 +5,32 @@ Apart from https://github.com/micronaut-projects/micronaut-core/milestone/6?clos
 The following changes and improvements were added since the last RC:
 
 * Swagger support has been improved to better handle generic types.
-* All Micronaut modules have been renamed to include `micronaut-` prefix to make it easier to manage dependencies. If you are upgrading rename all referenced modules. Example `bom` -> `micronaut-bom`, `inject` -> `micronaut-inject` etc.
+* All Micronaut modules have been renamed to include `micronaut-` prefix to make it easier to find and manage dependencies. If you are upgrading rename all referenced modules. Example `bom` -> `micronaut-bom`, `inject` -> `micronaut-inject` etc.
+
+The following example illustrates the typical changes required to a build:
+
+.Updating Micronaut Gradle Build for 1.0.0 RC3
+[source,gradle]
+----
+
+dependencyManagement {
+    imports {
+        mavenBom 'io.micronaut:micronaut-bom:1.0.0.RC3' // <1>
+    }
+}
+
+dependencies {
+    annotationProcessor "io.micronaut:micronaut-inject-java" // <2>
+    compile "io.micronaut:micronaut-inject" // <3>
+    // repeat rename for remaining "io.micronaut" dependencies
+    ...
+}
+----
+
+<1> Renamed `bom` -> `micronaut-bom`
+<2> Renamed `inject-java` -> `micronaut-inject-java`
+<3> Renamed `inject` -> `micronaut-inject`
+
 
 === Support for GraalVM Native Images
 
