@@ -27,12 +27,15 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
+import io.netty.buffer.ByteBuf
+import io.netty.buffer.Unpooled
 import io.reactivex.Flowable
 import io.reactivex.Single
 import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+import spock.lang.Unroll
 
 import javax.annotation.Nullable
 import java.nio.charset.StandardCharsets
@@ -121,6 +124,24 @@ class StreamSpec extends Specification {
                 'ByteBuffer to class io.micronaut.http.client.aop.StreamSpec$Elephant is registered'
     }
 
+    @Unroll
+    void "JSON is still just text (variation #n)"() {
+        given:
+        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+        expect:
+        myClient.someJson(n) == '{"key":"value"}'
+        where:
+        n << [1, 2, 3]
+    }
+
+    @Unroll
+    void "JSON can still be streamed using Flowable as container"() {
+        given:
+        StreamEchoClient myClient = context.getBean(StreamEchoClient)
+        expect:
+        myClient.someJsonCollection() == '[{"x":1},{"x":2}]'
+    }
+
     @Client('/stream')
     static interface StreamEchoClient {
         @Get(value = "/echo{?n,data}", consumes = MediaType.TEXT_PLAIN)
@@ -140,6 +161,12 @@ class StreamSpec extends Specification {
 
         @Get(value = "/echoWithHeadersSingle{?data}", consumes = MediaType.TEXT_PLAIN)
         HttpResponse<String> echoWithHeadersSingle(@QueryValue @Nullable String data);
+
+        @Get(value = "/someJson{n}", consumes = MediaType.APPLICATION_JSON)
+        String someJson(int n);
+
+        @Get(value = "/someJsonCollection", consumes = MediaType.APPLICATION_JSON)
+        String someJsonCollection();
     }
 
     static class Elephant {
@@ -164,6 +191,31 @@ class StreamSpec extends Specification {
         HttpResponse<Single<byte[]>> echoWithHeadersSingle(@QueryValue @Nullable String data) {
             return HttpResponse.ok(Single.just(data.getBytes(StandardCharsets.UTF_8))).header("X-MyHeader", "42")
         }
+
+        @Get(value = "/someJson1", produces = MediaType.APPLICATION_JSON)
+        Flowable<byte[]> someJson1() {
+            return Flowable.just('{"key":"value"}'.getBytes(StandardCharsets.UTF_8))
+        }
+
+        @Get(value = "/someJson2", produces = MediaType.APPLICATION_JSON)
+        HttpResponse<Flowable<byte[]>> someJson2() {
+            return HttpResponse.ok(Flowable.just('{"key":"value"}'.getBytes(StandardCharsets.UTF_8)))
+        }
+
+        @Get(value = "/someJson3", produces = MediaType.APPLICATION_JSON)
+        Flowable<ByteBuf> someJson3() {
+            return Flowable.just(byteBuf('{"key":'), byteBuf('"value"}'))
+        }
+
+        @Get(value = "/someJsonCollection", produces = MediaType.APPLICATION_JSON)
+        HttpResponse<Flowable<String>> someJsonCollection() {
+            return HttpResponse.ok(Flowable.just('{"x":1}','{"x":2}'))
+        }
+
+        private static ByteBuf byteBuf(String s) {
+            Unpooled.wrappedBuffer(s.getBytes(StandardCharsets.UTF_8))
+        }
+
     }
 
 }

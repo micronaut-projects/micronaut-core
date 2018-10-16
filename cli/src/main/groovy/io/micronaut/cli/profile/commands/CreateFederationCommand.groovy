@@ -41,7 +41,7 @@ import java.nio.file.Paths
  */
 @CompileStatic
 @Command(name = 'create-federation', description = 'Creates a federation of services')
-class CreateFederationCommand extends AbstractCreateCommand {
+class CreateFederationCommand extends AbstractCreateAppCommand {
     public static final String NAME = 'create-federation'
 
     @Parameters(arity = '0..1', paramLabel = 'NAME', description = 'The name of the federation to create.')
@@ -60,7 +60,6 @@ class CreateFederationCommand extends AbstractCreateCommand {
 
     @Override
     boolean handle(ExecutionContext executionContext) {
-        final Set<String> featureSet = new HashSet<>(this.features)
         final String micronautVersion = VersionInfo.getVersion(MicronautCli)
         final File serviceDir = inplace ? new File('.').canonicalFile : new File(executionContext.baseDir, federationName)
         final String profileName = evaluateProfileName()
@@ -70,7 +69,7 @@ class CreateFederationCommand extends AbstractCreateCommand {
                 baseDir: executionContext.baseDir,
                 profileName: 'federation',
                 micronautVersion: micronautVersion,
-                features: featureSet,
+                features: [] as Set,
                 inplace: this.inplace,
                 build: this.build.toString(),
                 console: executionContext.console
@@ -82,10 +81,11 @@ class CreateFederationCommand extends AbstractCreateCommand {
                         baseDir: serviceDir,
                         profileName: profileName,
                         micronautVersion: micronautVersion,
-                        features: featureSet,
+                        features: new HashSet<>(this.features),
                         inplace: false,
                         build: this.build.toString(),
                         console: executionContext.console,
+                        lang: resolveLang(),
                         skeletonExclude: ["gradle*", "gradle/", ".mvn/", "mvnw*"]
                 )
                 super.handle(cmd)
@@ -95,6 +95,9 @@ class CreateFederationCommand extends AbstractCreateCommand {
 
     @Override
     String getName() { NAME }
+
+    @Override
+    protected String getNameOfAppToCreate() { federationName }
 
     @Override
     protected void messageOnComplete(MicronautConsole console, CreateServiceCommandObject command, File targetDir) {
