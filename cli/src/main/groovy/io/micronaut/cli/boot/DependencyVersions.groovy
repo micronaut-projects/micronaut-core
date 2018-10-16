@@ -47,7 +47,7 @@ class DependencyVersions implements DependencyManagement {
     }
 
     DependencyVersions(GrapeEngine grape) {
-        this(grape, [group: "io.micronaut", module: "bom", version: VersionInfo.getVersion(DependencyVersions), type: "pom"])
+        this(grape, [group: "io.micronaut", module: "micronaut-bom", version: VersionInfo.getVersion(DependencyVersions), type: "pom"])
     }
 
     DependencyVersions(GrapeEngine grape, Map<String, String> bomCoords) {
