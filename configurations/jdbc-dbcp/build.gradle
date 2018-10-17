@@ -5,7 +5,7 @@ dependencies {
 
     compile 'org.apache.commons:commons-dbcp2:2.1.1'
 
-    testCompile "com.h2database:h2:1.4.196"
+    testCompile dependencyVersion("h2")
 
     testCompile project(":spring")
     testCompile project(":inject-java")

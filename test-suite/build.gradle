@@ -24,8 +24,8 @@ dependencies {
     testCompile "org.testcontainers:postgresql:1.8.0"
     // end::testcontainers-dependencies[]
 
-    testRuntime 'org.apache.tomcat:tomcat-jdbc:8.0.44'
-    testRuntime 'com.h2database:h2:1.4.196'
+    testRuntime dependencyVersion("tomcatJdbc")
+    testRuntime dependencyVersion("h2")
     testRuntime "ch.qos.logback:logback-classic:1.2.3"
 }
 
