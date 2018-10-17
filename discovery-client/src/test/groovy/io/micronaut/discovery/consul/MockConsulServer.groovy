@@ -61,6 +61,13 @@ class MockConsulServer implements ConsulOperations {
         nodeEntry = new CatalogEntry(UUID.randomUUID().toString(), InetAddress.localHost)
     }
 
+    void reset() {
+        services.clear()
+        checks.clear()
+        passingReports.clear()
+        lastNewEntry = null
+    }
+
     @Override
     Publisher<Boolean> putValue(String key, @Body String value) {
         // make sure it isn't a folder
@@ -111,7 +118,7 @@ class MockConsulServer implements ConsulOperations {
     Publisher<HttpStatus> pass(String checkId, @Nullable String note) {
         passingReports.add(checkId)
         String service = nameFromCheck(checkId)
-        checks.get(service)?.setStatus(Check.Status.PASSING.name().toLowerCase())
+        checks.get(service).setStatus(Check.Status.PASSING.name().toLowerCase())
 
         return Publishers.just(HttpStatus.OK)
     }
