@@ -56,7 +56,7 @@ Alternatively you can alter the cache's expiration policy:
 micronaut:
     caches:
         discovery-client:
-            expireAfterAccess: 60s
+            expire-after-access: 60s
 ----
 
 See the api:discovery.client.DiscoveryClientCacheConfiguration[] class for available configuration options.

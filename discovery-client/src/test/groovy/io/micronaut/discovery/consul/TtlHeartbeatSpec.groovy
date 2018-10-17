@@ -63,4 +63,50 @@ class TtlHeartbeatSpec extends Specification implements MockConsulSpec {
         application?.stop()
         consulServer?.stop()
     }
+
+    void "test that if the consul server goes down and comes back up the application re-registers"() {
+        given:
+        EmbeddedServer consulServer = ApplicationContext.run(EmbeddedServer,
+                [(MockConsulServer.ENABLED):true]
+        )
+        waitFor(consulServer)
+
+        when:"An application is started that sends a heart beat to consul"
+        String serviceId = 'myService'
+        EmbeddedServer application = ApplicationContext.run(
+                EmbeddedServer,
+                ['consul.client.host': consulServer.getHost(),
+                 'consul.client.port': consulServer.getPort(),
+                 'micronaut.application.name': serviceId,
+                 'micronaut.caches.discovery-client.enabled': false,
+                 'micronaut.heartbeat.interval':'3s'] // short heart beat interval
+        )
+        waitForService(consulServer, 'myService')
+
+        DiscoveryClient discoveryClient = application.applicationContext.getBean(DiscoveryClient)
+        PollingConditions conditions = new PollingConditions(timeout: 30, delay: 0.5 )
+
+        then:"The heart beat is received"
+        conditions.eventually {
+            Flowable.fromPublisher(discoveryClient.getInstances(serviceId)).blockingFirst().size() == 1
+            MockConsulServer.passingReports.find { it.contains(NameUtils.hyphenate(serviceId))} != null
+        }
+
+        when:"the mock consul server is reset (simulating the server going down and coming back)"
+        consulServer.applicationContext.getBean(MockConsulServer).reset()
+
+        then:"There are no services"
+        Flowable.fromPublisher(discoveryClient.getInstances(serviceId)).blockingFirst().size() == 0
+
+        and:"eventually the service comes back"
+        conditions.eventually {
+            Flowable.fromPublisher(discoveryClient.getInstances(serviceId)).blockingFirst().size() == 1
+            MockConsulServer.passingReports.find { it.contains(NameUtils.hyphenate(serviceId))} != null
+        }
+
+
+        cleanup:
+        application?.stop()
+        consulServer?.stop()
+    }
 }

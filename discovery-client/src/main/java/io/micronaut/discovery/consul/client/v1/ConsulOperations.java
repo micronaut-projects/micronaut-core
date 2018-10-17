@@ -85,6 +85,10 @@ public interface ConsulOperations {
      * @return An {@link io.micronaut.http.HttpStatus} of {@link io.micronaut.http.HttpStatus#OK} if all is well
      */
     @Put("/agent/check/pass/{checkId}{?note}")
+    @Retryable(
+            attempts = AbstractConsulClient.CONSUL_REGISTRATION_RETRY_COUNT,
+            delay = AbstractConsulClient.CONSUL_REGISTRATION_RETRY_DELAY
+    )
     Publisher<HttpStatus> pass(String checkId, @Nullable String note);
 
     /**
@@ -105,6 +109,10 @@ public interface ConsulOperations {
      * @return An {@link io.micronaut.http.HttpStatus} of {@link io.micronaut.http.HttpStatus#OK} if all is well
      */
     @Put("/agent/check/fail/{checkId}{?note}")
+    @Retryable(
+            attempts = AbstractConsulClient.CONSUL_REGISTRATION_RETRY_COUNT,
+            delay = AbstractConsulClient.CONSUL_REGISTRATION_RETRY_DELAY
+    )
     Publisher<HttpStatus> fail(String checkId, @Nullable String note);
 
     /**
