@@ -34,7 +34,6 @@ import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
-import io.micronaut.core.io.service.StreamSoftServiceLoader;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
@@ -67,7 +66,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -1108,10 +1106,16 @@ public class DefaultBeanContext implements BeanContext {
             }
         }
 
-        // proactively remove bean definitions that are not enabled
-        new Thread(() ->
+        final Runnable runnable = () ->
                 beanDefinitionsClasses.removeIf((BeanDefinitionReference beanDefinitionReference) ->
-                        !beanDefinitionReference.isEnabled(this))).start();
+                        !beanDefinitionReference.isEnabled(this));
+        if (ClassLoadingReporter.isReportingEnabled()) {
+            // do this in a blocking manner so that reporting is immediately aware of missing classes
+            runnable.run();
+        } else {
+            // proactively remove bean definitions that are not enabled
+            new Thread(runnable).start();
+        }
 
     }
 
@@ -1956,9 +1960,6 @@ public class DefaultBeanContext implements BeanContext {
         final boolean reportingEnabled = ClassLoadingReporter.isReportingEnabled();
         for (BeanDefinitionReference beanDefinitionReference : beanDefinitionReferences) {
             allReferences.add(beanDefinitionReference);
-            if (reportingEnabled) {
-                ClassLoadingReporter.reportPresent(beanDefinitionReference.getBeanType());
-            }
             if (beanDefinitionReference.isContextScope()) {
                 contextScopeBeans.add(beanDefinitionReference);
             }
@@ -1980,6 +1981,10 @@ public class DefaultBeanContext implements BeanContext {
                 }
                 contextScopeBeans.remove(beanDefinitionReference);
                 processedBeans.remove(beanDefinitionReference);
+                if (reportingEnabled) {
+                    ClassLoadingReporter.reportMissing(beanDefinitionReference.getBeanDefinitionName());
+                    ClassLoadingReporter.reportMissing(beanDefinitionReference.getName());
+                }
                 return true;
             }
 
