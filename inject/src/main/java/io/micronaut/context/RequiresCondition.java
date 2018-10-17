@@ -411,7 +411,10 @@ public class RequiresCondition implements Condition {
     private void reportMissingClass(ConditionContext context) {
         AnnotationMetadataProvider component = context.getComponent();
         if (component instanceof BeanDefinitionReference) {
-            ClassLoadingReporter.reportMissing(component.getClass().getName());
+            BeanDefinitionReference ref = (BeanDefinitionReference) component;
+            ClassLoadingReporter.reportMissing(ref.getClass().getName());
+            ClassLoadingReporter.reportMissing(ref.getBeanDefinitionName());
+            ClassLoadingReporter.reportMissing(ref.getName());
         }
     }
 
