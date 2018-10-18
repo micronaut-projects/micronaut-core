@@ -33,6 +33,7 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.reflect.Array;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Default implementation of {@link AnnotationMetadata}.
@@ -80,12 +81,12 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     Map<String, Map<CharSequence, Object>> declaredStereotypes;
     Map<String, Map<CharSequence, Object>> allStereotypes;
     Map<String, List<String>> annotationsByStereotype;
+    private Map<Class, List> annotationValuesByType = new ConcurrentHashMap<>(2);
 
     // should not be used in any of the read methods
     // The following fields are used only at compile time, and
-    Map<String, Map<CharSequence, Object>> annotationDefaultValues;
+    private Map<String, Map<CharSequence, Object>> annotationDefaultValues;
     private Map<String, String> repeated = null;
-    private Map<Class, List> annotationValuesByType = new HashMap<>();
 
     /**
      * Constructs empty annotation metadata.
@@ -183,13 +184,17 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(Class<T> annotationType) {
         if (annotationType != null) {
-            return this.annotationValuesByType.computeIfAbsent(annotationType, aClass -> {
-                List<AnnotationValue<T>> results = resolveAnnotationValuesByType(annotationType, allAnnotations, allStereotypes);
+            List<AnnotationValue<T>> results = annotationValuesByType.get(annotationType);
+            if (results == null) {
+
+                results = resolveAnnotationValuesByType(annotationType, allAnnotations, allStereotypes);
                 if (results != null) {
                     return results;
                 }
-                return Collections.emptyList();
-            });
+                results = Collections.emptyList();
+                annotationValuesByType.put(annotationType, results);
+            }
+            return results;
         }
         return Collections.emptyList();
     }
