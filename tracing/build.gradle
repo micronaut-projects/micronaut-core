@@ -12,7 +12,7 @@ dependencies {
     compileOnly dependencyVersion("brave.instrumentation")
     compileOnly dependencyVersion("zipkin.reporter")
     compileOnly 'io.zipkin.reporter:zipkin-reporter:1.1.2'
-    compileOnly 'io.opentracing.brave:brave-opentracing:0.33.3'
+    compileOnly dependencyVersion("brave.opentracing")
 
     compileOnly dependencyVersion("jaeger")
     compileOnly dependencyVersion("reactor")
@@ -27,6 +27,6 @@ dependencies {
     testCompile dependencyVersion("reactor")
     testCompile dependencyVersion("zipkin.reporter")
     testCompile dependencyVersion("brave.instrumentation")
-    testCompile 'io.opentracing.brave:brave-opentracing:0.33.3'
+    testCompile dependencyVersion("brave.opentracing")
 
 }
