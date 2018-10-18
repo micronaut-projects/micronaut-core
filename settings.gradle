@@ -73,5 +73,6 @@ include "configurations:picocli"
 include "configurations:openapi"
 include "configurations:security-ldap"
 include "configurations:multitenancy-gorm"
+include 'configurations:elasticsearch6'
 
 include "build-projects:asciidoc-config-props"
