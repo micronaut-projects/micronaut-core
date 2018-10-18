@@ -6,7 +6,7 @@ dependencies {
     compileOnly project(":configurations:micrometer-core")
     compileOnly project(":inject-java")
 
-    testCompile "com.h2database:h2:1.4.196"
+    testCompile dependencyVersion("h2")
     testCompile project(":spring")
     testCompile project(":inject-java")
     testCompile project(":http-server-netty")

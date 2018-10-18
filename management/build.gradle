@@ -8,7 +8,7 @@ dependencies {
     testCompile project(":http-server-netty")
     testCompile project(":configurations:jdbc-tomcat")
     testCompile dependencyModuleVersion("groovy", "groovy-json")
-    testCompile "com.h2database:h2:1.4.196"
+    testCompile dependencyVersion("h2")
     testCompile "mysql:mysql-connector-java:6.0.6"
 
     compileOnly "ch.qos.logback:logback-classic:1.2.3"
