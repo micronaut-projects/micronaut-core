@@ -13,7 +13,7 @@ dependencies {
     testCompile project(":inject-groovy")
 
     testCompile project(":configurations:hibernate-gorm")
-    testRuntime "com.h2database:h2:$h2Version"
+    testRuntime dependencyVersion("h2")
     testRuntime "org.apache.tomcat:tomcat-jdbc:$tomcatJdbcVersion"
     testRuntime "ch.qos.logback:logback-classic:1.2.3"
     testRuntime 'org.glassfish:javax.el:3.0.1-b08'

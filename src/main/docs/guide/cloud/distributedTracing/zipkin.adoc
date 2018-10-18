@@ -28,9 +28,9 @@ To send tracing spans to Zipkin the minimal configuration requires you add the f
 .Adding Zipkin Dependencies
 [source,groovy]
 ----
-runtime 'io.zipkin.brave:brave-instrumentation-http:4.19.0'
-runtime 'io.zipkin.reporter2:zipkin-reporter:2.5.0'
-compile 'io.opentracing.brave:brave-opentracing:0.30.0'
+runtime 'io.zipkin.brave:brave-instrumentation-http'
+runtime 'io.zipkin.reporter2:zipkin-reporter'
+compile 'io.opentracing.brave:brave-opentracing'
 ----
 
 Then you need to enable ZipKin tracing in your configuration (potentially only your production configuration):

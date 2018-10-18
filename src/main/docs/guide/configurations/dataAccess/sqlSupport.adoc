@@ -29,7 +29,7 @@ You also need to add a JDBC driver dependency to your classpath. For example to 
 .build.gradle
 [source,groovy]
 ----
-runtime "com.h2database:h2:1.4.196"
+runtime "com.h2database:h2"
 ----
 
 == Configuring JDBC Connection Pools
