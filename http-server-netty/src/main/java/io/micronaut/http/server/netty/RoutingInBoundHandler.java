@@ -923,7 +923,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         isStreaming = Publishers.isConvertibleToPublisher(genericType) && !Publishers.isSingle(genericType);
 
                         if (isStreaming) {
-                            javaPayloadType = generic.get().getFirstTypeVariable().map(arg -> arg.getType());
+                            javaPayloadType = generic.get().getFirstTypeVariable().map(Argument::getType);
                         }
                     }
                 }
