@@ -54,8 +54,14 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
         this.annotationUtils = annotationUtils;
         this.modelUtils = new ModelUtils(elements, types);
         // ensure initialization
-        this.annotationUtils.getAnnotationMetadata(elements.getTypeElement(ConfigurationReader.class.getName()));
-        this.annotationUtils.getAnnotationMetadata(elements.getTypeElement(EachProperty.class.getName()));
+        final TypeElement crte = elements.getTypeElement(ConfigurationReader.class.getName());
+        if (crte != null) {
+            this.annotationUtils.getAnnotationMetadata(crte);
+        }
+        final TypeElement epte = elements.getTypeElement(EachProperty.class.getName());
+        if (epte != null) {
+            this.annotationUtils.getAnnotationMetadata(epte);
+        }
     }
 
     /**
