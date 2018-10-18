@@ -121,9 +121,9 @@ Rather, you only need to include the  `hibernate-gorm` dependency in your projec
 ----
   compile "io.micronaut.configuration:micronaut-hibernate-gorm"
   // Use Tomcat connection pool
-  runtime 'org.apache.tomcat:tomcat-jdbc:8.0.44'
+  runtime 'org.apache.tomcat:tomcat-jdbc'
   // Use H2 database driver
-  runtime  'com.h2database:h2:1.4.196'
+  runtime  'com.h2database:h2'
 ----
 
 You can now use the same http://gorm.grails.org/latest/hibernate/manual/index.html#configuration[configuration properties described in the GORM documentation]. For example:

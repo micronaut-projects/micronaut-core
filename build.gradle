@@ -83,6 +83,11 @@ ext {
                     group:'io.zipkin.brave',
                     name:'brave-instrumentation-http'
             ],
+            'brave.opentracing': [
+                    version: braveOpentracingVersion,
+                    group: 'io.opentracing.brave',
+                    name: 'brave-opentracing'
+            ],
             'javax.annotation-api': [
                     version: javaxAnnotationApiVersion,
                     group:'javax.annotation',
@@ -221,6 +226,21 @@ ext {
                     group:'com.netflix.hystrix',
                     name: 'hystrix-core',
                     modules:['hystrix-serialization']
+            ],
+            graal: [
+                version: graalVersion,
+                group: 'com.oracle.substratevm',
+                name: 'svm'
+            ],
+            h2: [
+                version: h2Version,
+                group: 'com.h2database',
+                name: 'h2'
+            ],
+            tomcatJdbc: [
+                version: tomcatJdbcVersion,
+                group: 'org.apache.tomcat',
+                name: 'tomcat-jdbc'
             ]
 
     ]
