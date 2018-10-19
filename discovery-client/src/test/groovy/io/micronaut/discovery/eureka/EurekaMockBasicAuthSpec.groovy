@@ -42,7 +42,7 @@ class EurekaMockBasicAuthSpec extends Specification {
         and: "A client with the token"
         def serviceName = 'authenticated-server'
         EmbeddedServer anotherServer = ApplicationContext.run(EmbeddedServer, ['micronaut.application.name'  : serviceName,
-                                                                               'consul.client.registration.enabled': false,
+                                                                               'consul.client.enabled': false,
                                                                                'jackson.deserialization.UNWRAP_ROOT_VALUE': true,
                                                                                'eureka.client.defaultZone'  : "http://foo:bar@localhost:${eurekaServer.port}"])
 

@@ -16,9 +16,11 @@
 
 package io.micronaut.discovery.eureka;
 
+import io.micronaut.discovery.client.DiscoveryClientConfiguration;
 import io.micronaut.discovery.client.DiscoveryServerInstanceList;
 import io.micronaut.discovery.eureka.client.v2.EurekaClient;
 import io.micronaut.discovery.eureka.condition.RequiresEureka;
+import io.micronaut.runtime.ApplicationConfiguration;
 
 import javax.inject.Singleton;
 
@@ -37,10 +39,12 @@ import javax.inject.Singleton;
 public class EurekaServiceInstanceList extends DiscoveryServerInstanceList {
 
     /**
-     * @param configuration The Eureka configuration
+     * Creates a new eureka service instance list.
+     * @param configuration The discovery config
+     * @param instanceConfiguration The instance config
      */
-    public EurekaServiceInstanceList(EurekaConfiguration configuration) {
-        super(configuration);
+    public EurekaServiceInstanceList(DiscoveryClientConfiguration configuration, ApplicationConfiguration.InstanceConfiguration instanceConfiguration) {
+        super(configuration, instanceConfiguration);
     }
 
     @Override

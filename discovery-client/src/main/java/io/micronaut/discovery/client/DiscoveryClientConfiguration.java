@@ -17,6 +17,7 @@
 package io.micronaut.discovery.client;
 
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.DiscoveryConfiguration;
@@ -54,6 +55,8 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
     private String host = SocketUtils.LOCALHOST;
     private int port = -1;
     private boolean secure;
+    private boolean shouldUseDns = false;
+    private String contextPath;
 
     /**
      * Default constructor.
@@ -68,6 +71,41 @@ public abstract class DiscoveryClientConfiguration extends HttpClientConfigurati
     public DiscoveryClientConfiguration(ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
         this.applicationConfiguration = applicationConfiguration;
+    }
+
+    /**
+     * Whether DNS should be used to resolve the discovery servers.
+     *
+     * @return True if DNS should be used.
+     */
+    @Experimental
+    public boolean isShouldUseDns() {
+        return shouldUseDns;
+    }
+
+    /**
+     * Whether DNS should be used to resolve the discovery servers.
+     *
+     * @param shouldUseDns True if DNS should be used.
+     */
+    @Experimental
+    public void setShouldUseDns(boolean shouldUseDns) {
+        this.shouldUseDns = shouldUseDns;
+    }
+
+    /**
+     * @return The context path to use
+     */
+    public Optional<String> getContextPath() {
+        return Optional.ofNullable(contextPath);
+    }
+
+    /**
+     * Sets the context path.
+     * @param contextPath The context path
+     */
+    public void setContextPath(String contextPath) {
+        this.contextPath = contextPath;
     }
 
     /**

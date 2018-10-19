@@ -50,7 +50,7 @@ class EurekaMockAutoRegistrationSpec extends Specification {
 
         when: "An application is started and eureka configured"
         String serviceId = 'gr8crm-tag-service'
-        Map applicationConfig = ['consul.client.registration.enabled'        : false,
+        Map applicationConfig = ['consul.client.enabled'        : false,
                                  "micronaut.caches.discoveryClient.enabled"  : false,
                                  'eureka.client.host'                        : eurekaServer.getHost(),
                                  'eureka.client.port'                        : eurekaServer.getPort(),
@@ -95,7 +95,7 @@ class EurekaMockAutoRegistrationSpec extends Specification {
 
         when: "An application is started and eureka configured"
         String serviceId = 'myService'
-        Map applicationConfig = ['consul.client.registration.enabled'        : false,
+        Map applicationConfig = ['consul.client.enabled'        : false,
                                  "micronaut.caches.discoveryClient.enabled"  : false,
                                  'eureka.client.host'                        : eurekaServer.getHost(),
                                  'eureka.client.port'                        : eurekaServer.getPort(),
@@ -166,7 +166,7 @@ class EurekaMockAutoRegistrationSpec extends Specification {
                 (MockEurekaServer.ENABLED): true
         ])
 
-        def map = ['consul.registration.enabled'              : false,
+        def map = ['consul.client.enabled'              : false,
                    'eureka.client.host'                       : eurekaServer.getHost(),
                    'eureka.client.port'                       : eurekaServer.getPort(),
                    'jackson.deserialization.UNWRAP_ROOT_VALUE': true,

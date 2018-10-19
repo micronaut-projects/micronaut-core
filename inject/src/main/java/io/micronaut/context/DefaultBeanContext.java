@@ -915,6 +915,9 @@ public class DefaultBeanContext implements BeanContext {
                 EVENT_LOGGER.debug("Publishing event: {}", event);
             }
             Collection<ApplicationEventListener> eventListeners = getBeansOfType(ApplicationEventListener.class, Qualifiers.byTypeArguments(event.getClass()));
+
+            eventListeners = eventListeners.stream().sorted(OrderUtil.COMPARATOR).collect(Collectors.toList());
+
             if (!eventListeners.isEmpty()) {
                 if (EVENT_LOGGER.isTraceEnabled()) {
                     EVENT_LOGGER.trace("Established event listeners {} for event: {}", eventListeners, event);

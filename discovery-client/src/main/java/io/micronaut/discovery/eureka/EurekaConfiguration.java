@@ -33,7 +33,6 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
-import java.util.Optional;
 
 /**
  * Configuration options for the Eureka client.
@@ -74,9 +73,9 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
     public EurekaConfiguration(
         EurekaConnectionPoolConfiguration eurekaConnectionPoolConfiguration,
         ApplicationConfiguration applicationConfiguration,
-        Optional<EurekaRegistrationConfiguration> eurekaRegistrationConfiguration) {
+        @Nullable EurekaRegistrationConfiguration eurekaRegistrationConfiguration) {
         super(applicationConfiguration);
-        this.registration = eurekaRegistrationConfiguration.orElse(null);
+        this.registration = eurekaRegistrationConfiguration;
         this.eurekaConnectionPoolConfiguration = eurekaConnectionPoolConfiguration;
         setPort(EUREKA_DEFAULT_PORT);
     }

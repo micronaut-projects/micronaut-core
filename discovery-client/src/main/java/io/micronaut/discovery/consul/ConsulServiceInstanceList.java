@@ -16,9 +16,11 @@
 
 package io.micronaut.discovery.consul;
 
+import io.micronaut.discovery.client.DiscoveryClientConfiguration;
 import io.micronaut.discovery.client.DiscoveryServerInstanceList;
 import io.micronaut.discovery.consul.client.v1.ConsulClient;
 import io.micronaut.discovery.consul.condition.RequiresConsul;
+import io.micronaut.runtime.ApplicationConfiguration;
 
 import javax.inject.Singleton;
 
@@ -38,10 +40,12 @@ import javax.inject.Singleton;
 public class ConsulServiceInstanceList extends DiscoveryServerInstanceList {
 
     /**
-     * @param configuration The Consul configuration
+     * Creates a new consul service instance list.
+     * @param configuration The discovery config
+     * @param instanceConfiguration The instance config
      */
-    public ConsulServiceInstanceList(ConsulConfiguration configuration) {
-        super(configuration);
+    public ConsulServiceInstanceList(DiscoveryClientConfiguration configuration, ApplicationConfiguration.InstanceConfiguration instanceConfiguration) {
+        super(configuration, instanceConfiguration);
     }
 
     @Override
