@@ -55,4 +55,19 @@ class ArgumentSpec extends Specification {
         arg.getTypeParameters()[0].getType() == List.class
         arg.getTypeParameters()[0].getTypeParameters()[0].getType() == Long.class
     }
+
+/*
+    void "test inner class"() {
+        def arg = new Test<String>() {}.get();
+        expect:
+        arg.getType() == List.class
+        arg.getTypeParameters()[0].getType() == String.class
+    }
+
+    abstract class Test<T> {
+        Argument<List<T>> get() {
+            return new GenericArgument<List<T>>(getClass()) {}
+        }
+    }
+*/
 }

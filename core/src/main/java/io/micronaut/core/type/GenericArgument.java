@@ -9,7 +9,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
  *
  * @param <T> generic argument type
  */
-public class GenericArgument<T> extends DefaultArgument<T> {
+public abstract class GenericArgument<T> extends DefaultArgument<T> {
 
     protected GenericArgument() {
         super(null, null, AnnotationMetadata.EMPTY_METADATA);
