@@ -13,7 +13,7 @@ Or with Maven:
 ----
 <dependency>
   <groupId>io.micronaut.configuration</groupId>
-  <artifactId>kafka</artifactId>
+  <artifactId>micronaut-kafka</artifactId>
 </dependency>
 ----
 
