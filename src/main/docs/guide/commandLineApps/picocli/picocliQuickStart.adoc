@@ -29,7 +29,7 @@ Or with Maven:
 </dependency>
 <dependency>
   <groupId>io.micronaut.configuration</groupId>
-  <artifactId>picocli</artifactId>
+  <artifactId>micronaut-picocli</artifactId>
 </dependency>
 ----
 

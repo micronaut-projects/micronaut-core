@@ -22,7 +22,7 @@ compile "io.micronaut.configuration:micronaut-rabbitmq"
 ----
 <dependency>
     <groupId>io.micronaut.configuration</groupId>
-    <artifactId>rabbitmq</artifactId>
+    <artifactId>micronaut-rabbitmq</artifactId>
 </dependency>
 ----
 
