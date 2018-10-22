@@ -128,9 +128,12 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
 
     private String viewLocation(final String name) {
         final StringBuilder sb = new StringBuilder();
-        if (templateResolver.getPrefix() != null) {
-            sb.append(templateResolver.getPrefix());
-            sb.append(FILE_SEPARATOR);
+        String prefix = templateResolver.getPrefix();
+        if (prefix != null) {
+            sb.append(prefix);
+            if (!prefix.endsWith(FILE_SEPARATOR)) {
+                sb.append(FILE_SEPARATOR);
+            }
         }
         sb.append(name.replace("/", FILE_SEPARATOR));
         if (templateResolver.getSuffix() != null) {
