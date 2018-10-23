@@ -227,7 +227,7 @@ and progress through process manually -> Close -> Publish ... under staging repo
         try {
             try {
                 def mavenClent = new RESTClient("https://repo.maven.apache.org/maven2/")
-                mavenClent.get(path:"${project.group.replace('.','/')}/$project.name/$projectVersion/$project.name-${projectVersion}.jar")
+                mavenClent.get(path:"${project.group.replace('.','/')}/micronaut-$project.name/$projectVersion/micronaut-$project.name-${projectVersion}.jar")
             } catch(groovyx.net.http.HttpResponseException e) {
                 // doesn't exist.. try sync
                 def client = new RESTClient('https://api.bintray.com/maven_central_sync/micronaut/core-releases-local/')
