@@ -43,7 +43,6 @@ import java.util.Set;
 @SupportedAnnotationTypes({
     "io.micronaut.context.annotation.Configuration"
 })
-@SupportedSourceVersion(SourceVersion.RELEASE_8)
 @Internal
 public class PackageConfigurationInjectProcessor extends AbstractInjectAnnotationProcessor {
 

@@ -89,7 +89,6 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @SupportedAnnotationTypes("*")
-@SupportedSourceVersion(SourceVersion.RELEASE_8)
 @Internal
 public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProcessor {
 

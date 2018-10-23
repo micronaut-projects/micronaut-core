@@ -52,7 +52,6 @@ import static javax.lang.model.element.ElementKind.FIELD;
  * @since 1.0
  */
 @SupportedAnnotationTypes("*")
-@SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcessor {
 
     private boolean executed = false;
