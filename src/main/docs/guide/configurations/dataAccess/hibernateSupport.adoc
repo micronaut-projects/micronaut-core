@@ -30,11 +30,13 @@ And that is it. For each registered SQL `DataSource`, Micronaut will configure t
 
 You can use the `javax.persistence.PersistenceContext` annotation to inject an `EntityManager` (or Hibernate `Session`). To do so you need to make sure the JPA annotations are on the `annotationProcessor` path in your build:
 
+[source,groovy]
 .Adding the JPA dependency to `annotationProcessor` in Gradle
 ----
 annotationProcessor "javax.persistence:javax.persistence-api:2.2"
 ----
 
+[source,java]
 .Using `@PersistenceContext`
 ----
 @PersistenceContext
