@@ -18,7 +18,7 @@ To start using GraalVM you should first install the GraalVM SDK via the https://
 
 WARNING: As of this writing, GraalVM is currently only available for Linux and Mac OS X systems.
 
-To compile Micronaut and Graal applications you need to substrace dependency available to your application. The easiest way to make it available is via Docker:
+To compile Micronaut and Graal applications you need to make the substrate VM dependency available to your application. The easiest way to make it available is via Docker:
 
 .Using Docker to Obtain the SVM Dependency
 [source,bash]
