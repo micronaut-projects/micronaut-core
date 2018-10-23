@@ -20,12 +20,14 @@ import io.micronaut.context.env.Environment
 import io.micronaut.context.env.PropertySource
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpHeaders
+import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Put
+import io.micronaut.http.client.DefaultHttpClientConfiguration
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.server.exceptions.ServerStartupException
@@ -33,6 +35,9 @@ import io.micronaut.runtime.Micronaut
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 import spock.lang.Stepwise
+
+import java.time.Duration
+import java.time.temporal.ChronoUnit
 
 /**
  * @author Graeme Rocher
@@ -180,6 +185,31 @@ class NettyHttpServerSpec extends Specification {
         applicationContext?.stop()
         applicationContext?.close()
 
+        embeddedServer?.stop()
+        embeddedServer?.close()
+    }
+
+    void "test expected connection persistence"() {
+        when:
+        DefaultHttpClientConfiguration config = new DefaultHttpClientConfiguration()
+        // The client will explicitly request "Connection: close" unless using a connection pool, so set it up
+        config.connectionPoolConfiguration.enabled = true
+        config.connectionPoolConfiguration.maxConnections = 2;
+        config.connectionPoolConfiguration.acquireTimeout = Duration.of(3, ChronoUnit.SECONDS);
+
+        ApplicationContext applicationContext = Micronaut.run()
+        EmbeddedServer embeddedServer = applicationContext.getBean(EmbeddedServer)
+        RxHttpClient client = applicationContext.createBean(RxHttpClient, embeddedServer.getURL(), config)
+
+        HttpRequest request = HttpRequest.create(HttpMethod.GET, '/person/Fred')
+        HttpResponse response = client.exchange(request, String).blockingFirst()
+        then:
+        response.body() == "Person Named Fred"
+        response.header(HttpHeaders.CONNECTION) == 'keep-alive'
+
+        cleanup:
+        applicationContext?.stop()
+        applicationContext?.close()
         embeddedServer?.stop()
         embeddedServer?.close()
     }
