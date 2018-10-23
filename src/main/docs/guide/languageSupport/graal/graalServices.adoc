@@ -1,3 +1,5 @@
+=== Getting Started with Micronaut and Graal
+
 To get started creating a Microservice that can be compiled into a native image, use the `graal-native-image` feature when creating the application with the CLI:
 
 .Creating a Graal Native Microservice
@@ -10,9 +12,22 @@ The `graal-native-image` feature adds 3 important items:
 
 1. A `MicronautSubstitutions.java` file needed to recompute Netty and Caffeine's use of `Unsafe`.
 2. The `svm` and `graal` dependencies to your `build.gradle` (or `pom.xml` if `--build maven` is used).
-3. A `build-native-image.sh` bash script which can be used as a template to construct the native image.
+3. A `Dockerfile` which canbe used to construct the native image.
 
-Although Micronaut Dependency Injection does not use reflection, Micronaut does heavily rely on dynamic class loading. GraalVM needs to know ahead of time all the classes that are to be dynamically loaded. So before you can build a native image Micronaut needs to compute your application's classloading requirements. This can be done by simply running your application:
+
+To build your native image using Docker simply run:
+
+[source,bash]
+----
+$ docker build . -t hello-world
+$ docker run hello-world
+----
+
+=== Understanding Micronaut and Graal
+
+Although Micronaut Dependency Injection does not use reflection, Micronaut does heavily rely on dynamic class loading. GraalVM needs to know ahead of time all the classes that are to be dynamically loaded.
+
+So before you can build a native image Micronaut needs to compute your application's classloading requirements. The `Dockerfile` does this automatically for you, but you can also run the logic to generate Graal's `reflect.json` file manually:
 
 .Computing Class Loading Requirements
 [source,bash]
@@ -33,9 +48,9 @@ $ java -cp build/libs/hello-world-0.1-all.jar io.micronaut.graal.reflect.GraalCl
 
 The generated `reflect.json` file contains the classes that were dynamically loaded by the application when started up. See https://github.com/oracle/graal/blob/master/substratevm/REFLECTION.md[GraalVM documentation] for information on the JSON format.
 
-TIP: If you wish you can use this file as a template and copy it to the source tree, making modifications as necessary and then altering the `build-native-image.sh` template to point to the new location.
+TIP: If you wish you can use this file as a template and copy it to the source tree, making modifications as necessary and then altering the `Dockerfile` template to point to the new location.
 
-Once the `reflect.json` file is ready you can run the `build-native-image.sh` script. The script runs the following `native-image` command:
+Once the `reflect.json` file is ready you can run the `native-image` command. The script runs the following `native-image` command:
 
 .The `native-image` command
 [source,bash]

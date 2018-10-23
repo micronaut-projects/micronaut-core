@@ -13,25 +13,25 @@ So far Micronaut's HTTP server, HTTP client, function support and service discov
 
 NOTE: Use of GraalVM's `nativeimage` tool is only supported in Java or Kotlin projects. Groovy relies heavily on reflection which is only partially supported by GraalVM.
 
-To start using GraalVM you should first install the GraalVM SDK via the https://www.graalvm.org/docs/getting-started/[Getting Started] instructions or using SDKman:
+To start using GraalVM you should first install the GraalVM SDK via the https://www.graalvm.org/docs/getting-started/[Getting Started].
 
-.Installing GraalVM 1.0.0-rc7 with SDKman
-[source,bash]
-----
-$ sdk install java 1.0.0-rc7-graal
-$ sdk use java 1.0.0-rc7-graal
-----
-
-Note the above commands install the `1.0.0-rc6` version, and may need to be altered depending on the current release available.
 
 WARNING: As of this writing, GraalVM is currently only available for Linux and Mac OS X systems.
 
-Once you have installed the SDK you should make the `svm` dependency available via your local Maven cache. The easiest way to do this is via Maven's `install` command:
+To compile Micronaut and Graal applications you need to substrace dependency available to your application. The easiest way to make it available is via Docker:
+
+.Using Docker to Obtain the SVM Dependency
+[source,bash]
+----
+docker run oracle/graalvm-ce:1.0.0-rc7 cat /usr/java/latest/jre/lib/svm/builder/svm.jar > svm.jar
+----
+
+Once you have obtained the `svm.jar` from the latest Graal Docker images you can install it into your local Maven cache:
 
 .Installing the SVM Dependency Locally
 [source,bash]
 ----
-$ mvn install:install-file -Dfile=${JAVA_HOME}/jre/lib/svm/builder/svm.jar \
+$ mvn install:install-file -Dfile=svm.jar \
                            -DgroupId=com.oracle.substratevm \
                            -DartifactId=svm \
                            -Dversion=GraalVM-1.0.0-rc7 \
