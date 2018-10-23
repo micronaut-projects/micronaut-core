@@ -29,8 +29,6 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import javax.annotation.processing.Messager;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
-import javax.annotation.processing.SupportedSourceVersion;
-import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
 import javax.lang.model.element.TypeElement;
@@ -52,7 +50,6 @@ import static javax.lang.model.element.ElementKind.FIELD;
  * @since 1.0
  */
 @SupportedAnnotationTypes("*")
-@SupportedSourceVersion(SourceVersion.RELEASE_8)
 public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcessor {
 
     private boolean executed = false;

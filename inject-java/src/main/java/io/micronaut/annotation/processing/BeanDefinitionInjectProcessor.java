@@ -49,7 +49,6 @@ import io.micronaut.inject.writer.ExecutableMethodWriter;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
-import javax.annotation.processing.SupportedSourceVersion;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
@@ -89,7 +88,6 @@ import java.util.stream.Collectors;
  * @since 1.0
  */
 @SupportedAnnotationTypes("*")
-@SupportedSourceVersion(SourceVersion.RELEASE_8)
 @Internal
 public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProcessor {
 
