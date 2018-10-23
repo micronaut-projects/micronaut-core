@@ -25,7 +25,8 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
 
 import javax.annotation.Nullable;
-import java.lang.reflect.*;
+import java.lang.reflect.TypeVariable;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -259,7 +260,7 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
     @UsedByGeneratedCode
     static <T> Argument<T> of(
         Class<T> type, @Nullable Argument... typeParameters) {
-        return new DefaultArgument<>(type, type.getSimpleName(), AnnotationMetadata.EMPTY_METADATA, typeParameters);
+        return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), AnnotationMetadata.EMPTY_METADATA, typeParameters);
     }
 
     /**
@@ -299,8 +300,20 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
                 TypeVariable<Class<T>> parameter = parameters[i];
                 typeArguments[i] = Argument.of(typeParameters[i], parameter.getName());
             }
-            return new DefaultArgument<>(type, type.getSimpleName(), AnnotationMetadata.EMPTY_METADATA, typeArguments);
+            return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), AnnotationMetadata.EMPTY_METADATA, typeArguments);
         }
+    }
+
+    /**
+     * Creates a new argument representing a generic list.
+     *
+     * @param type list element type
+     * @param <T>  list element type
+     * @return The argument instance
+     */
+    static <T> Argument<List<T>> ofList(Class<T> type) {
+        //noinspection unchecked
+        return of((Class<List<T>>) ((Class) List.class), type);
     }
 
 }
