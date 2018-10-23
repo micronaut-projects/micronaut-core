@@ -12,7 +12,7 @@ The `graal-native-image` feature adds 3 important items:
 
 1. A `MicronautSubstitutions.java` file needed to recompute Netty and Caffeine's use of `Unsafe`.
 2. The `svm` and `graal` dependencies to your `build.gradle` (or `pom.xml` if `--build maven` is used).
-3. A `Dockerfile` which canbe used to construct the native image.
+3. A `Dockerfile` which can be used to construct the native image.
 
 
 To build your native image using Docker simply run:
