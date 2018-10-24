@@ -44,7 +44,7 @@ micronaut:
         enabled: true
     session:
       enabled: true
-      loginFailureTargetUrl: /login/authFailed
+      login-failure-target-url: /login/authFailed
 '''//end::yamlconfig[]
 
     @Shared
@@ -61,7 +61,7 @@ micronaut:
                     ],
                     'session': [
                             'enabled': true,
-                            'loginFailureTargetUrl': '/login/authFailed',
+                            'login-failure-target-url': '/login/authFailed',
                     ]
             ]
         ]
