@@ -18,8 +18,9 @@ class EnvironmentAWSCredentialsProviderTest extends Specification {
     def "AWS accessKeyId and secretKey can be read from environment"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-                PropertySource.of(CollectionUtils.mapOf("aws.accessKeyId", "$TEST_KEY_ID", "aws" +
-                        ".secretKey", "$TEST_SECRET_KEY"))
+                PropertySource.of(CollectionUtils.mapOf(
+                        "aws.accessKeyId", "$TEST_KEY_ID",
+                        "aws.secretKey", "$TEST_SECRET_KEY"))
         )
 
         Environment environment = applicationContext.getEnvironment()
@@ -37,9 +38,12 @@ class EnvironmentAWSCredentialsProviderTest extends Specification {
     def "AWS alternate accessKey and secretAccessKey can be read from environment"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-                PropertySource.of(CollectionUtils.mapOf("aws.accessKey", "$TEST_KEY_ID", "aws" +
-                        ".secretAccessKey", "$TEST_SECRET_KEY"))
-        )
+                PropertySource.of(CollectionUtils.mapOf(
+                        //  nulling out non alternate values so that alternates will get picked up
+                        "aws.accessKeyId", null,
+                        "aws.secretKey", null,
+                        "aws.accessKey", "$TEST_KEY_ID",
+                        "aws.secretAccessKey", "$TEST_SECRET_KEY")))
 
         Environment environment = applicationContext.getEnvironment()
         EnvironmentAWSCredentialsProvider awsCredentialsProvider = new
@@ -56,9 +60,10 @@ class EnvironmentAWSCredentialsProviderTest extends Specification {
     def "AWS accessKeyId, secretKey, and sessionToken can be read from environment"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-                PropertySource.of(CollectionUtils.mapOf("aws.accessKeyId", "$TEST_KEY_ID", "aws" +
-                        ".secretKey", "$TEST_SECRET_KEY", "aws.sessionToken",
-                        "$TEST_SESSION_TOKEN")))
+                PropertySource.of(CollectionUtils.mapOf(
+                        "aws.accessKeyId", "$TEST_KEY_ID",
+                        "aws.secretKey", "$TEST_SECRET_KEY",
+                        "aws.sessionToken", "$TEST_SESSION_TOKEN")))
 
         Environment environment = applicationContext.getEnvironment()
         EnvironmentAWSCredentialsProvider awsCredentialsProvider = new
