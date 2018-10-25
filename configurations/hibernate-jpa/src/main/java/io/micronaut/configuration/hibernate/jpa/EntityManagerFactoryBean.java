@@ -40,7 +40,6 @@ import org.springframework.orm.hibernate5.SpringSessionContext;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
-import javax.inject.Singleton;
 import javax.persistence.Entity;
 import javax.sql.DataSource;
 import javax.validation.ValidatorFactory;
