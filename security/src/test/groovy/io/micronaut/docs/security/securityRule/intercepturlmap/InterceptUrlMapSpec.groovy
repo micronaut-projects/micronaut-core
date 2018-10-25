@@ -33,10 +33,10 @@ class InterceptUrlMapSpec extends Specification implements YamlAsciidocTagCleane
 micronaut:
   security:
     enabled: true
-    interceptUrlMap:
+    intercept-url-map:
       -
         pattern: /images/*
-        httpMethod: GET
+        http-method: GET
         access:
           - isAnonymous() # <1>
       -
@@ -45,7 +45,7 @@ micronaut:
           - isAuthenticated() # <2>
       -
         pattern: /books/grails
-        httpMethod: GET
+        http-method: GET
         access:
           - ROLE_GRAILS # <3>
           - ROLE_GROOVY
@@ -55,10 +55,10 @@ micronaut:
     Map<String, Object> ipPatternsMap = ['micronaut': [
             'security': [
                     'enabled'    : true,
-                    'interceptUrlMap' : [
+                    'intercept-url-map' : [
                             [
                                     pattern: '/images/*',
-                                    httpMethod: 'GET',
+                                    'http-method': 'GET',
                                     access: ['isAnonymous()']
                             ],
                             [
@@ -67,7 +67,7 @@ micronaut:
                             ],
                             [
                                     pattern: '/books/grails',
-                                    httpMethod: 'GET',
+                                    'http-method': 'GET',
                                     access: ['ROLE_GRAILS', 'ROLE_GROOVY']
                             ],
                     ]
@@ -80,7 +80,7 @@ micronaut:
             'spec.name'                                : 'docsintercepturlmap',
             'endpoints.health.enabled'                 : true,
             'endpoints.health.sensitive'               : false,
-            'micronaut.security.token.basicAuth.enabled'           : true,
+            'micronaut.security.token.basic-auth.enabled'           : true,
     ] << ipPatternsMap
 
     @Shared

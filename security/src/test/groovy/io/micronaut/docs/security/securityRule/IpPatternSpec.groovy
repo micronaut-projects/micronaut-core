@@ -33,7 +33,7 @@ class IpPatternSpec extends Specification implements YamlAsciidocTagCleaner {
 micronaut:
   security:
     enabled: true
-    ipPatterns:
+    ip-patterns:
       - 127.0.0.1
       - 192.168.1.*
 '''//end::yamlconfig[]
@@ -43,7 +43,7 @@ micronaut:
     Map<String, Object> ipPatternsMap = ['micronaut': [
             'security': [
                     'enabled'    : true,
-                    'ipPatterns' : ['127.0.0.1', '192.168.1.*']
+                    'ip-patterns' : ['127.0.0.1', '192.168.1.*']
             ]
         ]
     ]
