@@ -1,0 +1,41 @@
+To use the Micronaut's integration with http://www.liquibase.org[Liquibase] you must have the `micronaut-liquibase` dependency on your classpath. For example in `build.gradle`:
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut.configuration:micronaut-liquibase"
+----
+
+You can define liquibase configuration for each datasource. The following example demonstrates using it:
+
+[source, yaml]
+.src/main/resources/application.yml
+----
+include::{testsliquibase}/groovy/io/micronaut/docs/dbmigration/liquibase/LiquibaseSpec.groovy[tag=yamlconfig,indent=0]
+----
+
+<1> Disable schema DDL creation.
+<2> Configure liquibase configuration for `default` data source.
+<3> Root changelog under `src/main/resources/db/liquibase-changelog.xml`
+
+
+
+Often, you will have a root changelog:
+
+[source, xml]
+.resources/db/liquibase-changelog.xml
+----
+include::{testsliquibase}/resources/db/liquibase-changelog.xml[indent=0]
+----
+
+which imports changelogs which you keep generating as your app evolves:
+
+[source, xml]
+.resources/db/changelog/01-create-books-schema.xml
+----
+include::{testsliquibase}/resources/db/changelog/01-create-books-schema.xml[indent=0]
+----
+
+There are several options available for configuration:
+
+include::{includedir}configurationProperties/io.micronaut.dbmigration.liquibase.LiquibaseConfigurationProperties.adoc[]

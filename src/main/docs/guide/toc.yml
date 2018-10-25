@@ -201,6 +201,7 @@ configurations:
     postgresSupport: Configuring Postgres
     redisSupport: Configuring Redis
     cassandraSupport: Configuring Cassandra
+    liquibase: Configuring Liquibase
   otherConfigurations:
     title: Other Configurations
     rabbitmq: RabbitMQ

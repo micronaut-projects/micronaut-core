@@ -267,4 +267,22 @@ public final class StringUtils {
         }
         return new String(array);
     }
+
+    /**
+     * Returns the trimmed (left and right) form of the input string. If the string is empty after trimming (or null
+     * was passed in the first place), null is returned, i.e. the input string is reduced to nothing.
+     * @param string the string to trim
+     * @return the trimmed string or null
+     */
+    public static String trimToNull(String string) {
+        if (string == null) {
+            return null;
+        }
+        String returnString = string.trim();
+        if (returnString.isEmpty()) {
+            return null;
+        } else {
+            return returnString;
+        }
+    }
 }

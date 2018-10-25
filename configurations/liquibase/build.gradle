@@ -1,0 +1,18 @@
+dependencies {
+    compile project(":runtime")
+    compileOnly project(":inject-java")
+    compile ("org.liquibase:liquibase-core:$liquibaseCoreVersion") {
+        exclude group: 'org.springframework'
+    }
+
+    testCompile project(":inject-java")
+    testCompile project(":inject-groovy")
+    testCompile project(":http-client")
+    testCompile project(":http-server-netty")
+    testCompile project(":test-utils")
+
+    testCompile project(':configurations:hibernate-jpa')
+    testCompile project(':configurations:jdbc-hikari')
+    testAnnotationProcessor "javax.persistence:javax.persistence-api:2.2"
+    testCompile dependencyVersion("h2")
+}
