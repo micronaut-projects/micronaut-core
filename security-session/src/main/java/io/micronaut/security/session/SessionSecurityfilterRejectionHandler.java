@@ -60,11 +60,14 @@ public class SessionSecurityfilterRejectionHandler implements RejectionHandler {
      */
     @Override
     public Publisher<MutableHttpResponse<?>> reject(HttpRequest<?> request, boolean forbidden) {
-        if (request.getHeaders().getContentType().isPresent() &&
-                request.getHeaders().getContentType().get().equals(MediaType.TEXT_HTML)) {
+        if (request.getHeaders().accept().stream().anyMatch(mediaType -> mediaType.equals(MediaType.TEXT_HTML_TYPE))) {
             try {
-                URI location = new URI(forbidden ? securitySessionConfiguration.getForbiddenTargetUrl() :
-                        securitySessionConfiguration.getUnauthorizedTargetUrl());
+                String uri = forbidden ? securitySessionConfiguration.getForbiddenTargetUrl() :
+                        securitySessionConfiguration.getUnauthorizedTargetUrl();
+                if (uri == null) {
+                    uri = "/";
+                }
+                URI location = new URI(uri);
                 return Publishers.just(HttpResponse.seeOther(location));
             } catch (URISyntaxException e) {
                 return Publishers.just(HttpResponse.serverError());
