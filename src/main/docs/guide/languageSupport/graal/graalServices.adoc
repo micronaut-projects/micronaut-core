@@ -12,7 +12,7 @@ The `graal-native-image` feature adds four important items:
 
 1. A `MicronautSubstitutions.java` file needed to recompute Netty and Caffeine's use of `Unsafe`.
 2. The `svm` and `graal` dependencies to your `build.gradle` (or `pom.xml` if `--build maven` is used).
-3. A `Dockerfile` which can be used to construct the native image using Docker.
+3. A `Dockerfile` which can be used to construct the native image using Docker and a script `docker-build.sh` to run it.
 4. A `build-native-image.sh` script to build the native image without using Docker.
 
 
@@ -26,6 +26,13 @@ $ docker build . -t hello-world
 $ docker run --network=host hello-world # <1>
 ----
 <1> Start the Docker container with `--network=host` makes the application uses the same network as the host so all ports are exposed automatically without needing to map them manually
+
+Or use the provided script:
+
+[source,bash]
+----
+$ ./docker-build.sh
+----
 
 
 ==== Build native image without using Docker
