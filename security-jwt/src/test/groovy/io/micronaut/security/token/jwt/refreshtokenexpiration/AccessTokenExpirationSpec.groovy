@@ -30,7 +30,7 @@ class AccessTokenExpirationSpec extends Specification {
                     'micronaut.security.endpoints.login.enabled': true,
                     'micronaut.security.endpoints.oauth.enabled': true,
                     'micronaut.security.token.jwt.enabled': true,
-                    'micronaut.security.token.jwt.generator.refreshTokenExpiration': 5,
+                    'micronaut.security.token.jwt.generator.refresh-token-expiration': 5,
                     'micronaut.security.token.jwt.signatures.secret.generator.secret': 'pleaseChangeThisSecretForANewOne'
             ], Environment.TEST)
 
