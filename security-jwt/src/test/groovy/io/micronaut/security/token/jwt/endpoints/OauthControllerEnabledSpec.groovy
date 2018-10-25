@@ -4,10 +4,6 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.security.token.jwt.cookie.JwtCookieClearerLogoutHandler
-import io.micronaut.security.token.jwt.cookie.JwtCookieConfigurationProperties
-import io.micronaut.security.token.jwt.cookie.JwtCookieLoginHandler
-import io.micronaut.security.token.jwt.cookie.JwtCookieTokenReader
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
