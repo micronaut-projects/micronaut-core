@@ -23,7 +23,6 @@ import io.micronaut.security.token.jwt.signature.rsa.RSASignatureFactory
 import io.micronaut.security.token.jwt.signature.rsa.RSASignatureGeneratorConfiguration
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Stepwise
