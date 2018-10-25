@@ -1,6 +1,5 @@
 package io.micronaut.security.token.jwt.render
 
-
 import com.fasterxml.jackson.databind.ObjectMapper
 import spock.lang.Specification
 

@@ -15,7 +15,6 @@
  */
 package io.micronaut.security.token.jwt.cookie
 
-
 import geb.Page
 
 class HomePage extends Page {
