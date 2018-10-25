@@ -107,6 +107,13 @@ public class JpaConfiguration {
     }
 
     /**
+     * @return The JPA properties
+     */
+    public Map<String, Object> getProperties() {
+        return jpaProperties;
+    }
+
+    /**
      * Creates the default {@link BootstrapServiceRegistryBuilder}.
      *
      * @param integrator  The integrator to use. Can be null
