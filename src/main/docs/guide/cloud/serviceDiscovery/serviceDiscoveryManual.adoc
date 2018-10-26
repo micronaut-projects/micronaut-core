@@ -21,7 +21,7 @@ WARN: This client configuration can be used in conjunction with the `@Client` an
 
 TIP: You can override this configuration in production by specifying an environment variable such as `MICRONAUT_HTTP_SERVICES_FOO_URLS=http://prod1,http://prod2`
 
-Note that by default no health checking will happen to assert that the referenced services are operational. You can alter that by enabling health checking and optionally specifying a health check path (the default is `/heath`):
+Note that by default no health checking will happen to assert that the referenced services are operational. You can alter that by enabling health checking and optionally specifying a health check path (the default is `/health`):
 
 .Enabling Health Checking
 [source,yaml]
