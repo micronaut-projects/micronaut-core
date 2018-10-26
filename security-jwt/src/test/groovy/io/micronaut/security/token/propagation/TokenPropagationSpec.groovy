@@ -164,7 +164,7 @@ class TokenPropagationSpec extends Specification {
         when:
         String accessToken = rsp.body().accessToken
         List<Book> books = gatewayClient.toBlocking().retrieve(HttpRequest.GET("/api/gateway")
-                .bearerAuth(accessToken), Argument.of(List, Book))
+                .bearerAuth(accessToken), Argument.listOf(Book))
 
         then:
         noExceptionThrown()
