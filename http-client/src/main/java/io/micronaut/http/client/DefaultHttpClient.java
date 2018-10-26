@@ -1641,9 +1641,20 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         ).asNativeBuffer();
     }
 
+    private String getHostHeader(URI requestURI) {
+        StringBuilder host = new StringBuilder(requestURI.getHost());
+        int port = requestURI.getPort();
+        if (port > -1) {
+            if (port != 80 && port != 443) {
+                host.append(":").append(port);
+            }
+        }
+        return host.toString();
+    }
+
     private <I> void prepareHttpHeaders(URI requestURI, io.micronaut.http.HttpRequest<I> request, io.netty.handler.codec.http.HttpRequest nettyRequest, boolean permitsBody, boolean closeConnection) {
         HttpHeaders headers = nettyRequest.headers();
-        headers.set(HttpHeaderNames.HOST, requestURI.getHost());
+        headers.set(HttpHeaderNames.HOST, getHostHeader(requestURI));
 
         if (closeConnection) {
             headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
