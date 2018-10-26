@@ -36,6 +36,7 @@ import javax.sql.DataSource;
 @Factory
 @Requires(classes = DataSourceTransactionManager.class)
 @Requires(condition = HibernatePresenceCondition.class)
+@Requires(missingProperty = "io.micronaut.datasource.disabled")
 public class DataSourceTransactionManagerFactory {
 
     /**
