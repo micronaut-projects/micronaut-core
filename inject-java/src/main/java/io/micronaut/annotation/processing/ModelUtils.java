@@ -202,7 +202,7 @@ public class ModelUtils {
      */
     Class<?> classOfPrimitiveArrayFor(String primitiveType) {
         try {
-            
+
             switch (primitiveType) {
                 case "byte":
                     return Class.forName("[B");
