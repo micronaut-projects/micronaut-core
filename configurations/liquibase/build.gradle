@@ -4,6 +4,7 @@ dependencies {
     compile ("org.liquibase:liquibase-core:$liquibaseCoreVersion") {
         exclude group: 'org.springframework'
     }
+    compile project(":management")
 
     testCompile project(":inject-java")
     testCompile project(":inject-groovy")
