@@ -143,7 +143,7 @@ class SyncCacheSpec extends Specification {
         ApplicationContext applicationContext = ApplicationContext.run(
                 'micronaut.caches.test.initialCapacity':1,
                 'micronaut.caches.test.maximumSize':3,
-                'micronaut.caches.test.testMode':true,
+                'micronaut.caches.test.test-mode':true,
         )
 
         when:
@@ -158,7 +158,7 @@ class SyncCacheSpec extends Specification {
         syncCache.put("three", 3)
         syncCache.put("four", 4)
         syncCache.nativeCache.cleanUp()
-        PollingConditions conditions = new PollingConditions(timeout: 5)
+        PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
 
         then:
         conditions.eventually {

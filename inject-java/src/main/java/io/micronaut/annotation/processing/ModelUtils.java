@@ -40,10 +40,7 @@ import javax.lang.model.element.Modifier;
 import javax.lang.model.element.Name;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
-import javax.lang.model.type.ArrayType;
-import javax.lang.model.type.DeclaredType;
-import javax.lang.model.type.TypeKind;
-import javax.lang.model.type.TypeMirror;
+import javax.lang.model.type.*;
 import javax.lang.model.util.ElementFilter;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
@@ -205,6 +202,7 @@ public class ModelUtils {
      */
     Class<?> classOfPrimitiveArrayFor(String primitiveType) {
         try {
+
             switch (primitiveType) {
                 case "byte":
                     return Class.forName("[B");
@@ -478,7 +476,34 @@ public class ModelUtils {
             DeclaredType dt = (DeclaredType) type;
             result = classOfPrimitiveFor(dt.asElement().getSimpleName().toString());
         } else {
-            result = classOfPrimitiveFor(type.toString());
+            if (type instanceof PrimitiveType) {
+                PrimitiveType pt = (PrimitiveType) type;
+                TypeKind kind = pt.getKind();
+                switch (kind) {
+                    case VOID:
+                        return void.class;
+                    case INT:
+                        return int.class;
+                    case BYTE:
+                        return byte.class;
+                    case CHAR:
+                        return char.class;
+                    case LONG:
+                        return long.class;
+                    case FLOAT:
+                        return float.class;
+                    case SHORT:
+                        return short.class;
+                    case DOUBLE:
+                        return double.class;
+                    case BOOLEAN:
+                        return boolean.class;
+                    default:
+                        result = classOfPrimitiveFor(type.toString());
+                }
+            } else {
+                result = classOfPrimitiveFor(type.toString());
+            }
         }
         return result;
     }

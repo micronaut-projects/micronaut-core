@@ -15,7 +15,6 @@
  */
 package io.micronaut.docs.security.session
 
-
 import geb.Page
 
 class HomePage extends Page {
