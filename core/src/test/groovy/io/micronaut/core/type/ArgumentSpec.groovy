@@ -36,7 +36,16 @@ class ArgumentSpec extends Specification {
         arg.getType() == List.class
         arg.getTypeParameters().length == 1
         arg.getTypeParameters()[0].getType() == String.class
-        arg == Argument.ofList(String.class)
+        arg == Argument.listOf(String.class)
+    }
+
+    void "test generic set"() {
+        def arg = new GenericArgument<Set<String>>() {}
+        expect:
+        arg.getType() == Set.class
+        arg.getTypeParameters().length == 1
+        arg.getTypeParameters()[0].getType() == String.class
+        arg == Argument.setOf(String.class)
     }
 
     void "test generic map"() {
@@ -46,6 +55,7 @@ class ArgumentSpec extends Specification {
         arg.getTypeParameters().length == 2
         arg.getTypeParameters()[0].getType() == UUID.class
         arg.getTypeParameters()[1].getType() == String.class
+        arg == Argument.mapOf(UUID, String)
     }
 
     void "test generic list of lists"() {

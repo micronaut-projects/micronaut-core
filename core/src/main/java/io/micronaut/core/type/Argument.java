@@ -28,6 +28,7 @@ import javax.annotation.Nullable;
 import java.lang.reflect.TypeVariable;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -311,9 +312,34 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
      * @param <T>  list element type
      * @return The argument instance
      */
-    static <T> Argument<List<T>> ofList(Class<T> type) {
+    static <T> Argument<List<T>> listOf(Class<T> type) {
         //noinspection unchecked
         return of((Class<List<T>>) ((Class) List.class), type);
     }
 
+    /**
+     * Creates a new argument representing a generic set.
+     *
+     * @param type set element type
+     * @param <T>  set element type
+     * @return The argument instance
+     */
+    static <T> Argument<Set<T>> setOf(Class<T> type) {
+        //noinspection unchecked
+        return of((Class<Set<T>>) ((Class) Set.class), type);
+    }
+
+    /**
+     * Creates a new argument representing a generic map.
+     *
+     * @param keyType The key type
+     * @param valueType The value type
+     * @param <K>  The map key type
+     * @param <V> The map value type
+     * @return The argument instance
+     */
+    static <K, V> Argument<Map<K, V>> mapOf(Class<K> keyType, Class<V> valueType) {
+        //noinspection unchecked
+        return of((Class<Map<K, V>>) ((Class) Map.class), keyType, valueType);
+    }
 }
