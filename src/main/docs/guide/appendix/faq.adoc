@@ -11,7 +11,7 @@ When asking why Micronaut doesn't use Spring, it is typically in reference to th
 
 NOTE: The Spring ecosystem is very broad and there are many Spring libraries you can use directly in Micronaut without requiring the Spring container.
 
-The reason Micronaut features its own native JSR-305 compliant dependency injection is that the cost of these features in Spring (and any reflection based DI/AOP container) is too great in terms of memory consumption and the impact on startup time. In order to support dependency injection at runtime Spring:
+The reason Micronaut features its own native https://www.jcp.org/en/jsr/detail?id=330[JSR-330] compliant dependency injection is that the cost of these features in Spring (and any reflection based DI/AOP container) is too great in terms of memory consumption and the impact on startup time. In order to support dependency injection at runtime Spring:
 
 * https://github.com/spring-projects/spring-framework/tree/master/spring-core/src/main/java/org/springframework/core/type/classreading[Reads the byte code] of every bean it finds at runtime.
 * https://github.com/spring-projects/spring-framework/blob/a691065d05741a4f1ca17925c8a5deec0f378c8b/spring-core/src/main/java/org/springframework/core/annotation/AnnotationUtils.java#L1465[Synthesizes new annotations] for each annotation on each bean method, constructor, field etc. to support Annotation metadata.
