@@ -36,7 +36,7 @@ class AuthorizationSpec extends Specification {
             'endpoints.beans.sensitive': true,
             'micronaut.security.enabled': true,
             'micronaut.security.endpoints.login.enabled': true,
-            'micronaut.security.interceptUrlMap': [
+            'micronaut.security.intercept-url-map': [
                     [pattern: '/urlMap/admin', access: ['ROLE_ADMIN', 'ROLE_X']],
                     [pattern: '/urlMap/**',    access: 'isAuthenticated()'],
                     [pattern: '/anonymous/**', access: 'isAnonymous()'],

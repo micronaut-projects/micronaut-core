@@ -1,0 +1,4 @@
+aws:
+  accessKeyId: yamlAccessKeyId
+  secretKey: yamlSecretKey
+  sessionToken: yamlSessionToken

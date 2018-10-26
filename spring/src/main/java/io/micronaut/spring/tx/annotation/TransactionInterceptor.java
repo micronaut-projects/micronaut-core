@@ -59,7 +59,7 @@ public class TransactionInterceptor implements MethodInterceptor<Object, Object>
 
     @Override
     public final Object intercept(MethodInvocationContext<Object, Object> context) {
-        if (context.hasDeclaredAnnotation(Transactional.class)) {
+        if (context.hasAnnotation(Transactional.class)) {
             String transactionManagerName = context.getValue(Transactional.class, String.class).orElse(null);
             if (StringUtils.isEmpty(transactionManagerName)) {
                 transactionManagerName = null;

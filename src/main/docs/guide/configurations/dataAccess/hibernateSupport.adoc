@@ -50,9 +50,10 @@ Micronaut will inject a compile time scoped proxy that retrieves the `EntityMana
 
 Note the examples above use field injection, since the `@PersistenceContext` annotation does not support declaration on a parameter of a constructor or method argument. Therefore if you wish to instead use constructor or method injection you must use the ann:configuration.hibernate.jpa.scope.CurrentSession[] instead:
 
+[source,java]
 .Using `@CurrentSession` for constructor injection
 ----
-MyService(@CurrentSession EntityManager entityManager) {
+public MyService(@CurrentSession EntityManager entityManager) {
      this.entityManager = entityManager;
 }
 ----

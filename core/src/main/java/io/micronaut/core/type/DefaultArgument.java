@@ -18,7 +18,11 @@ package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.naming.NameUtils;
 
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
+import java.lang.reflect.TypeVariable;
 import java.util.*;
 
 /**
@@ -50,6 +54,42 @@ class DefaultArgument<T> implements Argument<T> {
         this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
         this.typeParameters = initializeTypeParameters(genericTypes);
         this.typeParameterArray = genericTypes;
+    }
+
+    DefaultArgument(Type type, String name, AnnotationMetadata annotationMetadata) {
+        this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
+        if (type == null) {
+            type = getClass().getGenericSuperclass();
+            if (type instanceof ParameterizedType) {
+                type = ((ParameterizedType) type).getActualTypeArguments()[0];
+            } else {
+                throw new IllegalArgumentException(type + " is not parameterized");
+            }
+        }
+        if (type instanceof Class) {
+            //noinspection unchecked
+            this.type = (Class<T>) type;
+            this.typeParameterArray = Argument.ZERO_ARGUMENTS;
+        } else if (type instanceof ParameterizedType) {
+            ParameterizedType parameterizedType = (ParameterizedType) type;
+            //noinspection unchecked
+            this.type = (Class<T>) parameterizedType.getRawType();
+            TypeVariable<Class<T>>[] params = this.type.getTypeParameters();
+            Type[] paramValues = parameterizedType.getActualTypeArguments();
+            typeParameterArray = new Argument[params.length];
+            for (int i = 0; i < params.length; i++) {
+                TypeVariable param = params[i];
+                Type value = paramValues[i];
+                typeParameterArray[i] = new DefaultArgument(value, param.getName(), AnnotationMetadata.EMPTY_METADATA);
+            }
+        } else {
+            throw new IllegalArgumentException(type.getClass().getSimpleName() + " types are not supported");
+        }
+        if (name == null) {
+            name = NameUtils.decapitalize(this.type.getSimpleName());
+        }
+        this.name = name;
+        this.typeParameters = initializeTypeParameters(this.typeParameterArray);
     }
 
     @Override
@@ -107,7 +147,7 @@ class DefaultArgument<T> implements Argument<T> {
         if (this == o) {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
+        if (!(o instanceof DefaultArgument)) {
             return false;
         }
         DefaultArgument<?> that = (DefaultArgument<?>) o;

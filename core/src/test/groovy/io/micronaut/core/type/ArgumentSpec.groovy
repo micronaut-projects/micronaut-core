@@ -22,11 +22,62 @@ import spock.lang.Specification
  * @author Graeme Rocher
  * @since 1.0
  */
-class ArgumentSpec extends Specification{
+class ArgumentSpec extends Specification {
 
     void "test equals/hashcode"() {
         expect:
         Argument.of(Optional.class, Integer.class).hashCode() == Argument.of(Optional.class, Integer.class).hashCode()
         Argument.of(Optional.class, Integer.class) == Argument.of(Optional.class, Integer.class)
     }
+
+    void "test generic list"() {
+        def arg = new GenericArgument<List<String>>() {}
+        expect:
+        arg.getType() == List.class
+        arg.getTypeParameters().length == 1
+        arg.getTypeParameters()[0].getType() == String.class
+        arg == Argument.listOf(String.class)
+    }
+
+    void "test generic set"() {
+        def arg = new GenericArgument<Set<String>>() {}
+        expect:
+        arg.getType() == Set.class
+        arg.getTypeParameters().length == 1
+        arg.getTypeParameters()[0].getType() == String.class
+        arg == Argument.setOf(String.class)
+    }
+
+    void "test generic map"() {
+        def arg = new GenericArgument<Map<UUID, String>>() {}
+        expect:
+        arg.getType() == Map.class
+        arg.getTypeParameters().length == 2
+        arg.getTypeParameters()[0].getType() == UUID.class
+        arg.getTypeParameters()[1].getType() == String.class
+        arg == Argument.mapOf(UUID, String)
+    }
+
+    void "test generic list of lists"() {
+        def arg = new GenericArgument<List<List<Long>>>() {}
+        expect:
+        arg.getType() == List.class
+        arg.getTypeParameters()[0].getType() == List.class
+        arg.getTypeParameters()[0].getTypeParameters()[0].getType() == Long.class
+    }
+
+/*
+    void "test inner class"() {
+        def arg = new Test<String>() {}.get();
+        expect:
+        arg.getType() == List.class
+        arg.getTypeParameters()[0].getType() == String.class
+    }
+
+    abstract class Test<T> {
+        Argument<List<T>> get() {
+            return new GenericArgument<List<T>>(getClass()) {}
+        }
+    }
+*/
 }

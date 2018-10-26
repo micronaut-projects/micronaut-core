@@ -168,11 +168,13 @@ class JpaSetupSpec extends Specification {
     void "test inject java persistence context"() {
         given:
         JavaBookService bookService = applicationContext.getBean(JavaBookService)
+        JavaReadOnlyBookService readOnlyBookService = applicationContext.getBean(JavaReadOnlyBookService)
 
         expect:
         bookService.testFieldInject()
         bookService.testMethodInject()
         bookService.testNativeQuery()
+        readOnlyBookService.testNativeQuery()
     }
 }
 
