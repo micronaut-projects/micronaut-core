@@ -1748,7 +1748,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 DeclaredType dt = (DeclaredType) typeMirror;
                                 typeName = dt.asElement().getSimpleName().toString();
                             } else {
-                                typeName = typeMirror.toString();
+                                typeName = modelUtils.resolveTypeName(typeMirror);
                             }
                             Object argType = modelUtils.classOfPrimitiveFor(typeName);
                             params.addParameter(argName, argType);
