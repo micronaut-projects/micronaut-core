@@ -241,6 +241,16 @@ ext {
                 version: tomcatJdbcVersion,
                 group: 'org.apache.tomcat',
                 name: 'tomcat-jdbc'
+            ],
+            hibernate: [
+                    version: hibernateVersion,
+                    group: 'org.hibernate',
+                    name: 'hibernate-core'
+            ],
+            'hibernate.jcache': [
+                    version: hibernateVersion,
+                    group: 'org.hibernate',
+                    name: 'hibernate-jcache'
             ]
 
     ]

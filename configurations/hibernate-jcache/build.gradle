@@ -1,0 +1,8 @@
+dependencies {
+    compile project(":configurations:hibernate-jpa")
+    compile dependencyVersion("hibernate.jcache")
+    testCompile project(":inject-groovy")
+    testCompile project(":inject-java")
+    testRuntime project(":configurations:jdbc-tomcat")
+    testRuntime dependencyVersion("h2")
+}
