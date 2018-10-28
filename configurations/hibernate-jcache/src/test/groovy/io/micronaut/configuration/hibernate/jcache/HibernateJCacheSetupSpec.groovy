@@ -17,14 +17,10 @@ package io.micronaut.configuration.hibernate.jcache
 
 import io.micronaut.configuration.hibernate.jpa.JpaConfiguration
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Requires
-import io.micronaut.context.event.BeanCreatedEvent
-import io.micronaut.context.event.BeanCreatedEventListener
 import org.hibernate.cache.jcache.ConfigSettings
 import spock.lang.Specification
 
 import javax.cache.CacheManager
-import javax.inject.Singleton
 
 /**
  * @author Marcel Overdijk
@@ -47,20 +43,6 @@ class HibernateJCacheSetupSpec extends Specification {
         JpaConfiguration jpaConfiguration = applicationContext.getBean(JpaConfiguration)
         Map<String, Object> jpaProperties = jpaConfiguration.getProperties()
 
-        // ****** TESTING ******
-
-        println "jpaProperties = " + jpaProperties
-
-        // The local LocalHibernateJCacheManagerBinder *can* be found
-        LocalHibernateJCacheManagerBinder localHibernateJCacheManagerBinder = applicationContext.getBean(LocalHibernateJCacheManagerBinder)
-        println "localHibernateJCacheManagerBinder = " + localHibernateJCacheManagerBinder
-
-        // The configuration's HibernateJCacheManagerBinder *cannot* be found :-(
-        HibernateJCacheManagerBinder hibernateJCacheManagerBinder = applicationContext.getBean(HibernateJCacheManagerBinder)
-        println "hibernateJCacheManagerBinder = " + hibernateJCacheManagerBinder
-
-        // ****** TESTING ******
-
         expect:
         jpaProperties[ConfigSettings.CACHE_MANAGER] == cacheManager
 
@@ -68,23 +50,25 @@ class HibernateJCacheSetupSpec extends Specification {
         applicationContext.close()
     }
 
-    @Singleton
-    @Requires(beans = CacheManager.class)
-    static class LocalHibernateJCacheManagerBinder implements BeanCreatedEventListener<JpaConfiguration> {
+    void "test cache manager not bound"() {
+        given:
+        CacheManager cacheManager = Mock(CacheManager)
+        ApplicationContext applicationContext = ApplicationContext.build([
+                'datasources.default.name'                     : 'mydb',
+                'jpa.default.properties.hibernate.hbm2ddl.auto': 'create-drop'
+        ])
+                .mainClass(HibernateJCacheSetupSpec)
+                .build()
+        applicationContext.start()
 
-        private final CacheManager cacheManager;
+        JpaConfiguration jpaConfiguration = applicationContext.getBean(JpaConfiguration)
+        Map<String, Object> jpaProperties = jpaConfiguration.getProperties()
 
-        LocalHibernateJCacheManagerBinder(CacheManager cacheManager) {
-            this.cacheManager = cacheManager
-        }
+        expect:
+        jpaProperties[ConfigSettings.CACHE_MANAGER] == null
 
-        @Override
-        JpaConfiguration onCreated(BeanCreatedEvent<JpaConfiguration> event) {
-            JpaConfiguration jpaConfiguration = event.getBean()
-            Map<String, Object> jpaProperties = jpaConfiguration.getProperties()
-            jpaProperties.put(ConfigSettings.CACHE_MANAGER, cacheManager)
-            return jpaConfiguration
-        }
+        cleanup:
+        applicationContext.close()
     }
 }
 
