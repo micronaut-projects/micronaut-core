@@ -48,7 +48,7 @@ import java.util.Map;
  * @see <a href="https://github.com/liquibase/liquibase/blob/master/liquibase-core/src/main/java/liquibase/integration/spring/SpringLiquibase.java">SpringLiquibase</a>
  *
  * @author Sergio del Amo
- * @since 1.0
+ * @since 1.1
  */
 public abstract class AbstractLiquibase {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractLiquibase.class);
