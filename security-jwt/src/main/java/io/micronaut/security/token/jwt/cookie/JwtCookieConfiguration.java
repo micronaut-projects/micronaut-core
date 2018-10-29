@@ -32,6 +32,12 @@ public interface JwtCookieConfiguration extends Toggleable {
     String getCookieName();
 
     /**
+     * cookiePath getter.
+     * @return a String with the Cookie path
+     */
+    String getCookiePath();
+
+    /**
      *
      * @return String to be parsed into a URI which represents where the user is redirected to after a successful login.
      */
