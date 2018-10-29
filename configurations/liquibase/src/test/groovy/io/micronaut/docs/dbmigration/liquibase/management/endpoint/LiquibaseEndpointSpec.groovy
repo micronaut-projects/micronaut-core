@@ -115,5 +115,10 @@ class LiquibaseEndpointSpec extends Specification {
         response.body()[0].changeSets.size() == 2
         response.body()[0].changeSets[0].changeLog == 'classpath:db/changelog/01-create-books-schema.xml'
         response.body()[0].changeSets[1].changeLog == 'classpath:db/changelog/02-insert-data-books.xml'
+
+        cleanup:
+        rxClient.close()
+        embeddedServer.stop()
+        embeddedServer.close()
     }
 }
