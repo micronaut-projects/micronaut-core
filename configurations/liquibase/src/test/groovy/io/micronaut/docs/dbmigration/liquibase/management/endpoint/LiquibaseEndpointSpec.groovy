@@ -17,7 +17,11 @@ package io.micronaut.docs.dbmigration.liquibase.management.endpoint
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
+import io.micronaut.core.type.Argument
 import io.micronaut.dbmigration.liquibase.management.endpoint.LiquibaseEndpoint
+import io.micronaut.dbmigration.liquibase.management.endpoint.LiquibaseReport
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
@@ -105,9 +109,6 @@ class LiquibaseEndpointSpec extends Specification implements YamlAsciidocTagClea
                     driverClassName: 'org.h2.Driver',
                 ]
             ],
-            ////////////////////////// REMOVE THIS //////////////////////
-            'micronaut.http.client.read-timeout': '1000s'
-            ////////////////////////// REMOVE THIS //////////////////////
         ]
 
         Map<String, Object> config = [:] << flatten(liquibaseMap)
@@ -117,14 +118,16 @@ class LiquibaseEndpointSpec extends Specification implements YamlAsciidocTagClea
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
 
         when:
-        def response = rxClient.exchange("/liquibase", Map).blockingFirst()
-        def result = response.body()
+        HttpResponse<List> response = rxClient.toBlocking().exchange(HttpRequest.GET("/liquibase"),
+                Argument.of(List, LiquibaseReport))
 
         then:
-        println "=" * 100
-        println "result -> " + result
-        println "=" * 100
-        response.code() == HttpStatus.OK.code
-        result != null
+        response.status() == HttpStatus.OK
+        response.body().size() == 1
+        response.body().size() == 1
+        response.body()[0].name == 'default'
+//        response.body()[0].changeSets.size() == 1
+//        response.body()[0].changeSets[0].changeLog == 'changelog/01-create-books-schema.xml'
+//        response.body()[0].changeSets[1].changeLog == 'changelog/02-insert-data-books.xml'
     }
 }
