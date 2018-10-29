@@ -39,3 +39,62 @@ include::{testsliquibase}/resources/db/changelog/01-create-books-schema.xml[inde
 There are several options available for configuration:
 
 include::{includedir}configurationProperties/io.micronaut.dbmigration.liquibase.LiquibaseConfigurationProperties.adoc[]
+
+
+=== Endpoint
+
+Micronaut also provides a built-in endpoint to expose all the applied migrations in the built-in endpoing `/liquibase`.
+
+To enable the endpoint add the following to the configuration:
+
+[source,yaml]
+.resources/application.yml
+----
+endpoints:
+    liquibase:
+        enabled: true # <1>
+        sensitive: false # <2>
+----
+<1> `/liquibase` endpoint is enabled.
+<2> `/liquibase` endpoint is open for unauthenticated access.
+
+[source,bash]
+----
+$ curl http://localhost:8080/liquibase
+
+[{
+    "name": "default",
+    "changeSets": [{
+        "author": "sdelamo",
+        "changeLog": "classpath:db/changelog/01-create-books-and-author-schema.xml",
+        "comments": "",
+        "contexts": [],
+        "dateExecuted": 1540830785.000000000,
+        "deploymentId": "0830784929",
+        "description": "createTable tableName=books; createTable tableName=authors; addForeignKeyConstraint baseTableName=books, constraintName=author_fk, referencedTableName=authors",
+        "execType": "EXECUTED",
+        "id": "01",
+        "labels": [],
+        "checksum": "8:140eb966bb6a14bccade2c2d9133b7d3",
+        "orderExecuted": 1,
+        "tag": null
+    }, {
+        "author": "sdelamo",
+        "changeLog": "classpath:db/changelog/02-insert-data-authors.xml",
+        "comments": "Inserting Authors",
+        "contexts": [],
+        "dateExecuted": 1540830785.000000000,
+        "deploymentId": "0830784929",
+        "description": "insert tableName=authors; insert tableName=authors; insert tableName=authors; insert tableName=authors; insert tableName=authors",
+        "execType": "EXECUTED",
+        "id": "02",
+        "labels": [],
+        "checksum": "8:6204c525ce5c1c55f064888d078b8f05",
+        "orderExecuted": 2,
+        "tag": null
+    }]
+}]
+----
+
+
+NOTE: See the section on <<providedEndpoints, Built-in endpoints>> in the user guide for more information.
