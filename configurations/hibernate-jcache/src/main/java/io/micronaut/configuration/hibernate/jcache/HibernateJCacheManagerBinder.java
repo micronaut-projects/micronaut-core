@@ -30,7 +30,7 @@ import java.util.Map;
  * Binds the JCache {@link CacheManager} to Hibernate.
  *
  * @author Marcel Overdijk
- * @since 1.0.1
+ * @since 1.1
  */
 @Singleton
 @Requires(beans = CacheManager.class)
