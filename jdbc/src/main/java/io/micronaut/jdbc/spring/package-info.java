@@ -15,9 +15,9 @@
  */
 
 /**
- * Classes for configuring transaction management for data sources.
+ * Classes for configuring transaction management via Spring for data sources.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.spring.tx.datasource;
+package io.micronaut.jdbc.spring;
