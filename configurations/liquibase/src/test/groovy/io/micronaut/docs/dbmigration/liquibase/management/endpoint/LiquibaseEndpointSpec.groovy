@@ -126,8 +126,8 @@ class LiquibaseEndpointSpec extends Specification implements YamlAsciidocTagClea
         response.body().size() == 1
         response.body().size() == 1
         response.body()[0].name == 'default'
-//        response.body()[0].changeSets.size() == 1
-//        response.body()[0].changeSets[0].changeLog == 'changelog/01-create-books-schema.xml'
-//        response.body()[0].changeSets[1].changeLog == 'changelog/02-insert-data-books.xml'
+        response.body()[0].changeSets.size() == 2
+        response.body()[0].changeSets[0].changeLog == 'classpath:db/changelog/01-create-books-schema.xml'
+        response.body()[0].changeSets[1].changeLog == 'classpath:db/changelog/02-insert-data-books.xml'
     }
 }
