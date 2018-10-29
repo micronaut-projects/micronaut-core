@@ -24,7 +24,7 @@ import javax.cache.CacheManager
 
 /**
  * @author Marcel Overdijk
- * @since 1.0.1
+ * @since 1.1
  */
 class HibernateJCacheSetupSpec extends Specification {
 
