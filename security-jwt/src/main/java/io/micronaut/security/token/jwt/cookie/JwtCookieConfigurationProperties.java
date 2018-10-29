@@ -42,6 +42,12 @@ public class JwtCookieConfigurationProperties implements JwtCookieConfiguration 
     public static final String DEFAULT_COOKIENAME = "JWT";
 
     /**
+     * The default cookie path.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_COOKIEPATH = null;
+
+    /**
      * The default logout target URL.
      */
     @SuppressWarnings("WeakerAccess")
@@ -61,6 +67,7 @@ public class JwtCookieConfigurationProperties implements JwtCookieConfiguration 
     private boolean enabled = DEFAULT_ENABLED;
     private String logoutTargetUrl = DEFAULT_LOGOUTTARGETURL;
     private String cookieName = DEFAULT_COOKIENAME;
+    private String cookiePath = DEFAULT_COOKIEPATH;
     private String loginSuccessTargetUrl = DEFAULT_LOGINSUCCESSTARGETURL;
     private String loginFailureTargetUrl = DEFAULT_LOGINFAILURETARGETURL;
 
@@ -98,6 +105,15 @@ public class JwtCookieConfigurationProperties implements JwtCookieConfiguration 
     }
 
     /**
+     * cookiePath getter.
+     * @return a String with the Cookie path
+     */
+    @Override
+    public String getCookiePath() {
+        return cookiePath;
+    }
+
+    /**
      * Sets whether JWT cookie based security is enabled. Default value ({@value #DEFAULT_ENABLED}).
      *
      * @param enabled True if it is enabled
@@ -123,6 +139,18 @@ public class JwtCookieConfigurationProperties implements JwtCookieConfiguration 
     public void setCookieName(String cookieName) {
         if (StringUtils.isNotEmpty(cookieName)) {
             this.cookieName = cookieName;
+        }
+    }
+
+    /**
+     * Sets the cookie path to use. Default value ({@value #DEFAULT_COOKIEPATH}).
+     * @param cookiePath The cookie path
+     */
+    public void setCookiePath(String cookiePath) {
+        if (StringUtils.isNotEmpty(cookiePath)) {
+            this.cookiePath = cookiePath;
+        } else {
+            this.cookiePath = null;
         }
     }
 
