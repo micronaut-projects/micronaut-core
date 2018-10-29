@@ -11,12 +11,15 @@ import spock.util.concurrent.PollingConditions
 
 class KafkaStreamsSpec extends Specification {
 
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
+    @Shared
+    @AutoCleanup
+    ApplicationContext context = ApplicationContext.run(
             CollectionUtils.mapOf(
                     "kafka.bootstrap.servers", 'localhost:${random.port}',
                     AbstractKafkaConfiguration.EMBEDDED, true,
                     AbstractKafkaConfiguration.EMBEDDED_TOPICS, [WordCountStream.INPUT, WordCountStream.OUTPUT],
-                    'kafka.streams.my-stream.num.stream.threads',10
+                    'kafka.streams.my-stream.num.stream.threads', 10,
+                    'kafka.streams.state-stream.num.stream.threads', 10
             )
     )
 
@@ -27,12 +30,11 @@ class KafkaStreamsSpec extends Specification {
 
     void "test kafka stream application"() {
         given:
-
         PollingConditions conditions = new PollingConditions(timeout: 30, delay: 1)
 
         when:
-        WordCountClient wordCountClient = context.getBean(WordCountClient);
-        wordCountClient.publishSentence("The quick brown fox jumps over the lazy dog. THE QUICK BROWN FOX JUMPED OVER THE LAZY DOG'S BACK");
+        WordCountClient wordCountClient = context.getBean(WordCountClient)
+        wordCountClient.publishSentence("The quick brown fox jumps over the lazy dog. THE QUICK BROWN FOX JUMPED OVER THE LAZY DOG'S BACK")
 
         WordCountListener countListener = context.getBean(WordCountListener)
 
@@ -44,6 +46,5 @@ class KafkaStreamsSpec extends Specification {
         }
 
     }
-
 
 }
