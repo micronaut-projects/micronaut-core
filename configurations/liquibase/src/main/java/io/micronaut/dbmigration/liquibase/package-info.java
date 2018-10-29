@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-
 /**
  * Liquibase integration with Micronaut.
- * @see <a href="http://www.liquibase.org">Liquibase</a>
+ *
  * @author Sergio del Amo
+ * @see <a href="http://www.liquibase.org">Liquibase</a>
  * @since 1.1
  */
 package io.micronaut.dbmigration.liquibase;

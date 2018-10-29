@@ -26,10 +26,13 @@ import java.util.List;
  * @since 1.1
  */
 public class LiquibaseReport {
-    String name;
 
-    List<ChangeSet> changeSets;
+    private String name;
+    private List<ChangeSet> changeSets;
 
+    /**
+     * Default constructor.
+     */
     public LiquibaseReport() {
     }
 
@@ -42,14 +45,6 @@ public class LiquibaseReport {
         this.changeSets = changeSets;
     }
 
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    public void setChangeSets(List<ChangeSet> changeSets) {
-        this.changeSets = changeSets;
-    }
-
     /**
      * @return The name of the data source
      */
@@ -58,9 +53,23 @@ public class LiquibaseReport {
     }
 
     /**
-     * @return The list of changesets
+     * @param name The name of the data source
+     */
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    /**
+     * @return The list of change sets
      */
     public List<ChangeSet> getChangeSets() {
         return changeSets;
+    }
+
+    /**
+     * @param changeSets The list of the change sets
+     */
+    public void setChangeSets(List<ChangeSet> changeSets) {
+        this.changeSets = changeSets;
     }
 }

@@ -58,8 +58,10 @@ public class ChangeSet {
 
     private String tag;
 
+    /**
+     * Default constructor.
+     */
     public ChangeSet() {
-
     }
 
     /**

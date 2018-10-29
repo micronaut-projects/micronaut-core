@@ -29,6 +29,7 @@ import java.util.Collection;
 
 /**
  * Asynchronous listener for  {@link io.micronaut.context.event.StartupEvent} to run liquibase operations.
+ *
  * @author Sergio del Amo
  * @since 1.1
  */

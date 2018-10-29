@@ -45,9 +45,8 @@ import java.util.Map;
 /**
  * For each {@link javax.sql.DataSource}, it looks for a liquibase configuration ({@link LiquibaseConfigurationProperties}) with the same name qualifier and runs it.
  *
- * @see <a href="https://github.com/liquibase/liquibase/blob/master/liquibase-core/src/main/java/liquibase/integration/spring/SpringLiquibase.java">SpringLiquibase</a>
- *
  * @author Sergio del Amo
+ * @see <a href="https://github.com/liquibase/liquibase/blob/master/liquibase-core/src/main/java/liquibase/integration/spring/SpringLiquibase.java">SpringLiquibase</a>
  * @since 1.1
  */
 public abstract class AbstractLiquibase {
@@ -57,18 +56,18 @@ public abstract class AbstractLiquibase {
     private final Collection<LiquibaseConfigurationProperties> liquibaseConfigurationProperties;
 
     /**
-     *
-     * @param resourceAccessor An implementation of {@link liquibase.resource.ResourceAccessor}.
+     * @param resourceAccessor                 An implementation of {@link liquibase.resource.ResourceAccessor}.
      * @param liquibaseConfigurationProperties Collection of Liquibase Configurations
      */
     public AbstractLiquibase(ResourceAccessor resourceAccessor,
-                             Collection<LiquibaseConfigurationProperties> liquibaseConfigurationProperties)  {
+                             Collection<LiquibaseConfigurationProperties> liquibaseConfigurationProperties) {
         this.resourceAccessor = resourceAccessor;
         this.liquibaseConfigurationProperties = liquibaseConfigurationProperties;
     }
 
     /**
      * Runs Liquibase for the datasource where there is a liquibase configuration available.
+     *
      * @param async if true only liquibase configurations set to async are run.
      */
     public void run(boolean async) {
@@ -100,8 +99,9 @@ public abstract class AbstractLiquibase {
 
     /**
      * Performs liquibase update for the given data datasource and configuration.
+     *
      * @param dataSource The DataSource
-     * @param conf Liquibase configuration
+     * @param conf       Liquibase configuration
      */
     protected void runLiquibaseForDataSourceWithConfig(DataSource dataSource, LiquibaseConfigurationProperties conf) {
         try {
@@ -137,8 +137,9 @@ public abstract class AbstractLiquibase {
 
     /**
      * Performs Liquibase update.
+     *
      * @param liquibase Primary facade class for interacting with Liquibase.
-     * @param conf Liquibase configuration
+     * @param conf      Liquibase configuration
      * @throws LiquibaseException Liquibase exception.
      */
     protected void performUpdate(Liquibase liquibase, LiquibaseConfigurationProperties conf) throws LiquibaseException {
@@ -161,8 +162,9 @@ public abstract class AbstractLiquibase {
 
     /**
      * Generates Rollback file.
+     *
      * @param liquibase Primary facade class for interacting with Liquibase.
-     * @param conf Liquibase configuration
+     * @param conf      Liquibase configuration
      * @throws LiquibaseException Liquibase exception.
      */
     protected void generateRollbackFile(Liquibase liquibase, LiquibaseConfigurationProperties conf) throws LiquibaseException {
@@ -184,9 +186,8 @@ public abstract class AbstractLiquibase {
     }
 
     /**
-     *
      * @param connection Connection with the data source
-     * @param conf Liquibase Configuration for the Data source
+     * @param conf       Liquibase Configuration for the Data source
      * @return A Liquibase object
      * @throws LiquibaseException A liquibase exception.
      */
@@ -211,9 +212,9 @@ public abstract class AbstractLiquibase {
      * Subclasses may override this method add change some database settings such as
      * default schema before returning the database object.
      *
-     * @param connection Connection with the data source
+     * @param connection       Connection with the data source
      * @param resourceAccessor Abstraction of file access
-     * @param conf Liquibase Configuration for the Data source
+     * @param conf             Liquibase Configuration for the Data source
      * @return a Database implementation retrieved from the {@link DatabaseFactory}.
      * @throws DatabaseException A Liquibase Database exception.
      */

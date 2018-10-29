@@ -27,6 +27,7 @@ import java.util.Map;
 
 /**
  * Create a Liquibase Configuration for each sub-property of liquibase.*.
+ *
  * @author Sergio del Amo
  * @since 1.1
  */
@@ -108,7 +109,6 @@ public class LiquibaseConfigurationProperties implements Toggleable {
      * "classpath:" whereas the ones parsed via AbstractLiquibase are.
      *
      * To avoid this issue, just set ignoreClasspathPrefix to true.
-     *
      */
     private boolean ignoreClasspathPrefix = DEFAULT_IGNORECLASSPATHPREFIX;
 
@@ -121,9 +121,8 @@ public class LiquibaseConfigurationProperties implements Toggleable {
     private final String nameQualifier;
 
     /**
-     *
      * @param dataSource DataSource with the same name qualifier.
-     * @param name name qualifier.
+     * @param name       name qualifier.
      */
     public LiquibaseConfigurationProperties(@Nullable @Parameter DataSource dataSource,
                                             @Parameter String name) {
@@ -133,6 +132,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Whether rollback should be tested before update is performed. Default value ({@value #DEFAULT_TESTROLLBACKONUPDATE}).
+     *
      * @param testRollbackOnUpdate Whether rollback should be tested before update is performed.
      */
     public void setTestRollbackOnUpdate(boolean testRollbackOnUpdate) {
@@ -141,6 +141,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Returns whether a rollback should be tested at update time or not.
+     *
      * @return Whether a rollback should be tested at update time or not.
      */
     public boolean isTestRollbackOnUpdate() {
@@ -148,7 +149,6 @@ public class LiquibaseConfigurationProperties implements Toggleable {
     }
 
     /**
-     *
      * @return true if classpath prefix should be ignored during changeset comparison
      */
     public boolean isIgnoreClasspathPrefix() {
@@ -157,6 +157,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Ignores classpath prefix during changeset comparison. Default value ({@value #DEFAULT_IGNORECLASSPATHPREFIX}).
+     *
      * @param ignoreClasspathPrefix Sets whether to ignore the classpath prefix during changeset comparison.
      */
     public void setIgnoreClasspathPrefix(boolean ignoreClasspathPrefix) {
@@ -165,6 +166,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Name of table to use for tracking concurrent Liquibase usage.
+     *
      * @return the name of table to use for tracking concurrent Liquibase usage.
      */
     public String getDatabaseChangeLogLockTable() {
@@ -173,6 +175,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Name of table to use for tracking concurrent Liquibase usage.
+     *
      * @param databaseChangeLogLockTable the name of table to use for tracking concurrent Liquibase usage.
      */
     public void setDatabaseChangeLogLockTable(String databaseChangeLogLockTable) {
@@ -181,6 +184,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Name of table to use for tracking change history.
+     *
      * @return the name of table to use for tracking change history.
      */
     public String getDatabaseChangeLogTable() {
@@ -189,6 +193,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Name of table to use for tracking change history.
+     *
      * @param databaseChangeLogTable the name of table to use for tracking change history.
      */
     public void setDatabaseChangeLogTable(String databaseChangeLogTable) {
@@ -197,6 +202,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Tablespace to use for Liquibase objects.
+     *
      * @return the tablespace to use for Liquibase objects.
      */
     public String getLiquibaseTablespace() {
@@ -205,6 +211,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Tablespace to use for Liquibase objects.
+     *
      * @param liquibaseTablespace the tablespace to use for Liquibase objects.
      */
     public void setLiquibaseTablespace(String liquibaseTablespace) {
@@ -213,6 +220,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Schema to use for Liquibase objects.
+     *
      * @return Schema to use for Liquibase objects.
      */
     public String getLiquibaseSchema() {
@@ -221,6 +229,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Schema to use for Liquibase objects.
+     *
      * @param liquibaseSchema Schema to use for Liquibase objects.
      */
     public void setLiquibaseSchema(String liquibaseSchema) {
@@ -228,7 +237,6 @@ public class LiquibaseConfigurationProperties implements Toggleable {
     }
 
     /**
-     *
      * @return the liquibase changelog
      */
     public String getChangeLog() {
@@ -237,6 +245,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Change log configuration path.
+     *
      * @param changeLog sets the change log configuration path.
      */
     public void setChangeLog(String changeLog) {
@@ -245,6 +254,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Path to file to which rollback SQL is written when an update is performed.
+     *
      * @param rollbackFilePath Path to file to which rollback SQL is written when an update is performed.
      */
     public void setRollbackFilePath(String rollbackFilePath) {
@@ -252,7 +262,6 @@ public class LiquibaseConfigurationProperties implements Toggleable {
     }
 
     /**
-     *
      * @return the path to file to which rollback SQL is written when an update is performed.
      */
     public String getRollbackFilePath() {
@@ -260,7 +269,6 @@ public class LiquibaseConfigurationProperties implements Toggleable {
     }
 
     /**
-     *
      * @return the file to which rollback SQL is written when an update is performed.
      */
     public File getRollbackFile() {
@@ -271,7 +279,6 @@ public class LiquibaseConfigurationProperties implements Toggleable {
     }
 
     /**
-     *
      * @return true if database schema should be drop before running liquibase operations.
      */
     public boolean isDropFirst() {
@@ -280,6 +287,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Whether to first drop the database schema. Default value ({@value #DEFAULT_DROPFIRST}).
+     *
      * @param dropFirst True to drop the schema.
      */
     public void setDropFirst(boolean dropFirst) {
@@ -287,7 +295,6 @@ public class LiquibaseConfigurationProperties implements Toggleable {
     }
 
     /**
-     *
      * @return the default database schema.
      */
     public String getDefaultSchema() {
@@ -296,6 +303,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Default database schema.
+     *
      * @param defaultSchema Sets the default database schema.
      */
     public void setDefaultSchema(String defaultSchema) {
@@ -311,6 +319,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Change log parameters.
+     *
      * @param parameters Change log parameters
      */
     public void setParameters(Map<String, String> parameters) {
@@ -318,7 +327,6 @@ public class LiquibaseConfigurationProperties implements Toggleable {
     }
 
     /**
-     *
      * @return the liquibase tag.
      */
     public String getTag() {
@@ -326,7 +334,6 @@ public class LiquibaseConfigurationProperties implements Toggleable {
     }
 
     /**
-     *
      * @param tag a tag.
      */
     public void setTag(String tag) {
@@ -335,6 +342,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Comma-separated list of runtime contexts to use.
+     *
      * @return a comma-separated list of runtime contexts to use.
      */
     public String getContexts() {
@@ -343,6 +351,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Comma-separated list of runtime contexts to use.
+     *
      * @param contexts a comma-separated list of runtime contexts to use.
      */
     public void setContexts(String contexts) {
@@ -351,6 +360,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Comma-separated list of runtime labels to use.
+     *
      * @return A Comma-separated list of runtime labels to use
      */
     public String getLabels() {
@@ -359,6 +369,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Comma-separated list of runtime labels to use.
+     *
      * @param labels A Comma-separated list of runtime labels to use
      */
     public void setLabels(String labels) {
@@ -372,6 +383,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Sets whether this liquibase configuration is enabled. Default value ({@value #DEFAULT_ENABLED}).
+     *
      * @param enabled True if it is enabled
      */
     public void setEnabled(boolean enabled) {
@@ -379,7 +391,6 @@ public class LiquibaseConfigurationProperties implements Toggleable {
     }
 
     /**
-     *
      * @return name qualifier associated with this liquibase configuration.
      */
     public String getNameQualifier() {
@@ -387,7 +398,6 @@ public class LiquibaseConfigurationProperties implements Toggleable {
     }
 
     /**
-     *
      * @return The DataSource qualified with the same name.
      */
     public DataSource getDataSource() {
@@ -396,6 +406,7 @@ public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**
      * Whether liquibase operations should be run asynchronously.
+     *
      * @param async true to run liquibase operations asynchronously
      */
     public void setAsync(boolean async) {
@@ -403,7 +414,6 @@ public class LiquibaseConfigurationProperties implements Toggleable {
     }
 
     /**
-     *
      * @return true if liquibase operations should be run asynchronously.
      */
     public boolean isAsync() {
