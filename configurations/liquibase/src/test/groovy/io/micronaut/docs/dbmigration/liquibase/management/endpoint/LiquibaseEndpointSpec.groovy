@@ -25,7 +25,6 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.testutils.YamlAsciidocTagCleaner
 import spock.lang.Specification
 
 class LiquibaseEndpointSpec extends Specification {
@@ -42,6 +41,7 @@ class LiquibaseEndpointSpec extends Specification {
 
         cleanup:
         embeddedServer.stop()
+        embeddedServer.close()
     }
 
     void "test the endpoint bean can be disabled"() {
@@ -56,6 +56,7 @@ class LiquibaseEndpointSpec extends Specification {
 
         cleanup:
         embeddedServer.stop()
+        embeddedServer.close()
     }
 
     void "test the endpoint bean is not available will all disabled"() {
@@ -70,6 +71,7 @@ class LiquibaseEndpointSpec extends Specification {
 
         cleanup:
         embeddedServer.stop()
+        embeddedServer.close()
     }
 
     void "test the endpoint bean is available will all disabled but having it enabled"() {
@@ -81,40 +83,120 @@ class LiquibaseEndpointSpec extends Specification {
                  Environment.TEST)
 
         expect:
-            embeddedServer.applicationContext.containsBean(LiquibaseEndpoint)
+        embeddedServer.applicationContext.containsBean(LiquibaseEndpoint)
 
         cleanup:
-            embeddedServer.stop()
+        embeddedServer.stop()
+        embeddedServer.close()
     }
 
     void 'test liquibase endpoint'() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'jpa.default.packages-to-scan': 'example.micronaut',
-                'jpa.default.properties.hibernate.hbm2ddl.auto': 'none',
-                'jpa.default.properties.hibernate.show_sql': true,
-                'liquibase.default.change-log'      : 'classpath:db/liquibase-changelog.xml',
-                'endpoints.liquibase.sensitive'     : false,
-                'datasources.default.url': 'jdbc:h2:mem:liquibaseDisabledDb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
-                'datasources.default.username': 'sa',
-                'datasources.default.password': '',
-                'datasources.default.driver-class-name': 'org.h2.Driver',
-        ], Environment.TEST)
+        EmbeddedServer embeddedServer = ApplicationContext.run(
+            EmbeddedServer,
+            ['jpa.default.packages-to-scan'                 : 'example.micronaut',
+             'jpa.default.properties.hibernate.hbm2ddl.auto': 'none',
+             'jpa.default.properties.hibernate.show_sql'    : true,
+             'liquibase.default.change-log'                 : 'classpath:db/liquibase-changelog.xml',
+             'endpoints.liquibase.sensitive'                : false,
+             'datasources.default.url'                      : 'jdbc:h2:mem:liquibaseDisabledDb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
+             'datasources.default.username'                 : 'sa',
+             'datasources.default.password'                 : '',
+             'datasources.default.driver-class-name'        : 'org.h2.Driver'] as Map,
+            Environment.TEST
+        )
         URL server = embeddedServer.getURL()
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
 
         when:
-        HttpResponse<List> response = rxClient.toBlocking().exchange(HttpRequest.GET("/liquibase"),
-                Argument.of(List, LiquibaseReport))
+        HttpResponse<List> response = rxClient.toBlocking()
+            .exchange(HttpRequest.GET("/liquibase"), Argument.of(List, LiquibaseReport))
 
         then:
         response.status() == HttpStatus.OK
-        response.body().size() == 1
-        response.body().size() == 1
-        response.body()[0].name == 'default'
-        response.body()[0].changeSets.size() == 2
-        response.body()[0].changeSets[0].changeLog == 'classpath:db/changelog/01-create-books-schema.xml'
-        response.body()[0].changeSets[1].changeLog == 'classpath:db/changelog/02-insert-data-books.xml'
+        List<LiquibaseReport> result = response.body()
+        result.size() == 1
+        result[0].name == 'default'
+        result[0].changeSets.size() == 2
+        result[0].changeSets[0].changeLog == 'classpath:db/changelog/01-create-books-schema.xml'
+        result[0].changeSets[1].changeLog == 'classpath:db/changelog/02-insert-data-books.xml'
+
+        cleanup:
+        rxClient.close()
+        embeddedServer.stop()
+        embeddedServer.close()
+    }
+
+    void 'test liquibase endpoint with multiple datasources'() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(
+            EmbeddedServer,
+            ['jpa.default.packages-to-scan'                 : 'example.micronaut',
+             'jpa.default.properties.hibernate.hbm2ddl.auto': 'none',
+             'jpa.default.properties.hibernate.show_sql'    : true,
+             'liquibase.default.change-log'                 : 'classpath:db/liquibase-changelog.xml',
+             'liquibase.other.change-log'                   : 'classpath:db/liquibase-other-changelog.xml',
+             'endpoints.liquibase.sensitive'                : false,
+             'datasources.default.url'                      : 'jdbc:h2:mem:liquibaseDb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
+             'datasources.default.username'                 : 'sa',
+             'datasources.default.password'                 : '',
+             'datasources.default.driver-class-name'        : 'org.h2.Driver',
+             'datasources.other.url'                        : 'jdbc:h2:mem:liquibase2Db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
+             'datasources.other.username'                   : 'sa',
+             'datasources.other.password'                   : '',
+             'datasources.other.driver-class-name'          : 'org.h2.Driver'] as Map,
+            Environment.TEST
+        )
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        when:
+        HttpResponse<List> response = rxClient.toBlocking()
+            .exchange(HttpRequest.GET("/liquibase"), Argument.of(List, LiquibaseReport))
+
+        then:
+        response.status() == HttpStatus.OK
+        List<LiquibaseReport> result = response.body()
+        result.sort { it.name }
+        result[0].name == 'default'
+        result[0].changeSets.size() == 2
+        result[0].changeSets[0].changeLog == 'classpath:db/changelog/01-create-books-schema.xml'
+        result[0].changeSets[1].changeLog == 'classpath:db/changelog/02-insert-data-books.xml'
+        result[1].name == 'other'
+        result[1].changeSets.size() == 1
+        result[1].changeSets[0].changeLog == 'classpath:db/changelog/01-create-books-schema.xml'
+
+        cleanup:
+        rxClient.close()
+        embeddedServer.stop()
+        embeddedServer.close()
+    }
+
+    void 'test liquibase endpoint without migrations'() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(
+            EmbeddedServer,
+            ['jpa.default.packages-to-scan'                 : 'example.micronaut',
+             'jpa.default.properties.hibernate.hbm2ddl.auto': 'none',
+             'jpa.default.properties.hibernate.show_sql'    : true,
+             'endpoints.liquibase.sensitive'                : false,
+             'datasources.default.url'                      : 'jdbc:h2:mem:liquibaseDisabledDb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
+             'datasources.default.username'                 : 'sa',
+             'datasources.default.password'                 : '',
+             'datasources.default.driver-class-name'        : 'org.h2.Driver'] as Map,
+            Environment.TEST
+        )
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        when:
+        HttpResponse<List> response = rxClient.toBlocking()
+            .exchange(HttpRequest.GET("/liquibase"), Argument.of(List, LiquibaseReport))
+
+        then:
+        response.status() == HttpStatus.OK
+        List<LiquibaseReport> result = response.body()
+        result.size() == 0
 
         cleanup:
         rxClient.close()
