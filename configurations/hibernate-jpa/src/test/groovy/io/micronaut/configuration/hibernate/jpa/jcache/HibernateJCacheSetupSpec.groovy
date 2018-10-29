@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.configuration.hibernate.jcache
+package io.micronaut.configuration.hibernate.jpa.jcache
 
 import io.micronaut.configuration.hibernate.jpa.JpaConfiguration
 import io.micronaut.context.ApplicationContext

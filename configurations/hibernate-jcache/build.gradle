@@ -1,9 +1,0 @@
-dependencies {
-    compile project(":configurations:hibernate-jpa")
-    compile dependencyVersion("hibernate.jcache")
-    compileOnly project(":inject-java")
-    testCompile project(":inject-groovy")
-    testCompile project(":inject-java")
-    testRuntime project(":configurations:jdbc-tomcat")
-    testRuntime dependencyVersion("h2")
-}

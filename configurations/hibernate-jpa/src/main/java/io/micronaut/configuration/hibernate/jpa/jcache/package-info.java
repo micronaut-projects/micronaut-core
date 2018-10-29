@@ -22,7 +22,7 @@
  */
 @Configuration
 @Requires(classes = CacheManager.class)
-package io.micronaut.configuration.hibernate.jcache;
+package io.micronaut.configuration.hibernate.jpa.jcache;
 
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;
