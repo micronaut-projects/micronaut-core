@@ -10,10 +10,12 @@ dependencies {
     compileOnly project(":inject-java")
     compileOnly project(":management")
     compileOnly project(":configurations:micrometer-core")
+    compileOnly dependencyVersion("hibernate.jcache")
 
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
     testRuntime project(":configurations:jdbc-tomcat")
     testRuntime dependencyVersion("h2")
     testCompile project(":configurations:micrometer-core")
+    testCompile dependencyVersion("hibernate.jcache")
 }

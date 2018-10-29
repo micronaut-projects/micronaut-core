@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.configuration.hibernate.jcache;
+package io.micronaut.configuration.hibernate.jpa.jcache;
 
 import io.micronaut.configuration.hibernate.jpa.JpaConfiguration;
 import io.micronaut.context.annotation.Requires;
