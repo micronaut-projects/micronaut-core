@@ -28,7 +28,7 @@ import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.testutils.YamlAsciidocTagCleaner
 import spock.lang.Specification
 
-class LiquibaseEndpointSpec extends Specification implements YamlAsciidocTagCleaner {
+class LiquibaseEndpointSpec extends Specification {
 
     void "test the endpoint bean is available"() {
         given:
@@ -89,31 +89,17 @@ class LiquibaseEndpointSpec extends Specification implements YamlAsciidocTagClea
 
     void 'test liquibase endpoint'() {
         given:
-        Map<String, Object> liquibaseMap = [
-            'jpa.default'                       : [
-                'packages-to-scan': 'example.micronaut',
-                properties        : [
-                    hibernate: [
-                        'hbm2ddl.auto': 'none',
-                        'show_sql'    : true,
-                    ]
-                ]
-            ],
-            'liquibase.default.change-log'      : 'classpath:db/liquibase-changelog.xml',
-            'endpoints.liquibase.sensitive'     : false,
-            datasources                         : [
-                default: [
-                    url            : 'jdbc:h2:mem:liquibaseDisabledDb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
-                    username       : 'sa',
-                    password       : '',
-                    driverClassName: 'org.h2.Driver',
-                ]
-            ],
-        ]
-
-        Map<String, Object> config = [:] << flatten(liquibaseMap)
-
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, config, Environment.TEST)
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'jpa.default.packages-to-scan': 'example.micronaut',
+                'jpa.default.properties.hibernate.hbm2ddl.auto': 'none',
+                'jpa.default.properties.hibernate.show_sql': true,
+                'liquibase.default.change-log'      : 'classpath:db/liquibase-changelog.xml',
+                'endpoints.liquibase.sensitive'     : false,
+                'datasources.default.url': 'jdbc:h2:mem:liquibaseDisabledDb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
+                'datasources.default.username': 'sa',
+                'datasources.default.password': '',
+                'datasources.default.driver-class-name': 'org.h2.Driver',
+        ], Environment.TEST)
         URL server = embeddedServer.getURL()
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
 
