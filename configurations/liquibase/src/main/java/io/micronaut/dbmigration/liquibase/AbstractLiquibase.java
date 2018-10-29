@@ -77,13 +77,13 @@ public abstract class AbstractLiquibase {
                 DataSource dataSource = conf.getDataSource();
                 if (dataSource == null) {
                     if (LOG.isDebugEnabled()) {
-                        LOG.debug("Liquibase not run for identifier {} because no data source found", conf.getNameQualifier());
+                        LOG.debug("Liquibase not run for identifier \"{}\" because no data source found", conf.getNameQualifier());
                     }
                     continue;
                 }
                 if (!conf.isEnabled()) {
                     if (LOG.isDebugEnabled()) {
-                        LOG.debug("Liquibase not run for identifier {} because no liquibase configuration is disabled", conf.getNameQualifier());
+                        LOG.debug("Liquibase not run for identifier \"{}\" because liquibase configuration is disabled", conf.getNameQualifier());
                     }
                     continue;
                 }
