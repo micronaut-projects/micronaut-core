@@ -21,10 +21,11 @@
  * @since 1.0.1
  */
 @Configuration
-@Requires(classes = CacheManager.class)
+@Requires(classes = {CacheManager.class, ConfigSettings.class})
 package io.micronaut.configuration.hibernate.jpa.jcache;
 
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;
+import org.hibernate.cache.jcache.ConfigSettings;
 
 import javax.cache.CacheManager;
