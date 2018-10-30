@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-package io.micronaut.spring.tx.datasource;
+package io.micronaut.jdbc.spring;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
 
 /**
@@ -27,6 +28,7 @@ import io.micronaut.core.reflect.ClassUtils;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 public final class HibernatePresenceCondition implements Condition {
     @Override
     public boolean matches(ConditionContext context) {
