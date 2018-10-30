@@ -44,6 +44,7 @@ include "websocket"
 // configurations
 include "configurations:aws-common"
 include "configurations:cassandra"
+include "configurations:flyway"
 include "configurations:gorm-common"
 include "configurations:hibernate-gorm"
 include "configurations:hibernate-jpa"
