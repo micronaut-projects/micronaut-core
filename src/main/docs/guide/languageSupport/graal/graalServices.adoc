@@ -8,20 +8,50 @@ To get started creating a Microservice that can be compiled into a native image,
 $ mn create-app hello-world --features graal-native-image
 ----
 
-The `graal-native-image` feature adds 3 important items:
+The `graal-native-image` feature adds four important items:
 
 1. A `MicronautSubstitutions.java` file needed to recompute Netty and Caffeine's use of `Unsafe`.
 2. The `svm` and `graal` dependencies to your `build.gradle` (or `pom.xml` if `--build maven` is used).
-3. A `Dockerfile` which can be used to construct the native image.
+3. A `Dockerfile` which can be used to construct the native image using Docker and a script `docker-build.sh` to run it.
+4. A `build-native-image.sh` script to build the native image without using Docker.
 
+
+==== Build native image using Docker
 
 To build your native image using Docker simply run:
 
 [source,bash]
 ----
 $ docker build . -t hello-world
-$ docker run hello-world
+$ docker run --network=host hello-world # <1>
 ----
+<1> Start the Docker container with `--network=host` makes the application uses the same network as the host so all ports are exposed automatically without needing to map them manually
+
+Or use the provided script:
+
+[source,bash]
+----
+$ ./docker-build.sh
+----
+
+
+==== Build native image without using Docker
+
+To build your native image without using Docker you need to install GraalVM SDK via the https://www.graalvm.org/docs/getting-started/[Getting Started] instructions or using SDKman:
+
+.Installing GraalVM 1.0.0-rc8 with SDKman
+[source,bash]
+----
+$ sdk install java 1.0.0-rc8-graal
+$ sdk use java 1.0.0-rc8-graal
+----
+
+.Creating native image
+[source,bash]
+----
+$ ./build-native-image.sh
+----
+
 
 === Understanding Micronaut and Graal
 
@@ -56,15 +86,16 @@ Once the `reflect.json` file is ready you can run the `native-image` command. Th
 [source,bash]
 ----
 native-image --class-path build/libs/hello-world-0.1-all.jar \ # <1>
-			 -H:ReflectionConfigurationFiles=build/reflect.json \ # <2>
-			 -H:EnableURLProtocols=http \ # <3>
-			 -H:IncludeResources="logback.xml|application.yml|META-INF/services/*.*" \ # <4>
-			 -H:Name=hello-world \ # <5>
-			 -H:Class=hello.world.Application \ # <6>
-			 -H:+ReportUnsupportedElementsAtRuntime \ # <7>
-			 -H:+AllowVMInspection \
-			 --rerun-class-initialization-at-runtime='sun.security.jca.JCAUtil$CachedSecureRandomHolder,javax.net.ssl.SSLContext' \
-			 --delay-class-initialization-to-runtime=io.netty.handler.codec.http.HttpObjectEncoder,io.netty.handler.codec.http.websocketx.WebSocket00FrameEncoder,io.netty.handler.ssl.util.ThreadLocalInsecureRandom <8>
+             -H:ReflectionConfigurationFiles=build/reflect.json \ # <2>
+             -H:EnableURLProtocols=http \ # <3>
+             -H:IncludeResources="logback.xml|application.yml|META-INF/services/*.*" \ # <4>
+             -H:Name=hello-world \ # <5>
+             -H:Class=hello.world.Application \ # <6>
+             -H:+ReportUnsupportedElementsAtRuntime \ # <7>
+             -H:+AllowVMInspection \
+             -H:-UseServiceLoaderFeature \
+             --rerun-class-initialization-at-runtime='sun.security.jca.JCAUtil$CachedSecureRandomHolder,javax.net.ssl.SSLContext' \
+             --delay-class-initialization-to-runtime=io.netty.handler.codec.http.HttpObjectEncoder,io.netty.handler.codec.http.websocketx.WebSocket00FrameEncoder,io.netty.handler.ssl.util.ThreadLocalInsecureRandom <8>
 ----
 
 <1> The `class-path` argument is used to refer to the Micronaut shaded JAR
