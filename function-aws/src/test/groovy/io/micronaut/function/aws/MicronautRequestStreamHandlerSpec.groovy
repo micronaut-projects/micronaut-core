@@ -52,6 +52,20 @@ class MicronautRequestStreamHandlerSpec extends Specification{
 
         then:
         output.toString() == '{"title":"THE STAND"}'
+
+        when:"invoked for a second time"
+        body = '{"title":"The Stand"}'
+        input = new ByteArrayInputStream()
+        input.text
+        output = new ByteArrayOutputStream()
+        requestStreamHandler.handleRequest(
+                new ByteArrayInputStream(body.bytes),
+                output,
+                Mock(Context)
+        )
+
+        then:
+        output.toString() == '{"title":"THE STAND"}'
     }
 
     void "test micronaut stream handler with integer"() {
