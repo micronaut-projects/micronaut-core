@@ -36,6 +36,7 @@ import zipkin2.CheckResult;
 import zipkin2.codec.Encoding;
 import zipkin2.reporter.Sender;
 
+import javax.inject.Provider;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Collections;
@@ -52,18 +53,23 @@ import java.util.concurrent.atomic.AtomicReference;
  */
 public final class HttpClientSender extends Sender {
 
-    private final HttpClient httpClient ;
     private final Encoding encoding;
     private final int messageMaxBytes;
     private final boolean compressionEnabled;
     private final URI endpoint;
+    private final Provider<LoadBalancerResolver> loadBalancerResolver;
+    private final HttpClientConfiguration clientConfiguration;
+    private HttpClient httpClient;
 
-    private HttpClientSender(Encoding encoding, int messageMaxBytes, boolean compressionEnabled, HttpClientConfiguration clientConfiguration, LoadBalancerResolver loadBalancerResolver, String path) {
-        Optional<? extends LoadBalancer> loadBalancer = loadBalancerResolver.resolve(ZipkinServiceInstanceList.SERVICE_ID);
-        this.httpClient = loadBalancer.map(lb -> new DefaultHttpClient(
-                lb,
-                clientConfiguration
-        )).orElse(null);
+    private HttpClientSender(
+            Encoding encoding,
+            int messageMaxBytes,
+            boolean compressionEnabled,
+            HttpClientConfiguration clientConfiguration,
+            Provider<LoadBalancerResolver> loadBalancerResolver,
+            String path) {
+        this.loadBalancerResolver = loadBalancerResolver;
+        this.clientConfiguration = clientConfiguration;
         this.encoding = encoding;
         this.messageMaxBytes = messageMaxBytes;
         this.compressionEnabled = compressionEnabled;
@@ -87,6 +93,7 @@ public final class HttpClientSender extends Sender {
 
     @Override
     public Call<Void> sendSpans(List<byte[]> encodedSpans) {
+        initHttpClient();
         if (httpClient != null && httpClient.isRunning()) {
             return new HttpCall(httpClient, endpoint, compressionEnabled, encodedSpans);
         } else {
@@ -96,6 +103,8 @@ public final class HttpClientSender extends Sender {
 
     @Override
     public CheckResult check() {
+        initHttpClient();
+
         if (httpClient == null) {
             return CheckResult.failed(new NoAvailableServiceException(ZipkinServiceInstanceList.SERVICE_ID));
         }
@@ -112,8 +121,19 @@ public final class HttpClientSender extends Sender {
         }
     }
 
+    private void initHttpClient() {
+        if (this.httpClient == null) {
+            final Optional<? extends LoadBalancer> loadBalancer = loadBalancerResolver.get().resolve(ZipkinServiceInstanceList.SERVICE_ID);
+
+            this.httpClient = loadBalancer.map(lb -> new DefaultHttpClient(
+                    lb,
+                    clientConfiguration
+            )).orElse(null);
+        }
+    }
+
     @Override
-    public void close() throws IOException {
+    public void close() {
         if (httpClient != null) {
             httpClient.close();
         }
@@ -324,7 +344,7 @@ public final class HttpClientSender extends Sender {
          * @param loadBalancerResolver Resolver instance capable of resolving references to services into a concrete load-balance
          * @return The sender
          */
-        public HttpClientSender build(LoadBalancerResolver loadBalancerResolver) {
+        public HttpClientSender build(Provider<LoadBalancerResolver> loadBalancerResolver) {
             return new HttpClientSender(
                     encoding,
                     messageMaxBytes,
