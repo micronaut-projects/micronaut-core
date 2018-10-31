@@ -21,7 +21,6 @@ import io.micronaut.spring.tx.datasource.DataSourceTransactionManagerFactory;
 import org.hibernate.SessionFactory;
 import org.springframework.orm.hibernate5.HibernateTransactionManager;
 
-import javax.inject.Singleton;
 import javax.sql.DataSource;
 
 /**
