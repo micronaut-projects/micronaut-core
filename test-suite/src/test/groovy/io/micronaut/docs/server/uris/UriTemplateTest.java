@@ -1,7 +1,6 @@
 package io.micronaut.docs.server.uris;
 
 import io.micronaut.http.uri.UriMatchTemplate;
-import io.micronaut.http.uri.UriTemplate;
 import static org.junit.Assert.*;
 import org.junit.Test;
 
