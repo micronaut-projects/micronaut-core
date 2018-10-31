@@ -29,4 +29,5 @@ license {
     exclude '**/build-info.properties'
     exclude '**/git.properties'
     exclude '**/othergit.properties'
+    exclude '**/*.sql'
 }
