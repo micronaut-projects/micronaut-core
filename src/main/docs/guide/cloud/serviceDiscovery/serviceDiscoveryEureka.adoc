@@ -6,7 +6,7 @@ Micronaut features a native non-blocking api:discovery.eureka.client.v2.EurekaCl
 
 The quickest way to start a Eureka server is to use to use https://spring.io/guides/gs/service-registration-and-discovery/#initial[Spring Boot's Eureka starters].
 
-NOTE: As of this writing the Docker images for Eureka are significantly out-of-date so it is recommended to create a Eureka server following the steps above.
+NOTE: As of this writing the official Docker images for Eureka are significantly out-of-date so it is recommended to create a Eureka server following the steps above.
 
 == Auto Registering with Eureka
 
