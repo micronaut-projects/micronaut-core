@@ -131,6 +131,24 @@ class DataStreamSpec extends Specification {
 
     }
 
+    void "test that stream response is free of race conditions"() {
+        given:
+        RxStreamingHttpClient client = context.createBean(RxStreamingHttpClient,embeddedServer.getURL())
+
+        when:
+        List<byte[]> arrays = client.exchangeStream(HttpRequest.GET(
+                '/datastream/books'
+        )).blockingIterable().toList().collect { res -> res.body.get().toByteArray() }
+
+        then:
+        arrays.size() == 2
+        new String(arrays[0]) == 'The Stand'
+        new String(arrays[1]) == 'The Shining'
+
+        cleanup:
+        client.stop()
+
+    }
     @Controller("/datastream/books")
     static class BookController {
 
