@@ -36,6 +36,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.*;
+import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
@@ -827,8 +828,12 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         traceBody("Response", byteBuf);
                     }
                     ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
-                    nettyStreamedHttpResponse.setBody(byteBuffer);
-                    return nettyStreamedHttpResponse;
+                    return new HttpResponseWrapper<ByteBuffer<?>>(nettyStreamedHttpResponse) {
+                        @Override
+                        public Optional<ByteBuffer<?>> getBody() {
+                            return Optional.of(byteBuffer);
+                        }
+                    };
                 });
             });
         };
