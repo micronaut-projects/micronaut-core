@@ -33,7 +33,6 @@ import java.util.Collection;
  * @since 1.1
  */
 @Requires(classes = Liquibase.class)
-@Requires(property = "liquibase.enabled", notEquals = "false")
 @Singleton
 class LiquibaseStartupEventListener extends AbstractLiquibase {
     private static final Logger LOG = LoggerFactory.getLogger(LiquibaseStartupEventListener.class);

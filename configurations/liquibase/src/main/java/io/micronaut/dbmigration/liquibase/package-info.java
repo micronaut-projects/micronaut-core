@@ -21,4 +21,9 @@
  * @see <a href="http://www.liquibase.org">Liquibase</a>
  * @since 1.1
  */
+@Configuration
+@Requires(property = "liquibase.enabled", notEquals = "false")
 package io.micronaut.dbmigration.liquibase;
+
+import io.micronaut.context.annotation.Configuration;
+import io.micronaut.context.annotation.Requires;

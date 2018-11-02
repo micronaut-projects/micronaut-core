@@ -34,7 +34,6 @@ import java.util.Collection;
  * @since 1.1
  */
 @Requires(classes = Liquibase.class)
-@Requires(property = "liquibase.enabled", notEquals = "false")
 @Singleton
 class LiquibaseAysncStartupEventListener extends AbstractLiquibase {
     private static final Logger LOG = LoggerFactory.getLogger(LiquibaseAysncStartupEventListener.class);
