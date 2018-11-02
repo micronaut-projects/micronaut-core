@@ -56,6 +56,11 @@ class DefaultArgument<T> implements Argument<T> {
         this.typeParameterArray = genericTypes;
     }
 
+    /**
+     * @param type               The type
+     * @param name               The name
+     * @param annotationMetadata The annotation metadata
+     */
     DefaultArgument(Type type, String name, AnnotationMetadata annotationMetadata) {
         this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
         if (type == null) {
