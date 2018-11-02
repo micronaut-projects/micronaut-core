@@ -33,7 +33,6 @@ import java.util.Collection;
  * @since 1.1
  */
 @Requires(classes = Flyway.class)
-@Requires(property = "flyway.enabled", notEquals = "false")
 @Singleton
 class FlywayStartupEventListener extends AbstractFlyway {
     private static final Logger LOG = LoggerFactory.getLogger(FlywayStartupEventListener.class);
