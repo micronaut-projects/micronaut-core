@@ -24,7 +24,7 @@ import org.apache.kafka.streams.state.QueryableStoreType;
  * A factory that constructs a {@link KafkaStreamsRegistry} and {@link QueryableStoreRegistry} beans.
  *
  * @author Christian Oestreich
- * @since 1.0
+ * @since 1.1
  */
 public class QueryableStoreRegistry {
 
