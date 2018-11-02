@@ -134,7 +134,7 @@ public class KafkaClientScope implements CustomScope<KafkaClient>, LifeCycle<Kaf
         );
 
         return (T) clients.computeIfAbsent(key, clientKey -> {
-            Supplier<AbstractKafkaProducerConfiguration> defaultResolver = () -> beanContext.getBean(DefaultKafkaProducerConfiguration.class);
+            Supplier<AbstractKafkaProducerConfiguration> defaultResolver = () -> beanContext.getBean(AbstractKafkaProducerConfiguration.class);
             AbstractKafkaProducerConfiguration config;
             boolean hasId = StringUtils.isNotEmpty(id);
             if (hasId) {
