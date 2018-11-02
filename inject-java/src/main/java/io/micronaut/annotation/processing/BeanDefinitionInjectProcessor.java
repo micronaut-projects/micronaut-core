@@ -40,6 +40,7 @@ import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadataWriter;
 import io.micronaut.inject.configuration.PropertyMetadata;
+import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.processing.ProcessedTypes;
 import io.micronaut.inject.writer.BeanDefinitionReferenceWriter;
 import io.micronaut.inject.writer.BeanDefinitionVisitor;
@@ -149,7 +150,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         String name = typeElement.getQualifiedName().toString();
                         if (!beanDefinitionWriters.containsKey(name)) {
                             if (!processed.contains(name) && !name.endsWith(BeanDefinitionVisitor.PROXY_SUFFIX)) {
-                                boolean isInterface = typeElement.getKind() == ElementKind.INTERFACE;
+                                boolean isInterface = JavaModelUtils.resolveKind(typeElement, ElementKind.INTERFACE).isPresent();
                                 if (!isInterface) {
                                     if (!processed.contains(name) && !name.endsWith(BeanDefinitionVisitor.PROXY_SUFFIX)) {
                                         AnnBeanElementVisitor visitor = new AnnBeanElementVisitor(typeElement);
@@ -329,7 +330,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             if (annotationUtils.hasStereotype(classElement, INTRODUCTION_TYPE)) {
                 AopProxyWriter aopProxyWriter = createIntroductionAdviceWriter(classElement);
-                ExecutableElement constructor = classElement.getKind() == ElementKind.CLASS ? modelUtils.concreteConstructorFor(classElement) : null;
+                ExecutableElement constructor = JavaModelUtils.resolveKind(classElement, ElementKind.CLASS).isPresent() ? modelUtils.concreteConstructorFor(classElement) : null;
                 ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(constructor) : null;
 
                 if (constructorData != null) {
@@ -349,7 +350,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 beanDefinitionWriters.put(classElement.getQualifiedName(), aopProxyWriter);
                 visitIntroductionAdviceInterface(classElement, typeAnnotationMetadata, aopProxyWriter);
 
-                boolean isInterface = classElement.getKind() == ElementKind.INTERFACE;
+                boolean isInterface = JavaModelUtils.isInterface(classElement);
                 if (!isInterface) {
 
                     List<? extends Element> elements = classElement.getEnclosedElements().stream()
@@ -362,11 +363,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
 
             } else {
-                assert (classElement.getKind() == CLASS) : "classElement must be a class";
-
                 Element enclosingElement = classElement.getEnclosingElement();
                 // don't process inner class unless this is the visitor for it
-                if (!enclosingElement.getKind().isClass() ||
+                if (!JavaModelUtils.isClass(enclosingElement) ||
                         concreteClass.getQualifiedName().equals(classElement.getQualifiedName())) {
 
                     if (concreteClass.getQualifiedName().equals(classElement.getQualifiedName())) {
@@ -658,7 +657,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         .getAnnotationNamesByStereotype(AROUND_TYPE)
                         .toArray();
                 TypeElement returnTypeElement = (TypeElement) ((DeclaredType) beanMethod.getReturnType()).asElement();
-                ExecutableElement constructor = returnTypeElement.getKind() == ElementKind.CLASS ? modelUtils.concreteConstructorFor(returnTypeElement) : null;
+                ExecutableElement constructor = JavaModelUtils.isClass(returnTypeElement) ? modelUtils.concreteConstructorFor(returnTypeElement) : null;
                 ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(constructor) : null;
 
                 OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean.class);
@@ -899,7 +898,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 Element element = typeToImplement.asElement();
                 if (element instanceof TypeElement) {
                     TypeElement typeElement = (TypeElement) element;
-                    boolean isInterface = element.getKind() == ElementKind.INTERFACE;
+                    boolean isInterface = JavaModelUtils.isInterface(element);
                     if (isInterface) {
 
                         PackageElement packageElement = elementUtils.getPackageOf(concreteClass);
@@ -1480,7 +1479,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             PackageElement packageElement = elementUtils.getPackageOf(typeElement);
             String beanClassName = modelUtils.simpleBinaryNameFor(typeElement);
 
-            boolean isInterface = typeElement.getKind() == ElementKind.INTERFACE;
+            boolean isInterface = JavaModelUtils.isInterface(typeElement);
 
             if (configurationMetadata != null) {
                 // unfortunate we have to do this
@@ -1599,7 +1598,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             String[] interfaceTypes = annotationMetadata.getValue(Introduction.class, "interfaces", String[].class).orElse(new String[0]);
 
             Object[] interceptorTypes = ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
-            boolean isInterface = typeElement.getKind() == ElementKind.INTERFACE;
+            boolean isInterface = JavaModelUtils.isInterface(typeElement);
             AopProxyWriter aopProxyWriter = new AopProxyWriter(
                     packageElement.getQualifiedName().toString(),
                     beanClassName,
@@ -1669,7 +1668,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             PackageElement producedPackageElement = elementUtils.getPackageOf(producedElement);
             PackageElement definingPackageElement = elementUtils.getPackageOf(concreteClass);
 
-            boolean isInterface = producedElement.getKind() == ElementKind.INTERFACE;
+            boolean isInterface = JavaModelUtils.isInterface(producedElement);
             String packageName = producedPackageElement.getQualifiedName().toString();
             String beanDefinitionPackage = definingPackageElement.getQualifiedName().toString();
             String shortClassName = modelUtils.simpleBinaryNameFor(producedElement);

@@ -19,6 +19,7 @@ package io.micronaut.annotation.processing.visitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -118,7 +119,7 @@ public abstract class AbstractJavaElement implements io.micronaut.inject.ast.Ele
             List<? extends TypeMirror> typeArguments = dt.getTypeArguments();
             if (e instanceof TypeElement) {
                 TypeElement typeElement = (TypeElement) e;
-                if (typeElement.getKind() == ElementKind.ENUM) {
+                if (JavaModelUtils.resolveKind(typeElement, ElementKind.ENUM).isPresent()) {
                     return new JavaEnumElement(
                             typeElement,
                             visitorContext.getAnnotationUtils().getAnnotationMetadata(typeElement),

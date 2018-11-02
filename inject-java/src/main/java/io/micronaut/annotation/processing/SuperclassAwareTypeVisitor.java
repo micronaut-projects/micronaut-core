@@ -16,6 +16,8 @@
 
 package io.micronaut.annotation.processing;
 
+import io.micronaut.inject.processing.JavaModelUtils;
+
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.ExecutableElement;
@@ -52,7 +54,7 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
     public R visitDeclared(DeclaredType type, P p) {
         Element element = type.asElement();
 
-        while ((element.getKind() == ElementKind.CLASS || element.getKind() == ElementKind.INTERFACE) && !element.toString().equals(Object.class.getName())) {
+        while ((JavaModelUtils.isClassOrInterface(element)) && !element.toString().equals(Object.class.getName())) {
             TypeElement typeElement = (TypeElement) element;
             List<? extends Element> enclosedElements = typeElement.getEnclosedElements();
             for (Element enclosedElement : enclosedElements) {
