@@ -23,7 +23,7 @@ fi
 
 if [[ $EXIT_STATUS -eq 0 ]]; then
     echo "Publishing archives for branch $TRAVIS_BRANCH"
-    if [[ -n $TRAVIS_TAG ]] || [[ $TRAVIS_BRANCH =~ ^1.0.x$ && $TRAVIS_PULL_REQUEST == 'false' ]]; then
+    if [[ -n $TRAVIS_TAG ]] || [[ $TRAVIS_BRANCH =~ ^master$ && $TRAVIS_PULL_REQUEST == 'false' ]]; then
 
       echo "Publishing archives"
       ./gradlew --stop
@@ -38,6 +38,13 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
       git clone https://${GH_TOKEN}@github.com/micronaut-projects/micronaut-docs.git -b gh-pages gh-pages --single-branch > /dev/null
 
       cd gh-pages
+
+      # If this is the master branch then update the snapshot
+      if [[ $TRAVIS_BRANCH =~ ^master|[12]\..\.x$ ]]; then
+         mkdir -p snapshot
+         cp -r ../build/docs/. ./snapshot/
+          git add snapshot/*
+      fi
 
       # If there is a tag present then this becomes the latest
       if [[ -n $TRAVIS_TAG ]]; then
