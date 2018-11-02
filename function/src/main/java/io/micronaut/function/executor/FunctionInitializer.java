@@ -36,7 +36,6 @@ import java.util.function.Function;
  */
 public class FunctionInitializer extends AbstractExecutor implements Closeable, AutoCloseable {
 
-    protected final ApplicationContext applicationContext;
     protected final boolean closeContext;
     private FunctionExitHandler functionExitHandler = new DefaultFunctionExitHandler();
 
@@ -45,7 +44,6 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
      */
     public FunctionInitializer() {
         ApplicationContext applicationContext = buildApplicationContext(null);
-        this.applicationContext = applicationContext;
         startThis(applicationContext);
         injectThis(applicationContext);
         this.closeContext = true;

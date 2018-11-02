@@ -51,7 +51,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Client(id = EurekaClient.SERVICE_ID, path = "/eureka", configuration = EurekaConfiguration.class)
+@Client(id = EurekaClient.SERVICE_ID, path = EurekaConfiguration.CONTEXT_PATH_PLACEHOLDER, configuration = EurekaConfiguration.class)
 @JacksonFeatures(
     enabledSerializationFeatures = WRAP_ROOT_VALUE,
     disabledSerializationFeatures = WRITE_SINGLE_ELEM_ARRAYS_UNWRAPPED,

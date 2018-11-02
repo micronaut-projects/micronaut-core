@@ -30,15 +30,15 @@ Once you have enabled annotation processing in IntelliJ you can run the applicat
 
 If you wish to use Eclipse IDE, it is recommended you import your Micronaut project into Eclipse using either https://projects.eclipse.org/projects/tools.buildship[Gradle BuildShip] for Gradle or http://www.eclipse.org/m2e/[M2Eclipse] for Maven.
 
-As of this writing, the latest stable version of Eclipse has https://bugs.eclipse.org/bugs/show_bug.cgi?id=534501[incomplete support] for Java annotation processors, this has been resolved in http://download.eclipse.org/eclipse/downloads/drops4/S-4.9M2-201808012000/[Eclipse 4.9 M2] and above, which you will need to download.
+NOTE: Micronaut requires Eclipse IDE 4.9 or above
 
 === Eclipse and Gradle
 
-Once you have setup Eclipse 4.9 M2 or above with https://projects.eclipse.org/projects/tools.buildship[Gradle BuildShip] first run the `gradle eclipse` task from the root of your project then import the project by selecting `File -> Import` then choosing `Gradle -> Existing Gradle Project` and navigating to the root directory of your project (where the `build.gradle` is located).
+Once you have setup Eclipse 4.9 or above with https://projects.eclipse.org/projects/tools.buildship[Gradle BuildShip] first run the `gradle eclipse` task from the root of your project then import the project by selecting `File -> Import` then choosing `Gradle -> Existing Gradle Project` and navigating to the root directory of your project (where the `build.gradle` is located).
 
 === Eclipse and Maven
 
-For Eclipse 4.9 M2 and above with Maven you need the following Eclipse plugins:
+For Eclipse 4.9 and above with Maven you need the following Eclipse plugins:
 
 * http://www.eclipse.org/m2e/[M2Eclipse for Maven]
 * https://github.com/jbosstools/m2e-apt[Maven integration with Eclipse JDT Annotation Processor Toolkit]
@@ -47,3 +47,10 @@ Once installed you need to import the project by selecting `File -> Import` then
 
 You should then enable annotation processing by opening `Eclipse -> Preferences` and navigating to `Maven -> Annotation Processing` and selecting the option `Automatically configure JDT APT`.
 
+== Configuring Visual Studio Code
+
+Micronaut can be setup within Visual Studio Code. You will need to first install the The https://marketplace.visualstudio.com/items?itemName=vscjava.vscode-java-pack[Java Extension Pack].
+
+NOTE: Visual Studio Code support currently only works for Maven builds.
+
+Once the extension pack is installed follow the same setup steps as Eclipse above or if you have setup https://code.visualstudio.com/docs/setup/mac[terminal integration] just type `code .` in any project directory and the project will be automatically setup.

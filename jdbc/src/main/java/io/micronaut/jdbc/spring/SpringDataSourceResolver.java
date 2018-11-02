@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 
-package io.micronaut.spring.tx.datasource;
+package io.micronaut.jdbc.spring;
 
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.jdbc.DataSourceResolver;
 import org.springframework.jdbc.datasource.DelegatingDataSource;
 
@@ -29,6 +30,7 @@ import javax.sql.DataSource;
  * @since 1.0
  */
 @Singleton
+@Internal
 public final class SpringDataSourceResolver implements DataSourceResolver {
 
     @Override

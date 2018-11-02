@@ -16,6 +16,7 @@
 
 package io.micronaut.configuration.hibernate.jpa;
 
+import io.micronaut.configuration.hibernate.jpa.condition.RequiresHibernateEntities;
 import io.micronaut.configuration.hibernate.jpa.scope.CurrentSession;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.Bean;
@@ -112,20 +113,17 @@ public class EntityManagerFactoryBean {
     /**
      * Builds the {@link MetadataSources} for the given {@link StandardServiceRegistry}.
      *
-     * @param dataSourceName          The data source name
+     * @param jpaConfiguration        The JPA configuration
      * @param standardServiceRegistry The standard service registry
      * @return The {@link MetadataSources}
      */
     @EachBean(StandardServiceRegistry.class)
-    @Requires(entities = Entity.class)
+    @RequiresHibernateEntities
     protected MetadataSources hibernateMetadataSources(
-        @Parameter String dataSourceName,
+        @Parameter JpaConfiguration jpaConfiguration,
         StandardServiceRegistry standardServiceRegistry) {
 
         MetadataSources metadataSources = createMetadataSources(standardServiceRegistry);
-        JpaConfiguration jpaConfiguration = beanLocator.findBean(JpaConfiguration.class, Qualifiers.byName(dataSourceName))
-            .orElse(this.jpaConfiguration);
-
         String[] packagesToScan = jpaConfiguration.getPackagesToScan();
         if (ArrayUtils.isNotEmpty(packagesToScan)) {
             environment.scan(Entity.class, packagesToScan).forEach(metadataSources::addAnnotatedClass);

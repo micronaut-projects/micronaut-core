@@ -23,7 +23,7 @@ To compile Micronaut and Graal applications you need to make the substrate VM de
 .Using Docker to Obtain the SVM Dependency
 [source,bash]
 ----
-docker run oracle/graalvm-ce:1.0.0-rc7 cat /usr/java/latest/jre/lib/svm/builder/svm.jar > svm.jar
+docker run oracle/graalvm-ce:1.0.0-rc8 cat /usr/java/latest/jre/lib/svm/builder/svm.jar > svm.jar
 ----
 
 Once you have obtained the `svm.jar` from the latest Graal Docker images you can install it into your local Maven cache:
@@ -34,6 +34,6 @@ Once you have obtained the `svm.jar` from the latest Graal Docker images you can
 $ mvn install:install-file -Dfile=svm.jar \
                            -DgroupId=com.oracle.substratevm \
                            -DartifactId=svm \
-                           -Dversion=GraalVM-1.0.0-rc7 \
+                           -Dversion=GraalVM-1.0.0-rc8 \
                            -Dpackaging=jar
 ----

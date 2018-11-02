@@ -36,7 +36,7 @@ import java.util.concurrent.ConcurrentHashMap
  * @author graemerocher
  * @since 1.0
  */
-@Controller('/eureka')
+@Controller(EurekaConfiguration.CONTEXT_PATH_PLACEHOLDER)
 @Requires(property = MockEurekaServer.ENABLED)
 class MockEurekaServer implements EurekaOperations{
     public static Map<String, Map<String, Boolean>> heartbeats = new ConcurrentHashMap<>()

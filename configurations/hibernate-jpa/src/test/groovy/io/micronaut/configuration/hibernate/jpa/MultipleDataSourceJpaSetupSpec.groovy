@@ -15,6 +15,7 @@
  */
 package io.micronaut.configuration.hibernate.jpa
 
+import io.micronaut.configuration.hibernate.jpa.other.Author
 import io.micronaut.configuration.hibernate.jpa.scope.CurrentSession
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.qualifiers.Qualifiers
@@ -56,7 +57,7 @@ class MultipleDataSourceJpaSetupSpec extends Specification{
         expect:
         defaultSessionFactory != otherSessionFactory
         defaultSessionFactory.getMetamodel().entity(Book)
-        otherSessionFactory.getMetamodel().entities.isEmpty()
+        otherSessionFactory.getMetamodel().entity(Author)
         defaultTxManager.sessionFactory == defaultSessionFactory
         otherTxManager.sessionFactory == otherSessionFactory
         defaultSessionFactory.jdbcServices.jdbcEnvironment.currentCatalog.toString() == "MYDB"
