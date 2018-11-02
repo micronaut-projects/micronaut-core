@@ -26,7 +26,7 @@ import java.util.Set;
  * A factory that constructs a {@link KafkaStreamsRegistry} and {@link QueryableStoreRegistry} beans.
  *
  * @author Christian Oestreich
- * @since 1.0
+ * @since 1.1
  */
 @Factory
 public class KafkaStreamRegistryFactory {

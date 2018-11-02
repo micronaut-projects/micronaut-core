@@ -24,7 +24,7 @@ import java.util.Set;
  * A bean to hold all the registered streams for use in activities like querying state stores, etc.
  *
  * @author Christian Oestreich
- * @since 1.0
+ * @since 1.1
  */
 class KafkaStreamsRegistry {
 
