@@ -41,7 +41,7 @@ class FlywayAsyncSpec extends Specification implements YamlAsciidocTagCleaner {
         'jpa.default.properties.hibernate.hbm2ddl.auto': 'none',
         'jpa.default.properties.hibernate.show_sql'    : true,
 
-        'flyway.default.enabled'                       : true,
+        'flyway.default.locations'                     : 'classpath:databasemigrations',
         'flyway.default.async'                         : true,
     ]
 

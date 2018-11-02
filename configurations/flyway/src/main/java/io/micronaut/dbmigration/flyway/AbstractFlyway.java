@@ -16,6 +16,10 @@
 
 package io.micronaut.dbmigration.flyway;
 
+import static io.micronaut.core.util.CollectionUtils.toStringArray;
+import static io.micronaut.core.util.StringUtils.hasText;
+
+import io.micronaut.core.util.CollectionUtils;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
 import org.flywaydb.core.api.configuration.FluentConfiguration;
@@ -52,8 +56,7 @@ public abstract class AbstractFlyway {
     public void run(boolean async) {
         if (properties != null) {
             for (FlywayConfigurationProperties config : properties) {
-                DataSource dataSource = config.getDataSource();
-                if (dataSource == null) {
+                if (config.getDataSource() == null && !config.hasAlternativeDatabaseConfiguration()) {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Flyway not run for identifier \"{}\" because no data source found", config.getNameQualifier());
                     }
@@ -71,7 +74,7 @@ public abstract class AbstractFlyway {
                 if (LOG.isInfoEnabled()) {
                     LOG.info("Executing Flyway operations for identifier \"{}\" {}", config.getNameQualifier(), async ? "asynchronously" : "synchronously");
                 }
-                runFlywayForDataSourceWithConfig(dataSource, config);
+                runFlywayWithConfig(config);
             }
         }
     }
@@ -79,18 +82,65 @@ public abstract class AbstractFlyway {
     /**
      * Runs Flyway migrations.
      *
-     * @param dataSource The DataSource
-     * @param config     Flyway configuration
+     * @param flywayConfig Flyway configuration
      */
-    protected void runFlywayForDataSourceWithConfig(DataSource dataSource, FlywayConfigurationProperties config) {
+    protected void runFlywayWithConfig(FlywayConfigurationProperties flywayConfig) {
         try {
-            FluentConfiguration configuration = new FluentConfiguration();
-            configuration.dataSource(dataSource);
+            FluentConfiguration fluentConfiguration = new FluentConfiguration();
+            configureDatabase(fluentConfiguration, flywayConfig);
+            configureProperties(fluentConfiguration, flywayConfig);
 
-            Flyway flyway = configuration.load();
+            Flyway flyway = fluentConfiguration.load();
             flyway.migrate();
         } catch (FlywayException e) {
             LOG.error("FlywayException: ", e);
         }
+    }
+
+    private void configureDatabase(FluentConfiguration fluentConfiguration, FlywayConfigurationProperties flywayConfig) {
+        if (flywayConfig.hasAlternativeDatabaseConfiguration()) {
+            fluentConfiguration.dataSource(flywayConfig.getUrl(), flywayConfig.getUser(), flywayConfig.getPassword());
+        } else {
+            fluentConfiguration.dataSource(flywayConfig.getDataSource());
+        }
+
+        if (!CollectionUtils.isEmpty(flywayConfig.getInitSqls())) {
+            String initSql = CollectionUtils.toString("\n", flywayConfig.getInitSqls());
+            fluentConfiguration.initSql(initSql);
+        }
+    }
+
+    private void configureProperties(FluentConfiguration fluentConfiguration, FlywayConfigurationProperties flywayConfig) {
+        fluentConfiguration.connectRetries(flywayConfig.getConnectRetries());
+        fluentConfiguration.schemas(toStringArray(flywayConfig.getSchemas()));
+        fluentConfiguration.table(flywayConfig.getTable());
+        fluentConfiguration.locations(toStringArray(flywayConfig.getLocations()));
+        fluentConfiguration.skipDefaultResolvers(flywayConfig.isSkipDefaultResolvers());
+        fluentConfiguration.sqlMigrationPrefix(flywayConfig.getSqlMigrationPrefix());
+        fluentConfiguration.repeatableSqlMigrationPrefix(flywayConfig.getRepeatableSqlMigrationPrefix());
+        fluentConfiguration.sqlMigrationSeparator(flywayConfig.getSqlMigrationSeparator());
+        fluentConfiguration.sqlMigrationSuffixes(toStringArray(flywayConfig.getSqlMigrationSuffixes()));
+        fluentConfiguration.encoding(flywayConfig.getEncoding());
+        fluentConfiguration.placeholderReplacement(flywayConfig.isPlaceholderReplacement());
+        fluentConfiguration.placeholders(flywayConfig.getPlaceholders());
+        fluentConfiguration.placeholderPrefix(flywayConfig.getPlaceholderPrefix());
+        fluentConfiguration.placeholderSuffix(flywayConfig.getPlaceholderSuffix());
+        if (hasText(flywayConfig.getTarget())) {
+            fluentConfiguration.target(flywayConfig.getTarget());
+        }
+        fluentConfiguration.validateOnMigrate(flywayConfig.isValidateOnMigrate());
+        fluentConfiguration.cleanOnValidationError(flywayConfig.isCleanOnValidationError());
+        fluentConfiguration.cleanDisabled(flywayConfig.isCleanDisabled());
+        fluentConfiguration.baselineVersion(flywayConfig.getBaselineVersion());
+        fluentConfiguration.baselineDescription(flywayConfig.getBaselineDescription());
+        fluentConfiguration.baselineOnMigrate(flywayConfig.isBaselineOnMigrate());
+        fluentConfiguration.outOfOrder(flywayConfig.isOutOfOrder());
+        fluentConfiguration.ignoreMissingMigrations(flywayConfig.isIgnoreMissingMigrations());
+        fluentConfiguration.ignoreIgnoredMigrations(flywayConfig.isIgnoreIgnoredMigrations());
+        fluentConfiguration.ignorePendingMigrations(flywayConfig.isIgnorePendingMigrations());
+        fluentConfiguration.ignoreFutureMigrations(flywayConfig.isIgnoreFutureMigrations());
+        fluentConfiguration.mixed(flywayConfig.isMixed());
+        fluentConfiguration.group(flywayConfig.isGroup());
+        fluentConfiguration.installedBy(flywayConfig.getInstalledBy());
     }
 }

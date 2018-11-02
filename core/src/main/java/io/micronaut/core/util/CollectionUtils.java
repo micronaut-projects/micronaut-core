@@ -243,4 +243,14 @@ public class CollectionUtils {
         }
         return Collections.unmodifiableList(list);
     }
+
+    /**
+     * Converts a {@link Collection} to a {@code String} array.
+     *
+     * @param collection the {@code Collection} to convert
+     * @return the {@code String} array
+     */
+    public static String[] toStringArray(Collection<String> collection) {
+        return collection.toArray(new String[0]);
+    }
 }
