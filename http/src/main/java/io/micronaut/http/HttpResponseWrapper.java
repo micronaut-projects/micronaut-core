@@ -14,10 +14,31 @@
  * limitations under the License.
  */
 
+package io.micronaut.http;
+
 /**
- * Classes for configuring transaction management for data sources.
+ * A wrapper around a {@link HttpResponse}.
  *
- * @author graemerocher
- * @since 1.0
+ * @param <B> The Http body type
+ * @since 1.0.1
  */
-package io.micronaut.spring.tx.datasource;
+public class HttpResponseWrapper<B> extends HttpMessageWrapper<B> implements HttpResponse<B> {
+
+    /**
+     * @param delegate The Http Request
+     */
+    public HttpResponseWrapper(HttpResponse<B> delegate) {
+        super(delegate);
+    }
+
+    @Override
+    public HttpStatus getStatus() {
+        return getDelegate().getStatus();
+    }
+
+    @Override
+    public HttpResponse<B> getDelegate() {
+        return (HttpResponse<B>) super.getDelegate();
+    }
+
+}

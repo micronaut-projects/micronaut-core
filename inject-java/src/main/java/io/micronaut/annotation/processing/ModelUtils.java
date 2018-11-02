@@ -85,7 +85,7 @@ public class ModelUtils {
      * @return The {@link TypeElement}
      */
     final TypeElement classElementFor(Element element) {
-        while (!(element.getKind().isClass() || element.getKind().isInterface())) {
+        while (!(JavaModelUtils.isClass(element) || JavaModelUtils.isInterface(element))) {
             element = element.getEnclosingElement();
         }
         return (TypeElement) element;

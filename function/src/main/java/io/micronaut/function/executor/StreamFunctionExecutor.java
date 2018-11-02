@@ -74,12 +74,13 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
      * @throws IOException If an error occurs
      */
     protected void execute(InputStream input, OutputStream output, C context) throws IOException {
-        ApplicationContext applicationContext = buildApplicationContext(context);
+        final ApplicationContext applicationContext = buildApplicationContext(context);
         if (context == null) {
             context = (C) applicationContext;
         }
-        Environment env = startEnvironment(applicationContext);
-        String functionName = resolveFunctionName(env);
+
+        final Environment env = startEnvironment(applicationContext);
+        final String functionName = resolveFunctionName(env);
 
         if (functionName == null) {
             throw new InvocationException("No Function name configured. Set 'micronaut.function.name' in your Function configuration");
@@ -88,7 +89,9 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
         LocalFunctionRegistry localFunctionRegistry = applicationContext.getBean(LocalFunctionRegistry.class);
         ExecutableMethod<Object, Object> method = resolveFunction(localFunctionRegistry, functionName);
         Class<?> returnJavaType = method.getReturnType().getType();
-        ClassLoadingReporter.reportBeanPresent(returnJavaType);
+        if (ClassLoadingReporter.isReportingEnabled()) {
+            ClassLoadingReporter.reportBeanPresent(returnJavaType);
+        }
 
         Argument[] requiredArguments = method.getArguments();
         int argCount = requiredArguments.length;
@@ -99,45 +102,36 @@ public class StreamFunctionExecutor<C> extends AbstractExecutor<C> {
         Object bean = applicationContext.getBean(functionType, qualifier);
         List<Argument<?>> typeArguments = beanDefinition.getTypeArguments();
 
-        try {
-            switch (argCount) {
-                case 0:
-                    result = method.invoke(bean);
-                    break;
-                case 1:
+        switch (argCount) {
+            case 0:
+                result = method.invoke(bean);
+                break;
+            case 1:
 
-                    Argument arg = requiredArguments[0];
-                    if (!typeArguments.isEmpty()) {
-                        arg = Argument.of(typeArguments.get(0).getType(), arg.getName());
-                    }
-                    Object value = decodeInputArgument(env, localFunctionRegistry, arg, input);
-                    result = method.invoke(bean, value);
-                    break;
-                case 2:
-                    Argument firstArgument = requiredArguments[0];
-                    Argument secondArgument = requiredArguments[1];
+                Argument arg = requiredArguments[0];
+                if (!typeArguments.isEmpty()) {
+                    arg = Argument.of(typeArguments.get(0).getType(), arg.getName());
+                }
+                Object value = decodeInputArgument(env, localFunctionRegistry, arg, input);
+                result = method.invoke(bean, value);
+                break;
+            case 2:
+                Argument firstArgument = requiredArguments[0];
+                Argument secondArgument = requiredArguments[1];
 
-                    if (!typeArguments.isEmpty()) {
-                        firstArgument = Argument.of(typeArguments.get(0).getType(), firstArgument.getName());
-                    }
+                if (!typeArguments.isEmpty()) {
+                    firstArgument = Argument.of(typeArguments.get(0).getType(), firstArgument.getName());
+                }
 
-                    Object first = decodeInputArgument(env, localFunctionRegistry, firstArgument, input);
-                    Object second = decodeContext(env, secondArgument, context);
-                    result = method.invoke(bean, first, second);
-                    break;
-                default:
-                    throw new InvocationException("Function [" + functionName + "] cannot be made executable.");
-            }
-            if (result != null) {
-                encode(env, localFunctionRegistry, returnJavaType, result, output);
-            }
-        } finally {
-            try {
-                applicationContext.close();
-            } catch (Exception e) {
-                // ignore
-            }
-
+                Object first = decodeInputArgument(env, localFunctionRegistry, firstArgument, input);
+                Object second = decodeContext(env, secondArgument, context);
+                result = method.invoke(bean, first, second);
+                break;
+            default:
+                throw new InvocationException("Function [" + functionName + "] cannot be made executable.");
+        }
+        if (result != null) {
+            encode(env, localFunctionRegistry, returnJavaType, result, output);
         }
     }
 
