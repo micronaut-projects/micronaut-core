@@ -24,6 +24,7 @@ import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.VersionUtils;
+import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
 import javax.annotation.processing.Messager;
@@ -122,7 +123,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         roundEnv.getRootElements()
                 .stream()
-                .filter(element -> element.getKind().isClass() || element.getKind().isInterface())
+                .filter(JavaModelUtils::isClassOrInterface)
                 .map(modelUtils::classElementFor)
                 .filter(typeElement -> {
                     return groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType);
@@ -168,7 +169,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
             Element enclosingElement = classElement.getEnclosingElement();
             // don't process inner class unless this is the visitor for it
-            boolean shouldVisit = !enclosingElement.getKind().isClass() ||
+            boolean shouldVisit = !JavaModelUtils.isClass(enclosingElement) ||
                     concreteClass.getQualifiedName().equals(classElement.getQualifiedName());
 
             if (shouldVisit) {

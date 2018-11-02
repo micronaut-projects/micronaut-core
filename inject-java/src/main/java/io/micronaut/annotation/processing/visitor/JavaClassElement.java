@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
@@ -75,7 +76,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
 
     @Override
     public boolean isInterface() {
-        return classElement.getKind() == ElementKind.INTERFACE;
+        return JavaModelUtils.isInterface(classElement);
     }
 
     @Override

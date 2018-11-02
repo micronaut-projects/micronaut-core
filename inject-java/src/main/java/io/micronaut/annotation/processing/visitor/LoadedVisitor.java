@@ -20,6 +20,7 @@ import io.micronaut.annotation.processing.GenericUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.GenericTypeUtils;
+import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
 import javax.annotation.processing.ProcessingEnvironment;
@@ -139,7 +140,7 @@ public class LoadedVisitor {
             }
         } else if (element instanceof TypeElement) {
             TypeElement typeElement = (TypeElement) element;
-            boolean isEnum = typeElement.getKind() == ElementKind.ENUM;
+            boolean isEnum = JavaModelUtils.resolveKind(typeElement, ElementKind.ENUM).isPresent();
             if (isEnum) {
                 visitor.visitClass(
                         new JavaEnumElement(
