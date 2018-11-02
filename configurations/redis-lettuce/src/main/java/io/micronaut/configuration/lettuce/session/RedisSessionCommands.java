@@ -40,7 +40,7 @@ public interface RedisSessionCommands extends Commands {
      * @param attributes The attributes
      * @return String simple-string-reply
      */
-    @Command("HMSET :sessionId :value")
+    @Command("HMSET :sessionId :attributes")
     CompletableFuture<Void> saveSessionData(@Param("sessionId") byte[] sessionId, @Param("value") Map<byte[], byte[]> attributes);
 
     /**
@@ -107,7 +107,7 @@ public interface RedisSessionCommands extends Commands {
      * @param key The key to get
      * @return Long integer-reply the number of found keys.
      */
-    CompletableFuture<byte[]> get(@Param("keys") byte[] key);
+    CompletableFuture<byte[]> get(@Param("key") byte[] key);
 
     /**
      * Return a range of members in a sorted set, by score.

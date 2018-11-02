@@ -36,6 +36,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.*;
+import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
@@ -827,8 +828,12 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         traceBody("Response", byteBuf);
                     }
                     ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
-                    nettyStreamedHttpResponse.setBody(byteBuffer);
-                    return nettyStreamedHttpResponse;
+                    return new HttpResponseWrapper<ByteBuffer<?>>(nettyStreamedHttpResponse) {
+                        @Override
+                        public Optional<ByteBuffer<?>> getBody() {
+                            return Optional.of(byteBuffer);
+                        }
+                    };
                 });
             });
         };
@@ -1641,9 +1646,20 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         ).asNativeBuffer();
     }
 
+    private String getHostHeader(URI requestURI) {
+        StringBuilder host = new StringBuilder(requestURI.getHost());
+        int port = requestURI.getPort();
+        if (port > -1) {
+            if (port != 80 && port != 443) {
+                host.append(":").append(port);
+            }
+        }
+        return host.toString();
+    }
+
     private <I> void prepareHttpHeaders(URI requestURI, io.micronaut.http.HttpRequest<I> request, io.netty.handler.codec.http.HttpRequest nettyRequest, boolean permitsBody, boolean closeConnection) {
         HttpHeaders headers = nettyRequest.headers();
-        headers.set(HttpHeaderNames.HOST, requestURI.getHost());
+        headers.set(HttpHeaderNames.HOST, getHostHeader(requestURI));
 
         if (closeConnection) {
             headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);

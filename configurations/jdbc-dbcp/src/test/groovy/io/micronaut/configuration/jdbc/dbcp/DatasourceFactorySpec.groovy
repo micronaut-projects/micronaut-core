@@ -16,7 +16,7 @@
 
 package io.micronaut.configuration.jdbc.dbcp
 
-import io.micronaut.spring.tx.datasource.SpringDataSourceResolver
+import io.micronaut.jdbc.spring.SpringDataSourceResolver
 import org.apache.commons.dbcp2.BasicDataSource
 import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy
 import spock.lang.Specification
