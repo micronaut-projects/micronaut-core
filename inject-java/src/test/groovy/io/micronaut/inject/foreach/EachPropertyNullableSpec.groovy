@@ -31,10 +31,7 @@ class EachPropertyNullableSpec extends Specification {
         applicationContext.environment.addPropertySource(MapPropertySource.of(
             Environment.TEST,
             [
-                'datasources.one.url'            : 'jdbc:h2:mem:flywayDb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
-                'datasources.one.username'       : 'sa',
-                'datasources.one.password'       : '',
-                'datasources.one.driverClassName': 'org.h2.Driver',
+                'foo.bar.one.url'            : 'jdbc:h2:mem:flywayDb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
                 'someconf.one.foo'               : true,
                 'someconf.two.foo'               : false
             ]
@@ -48,7 +45,7 @@ class EachPropertyNullableSpec extends Specification {
         then:
         noExceptionThrown()
         bean.getNameQualifier() == 'one'
-        bean.getDataSource() != null
+        bean.getOtherConfig() != null
 
         when:
         SomeConfiguration bean2 = applicationContext.getBean(SomeConfiguration, Qualifiers.byName("two"))
@@ -56,7 +53,7 @@ class EachPropertyNullableSpec extends Specification {
         then:
         noExceptionThrown()
         bean2.getNameQualifier() == 'two'
-        bean2.getDataSource() == null
+        bean2.getOtherConfig() == null
 
         cleanup:
         applicationContext.close()

@@ -25,17 +25,17 @@ import javax.sql.DataSource;
 @EachProperty("someconf")
 public class SomeConfiguration {
 
-    private final DataSource dataSource;
+    private final MyConfiguration otherConfig;
     private final String nameQualifier;
 
-    SomeConfiguration(@Nullable @Parameter DataSource dataSource,
+    SomeConfiguration(@Nullable @Parameter MyConfiguration otherConfig,
                       @Parameter String name) {
-        this.dataSource = dataSource;
+        this.otherConfig = otherConfig;
         this.nameQualifier = name;
     }
 
-    public DataSource getDataSource() {
-        return dataSource;
+    public MyConfiguration getOtherConfig() {
+        return otherConfig;
     }
 
     public String getNameQualifier() {
