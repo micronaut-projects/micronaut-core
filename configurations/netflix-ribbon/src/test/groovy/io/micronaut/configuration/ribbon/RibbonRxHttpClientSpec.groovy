@@ -97,7 +97,7 @@ class RibbonRxHttpClientSpec extends Specification {
         EmbeddedServer messageServer = ApplicationContext.run(EmbeddedServer, serverConfig)
         EmbeddedServer messageServer2 = ApplicationContext.run(EmbeddedServer, serverConfig)
 
-        PollingConditions conditions = new PollingConditions(timeout: 5)
+        PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
 
         expect: "Different servers are called for each invocation of getMessage()"
         conditions.eventually {
@@ -143,7 +143,7 @@ class RibbonRxHttpClientSpec extends Specification {
         EmbeddedServer messageServer = ApplicationContext.run(EmbeddedServer, serverConfig)
         EmbeddedServer messageServer2 = ApplicationContext.run(EmbeddedServer, serverConfig)
 
-        PollingConditions conditions = new PollingConditions(timeout: 5)
+        PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
 
         expect: "Different servers are called for each invocation of getMessage()"
         conditions.eventually {
@@ -206,7 +206,7 @@ class RibbonRxHttpClientSpec extends Specification {
 
         when:"One of the servers is taken down"
         messageServer.stop()
-        PollingConditions conditions = new PollingConditions(timeout: 3)
+        PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
 
         then:"Eventually only one server is being used"
         conditions.eventually {
