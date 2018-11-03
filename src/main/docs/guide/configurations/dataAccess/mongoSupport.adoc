@@ -138,3 +138,10 @@ The following should be noted regarding using GORM for MongoDB in Micronaut:
 * Each class you wish to be a GORM entity should be annotated with the `grails.gorm.annotation.Entity` annotation.
 * Each method that interacts with GORM should be annotated with GORM's `grails.gorm.transactions.Transactional` to ensure a session is present. You can also add the `@Transactional` annotation to the class.
 * By default Micronaut will scan for entities relative to your `Application` class. If you wish to customize this specify additional packages via the api:context.ApplicationContextBuilder[] when starting your application.
+
+==== Mongodb POJO mapping using Mongodb driver
+The 3.5 release of mongo db reactive driver adds POJO support via the PojoCodec, which allows for direct serialization of POJOs and Java Beans to and from BSON. 
+POJO support is added automatically to micronaut via the option ``PojoCodecProvider.Builder#automatic(true)``.
+More details about this feature is documented on http://mongodb.github.io/mongo-java-driver/3.8/bson/pojos/[Mongodb java reactive driver].
+
+You can find a usage example at https://github.com/micronaut-projects/micronaut-examples/tree/master/petstore/pets[micronaut-examples: petstore]. Pet Pojo declared https://github.com/micronaut-projects/micronaut-examples/blob/master/petstore/api/src/main/java/example/api/v1/Pet.java[here]
