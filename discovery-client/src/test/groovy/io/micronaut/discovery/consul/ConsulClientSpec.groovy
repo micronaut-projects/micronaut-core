@@ -212,7 +212,7 @@ class ConsulClientSpec extends Specification {
 
         then:
         members
-        members.first().address == Inet4Address.localHost
+        members.first().status == 1
     }
 
     void "test get self"() {
@@ -221,7 +221,7 @@ class ConsulClientSpec extends Specification {
 
         then:
         self
-        self.member.address == Inet4Address.localHost
+        self.member.status == 1
     }
 
     @Controller('/consul/test')
