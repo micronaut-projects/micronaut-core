@@ -26,7 +26,6 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
-import net.sf.cglib.core.Local
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
 
@@ -230,7 +229,7 @@ class MockConsulServer implements ConsulOperations {
 
     @Override
     Publisher<LocalAgentConfiguration> getSelf() {
-        LocalAgentConfiguration self = new LocalAgentConfiguration().tap {
+        return Publishers.just(new LocalAgentConfiguration().tap {
             configuration = [
                 Datacenter: 'dc1',
                 NodeName: 'foobar',
@@ -238,7 +237,6 @@ class MockConsulServer implements ConsulOperations {
             ]
             member = agent
             metadata = [ "os_version": "ubuntu_16.04" ]
-        }
-        return Publishers.just(self)
+        })
     }
 }
