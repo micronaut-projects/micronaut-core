@@ -26,6 +26,7 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.QueryValue
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
+import net.sf.cglib.core.Local
 import org.reactivestreams.Publisher
 import reactor.core.publisher.Mono
 
@@ -54,6 +55,13 @@ class MockConsulServer implements ConsulOperations {
 
     static NewServiceEntry lastNewEntry
     static List<String> passingReports = []
+
+    final MemberEntry agent = new MemberEntry().tap {
+        name = "localhost"
+        address = InetAddress.localHost
+        port = 8301
+        status = 1
+    }
 
     MockConsulServer(EmbeddedServer embeddedServer) {
         lastNewEntry = null
@@ -213,5 +221,24 @@ class MockConsulServer implements ConsulOperations {
         return Publishers.just(services.collectEntries { String key, ServiceEntry entry ->
               return [(key): entry.tags]
         })
+    }
+
+    @Override
+    Publisher<List<MemberEntry>> getMembers() {
+        return Publishers.just([agent])
+    }
+
+    @Override
+    Publisher<LocalAgentConfiguration> getSelf() {
+        LocalAgentConfiguration self = new LocalAgentConfiguration().tap {
+            configuration = [
+                Datacenter: 'dc1',
+                NodeName: 'foobar',
+                NodeId: '9d754d17-d864-b1d3-e758-f3fe25a9874f'
+            ]
+            member = agent
+            metadata = [ "os_version": "ubuntu_16.04" ]
+        }
+        return Publishers.just(self)
     }
 }

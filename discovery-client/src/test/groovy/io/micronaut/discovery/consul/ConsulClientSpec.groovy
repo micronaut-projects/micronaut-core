@@ -205,6 +205,25 @@ class ConsulClientSpec extends Specification {
         result == HttpStatus.OK
 
     }
+
+    void "test list members"() {
+        when:
+        List<MemberEntry> members = Flowable.fromPublisher(client.members).blockingFirst()
+
+        then:
+        members
+        members.first().address == Inet4Address.localHost
+    }
+
+    void "test get self"() {
+        when:
+        LocalAgentConfiguration self = Flowable.fromPublisher(client.self).blockingFirst()
+
+        then:
+        self
+        self.member.address == Inet4Address.localHost
+    }
+
     @Controller('/consul/test')
     static class TestController {
         @Get
