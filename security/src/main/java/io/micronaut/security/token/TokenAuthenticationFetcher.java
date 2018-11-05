@@ -21,11 +21,14 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.event.TokenValidatedEvent;
 import io.micronaut.security.filters.AuthenticationFetcher;
+import io.micronaut.security.token.reader.DefaultTokenResolver;
+import io.micronaut.security.token.reader.TokenReader;
 import io.micronaut.security.token.reader.TokenResolver;
 import io.micronaut.security.token.validator.TokenValidator;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.Iterator;
@@ -58,6 +61,7 @@ public class TokenAuthenticationFetcher implements AuthenticationFetcher {
      * @param tokenResolver   The {@link io.micronaut.security.token.reader.TokenResolver} which returns the first found token in the request.
      * @param eventPublisher  The Application event publiser
      */
+    @Inject
     public TokenAuthenticationFetcher(Collection<TokenValidator> tokenValidators,
                                       TokenResolver tokenResolver,
                                       ApplicationEventPublisher eventPublisher) {
@@ -65,6 +69,19 @@ public class TokenAuthenticationFetcher implements AuthenticationFetcher {
         this.tokenResolver = tokenResolver;
         this.tokenValidators = tokenValidators;
     }
+
+    /**
+     * @param tokenValidators The list of {@link TokenValidator} which attempt to validate the request
+     * @param tokenReaders    The list {@link TokenReader} which attempt to read the request
+     * @param eventPublisher  The Application event publiser
+     */
+    @Deprecated
+    public TokenAuthenticationFetcher(Collection<TokenValidator> tokenValidators,
+                                      Collection<TokenReader> tokenReaders,
+                                      ApplicationEventPublisher eventPublisher) {
+        this(tokenValidators, new DefaultTokenResolver(tokenReaders), eventPublisher);
+    }
+
 
     @Override
     public Publisher<Authentication> fetchAuthentication(HttpRequest<?> request) {
