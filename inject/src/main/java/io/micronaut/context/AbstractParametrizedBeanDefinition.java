@@ -26,6 +26,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ParametrizedBeanFactory;
 
+import javax.annotation.Nullable;
 import javax.inject.Qualifier;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
@@ -95,8 +96,8 @@ public abstract class AbstractParametrizedBeanDefinition<T> extends AbstractBean
             try {
                 path.pushConstructorResolve(this, requiredArgument);
                 String argumentName = requiredArgument.getName();
-                if (!requiredArgumentValues.containsKey(argumentName)) {
-                    throw new BeanInstantiationException(resolutionContext, "Missing argument value: " + argumentName);
+                if (!requiredArgumentValues.containsKey(argumentName) && !requiredArgument.isAnnotationPresent(Nullable.class)) {
+                    throw new BeanInstantiationException(resolutionContext, "Missing bean argument value: " + argumentName);
                 }
                 Object value = requiredArgumentValues.get(argumentName);
                 boolean requiresConversion = value != null && !requiredArgument.getType().isInstance(value);

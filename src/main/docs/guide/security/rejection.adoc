@@ -1,0 +1,12 @@
+Micronaut allows the customization of the response that is sent when a request is not authorized to access a resource, or is not authenticated and the resource requires authentication.
+
+To control this response, it is necessary to register a api:io.micronaut.security.handlers.RejectionHandler[] and ensure your bean replaces the default implementation.
+
+For those using session based security, replace api:io.micronaut.security.session.SessionSecurityfilterRejectionHandler[]. For those using JWT based security, replace api:io.micronaut.security.handlers.HttpStatusCodeRejectionHandler[].
+
+For example:
+
+[source,java]
+----
+include::{testssecurityjwt}/rejection/MyRejectionHandler.java[tag=clazz,indent=0]
+----
