@@ -19,9 +19,15 @@ package io.micronaut.security.endpoints;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.security.config.SecurityConfigurationProperties;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 /**
+ * Implementation of {@link LogoutControllerConfiguration} used to configure the {@link LogoutController}.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -43,8 +49,38 @@ public class LogoutControllerConfigurationProperties implements LogoutController
     @SuppressWarnings("WeakerAccess")
     public static final String DEFAULT_PATH = "/logout";
 
+    /**
+     * Default Allowed Http Method.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final HttpMethod DEFAULT_HTTPMETHOD = HttpMethod.POST;
+
+    private static final List<HttpMethod> SUPPORTED_ALLOWEDMETHODS = new ArrayList<HttpMethod>() {{
+        add(HttpMethod.GET);
+        add(HttpMethod.POST);
+    }};
+
     private boolean enabled = DEFAULT_ENABLED;
     private String path = DEFAULT_PATH;
+    private List<HttpMethod> allowedMethods = Collections.singletonList(DEFAULT_HTTPMETHOD);
+
+    @Override
+    public List<HttpMethod> getAllowedMethods() {
+        return allowedMethods;
+    }
+
+    /**
+     * Allowed HTTP Methods for {@link io.micronaut.security.endpoints.LogoutController}. Default value [POST]. Only GET or POST are valid values.
+     * @param allowedMethods a List of Allowed methods. Only GET or POST are valid values.
+     */
+    public void setAllowedMethods(List<HttpMethod> allowedMethods) {
+        if (allowedMethods.stream().anyMatch(method -> !SUPPORTED_ALLOWEDMETHODS.contains(method))) {
+            String supportedMethodsCsv = SUPPORTED_ALLOWEDMETHODS.stream().map(HttpMethod::toString).reduce((a, b) -> a + ", " + b).get();
+            String allowedMethodsCsv = allowedMethods.stream().map(HttpMethod::toString).reduce((a, b) -> a + ", " + b).get();
+            throw new IllegalArgumentException(supportedMethodsCsv + " are the only values supported for " + LogoutControllerConfigurationProperties.PREFIX + ".allowed-methods, you supplied: " + allowedMethodsCsv);
+        }
+        this.allowedMethods = allowedMethods;
+    }
 
     /**
      * @return true if you want to enable the {@link LogoutController}

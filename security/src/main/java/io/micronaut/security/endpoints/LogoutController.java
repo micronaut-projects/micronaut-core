@@ -21,9 +21,11 @@ import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.security.annotation.Secured;
 import io.micronaut.security.authentication.Authentication;
@@ -42,21 +44,27 @@ import javax.annotation.Nullable;
 @Secured(SecurityRule.IS_ANONYMOUS)
 public class LogoutController {
 
-    protected final LogoutHandler logoutHandler;
-    protected final ApplicationEventPublisher eventPublisher;
+    private final LogoutHandler logoutHandler;
+    private final ApplicationEventPublisher eventPublisher;
+    private final LogoutControllerConfiguration logoutControllerConfiguration;
 
     /**
      *
      * @param logoutHandler A collaborator which helps to build HTTP response if user logout.
      * @param eventPublisher The application event publisher
+     * @param logoutControllerConfiguration Configuration for the Logout controller
      */
     public LogoutController(@Nullable LogoutHandler logoutHandler,
-                            ApplicationEventPublisher eventPublisher) {
+                            ApplicationEventPublisher eventPublisher,
+                            LogoutControllerConfiguration logoutControllerConfiguration) {
         this.logoutHandler = logoutHandler;
         this.eventPublisher = eventPublisher;
+        this.logoutControllerConfiguration = logoutControllerConfiguration;
     }
 
     /**
+     * POST endpoint for Logout Controller.
+     *
      * @param request The {@link HttpRequest} being executed
      * @param authentication {@link Authentication} instance for current user
      * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
@@ -64,6 +72,35 @@ public class LogoutController {
     @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})
     @Post
     public HttpResponse index(HttpRequest<?> request, Authentication authentication) {
+        if (!logoutControllerConfiguration.getAllowedMethods().contains(request.getMethod())) {
+            return HttpResponse.status(HttpStatus.METHOD_NOT_ALLOWED);
+        }
+        return handleLogout(request, authentication);
+    }
+
+    /**
+     * GET endpoint for Logout Controller.
+     *
+     * @param request The {@link HttpRequest} being executed
+     * @param authentication {@link Authentication} instance for current user
+     * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
+     */
+    @Get
+    public HttpResponse indexGet(HttpRequest<?> request, Authentication authentication) {
+        if (!logoutControllerConfiguration.getAllowedMethods().contains(request.getMethod())) {
+           return HttpResponse.status(HttpStatus.METHOD_NOT_ALLOWED);
+        }
+
+        return handleLogout(request, authentication);
+    }
+
+    /**
+     *
+     * @param request The {@link HttpRequest} being executed
+     * @param authentication {@link Authentication} instance for current user
+     * @return An AccessRefreshToken encapsulated in the HttpResponse or a failure indicated by the HTTP status
+     */
+    protected HttpResponse handleLogout(HttpRequest<?> request, Authentication authentication) {
         eventPublisher.publishEvent(new LogoutEvent(authentication));
         if (logoutHandler != null) {
             return logoutHandler.logout(request);

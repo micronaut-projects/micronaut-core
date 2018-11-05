@@ -17,6 +17,9 @@
 package io.micronaut.security.endpoints;
 
 import io.micronaut.core.util.Toggleable;
+import io.micronaut.http.HttpMethod;
+
+import java.util.List;
 
 /**
  * Encapsulates the configuration of {@link LogoutController}.
@@ -29,4 +32,10 @@ public interface LogoutControllerConfiguration extends Toggleable {
      * @return path
      */
     String getPath();
+
+    /**
+     *
+     * @return List of allowed HTTP Methods to access {@link LogoutController}.
+     */
+    List<HttpMethod> getAllowedMethods();
 }
