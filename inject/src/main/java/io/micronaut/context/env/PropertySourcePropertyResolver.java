@@ -33,20 +33,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Properties;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -404,53 +391,19 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
 
                 Object value = properties.get(property);
 
-                if (value instanceof String) {
-                    String str = (String) value;
-                    if (convention != PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE && str.contains(propertyPlaceholderResolver.getPrefix())) {
-                        StringBuffer newValue = new StringBuffer();
-                        Matcher matcher = RANDOM_PATTERN.matcher(str);
-                        boolean hasRandoms = false;
-                        while (matcher.find()) {
-                            hasRandoms = true;
-                            String type = matcher.group(1).trim().toLowerCase();
-                            String randomValue;
-                            switch (type) {
-                                case "port":
-                                    randomValue = String.valueOf(SocketUtils.findAvailableTcpPort());
-                                    break;
-                                case "int":
-                                case "integer":
-                                    randomValue = String.valueOf(random.nextInt());
-                                    break;
-                                case "long":
-                                    randomValue = String.valueOf(random.nextLong());
-                                    break;
-                                case "float":
-                                    randomValue = String.valueOf(random.nextFloat());
-                                    break;
-                                case "shortuuid":
-                                    randomValue = UUID.randomUUID().toString().substring(25, 35);
-                                    break;
-                                case "uuid":
-                                    randomValue = UUID.randomUUID().toString();
-                                    break;
-                                case "uuid2":
-                                    randomValue = UUID.randomUUID().toString().replaceAll("-", "");
-                                    break;
-                                default:
-                                    throw new ConfigurationException("Invalid random expression " + matcher.group(0) + " for property: " + property);
+                if (value instanceof CharSequence) {
+                    value = processRandomExpressions(convention, property, (CharSequence) value);
+                } else if (value instanceof List) {
+                    final ListIterator i = ((List) value).listIterator();
+                    while (i.hasNext()) {
+                        final Object o = i.next();
+                        if (o instanceof CharSequence) {
+                            final CharSequence newValue = processRandomExpressions(convention, property, (CharSequence) o);
+                            if (newValue != o) {
+                                i.set(newValue);
                             }
-                            matcher.appendReplacement(newValue, randomValue);
                         }
-
-                        if (hasRandoms) {
-                            matcher.appendTail(newValue);
-                            value = newValue.toString();
-                        }
-
                     }
-
-
                 }
 
                 List<String> resolvedProperties = resolvePropertiesForConvention(property, convention);
@@ -495,6 +448,53 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         }
     }
 
+    private CharSequence processRandomExpressions(PropertySource.PropertyConvention convention, String property, CharSequence str) {
+        if (convention != PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE && str.toString().contains(propertyPlaceholderResolver.getPrefix())) {
+            StringBuffer newValue = new StringBuffer();
+            Matcher matcher = RANDOM_PATTERN.matcher(str);
+            boolean hasRandoms = false;
+            while (matcher.find()) {
+                hasRandoms = true;
+                String type = matcher.group(1).trim().toLowerCase();
+                String randomValue;
+                switch (type) {
+                    case "port":
+                        randomValue = String.valueOf(SocketUtils.findAvailableTcpPort());
+                        break;
+                    case "int":
+                    case "integer":
+                        randomValue = String.valueOf(random.nextInt());
+                        break;
+                    case "long":
+                        randomValue = String.valueOf(random.nextLong());
+                        break;
+                    case "float":
+                        randomValue = String.valueOf(random.nextFloat());
+                        break;
+                    case "shortuuid":
+                        randomValue = UUID.randomUUID().toString().substring(25, 35);
+                        break;
+                    case "uuid":
+                        randomValue = UUID.randomUUID().toString();
+                        break;
+                    case "uuid2":
+                        randomValue = UUID.randomUUID().toString().replaceAll("-", "");
+                        break;
+                    default:
+                        throw new ConfigurationException("Invalid random expression " + matcher.group(0) + " for property: " + property);
+                }
+                matcher.appendReplacement(newValue, randomValue);
+            }
+
+            if (hasRandoms) {
+                matcher.appendTail(newValue);
+                return newValue.toString();
+            }
+
+        }
+        return str;
+    }
+
     /**
      * @param name        The name
      * @param allowCreate Whether allows creation
@@ -535,6 +535,26 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     private Object resolvePlaceHoldersIfNecessary(Object value) {
         if (value instanceof CharSequence) {
             return propertyPlaceholderResolver.resolveRequiredPlaceholders(value.toString());
+        } else if (value instanceof List) {
+            List<?> list = (List) value;
+            List<?> newList = new ArrayList<>(list);
+            final ListIterator i = newList.listIterator();
+            while (i.hasNext()) {
+                final Object o = i.next();
+                if (o instanceof CharSequence) {
+                    i.set(resolvePlaceHoldersIfNecessary(o));
+                } else if (o instanceof Map) {
+                    Map<?, ?> submap = (Map) o;
+                    Map<Object, Object> newMap = new LinkedHashMap<>(submap.size());
+                    for (Map.Entry<?, ?> entry : submap.entrySet()) {
+                        final Object k = entry.getKey();
+                        final Object v = entry.getValue();
+                        newMap.put(k, resolvePlaceHoldersIfNecessary(v));
+                    }
+                    i.set(newMap);
+                }
+            }
+            value = newList;
         }
         return value;
     }
