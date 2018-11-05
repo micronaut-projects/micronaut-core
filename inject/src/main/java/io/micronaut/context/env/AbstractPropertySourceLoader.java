@@ -139,7 +139,7 @@ public abstract class AbstractPropertySourceLoader implements PropertySourceLoad
             Map.Entry entry = (Map.Entry) o;
             String key = entry.getKey().toString();
             Object value = entry.getValue();
-            if (value instanceof Map) {
+            if (value instanceof Map && !((Map) value).isEmpty()) {
                 processMap(finalMap, (Map) value, prefix + key + '.');
             } else {
                 finalMap.put(prefix + key, value);
