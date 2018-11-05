@@ -18,6 +18,7 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 
 /**
@@ -26,6 +27,7 @@ import io.micronaut.inject.ast.ClassElement;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 final class JavaVoidElement implements ClassElement, AnnotationMetadataDelegate {
 
     @Override
