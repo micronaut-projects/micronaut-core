@@ -201,6 +201,7 @@ configurations:
     postgresSupport: Configuring Postgres
     redisSupport: Configuring Redis
     cassandraSupport: Configuring Cassandra
+    flyway: Configuring Flyway
   otherConfigurations:
     title: Other Configurations
     rabbitmq: RabbitMQ

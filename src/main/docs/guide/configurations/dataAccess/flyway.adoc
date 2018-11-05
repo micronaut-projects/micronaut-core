@@ -1,0 +1,47 @@
+To use the Micronaut's integration with https://flywaydb.org/[Flyway] you need to add the following dependency to your
+classpath.
+
+.build.gradle
+[source,groovy]
+----
+compile "io.micronaut.configuration:micronaut-flyway"
+----
+
+.pom.xml
+[source,xml]
+----
+<dependency>
+    <groupId>io.micronaut.configuration</groupId>
+    <artifactId>micronaut-flyway</artifactId>
+</dependency>
+----
+
+You can define Flyway configuration for each datasource. The following example demonstrates using it:
+
+[source, yaml]
+.src/main/resources/application.yml
+----
+include::{testsflyway}/groovy/io/micronaut/dbmigration/flyway/FlywaySpec.groovy[tag=yamlconfig,indent=0]
+----
+
+<1> Disable schema DDL creation.
+<2> Configure flyway configuration for `default` data source.
+<3> The migrations directory is `src/main/resources/databsemigrations`.
+
+
+In that directory you need to include all your migrations, for example:
+
+[source,sql]
+.resources/databasemicrations/V1__create-books-schema.sql
+----
+include::{testsflyway}/resources/databasemigrations/V1__create-books-schema.sql[indent=0]
+----
+
+There are several options available for configuration:
+
+include::{includedir}configurationProperties/io.micronaut.dbmigration.flyway.FlywayConfigurationProperties.adoc[]
+
+NOTE: By default Micronaut will configure Flyway to use the datasources defined under `datasources` configuration key. If
+you want to use a different datasource you need to define the properties `+flyway.*.url+`, `+flyway.*.user+` and
+`+flyway.*.password+`.
+

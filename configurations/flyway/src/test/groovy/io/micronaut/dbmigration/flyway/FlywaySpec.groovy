@@ -40,7 +40,7 @@ datasources:
         password: ''
         driverClassName: 'org.h2.Driver'
 jpa:
-    default:
+    default: # <2>
         packages-to-scan:
             - 'example.micronaut'
         properties:
