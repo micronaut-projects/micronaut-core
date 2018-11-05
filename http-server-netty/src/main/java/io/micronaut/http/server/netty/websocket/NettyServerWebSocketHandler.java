@@ -43,6 +43,7 @@ import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketServerHandshaker;
 import io.netty.handler.ssl.SslHandler;
+import io.netty.handler.timeout.IdleStateEvent;
 import io.reactivex.Flowable;
 import io.reactivex.schedulers.Schedulers;
 import org.reactivestreams.Publisher;
@@ -119,6 +120,15 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error publishing WebSocket opened event: " + e.getMessage(), e);
             }
+        }
+    }
+
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+        if (evt instanceof IdleStateEvent) {
+            writeCloseFrameAndTerminate(ctx, CloseReason.GOING_AWAY);
+        } else {
+            super.userEventTriggered(ctx, evt);
         }
     }
 
