@@ -17,7 +17,8 @@
 package io.micronaut.inject.ast;
 
 /**
- * An inner element is an element that is contained within a class.
+ * A member element is an element that is contained within a {@link ClassElement}.
+ * The {@link #getDeclaringType()} method returns the class that declares the element.
  *
  * @author graemerocher
  * @since 1.0
