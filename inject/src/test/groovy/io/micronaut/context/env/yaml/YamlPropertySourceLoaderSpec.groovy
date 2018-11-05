@@ -80,4 +80,46 @@ dataSource:
         env.get("data-source.password", String).get() == 'test'
         env.get("data-source.jmx-export", boolean).get() == true
     }
+
+    void "test datasources.default: {}"() {
+        def serviceDefinition = Mock(ServiceDefinition)
+        serviceDefinition.isPresent() >> true
+        serviceDefinition.load() >> new YamlPropertySourceLoader()
+
+        Environment env = new DefaultEnvironment(["test"] as String[]) {
+            @Override
+            protected SoftServiceLoader<PropertySourceLoader> readPropertySourceLoaders() {
+                GroovyClassLoader gcl = new GroovyClassLoader()
+                gcl.addClass(YamlPropertySourceLoader)
+                gcl.addURL(YamlPropertySourceLoader.getResource("/META-INF/services/io.micronaut.context.env.PropertySourceLoader"))
+                return new SoftServiceLoader<PropertySourceLoader>(PropertySourceLoader, gcl)
+            }
+
+            @Override
+            Optional<InputStream> getResourceAsStream(String path) {
+                if(path.endsWith('-test.yml')) {
+                    return Optional.of(new ByteArrayInputStream('''\
+datasources.default: {}
+'''.bytes))
+                }
+                else if(path.endsWith("application.yml")) {
+                    return Optional.of(new ByteArrayInputStream('''\
+datasources.default: {}    
+'''.bytes))
+                }
+
+                return Optional.empty()
+            }
+
+        }
+
+
+        when:
+        env.start()
+
+        then:
+        env.get("datasources.default", String).get() == "{}"
+        env.get("datasources.default", Map).get() == [:]
+
+    }
 }
