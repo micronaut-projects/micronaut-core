@@ -17,10 +17,15 @@
 package io.micronaut.inject.ast;
 
 /**
- * Stores data about an element that references a field.
+ * An inner element is an element that is contained within a class.
  *
- * @author James Kleeh
+ * @author graemerocher
  * @since 1.0
  */
-public interface FieldElement extends TypedElement, MemberElement {
+public interface MemberElement extends Element {
+
+    /**
+     * @return The declaring type of the element.
+     */
+    ClassElement getDeclaringType();
 }

@@ -17,6 +17,7 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PropertyElement;
 
@@ -29,26 +30,30 @@ import javax.lang.model.element.ExecutableElement;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 class JavaPropertyElement extends AbstractJavaElement implements PropertyElement {
 
     private final String name;
     private final ClassElement type;
     private final boolean readOnly;
+    private final ClassElement declaringElement;
 
     /**
      * Default constructor.
      *
+     * @param declaringElement The declaring element
      * @param getter The element
      * @param annotationMetadata The annotation metadata
      * @param name The name
      * @param type The type
      * @param readOnly Whether it is read only
      */
-    JavaPropertyElement(ExecutableElement getter, AnnotationMetadata annotationMetadata, String name, ClassElement type, boolean readOnly) {
+    JavaPropertyElement(ClassElement declaringElement, ExecutableElement getter, AnnotationMetadata annotationMetadata, String name, ClassElement type, boolean readOnly) {
         super(getter, annotationMetadata);
         this.name = name;
         this.type = type;
         this.readOnly = readOnly;
+        this.declaringElement = declaringElement;
     }
 
     @Override
@@ -70,5 +75,10 @@ class JavaPropertyElement extends AbstractJavaElement implements PropertyElement
     @Override
     public boolean isReadOnly() {
         return readOnly;
+    }
+
+    @Override
+    public ClassElement getDeclaringType() {
+        return declaringElement;
     }
 }

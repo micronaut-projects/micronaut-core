@@ -21,7 +21,9 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 
+import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
+import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 import java.util.List;
@@ -70,5 +72,18 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
         return parameters.stream().map((Function<VariableElement, ParameterElement>) variableElement ->
                 new JavaParameterElement(variableElement, visitorContext.getAnnotationUtils().getAnnotationMetadata(variableElement), visitorContext)
         ).toArray(ParameterElement[]::new);
+    }
+
+    @Override
+    public ClassElement getDeclaringType() {
+        final Element enclosingElement = executableElement.getEnclosingElement();
+        if (!(enclosingElement instanceof TypeElement)) {
+            throw new IllegalStateException("Enclosing element should be a type element");
+        }
+        return new JavaClassElement(
+                (TypeElement) enclosingElement,
+                visitorContext.getAnnotationUtils().getAnnotationMetadata(enclosingElement),
+                visitorContext
+        );
     }
 }

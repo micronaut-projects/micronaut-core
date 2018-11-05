@@ -24,7 +24,7 @@ import javax.annotation.Nullable;
  * @author James Kleeh
  * @since 1.0
  */
-public interface MethodElement extends Element {
+public interface MethodElement extends MemberElement {
 
     /**
      * @return The return type of the method
