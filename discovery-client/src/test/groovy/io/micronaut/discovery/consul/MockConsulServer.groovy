@@ -55,6 +55,13 @@ class MockConsulServer implements ConsulOperations {
     static NewServiceEntry lastNewEntry
     static List<String> passingReports = []
 
+    final MemberEntry agent = new MemberEntry().tap {
+        name = "localhost"
+        address = InetAddress.localHost
+        port = 8301
+        status = 1
+    }
+
     MockConsulServer(EmbeddedServer embeddedServer) {
         lastNewEntry = null
         passingReports.clear()
@@ -212,6 +219,24 @@ class MockConsulServer implements ConsulOperations {
     Publisher<Map<String, List<String>>> getServiceNames() {
         return Publishers.just(services.collectEntries { String key, ServiceEntry entry ->
               return [(key): entry.tags]
+        })
+    }
+
+    @Override
+    Publisher<List<MemberEntry>> getMembers() {
+        return Publishers.just([agent])
+    }
+
+    @Override
+    Publisher<LocalAgentConfiguration> getSelf() {
+        return Publishers.just(new LocalAgentConfiguration().tap {
+            configuration = [
+                Datacenter: 'dc1',
+                NodeName: 'foobar',
+                NodeId: '9d754d17-d864-b1d3-e758-f3fe25a9874f'
+            ]
+            member = agent
+            metadata = [ "os_version": "ubuntu_16.04" ]
         })
     }
 }
