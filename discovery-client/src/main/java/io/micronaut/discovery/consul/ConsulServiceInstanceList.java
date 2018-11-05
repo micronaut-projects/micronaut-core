@@ -16,7 +16,6 @@
 
 package io.micronaut.discovery.consul;
 
-import io.micronaut.discovery.client.DiscoveryClientConfiguration;
 import io.micronaut.discovery.client.DiscoveryServerInstanceList;
 import io.micronaut.discovery.consul.client.v1.ConsulClient;
 import io.micronaut.discovery.consul.condition.RequiresConsul;
@@ -44,7 +43,7 @@ public class ConsulServiceInstanceList extends DiscoveryServerInstanceList {
      * @param configuration The discovery config
      * @param instanceConfiguration The instance config
      */
-    public ConsulServiceInstanceList(DiscoveryClientConfiguration configuration, ApplicationConfiguration.InstanceConfiguration instanceConfiguration) {
+    public ConsulServiceInstanceList(ConsulConfiguration configuration, ApplicationConfiguration.InstanceConfiguration instanceConfiguration) {
         super(configuration, instanceConfiguration);
     }
 
