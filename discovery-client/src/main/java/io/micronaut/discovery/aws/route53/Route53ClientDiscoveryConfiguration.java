@@ -34,10 +34,12 @@ import javax.annotation.Nullable;
  * See https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html for details info
  */
 @Requires(env = Environment.AMAZON_EC2)
-@ConfigurationProperties("aws.route53.discovery.client")
+@Requires(property = Route53ClientDiscoveryConfiguration.PREFIX)
+@ConfigurationProperties(Route53ClientDiscoveryConfiguration.PREFIX)
 public class Route53ClientDiscoveryConfiguration extends DiscoveryClientConfiguration {
 
     public static final String SERVICE_ID = "route53";
+    public static final String PREFIX = "aws.route53.discovery.client";
 
     private String awsServiceId; //ID of the service - required to find it
     private String namespaceId; // used to filter a list of available services attached to a namespace
