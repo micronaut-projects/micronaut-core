@@ -16,6 +16,7 @@
 
 package io.micronaut.dbmigration.flyway;
 
+import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.runtime.event.annotation.EventListener;
@@ -33,20 +34,23 @@ import java.util.Collection;
  * @author Iván López
  * @since 1.1
  */
-@Requires(classes = Flyway.class)
+@Requires(beans = Flyway.class)
 @Singleton
 class FlywayAsyncStartupEventListener extends AbstractFlyway {
+
     private static final Logger LOG = LoggerFactory.getLogger(FlywayAsyncStartupEventListener.class);
 
     /**
-     * @param flywayConfigurationProperties Collection of Flyway Configurations
+     * @param applicationContext            The application context
+     * @param flywayConfigurationProperties Collection of Flyway configuration properties
      */
-    public FlywayAsyncStartupEventListener(Collection<FlywayConfigurationProperties> flywayConfigurationProperties) {
-        super(flywayConfigurationProperties);
+    public FlywayAsyncStartupEventListener(ApplicationContext applicationContext,
+                                           Collection<FlywayConfigurationProperties> flywayConfigurationProperties) {
+        super(applicationContext, flywayConfigurationProperties);
     }
 
     /**
-     * Runs Flyway for the datasource where there is a flyway configuration available.
+     * Runs Flyway migrations asynchronously.
      *
      * @param event Server startup event
      */

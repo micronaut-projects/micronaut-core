@@ -19,6 +19,7 @@ package io.micronaut.dbmigration.flyway
 import groovy.sql.Sql
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
+import org.flywaydb.core.Flyway
 import spock.lang.Specification
 
 class FlywayConfigurationPropertiesSpec extends Specification {
@@ -38,6 +39,12 @@ class FlywayConfigurationPropertiesSpec extends Specification {
 
         when:
         applicationContext.getBean(FlywayStartupEventListener)
+
+        then:
+        noExceptionThrown()
+
+        when:
+        applicationContext.getBean(Flyway)
 
         then:
         noExceptionThrown()
@@ -73,6 +80,12 @@ class FlywayConfigurationPropertiesSpec extends Specification {
         noExceptionThrown()
 
         when:
+        applicationContext.getBean(Flyway)
+
+        then:
+        noExceptionThrown()
+
+        when:
         Map db = [url: 'jdbc:h2:mem:flywayBooksDB2', user: 'sa', password: '', driver: 'org.h2.Driver']
         Sql sql = Sql.newInstance(db.url, db.user, db.password, db.driver)
 
@@ -97,6 +110,12 @@ class FlywayConfigurationPropertiesSpec extends Specification {
 
         when:
         applicationContext.getBean(FlywayStartupEventListener)
+
+        then:
+        noExceptionThrown()
+
+        when:
+        applicationContext.getBean(Flyway)
 
         then:
         noExceptionThrown()

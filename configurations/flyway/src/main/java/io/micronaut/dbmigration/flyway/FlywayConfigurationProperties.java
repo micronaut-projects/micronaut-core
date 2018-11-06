@@ -35,7 +35,7 @@ import java.util.Map;
  * Create a Flyway Configuration for each sub-property of flyway.*.
  *
  * @author Iván López
- * @see <a href="https://flywaydb.org/documentation/configfiles">Flyway Config</a>
+ * @see org.flywaydb.core.api.configuration.Configuration
  * @since 1.1
  */
 @EachProperty("flyway")
