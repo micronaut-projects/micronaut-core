@@ -22,6 +22,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.writer.GeneratedFile;
 
+import javax.annotation.Nullable;
 import java.util.Optional;
 
 /**
@@ -39,13 +40,15 @@ public interface VisitorContext extends MutableConvertibleValues<Object> {
      * @param message The message
      * @param element The element
      */
-    void info(String message, Element element);
+    void info(String message, @Nullable Element element);
 
     /**
      * Allows printing informational messages.
      *
+     * @deprecated Use {@link #info(String, Element)} with a null element
      * @param message The message
      */
+    @Deprecated
     void info(String message);
 
     /**
@@ -54,7 +57,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object> {
      * @param message The message
      * @param element The element
      */
-    void fail(String message, Element element);
+    void fail(String message, @Nullable Element element);
 
     /**
      * Allows printing a warning for the given message and element.
@@ -62,7 +65,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object> {
      * @param message The message
      * @param element The element
      */
-    void warn(String message, Element element);
+    void warn(String message, @Nullable Element element);
 
     /**
      * Visit a file within the META-INF directory.
