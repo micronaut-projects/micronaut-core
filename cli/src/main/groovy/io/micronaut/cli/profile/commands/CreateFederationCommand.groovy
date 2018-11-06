@@ -51,10 +51,6 @@ class CreateFederationCommand extends AbstractCreateAppCommand {
             required = true, description = 'The names of the services to create.')
     List<String> services = []
 
-    // note: description contains a variable that will be replaced by picocli, not by Groovy
-    @Option(names = ['-b', '--build'], paramLabel = 'BUILD-TOOL', description = 'Which build tool to configure. Possible values: ${COMPLETION-CANDIDATES}.')
-    SupportedBuildTool build = SupportedBuildTool.gradle
-
     CreateFederationCommand() {
     }
 
