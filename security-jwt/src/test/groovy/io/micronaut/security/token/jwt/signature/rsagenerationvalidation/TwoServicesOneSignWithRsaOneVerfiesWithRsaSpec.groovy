@@ -82,15 +82,15 @@ class TwoServicesOneSignWithRsaOneVerfiesWithRsaSpec extends Specification imple
 
     def "setup books server"() {
         given:
-        booksPort = SocketUtils.findAvailableTcpPort()
         Map booksConfig = [
                 (SPEC_NAME_PROPERTY)                          : 'rsajwtbooks',
-                'micronaut.server.port'                       : booksPort,
+                'micronaut.server.port'                       : -1,
                 'micronaut.security.enabled'                  : true,
                 'micronaut.security.token.jwt.enabled'        : true,
         ]
 
         booksEmbeddedServer = ApplicationContext.run(EmbeddedServer, booksConfig, Environment.TEST)
+        booksPort = booksEmbeddedServer.getPort()
         BooksRsaSignatureConfiguration bean = booksEmbeddedServer.applicationContext.createBean(BooksRsaSignatureConfiguration, rsaJwk)
         booksEmbeddedServer.applicationContext.registerSingleton(bean)
 
