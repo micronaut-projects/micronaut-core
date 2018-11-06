@@ -95,8 +95,8 @@ public class HandlebarsViewsRenderer implements ViewsRenderer {
         if (viewsConfiguration.getFolder() != null) {
             sb.append(viewsConfiguration.getFolder());
         }
-        sb.append(FILE_SEPARATOR);
-        sb.append(name.replace("/", FILE_SEPARATOR));
+        sb.append("/");
+        sb.append(name);
         int index = sb.indexOf(extension());
         if (index != -1) {
             return sb.substring(0, index);
