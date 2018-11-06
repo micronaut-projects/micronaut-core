@@ -266,7 +266,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                             argumentList.add(resolveValueOrError(argument, conversionContext, result));
                         }
                     } else {
-                        if (argument.isDeclaredAnnotationPresent(Nullable.class)) {
+                        if (argument.isAnnotationPresent(Nullable.class)) {
                             argumentList.add(null);
                             continue;
                         } else {
@@ -348,7 +348,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
     protected Object resolveValueOrError(Argument argument, ConversionContext conversionContext, Optional<?> result) {
         if (!result.isPresent()) {
             Optional<ConversionError> lastError = conversionContext.getLastError();
-            if (!lastError.isPresent() && argument.isDeclaredAnnotationPresent(Nullable.class)) {
+            if (!lastError.isPresent() && argument.isAnnotationPresent(Nullable.class)) {
                 return null;
             }
             throw lastError.map(conversionError ->
