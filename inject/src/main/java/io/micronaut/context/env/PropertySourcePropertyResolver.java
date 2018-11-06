@@ -25,6 +25,7 @@ import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.StringConvention;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
@@ -332,43 +333,31 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         Map<String, Object> subMap = new LinkedHashMap<>(entries.size());
         AnnotationMetadata annotationMetadata = conversionContext.getAnnotationMetadata();
         StringConvention keyConvention = annotationMetadata.getValue(MapFormat.class, "keyFormat", StringConvention.class).orElse(StringConvention.RAW);
+        MapFormat.MapTransformation transformation = annotationMetadata.getValue(
+                MapFormat.class,
+                "transformation",
+                MapFormat.MapTransformation.class)
+                .orElse(conversionContext.isAnnotationPresent(Property.class) ? MapFormat.MapTransformation.FLAT : MapFormat.MapTransformation.NESTED);
+        final Argument<?> valueType = conversionContext.getTypeVariable("V").orElse(Argument.OBJECT_ARGUMENT);
+
         String prefix = name + '.';
-        for (Map.Entry<String, Object> map : entries.entrySet()) {
-            if (map.getKey().startsWith(prefix)) {
-                String subMapKey = map.getKey().substring(prefix.length());
-                Object value = resolvePlaceHoldersIfNecessary(map.getValue());
-                MapFormat.MapTransformation transformation = annotationMetadata.getValue(
-                        MapFormat.class,
-                        "transformation",
-                        MapFormat.MapTransformation.class)
-                        .orElse(conversionContext.isAnnotationPresent(Property.class) ? MapFormat.MapTransformation.FLAT : MapFormat.MapTransformation.NESTED);
+        for (Map.Entry<String, Object> entry : entries.entrySet()) {
+            final String key = entry.getKey();
+            if (key.startsWith(prefix)) {
+                String subMapKey = key.substring(prefix.length());
+                Object value = resolvePlaceHoldersIfNecessary(entry.getValue());
 
                 if (transformation == MapFormat.MapTransformation.FLAT) {
                     subMapKey = keyConvention.format(subMapKey);
+                    value = conversionService.convert(value, valueType).orElse(null);
                     subMap.put(subMapKey, value);
                 } else {
-                    int index = subMapKey.indexOf('.');
-                    if (index == -1) {
-                        subMapKey = keyConvention.format(subMapKey);
-                        subMap.put(subMapKey, value);
-                    } else {
-
-                        String mapKey = subMapKey.substring(0, index);
-                        mapKey = keyConvention.format(mapKey);
-                        if (!subMap.containsKey(mapKey)) {
-                            subMap.put(mapKey, new LinkedHashMap<>());
-                        }
-                        final Object v = subMap.get(mapKey);
-                        if (v instanceof Map) {
-
-                            Map<String, Object> nestedMap = (Map<String, Object>) v;
-                            String nestedKey = subMapKey.substring(index + 1);
-                            keyConvention.format(nestedKey);
-                            nestedMap.put(nestedKey, value);
-                        } else {
-                            subMap.put(mapKey, v);
-                        }
-                    }
+                    processSubmapKey(
+                            subMap,
+                            subMapKey,
+                            value,
+                            keyConvention
+                    );
                 }
             }
         }
@@ -526,6 +515,29 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     protected void resetCaches() {
         containsCache.clear();
         resolvedValueCache.clear();
+    }
+
+    private void processSubmapKey(Map<String, Object> map, String key, Object value, StringConvention keyConvention) {
+        int index = key.indexOf('.');
+        if (index == -1) {
+            key = keyConvention.format(key);
+            map.put(key, value);
+        } else {
+
+            String mapKey = key.substring(0, index);
+            mapKey = keyConvention.format(mapKey);
+            if (!map.containsKey(mapKey)) {
+                map.put(mapKey, new LinkedHashMap<>());
+            }
+            final Object v = map.get(mapKey);
+            if (v instanceof Map) {
+                Map<String, Object> nestedMap = (Map<String, Object>) v;
+                String nestedKey = key.substring(index + 1);
+                processSubmapKey(nestedMap, nestedKey, value, keyConvention);
+            } else {
+                map.put(mapKey, v);
+            }
+        }
     }
 
     private String normalizeName(String name) {
