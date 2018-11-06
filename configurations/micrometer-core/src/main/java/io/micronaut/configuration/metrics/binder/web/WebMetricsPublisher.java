@@ -20,6 +20,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Tag;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpResponseProvider;
 import io.micronaut.http.HttpStatus;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -281,7 +282,11 @@ public class WebMetricsPublisher<T extends HttpResponse<?>> implements Publisher
      * @param throwable   exception that occurred
      */
     private void error(long start, String httpMethod, String requestPath, Throwable throwable) {
-        Iterable<Tag> tags = getTags(null, httpMethod, requestPath, throwable);
+        HttpResponse response = null;
+        if (throwable instanceof HttpResponseProvider) {
+            response = ((HttpResponseProvider) throwable).getResponse();
+        }
+        Iterable<Tag> tags = getTags(response, httpMethod, requestPath, throwable);
         this.meterRegistry.timer(metricName, tags)
                 .record(System.nanoTime() - start, TimeUnit.NANOSECONDS);
     }

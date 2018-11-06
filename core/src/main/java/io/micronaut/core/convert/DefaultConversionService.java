@@ -699,7 +699,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                         continue;
                     }
                 }
-                if (!valueType.isInstance(value)) {
+                if (!valueType.isInstance(value) || Map.class.isAssignableFrom(valueType)) {
                     Optional converted = convert(value, valueType, valContext);
                     if (converted.isPresent()) {
                         value = converted.get();

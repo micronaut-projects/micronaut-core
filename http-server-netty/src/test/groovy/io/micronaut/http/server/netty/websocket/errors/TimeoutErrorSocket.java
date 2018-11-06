@@ -4,15 +4,15 @@ import io.micronaut.websocket.annotation.OnClose;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.ServerWebSocket;
 
-@ServerWebSocket("/ws/errors/message")
-public class MessageErrorSocket {
+@ServerWebSocket("/ws/timeout/message")
+public class TimeoutErrorSocket {
 
     boolean closed = false;
 
 
     @OnMessage
     public void onMessage(String blah) {
-        throw new RuntimeException("Bad things happened");
+        System.out.println("blah = " + blah);
     }
 
     @OnClose
@@ -24,3 +24,4 @@ public class MessageErrorSocket {
         return closed;
     }
 }
+

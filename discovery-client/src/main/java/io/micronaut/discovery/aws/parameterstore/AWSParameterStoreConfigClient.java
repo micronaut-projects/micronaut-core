@@ -31,6 +31,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.aws.route53.Route53ClientDiscoveryConfiguration;
 import io.micronaut.discovery.client.ClientUtil;
 import io.micronaut.discovery.config.ConfigurationClient;
+import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
@@ -65,7 +66,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
     private final int PRIORITY_INCREMENT = 10;
     private final AWSClientConfiguration awsConfiguration;
     private final AWSParameterStoreConfiguration awsParameterStoreConfiguration;
-    private final Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration;
+    private final String serviceId;
     private AWSSimpleSystemsManagementAsync client;
     private ExecutorService executionService;
 
@@ -74,12 +75,14 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
      * Initialize @Singleton.
      * @param awsConfiguration your aws configuration credentials
      * @param awsParameterStoreConfiguration configuration for the parameter store
+     * @param applicationConfiguration the application configuration
      * @param route53ClientDiscoveryConfiguration configuration for route53 service discovery, if you are using this (not required)
      */
     AWSParameterStoreConfigClient(
             AWSClientConfiguration awsConfiguration,
             AWSParameterStoreConfiguration awsParameterStoreConfiguration,
-            Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration) {
+            ApplicationConfiguration applicationConfiguration,
+            @Nullable Route53ClientDiscoveryConfiguration route53ClientDiscoveryConfiguration) {
         this.awsConfiguration = awsConfiguration;
         this.awsParameterStoreConfiguration = awsParameterStoreConfiguration;
 
@@ -89,7 +92,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
             LOG.warn("Error creating Simple Systems Management client - check your credentials: " + sce.getMessage(), sce);
         }
 
-        this.route53ClientDiscoveryConfiguration = route53ClientDiscoveryConfiguration;
+        this.serviceId = (route53ClientDiscoveryConfiguration != null ? route53ClientDiscoveryConfiguration.getServiceId() : applicationConfiguration.getName()).orElse(null);
     }
 
 
@@ -108,7 +111,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
             return Flowable.empty();
         }
         Set<String> activeNames = environment.getActiveNames();
-        Optional<String> serviceId = route53ClientDiscoveryConfiguration.getServiceId();
+        Optional<String> serviceId = Optional.ofNullable(this.serviceId);
 
 
         String path = awsParameterStoreConfiguration.getRootHierarchyPath();
