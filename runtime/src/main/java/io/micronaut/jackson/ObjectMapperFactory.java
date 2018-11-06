@@ -27,9 +27,11 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.core.reflect.GenericTypeUtils;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.text.SimpleDateFormat;
@@ -76,12 +78,11 @@ public class ObjectMapperFactory {
      */
     @Bean
     @Singleton
-    public ObjectMapper objectMapper(Optional<JacksonConfiguration> jacksonConfiguration,
-                                     Optional<JsonFactory> jsonFactory) {
+    @Primary
+    public ObjectMapper objectMapper(@Nullable JacksonConfiguration jacksonConfiguration,
+                                     @Nullable JsonFactory jsonFactory) {
 
-        ObjectMapper objectMapper = jsonFactory
-            .map(ObjectMapper::new)
-            .orElseGet(ObjectMapper::new);
+        ObjectMapper objectMapper = jsonFactory != null ? new ObjectMapper(jsonFactory) : new ObjectMapper();
 
         objectMapper.findAndRegisterModules();
         objectMapper.registerModules(jacksonModules);
@@ -129,31 +130,32 @@ public class ObjectMapperFactory {
         objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
         objectMapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
         objectMapper.configure(DeserializationFeature.UNWRAP_SINGLE_VALUE_ARRAYS, true);
-        jacksonConfiguration.ifPresent((configuration) -> {
-            JsonInclude.Include include = configuration.getSerializationInclusion();
+
+        if (jacksonConfiguration != null) {
+
+            JsonInclude.Include include = jacksonConfiguration.getSerializationInclusion();
             if (include != null) {
                 objectMapper.setSerializationInclusion(include);
             }
-            String dateFormat = configuration.getDateFormat();
+            String dateFormat = jacksonConfiguration.getDateFormat();
             if (dateFormat != null) {
                 objectMapper.setDateFormat(new SimpleDateFormat(dateFormat));
             }
-            Locale locale = configuration.getLocale();
+            Locale locale = jacksonConfiguration.getLocale();
             if (locale != null) {
                 objectMapper.setLocale(locale);
             }
-            TimeZone timeZone = configuration.getTimeZone();
+            TimeZone timeZone = jacksonConfiguration.getTimeZone();
             if (timeZone != null) {
                 objectMapper.setTimeZone(timeZone);
             }
 
-            configuration.getSerializationSettings().forEach(objectMapper::configure);
-            configuration.getDeserializationSettings().forEach(objectMapper::configure);
-            configuration.getMapperSettings().forEach(objectMapper::configure);
-            configuration.getParserSettings().forEach(objectMapper::configure);
-            configuration.getGeneratorSettings().forEach(objectMapper::configure);
-        });
-
+            jacksonConfiguration.getSerializationSettings().forEach(objectMapper::configure);
+            jacksonConfiguration.getDeserializationSettings().forEach(objectMapper::configure);
+            jacksonConfiguration.getMapperSettings().forEach(objectMapper::configure);
+            jacksonConfiguration.getParserSettings().forEach(objectMapper::configure);
+            jacksonConfiguration.getGeneratorSettings().forEach(objectMapper::configure);
+        }
         return objectMapper;
     }
 }
