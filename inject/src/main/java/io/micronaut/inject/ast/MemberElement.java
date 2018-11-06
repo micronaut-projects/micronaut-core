@@ -14,26 +14,19 @@
  * limitations under the License.
  */
 
-package io.micronaut.core.type;
-
-import io.micronaut.core.annotation.AnnotationMetadata;
+package io.micronaut.inject.ast;
 
 /**
- * Captures a generic {@link Argument}.
- * <p>
- * Example usage: <code>new GenericArgument&lt;List&lt;T&gt;&gt;() {}</code>
+ * A member element is an element that is contained within a {@link ClassElement}.
+ * The {@link #getDeclaringType()} method returns the class that declares the element.
  *
- * @param <T> generic argument type
- * @author Vladimir Kulev
+ * @author graemerocher
  * @since 1.0
  */
-public abstract class GenericArgument<T> extends DefaultArgument<T> {
+public interface MemberElement extends Element {
 
     /**
-     * Default constructor.
+     * @return The declaring type of the element.
      */
-    protected GenericArgument() {
-        super(null, null, AnnotationMetadata.EMPTY_METADATA);
-    }
-
+    ClassElement getDeclaringType();
 }

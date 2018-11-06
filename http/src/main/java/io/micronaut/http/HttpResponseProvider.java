@@ -14,26 +14,18 @@
  * limitations under the License.
  */
 
-package io.micronaut.core.type;
-
-import io.micronaut.core.annotation.AnnotationMetadata;
+package io.micronaut.http;
 
 /**
- * Captures a generic {@link Argument}.
- * <p>
- * Example usage: <code>new GenericArgument&lt;List&lt;T&gt;&gt;() {}</code>
+ * A contract to provide an http response.
  *
- * @param <T> generic argument type
- * @author Vladimir Kulev
+ * @author James Kleeh
  * @since 1.0
  */
-public abstract class GenericArgument<T> extends DefaultArgument<T> {
+public interface HttpResponseProvider {
 
     /**
-     * Default constructor.
+     * @return An http response
      */
-    protected GenericArgument() {
-        super(null, null, AnnotationMetadata.EMPTY_METADATA);
-    }
-
+    HttpResponse<?> getResponse();
 }

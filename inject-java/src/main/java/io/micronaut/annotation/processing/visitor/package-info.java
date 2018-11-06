@@ -20,4 +20,7 @@
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 package io.micronaut.annotation.processing.visitor;
+
+import io.micronaut.core.annotation.Internal;

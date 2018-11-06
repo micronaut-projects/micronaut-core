@@ -1911,7 +1911,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {
-        ObjectMapper objectMapper = new ObjectMapperFactory().objectMapper(Optional.empty(), Optional.empty());
+        ObjectMapper objectMapper = new ObjectMapperFactory().objectMapper(null, null);
         ApplicationConfiguration applicationConfiguration = new ApplicationConfiguration();
         return MediaTypeCodecRegistry.of(
                 new JsonMediaTypeCodec(objectMapper, applicationConfiguration, null), new JsonStreamMediaTypeCodec(objectMapper, applicationConfiguration, null)

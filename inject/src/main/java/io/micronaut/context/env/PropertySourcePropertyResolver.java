@@ -25,6 +25,7 @@ import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.StringConvention;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
@@ -33,20 +34,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Properties;
-import java.util.Random;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -345,43 +333,31 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         Map<String, Object> subMap = new LinkedHashMap<>(entries.size());
         AnnotationMetadata annotationMetadata = conversionContext.getAnnotationMetadata();
         StringConvention keyConvention = annotationMetadata.getValue(MapFormat.class, "keyFormat", StringConvention.class).orElse(StringConvention.RAW);
+        MapFormat.MapTransformation transformation = annotationMetadata.getValue(
+                MapFormat.class,
+                "transformation",
+                MapFormat.MapTransformation.class)
+                .orElse(conversionContext.isAnnotationPresent(Property.class) ? MapFormat.MapTransformation.FLAT : MapFormat.MapTransformation.NESTED);
+        final Argument<?> valueType = conversionContext.getTypeVariable("V").orElse(Argument.OBJECT_ARGUMENT);
+
         String prefix = name + '.';
-        for (Map.Entry<String, Object> map : entries.entrySet()) {
-            if (map.getKey().startsWith(prefix)) {
-                String subMapKey = map.getKey().substring(prefix.length());
-                Object value = resolvePlaceHoldersIfNecessary(map.getValue());
-                MapFormat.MapTransformation transformation = annotationMetadata.getValue(
-                        MapFormat.class,
-                        "transformation",
-                        MapFormat.MapTransformation.class)
-                        .orElse(conversionContext.isAnnotationPresent(Property.class) ? MapFormat.MapTransformation.FLAT : MapFormat.MapTransformation.NESTED);
+        for (Map.Entry<String, Object> entry : entries.entrySet()) {
+            final String key = entry.getKey();
+            if (key.startsWith(prefix)) {
+                String subMapKey = key.substring(prefix.length());
+                Object value = resolvePlaceHoldersIfNecessary(entry.getValue());
 
                 if (transformation == MapFormat.MapTransformation.FLAT) {
                     subMapKey = keyConvention.format(subMapKey);
+                    value = conversionService.convert(value, valueType).orElse(null);
                     subMap.put(subMapKey, value);
                 } else {
-                    int index = subMapKey.indexOf('.');
-                    if (index == -1) {
-                        subMapKey = keyConvention.format(subMapKey);
-                        subMap.put(subMapKey, value);
-                    } else {
-
-                        String mapKey = subMapKey.substring(0, index);
-                        mapKey = keyConvention.format(mapKey);
-                        if (!subMap.containsKey(mapKey)) {
-                            subMap.put(mapKey, new LinkedHashMap<>());
-                        }
-                        final Object v = subMap.get(mapKey);
-                        if (v instanceof Map) {
-
-                            Map<String, Object> nestedMap = (Map<String, Object>) v;
-                            String nestedKey = subMapKey.substring(index + 1);
-                            keyConvention.format(nestedKey);
-                            nestedMap.put(nestedKey, value);
-                        } else {
-                            subMap.put(mapKey, v);
-                        }
-                    }
+                    processSubmapKey(
+                            subMap,
+                            subMapKey,
+                            value,
+                            keyConvention
+                    );
                 }
             }
         }
@@ -404,53 +380,19 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
 
                 Object value = properties.get(property);
 
-                if (value instanceof String) {
-                    String str = (String) value;
-                    if (convention != PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE && str.contains(propertyPlaceholderResolver.getPrefix())) {
-                        StringBuffer newValue = new StringBuffer();
-                        Matcher matcher = RANDOM_PATTERN.matcher(str);
-                        boolean hasRandoms = false;
-                        while (matcher.find()) {
-                            hasRandoms = true;
-                            String type = matcher.group(1).trim().toLowerCase();
-                            String randomValue;
-                            switch (type) {
-                                case "port":
-                                    randomValue = String.valueOf(SocketUtils.findAvailableTcpPort());
-                                    break;
-                                case "int":
-                                case "integer":
-                                    randomValue = String.valueOf(random.nextInt());
-                                    break;
-                                case "long":
-                                    randomValue = String.valueOf(random.nextLong());
-                                    break;
-                                case "float":
-                                    randomValue = String.valueOf(random.nextFloat());
-                                    break;
-                                case "shortuuid":
-                                    randomValue = UUID.randomUUID().toString().substring(25, 35);
-                                    break;
-                                case "uuid":
-                                    randomValue = UUID.randomUUID().toString();
-                                    break;
-                                case "uuid2":
-                                    randomValue = UUID.randomUUID().toString().replaceAll("-", "");
-                                    break;
-                                default:
-                                    throw new ConfigurationException("Invalid random expression " + matcher.group(0) + " for property: " + property);
+                if (value instanceof CharSequence) {
+                    value = processRandomExpressions(convention, property, (CharSequence) value);
+                } else if (value instanceof List) {
+                    final ListIterator i = ((List) value).listIterator();
+                    while (i.hasNext()) {
+                        final Object o = i.next();
+                        if (o instanceof CharSequence) {
+                            final CharSequence newValue = processRandomExpressions(convention, property, (CharSequence) o);
+                            if (newValue != o) {
+                                i.set(newValue);
                             }
-                            matcher.appendReplacement(newValue, randomValue);
                         }
-
-                        if (hasRandoms) {
-                            matcher.appendTail(newValue);
-                            value = newValue.toString();
-                        }
-
                     }
-
-
                 }
 
                 List<String> resolvedProperties = resolvePropertiesForConvention(property, convention);
@@ -495,6 +437,53 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         }
     }
 
+    private CharSequence processRandomExpressions(PropertySource.PropertyConvention convention, String property, CharSequence str) {
+        if (convention != PropertySource.PropertyConvention.ENVIRONMENT_VARIABLE && str.toString().contains(propertyPlaceholderResolver.getPrefix())) {
+            StringBuffer newValue = new StringBuffer();
+            Matcher matcher = RANDOM_PATTERN.matcher(str);
+            boolean hasRandoms = false;
+            while (matcher.find()) {
+                hasRandoms = true;
+                String type = matcher.group(1).trim().toLowerCase();
+                String randomValue;
+                switch (type) {
+                    case "port":
+                        randomValue = String.valueOf(SocketUtils.findAvailableTcpPort());
+                        break;
+                    case "int":
+                    case "integer":
+                        randomValue = String.valueOf(random.nextInt());
+                        break;
+                    case "long":
+                        randomValue = String.valueOf(random.nextLong());
+                        break;
+                    case "float":
+                        randomValue = String.valueOf(random.nextFloat());
+                        break;
+                    case "shortuuid":
+                        randomValue = UUID.randomUUID().toString().substring(25, 35);
+                        break;
+                    case "uuid":
+                        randomValue = UUID.randomUUID().toString();
+                        break;
+                    case "uuid2":
+                        randomValue = UUID.randomUUID().toString().replaceAll("-", "");
+                        break;
+                    default:
+                        throw new ConfigurationException("Invalid random expression " + matcher.group(0) + " for property: " + property);
+                }
+                matcher.appendReplacement(newValue, randomValue);
+            }
+
+            if (hasRandoms) {
+                matcher.appendTail(newValue);
+                return newValue.toString();
+            }
+
+        }
+        return str;
+    }
+
     /**
      * @param name        The name
      * @param allowCreate Whether allows creation
@@ -528,6 +517,29 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         resolvedValueCache.clear();
     }
 
+    private void processSubmapKey(Map<String, Object> map, String key, Object value, StringConvention keyConvention) {
+        int index = key.indexOf('.');
+        if (index == -1) {
+            key = keyConvention.format(key);
+            map.put(key, value);
+        } else {
+
+            String mapKey = key.substring(0, index);
+            mapKey = keyConvention.format(mapKey);
+            if (!map.containsKey(mapKey)) {
+                map.put(mapKey, new LinkedHashMap<>());
+            }
+            final Object v = map.get(mapKey);
+            if (v instanceof Map) {
+                Map<String, Object> nestedMap = (Map<String, Object>) v;
+                String nestedKey = key.substring(index + 1);
+                processSubmapKey(nestedMap, nestedKey, value, keyConvention);
+            } else {
+                map.put(mapKey, v);
+            }
+        }
+    }
+
     private String normalizeName(String name) {
         return name.replace('-', '.');
     }
@@ -535,6 +547,26 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     private Object resolvePlaceHoldersIfNecessary(Object value) {
         if (value instanceof CharSequence) {
             return propertyPlaceholderResolver.resolveRequiredPlaceholders(value.toString());
+        } else if (value instanceof List) {
+            List<?> list = (List) value;
+            List<?> newList = new ArrayList<>(list);
+            final ListIterator i = newList.listIterator();
+            while (i.hasNext()) {
+                final Object o = i.next();
+                if (o instanceof CharSequence) {
+                    i.set(resolvePlaceHoldersIfNecessary(o));
+                } else if (o instanceof Map) {
+                    Map<?, ?> submap = (Map) o;
+                    Map<Object, Object> newMap = new LinkedHashMap<>(submap.size());
+                    for (Map.Entry<?, ?> entry : submap.entrySet()) {
+                        final Object k = entry.getKey();
+                        final Object v = entry.getValue();
+                        newMap.put(k, resolvePlaceHoldersIfNecessary(v));
+                    }
+                    i.set(newMap);
+                }
+            }
+            value = newList;
         }
         return value;
     }

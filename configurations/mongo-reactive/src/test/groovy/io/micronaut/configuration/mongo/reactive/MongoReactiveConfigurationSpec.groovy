@@ -28,8 +28,15 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.reactivex.Single
+import org.bson.BsonReader
+import org.bson.BsonWriter
+import org.bson.codecs.Codec
+import org.bson.codecs.DecoderContext
+import org.bson.codecs.EncoderContext
 import spock.lang.Specification
 import spock.lang.Unroll
+
+import javax.inject.Singleton
 
 class MongoReactiveConfigurationSpec extends Specification {
 
@@ -100,6 +107,24 @@ class MongoReactiveConfigurationSpec extends Specification {
 
     }
 
+
+
+    void "test configure pick up custom codecs"() {
+        given:
+        ApplicationContext context = ApplicationContext.run(
+                (MongoSettings.EMBEDDED): false,
+                "mongodb.url":"mongodb://localhost"
+        )
+
+        DefaultReactiveMongoConfiguration configuration = context.getBean(DefaultReactiveMongoConfiguration)
+
+        expect:
+        configuration.codecs.size() == 1
+
+        cleanup:
+        context.stop()
+
+    }
 
     @Unroll
     void "test configure #property pool setting"() {
@@ -206,4 +231,28 @@ class MongoReactiveConfigurationSpec extends Specification {
      static class Book {
          String title
      }
+
+    static class Fluff {
+
+    }
+
+    @Singleton
+    static class FluffCodec implements Codec<Fluff> {
+
+        @Override
+        Fluff decode(BsonReader reader, DecoderContext decoderContext) {
+            reader.readString()
+            return new Fluff()
+        }
+
+        @Override
+        void encode(BsonWriter writer, Fluff value, EncoderContext encoderContext) {
+            writer.writeString("fluff")
+        }
+
+        @Override
+        Class<Fluff> getEncoderClass() {
+            Fluff
+        }
+    }
 }
