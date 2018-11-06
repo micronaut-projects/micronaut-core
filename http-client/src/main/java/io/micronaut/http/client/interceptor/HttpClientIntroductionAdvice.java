@@ -597,7 +597,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         }
                     }
                     if (objectMapper == null) {
-                        objectMapper = new ObjectMapperFactory().objectMapper(Optional.empty(), Optional.empty());
+                        objectMapper = new ObjectMapperFactory().objectMapper(null, null);
                     }
 
                     SerializationFeature[] enabledSerializationFeatures = jacksonFeatures.get("enabledSerializationFeatures", SerializationFeature[].class).orElse(null);
