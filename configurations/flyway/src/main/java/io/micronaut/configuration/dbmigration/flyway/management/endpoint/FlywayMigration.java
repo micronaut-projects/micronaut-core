@@ -60,6 +60,10 @@ public class FlywayMigration {
     public FlywayMigration() {
     }
 
+    /**
+     * @param migrationInfo The {@link MigrationInfo} used to create a new FlywayMigration that will be exposed in
+     *                      the endpoint
+     */
     public FlywayMigration(MigrationInfo migrationInfo) {
         this.type = migrationInfo.getType();
         this.checksum = migrationInfo.getChecksum();

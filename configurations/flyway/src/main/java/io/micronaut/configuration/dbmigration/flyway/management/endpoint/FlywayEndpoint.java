@@ -49,8 +49,7 @@ public class FlywayEndpoint {
     private final Collection<FlywayConfigurationProperties> flywayConfigurationProperties;
 
     /**
-     * Constructor.
-     *
+     * @param applicationContext            The {@link ApplicationContext}
      * @param flywayConfigurationProperties Collection of Flyway Configurations
      */
     public FlywayEndpoint(ApplicationContext applicationContext,

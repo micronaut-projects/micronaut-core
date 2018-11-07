@@ -20,13 +20,12 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.flywaydb.core.Flyway;
 
-import javax.sql.DataSource;
 import java.util.Collection;
 import java.util.Optional;
 
 /**
- * For each {@link DataSource}, it looks for a flyway configuration ({@link FlywayConfigurationProperties}) with the
- * same name qualifier and runs it.
+ * For each {@link FlywayConfigurationProperties}, it looks for a {@link Flyway} bean with the same qualifier and
+ * run the migations.
  *
  * @author Iván López
  * @since 1.1
@@ -47,7 +46,7 @@ public abstract class AbstractFlyway {
     }
 
     /**
-     * Runs Flyway migrations for all the created {@link Flyway} beans
+     * Runs Flyway migrations for all the created {@link Flyway} beans.
      *
      * @param async if true only flyway configurations set to async are run.
      */
