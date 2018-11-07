@@ -62,7 +62,7 @@ public interface BeanResolutionContext extends Map<String, Object>, ValueResolve
     <T> void addInFlightBean(BeanIdentifier beanIdentifier, T instance);
 
     /**
-     * Obtains an inflight bean for the given identifier
+     * Obtains an inflight bean for the given identifier.
      * @param beanIdentifier The bean identifier
      * @param <T> The bean type
      * @return The bean
