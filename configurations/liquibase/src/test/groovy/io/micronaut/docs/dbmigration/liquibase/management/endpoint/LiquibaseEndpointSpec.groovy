@@ -30,65 +30,57 @@ import spock.lang.Specification
 
 class LiquibaseEndpointSpec extends Specification {
 
-    void "test the endpoint bean is available"() {
+    void "test liquibase endpoint bean is available"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.
-            run(EmbeddedServer,
-                ['endpoints.beans.sensitive': false] as Map,
-                Environment.TEST)
+        ApplicationContext applicationContext = ApplicationContext.run(Environment.TEST)
 
         expect:
-        embeddedServer.applicationContext.containsBean(LiquibaseEndpoint)
+        applicationContext.containsBean(LiquibaseEndpoint)
 
         cleanup:
-        embeddedServer.stop()
-        embeddedServer.close()
+        applicationContext.close()
     }
 
-    void "test the endpoint bean can be disabled"() {
+    void "test liquibase the endpoint bean can be disabled"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext
-            .run(EmbeddedServer,
-                 ['endpoints.liquibase.enabled': false] as Map,
-                 Environment.TEST)
+        ApplicationContext applicationContext = ApplicationContext.run(
+            ['endpoints.liquibase.enabled': false] as Map,
+            Environment.TEST
+        )
 
         expect:
-        !embeddedServer.applicationContext.containsBean(LiquibaseEndpoint)
+        !applicationContext.containsBean(LiquibaseEndpoint)
 
         cleanup:
-        embeddedServer.stop()
-        embeddedServer.close()
+        applicationContext.close()
     }
 
-    void "test the endpoint bean is not available will all disabled"() {
+    void "test the liquibase endpoint bean is not available with all endpoints disabled"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext
-            .run(EmbeddedServer,
-                 ['endpoints.all.enabled': false] as Map,
-                 Environment.TEST)
+        ApplicationContext applicationContext = ApplicationContext.run(
+            ['endpoints.all.enabled': false] as Map,
+            Environment.TEST
+        )
 
         expect:
-        !embeddedServer.applicationContext.containsBean(LiquibaseEndpoint)
+        !applicationContext.containsBean(LiquibaseEndpoint)
 
         cleanup:
-        embeddedServer.stop()
-        embeddedServer.close()
+        applicationContext.close()
     }
 
-    void "test the endpoint bean is available will all disabled but having it enabled"() {
+    void "test the liquibase endpoint bean is available with all disabled but having it enabled"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext
-            .run(EmbeddedServer,
-                 ['endpoints.all.enabled'      : false,
-                  'endpoints.liquibase.enabled': true] as Map,
-                 Environment.TEST)
+        ApplicationContext applicationContext = ApplicationContext.run(
+            ['endpoints.all.enabled'      : false,
+             'endpoints.liquibase.enabled': true] as Map,
+            Environment.TEST)
 
         expect:
-        embeddedServer.applicationContext.containsBean(LiquibaseEndpoint)
+        applicationContext.containsBean(LiquibaseEndpoint)
 
         cleanup:
-        embeddedServer.stop()
-        embeddedServer.close()
+        applicationContext.close()
     }
 
     void 'test liquibase endpoint'() {
