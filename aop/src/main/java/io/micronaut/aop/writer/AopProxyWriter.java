@@ -1356,8 +1356,12 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
             MethodRef methodRef = (MethodRef) o;
             return Objects.equals(name, methodRef.name) &&
                     Objects.equals(argumentTypes, methodRef.argumentTypes) &&

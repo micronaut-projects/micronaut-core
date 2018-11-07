@@ -38,6 +38,7 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
 
     private final SourceUnit sourceUnit;
     private final Parameter parameter;
+
     /**
      * Default constructor.
      *
