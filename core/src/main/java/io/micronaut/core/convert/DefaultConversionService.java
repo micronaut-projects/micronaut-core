@@ -242,7 +242,20 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         // String -> File
         addConverter(CharSequence.class, File.class, (object, targetType, context) -> Optional.of(new File(object.toString())));
 
-        // String[] -> String
+        // String[] -> Enum
+        addConverter(String[].class, Enum.class, (object, targetType, context) -> {
+            if (object == null || object.length == 0) {
+                return Optional.empty();
+            }
+
+            StringJoiner joiner = new StringJoiner("");
+            for (String string : object) {
+                joiner.add(string);
+            }
+            final String val = joiner.toString();
+            return convert(val, targetType, context);
+        });
+
         addConverter(String[].class, CharSequence.class, (object, targetType, context) -> {
             if (object == null || object.length == 0) {
                 return Optional.empty();
