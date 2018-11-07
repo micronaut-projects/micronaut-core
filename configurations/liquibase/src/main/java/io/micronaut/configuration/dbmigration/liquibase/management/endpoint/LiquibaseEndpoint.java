@@ -19,7 +19,6 @@ package io.micronaut.configuration.dbmigration.liquibase.management.endpoint;
 import io.micronaut.configuration.dbmigration.liquibase.LiquibaseConfigurationProperties;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
-import io.reactivex.Single;
 import liquibase.changelog.StandardChangeLogHistoryService;
 import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
@@ -63,7 +62,7 @@ public class LiquibaseEndpoint {
      * @return A list of liquibase changes per active configuration
      */
     @Read
-    public Single<List<LiquibaseReport>> liquibaseMigrations() {
+    public List<LiquibaseReport> liquibaseMigrations() {
         List<LiquibaseReport> reports = new ArrayList<>();
 
         if (liquibaseConfigurationProperties != null) {
@@ -99,6 +98,6 @@ public class LiquibaseEndpoint {
             }
         }
 
-        return Single.just(reports);
+        return reports;
     }
 }
