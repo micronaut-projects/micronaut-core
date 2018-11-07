@@ -60,7 +60,6 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.reactivestreams.Publisher;
 
 import javax.annotation.Nullable;
-import javax.lang.model.element.TypeElement;
 import javax.validation.constraints.*;
 import java.io.IOException;
 import java.math.BigDecimal;
