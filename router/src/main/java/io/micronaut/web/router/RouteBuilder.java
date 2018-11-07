@@ -24,11 +24,13 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.UriMapping;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ProxyBeanDefinition;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.List;
 import java.util.function.Supplier;
@@ -1163,8 +1165,10 @@ public interface RouteBuilder {
          * @param beanDefinition The type
          * @return The URI to use
          */
-        default String resolveUri(BeanDefinition<?> beanDefinition) {
-            String uri = beanDefinition.getValue(Controller.class, String.class).orElse(null);
+        default @Nonnull String resolveUri(BeanDefinition<?> beanDefinition) {
+            String uri = beanDefinition.getValue(Controller.class, String.class).orElseGet(() ->
+                    beanDefinition.getValue(UriMapping.class, String.class).orElse(UriMapping.DEFAULT_URI)
+            );
             uri = normalizeUri(uri);
             if (uri != null) {
                 return uri;
@@ -1185,7 +1189,7 @@ public interface RouteBuilder {
          * @param property The property
          * @return The URI to use
          */
-        default String resolveUri(String property) {
+        default @Nonnull String resolveUri(String property) {
             if (StringUtils.isEmpty(property)) {
                 return "/";
             }
@@ -1202,7 +1206,7 @@ public interface RouteBuilder {
          * @param id   the route id
          * @return The URI to use
          */
-        default String resolveUri(Class type, PropertyConvention id) {
+        default @Nonnull String resolveUri(Class type, PropertyConvention id) {
             return resolveUri(type) + "/{" + id.lowerCaseName() + "}";
         }
 
