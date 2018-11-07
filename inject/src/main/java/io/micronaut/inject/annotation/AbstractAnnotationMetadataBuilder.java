@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.util.CollectionUtils;
@@ -350,6 +351,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return annotationValues;
     }
 
+    /**
+     * Creates the visitor context for this implementation.
+     *
+     * @return The visitor context
+     */
+    protected abstract VisitorContext createVisitorContext();
+
+
+
     private void processAnnotationDefaults(A annotationMirror, DefaultAnnotationMetadata metadata, String annotationName) {
         Map<? extends T, ?> elementDefaultValues = readAnnotationDefaultValues(annotationMirror);
         processAnnotationDefaults(metadata, annotationName, elementDefaultValues);
@@ -374,13 +384,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             DefaultAnnotationMetadata.registerAnnotationDefaults(annotationName, annotationDefaults);
         }
     }
-
-    /**
-     * Creates the visitor context for this implementation.
-     *
-     * @return The visitor context
-     */
-    protected abstract VisitorContext createVisitorContext();
 
     private void processAnnotationAlias(
             DefaultAnnotationMetadata metadata,
@@ -554,5 +557,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         List<String> stereoTypeParents = new ArrayList<>(parents);
         stereoTypeParents.add(annotationTypeName);
         buildStereotypeHierarchy(stereoTypeParents, annotationType, metadata, isDeclared);
+    }
+
+    /**
+     * Returns whether the given annotation is a mapped annotation.
+     * @param annotationName The annotation name
+     * @return True if it is
+     */
+    @Internal
+    public static boolean isAnnotationMapped(@Nullable String annotationName) {
+        return annotationName != null && ANNOTATION_MAPPERS.containsKey(annotationName);
     }
 }
