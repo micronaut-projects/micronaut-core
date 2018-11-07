@@ -157,10 +157,10 @@ class MavenBuildTokens extends BuildTokens {
 
 
         tokens.put("arguments", prettyPrint(jvmArgsWriter.toString(), 12))
-        tokens.put("dependencies", prettyPrint(dependenciesWriter.toString(), 8))
-        tokens.put("repositories", prettyPrint(repositoriesWriter.toString(), 8))
+        tokens.put("dependencies", prettyPrint(dependenciesWriter.toString(), 4))
+        tokens.put("repositories", prettyPrint(repositoriesWriter.toString(), 4))
         tokens.put("jdkversion", VersionInfo.getJdkVersion())
-        tokens.put("annotationProcessorPaths", prettyPrint(annotationProcessorsWriter.toString(), 14))
+        tokens.put("annotationProcessorPaths", prettyPrint(annotationProcessorsWriter.toString(), 18))
 
         tokens
     }
@@ -174,7 +174,7 @@ class MavenBuildTokens extends BuildTokens {
             modulesXml.module(name)
         }
 
-        ["services": prettyPrint(modulesWriter.toString(), 8)]
+        ["services": prettyPrint(modulesWriter.toString(), 4)]
     }
 
     Dependency convertScope(Dependency dependency) {
