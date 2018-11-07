@@ -67,6 +67,17 @@ class HttpStatusSpec extends Specification {
             body.get() == 'success'
     }
 
+    void "void return HttpStatus CREATED"() {
+        when:
+        Flowable<HttpResponse> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.GET("/status/voidCreated")
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+
+        then:
+        response.status == HttpStatus.CREATED
+    }
+
     void "Simple custom return HttpStatus 404"() {
         when:
             Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
@@ -92,6 +103,11 @@ class HttpStatusSpec extends Specification {
         @Get(value = "/simpleCreated", produces = MediaType.TEXT_PLAIN)
         String simpleCreated() {
             return "success"
+        }
+
+        @Status(HttpStatus.CREATED)
+        @Get(value = "/voidCreated")
+        void voidCreated() {
         }
 
         @Status(HttpStatus.NOT_FOUND)
