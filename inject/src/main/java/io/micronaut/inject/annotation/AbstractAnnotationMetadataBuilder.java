@@ -216,6 +216,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract @Nullable String getRepeatableName(A annotationMirror);
 
     /**
+     * Obtain the name of the repeatable annotation if the annotation is is one.
+     *
+     * @param annotationType The annotation mirror
+     * @return Return the name or null
+     */
+    protected abstract @Nullable String getRepeatableNameForType(T annotationType);
+
+    /**
      * @param annotationMirror The annotation
      * @return The annotation value
      */
@@ -324,25 +332,44 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                             AnnotationValue av = (AnnotationValue) o;
                             String mappedAnnotationName = av.getAnnotationName();
 
-                            if (isDeclared) {
-                                metadata.addDeclaredAnnotation(
-                                        mappedAnnotationName,
-                                        av.getValues()
-                                );
-                            } else {
-                                metadata.addAnnotation(
-                                        mappedAnnotationName,
-                                        av.getValues()
-                                );
-                            }
                             Optional<T> mappedMirror = getAnnotationMirror(mappedAnnotationName);
-                            mappedMirror.ifPresent(annMirror -> processAnnotationStereotype(
-                                    new ArrayList<>(),
+                            String repeatableName = mappedMirror.map(this::getRepeatableNameForType).orElse(null);
+                            if (repeatableName != null) {
+                                if (isDeclared) {
+                                    metadata.addDeclaredRepeatable(
+                                            repeatableName,
+                                            av
+                                    );
+                                } else {
+                                    metadata.addRepeatable(
+                                            repeatableName,
+                                            av
+                                    );
+                                }
+                            } else {
+                                if (isDeclared) {
+                                    metadata.addDeclaredAnnotation(
+                                            mappedAnnotationName,
+                                            av.getValues()
+                                    );
+                                } else {
+                                    metadata.addAnnotation(
+                                            mappedAnnotationName,
+                                            av.getValues()
+                                    );
+                                }
+                            }
+
+                            mappedMirror.ifPresent(annMirror -> {
+                                final ArrayList<String> parents = new ArrayList<>();
+                                processAnnotationStereotype(
+                                        parents,
                                     annMirror,
                                     mappedAnnotationName,
                                     metadata,
-                                    isDeclared
-                            ));
+                                    isDeclared);
+
+                            });
                         }
                     }
                 }
