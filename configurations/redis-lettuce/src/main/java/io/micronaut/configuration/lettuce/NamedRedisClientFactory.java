@@ -23,8 +23,6 @@ import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 
-import javax.inject.Singleton;
-
 /**
  * A factory bean for constructing {@link RedisClient} instances from {@link NamedRedisServersConfiguration} instances.
  *

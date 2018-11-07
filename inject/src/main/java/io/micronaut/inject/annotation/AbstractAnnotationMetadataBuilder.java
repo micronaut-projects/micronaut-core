@@ -385,8 +385,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     protected abstract VisitorContext createVisitorContext();
 
-
-
     private void processAnnotationDefaults(A annotationMirror, DefaultAnnotationMetadata metadata, String annotationName) {
         Map<? extends T, ?> elementDefaultValues = readAnnotationDefaultValues(annotationMirror);
         processAnnotationDefaults(metadata, annotationName, elementDefaultValues);
