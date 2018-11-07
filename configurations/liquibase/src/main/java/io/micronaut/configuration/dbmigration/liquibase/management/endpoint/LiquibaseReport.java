@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.dbmigration.liquibase.management.endpoint;
+package io.micronaut.configuration.dbmigration.liquibase.management.endpoint;
 
 import java.util.List;
 

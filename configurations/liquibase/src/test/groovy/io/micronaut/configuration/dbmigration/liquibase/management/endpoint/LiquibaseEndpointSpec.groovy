@@ -14,13 +14,11 @@
  * limitations under the License.
  */
 
-package io.micronaut.docs.dbmigration.liquibase.management.endpoint
+package io.micronaut.configuration.dbmigration.liquibase.management.endpoint
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.core.type.Argument
-import io.micronaut.dbmigration.liquibase.management.endpoint.LiquibaseEndpoint
-import io.micronaut.dbmigration.liquibase.management.endpoint.LiquibaseReport
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus

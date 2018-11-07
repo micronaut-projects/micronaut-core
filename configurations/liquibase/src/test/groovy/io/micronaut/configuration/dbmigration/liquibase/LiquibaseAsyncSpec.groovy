@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-package io.micronaut.docs.dbmigration.liquibase
+package io.micronaut.configuration.dbmigration.liquibase
 
 import groovy.sql.Sql
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
-import io.micronaut.dbmigration.liquibase.LiquibaseConfigurationProperties
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.testutils.YamlAsciidocTagCleaner
 import spock.lang.AutoCleanup

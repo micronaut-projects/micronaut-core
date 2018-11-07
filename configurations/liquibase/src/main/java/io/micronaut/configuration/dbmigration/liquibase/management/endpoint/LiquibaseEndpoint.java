@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-package io.micronaut.dbmigration.liquibase.management.endpoint;
+package io.micronaut.configuration.dbmigration.liquibase.management.endpoint;
 
-import io.micronaut.dbmigration.liquibase.LiquibaseConfigurationProperties;
+import io.micronaut.configuration.dbmigration.liquibase.LiquibaseConfigurationProperties;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
 import io.reactivex.Single;

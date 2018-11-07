@@ -14,35 +14,34 @@
  * limitations under the License.
  */
 
-package io.micronaut.dbmigration.liquibase;
+package io.micronaut.configuration.dbmigration.liquibase;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.StartupEvent;
-import io.micronaut.scheduling.annotation.Async;
+import io.micronaut.runtime.event.annotation.EventListener;
 import liquibase.Liquibase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import io.micronaut.runtime.event.annotation.EventListener;
 
 import javax.inject.Singleton;
 import java.util.Collection;
 
 /**
- * Asynchronous listener for  {@link io.micronaut.context.event.StartupEvent} to run liquibase operations.
+ * Synchronous listener for  {@link io.micronaut.context.event.StartupEvent} to run liquibase operations.
  *
  * @author Sergio del Amo
  * @since 1.1
  */
 @Requires(classes = Liquibase.class)
 @Singleton
-class LiquibaseAysncStartupEventListener extends AbstractLiquibase {
-    private static final Logger LOG = LoggerFactory.getLogger(LiquibaseAysncStartupEventListener.class);
+class LiquibaseStartupEventListener extends AbstractLiquibase {
+    private static final Logger LOG = LoggerFactory.getLogger(LiquibaseStartupEventListener.class);
 
     /**
      * @param resourceAccessor                 An implementation of {@link liquibase.resource.ResourceAccessor}.
      * @param liquibaseConfigurationProperties Collection of Liquibase Configurations
      */
-    public LiquibaseAysncStartupEventListener(ResourceAccessor resourceAccessor, Collection<LiquibaseConfigurationProperties> liquibaseConfigurationProperties) {
+    public LiquibaseStartupEventListener(ResourceAccessor resourceAccessor, Collection<LiquibaseConfigurationProperties> liquibaseConfigurationProperties) {
         super(resourceAccessor, liquibaseConfigurationProperties);
     }
 
@@ -52,11 +51,10 @@ class LiquibaseAysncStartupEventListener extends AbstractLiquibase {
      * @param event Server startup event
      */
     @EventListener
-    @Async
     public void onStartup(StartupEvent event) {
         if (LOG.isTraceEnabled()) {
-            LOG.trace("executing liquibase async event listener");
+            LOG.trace("executing liquibase event listener");
         }
-        run(true);
+        run(false);
     }
 }

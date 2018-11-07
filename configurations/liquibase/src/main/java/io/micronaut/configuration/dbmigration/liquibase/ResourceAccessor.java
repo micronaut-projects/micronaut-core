@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.dbmigration.liquibase;
+package io.micronaut.configuration.dbmigration.liquibase;
 
 import io.micronaut.core.io.ResourceResolver;
 
