@@ -320,7 +320,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      */
     public AnnotationValueBuilder<T> member(String name, @Nullable Class<?> type) {
         if (type != null) {
-            values.put(name, type);
+            values.put(name, new AnnotationClassValue<>(type));
         }
         return this;
     }
@@ -334,7 +334,12 @@ public class AnnotationValueBuilder<T extends Annotation> {
      */
     public AnnotationValueBuilder<T> member(String name, @Nullable Class<?>... types) {
         if (types != null) {
-            values.put(name, types);
+            AnnotationClassValue[] classValues = new AnnotationClassValue[types.length];
+            for (int i = 0; i < types.length; i++) {
+                Class<?> type = types[i];
+                classValues[i] = new AnnotationClassValue<>(type);
+            }
+            values.put(name, classValues);
         }
         return this;
     }
