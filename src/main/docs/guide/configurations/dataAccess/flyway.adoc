@@ -45,3 +45,57 @@ NOTE: By default Micronaut will configure Flyway to use the datasources defined 
 you want to use a different datasource you need to define the properties `+flyway.*.url+`, `+flyway.*.user+` and
 `+flyway.*.password+`.
 
+
+=== Endpoint
+
+Micronaut also provides a built-in endpoint to expose all the applied migrations in `/flyway`.
+
+To enable the endpoint add the following to the configuration:
+
+[source,yaml]
+.resources/application.yml
+----
+endpoints:
+    flyway:
+        enabled: true # <1>
+        sensitive: false # <2>
+----
+<1> `/flyway` endpoint is enabled (this is the default).
+<2> `/flyway` endpoint is open for unauthenticated access.
+
+[source,bash]
+----
+$ curl http://localhost:8080/flyway
+
+[{
+    "name": "default",
+    "migrations": [{
+        "type": "SQL",
+        "checksum": 1952043475,
+        "version": "1",
+        "description": "init",
+        "script": "V1__init.sql",
+        "state": "SUCCESS",
+        "installedBy": "root",
+        "installedOn": "2018-11-06T14:24:49Z",
+        "installedRank": 1,
+        "executionTime": 63
+    }, {
+        "type": "SQL",
+        "checksum": -1926058189,
+        "version": "2",
+        "description": "testdata",
+        "script": "V2__testdata.sql",
+        "state": "SUCCESS",
+        "installedBy": "root",
+        "installedOn": "2018-11-06T14:24:49Z",
+        "installedRank": 2,
+        "executionTime": 7
+    }]
+}]
+----
+
+TIP: `installedOn` is an link:{jdkapi}/java/time/Instant.html[Instant] and by default it is rendered as a long. If you
+want to render as a _human readable_ date, add the following to `application.yml` `jackson.serialization.writeDatesAsTimestamps: false`
+
+NOTE: See the section on <<providedEndpoints, Built-in endpoints>> in the user guide for more information about endpoints.
