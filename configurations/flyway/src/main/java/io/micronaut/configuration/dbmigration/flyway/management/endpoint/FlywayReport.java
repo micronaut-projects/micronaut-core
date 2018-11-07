@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.dbmigration.flyway.management.endpoint;
+package io.micronaut.configuration.dbmigration.flyway.management.endpoint;
 
 import java.util.List;
 

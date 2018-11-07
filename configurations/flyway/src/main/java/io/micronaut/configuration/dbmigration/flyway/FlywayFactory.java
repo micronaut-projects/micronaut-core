@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.dbmigration.flyway;
+package io.micronaut.configuration.dbmigration.flyway;
 
 import static io.micronaut.core.util.CollectionUtils.toStringArray;
 import static io.micronaut.core.util.StringUtils.hasText;

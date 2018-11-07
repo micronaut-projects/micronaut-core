@@ -23,7 +23,7 @@
  */
 @Configuration
 @Requires(property = "flyway.enabled", notEquals = "false")
-package io.micronaut.dbmigration.flyway;
+package io.micronaut.configuration.dbmigration.flyway;
 
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;

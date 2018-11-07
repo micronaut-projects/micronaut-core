@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.dbmigration.flyway
+package io.micronaut.configuration.dbmigration.flyway
 
 import groovy.sql.Sql
 import io.micronaut.context.ApplicationContext

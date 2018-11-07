@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-package io.micronaut.dbmigration.flyway;
+package io.micronaut.configuration.dbmigration.flyway;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.runtime.event.annotation.EventListener;
+import io.micronaut.scheduling.annotation.Async;
 import org.flywaydb.core.Flyway;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,36 +29,37 @@ import javax.inject.Singleton;
 import java.util.Collection;
 
 /**
- * Synchronous listener for {@link StartupEvent} to run flyway operations.
+ * Asynchronous listener for {@link StartupEvent} to run flyway operations.
  *
  * @author Iván López
  * @since 1.1
  */
 @Requires(beans = Flyway.class)
 @Singleton
-class FlywayStartupEventListener extends AbstractFlyway {
+class FlywayAsyncStartupEventListener extends AbstractFlyway {
 
-    private static final Logger LOG = LoggerFactory.getLogger(FlywayStartupEventListener.class);
+    private static final Logger LOG = LoggerFactory.getLogger(FlywayAsyncStartupEventListener.class);
 
     /**
      * @param applicationContext            The application context
      * @param flywayConfigurationProperties Collection of Flyway configuration properties
      */
-    public FlywayStartupEventListener(ApplicationContext applicationContext,
-                                      Collection<FlywayConfigurationProperties> flywayConfigurationProperties) {
+    public FlywayAsyncStartupEventListener(ApplicationContext applicationContext,
+                                           Collection<FlywayConfigurationProperties> flywayConfigurationProperties) {
         super(applicationContext, flywayConfigurationProperties);
     }
 
     /**
-     * Runs Flyway migrations synchronously.
+     * Runs Flyway migrations asynchronously.
      *
      * @param event Server startup event
      */
+    @Async
     @EventListener
     public void onStartup(StartupEvent event) {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Executing flyway event listener");
         }
-        run(false);
+        run(true);
     }
 }
