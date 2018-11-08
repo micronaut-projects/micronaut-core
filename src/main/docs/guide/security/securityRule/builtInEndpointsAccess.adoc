@@ -7,3 +7,6 @@ include::{testssecurity}/security/securityRule/builtinendpoints/BuiltInEndpoints
 
 <1> `/beans` endpoint is secured
 <2> `/info` endpoint is open for unauthenticated access.
+
+WARNING: It is possible to open all endpoints for unauthenticated access defining `endpoints.all.sensitive: false` but
+this should be used with care because private and sensitive information will be exposed.
