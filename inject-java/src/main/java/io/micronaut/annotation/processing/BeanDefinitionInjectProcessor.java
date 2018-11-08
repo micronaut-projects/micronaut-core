@@ -17,7 +17,6 @@
 package io.micronaut.annotation.processing;
 
 import static javax.lang.model.element.ElementKind.ANNOTATION_TYPE;
-import static javax.lang.model.element.ElementKind.CLASS;
 import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
 import static javax.lang.model.element.ElementKind.FIELD;
 import static javax.lang.model.type.TypeKind.ARRAY;
@@ -55,7 +54,6 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
 import javax.inject.Scope;
-import javax.lang.model.SourceVersion;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
@@ -610,6 +608,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
          * @param beanMethod The {@link ExecutableElement}
          */
         void visitBeanFactoryMethod(ExecutableElement beanMethod) {
+            if (isFactoryType && annotationUtils.hasStereotype(concreteClass, AROUND_TYPE)) {
+                visitExecutableMethod(beanMethod, annotationUtils.getAnnotationMetadata(beanMethod));
+            }
+
             TypeMirror returnType = beanMethod.getReturnType();
             ExecutableElementParamInfo beanMethodParams = populateParameterData(beanMethod);
 
