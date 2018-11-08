@@ -46,7 +46,7 @@ import java.util.concurrent.TimeoutException;
  * @since 1.0
  */
 @Singleton
-@Requires(property = ConfigurationClient.ENABLED, value = StringUtils.TRUE, defaultValue = "false")
+@Requires(property = ConfigurationClient.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 public class DistributedPropertySourceLocator implements BootstrapPropertySourceLocator {
     private static final Logger LOG = LoggerFactory.getLogger(DistributedPropertySourceLocator.class);
     private final ConfigurationClient configurationClient;

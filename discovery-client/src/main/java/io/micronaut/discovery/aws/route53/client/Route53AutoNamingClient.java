@@ -52,7 +52,7 @@ import java.util.concurrent.Future;
 @Requires(env = Environment.AMAZON_EC2)
 @Requires(beans = Route53DiscoveryConfiguration.class)
 @Requires(beans = AWSClientConfiguration.class)
-@Requires(property = Route53AutoNamingClient.ENABLED, value = StringUtils.TRUE, defaultValue = "false")
+@Requires(property = Route53AutoNamingClient.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 public class Route53AutoNamingClient implements DiscoveryClient {
 
     /**

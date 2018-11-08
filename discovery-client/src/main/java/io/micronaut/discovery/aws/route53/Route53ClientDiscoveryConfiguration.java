@@ -36,7 +36,7 @@ import javax.annotation.Nullable;
  * See https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html for details info
  */
 @Requires(env = Environment.AMAZON_EC2)
-@Requires(property = Route53AutoNamingClient.ENABLED, value = StringUtils.TRUE, defaultValue = "false")
+@Requires(property = Route53AutoNamingClient.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @ConfigurationProperties(Route53ClientDiscoveryConfiguration.PREFIX)
 public class Route53ClientDiscoveryConfiguration extends DiscoveryClientConfiguration {
 

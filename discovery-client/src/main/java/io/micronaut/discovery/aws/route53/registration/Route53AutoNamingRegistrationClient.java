@@ -60,7 +60,7 @@ import java.util.concurrent.Future;
 @Requires(classes = com.amazonaws.services.servicediscovery.AWSServiceDiscovery.class)
 @Requires(env = Environment.AMAZON_EC2)
 @Requires(beans = {Route53AutoRegistrationConfiguration.class})
-@Requires(property = Route53AutoNamingRegistrationClient.ENABLED, value = StringUtils.TRUE, defaultValue = "false")
+@Requires(property = Route53AutoNamingRegistrationClient.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @Requires(property = ApplicationConfiguration.APPLICATION_NAME)
 public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoRegistration {
 

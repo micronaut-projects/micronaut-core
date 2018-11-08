@@ -34,7 +34,7 @@ import javax.inject.Singleton;
  */
 @Requires(classes = AWSServiceDiscoveryAsync.class)
 @Requires(env = Environment.AMAZON_EC2)
-@Requires(property = Route53AutoNamingClient.ENABLED, value = StringUtils.TRUE, defaultValue = "false")
+@Requires(property = Route53AutoNamingClient.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @Singleton
 public class AWSServiceDiscoveryClientResolver implements AWSServiceDiscoveryResolver {
     private final AWSServiceDiscoveryAsync awsServiceDiscoveryAsync;

@@ -28,7 +28,7 @@ import io.micronaut.core.util.Toggleable;
  */
 @Requires(classes = {com.amazonaws.ClientConfiguration.class, AWSClientConfiguration.class})
 @Requires(env = Environment.AMAZON_EC2)
-@Requires(property = AWSParameterStoreConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = "false")
+@Requires(property = AWSParameterStoreConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @ConfigurationProperties(AWSParameterStoreConfiguration.CONFIGURATION_PREFIX)
 public class AWSParameterStoreConfiguration extends AWSClientConfiguration implements Toggleable  {
 
