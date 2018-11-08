@@ -21,6 +21,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.MapPropertySource;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.async.SupplierUtil;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.management.endpoint.info.InfoEndpoint;
 import io.micronaut.management.endpoint.info.InfoSource;
 import io.micronaut.runtime.context.scope.Refreshable;
@@ -39,7 +40,7 @@ import java.util.function.Supplier;
  */
 @Refreshable
 @Requires(beans = InfoEndpoint.class)
-@Requires(property = "endpoints.info.config.enabled", notEquals = "false")
+@Requires(property = "endpoints.info.config.enabled", notEquals = StringUtils.FALSE)
 public class ConfigurationInfoSource implements InfoSource {
 
     private final Environment environment;
