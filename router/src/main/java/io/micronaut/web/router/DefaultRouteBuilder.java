@@ -40,6 +40,7 @@ import io.micronaut.web.router.exceptions.RoutingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Qualifier;
 import java.nio.charset.Charset;
@@ -65,15 +66,18 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     /**
      * A {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} whereby hyphenated naming conventions are used.
+     *
+     * @deprecated Dynamic naming conventions are no longer supported
      */
+    @Deprecated
     public static final UriNamingStrategy HYPHENATED_NAMING_STRATEGY = new UriNamingStrategy() {
         @Override
-        public String resolveUri(Class type) {
+        public @Nonnull String resolveUri(Class type) {
             return '/' + TypeConvention.CONTROLLER.asHyphenatedName(type);
         }
 
         @Override
-        public String resolveUri(String property) {
+        public @Nonnull String resolveUri(String property) {
             if (StringUtils.isEmpty(property)) {
                 return "/";
             }

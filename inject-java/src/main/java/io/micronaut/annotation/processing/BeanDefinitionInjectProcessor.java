@@ -17,7 +17,6 @@
 package io.micronaut.annotation.processing;
 
 import static javax.lang.model.element.ElementKind.ANNOTATION_TYPE;
-import static javax.lang.model.element.ElementKind.CLASS;
 import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
 import static javax.lang.model.element.ElementKind.FIELD;
 import static javax.lang.model.type.TypeKind.ARRAY;
@@ -35,6 +34,7 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.configuration.ConfigurationMetadata;
@@ -54,7 +54,6 @@ import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
 import javax.inject.Scope;
-import javax.lang.model.SourceVersion;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.AnnotationValue;
 import javax.lang.model.element.Element;
@@ -128,7 +127,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         annotations = annotations
                 .stream()
                 .filter(ann -> !ann.getQualifiedName().toString().equals(AnnotationUtil.KOTLIN_METADATA))
-                .filter(ann -> annotationUtils.hasStereotype(ann, ANNOTATION_STEREOTYPES))
+                .filter(ann -> annotationUtils.hasStereotype(ann, ANNOTATION_STEREOTYPES) || AbstractAnnotationMetadataBuilder.isAnnotationMapped(((TypeElement) ann).getQualifiedName().toString()))
                 .collect(Collectors.toSet());
 
         if (!annotations.isEmpty()) {
@@ -609,6 +608,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
          * @param beanMethod The {@link ExecutableElement}
          */
         void visitBeanFactoryMethod(ExecutableElement beanMethod) {
+            if (isFactoryType && annotationUtils.hasStereotype(concreteClass, AROUND_TYPE)) {
+                visitExecutableMethod(beanMethod, annotationUtils.getAnnotationMetadata(beanMethod));
+            }
+
             TypeMirror returnType = beanMethod.getReturnType();
             ExecutableElementParamInfo beanMethodParams = populateParameterData(beanMethod);
 

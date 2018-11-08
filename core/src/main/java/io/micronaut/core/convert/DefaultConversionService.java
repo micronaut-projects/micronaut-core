@@ -242,8 +242,8 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         // String -> File
         addConverter(CharSequence.class, File.class, (object, targetType, context) -> Optional.of(new File(object.toString())));
 
-        // String[] -> String
-        addConverter(String[].class, CharSequence.class, (object, targetType, context) -> {
+        // String[] -> Enum
+        addConverter(String[].class, Enum.class, (object, targetType, context) -> {
             if (object == null || object.length == 0) {
                 return Optional.empty();
             }
@@ -252,7 +252,26 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             for (String string : object) {
                 joiner.add(string);
             }
-            return Optional.of(joiner.toString());
+            final String val = joiner.toString();
+            return convert(val, targetType, context);
+        });
+
+        addConverter(String[].class, CharSequence.class, (object, targetType, context) -> {
+            if (object == null || object.length == 0) {
+                return Optional.empty();
+            }
+
+
+
+            StringJoiner joiner = new StringJoiner("");
+            for (String string : object) {
+                joiner.add(string);
+            }
+            if (targetType.isEnum()) {
+                return convert(joiner.toString(), targetType, context);
+            } else {
+                return Optional.of(joiner.toString());
+            }
         });
 
         // CharSequence -> Long for bytes
