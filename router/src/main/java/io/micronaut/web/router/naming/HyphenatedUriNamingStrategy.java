@@ -21,10 +21,11 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.TypeConvention;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.UriMapping;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ProxyBeanDefinition;
 import io.micronaut.web.router.RouteBuilder;
 
+import javax.annotation.Nonnull;
 import javax.inject.Singleton;
 
 /**
@@ -42,24 +43,14 @@ public class HyphenatedUriNamingStrategy implements RouteBuilder.UriNamingStrate
     }
 
     @Override
-    public String resolveUri(BeanDefinition<?> beanDefinition) {
-        String uri = normalizeUri(beanDefinition.getValue(Controller.class, String.class).orElse(null));
-        if (uri != null) {
-            return uri;
-        }
-
-        Class<?> beanType;
-        if (beanDefinition instanceof ProxyBeanDefinition) {
-            ProxyBeanDefinition pbd = (ProxyBeanDefinition) beanDefinition;
-            beanType = pbd.getTargetType();
-        } else {
-            beanType = beanDefinition.getBeanType();
-        }
-        return '/' + TypeConvention.CONTROLLER.asHyphenatedName(beanType);
+    public @Nonnull String resolveUri(BeanDefinition<?> beanDefinition) {
+        return beanDefinition.getValue(UriMapping.class, String.class).orElseGet(() ->
+                beanDefinition.getValue(Controller.class, String.class).orElse(UriMapping.DEFAULT_URI)
+        );
     }
 
     @Override
-    public String resolveUri(String property) {
+    public @Nonnull String resolveUri(String property) {
         if (StringUtils.isEmpty(property)) {
             return "/";
         }

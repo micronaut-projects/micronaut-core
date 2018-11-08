@@ -858,6 +858,18 @@ public class DefaultBeanContext implements BeanContext {
         return (Collection<BeanDefinition<?>>) Collections.EMPTY_MAP;
     }
 
+    @SuppressWarnings("unchecked")
+    @Override
+    public Collection<BeanDefinitionReference<?>> getBeanDefinitionReferences() {
+        if (!beanDefinitionsClasses.isEmpty()) {
+            final List refs = beanDefinitionsClasses.stream().filter(ref -> ref.isEnabled(this))
+                    .collect(Collectors.toList());
+
+            return (Collection<BeanDefinitionReference<?>>) Collections.unmodifiableList(refs);
+        }
+        return Collections.emptyList();
+    }
+
     /**
      * Get a bean of the given type.
      *

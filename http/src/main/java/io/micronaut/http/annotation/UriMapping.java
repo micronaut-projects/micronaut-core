@@ -16,35 +16,28 @@
 
 package io.micronaut.http.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
-import io.micronaut.context.annotation.Executable;
-
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 /**
- * <p>A meta annotation for HTTP {@link Controller} actions.</p>
+ * Meta annotation for the mapped URI whether at the controller or action level.
  *
- * @author Graeme Rocher
- * @since 1.0
+ * @author graemerocher
+ * @since 1.0.1
  */
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.ANNOTATION_TYPE})
-@Executable
-public @interface HttpMethodMapping {
+public @interface UriMapping {
 
-    /**
-     * @deprecated Use {@link UriMapping#DEFAULT_URI} instead
-     */
-    @Deprecated
-    String DEFAULT_URI = UriMapping.DEFAULT_URI;
+    String DEFAULT_URI = "/";
 
     /**
      * @return The URI of the action
      */
-    String value() default UriMapping.DEFAULT_URI;
+    String value() default DEFAULT_URI;
 }

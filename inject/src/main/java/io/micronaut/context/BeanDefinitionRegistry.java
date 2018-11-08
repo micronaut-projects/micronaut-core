@@ -19,6 +19,7 @@ package io.micronaut.context;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.BeanDefinitionReference;
 
 import java.util.Collection;
 import java.util.Optional;
@@ -134,6 +135,13 @@ public interface BeanDefinitionRegistry {
      * @return The bean definitions
      */
     Collection<BeanDefinition<?>> getAllBeanDefinitions();
+
+    /**
+     * Get all of the enabled {@link BeanDefinitionReference}.
+     *
+     * @return The bean definitions
+     */
+    Collection<BeanDefinitionReference<?>> getBeanDefinitionReferences();
 
     /**
      * Find active {@link javax.inject.Singleton} beans for the given qualifier.
