@@ -33,6 +33,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.serialize.ObjectSerializer;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.session.*;
@@ -83,7 +84,7 @@ import static io.micronaut.configuration.lettuce.session.RedisSessionStore.Redis
  */
 @Singleton
 @Primary
-@Requires(property = RedisSessionStore.REDIS_SESSION_ENABLED, value = "true")
+@Requires(property = RedisSessionStore.REDIS_SESSION_ENABLED, value = StringUtils.TRUE)
 @Replaces(InMemorySessionStore.class)
 public class RedisSessionStore extends RedisPubSubAdapter<String, String> implements SessionStore<RedisSessionStore.RedisSession> {
 

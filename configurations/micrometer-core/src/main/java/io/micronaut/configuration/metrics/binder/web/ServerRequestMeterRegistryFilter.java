@@ -19,6 +19,7 @@ package io.micronaut.configuration.metrics.binder.web;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.configuration.metrics.annotation.RequiresMetrics;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
@@ -43,7 +44,7 @@ import java.util.Optional;
  */
 @Filter("${micronaut.metrics.http.path:/**}")
 @RequiresMetrics
-@Requires(property = WebMetricsPublisher.ENABLED, value = "true", defaultValue = "true")
+@Requires(property = WebMetricsPublisher.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 public class ServerRequestMeterRegistryFilter extends OncePerRequestHttpServerFilter {
 
     private final MeterRegistry meterRegistry;

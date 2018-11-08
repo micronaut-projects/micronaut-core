@@ -24,6 +24,7 @@ import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 
 import javax.inject.Singleton;
 
@@ -60,8 +61,8 @@ public class GraphiteMeterRegistryFactory {
     @Bean
     @Primary
     @Singleton
-    @Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
-    @Requires(property = GRAPHITE_ENABLED, value = "true", defaultValue = "true")
+    @Requires(property = MICRONAUT_METRICS_ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
+    @Requires(property = GRAPHITE_ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
     @Requires(beans = CompositeMeterRegistry.class)
     GraphiteMeterRegistry graphiteMeterRegistry() {
         return new GraphiteMeterRegistry(graphiteConfig, Clock.SYSTEM);

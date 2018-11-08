@@ -19,6 +19,7 @@ package io.micronaut.discovery.aws.route53;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.DiscoveryConfiguration;
 import io.micronaut.discovery.aws.route53.client.Route53AutoNamingClient;
 import io.micronaut.discovery.client.DiscoveryClientConfiguration;
@@ -35,7 +36,7 @@ import javax.annotation.Nullable;
  * See https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html for details info
  */
 @Requires(env = Environment.AMAZON_EC2)
-@Requires(property = Route53AutoNamingClient.ENABLED, value = "true", defaultValue = "false")
+@Requires(property = Route53AutoNamingClient.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @ConfigurationProperties(Route53ClientDiscoveryConfiguration.PREFIX)
 public class Route53ClientDiscoveryConfiguration extends DiscoveryClientConfiguration {
 

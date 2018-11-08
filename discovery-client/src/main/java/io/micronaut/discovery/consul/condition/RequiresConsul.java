@@ -17,6 +17,7 @@
 package io.micronaut.discovery.consul.condition;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.consul.ConsulConfiguration;
 
 import java.lang.annotation.Documented;
@@ -35,6 +36,6 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.PACKAGE, ElementType.TYPE})
 @Requires(property = ConsulConfiguration.PREFIX)
-@Requires(property = ConsulConfiguration.PREFIX + ".enabled", value = "true", defaultValue = "true")
+@Requires(property = ConsulConfiguration.PREFIX + ".enabled", value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 public @interface RequiresConsul {
 }

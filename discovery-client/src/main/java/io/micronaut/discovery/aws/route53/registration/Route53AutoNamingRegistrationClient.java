@@ -24,6 +24,7 @@ import io.micronaut.configuration.aws.AWSClientConfiguration;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.aws.route53.AWSServiceDiscoveryResolver;
 import io.micronaut.discovery.aws.route53.Route53AutoRegistrationConfiguration;
@@ -59,7 +60,7 @@ import java.util.concurrent.Future;
 @Requires(classes = com.amazonaws.services.servicediscovery.AWSServiceDiscovery.class)
 @Requires(env = Environment.AMAZON_EC2)
 @Requires(beans = {Route53AutoRegistrationConfiguration.class})
-@Requires(property = Route53AutoNamingRegistrationClient.ENABLED, value = "true", defaultValue = "false")
+@Requires(property = Route53AutoNamingRegistrationClient.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @Requires(property = ApplicationConfiguration.APPLICATION_NAME)
 public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoRegistration {
 

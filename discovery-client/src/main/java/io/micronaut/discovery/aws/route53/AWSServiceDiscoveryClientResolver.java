@@ -22,6 +22,7 @@ import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsyncClientBui
 import io.micronaut.configuration.aws.AWSClientConfiguration;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.aws.route53.client.Route53AutoNamingClient;
 import javax.inject.Singleton;
 
@@ -33,7 +34,7 @@ import javax.inject.Singleton;
  */
 @Requires(classes = AWSServiceDiscoveryAsync.class)
 @Requires(env = Environment.AMAZON_EC2)
-@Requires(property = Route53AutoNamingClient.ENABLED, value = "true", defaultValue = "false")
+@Requires(property = Route53AutoNamingClient.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @Singleton
 public class AWSServiceDiscoveryClientResolver implements AWSServiceDiscoveryResolver {
     private final AWSServiceDiscoveryAsync awsServiceDiscoveryAsync;

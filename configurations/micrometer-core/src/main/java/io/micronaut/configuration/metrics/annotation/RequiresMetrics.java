@@ -18,6 +18,7 @@ package io.micronaut.configuration.metrics.annotation;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 
 import java.lang.annotation.*;
 
@@ -32,7 +33,7 @@ import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.PACKAGE, ElementType.TYPE, ElementType.ANNOTATION_TYPE, ElementType.METHOD})
-@Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
+@Requires(property = MICRONAUT_METRICS_ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 @Requires(beans = MeterRegistry.class)
 public @interface RequiresMetrics {
 }

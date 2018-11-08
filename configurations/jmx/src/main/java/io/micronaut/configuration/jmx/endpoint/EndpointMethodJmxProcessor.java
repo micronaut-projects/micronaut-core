@@ -24,6 +24,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.async.SupplierUtil;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.annotation.Endpoint;
@@ -44,7 +45,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Singleton
-@Requires(property = JmxConfiguration.PREFIX + ".registerEndpoints", defaultValue = "true")
+@Requires(property = JmxConfiguration.PREFIX + ".registerEndpoints", defaultValue = StringUtils.TRUE)
 public class EndpointMethodJmxProcessor implements ExecutableMethodProcessor<Endpoint> {
 
     private static final Logger LOG = LoggerFactory.getLogger(EndpointMethodJmxProcessor.class);

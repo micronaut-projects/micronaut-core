@@ -65,7 +65,7 @@ import java.util.concurrent.ExecutorService;
 @Singleton
 @RequiresConsul
 @Requires(beans = ConsulClient.class)
-@Requires(property = ConfigurationClient.ENABLED, value = "true", defaultValue = "false")
+@Requires(property = ConfigurationClient.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 public class ConsulConfigurationClient implements ConfigurationClient {
 
     private final ConsulClient consulClient;
