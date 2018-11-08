@@ -513,7 +513,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
     private Content buildContent(Element definingElement, ClassElement type, String mediaType, OpenAPI openAPI, VisitorContext context) {
         Content content = new Content();
         io.swagger.v3.oas.models.media.MediaType mt = new io.swagger.v3.oas.models.media.MediaType();
-        mt.setSchema(resolveSchema(openAPI,definingElement, type, context, mediaType));
+        mt.setSchema(resolveSchema(openAPI, definingElement, type, context, mediaType));
         content.addMediaType(mediaType, mt);
         return content;
     }

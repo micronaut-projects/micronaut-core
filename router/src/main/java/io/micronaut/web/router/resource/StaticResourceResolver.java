@@ -21,7 +21,6 @@ import io.micronaut.core.util.AntPathMatcher;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.hateos.Resource;
 
 import javax.inject.Singleton;
 import java.net.URL;
