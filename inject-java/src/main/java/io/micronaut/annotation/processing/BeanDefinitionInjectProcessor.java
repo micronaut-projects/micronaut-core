@@ -610,6 +610,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
          * @param beanMethod The {@link ExecutableElement}
          */
         void visitBeanFactoryMethod(ExecutableElement beanMethod) {
+            if (isFactoryType && annotationUtils.hasStereotype(concreteClass, AROUND_TYPE)) {
+                visitExecutableMethod(beanMethod, annotationUtils.getAnnotationMetadata(beanMethod));
+            }
+
             TypeMirror returnType = beanMethod.getReturnType();
             ExecutableElementParamInfo beanMethodParams = populateParameterData(beanMethod);
 
