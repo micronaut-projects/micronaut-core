@@ -24,6 +24,7 @@ import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 
 import javax.inject.Singleton;
 
@@ -59,8 +60,8 @@ public class AtlasMeterRegistryFactory {
     @Bean
     @Primary
     @Singleton
-    @Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
-    @Requires(property = ATLAS_ENABLED, value = "true", defaultValue = "true")
+    @Requires(property = MICRONAUT_METRICS_ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
+    @Requires(property = ATLAS_ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
     @Requires(beans = CompositeMeterRegistry.class)
     AtlasMeterRegistry atlasMeterRegistry() {
         return new AtlasMeterRegistry(atlasConfig, Clock.SYSTEM);

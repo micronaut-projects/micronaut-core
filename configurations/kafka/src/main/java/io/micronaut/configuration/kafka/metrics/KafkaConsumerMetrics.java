@@ -27,6 +27,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.StringUtils;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.metrics.KafkaMetric;
@@ -51,7 +52,7 @@ import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory
  */
 @RequiresMetrics
 @Context
-@Requires(property = MICRONAUT_METRICS_BINDERS + ".kafka.enabled", value = "true", defaultValue = "true")
+@Requires(property = MICRONAUT_METRICS_BINDERS + ".kafka.enabled", value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 public class KafkaConsumerMetrics implements BeanCreatedEventListener<AbstractKafkaConsumerConfiguration>, MeterBinder, Closeable {
 
     private static final Collection<MeterRegistry> METER_REGISTRIES = new ConcurrentLinkedQueue<>();

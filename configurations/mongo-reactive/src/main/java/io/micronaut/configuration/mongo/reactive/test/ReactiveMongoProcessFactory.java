@@ -43,7 +43,7 @@ import java.util.Optional;
 @Requires(classes = MongodProcess.class)
 @Requires(beans = DefaultReactiveMongoConfiguration.class)
 @Requires(env = Environment.TEST)
-@Requires(property = MongoSettings.EMBEDDED, notEquals = StringUtils.FALSE, defaultValue = "true")
+@Requires(property = MongoSettings.EMBEDDED, notEquals = StringUtils.FALSE, defaultValue = StringUtils.TRUE)
 @Singleton
 public class ReactiveMongoProcessFactory extends AbstractMongoProcessFactory implements BeanCreatedEventListener<DefaultReactiveMongoConfiguration>, Closeable {
 
