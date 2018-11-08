@@ -24,6 +24,7 @@ import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 
 import javax.inject.Singleton;
 
@@ -47,7 +48,7 @@ public class SystemMeterRegistryBinderFactoryFactory {
     @Bean
     @Singleton
     @Primary
-    @Requires(property = MICRONAUT_METRICS_BINDERS + ".uptime.enabled", value = "true", defaultValue = "true")
+    @Requires(property = MICRONAUT_METRICS_BINDERS + ".uptime.enabled", value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
     public UptimeMetrics uptimeMetrics() {
         return new UptimeMetrics();
     }
@@ -60,7 +61,7 @@ public class SystemMeterRegistryBinderFactoryFactory {
     @Bean
     @Singleton
     @Primary
-    @Requires(property = MICRONAUT_METRICS_BINDERS + ".processor.enabled", value = "true", defaultValue = "true")
+    @Requires(property = MICRONAUT_METRICS_BINDERS + ".processor.enabled", value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
     public ProcessorMetrics processorMetrics() {
         return new ProcessorMetrics();
     }
@@ -73,7 +74,7 @@ public class SystemMeterRegistryBinderFactoryFactory {
     @Bean
     @Singleton
     @Primary
-    @Requires(property = MICRONAUT_METRICS_BINDERS + ".files.enabled", value = "true", defaultValue = "true")
+    @Requires(property = MICRONAUT_METRICS_BINDERS + ".files.enabled", value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
     public FileDescriptorMetrics fileDescriptorMetrics() {
         return new FileDescriptorMetrics();
     }

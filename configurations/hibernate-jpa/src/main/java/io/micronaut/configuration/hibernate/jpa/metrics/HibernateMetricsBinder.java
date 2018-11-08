@@ -26,6 +26,7 @@ import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 
 import javax.inject.Provider;
 import javax.inject.Singleton;
@@ -46,7 +47,7 @@ import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory
  */
 @Singleton
 @RequiresMetrics
-@Requires(property = MICRONAUT_METRICS_BINDERS + ".hibernate.enabled", value = "true", defaultValue = "true")
+@Requires(property = MICRONAUT_METRICS_BINDERS + ".hibernate.enabled", value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 public class HibernateMetricsBinder implements BeanCreatedEventListener<EntityManagerFactory> {
 
     private final Provider<MeterRegistry> meterRegistryProvider;

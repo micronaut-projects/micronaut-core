@@ -26,6 +26,7 @@ import java.util.Properties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.io.Writable;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.views.ViewsConfiguration;
@@ -47,7 +48,7 @@ import org.apache.velocity.exception.ResourceNotFoundException;
  * @since 1.0
  */
 @Produces(MediaType.TEXT_HTML)
-@Requires(property = VelocityViewsRendererConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
+@Requires(property = VelocityViewsRendererConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 @Requires(classes = VelocityEngine.class)
 @Singleton
 public class VelocityViewsRenderer implements ViewsRenderer {

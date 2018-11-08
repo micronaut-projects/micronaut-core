@@ -23,6 +23,7 @@ import com.netflix.hystrix.serial.SerialHystrixDashboardData;
 import io.micronaut.configuration.hystrix.HystrixConfiguration;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
@@ -43,7 +44,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Controller("${hystrix.stream.path:/hystrix.stream}")
 @Requires(classes = {SerialHystrixDashboardData.class, Flowable.class})
-@Requires(property = HystrixConfiguration.HYSTRIX_STREAM_ENABLED, value = "true", defaultValue = "false")
+@Requires(property = HystrixConfiguration.HYSTRIX_STREAM_ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 public class HystrixStreamController {
 
     private final Duration interval;
