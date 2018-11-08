@@ -16,6 +16,8 @@
 
 package io.micronaut.core.exceptions;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.function.BiConsumer;
 
 /**
@@ -33,7 +35,7 @@ public interface BeanExceptionHandler<T, E extends Throwable> extends BiConsumer
      * @param bean The bean
      * @param throwable The error
      */
-    void handle(T bean, E throwable);
+    void handle(@Nullable T bean, @Nonnull E throwable);
 
     /**
      * Handles the exception.
@@ -41,7 +43,7 @@ public interface BeanExceptionHandler<T, E extends Throwable> extends BiConsumer
      * @param bean The bean
      * @param throwable The error
      */
-    default void accept(T bean, E throwable) {
+    default void accept(@Nullable T bean, @Nonnull E throwable) {
         handle(bean, throwable);
     }
 }
