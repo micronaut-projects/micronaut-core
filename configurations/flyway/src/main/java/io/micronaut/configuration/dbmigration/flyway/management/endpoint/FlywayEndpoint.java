@@ -21,15 +21,12 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
-import io.reactivex.Single;
+import io.reactivex.Flowable;
 import org.flywaydb.core.Flyway;
+import org.reactivestreams.Publisher;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * Provides a flyway endpoint to get all the migrations applied.
@@ -62,29 +59,45 @@ public class FlywayEndpoint {
      * @return A list of Flyway migrations per active configuration
      */
     @Read
-    public Single<List<FlywayReport>> flywayMigrations() {
-        List<FlywayReport> reports = new ArrayList<>();
+    public Publisher<FlywayReport> flywayMigrations() {
 
-        if (flywayConfigurationProperties != null) {
-            for (FlywayConfigurationProperties config : flywayConfigurationProperties) {
+        return Flowable.fromIterable(flywayConfigurationProperties)
+                .filter(FlywayConfigurationProperties::isEnabled)
+                .map(c -> {
+                    return new FlywayConfig(c, applicationContext
+                            .findBean(Flyway.class, Qualifiers.byName(c.getNameQualifier())));
+                })
+                .filter(FlywayConfig::flywayPresent)
+                .map(FlywayConfig::createReport);
+    }
 
-                if (config.isEnabled()) {
+    private class FlywayConfig {
 
-                    Optional<Flyway> flywayBean = applicationContext
-                            .findBean(Flyway.class, Qualifiers.byName(config.getNameQualifier()));
+        private final FlywayConfigurationProperties config;
+        private final Optional<Flyway> flyway;
 
-                    flywayBean.ifPresent(flyway -> reports.add(
-                            new FlywayReport(
-                                    config.getNameQualifier(),
-                                    Stream.of(flyway.info().all())
-                                            .map(FlywayMigration::new)
-                                            .collect(Collectors.toList())
-                            ))
-                    );
-                }
-            }
+        FlywayConfig(FlywayConfigurationProperties config, Optional<Flyway> flyway) {
+            this.config = config;
+            this.flyway = flyway;
         }
 
-        return Single.just(reports);
+        public Optional<Flyway> getFlyway() {
+            return flyway;
+        }
+
+        public FlywayConfigurationProperties getConfig() {
+            return config;
+        }
+
+        boolean flywayPresent() {
+            return flyway.isPresent();
+        }
+
+        FlywayReport createReport() {
+            return new FlywayReport(
+                    config.getNameQualifier(),
+                    Arrays.asList(flyway.get().info().all())
+            );
+        }
     }
 }

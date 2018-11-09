@@ -19,13 +19,16 @@ package io.micronaut.configuration.dbmigration.flyway;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.StartupEvent;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.event.annotation.EventListener;
+import io.micronaut.scheduling.annotation.Async;
 import org.flywaydb.core.Flyway;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.util.Collection;
+import java.util.Optional;
 
 /**
  * Synchronous listener for {@link StartupEvent} to run flyway operations.
@@ -35,17 +38,21 @@ import java.util.Collection;
  */
 @Requires(beans = Flyway.class)
 @Singleton
-class FlywayStartupEventListener extends AbstractFlyway {
+class FlywayStartupEventListener {
 
     private static final Logger LOG = LoggerFactory.getLogger(FlywayStartupEventListener.class);
+
+    private final ApplicationContext applicationContext;
+    private final Collection<FlywayConfigurationProperties> flywayConfigurationProperties;
 
     /**
      * @param applicationContext            The application context
      * @param flywayConfigurationProperties Collection of Flyway configuration properties
      */
     public FlywayStartupEventListener(ApplicationContext applicationContext,
-                                      Collection<FlywayConfigurationProperties> flywayConfigurationProperties) {
-        super(applicationContext, flywayConfigurationProperties);
+                          Collection<FlywayConfigurationProperties> flywayConfigurationProperties) {
+        this.applicationContext = applicationContext;
+        this.flywayConfigurationProperties = flywayConfigurationProperties;
     }
 
     /**
@@ -56,8 +63,31 @@ class FlywayStartupEventListener extends AbstractFlyway {
     @EventListener
     public void onStartup(StartupEvent event) {
         if (LOG.isTraceEnabled()) {
-            LOG.trace("Executing flyway event listener");
+            LOG.trace("Executing synchronous flyway migrations");
         }
         run(false);
+    }
+
+    @Async
+    @EventListener
+    public void onStartupAsync(StartupEvent event) {
+        if (LOG.isTraceEnabled()) {
+            LOG.trace("Executing asynchronous flyway migrations");
+        }
+        run(true);
+    }
+
+    /**
+     * Runs Flyway migrations for all the created {@link Flyway} beans.
+     *
+     * @param async if true only flyway configurations set to async are run.
+     */
+    public void run(boolean async) {
+        flywayConfigurationProperties.stream()
+                .filter(c -> c.isAsync() == async)
+                .map(c -> applicationContext.findBean(Flyway.class, Qualifiers.byName(c.getNameQualifier())))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .forEach(Flyway::migrate);
     }
 }

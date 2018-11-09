@@ -101,8 +101,8 @@ class FlywayEndpointSpec extends Specification {
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
 
         when:
-        HttpResponse<List> response = rxClient.toBlocking()
-            .exchange(HttpRequest.GET("/flyway"), Argument.of(List, FlywayReport))
+        HttpResponse<List<Map>> response = rxClient.toBlocking()
+            .exchange(HttpRequest.GET("/flyway"), Argument.of(List, Map))
 
         then:
         response.status() == HttpStatus.OK
@@ -143,7 +143,7 @@ class FlywayEndpointSpec extends Specification {
 
         when:
         HttpResponse<List> response = rxClient.toBlocking()
-            .exchange(HttpRequest.GET("/flyway"), Argument.of(List, FlywayReport))
+            .exchange(HttpRequest.GET("/flyway"), Argument.of(List, Map))
 
         then:
         response.status() == HttpStatus.OK

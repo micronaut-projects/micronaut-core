@@ -49,12 +49,12 @@ public class FlywayCondition implements Condition {
                     FlywayConfigurationProperties config = optionConfig.get();
 
                     if (config.getDataSource() == null && !config.hasAlternativeDatabaseConfiguration()) {
-                        context.fail("Flyway bean not created for identifier \"" + name.get() + "\" because no data source found");
+                        context.fail("Flyway bean not created for identifier [" + name.get() + "] because no data source was found with a named qualifier of the same name.");
                         return false;
                     }
 
                     if (!config.isEnabled()) {
-                        context.fail("Flyway bean not created for identifier \"" + name.get() + "\" because flyway configuration is disabled");
+                        context.fail("Flyway bean not created for identifier [" + name.get() + "] because the flyway configuration is disabled.");
                         return false;
                     }
                 }

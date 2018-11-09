@@ -16,6 +16,12 @@
 
 package io.micronaut.configuration.dbmigration.flyway.management.endpoint;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import org.flywaydb.core.api.MigrationInfo;
+import org.flywaydb.core.internal.info.MigrationInfoImpl;
+
 import java.util.List;
 
 /**
@@ -26,20 +32,14 @@ import java.util.List;
  */
 public class FlywayReport {
 
-    private String name;
-    private List<FlywayMigration> migrations;
-
-    /**
-     * Default constructor.
-     */
-    public FlywayReport() {
-    }
+    private final String name;
+    private final List<MigrationInfo> migrations;
 
     /**
      * @param name       The name of the data source
      * @param changeSets The list of changes
      */
-    public FlywayReport(String name, List<FlywayMigration> changeSets) {
+    public FlywayReport(String name, List<MigrationInfo> changeSets) {
         this.name = name;
         this.migrations = changeSets;
     }
@@ -52,23 +52,10 @@ public class FlywayReport {
     }
 
     /**
-     * @param name The name of the data source
-     */
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    /**
      * @return The list of change migrations
      */
-    public List<FlywayMigration> getMigrations() {
+    @JsonSerialize(contentAs = MigrationInfo.class)
+    public List<MigrationInfo> getMigrations() {
         return migrations;
-    }
-
-    /**
-     * @param migrations The list of migrations
-     */
-    public void setMigrations(List<FlywayMigration> migrations) {
-        this.migrations = migrations;
     }
 }
