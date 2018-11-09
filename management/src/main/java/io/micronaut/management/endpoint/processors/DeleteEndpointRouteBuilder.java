@@ -22,6 +22,7 @@ import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.annotation.Delete;
 import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
+import io.micronaut.web.router.UriRoute;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
@@ -58,6 +59,9 @@ public class DeleteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
     protected void registerRoute(ExecutableMethod<?, ?> method, String id) {
         Class<?> declaringType = method.getDeclaringType();
         UriTemplate template = buildUriTemplate(method, id);
-        DELETE(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes());
+        final UriRoute uriRoute = DELETE(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes());
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Created Route to @Endpoint {}: {}", method.getDeclaringType().getName(), uriRoute);
+        }
     }
 }
