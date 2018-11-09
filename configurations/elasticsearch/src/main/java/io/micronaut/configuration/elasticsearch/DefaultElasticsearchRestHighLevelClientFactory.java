@@ -25,7 +25,7 @@ import org.elasticsearch.client.RestHighLevelClient;
  * Default Factory for Create Elasticsearch RestHighLevelClient.
  *
  * @author lishuai
- * @since 1.0.1
+ * @since 1.1.0
  */
 @Requires(beans = DefaultElasticsearchConfiguration.class)
 @Factory
