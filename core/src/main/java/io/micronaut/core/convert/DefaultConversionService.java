@@ -189,6 +189,27 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
         // AnnotationClassValue -> Class
         addConverter(AnnotationClassValue.class, Class.class, (object, targetType, context) -> object.getType());
+        addConverter(AnnotationClassValue[].class, Class.class, (object, targetType, context) -> {
+            if (object.length > 0) {
+                final AnnotationClassValue o = object[0];
+                if (o != null) {
+                    return o.getType();
+                }
+            }
+            return Optional.empty();
+        });
+        addConverter(AnnotationClassValue[].class, Class[].class, (object, targetType, context) -> {
+            List<Class> classes = new ArrayList<>(object.length);
+            for (AnnotationClassValue<?> annotationClassValue : object) {
+                if (annotationClassValue != null) {
+                    final Optional<? extends Class<?>> type = annotationClassValue.getType();
+                    if (type.isPresent()) {
+                        classes.add(type.get());
+                    }
+                }
+            }
+            return Optional.of(classes.toArray(new Class[0]));
+        });
 
         // URI -> URL
         addConverter(URI.class, URL.class, uri -> {

@@ -26,6 +26,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 import io.micronaut.management.endpoint.annotation.Selector;
 import io.micronaut.management.endpoint.annotation.Write;
+import io.micronaut.web.router.UriRoute;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
@@ -63,8 +64,11 @@ public class WriteEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
         Class<?> declaringType = method.getDeclaringType();
         UriTemplate template = buildUriTemplate(method, id);
         String[] consumes = method.getValue(Write.class, "consumes", String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
-        POST(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes())
-            .consumes(MediaType.of(consumes));
+        final UriRoute uriRoute = POST(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes())
+                .consumes(MediaType.of(consumes));
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Created Route to @Endpoint {}: {}", method.getDeclaringType().getName(), uriRoute);
+        }
     }
 
     @Override
