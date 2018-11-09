@@ -9,6 +9,7 @@ import io.micronaut.configuration.kafka.serde.JsonSerde
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.util.CollectionUtils
 import io.micronaut.messaging.MessageHeaders
+import io.micronaut.messaging.annotation.Body
 import io.micronaut.messaging.annotation.Header
 import io.reactivex.Single
 import org.apache.kafka.clients.consumer.ConsumerRecord
@@ -84,7 +85,22 @@ class KafkaListenerSpec extends Specification {
             myConsumer.wordCount == 4
             myConsumer.key == "key"
         }
+    }
 
+    void "test @Body annotation"() {
+        when:
+        MyClient myClient = context.getBean(MyClient)
+        RecordMetadata metadata = myClient.sendGetRecordMetadata("key", "hello world")
+
+        PollingConditions conditions = new PollingConditions(timeout: 30, delay: 1)
+
+        MyConsumer4 myConsumer = context.getBean(MyConsumer4)
+        then:
+        metadata != null
+        metadata.topic() == "words"
+        conditions.eventually {
+            myConsumer.body == "hello world"
+        }
     }
 
     void "test receive ConsumerRecord"() {
@@ -180,6 +196,16 @@ class KafkaListenerSpec extends Specification {
         void countWord(@KafkaKey String key, ConsumerRecord<String, String> record) {
             wordCount += record.value().split(/\s/).size()
             this.key = key
+        }
+    }
+
+    @KafkaListener(offsetReset = OffsetReset.EARLIEST)
+    static class MyConsumer4 {
+        String body
+
+        @Topic("words")
+        void countWord(@Body String body) {
+            this.body = body
         }
     }
 
