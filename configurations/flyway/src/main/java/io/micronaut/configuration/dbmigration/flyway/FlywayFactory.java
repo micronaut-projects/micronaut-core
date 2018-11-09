@@ -16,13 +16,9 @@
 
 package io.micronaut.configuration.dbmigration.flyway;
 
-import static io.micronaut.core.util.CollectionUtils.toStringArray;
-import static io.micronaut.core.util.StringUtils.hasText;
-
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.util.CollectionUtils;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.configuration.FluentConfiguration;
 
@@ -30,7 +26,7 @@ import org.flywaydb.core.api.configuration.FluentConfiguration;
  * Factory used to create {@link Flyway} beans with the configuration defined in {@link FlywayConfigurationProperties}.
  *
  * @author Iván López
- * @since 1.1
+ * @since 1.1.0
  */
 @Factory
 public class FlywayFactory {

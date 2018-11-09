@@ -30,7 +30,7 @@ import java.util.Optional;
  * will enable the creation of the Flyway bean.
  *
  * @author Iván López
- * @since 1.1
+ * @since 1.1.0
  */
 public class FlywayCondition implements Condition {
 

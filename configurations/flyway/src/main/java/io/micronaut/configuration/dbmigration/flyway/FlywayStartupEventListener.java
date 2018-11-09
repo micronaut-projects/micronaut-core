@@ -31,10 +31,10 @@ import java.util.Collection;
 import java.util.Optional;
 
 /**
- * Synchronous listener for {@link StartupEvent} to run flyway operations.
+ * Listener for {@link StartupEvent}s to run flyway operations.
  *
  * @author Iván López
- * @since 1.1
+ * @since 1.1.0
  */
 @Requires(beans = Flyway.class)
 @Singleton
@@ -68,6 +68,11 @@ class FlywayStartupEventListener {
         run(false);
     }
 
+    /**
+     * Runs Flyway migrations asynchronously.
+     *
+     * @param event Server startup event
+     */
     @Async
     @EventListener
     public void onStartupAsync(StartupEvent event) {

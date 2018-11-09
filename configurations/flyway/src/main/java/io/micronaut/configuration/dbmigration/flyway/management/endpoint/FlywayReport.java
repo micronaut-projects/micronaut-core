@@ -16,11 +16,8 @@
 
 package io.micronaut.configuration.dbmigration.flyway.management.endpoint;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import org.flywaydb.core.api.MigrationInfo;
-import org.flywaydb.core.internal.info.MigrationInfoImpl;
 
 import java.util.List;
 
@@ -28,7 +25,7 @@ import java.util.List;
  * Flyway report for one datasource.
  *
  * @author Iván López
- * @since 1.1
+ * @since 1.1.0
  */
 public class FlywayReport {
 

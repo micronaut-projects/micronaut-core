@@ -25,20 +25,13 @@ import org.flywaydb.core.api.configuration.FluentConfiguration;
 
 import javax.annotation.Nullable;
 import javax.sql.DataSource;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 
 /**
  * Create a Flyway Configuration for each sub-property of flyway.*.
  *
  * @author Iván López
- * @see org.flywaydb.core.api.configuration.Configuration
- * @since 1.1
+ * @see org.flywaydb.core.api.configuration.FluentConfiguration
+ * @since 1.1.0
  */
 @EachProperty("flyway")
 public class FlywayConfigurationProperties implements Toggleable {
@@ -48,6 +41,9 @@ public class FlywayConfigurationProperties implements Toggleable {
 
     @SuppressWarnings("WeakerAccess")
     public static final boolean DEFAULT_ASYNC = false;
+
+    @ConfigurationBuilder(prefixes = "")
+    FluentConfiguration fluentConfiguration = new FluentConfiguration();
 
     private final DataSource dataSource;
     private final String nameQualifier;
@@ -163,9 +159,6 @@ public class FlywayConfigurationProperties implements Toggleable {
     public boolean hasAlternativeDatabaseConfiguration() {
         return StringUtils.hasText(this.getUrl()) && StringUtils.hasText(this.getUser());
     }
-
-    @ConfigurationBuilder(prefixes = "")
-    FluentConfiguration fluentConfiguration = new FluentConfiguration();
 
     /**
      * @return The flyway configuration builder

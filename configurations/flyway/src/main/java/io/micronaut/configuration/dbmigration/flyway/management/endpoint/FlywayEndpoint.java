@@ -26,13 +26,12 @@ import org.flywaydb.core.Flyway;
 import org.reactivestreams.Publisher;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Provides a flyway endpoint to get all the migrations applied.
  *
  * @author Iván López
- * @since 1.1
+ * @since 1.1.0
  */
 @Endpoint(id = FlywayEndpoint.NAME)
 public class FlywayEndpoint {
@@ -74,6 +73,12 @@ public class FlywayEndpoint {
                 });
     }
 
+    /**
+     * A pair of any types.
+     *
+     * @param <T1> The first type
+     * @param <T2> The second type
+     */
     private class Pair<T1, T2> {
 
         private final T1 first;
