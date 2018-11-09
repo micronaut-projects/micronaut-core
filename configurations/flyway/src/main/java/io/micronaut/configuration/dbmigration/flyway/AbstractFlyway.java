@@ -51,16 +51,11 @@ public abstract class AbstractFlyway {
      * @param async if true only flyway configurations set to async are run.
      */
     public void run(boolean async) {
-
-        for (FlywayConfigurationProperties config : flywayConfigurationProperties) {
-            if (config.isAsync() != async) {
-                continue;
-            }
-
-            Optional<Flyway> flyway = applicationContext
-                    .findBean(Flyway.class, Qualifiers.byName(config.getNameQualifier()));
-
-            flyway.ifPresent(Flyway::migrate);
-        }
+        flywayConfigurationProperties.stream()
+                .filter(c -> c.isAsync() == async)
+                .map(c -> applicationContext.findBean(Flyway.class, Qualifiers.byName(c.getNameQualifier())))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .forEach(Flyway::migrate);
     }
 }
