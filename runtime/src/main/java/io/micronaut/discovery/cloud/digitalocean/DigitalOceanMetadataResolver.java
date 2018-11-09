@@ -126,37 +126,40 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
     private List<NetworkInterface> processJsonInterfaces(JsonNode interfaces, Consumer<String> ipv4Setter, Consumer<String> ipv6Setter) {
         List<NetworkInterface> networkInterfaces = new ArrayList<>();
 
-        AtomicReference<Integer> networkCounter = new AtomicReference<>(0);
-        interfaces.elements().forEachRemaining(
-                jsonNode -> {
-                    DigitalOceanNetworkInterface networkInterface = new DigitalOceanNetworkInterface();
-                    networkInterface.setId(networkCounter.toString());
-                    JsonNode ipv4 = jsonNode.findValue(IPV4.getName());
-                    if (ipv4 != null) {
-                        networkInterface.setIpv4(textValue(ipv4, IP_ADDRESS));
-                        networkInterface.setNetmask(textValue(ipv4, NETMASK));
-                        networkInterface.setGateway(textValue(ipv4, GATEWAY));
+        if (interfaces != null) {
+            AtomicReference<Integer> networkCounter = new AtomicReference<>(0);
+            interfaces.elements().forEachRemaining(
+                    jsonNode -> {
+                        DigitalOceanNetworkInterface networkInterface = new DigitalOceanNetworkInterface();
+                        networkInterface.setId(networkCounter.toString());
+                        JsonNode ipv4 = jsonNode.findValue(IPV4.getName());
+                        if (ipv4 != null) {
+                            networkInterface.setIpv4(textValue(ipv4, IP_ADDRESS));
+                            networkInterface.setNetmask(textValue(ipv4, NETMASK));
+                            networkInterface.setGateway(textValue(ipv4, GATEWAY));
+                        }
+                        JsonNode ipv6 = jsonNode.findValue(IPV6.getName());
+                        if (ipv6 != null) {
+                            networkInterface.setIpv6(textValue(ipv6, IP_ADDRESS));
+                            networkInterface.setIpv6Gateway(textValue(ipv6, GATEWAY));
+                            networkInterface.setCidr(ipv6.findValue(CIDR.getName()).intValue());
+                        }
+                        networkInterface.setMac(textValue(jsonNode, MAC));
+
+                        networkCounter.getAndSet(networkCounter.get() + 1);
+                        networkInterfaces.add(networkInterface);
                     }
-                    JsonNode ipv6 = jsonNode.findValue(IPV6.getName());
-                    if (ipv6 != null) {
-                        networkInterface.setIpv6(textValue(ipv6, IP_ADDRESS));
-                        networkInterface.setIpv6Gateway(textValue(ipv6, GATEWAY));
-                        networkInterface.setCidr(ipv6.findValue(CIDR.getName()).intValue());
-                    }
-                    networkInterface.setMac(textValue(jsonNode, MAC));
+            );
 
-                    networkCounter.getAndSet(networkCounter.get() + 1);
-                    networkInterfaces.add(networkInterface);
-                }
-        );
+            JsonNode firstIpv4 = interfaces.get(0).findValue(IPV4.getName());
+            ipv4Setter.accept(textValue(firstIpv4, IP_ADDRESS));
 
-        JsonNode firstIpv4 = interfaces.get(0).findValue(IPV4.getName());
-        ipv4Setter.accept(textValue(firstIpv4, IP_ADDRESS));
-
-        JsonNode firstIpv6 = interfaces.get(0).findValue(IPV6.getName());
-        if (firstIpv6 != null) {
-            ipv6Setter.accept(textValue(firstIpv6, IP_ADDRESS));
+            JsonNode firstIpv6 = interfaces.get(0).findValue(IPV6.getName());
+            if (firstIpv6 != null) {
+                ipv6Setter.accept(textValue(firstIpv6, IP_ADDRESS));
+            }
         }
+
 
         return networkInterfaces;
     }
