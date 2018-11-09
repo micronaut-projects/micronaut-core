@@ -22,9 +22,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadataResolver;
-import io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils;
 import io.micronaut.discovery.cloud.NetworkInterface;
-import io.micronaut.http.HttpMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,11 +30,8 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.URLConnection;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 

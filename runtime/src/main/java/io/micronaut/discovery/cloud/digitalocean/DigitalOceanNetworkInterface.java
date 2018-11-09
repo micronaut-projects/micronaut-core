@@ -1,7 +1,29 @@
+/*
+ * Copyright 2017-2018 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.micronaut.discovery.cloud.digitalocean;
 
 import io.micronaut.discovery.cloud.NetworkInterface;
 
+/**
+ * A {@link NetworkInterface} implementation for Digital Ocean.
+ *
+ * @author Alvaro Sanchez-Mariscal
+ * @since 1.1
+ */
 public class DigitalOceanNetworkInterface extends NetworkInterface {
 
     private int cidr;
@@ -48,21 +70,32 @@ public class DigitalOceanNetworkInterface extends NetworkInterface {
         super.setNetmask(netmask);
     }
 
+    /**
+     * @return the CIDR mask
+     */
     public int getCidr() {
         return cidr;
     }
 
+    /**
+     * @param cidr the CIDR mask
+     */
     public void setCidr(int cidr) {
         this.cidr = cidr;
     }
 
+    /**
+     * @return the IPV6 gateway
+     */
     public String getIpv6Gateway() {
         return ipv6Gateway;
     }
 
+    /**
+     * @param ipv6Gateway the IPV6 gateway
+     */
     public void setIpv6Gateway(String ipv6Gateway) {
         this.ipv6Gateway = ipv6Gateway;
     }
-
 
 }
