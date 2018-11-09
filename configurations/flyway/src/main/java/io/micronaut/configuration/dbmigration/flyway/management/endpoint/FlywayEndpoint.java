@@ -64,40 +64,32 @@ public class FlywayEndpoint {
         return Flowable.fromIterable(flywayConfigurationProperties)
                 .filter(FlywayConfigurationProperties::isEnabled)
                 .map(c -> {
-                    return new FlywayConfig(c, applicationContext
-                            .findBean(Flyway.class, Qualifiers.byName(c.getNameQualifier())));
+                    return new Pair<>(c, applicationContext
+                            .findBean(Flyway.class, Qualifiers.byName(c.getNameQualifier())).orElse(null));
                 })
-                .filter(FlywayConfig::flywayPresent)
-                .map(FlywayConfig::createReport);
+                .filter(pair -> pair.getSecond() != null)
+                .map(pair -> {
+                    return new FlywayReport(pair.getFirst().getNameQualifier(),
+                                Arrays.asList(pair.getSecond().info().all()));
+                });
     }
 
-    private class FlywayConfig {
+    private class Pair<T1, T2> {
 
-        private final FlywayConfigurationProperties config;
-        private final Optional<Flyway> flyway;
+        private final T1 first;
+        private final T2 second;
 
-        FlywayConfig(FlywayConfigurationProperties config, Optional<Flyway> flyway) {
-            this.config = config;
-            this.flyway = flyway;
+        Pair(T1 first, T2 second) {
+            this.first = first;
+            this.second = second;
         }
 
-        public Optional<Flyway> getFlyway() {
-            return flyway;
+        T2 getSecond() {
+            return second;
         }
 
-        public FlywayConfigurationProperties getConfig() {
-            return config;
-        }
-
-        boolean flywayPresent() {
-            return flyway.isPresent();
-        }
-
-        FlywayReport createReport() {
-            return new FlywayReport(
-                    config.getNameQualifier(),
-                    Arrays.asList(flyway.get().info().all())
-            );
+        T1 getFirst() {
+            return first;
         }
     }
 }
