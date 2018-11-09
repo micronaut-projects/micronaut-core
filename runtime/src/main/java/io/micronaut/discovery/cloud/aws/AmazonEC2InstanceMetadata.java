@@ -18,14 +18,9 @@ package io.micronaut.discovery.cloud.aws;
 
 import io.micronaut.context.env.ComputePlatform;
 import io.micronaut.discovery.cloud.AbstractComputeInstanceMetadata;
-import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
-import io.micronaut.discovery.cloud.NetworkInterface;
-
-import java.util.List;
-import java.util.Map;
 
 /**
- * Represents {@link ComputeInstanceMetadata} for Amazon's EC2.
+ * Represents {@link io.micronaut.discovery.cloud.ComputeInstanceMetadata} for Amazon's EC2.
  *
  * @author rvanderwerf
  * @author Graeme Rocher

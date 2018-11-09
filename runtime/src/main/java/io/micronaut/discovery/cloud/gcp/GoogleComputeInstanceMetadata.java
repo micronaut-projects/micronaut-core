@@ -18,15 +18,9 @@ package io.micronaut.discovery.cloud.gcp;
 
 import io.micronaut.context.env.ComputePlatform;
 import io.micronaut.discovery.cloud.AbstractComputeInstanceMetadata;
-import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
-import io.micronaut.discovery.cloud.NetworkInterface;
-
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
 
 /**
- * Represents {@link ComputeInstanceMetadata} for Google Cloud Platform.
+ * Represents {@link io.micronaut.discovery.cloud.ComputeInstanceMetadata} for Google Cloud Platform.
  *
  * @author rvanderwerf
  * @author Graeme Rocher
