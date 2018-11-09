@@ -16,6 +16,7 @@
 
 package io.micronaut.context.env;
 
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.Map;
 
@@ -66,6 +67,15 @@ public class MapPropertySource implements PropertySource {
                 return i.next().toString();
             }
         };
+    }
+
+    /**
+     * The backing map (unmodifiable).
+     *
+     * @return The backing map
+     */
+    public Map<String, Object> asMap() {
+        return Collections.unmodifiableMap(map);
     }
 
     /**
