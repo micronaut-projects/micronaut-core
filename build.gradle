@@ -243,8 +243,8 @@ ext {
                 group: 'org.apache.tomcat',
                 name: 'tomcat-jdbc'
             ],
-            'elasticsearch6.high.client': [
-                    version: elasticsearch6Version,
+            'elasticsearch.rest.high.level.client': [
+                    version: elasticsearchVersion,
                     group:'org.elasticsearch.client',
                     name:'elasticsearch-rest-high-level-client'
             ]
