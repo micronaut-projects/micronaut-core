@@ -1,4 +1,4 @@
-package io.micronaut.configuration.elasticsearch6;
+package io.micronaut.configuration.elasticsearch;
 
 
 /**

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.configuration.elasticsearch6
+package io.micronaut.configuration.elasticsearch
 
 import io.micronaut.context.ApplicationContext
 import org.elasticsearch.action.main.MainResponse

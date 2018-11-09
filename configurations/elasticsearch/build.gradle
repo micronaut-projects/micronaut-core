@@ -1,0 +1,13 @@
+dependencies {
+    compile project(":runtime")
+    compile project(":inject")
+
+    compileOnly project(":inject-java")
+    compileOnly project(":management")
+
+    compile dependencyVersion("elasticsearch.rest.high.level.client")
+
+    testCompile "org.testcontainers:spock:1.10.1"
+    testCompile "org.testcontainers:elasticsearch:1.10.1"
+    testCompile project(":management")
+}

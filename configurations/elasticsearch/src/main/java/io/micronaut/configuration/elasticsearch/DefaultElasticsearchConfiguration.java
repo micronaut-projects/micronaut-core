@@ -14,27 +14,37 @@
  * limitations under the License.
  */
 
-package io.micronaut.configuration.elasticsearch6;
+package io.micronaut.configuration.elasticsearch;
 
+import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
+import org.apache.http.Header;
 import org.apache.http.HttpHost;
+import org.elasticsearch.client.RestClient;
+import org.elasticsearch.client.RestClientBuilder;
 
 import java.net.URI;
 import java.util.Collections;
 import java.util.List;
 
-import static io.micronaut.configuration.elasticsearch6.ElasticsearchSettings.DEFAULT_URI;
+import static io.micronaut.configuration.elasticsearch.ElasticsearchSettings.DEFAULT_URI;
 
 /**
- * Configuration for Elasticsearch6 RestHighLevelClient.
+ * Configuration for Elasticsearch RestHighLevelClient.
  *
  * @author lishuai
  * @since 1.0.1
  */
-@Requires(property = ElasticsearchSettings.PREFIX)
+@Requires(classes = RestClientBuilder.class)
 @ConfigurationProperties(ElasticsearchSettings.PREFIX)
 public class DefaultElasticsearchConfiguration {
+
+    protected HttpHost[] httpHosts;
+    protected Header[] defaultHeaders;
+
+    protected int connectTimeout;
+    protected int socketTimeout;
 
     private List<URI> uris = Collections.singletonList(URI.create(DEFAULT_URI));
 
@@ -52,6 +62,23 @@ public class DefaultElasticsearchConfiguration {
      */
     public void setUris(List<URI> uris) {
         this.uris = uris;
+        this.httpHosts = toHttpHosts();
+    }
+
+    /**
+     *
+     * @param connectTimeout The connection timeout.
+     */
+    public void setConnectTimeout(int connectTimeout) {
+        this.connectTimeout = connectTimeout;
+    }
+
+    /**
+     *
+     * @param socketTimeout The socket timeout.
+     */
+    public void setSocketTimeout(int socketTimeout) {
+        this.socketTimeout = socketTimeout;
     }
 
     /**
@@ -59,9 +86,21 @@ public class DefaultElasticsearchConfiguration {
      * @return HttpHost Array
      */
     HttpHost[] toHttpHosts() {
-
         return uris.stream()
                 .map(host -> new HttpHost(host.getHost(), host.getPort(), host.getScheme())).distinct().toArray(HttpHost[]::new);
+    }
+
+
+    /**
+     * @return RestClientBuilder
+     */
+    @ConfigurationBuilder
+    public RestClientBuilder builder() {
+        return RestClient.builder(httpHosts)
+                .setRequestConfigCallback(
+                        requestConfigBuilder -> requestConfigBuilder
+                                .setConnectTimeout(connectTimeout)
+                                .setSocketTimeout(socketTimeout));
     }
 
     @Override

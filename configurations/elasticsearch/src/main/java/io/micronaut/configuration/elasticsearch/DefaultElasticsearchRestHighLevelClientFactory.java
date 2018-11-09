@@ -14,16 +14,15 @@
  * limitations under the License.
  */
 
-package io.micronaut.configuration.elasticsearch6;
+package io.micronaut.configuration.elasticsearch;
 
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
-import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.RestHighLevelClient;
 
 /**
- * Default Factory for Create Elasticsearch6 RestHighLevelClient.
+ * Default Factory for Create Elasticsearch RestHighLevelClient.
  *
  * @author lishuai
  * @since 1.0.1
@@ -40,6 +39,6 @@ public class DefaultElasticsearchRestHighLevelClientFactory {
      */
     @Bean(preDestroy = "close")
     RestHighLevelClient restHighLevelClient(DefaultElasticsearchConfiguration elasticsearchRestClientConfiguration) {
-        return new RestHighLevelClient(RestClient.builder(elasticsearchRestClientConfiguration.toHttpHosts()));
+        return new RestHighLevelClient(elasticsearchRestClientConfiguration.builder());
     }
 }
