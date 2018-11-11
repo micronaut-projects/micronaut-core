@@ -1,6 +1,6 @@
 The ann:websocket.annotation.ClientWebSocket[] annotation can be used in combination with the api:websocket.WebSocketClient[] interface to define WebSocket clients.
 
-You can inject a reference to the a api:websocket.WebSocketClient[] instance using the ann:http.client.Client[] annotation:
+You can inject a reference to the a api:websocket.WebSocketClient[] instance using the ann:http.client.annotation.Client[] annotation:
 
 [source,java]
 ----
