@@ -1,10 +1,12 @@
 package io.micronaut.scheduling.exceptions
 
 import io.micronaut.context.ApplicationContext
+import spock.lang.Ignore
 import spock.lang.Specification
 
 class ScheduledInjectionExceptionSpec extends Specification {
 
+    @Ignore
     void "testing bean injections in scheduled beans logs an error"() {
         given:
         def oldOut = System.out
