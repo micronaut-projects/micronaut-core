@@ -97,7 +97,7 @@ interface HelloClient{
 }
 ----
 
-Alternatively you can also use ann:http.client.Client[] as a qualifier to `@Inject` an instance of api:http.client.HttpClient[]:
+Alternatively you can also use ann:http.client.annotation.Client[] as a qualifier to `@Inject` an instance of api:http.client.HttpClient[]:
 
 .Using @Client to Discover Services
 [source,java]

@@ -71,7 +71,7 @@ Another important thing to notice regarding the `save` method in the example abo
 
 This is a non-blocking reactive type and typically you want your HTTP clients not to block. There are cases where you may want to write an HTTP client that does block (such as in unit test cases), but this are rare.
 
-The following table illustrates common return types usable with ann:http.client.Client[]:
+The following table illustrates common return types usable with ann:http.client.annotation.Client[]:
 
 .Micronaut Response Types
 |===
