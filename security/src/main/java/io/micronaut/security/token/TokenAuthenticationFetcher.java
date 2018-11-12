@@ -71,6 +71,8 @@ public class TokenAuthenticationFetcher implements AuthenticationFetcher {
     }
 
     /**
+     * Deprecated. You can called the preferred constructor with new TokenAuthenticationFetcher(tokenValidators, new DefaultTokenResolver(tokenReaders), eventPublisher).
+     *
      * @param tokenValidators The list of {@link TokenValidator} which attempt to validate the request
      * @param tokenReaders    The list {@link TokenReader} which attempt to read the request
      * @param eventPublisher  The Application event publiser
