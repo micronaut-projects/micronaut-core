@@ -27,11 +27,7 @@ class ElasticsearchHealthIndicatorSpec extends Specification {
         final CredentialsProvider credentialsProvider = new BasicCredentialsProvider()
         credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials("elastic", "changeme"))
 
-        ApplicationContext applicationContext = ApplicationContext.run(
-                'elasticsearch.uris':"http://${container.getHttpHostAddress()}",
-                'elasticsearch.defaultHeaders': 'one:two'
-
-        )
+        ApplicationContext applicationContext = ApplicationContext.run('elasticsearch.httpHosts':"http://${container.getHttpHostAddress()}")
 
         when:
         ElasticsearchHealthIndicator indicator = applicationContext.getBean(ElasticsearchHealthIndicator)
@@ -55,7 +51,7 @@ class ElasticsearchHealthIndicatorSpec extends Specification {
 
     void "test that ElasticsearchHealthIndicator is not created when the endpoints.health.elasticsearch.rest.high.level.enabled is set to false "() {
         ApplicationContext applicationContext = ApplicationContext.run(
-                'elasticsearch.uris':"http://localhost:9200",
+                'elasticsearch.httpHosts':"http://localhost:9200",
                 'endpoints.health.elasticsearch.rest.high.level.enabled': "false"
 
         )
