@@ -1,4 +1,4 @@
-Now that you have gathered an understanding of the workings of the lower level HTTP client, it is time to take a look at Micronaut's support for declarative clients via the api:http.client.Client[] annotation.
+Now that you have gathered an understanding of the workings of the lower level HTTP client, it is time to take a look at Micronaut's support for declarative clients via the api:http.client.annotation.Client[] annotation.
 
 Essentially, the `@Client` annotation can be declared on any interface or abstract class and through the use of <<introductionAdvice, Introduction Advice>> the abstract methods will be implemented for you at compile time, greatly simplifying the creation of HTTP clients.
 
@@ -51,7 +51,7 @@ include::{testsclient}/annotation/PetClient.java[tags=imports, indent=0]
 include::{testsclient}/annotation/PetClient.java[tags=class, indent=0]
 ----
 
-<1> The api:http.client.Client[] annotation is used with a value relative to the current server. In this case `/pets`
+<1> The api:http.client.annotation.Client[] annotation is used with a value relative to the current server. In this case `/pets`
 <2> The interface extends from `PetOperations`
 <3> The `save` method is overridden. See warning below.
 
