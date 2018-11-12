@@ -18,22 +18,3 @@ To start using GraalVM you should first install the GraalVM SDK via the https://
 
 WARNING: As of this writing, GraalVM is currently only available for Linux and Mac OS X systems.
 
-To compile Micronaut and Graal applications you need to make the substrate VM dependency available to your application. The easiest way to make it available is via Docker:
-
-.Using Docker to Obtain the SVM Dependency
-[source,bash]
-----
-docker run oracle/graalvm-ce:1.0.0-rc8 cat /usr/java/latest/jre/lib/svm/builder/svm.jar > svm.jar
-----
-
-Once you have obtained the `svm.jar` from the latest Graal Docker images you can install it into your local Maven cache:
-
-.Installing the SVM Dependency Locally
-[source,bash]
-----
-$ mvn install:install-file -Dfile=svm.jar \
-                           -DgroupId=com.oracle.substratevm \
-                           -DartifactId=svm \
-                           -Dversion=GraalVM-1.0.0-rc8 \
-                           -Dpackaging=jar
-----
