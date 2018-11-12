@@ -70,27 +70,31 @@ $ curl http://localhost:8080/flyway
 [{
     "name": "default",
     "migrations": [{
-        "type": "SQL",
         "checksum": 1952043475,
-        "version": "1",
-        "description": "init",
-        "script": "V1__init.sql",
-        "state": "SUCCESS",
-        "installedBy": "root",
-        "installedOn": "2018-11-06T14:24:49Z",
+        "installedOn": "2018-11-12T11:32:52.000+0000",
+        "executionTime": 96,
         "installedRank": 1,
-        "executionTime": 63
-    }, {
-        "type": "SQL",
-        "checksum": -1926058189,
-        "version": "2",
-        "description": "testdata",
-        "script": "V2__testdata.sql",
-        "state": "SUCCESS",
+        "version": {
+            "version": "1"
+        },
+        "description": "init",
         "installedBy": "root",
-        "installedOn": "2018-11-06T14:24:49Z",
+        "state": "SUCCESS",
+        "type": "SQL",
+        "script": "V1__init.sql"
+    }, {
+        "checksum": -1926058189,
+        "installedOn": "2018-11-12T11:32:52.000+0000",
+        "executionTime": 10,
         "installedRank": 2,
-        "executionTime": 7
+        "version": {
+            "version": "2"
+        },
+        "description": "testdata",
+        "installedBy": "root",
+        "state": "SUCCESS",
+        "type": "SQL",
+        "script": "V2__testdata.sql"
     }]
 }]
 ----
