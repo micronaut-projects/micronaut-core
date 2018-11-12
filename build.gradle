@@ -140,7 +140,7 @@ ext {
                           'netty-codec-redis', 'netty-codec-smtp', 'netty-codec-socks', 'netty-codec-stomp', 
                           'netty-codec-xml', 'netty-common', 'netty-dev-tools', 'netty-handler', 
                           'netty-handler-proxy', 'netty-resolver', 'netty-resolver-dns', 'netty-transport', 
-                          'netty-transport-rxtx', 'netty-transport-sctp', 'netty-transport-udt', 'netty-example']
+                          'netty-transport-rxtx', 'netty-transport-sctp', 'netty-transport-udt']
             ],
             opentracing: [
                 version: '0.31.0',
@@ -354,10 +354,12 @@ subprojects { Project subproject ->
         targetCompatibility = '1.8'
         compileJava.options.compilerArgs.add '-parameters'
         compileTestJava.options.compilerArgs.add '-parameters'
+        
         if(
             !subproject.name.startsWith('test-') && 
             !subproject.toString().contains('build-projects')
         ) {
+            
             apply from:"${rootProject.rootDir}/gradle/publishing.gradle"
             apply plugin: 'checkstyle'
             
