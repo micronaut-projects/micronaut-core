@@ -1,5 +1,9 @@
 apply plugin:"java"
 
+ext {
+    bomExclude = true
+}
+
 dependencies {
     compile project(":inject")
     compile "org.codehaus.groovy:groovy:$groovyVersion"
