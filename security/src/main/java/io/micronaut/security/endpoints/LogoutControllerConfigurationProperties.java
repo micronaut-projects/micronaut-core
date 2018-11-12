@@ -19,12 +19,7 @@ package io.micronaut.security.endpoints;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpMethod;
 import io.micronaut.security.config.SecurityConfigurationProperties;
-
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 /**
  * Implementation of {@link LogoutControllerConfiguration} used to configure the {@link LogoutController}.
@@ -50,37 +45,14 @@ public class LogoutControllerConfigurationProperties implements LogoutController
     public static final String DEFAULT_PATH = "/logout";
 
     /**
-     * Default Allowed Http Method.
+     * Default Get Allowed.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final HttpMethod DEFAULT_HTTPMETHOD = HttpMethod.POST;
-
-    private static final List<HttpMethod> SUPPORTED_ALLOWEDMETHODS = new ArrayList<HttpMethod>() {{
-        add(HttpMethod.GET);
-        add(HttpMethod.POST);
-    }};
+    public static final boolean DEFAULT_GETALLOWED = false;
 
     private boolean enabled = DEFAULT_ENABLED;
     private String path = DEFAULT_PATH;
-    private List<HttpMethod> allowedMethods = Collections.singletonList(DEFAULT_HTTPMETHOD);
-
-    @Override
-    public List<HttpMethod> getAllowedMethods() {
-        return allowedMethods;
-    }
-
-    /**
-     * Allowed HTTP Methods for {@link io.micronaut.security.endpoints.LogoutController}. Default value [POST]. Only GET or POST are valid values.
-     * @param allowedMethods a List of Allowed methods. Only GET or POST are valid values.
-     */
-    public void setAllowedMethods(List<HttpMethod> allowedMethods) {
-        if (allowedMethods.stream().anyMatch(method -> !SUPPORTED_ALLOWEDMETHODS.contains(method))) {
-            String supportedMethodsCsv = SUPPORTED_ALLOWEDMETHODS.stream().map(HttpMethod::toString).reduce((a, b) -> a + ", " + b).get();
-            String allowedMethodsCsv = allowedMethods.stream().map(HttpMethod::toString).reduce((a, b) -> a + ", " + b).get();
-            throw new IllegalArgumentException(supportedMethodsCsv + " are the only values supported for " + LogoutControllerConfigurationProperties.PREFIX + ".allowed-methods, you supplied: " + allowedMethodsCsv);
-        }
-        this.allowedMethods = allowedMethods;
-    }
+    private boolean getAllowed = DEFAULT_GETALLOWED;
 
     /**
      * @return true if you want to enable the {@link LogoutController}
@@ -110,5 +82,21 @@ public class LogoutControllerConfigurationProperties implements LogoutController
      */
     public void setPath(String path) {
         this.path = path;
+    }
+
+    /**
+     * @return true if you want to support HTTP GET invocations in the {@link LogoutController}.
+     */
+    @Override
+    public boolean isGetAllowed() {
+        return this.getAllowed;
+    }
+
+    /**
+    *  Enables HTTP GET invocations of {@link io.micronaut.security.endpoints.LogoutController}. Default value ({@value #DEFAULT_GETALLOWED}).
+     * @param getAllowed Whether Http GET should be supported.
+    */
+    public void setGetAllowed(boolean getAllowed) {
+        this.getAllowed = getAllowed;
     }
 }
