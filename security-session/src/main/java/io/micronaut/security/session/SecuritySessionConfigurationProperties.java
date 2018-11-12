@@ -19,6 +19,8 @@ package io.micronaut.security.session;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.security.config.SecurityConfigurationProperties;
+import io.micronaut.security.handlers.ForbiddenRejectionUriProvider;
+import io.micronaut.security.handlers.UnauthorizedRejectionUriProvider;
 
 /**
  * Implementation of {@link SecuritySessionConfiguration}. Session-based Authentication configuration properties.
@@ -26,7 +28,9 @@ import io.micronaut.security.config.SecurityConfigurationProperties;
  * @since 1.0
  */
 @ConfigurationProperties(SecuritySessionConfigurationProperties.PREFIX)
-public class SecuritySessionConfigurationProperties implements SecuritySessionConfiguration {
+public class SecuritySessionConfigurationProperties implements SecuritySessionConfiguration,
+        UnauthorizedRejectionUriProvider,
+        ForbiddenRejectionUriProvider {
     public static final String PREFIX = SecurityConfigurationProperties.PREFIX + ".session";
 
     /**
@@ -152,5 +156,15 @@ public class SecuritySessionConfigurationProperties implements SecuritySessionCo
      */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    @Override
+    public String unthorizedRedirectUri() {
+        return this.unauthorizedTargetUrl;
+    }
+
+    @Override
+    public String forbiddenRedirectUri() {
+        return this.forbiddenTargetUrl;
     }
 }

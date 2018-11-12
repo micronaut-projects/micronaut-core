@@ -24,6 +24,8 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.cookie.Cookie
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.security.handlers.RedirectRejectionHandler
+import io.micronaut.security.handlers.RejectionHandler
 import io.micronaut.testutils.YamlAsciidocTagCleaner
 import org.yaml.snakeyaml.Yaml
 import spock.lang.AutoCleanup
@@ -199,5 +201,14 @@ micronaut:
         rsp.status().code == 200
         rsp.body()
         rsp.body().contains('sherlock')
+    }
+
+    def "verifies default RejectionHandler is now RedirectRejectionHandler"() {
+        when:
+        RejectionHandler rejectionHandler = context.getBean(RejectionHandler)
+
+        then:
+        noExceptionThrown()
+        rejectionHandler instanceof RedirectRejectionHandler
     }
 }
