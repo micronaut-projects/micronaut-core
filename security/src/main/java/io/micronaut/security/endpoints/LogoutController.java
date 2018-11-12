@@ -19,7 +19,6 @@ package io.micronaut.security.endpoints;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -33,10 +32,9 @@ import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.event.LogoutEvent;
 import io.micronaut.security.handlers.LogoutHandler;
 import io.micronaut.security.rules.SecurityRule;
+
 import javax.annotation.Nullable;
 import javax.inject.Inject;
-import java.util.Collections;
-import java.util.List;
 
 /**
  *
@@ -50,7 +48,7 @@ public class LogoutController {
 
     private final LogoutHandler logoutHandler;
     private final ApplicationEventPublisher eventPublisher;
-    private final List<HttpMethod> allowedMethods;
+    private final boolean getAllowed;
 
     /**
      *
@@ -64,7 +62,7 @@ public class LogoutController {
                             LogoutControllerConfiguration logoutControllerConfiguration) {
         this.logoutHandler = logoutHandler;
         this.eventPublisher = eventPublisher;
-        this.allowedMethods = logoutControllerConfiguration.getAllowedMethods();
+        this.getAllowed = logoutControllerConfiguration.isGetAllowed();
     }
 
     /**
@@ -77,7 +75,7 @@ public class LogoutController {
                             ApplicationEventPublisher eventPublisher) {
         this.logoutHandler = logoutHandler;
         this.eventPublisher = eventPublisher;
-        this.allowedMethods = Collections.singletonList(LogoutControllerConfigurationProperties.DEFAULT_HTTPMETHOD);
+        this.getAllowed = LogoutControllerConfigurationProperties.DEFAULT_GETALLOWED;
     }
 
     /**
@@ -90,9 +88,6 @@ public class LogoutController {
     @Consumes({MediaType.APPLICATION_FORM_URLENCODED, MediaType.APPLICATION_JSON})
     @Post
     public HttpResponse index(HttpRequest<?> request, Authentication authentication) {
-        if (!allowedMethods.contains(request.getMethod())) {
-            return HttpResponse.status(HttpStatus.METHOD_NOT_ALLOWED);
-        }
         return handleLogout(request, authentication);
     }
 
@@ -105,7 +100,7 @@ public class LogoutController {
      */
     @Get
     public HttpResponse indexGet(HttpRequest<?> request, Authentication authentication) {
-        if (!allowedMethods.contains(request.getMethod())) {
+        if (!getAllowed) {
            return HttpResponse.status(HttpStatus.METHOD_NOT_ALLOWED);
         }
 

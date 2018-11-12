@@ -64,11 +64,11 @@ class LogoutControllerAllowedMethodsSpec extends Specification {
         embeddedServer.close()
     }
 
-    void "LogoutController can accept GET requests if micronaut.security.endpoints.logout.allowedMethods includes GET"() {
+    void "LogoutController can accept GET requests if micronaut.security.endpoints.logout.get-allowed=true"() {
         given:
         Map<String, Object> m = new HashMap<>()
         m.putAll(config)
-        m.put('micronaut.security.endpoints.logout.allowedMethods', [HttpMethod.GET, HttpMethod.POST])
+        m.put('micronaut.security.endpoints.logout.get-allowed', true)
 
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, m, Environment.TEST)
         RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
@@ -81,24 +81,6 @@ class LogoutControllerAllowedMethodsSpec extends Specification {
 
         cleanup:
         client.close()
-        embeddedServer.close()
-    }
-
-    void "allowedMethods allows only GET and POST"() {
-        given:
-        Map<String, Object> m = new HashMap<>()
-        m.putAll(config)
-        m.put('micronaut.security.endpoints.logout.allowedMethods', [HttpMethod.GET, HttpMethod.PUT])
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, m, Environment.TEST)
-
-        when:
-        embeddedServer.applicationContext.getBean(LogoutControllerConfiguration)
-
-        then:
-        BeanInstantiationException e = thrown()
-        e.message.contains('GET, POST are the only values supported for micronaut.security.endpoints.logout.allowed-methods, you supplied: GET, PUT')
-
-        cleanup:
         embeddedServer.close()
     }
 
