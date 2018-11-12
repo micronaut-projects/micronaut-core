@@ -40,7 +40,7 @@ import javax.inject.Singleton;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Date;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -56,27 +56,37 @@ public class JwtTokenValidator implements TokenValidator {
 
     protected final List<SignatureConfiguration> signatureConfigurations = new ArrayList<>();
     protected final List<EncryptionConfiguration> encryptionConfigurations = new ArrayList<>();
+    protected final List<JwtClaimsValidator> jwtClaimsValidators = new ArrayList<>();
 
     /**
+     * Constructor.
      *
      * @param signatureConfigurations List of Signature configurations which are used to attempt validation.
      * @param encryptionConfigurations List of Encryption configurations which are used to attempt validation.
+     * @param jwtClaimsValidators JWT Claims validators.
      */
     public JwtTokenValidator(Collection<SignatureConfiguration> signatureConfigurations,
-                             Collection<EncryptionConfiguration> encryptionConfigurations) {
+                             Collection<EncryptionConfiguration> encryptionConfigurations,
+                             Collection<JwtClaimsValidator> jwtClaimsValidators) {
         this.signatureConfigurations.addAll(signatureConfigurations);
         this.encryptionConfigurations.addAll(encryptionConfigurations);
+        this.jwtClaimsValidators.addAll(jwtClaimsValidators);
     }
 
-    private boolean validateExpirationTime(JWTClaimsSet claimSet) {
-        final Date expTime = claimSet.getExpirationTime();
-        if (expTime != null) {
-            final Date now = new Date();
-            if (expTime.before(now)) {
-                return false;
-            }
-        }
-        return true;
+    /**
+     *
+     * Deprecated Constructor.
+     *
+     * Use instead new JwtTokenValidator(signatureConfigurations, encryptionConfigurations, Collections.singleton(new ExpirationJwtClaimsValidator())))
+     * @param signatureConfigurations List of Signature configurations which are used to attempt validation.
+     * @param encryptionConfigurations List of Encryption configurations which are used to attempt validation.
+     */
+    @Deprecated
+    public JwtTokenValidator(Collection<SignatureConfiguration> signatureConfigurations,
+                             Collection<EncryptionConfiguration> encryptionConfigurations) {
+        this(signatureConfigurations,
+                encryptionConfigurations,
+                Collections.singleton(new ExpirationJwtClaimsValidator()));
     }
 
     /**
@@ -93,6 +103,12 @@ public class JwtTokenValidator implements TokenValidator {
         } else {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("A non-signed JWT cannot be accepted as signature configurations have been defined");
+            }
+            return Flowable.empty();
+        }
+        if (!verifyClaims(jwt.getJWTClaimsSet())) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("JWT Claims verification failed: {}", jwt.getJWTClaimsSet().toString());
             }
             return Flowable.empty();
         }
@@ -120,10 +136,17 @@ public class JwtTokenValidator implements TokenValidator {
                 }
                 try {
                     if (config.verify(signedJWT)) {
-                        return createAuthentication(signedJWT);
+                        if (verifyClaims(signedJWT.getJWTClaimsSet())) {
+                            return createAuthentication(signedJWT);
+                        } else {
+                            if (LOG.isDebugEnabled()) {
+                                LOG.debug("JWT Claims verification failed: {}", signedJWT.getJWTClaimsSet().toString());
+                            }
+                        }
+
                     } else {
                         if (LOG.isDebugEnabled()) {
-                            LOG.debug("JWT verification failed: {}", signedJWT.getParsedString());
+                            LOG.debug("JWT Signature verification failed: {}", signedJWT.getParsedString());
                         }
                     }
                 } catch (final JOSEException e) {
@@ -141,6 +164,16 @@ public class JwtTokenValidator implements TokenValidator {
             LOG.debug("No signature algorithm found for JWT: {}", signedJWT.getParsedString());
         }
         return Flowable.empty();
+    }
+
+    /**
+     *
+     * @param jwtClaimsSet JWT Claims.
+     * @return Whether the JWT claims pass every validation.
+     */
+    protected boolean verifyClaims(JWTClaimsSet jwtClaimsSet) {
+        return this.jwtClaimsValidators.stream()
+                .allMatch(jwtClaimsValidator -> jwtClaimsValidator.validate(jwtClaimsSet));
     }
 
     /**
@@ -205,7 +238,7 @@ public class JwtTokenValidator implements TokenValidator {
 
             } else if (jwt instanceof EncryptedJWT) {
                 final EncryptedJWT encryptedJWT = (EncryptedJWT) jwt;
-                return validateEncryptedJWT(jwt, encryptedJWT, token);
+                return validateEncryptedJWT(encryptedJWT, token);
 
             } else if (jwt instanceof SignedJWT) {
                 final SignedJWT signedJWT = (SignedJWT) jwt;
@@ -230,19 +263,6 @@ public class JwtTokenValidator implements TokenValidator {
      */
     protected Publisher<Authentication> createAuthentication(final JWT jwt) throws ParseException {
         final JWTClaimsSet claimSet = jwt.getJWTClaimsSet();
-        final String subject = claimSet.getSubject();
-        if (subject == null) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("JWT must contain a subject ('sub' claim)");
-            }
-            return Flowable.empty();
-        }
-        if (!validateExpirationTime(jwt.getJWTClaimsSet())) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("JWT expired");
-            }
-            return Flowable.empty();
-        }
         return Flowable.just(new AuthenticationJWTClaimsSetAdapter(claimSet));
     }
 }
