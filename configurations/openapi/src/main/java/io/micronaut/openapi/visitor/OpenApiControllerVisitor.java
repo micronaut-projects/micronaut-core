@@ -162,7 +162,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 }
 
                 ClassElement returnType = element.getReturnType();
-                if (returnType.isAssignable(HttpResponse.class)) {
+                if (isResponseType(returnType)) {
                     returnType = returnType.getFirstTypeArgument().orElse(returnType);
                 }
                 if (returnType != null) {
@@ -352,6 +352,10 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 }
             }
         });
+    }
+
+    private boolean isResponseType(ClassElement returnType) {
+        return returnType.isAssignable(HttpResponse.class) || returnType.isAssignable("org.springframework.http.HttpEntity");
     }
 
     private void setOperationOnPathItem(PathItem pathItem, io.swagger.v3.oas.models.Operation swaggerOperation, HttpMethod httpMethod) {
