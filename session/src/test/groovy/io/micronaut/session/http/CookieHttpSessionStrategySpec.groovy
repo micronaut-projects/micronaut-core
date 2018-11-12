@@ -81,12 +81,12 @@ class CookieHttpSessionStrategySpec extends Specification {
 
         where:
         id     | prefix | path   | domain        | encoded             | expired | secure | expected
-        "1234" | null   | null   | null          | encode(id)          | false   | false  | "SESSION=$encoded; HTTPOnly"
-        "1234" | "foo-" | null   | null          | encode(prefix + id) | false   | false  | "SESSION=$encoded; HTTPOnly"
+        "1234" | null   | null   | null          | encode(id)          | false   | false  | "SESSION=$encoded; Path=/; HTTPOnly"
+        "1234" | "foo-" | null   | null          | encode(prefix + id) | false   | false  | "SESSION=$encoded; Path=/; HTTPOnly"
         "1234" | null   | "/foo" | null          | encode(id)          | false   | false  | "SESSION=$encoded; Path=/foo; HTTPOnly"
-        "1234" | null   | null   | "example.com" | encode(id)          | false   | false  | "SESSION=$encoded; Domain=example.com; HTTPOnly"
-        "1234" | null   | null   | null          | encode(id)          | true    | false  | ~/SESSION=; Max-Age=0; Expires=.*; HTTPOnly/
-        "1234" | null   | null   | null          | encode(id)          | false   | true   | "SESSION=$encoded; Secure; HTTPOnly"
+        "1234" | null   | null   | "example.com" | encode(id)          | false   | false  | "SESSION=$encoded; Path=/; Domain=example.com; HTTPOnly"
+        "1234" | null   | null   | null          | encode(id)          | true    | false  | ~/SESSION=; Max-Age=0; Expires=.*; Path=\/; HTTPOnly/
+        "1234" | null   | null   | null          | encode(id)          | false   | true   | "SESSION=$encoded; Path=/; Secure; HTTPOnly"
 
     }
 
