@@ -7,6 +7,7 @@ dependencies {
 
     compile dependencyVersion("elasticsearch.rest.high.level.client")
 
+    testCompileOnly project(":inject-groovy")
     testCompile "org.testcontainers:spock:1.10.1"
     testCompile "org.testcontainers:elasticsearch:1.10.1"
     testCompile project(":management")
