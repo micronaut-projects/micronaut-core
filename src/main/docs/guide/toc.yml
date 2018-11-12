@@ -265,6 +265,7 @@ security:
       title: LDAP Authentication
       configuration: Configuration
       extending: Extending Default Behavior
+  rejection: Rejection Handling
   tokenPropagation: Token Propagation
   endpoints:
     title: Built-In Security Controllers

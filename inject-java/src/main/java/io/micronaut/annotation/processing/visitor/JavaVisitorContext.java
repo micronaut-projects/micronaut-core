@@ -25,6 +25,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
 
+import javax.annotation.Nullable;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.Element;
@@ -77,11 +78,8 @@ public class JavaVisitorContext extends MutableConvertibleValuesMap<Object> impl
     }
 
     @Override
-    public void info(String message, io.micronaut.inject.ast.Element element) {
-        if (StringUtils.isNotEmpty(message)) {
-            Element el = (Element) element.getNativeType();
-            messager.printMessage(Diagnostic.Kind.NOTE, message, el);
-        }
+    public void info(String message, @Nullable io.micronaut.inject.ast.Element element) {
+        printMessage(message, Diagnostic.Kind.NOTE, element);
     }
 
     @Override
@@ -92,15 +90,24 @@ public class JavaVisitorContext extends MutableConvertibleValuesMap<Object> impl
     }
 
     @Override
-    public void fail(String message, io.micronaut.inject.ast.Element element) {
-        Element el = (Element) element.getNativeType();
-        messager.printMessage(Diagnostic.Kind.ERROR, message, el);
+    public void fail(String message, @Nullable io.micronaut.inject.ast.Element element) {
+        printMessage(message, Diagnostic.Kind.ERROR, element);
     }
 
     @Override
-    public void warn(String message, io.micronaut.inject.ast.Element element) {
-        Element el = (Element) element.getNativeType();
-        messager.printMessage(Diagnostic.Kind.WARNING, message, el);
+    public void warn(String message, @Nullable io.micronaut.inject.ast.Element element) {
+        printMessage(message, Diagnostic.Kind.WARNING, element);
+    }
+
+    private void printMessage(String message, Diagnostic.Kind kind, @Nullable io.micronaut.inject.ast.Element element) {
+        if (StringUtils.isNotEmpty(message)) {
+            if (element != null) {
+                Element el = (Element) element.getNativeType();
+                messager.printMessage(kind, message, el);
+            } else {
+                messager.printMessage(kind, message);
+            }
+        }
     }
 
     @Override

@@ -140,7 +140,11 @@ public class JavaConfigurationMetadataBuilder extends ConfigurationMetadataBuild
             String prefix = annotationMetadata.getValue(ConfigurationReader.class, "prefix", String.class)
                 .orElse(null);
             if (StringUtils.isNotEmpty(prefix)) {
-                return prefix + "." + path;
+                if (StringUtils.isEmpty(path)) {
+                    return prefix;
+                } else {
+                    return prefix + "." + path;
+                }
             } else {
                 return path;
             }

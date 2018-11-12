@@ -20,6 +20,7 @@ import io.micronaut.cache.annotation.Cacheable;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.CompositeDiscoveryClient;
 import io.micronaut.discovery.DefaultCompositeDiscoveryClient;
 import io.micronaut.discovery.DiscoveryClient;
@@ -36,7 +37,7 @@ import java.util.List;
  * @since 1.0
  */
 @Primary
-@Requires(property = DiscoveryClientCacheConfiguration.SETTING_ENABLED, notEquals = "false")
+@Requires(property = DiscoveryClientCacheConfiguration.SETTING_ENABLED, notEquals = StringUtils.FALSE)
 @Replaces(DefaultCompositeDiscoveryClient.class)
 public class CachingCompositeDiscoveryClient extends CompositeDiscoveryClient {
 

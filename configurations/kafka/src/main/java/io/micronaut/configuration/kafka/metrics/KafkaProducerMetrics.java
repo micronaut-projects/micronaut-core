@@ -27,6 +27,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.StringUtils;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.MetricName;
 import org.apache.kafka.common.metrics.KafkaMetric;
@@ -48,7 +49,7 @@ import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory
  * @since 1.0
  */
 @RequiresMetrics
-@Requires(property = MICRONAUT_METRICS_BINDERS + ".kafka.enabled", value = "true", defaultValue = "true")
+@Requires(property = MICRONAUT_METRICS_BINDERS + ".kafka.enabled", value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 @Context
 public class KafkaProducerMetrics implements BeanCreatedEventListener<AbstractKafkaConsumerConfiguration>, MeterBinder, Closeable {
 

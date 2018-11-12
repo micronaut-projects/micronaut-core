@@ -17,6 +17,7 @@
 package io.micronaut.management.health.indicator.diskspace;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.indicator.AbstractHealthIndicator;
@@ -35,7 +36,7 @@ import java.util.Map;
  * @since 1.0
  */
 @Singleton
-@Requires(property = HealthEndpoint.PREFIX + ".disk-space.enabled", notEquals = "false")
+@Requires(property = HealthEndpoint.PREFIX + ".disk-space.enabled", notEquals = StringUtils.FALSE)
 @Requires(beans = HealthEndpoint.class)
 public class DiskSpaceIndicator extends AbstractHealthIndicator<Map<String, Object>> {
 

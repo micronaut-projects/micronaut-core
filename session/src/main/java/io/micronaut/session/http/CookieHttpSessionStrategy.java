@@ -17,6 +17,7 @@
 package io.micronaut.session.http;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.cookie.Cookie;
@@ -37,7 +38,7 @@ import java.util.Map;
  * @since 1.0
  */
 @Singleton
-@Requires(property = SessionSettings.HTTP_COOKIE_STRATEGY, notEquals = "false")
+@Requires(property = SessionSettings.HTTP_COOKIE_STRATEGY, notEquals = StringUtils.FALSE)
 public class CookieHttpSessionStrategy implements HttpSessionIdStrategy {
 
     private final boolean base64Decode;

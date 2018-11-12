@@ -20,4 +20,7 @@
  * @author Graeme Rocher
  * @since 1.0
  */
+@Internal
 package io.micronaut.ast.groovy.visitor;
+
+import io.micronaut.core.annotation.Internal;

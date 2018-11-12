@@ -48,7 +48,7 @@ public class RouteValidationVisitor implements TypeElementVisitor<Object, HttpMe
         protected boolean resolveReplacement(StringBuilder builder, String str, String expr) {
             builder.append("tmp");
             return true;
-        };
+        }
     };
 
     @Override

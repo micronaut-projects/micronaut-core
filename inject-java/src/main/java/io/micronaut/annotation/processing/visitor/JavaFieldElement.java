@@ -21,6 +21,8 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 
 import javax.annotation.Nullable;
+import javax.lang.model.element.Element;
+import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 
@@ -51,5 +53,18 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
     public ClassElement getType() {
         TypeMirror returnType = variableElement.asType();
         return mirrorToClassElement(returnType, visitorContext);
+    }
+
+    @Override
+    public ClassElement getDeclaringType() {
+        final Element enclosingElement = variableElement.getEnclosingElement();
+        if (!(enclosingElement instanceof TypeElement)) {
+            throw new IllegalStateException("Enclosing element should be a type element");
+        }
+        return new JavaClassElement(
+                (TypeElement) enclosingElement,
+                visitorContext.getAnnotationUtils().getAnnotationMetadata(enclosingElement),
+                visitorContext
+        );
     }
 }

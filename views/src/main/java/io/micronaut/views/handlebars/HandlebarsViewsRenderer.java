@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.views.ViewsConfiguration;
@@ -39,7 +40,7 @@ import javax.inject.Singleton;
  * @since 1.0
  */
 @Produces(MediaType.TEXT_HTML)
-@Requires(property = HandlebarsViewsRendererConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
+@Requires(property = HandlebarsViewsRendererConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 @Requires(classes = Handlebars.class)
 @Singleton
 public class HandlebarsViewsRenderer implements ViewsRenderer {

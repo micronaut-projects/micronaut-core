@@ -109,4 +109,16 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
                 new GroovyParameterElement(sourceUnit, parameter, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, new ExtendedParameter(methodNode, parameter)))
         ).toArray(ParameterElement[]::new);
     }
+
+    @Override
+    public ClassElement getDeclaringType() {
+        return new GroovyClassElement(
+                sourceUnit,
+                methodNode.getDeclaringClass(),
+                AstAnnotationUtils.getAnnotationMetadata(
+                        sourceUnit,
+                        methodNode.getDeclaringClass()
+                )
+        );
+    }
 }

@@ -99,7 +99,7 @@ native-image --class-path build/libs/hello-world-0.1-all.jar \ # <1>
 ----
 
 <1> The `class-path` argument is used to refer to the Micronaut shaded JAR
-<2> The `-H:ReflectionConfigurationFiles` points GraalVM to the `reflect.json` file needed to run the application
+<2> The `-H:ReflectionConfigurationFiles` option points GraalVM to the `reflect.json` file (or files) needed to run the application. Multiple comma-separated files can be specified.
 <3> Micronaut uses the JVM's default URL connection classes. The `-H:EnableURLProtocols` allows using them in GraalVM `nativeimage`.
 <4> The `-H:IncludeResources` argument specifies a regex to dictate which static resources should be included in the image.
 <5> The `-H:Name` argument specifies the name of the native image to be built

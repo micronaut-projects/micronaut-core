@@ -22,8 +22,9 @@
  */
 
 @Configuration
-@Requires(property = ViewsConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
+@Requires(property = ViewsConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 package io.micronaut.views;
 
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;

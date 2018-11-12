@@ -144,6 +144,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         this.loadBalancerResolver = loadBalancerResolver;
         this.transformers = transformers != null ? transformers : Collections.emptyList();
     }
+
     /**
      * Interceptor to apply headers, cookies, parameter and body arguements.
      *
@@ -597,7 +598,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         }
                     }
                     if (objectMapper == null) {
-                        objectMapper = new ObjectMapperFactory().objectMapper(Optional.empty(), Optional.empty());
+                        objectMapper = new ObjectMapperFactory().objectMapper(null, null);
                     }
 
                     SerializationFeature[] enabledSerializationFeatures = jacksonFeatures.get("enabledSerializationFeatures", SerializationFeature[].class).orElse(null);

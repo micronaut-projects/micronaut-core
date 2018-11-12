@@ -34,6 +34,8 @@ import org.codehaus.groovy.ast.ModuleNode;
 import org.codehaus.groovy.control.ErrorCollector;
 import org.codehaus.groovy.control.Janitor;
 import org.codehaus.groovy.control.SourceUnit;
+import org.codehaus.groovy.control.messages.Message;
+import org.codehaus.groovy.control.messages.SimpleMessage;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
@@ -99,10 +101,14 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     @Override
-    public void info(String message, Element element) {
-        ASTNode expr = (ASTNode) element.getNativeType();
-        final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
-        System.err.println("Note: " + message + "\n\n" + sample);
+    public void info(String message, @Nullable Element element) {
+        StringBuilder msg = new StringBuilder("Note: ").append(message);
+        if (element != null) {
+            ASTNode expr = (ASTNode) element.getNativeType();
+            final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
+            msg.append("\n\n").append(sample);
+        }
+        System.out.println(msg.toString());
     }
 
     @Override
@@ -111,15 +117,25 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     @Override
-    public void fail(String message, Element element) {
-        errorCollector.addError(buildErrorMessage(message, element));
+    public void fail(String message, @Nullable Element element) {
+        Message msg;
+        if (element != null) {
+            msg = buildErrorMessage(message, element);
+        } else {
+            msg = new SimpleMessage(message, sourceUnit);
+        }
+        errorCollector.addError(msg);
     }
 
     @Override
-    public void warn(String message, Element element) {
-        ASTNode expr = (ASTNode) element.getNativeType();
-        final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
-        System.err.println("WARNING: " + message + "\n\n" + sample);
+    public void warn(String message, @Nullable Element element) {
+        StringBuilder msg = new StringBuilder("WARNING: ").append(message);
+        if (element != null) {
+            ASTNode expr = (ASTNode) element.getNativeType();
+            final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
+            msg.append("\n\n").append(sample);
+        }
+        System.out.println(msg.toString());
 
     }
 

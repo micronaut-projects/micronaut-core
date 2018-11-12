@@ -12,6 +12,7 @@ dependencies {
     compileOnly dependencyModuleVersion("mongo", "mongo-java-driver")
     compileOnly "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.0.1"
 
+    testCompile project(":inject-groovy")
     testCompile "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.0.1"
     testCompile dependencyVersion("rxjava2")
     testCompile project(":management")

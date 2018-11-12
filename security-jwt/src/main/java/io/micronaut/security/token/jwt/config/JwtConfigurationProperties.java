@@ -18,6 +18,7 @@ package io.micronaut.security.token.jwt.config;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.security.token.config.TokenConfigurationProperties;
 
 /**
@@ -26,7 +27,7 @@ import io.micronaut.security.token.config.TokenConfigurationProperties;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(property = TokenConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
+@Requires(property = TokenConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 @ConfigurationProperties(JwtConfigurationProperties.PREFIX)
 public class JwtConfigurationProperties implements JwtConfiguration {
 

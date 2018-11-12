@@ -17,6 +17,7 @@
 package io.micronaut.management.health.monitor;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.CurrentHealthStatus;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.management.health.indicator.HealthIndicator;
@@ -45,7 +46,7 @@ import java.util.stream.Collectors;
 @Singleton
 @Requires(beans = EmbeddedServer.class)
 @Requires(property = ApplicationConfiguration.APPLICATION_NAME)
-@Requires(property = "micronaut.health.monitor.enabled", value = "true", defaultValue = "true")
+@Requires(property = "micronaut.health.monitor.enabled", value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 public class HealthMonitorTask {
 
     private static final Logger LOG = LoggerFactory.getLogger(HealthMonitorTask.class);

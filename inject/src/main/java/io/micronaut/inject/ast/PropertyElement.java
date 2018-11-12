@@ -24,7 +24,7 @@ import javax.annotation.Nullable;
  * @author graemerocher
  * @since 1.0
  */
-public interface PropertyElement extends TypedElement {
+public interface PropertyElement extends TypedElement, MemberElement {
     /**
      * @return The type of the property
      */

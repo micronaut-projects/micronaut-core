@@ -18,6 +18,7 @@ package io.micronaut.management.health.indicator.jdbc;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.aggregator.HealthAggregator;
@@ -50,7 +51,7 @@ import java.util.stream.Collectors;
  */
 @Singleton
 @Requires(beans = HealthEndpoint.class)
-@Requires(property = HealthEndpoint.PREFIX + ".jdbc.enabled", notEquals = "false")
+@Requires(property = HealthEndpoint.PREFIX + ".jdbc.enabled", notEquals = StringUtils.FALSE)
 public class JdbcIndicator implements HealthIndicator {
 
     private static final String NAME = "jdbc";

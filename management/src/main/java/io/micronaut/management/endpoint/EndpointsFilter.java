@@ -18,6 +18,7 @@ package io.micronaut.management.endpoint;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -42,7 +43,7 @@ import static io.micronaut.management.endpoint.EndpointDefaultConfiguration.PATH
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(property = "micronaut.security.enabled", notEquals = "true")
+@Requires(property = "micronaut.security.enabled", notEquals = StringUtils.TRUE)
 @Filter("${" + PATH + ":/}**")
 public class EndpointsFilter extends OncePerRequestHttpServerFilter {
 

@@ -17,6 +17,7 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.EnumElement;
 
 import javax.lang.model.element.ElementKind;
@@ -32,6 +33,7 @@ import java.util.stream.Collectors;
  * @author graemerocher
  * @since 1.0
  */
+@Internal
 class JavaEnumElement extends JavaClassElement implements EnumElement {
     /**
      * @param classElement       The {@link TypeElement}
@@ -39,7 +41,7 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
      * @param visitorContext The visitor context
      * @param typeArguments The type arguments
      */
-    public JavaEnumElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext, List<? extends TypeMirror> typeArguments) {
+    JavaEnumElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext, List<? extends TypeMirror> typeArguments) {
         super(classElement, annotationMetadata, visitorContext, typeArguments);
     }
 

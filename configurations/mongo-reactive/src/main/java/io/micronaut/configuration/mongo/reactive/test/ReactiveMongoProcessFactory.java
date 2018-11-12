@@ -26,6 +26,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.util.StringUtils;
 
 import javax.annotation.PreDestroy;
 import javax.inject.Singleton;
@@ -42,7 +43,7 @@ import java.util.Optional;
 @Requires(classes = MongodProcess.class)
 @Requires(beans = DefaultReactiveMongoConfiguration.class)
 @Requires(env = Environment.TEST)
-@Requires(property = MongoSettings.EMBEDDED, notEquals = "false", defaultValue = "true")
+@Requires(property = MongoSettings.EMBEDDED, notEquals = StringUtils.FALSE, defaultValue = StringUtils.TRUE)
 @Singleton
 public class ReactiveMongoProcessFactory extends AbstractMongoProcessFactory implements BeanCreatedEventListener<DefaultReactiveMongoConfiguration>, Closeable {
 

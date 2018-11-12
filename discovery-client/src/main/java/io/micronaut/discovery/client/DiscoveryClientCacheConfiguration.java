@@ -21,6 +21,7 @@ import static io.micronaut.discovery.client.DiscoveryClientCacheConfiguration.CA
 import io.micronaut.cache.CacheConfiguration;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.runtime.ApplicationConfiguration;
 
@@ -35,7 +36,7 @@ import java.time.Duration;
  */
 @Named(CACHE_NAME)
 @ConfigurationProperties(CACHE_NAME)
-@Requires(property = DiscoveryClientCacheConfiguration.SETTING_ENABLED, notEquals = "false")
+@Requires(property = DiscoveryClientCacheConfiguration.SETTING_ENABLED, notEquals = StringUtils.FALSE)
 public class DiscoveryClientCacheConfiguration extends CacheConfiguration implements Toggleable {
 
     /**
