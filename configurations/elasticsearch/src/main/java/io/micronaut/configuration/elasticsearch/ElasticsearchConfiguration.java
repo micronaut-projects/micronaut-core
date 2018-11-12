@@ -18,6 +18,7 @@ package io.micronaut.configuration.elasticsearch;
 
 import org.apache.http.Header;
 import org.apache.http.HttpHost;
+import org.apache.http.client.config.RequestConfig;
 import org.elasticsearch.client.NodeSelector;
 
 /**
@@ -58,5 +59,11 @@ public interface ElasticsearchConfiguration {
      * @return The {@link NodeSelector} to be used.
      */
     NodeSelector getNodeSelector();
+
+    /**
+     *
+     * @return The builder to create default request configurations.
+     */
+    RequestConfig.Builder getRequestConfigBuilder();
 
 }

@@ -45,12 +45,14 @@ public class ElasticsearchConfigurationProperties implements ElasticsearchConfig
      * The HTTP client configurations.
      */
     @ConfigurationBuilder(configurationPrefix = "http.client", factoryMethod = "create")
+    @SuppressWarnings("WeakerAccess")
     protected HttpAsyncClientBuilder httpAsyncClientBuilder;
 
     /**
      * The default request configurations.
      */
     @ConfigurationBuilder(configurationPrefix = "request.default")
+    @SuppressWarnings("WeakerAccess")
     protected RequestConfig.Builder requestConfigBuilder = RequestConfig.custom();
 
     private int maxRetryTimeoutMillis;
@@ -76,6 +78,11 @@ public class ElasticsearchConfigurationProperties implements ElasticsearchConfig
     @Override
     public NodeSelector getNodeSelector() {
         return this.nodeSelector;
+    }
+
+    @Override
+    public RequestConfig.Builder getRequestConfigBuilder() {
+        return this.requestConfigBuilder;
     }
 
     /**
