@@ -1,6 +1,7 @@
 package io.micronaut.configuration.elasticsearch.health
 
 import groovy.json.JsonSlurper
+import io.micronaut.configuration.elasticsearch.ElasticsearchConfigurationProperties
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.health.HealthStatus
@@ -27,7 +28,10 @@ class ElasticsearchHealthIndicatorSpec extends Specification {
         final CredentialsProvider credentialsProvider = new BasicCredentialsProvider()
         credentialsProvider.setCredentials(AuthScope.ANY, new UsernamePasswordCredentials("elastic", "changeme"))
 
-        ApplicationContext applicationContext = ApplicationContext.run('elasticsearch.httpHosts':"http://${container.getHttpHostAddress()}")
+        ApplicationContext applicationContext = ApplicationContext.run('elasticsearch.httpHosts': "http://${container.getHttpHostAddress()}")
+
+        expect:
+        applicationContext.containsBean(ElasticsearchConfigurationProperties)
 
         when:
         ElasticsearchHealthIndicator indicator = applicationContext.getBean(ElasticsearchHealthIndicator)
@@ -35,7 +39,7 @@ class ElasticsearchHealthIndicatorSpec extends Specification {
 
         then:
         result.status == HealthStatus.UP
-        new JsonSlurper().parseText((String)result.details).status == "green"
+        new JsonSlurper().parseText((String) result.details).status == "green"
 
         when:
         container.stop()
@@ -51,7 +55,7 @@ class ElasticsearchHealthIndicatorSpec extends Specification {
 
     void "test that ElasticsearchHealthIndicator is not created when the endpoints.health.elasticsearch.rest.high.level.enabled is set to false "() {
         ApplicationContext applicationContext = ApplicationContext.run(
-                'elasticsearch.httpHosts':"http://localhost:9200",
+                'elasticsearch.httpHosts': "http://localhost:9200",
                 'endpoints.health.elasticsearch.rest.high.level.enabled': "false"
 
         )
