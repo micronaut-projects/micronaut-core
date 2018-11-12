@@ -1,6 +1,6 @@
 ==== Obtaining a HttpClient
 
-There are a few ways by which you can obtain a reference to a api:http.client.HttpClient[]. The most common way is using the api:http.client.Client[] annotation. For example:
+There are a few ways by which you can obtain a reference to a api:http.client.HttpClient[]. The most common way is using the api:http.client.annotation.Client[] annotation. For example:
 
 .Injecting an HTTP client
 [source,java]
@@ -17,9 +17,9 @@ The above example will inject a client that targets the Twitter API.
 
 The above Kotlin example will inject a client that targets the Twitter API using a configuration path. Note the required escaping (backslash) on `"\${path.to.config}"` which is required due to Kotlin string interpolation.
 
-The api:http.client.Client[] annotation is also a custom scope that will manage the creation of api:http.client.HttpClient[] instances and ensure they are shutdown when the application shuts down.
+The api:http.client.annotation.Client[] annotation is also a custom scope that will manage the creation of api:http.client.HttpClient[] instances and ensure they are shutdown when the application shuts down.
 
-The value you pass to the api:http.client.Client[] annotation can be one of the following:
+The value you pass to the api:http.client.annotation.Client[] annotation can be one of the following:
 
 * A absolute URI. Example `https://api.twitter.com/1.1`
 * A relative URI, in which case the server targeted will be the current server (useful for testing)
