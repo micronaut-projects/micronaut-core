@@ -79,7 +79,13 @@ public class JwtTokenValidator implements TokenValidator {
         return true;
     }
 
-    private Publisher<Authentication> validatePlainJWT(JWT jwt) throws ParseException {
+    /**
+     *
+     * @param jwt a JWT Token
+     * @return an Authentication if validation was successful or empty if not.
+     * @throws ParseException it may throw a ParseException while retrieving the JWT claims
+     */
+    protected Publisher<Authentication> validatePlainJWT(JWT jwt) throws ParseException {
         if (signatureConfigurations.isEmpty()) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("JWT is not signed and no signature configurations -> verified");
@@ -93,7 +99,15 @@ public class JwtTokenValidator implements TokenValidator {
         return createAuthentication(jwt);
     }
 
-    private Publisher<Authentication> validateSignedJWT(SignedJWT signedJWT) throws ParseException {
+    /**
+     *
+     * Validates a Signed JWT.
+     *
+     * @param signedJWT a Signed JWT Token
+     * @return an Authentication if validation was successful or empty if not.
+     * @throws ParseException it may throw a ParseException while retrieving the JWT claims
+     */
+    protected  Publisher<Authentication> validateSignedJWT(SignedJWT signedJWT) throws ParseException {
         if (LOG.isDebugEnabled()) {
             LOG.debug("JWT is signed");
         }
@@ -129,7 +143,16 @@ public class JwtTokenValidator implements TokenValidator {
         return Flowable.empty();
     }
 
-    private Publisher<Authentication> validateEncryptedJWT(JWT jwt, EncryptedJWT encryptedJWT, String token) throws ParseException  {
+    /**
+     *
+     * Validates a encrypted JWT.
+     *
+     * @param encryptedJWT a encrytped JWT Token
+     * @param token the JWT token as String
+     * @return an Authentication if validation was successful or empty if not.
+     * @throws ParseException it may throw a ParseException while retrieving the JWT claims
+     */
+    protected Publisher<Authentication> validateEncryptedJWT(EncryptedJWT encryptedJWT, String token) throws ParseException  {
         if (LOG.isDebugEnabled()) {
             LOG.debug("JWT is encrypted");
         }
@@ -166,6 +189,11 @@ public class JwtTokenValidator implements TokenValidator {
         return Flowable.empty();
     }
 
+    /**
+     *
+     * @param token The token string.
+     * @return The authentication or empty if the validation fails.
+     */
     @Override
     public Publisher<Authentication> validateToken(String token) {
         try {
@@ -194,7 +222,13 @@ public class JwtTokenValidator implements TokenValidator {
         }
     }
 
-    private Publisher<Authentication> createAuthentication(final JWT jwt) throws ParseException {
+    /**
+     *
+     * @param jwt a JWT token
+     * @return Publishes a {@link Authentication} based on the JWT.
+     * @throws ParseException it may throw a ParseException while retrieving the JWT claims
+     */
+    protected Publisher<Authentication> createAuthentication(final JWT jwt) throws ParseException {
         final JWTClaimsSet claimSet = jwt.getJWTClaimsSet();
         final String subject = claimSet.getSubject();
         if (subject == null) {
