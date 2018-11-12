@@ -16,8 +16,10 @@
 
 package io.micronaut.configuration.elasticsearch.convert;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
+import org.elasticsearch.client.RestClientBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,6 +33,7 @@ import java.util.Optional;
  * @since 1.1.0
  */
 @Singleton
+@Requires(classes = RestClientBuilder.class)
 public class StringToInetAddressConverter implements TypeConverter<CharSequence, InetAddress> {
 
     private static final Logger LOG = LoggerFactory.getLogger(StringToInetAddressConverter.class);

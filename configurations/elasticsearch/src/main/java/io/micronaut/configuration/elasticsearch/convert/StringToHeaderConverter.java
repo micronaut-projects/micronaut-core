@@ -16,10 +16,12 @@
 
 package io.micronaut.configuration.elasticsearch.convert;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 import org.apache.http.Header;
 import org.apache.http.message.BasicHeader;
+import org.elasticsearch.client.RestClientBuilder;
 
 import javax.inject.Singleton;
 import java.util.Optional;
@@ -29,6 +31,7 @@ import java.util.Optional;
  * @since 1.1.0
  */
 @Singleton
+@Requires(classes = RestClientBuilder.class)
 public class StringToHeaderConverter implements TypeConverter<CharSequence, Header> {
 
     @Override

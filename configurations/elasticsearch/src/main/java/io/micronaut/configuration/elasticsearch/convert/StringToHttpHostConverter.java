@@ -16,9 +16,11 @@
 
 package io.micronaut.configuration.elasticsearch.convert;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.TypeConverter;
 import org.apache.http.HttpHost;
+import org.elasticsearch.client.RestClientBuilder;
 
 import javax.inject.Singleton;
 import java.net.URI;
@@ -29,6 +31,7 @@ import java.util.Optional;
  * @since 1.1.0
  */
 @Singleton
+@Requires(classes = RestClientBuilder.class)
 public class StringToHttpHostConverter implements TypeConverter<CharSequence, HttpHost> {
 
     @Override
