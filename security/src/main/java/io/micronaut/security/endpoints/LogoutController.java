@@ -72,6 +72,7 @@ public class LogoutController {
      * @param logoutHandler A collaborator which helps to build HTTP response if user logout.
      * @param eventPublisher The application event publisher
      */
+    @Deprecated
     public LogoutController(@Nullable LogoutHandler logoutHandler,
                             ApplicationEventPublisher eventPublisher) {
         this.logoutHandler = logoutHandler;
