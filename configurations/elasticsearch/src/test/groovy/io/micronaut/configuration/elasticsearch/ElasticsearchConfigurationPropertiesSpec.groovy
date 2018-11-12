@@ -17,10 +17,20 @@
 package io.micronaut.configuration.elasticsearch
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Replaces
 import org.apache.http.HttpHost
+import org.apache.http.auth.AuthScope
+import org.apache.http.auth.UsernamePasswordCredentials
+import org.apache.http.client.CredentialsProvider
+import org.apache.http.impl.client.BasicCredentialsProvider
+import org.apache.http.impl.nio.client.HttpAsyncClientBuilder
+import org.apache.http.impl.nio.reactor.IOReactorConfig
 import org.elasticsearch.client.NodeSelector
 import org.elasticsearch.client.RestHighLevelClient
 import spock.lang.Specification
+
+import javax.inject.Singleton
 
 /**
  * @author puneetbehl
@@ -101,6 +111,68 @@ class ElasticsearchConfigurationPropertiesSpec extends Specification {
         applicationContext.containsBean(RestHighLevelClient)
         applicationContext.getBean(ElasticsearchConfigurationProperties).httpHosts.size() == 2
 
+    }
+
+    void "Test that HttpAsyncClientBuilder bean is created"() {
+
+        when:
+        ApplicationContext applicationContext = ApplicationContext.run("elasticsearch.httpHosts": "http://127.0.0.1:9200,http://127.0.1.1:9200")
+
+        then:
+        applicationContext.containsBean(HttpAsyncClientBuilder)
+
+        cleanup:
+        applicationContext.close()
+
+    }
+
+    void "Test overiding HttpAsyncClientBuilder bean"() {
+
+        when:
+        ApplicationContext applicationContext = ApplicationContext.run("elasticsearch.httpHosts": "http://127.0.0.1:9200,http://127.0.1.1:9200")
+
+        then:
+        applicationContext.containsBean(HttpAsyncClientBuilder)
+        applicationContext.getBean(ElasticsearchConfigurationProperties).httpAsyncClientBuilder
+        "Bar" == ((MyHttpAsyncClientBuilder) applicationContext.getBean(ElasticsearchConfigurationProperties).httpAsyncClientBuilder).foo
+
+        cleanup:
+        applicationContext.close()
+
+    }
+
+    @Factory
+    static class MyFactory {
+
+        @Replaces(HttpAsyncClientBuilder.class)
+        @Singleton
+        HttpAsyncClientBuilder httpAsyncClientBuilder() {
+            final CredentialsProvider credentialsProvider = new BasicCredentialsProvider()
+            credentialsProvider.setCredentials(AuthScope.ANY,
+                    new UsernamePasswordCredentials("user", "password"))
+
+            return MyHttpAsyncClientBuilder.create()
+                    .setFoo("Bar")
+                    .setDefaultIOReactorConfig(IOReactorConfig.custom().setIoThreadCount(1).build())
+                    .setDefaultCredentialsProvider(credentialsProvider)
+        }
+    }
+
+    static class MyHttpAsyncClientBuilder extends HttpAsyncClientBuilder {
+        public String foo
+
+        MyHttpAsyncClientBuilder() {
+            super()
+        }
+
+        MyHttpAsyncClientBuilder setFoo(String foo) {
+            this.foo = foo
+            return this
+        }
+
+        static MyHttpAsyncClientBuilder create() {
+            new MyHttpAsyncClientBuilder()
+        }
     }
 
 }
