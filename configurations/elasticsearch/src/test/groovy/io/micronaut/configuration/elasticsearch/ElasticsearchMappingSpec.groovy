@@ -26,6 +26,7 @@ import org.elasticsearch.action.get.GetRequest
 import org.elasticsearch.action.get.GetResponse
 import org.elasticsearch.action.index.IndexRequest
 import org.elasticsearch.action.index.IndexResponse
+import org.elasticsearch.action.main.MainResponse
 import org.elasticsearch.client.RequestOptions
 import org.elasticsearch.client.RestHighLevelClient
 import org.elasticsearch.common.xcontent.XContentType
@@ -40,13 +41,32 @@ import spock.lang.Specification
  */
 class ElasticsearchMappingSpec extends Specification {
 
+    void "Test Elasticsearch connection"() {
+
+        given:
+        ElasticsearchContainer container = new ElasticsearchContainer("docker.elastic.co/elasticsearch/elasticsearch:6.4.1")
+        container.start()
+
+        ApplicationContext applicationContext = ApplicationContext.run('elasticsearch.httpHosts': 'http://' + container.getHttpHostAddress())
+
+        expect:
+        applicationContext.containsBean(RestHighLevelClient)
+        applicationContext.getBean(RestHighLevelClient).ping(RequestOptions.DEFAULT)
+        MainResponse response = applicationContext.getBean(RestHighLevelClient).info(RequestOptions.DEFAULT)
+        System.out.println(String.format("cluser: %s, node: %s, version: %s, build: %s", response.getClusterName(), response.getNodeName(), response.getVersion(), response.getBuild()))
+
+        cleanup:
+        applicationContext.close()
+        container.stop()
+    }
+
     void "Test Elasticsearch(6.x) Mapping API"() {
 
         given:
-        ElasticsearchContainer container = new ElasticsearchContainer("docker.elastic.co/elasticsearch/elasticsearch:6.4.1");
+        ElasticsearchContainer container = new ElasticsearchContainer("docker.elastic.co/elasticsearch/elasticsearch:6.4.1")
         container.start()
 
-        ApplicationContext applicationContext = ApplicationContext.run('elasticsearch.uris': 'http://' + container.getHttpHostAddress())
+        ApplicationContext applicationContext = ApplicationContext.run('elasticsearch.httpHosts': 'http://' + container.getHttpHostAddress())
         RestHighLevelClient client = applicationContext.getBean(RestHighLevelClient)
 
         expect: "Make sure the version of ES is 6.4.1 because these tests may cause unexpected results"
@@ -108,7 +128,7 @@ class ElasticsearchMappingSpec extends Specification {
         String[] includes = ["message", "*Date"]
         String[] excludes = []
         FetchSourceContext fetchSourceContext =
-                new FetchSourceContext(true, includes, excludes);
+                new FetchSourceContext(true, includes, excludes)
         getRequest.fetchSourceContext(fetchSourceContext)
 
 
