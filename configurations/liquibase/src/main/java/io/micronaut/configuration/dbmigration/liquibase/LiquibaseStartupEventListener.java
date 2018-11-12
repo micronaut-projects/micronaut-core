@@ -103,36 +103,18 @@ class LiquibaseStartupEventListener {
      * @param async if true only liquibase configurations set to async are run.
      */
     public void run(boolean async) {
-        if (liquibaseConfigurationProperties != null) {
-            for (LiquibaseConfigurationProperties conf : liquibaseConfigurationProperties) {
-                DataSource dataSource = conf.getDataSource();
-                if (dataSource == null) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Liquibase not run for identifier \"{}\" because no data source found", conf.getNameQualifier());
-                    }
-                    continue;
-                }
-                if (!conf.isEnabled()) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Liquibase not run for identifier \"{}\" because liquibase configuration is disabled", conf.getNameQualifier());
-                    }
-                    continue;
-                }
-                if (conf.isAsync() != async) {
-                    continue;
-                }
-                if (LOG.isInfoEnabled()) {
-                    LOG.info("executing liquibase operations for identifier \"{}\" {}", conf.getNameQualifier(), async ? "asynchronously" : "synchronously");
-                }
-                runLiquibaseForDataSourceWithConfig(conf);
-            }
-        }
+        liquibaseConfigurationProperties
+                .stream()
+                .filter(c -> c.getDataSource() != null)
+                .filter(c -> c.isEnabled())
+                .filter(c -> c.isAsync() == async)
+                .forEach(this::runLiquibaseForDataSourceWithConfig);
     }
 
     /**
      * Performs liquibase update for the given data datasource and configuration.
      *
-     * @param conf       Liquibase configuration
+     * @param conf Liquibase configuration
      */
     protected void runLiquibaseForDataSourceWithConfig(LiquibaseConfigurationProperties conf) {
         try {
