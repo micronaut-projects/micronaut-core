@@ -24,7 +24,7 @@ import org.elasticsearch.client.RestClientBuilder;
 import org.elasticsearch.client.RestHighLevelClient;
 
 /**
- * Default Factory for Create Elasticsearch client.
+ * The default Factory for creating Elasticsearch client.
  *
  * @author lishuai
  * @author Puneet Behl
@@ -46,7 +46,6 @@ public class ElasticsearchClientFactory {
     }
 
     /**
-     *
      * @param elasticsearchConfiguration The {@link ElasticsearchConfigurationProperties} object
      * @return The Elasticsearch Rest Client
      */
@@ -56,7 +55,6 @@ public class ElasticsearchClientFactory {
     }
 
     /**
-     *
      * @param elasticsearchConfiguration The {@link ElasticsearchConfigurationProperties} object
      * @return The {@link RestClientBuilder}
      */
