@@ -1147,17 +1147,23 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                        MediaType mediaType,
                                                        ChannelHandlerContext context,
                                                        AtomicReference<HttpRequest<?>> requestReference) {
-        ByteBuf byteBuf = encodeBodyAsByteBuf(body, codec, context, requestReference);
-        int len = byteBuf.readableBytes();
-        MutableHttpHeaders headers = response.getHeaders();
-        if (!headers.contains(HttpHeaders.CONTENT_TYPE)) {
-            headers.add(HttpHeaderNames.CONTENT_TYPE, mediaType);
-        }
-        headers.remove(HttpHeaders.CONTENT_LENGTH);
-        headers.add(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(len));
+        ByteBuf byteBuf;
+        try {
+            byteBuf = encodeBodyAsByteBuf(body, codec, context, requestReference);
+            int len = byteBuf.readableBytes();
+            MutableHttpHeaders headers = response.getHeaders();
+            if (!headers.contains(HttpHeaders.CONTENT_TYPE)) {
+                headers.add(HttpHeaderNames.CONTENT_TYPE, mediaType);
+            }
+            headers.remove(HttpHeaders.CONTENT_LENGTH);
+            headers.add(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(len));
 
-        setBodyContent(response, byteBuf);
-        return response;
+            setBodyContent(response, byteBuf);
+            return response;
+        } catch (LinkageError e) {
+            // rxjava swallows linkage errors for some reasons so if one occurs, rethrow as a internal error
+            throw new InternalServerException("Fatal error encoding bytebuf: " + e.getMessage() , e);
+        }
     }
 
     private MutableHttpResponse<?> setBodyContent(MutableHttpResponse response, Object bodyContent) {
