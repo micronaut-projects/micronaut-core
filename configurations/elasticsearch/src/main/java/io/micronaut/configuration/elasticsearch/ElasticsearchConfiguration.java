@@ -19,6 +19,7 @@ package io.micronaut.configuration.elasticsearch;
 import org.apache.http.Header;
 import org.apache.http.HttpHost;
 import org.apache.http.client.config.RequestConfig;
+import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.elasticsearch.client.NodeSelector;
 
 /**
@@ -61,9 +62,16 @@ public interface ElasticsearchConfiguration {
     NodeSelector getNodeSelector();
 
     /**
-     *
      * @return The builder to create default request configurations.
      */
     RequestConfig.Builder getRequestConfigBuilder();
+
+    /**
+     * The http client configuration (e.g. encrypted communication over ssl, or anything that
+     * the {@link HttpAsyncClientBuilder} allows to set).
+     *
+     * @return The {@link HttpAsyncClientBuilder} bean
+     */
+    HttpAsyncClientBuilder getHttpAsyncClientBuilder();
 
 }

@@ -26,6 +26,7 @@ import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.elasticsearch.client.NodeSelector;
 import org.elasticsearch.client.RestClientBuilder;
 
+import javax.inject.Inject;
 import java.util.Collections;
 
 import static io.micronaut.configuration.elasticsearch.ElasticsearchSettings.DEFAULT_HOST;
@@ -41,10 +42,6 @@ import static io.micronaut.configuration.elasticsearch.ElasticsearchSettings.DEF
 @ConfigurationProperties(ElasticsearchSettings.PREFIX)
 public class ElasticsearchConfigurationProperties implements ElasticsearchConfiguration {
 
-    /**
-     * The HTTP client configurations.
-     */
-    @ConfigurationBuilder(configurationPrefix = "http.client", factoryMethod = "create")
     @SuppressWarnings("WeakerAccess")
     protected HttpAsyncClientBuilder httpAsyncClientBuilder;
 
@@ -85,6 +82,11 @@ public class ElasticsearchConfigurationProperties implements ElasticsearchConfig
         return this.requestConfigBuilder;
     }
 
+    @Override
+    public HttpAsyncClientBuilder getHttpAsyncClientBuilder() {
+        return httpAsyncClientBuilder;
+    }
+
     /**
      * @param httpHosts One or more hosts that client will connect to.
      */
@@ -111,5 +113,13 @@ public class ElasticsearchConfigurationProperties implements ElasticsearchConfig
      */
     public void setNodeSelector(NodeSelector nodeSelector) {
         this.nodeSelector = nodeSelector;
+    }
+
+    /**
+     * @param httpAsyncClientBuilder The {@link HttpAsyncClientBuilder} bean
+     */
+    @Inject
+    public void setHttpAsyncClientBuilder(HttpAsyncClientBuilder httpAsyncClientBuilder) {
+        this.httpAsyncClientBuilder = httpAsyncClientBuilder;
     }
 }
