@@ -20,6 +20,8 @@ import com.nimbusds.jose.jwk.KeyType;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.security.token.jwt.config.JwtConfigurationProperties;
 
+import javax.validation.constraints.NotNull;
+
 /**
  * JSON Web Key Set (JWKS) Signature Configuration properties holder.
  *
@@ -27,7 +29,7 @@ import io.micronaut.security.token.jwt.config.JwtConfigurationProperties;
  * @since 1.1.0
  */
 @EachProperty(JwtConfigurationProperties.PREFIX + ".signatures.jwks")
-public class JwksSignatureConfigurationProperties {
+public class JwksSignatureConfigurationProperties implements JwksSignatureConfiguration {
 
     /**
      * The default key type.
@@ -43,6 +45,7 @@ public class JwksSignatureConfigurationProperties {
      *
      * @return URL to the remote JSON Web Key Set.
      */
+    @Override
     public String getUrl() {
         return url;
     }
@@ -59,6 +62,8 @@ public class JwksSignatureConfigurationProperties {
      *
      * @return Representation the KeyType for this JWKS signature configuration. KeyType is the kty parameter in a JSON Web Key (JWK).
      */
+    @Override
+    @NotNull
     public KeyType getKeyType() {
         return keyType;
     }
