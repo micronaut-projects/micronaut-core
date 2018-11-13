@@ -135,14 +135,9 @@ public class JwksSignatureConfiguration implements SignatureConfiguration {
             if (LOG.isErrorEnabled()) {
                 LOG.error("FileNotFoundException loading JWK", e);
             }
-        } catch (IOException e) {
+        } catch (IOException | ParseException e) {
             if (LOG.isErrorEnabled()) {
-                LOG.error("IOException loading JWK", e);
-            }
-
-        } catch (ParseException e) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("ParseException loading JWK", e);
+                LOG.error("Exception loading JWK", e);
             }
         }
 
