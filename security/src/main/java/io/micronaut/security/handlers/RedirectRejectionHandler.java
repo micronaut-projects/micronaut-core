@@ -40,6 +40,7 @@ public class RedirectRejectionHandler implements RejectionHandler {
     private final ForbiddenRejectionUriProvider forbiddenRejectionUriProvider;
 
     /**
+     * Constructor.
      *
      * @param unauthorizedRejectionUriProvider URI Provider to redirect to if unauthenticated
      * @param forbiddenRejectionUriProvider URI Provider to redirect to if authenticated but not enough authorization level.
@@ -51,6 +52,7 @@ public class RedirectRejectionHandler implements RejectionHandler {
     }
 
     /**
+     * Handles rejection of a request.
      *
      * @param request {@link HttpRequest} being processed
      * @param forbidden if true indicates that although the user was authenticated he did not had the necessary access privileges.
@@ -72,6 +74,7 @@ public class RedirectRejectionHandler implements RejectionHandler {
     }
 
     /**
+     * Decides whether the request should be handled with a redirect.
      *
      * @param request The HTTP Request
      * @return true if the request accepts text/html
@@ -84,6 +87,7 @@ public class RedirectRejectionHandler implements RejectionHandler {
     }
 
     /**
+     * Builds a 303 HTTP Response to the supplied location.
      *
      * @param uri The Uri to redirect to
      * @return a 303 HTTP response with the Uri as location
@@ -95,6 +99,7 @@ public class RedirectRejectionHandler implements RejectionHandler {
     }
 
     /**
+     * Returns the redirection uri.
      *
      * @param forbidden if true indicates that although the user was authenticated he did not had the necessary access privileges.
      * @return the uri to redirect to
@@ -109,6 +114,7 @@ public class RedirectRejectionHandler implements RejectionHandler {
     }
 
     /**
+     * unauthorizedRejectionUriProvider Getter.
      *
      * @return URI Provider to redirect to if unauthenticated
      */
@@ -117,7 +123,7 @@ public class RedirectRejectionHandler implements RejectionHandler {
     }
 
     /**
-     *
+     * forbiddenRejectionUriProvider Getter.
      * @return URI Provider to redirect to if authenticated but not enough authorization level.
      */
     public ForbiddenRejectionUriProvider getForbiddenRejectionUriProvider() {
