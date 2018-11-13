@@ -34,13 +34,13 @@ class LiquibaseSpec  extends Specification implements YamlAsciidocTagCleaner {
     String yamlConfig = '''\
 //tag::yamlconfig[]
 datasources:
-    default: # <2>
+    default: # <3>
         url: 'jdbc:h2:mem:liquibaseDisabledDb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
         username: 'sa'
         password: ''
         driverClassName: 'org.h2.Driver'
 jpa:
-    default:
+    default: # <3>
         packages-to-scan:
             - 'example.micronaut'
         properties:
