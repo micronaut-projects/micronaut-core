@@ -44,12 +44,12 @@ public class SubjectNotNullJwtClaimsValidator implements JwtClaimsValidator {
     @Override
     public boolean validate(JWTClaimsSet claimsSet) {
         final String subject = claimsSet.getSubject();
-        boolean condition = subject == null;
-        if (!condition) {
+        boolean hasSubject = subject != null;
+        if (!hasSubject) {
             if (LOG.isWarnEnabled()) {
                 LOG.warn("JWT must contain a subject ('sub' claim)");
             }
         }
-        return condition;
+        return hasSubject;
     }
 }
