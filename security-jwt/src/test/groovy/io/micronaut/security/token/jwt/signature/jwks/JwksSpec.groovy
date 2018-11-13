@@ -124,7 +124,7 @@ class JwksSpec extends Specification {
         when:
         for (Class beanClazz : [SignatureConfiguration,
                                 JwksSignatureConfigurationProperties,
-                                JwksSignatureConfiguration,
+                                JwksSignature,
                                 HomeController]) {
             booksEmbeddedServer.applicationContext.getBean(beanClazz)
         }
