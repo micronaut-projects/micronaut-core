@@ -13,24 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.docs.server.intro.javacode;
 
-package io.micronaut.docs.server.intro;
+import io.micronaut.context.annotation.Requires;
 
 // tag::imports[]
+import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
-import io.micronaut.http.client.annotation.Client;
-import io.reactivex.Single;
 // end::imports[]
 
-/**
- * @author graemerocher
- * @since 1.0
- */
+@Requires(property = "spec.lang", value = "java")
+@Requires(property = "spec.name", value = "HelloControllerSpec")
 // tag::class[]
-@Client("/hello") // <1>
-public interface HelloClient {
-
-    @Get // <2>
-    Single<String> hello(); // <3>
+@Controller("/hello") // <1>
+public class HelloController {
+    @Get(produces = MediaType.TEXT_PLAIN) // <2>
+    public String index() {
+        return "Hello World"; // <3>
+    }
 }
 // end::class[]

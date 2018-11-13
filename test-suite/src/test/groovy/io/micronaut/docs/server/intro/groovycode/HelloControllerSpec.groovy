@@ -13,32 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.server.intro
+package io.micronaut.docs.server.intro.groovycode
 
-// tag::imports[]
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.*
-// end::imports[]
+import spock.lang.AutoCleanup
+import spock.lang.Shared
+import spock.lang.Specification
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-// tag::class[]
 class HelloControllerSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer) // <1>
+            ApplicationContext.run(EmbeddedServer,
+                    ['spec.name': HelloControllerSpec.simpleName,
+                     'spec.lang': 'groovy'],
+                     Environment.TEST)
 
-    @Shared @AutoCleanup HttpClient client = HttpClient.create(embeddedServer.URL) // <2>
+    @Shared @AutoCleanup HttpClient client = HttpClient.create(embeddedServer.URL)
 
     void "test hello world response"() {
         expect:
-        client.toBlocking() // <3>
-              .retrieve(HttpRequest.GET('/hello')) == "Hello World" // <4>
+        client.toBlocking()
+              .retrieve(HttpRequest.GET('/hello')) == "Hello World"
     }
 }
-// end::class[]

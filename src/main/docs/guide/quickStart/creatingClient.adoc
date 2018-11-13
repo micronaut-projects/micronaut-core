@@ -5,9 +5,10 @@ For example, the following test is written using http://spockframework.org[Spock
 .Testing Hello World
 [source,groovy]
 ----
-include::{testsuite}/server/intro/HelloControllerSpec.groovy[tags=imports, indent=0]
-
-include::{testsuite}/server/intro/HelloControllerSpec.groovy[tags=class, indent=0]
+include::{testsuite}/server/intro/javacode/HelloControllerSpec.groovy[tags=imports, indent=0]
+include::{testsuite}/server/intro/javacode/HelloControllerSpec.groovy[tags=class-init, indent=0]
+include::{testsuite}/server/intro/javacode/HelloControllerSpec.groovy[tags=embededdedServer, indent=0]
+include::{testsuite}/server/intro/javacode/HelloControllerSpec.groovy[tags=class-end, indent=0]
 ----
 
 <1> The api:runtime.server.EmbeddedServer[] is configured as a shared and automatically cleaned up test field
@@ -38,9 +39,11 @@ To test the `HelloClient` simply retrieve it from the api:context.ApplicationCon
 .Testing HelloClient
 [source,groovy]
 ----
-include::{testsuite}/server/intro/HelloClientSpec.groovy[tags=imports, indent=0]
+include::{testsuite}/server/intro/javacode/HelloClientSpec.groovy[tags=class-init, indent=0]
 
-include::{testsuite}/server/intro/HelloClientSpec.groovy[tags=class, indent=0]
+include::{testsuite}/server/intro/javacode/HelloClientSpec.groovy[tags=embeddedServer, indent=0]
+
+include::{testsuite}/server/intro/javacode/HelloClientSpec.groovy[tags=class-end, indent=0]
 ----
 
 <1> The api:runtime.server.EmbeddedServer[] is run
