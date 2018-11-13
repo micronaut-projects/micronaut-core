@@ -46,11 +46,12 @@ public class DefaultTokenResolver implements TokenResolver {
     }
 
     /**
+     * Returns the first token found by the supplied token readers.
      *
      * @param request The current HTTP request.
      * @return the first found token in the supplied request.
      */
-    public Optional<String> findFirstToken(HttpRequest<?> request) {
+    public Optional<String> resolveToken(HttpRequest<?> request) {
 
         Optional<String> token = this.tokenReaders
                 .stream()
