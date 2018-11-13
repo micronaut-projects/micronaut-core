@@ -16,7 +16,6 @@
 
 package io.micronaut.configuration.dbmigration.liquibase;
 
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.event.annotation.EventListener;
@@ -33,6 +32,7 @@ import liquibase.database.OfflineConnection;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.exception.DatabaseException;
 import liquibase.exception.LiquibaseException;
+import liquibase.resource.ResourceAccessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,12 +48,11 @@ import java.util.Collection;
 import java.util.Map;
 
 /**
- * Synchronous listener for  {@link io.micronaut.context.event.StartupEvent} to run liquibase operations.
+ * Listener for  {@link io.micronaut.context.event.StartupEvent} to run liquibase operations.
  *
  * @author Sergio del Amo
  * @since 1.1
  */
-@Requires(classes = Liquibase.class)
 @Singleton
 class LiquibaseStartupEventListener {
     private static final Logger LOG = LoggerFactory.getLogger(LiquibaseStartupEventListener.class);
@@ -108,43 +107,48 @@ class LiquibaseStartupEventListener {
                 .filter(c -> c.getDataSource() != null)
                 .filter(c -> c.isEnabled())
                 .filter(c -> c.isAsync() == async)
-                .forEach(this::runLiquibaseForDataSourceWithConfig);
+                .forEach(this::migrate);
     }
 
     /**
      * Performs liquibase update for the given data datasource and configuration.
      *
-     * @param conf Liquibase configuration
+     * @param config Liquibase configuration
      */
-    protected void runLiquibaseForDataSourceWithConfig(LiquibaseConfigurationProperties conf) {
+    protected void migrate(LiquibaseConfigurationProperties config) {
+        Connection connection;
+        DataSource dataSource = config.getDataSource();
         try {
-            Connection c = null;
-            Liquibase liquibase = null;
-            DataSource dataSource = conf.getDataSource();
-            try {
-                c = dataSource.getConnection();
-                liquibase = createLiquibase(c, conf);
-                generateRollbackFile(liquibase, conf);
-                performUpdate(liquibase, conf);
-            } catch (LiquibaseException e) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("LiquibaseException: ", e);
-                }
-            } catch (SQLException e) {
-                throw new DatabaseException(e);
-            } finally {
-                Database database = null;
-                if (liquibase != null) {
-                    database = liquibase.getDatabase();
-                }
-                if (database != null) {
-                    database.close();
-                }
-            }
-
-        } catch (DatabaseException e) {
+            connection = dataSource.getConnection();
+        } catch (SQLException e) {
             if (LOG.isErrorEnabled()) {
-                LOG.error("DatabaseException:", e);
+                LOG.error("Migration failed! Could not connect to the datasource.", e);
+            }
+            return;
+        }
+
+        Liquibase liquibase = null;
+        try {
+            liquibase = createLiquibase(connection, config);
+            generateRollbackFile(liquibase, config);
+            performUpdate(liquibase, config);
+        } catch (LiquibaseException e) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Migration failed! Liquibase encountered an exception.", e);
+            }
+        } finally {
+            Database database = null;
+            if (liquibase != null) {
+                database = liquibase.getDatabase();
+            }
+            if (database != null) {
+                try {
+                    database.close();
+                } catch (DatabaseException e) {
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn("Error closing the connection after the migration.", e);
+                    }
+                }
             }
         }
     }
@@ -153,21 +157,21 @@ class LiquibaseStartupEventListener {
      * Performs Liquibase update.
      *
      * @param liquibase Primary facade class for interacting with Liquibase.
-     * @param conf      Liquibase configuration
+     * @param config      Liquibase configuration
      * @throws LiquibaseException Liquibase exception.
      */
-    protected void performUpdate(Liquibase liquibase, LiquibaseConfigurationProperties conf) throws LiquibaseException {
-        LabelExpression labelExpression = new LabelExpression(conf.getLabels());
-        Contexts contexts = new Contexts(conf.getContexts());
-        if (conf.isTestRollbackOnUpdate()) {
-            if (conf.getTag() != null) {
-                liquibase.updateTestingRollback(conf.getTag(), contexts, labelExpression);
+    protected void performUpdate(Liquibase liquibase, LiquibaseConfigurationProperties config) throws LiquibaseException {
+        LabelExpression labelExpression = new LabelExpression(config.getLabels());
+        Contexts contexts = new Contexts(config.getContexts());
+        if (config.isTestRollbackOnUpdate()) {
+            if (config.getTag() != null) {
+                liquibase.updateTestingRollback(config.getTag(), contexts, labelExpression);
             } else {
                 liquibase.updateTestingRollback(contexts, labelExpression);
             }
         } else {
-            if (conf.getTag() != null) {
-                liquibase.update(conf.getTag(), contexts, labelExpression);
+            if (config.getTag() != null) {
+                liquibase.update(config.getTag(), contexts, labelExpression);
             } else {
                 liquibase.update(contexts, labelExpression);
             }
@@ -178,18 +182,18 @@ class LiquibaseStartupEventListener {
      * Generates Rollback file.
      *
      * @param liquibase Primary facade class for interacting with Liquibase.
-     * @param conf      Liquibase configuration
+     * @param config      Liquibase configuration
      * @throws LiquibaseException Liquibase exception.
      */
-    protected void generateRollbackFile(Liquibase liquibase, LiquibaseConfigurationProperties conf) throws LiquibaseException {
-        if (conf.getRollbackFile() != null) {
+    protected void generateRollbackFile(Liquibase liquibase, LiquibaseConfigurationProperties config) throws LiquibaseException {
+        if (config.getRollbackFile() != null) {
             String outputEncoding = LiquibaseConfiguration.getInstance().getConfiguration(GlobalConfiguration.class).getOutputEncoding();
-            try (FileOutputStream fileOutputStream = new FileOutputStream(conf.getRollbackFile());
+            try (FileOutputStream fileOutputStream = new FileOutputStream(config.getRollbackFile());
                  Writer output = new OutputStreamWriter(fileOutputStream, outputEncoding)) {
-                Contexts contexts = new Contexts(conf.getContexts());
-                LabelExpression labelExpression = new LabelExpression(conf.getLabels());
-                if (conf.getTag() != null) {
-                    liquibase.futureRollbackSQL(conf.getTag(), contexts, labelExpression, output);
+                Contexts contexts = new Contexts(config.getContexts());
+                LabelExpression labelExpression = new LabelExpression(config.getLabels());
+                if (config.getTag() != null) {
+                    liquibase.futureRollbackSQL(config.getTag(), contexts, labelExpression, output);
                 } else {
                     liquibase.futureRollbackSQL(contexts, labelExpression, output);
                 }
@@ -201,21 +205,22 @@ class LiquibaseStartupEventListener {
 
     /**
      * @param connection Connection with the data source
-     * @param conf       Liquibase Configuration for the Data source
+     * @param config       Liquibase Configuration for the Data source
      * @return A Liquibase object
      * @throws LiquibaseException A liquibase exception.
      */
-    protected Liquibase createLiquibase(Connection connection, LiquibaseConfigurationProperties conf) throws LiquibaseException {
-        String changeLog = conf.getChangeLog();
-        Liquibase liquibase = new Liquibase(changeLog, resourceAccessor, createDatabase(connection, resourceAccessor, conf));
-        liquibase.setIgnoreClasspathPrefix(conf.isIgnoreClasspathPrefix());
-        if (conf.getParameters() != null) {
-            for (Map.Entry<String, String> entry : conf.getParameters().entrySet()) {
+    protected Liquibase createLiquibase(Connection connection, LiquibaseConfigurationProperties config) throws LiquibaseException {
+        String changeLog = config.getChangeLog();
+        Database database = createDatabase(connection, resourceAccessor, config);
+        Liquibase liquibase = new Liquibase(changeLog, resourceAccessor, database);
+        liquibase.setIgnoreClasspathPrefix(config.isIgnoreClasspathPrefix());
+        if (config.getParameters() != null) {
+            for (Map.Entry<String, String> entry : config.getParameters().entrySet()) {
                 liquibase.setChangeLogParameter(entry.getKey(), entry.getValue());
             }
         }
 
-        if (conf.isDropFirst()) {
+        if (config.isDropFirst()) {
             liquibase.dropAll();
         }
 
@@ -228,13 +233,13 @@ class LiquibaseStartupEventListener {
      *
      * @param connection       Connection with the data source
      * @param resourceAccessor Abstraction of file access
-     * @param conf             Liquibase Configuration for the Data source
+     * @param config             Liquibase Configuration for the Data source
      * @return a Database implementation retrieved from the {@link DatabaseFactory}.
      * @throws DatabaseException A Liquibase Database exception.
      */
     protected Database createDatabase(Connection connection,
-                                      liquibase.resource.ResourceAccessor resourceAccessor,
-                                      LiquibaseConfigurationProperties conf) throws DatabaseException {
+                                      ResourceAccessor resourceAccessor,
+                                      LiquibaseConfigurationProperties config) throws DatabaseException {
 
         DatabaseConnection liquibaseConnection;
         if (connection == null) {
@@ -248,28 +253,30 @@ class LiquibaseStartupEventListener {
         }
 
         Database database = DatabaseFactory.getInstance().findCorrectDatabaseImplementation(liquibaseConnection);
-        if (StringUtils.trimToNull(conf.getDefaultSchema()) != null) {
+        String defaultSchema = config.getDefaultSchema();
+        if (StringUtils.isNotEmpty(defaultSchema)) {
             if (database.supportsSchemas()) {
-                database.setDefaultSchemaName(conf.getDefaultSchema());
+                database.setDefaultSchemaName(defaultSchema);
             } else if (database.supportsCatalogs()) {
-                database.setDefaultCatalogName(conf.getDefaultSchema());
+                database.setDefaultCatalogName(defaultSchema);
             }
         }
-        if (StringUtils.trimToNull(conf.getLiquibaseSchema()) != null) {
+        String liquibaseSchema = config.getLiquibaseSchema();
+        if (StringUtils.isNotEmpty(liquibaseSchema)) {
             if (database.supportsSchemas()) {
-                database.setLiquibaseSchemaName(conf.getLiquibaseSchema());
+                database.setLiquibaseSchemaName(liquibaseSchema);
             } else if (database.supportsCatalogs()) {
-                database.setLiquibaseCatalogName(conf.getLiquibaseSchema());
+                database.setLiquibaseCatalogName(liquibaseSchema);
             }
         }
-        if (StringUtils.trimToNull(conf.getLiquibaseTablespace()) != null && database.supportsTablespaces()) {
-            database.setLiquibaseTablespaceName(conf.getLiquibaseTablespace());
+        if (StringUtils.trimToNull(config.getLiquibaseTablespace()) != null && database.supportsTablespaces()) {
+            database.setLiquibaseTablespaceName(config.getLiquibaseTablespace());
         }
-        if (StringUtils.trimToNull(conf.getDatabaseChangeLogTable()) != null) {
-            database.setDatabaseChangeLogTableName(conf.getDatabaseChangeLogTable());
+        if (StringUtils.trimToNull(config.getDatabaseChangeLogTable()) != null) {
+            database.setDatabaseChangeLogTableName(config.getDatabaseChangeLogTable());
         }
-        if (StringUtils.trimToNull(conf.getDatabaseChangeLogLockTable()) != null) {
-            database.setDatabaseChangeLogLockTableName(conf.getDatabaseChangeLogLockTable());
+        if (StringUtils.trimToNull(config.getDatabaseChangeLogLockTable()) != null) {
+            database.setDatabaseChangeLogLockTableName(config.getDatabaseChangeLogLockTable());
         }
         return database;
     }

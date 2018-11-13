@@ -23,7 +23,9 @@
  */
 @Configuration
 @Requires(property = "liquibase.enabled", notEquals = "false")
+@Requires(classes = Liquibase.class)
 package io.micronaut.configuration.dbmigration.liquibase;
 
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;
+import liquibase.Liquibase;
