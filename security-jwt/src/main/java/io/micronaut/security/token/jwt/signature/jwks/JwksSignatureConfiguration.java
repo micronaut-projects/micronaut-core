@@ -67,7 +67,7 @@ public class JwksSignatureConfiguration implements SignatureConfiguration {
      */
     public JwksSignatureConfiguration(JwksSignatureConfigurationProperties jwksSignatureConfigurationProperties) {
         if (LOG.isDebugEnabled()) {
-            LOG.error("JWT validation URL: {}", jwksSignatureConfigurationProperties.getUrl());
+            LOG.debug("JWT validation URL: {}", jwksSignatureConfigurationProperties.getUrl());
         }
         this.url = jwksSignatureConfigurationProperties.getUrl();
         this.jwkSet = jwkSetByUrl(jwksSignatureConfigurationProperties.getUrl());
