@@ -41,9 +41,9 @@ class LiquibaseAsyncSpec extends Specification implements YamlAsciidocTagCleaner
         'jpa.default.properties.hibernate.hbm2ddl.auto': 'none',
         'jpa.default.properties.hibernate.show_sql'    : true,
 
-        'liquibase.default.async'                      : true,
-        'liquibase.default.dropFirst'                  : true,
-        'liquibase.default.change-log'                 : 'classpath:db/liquibase-changelog.xml',
+        'liquibase.datasources.default.async'          : true,
+        'liquibase.datasources.default.dropFirst'      : true,
+        'liquibase.datasources.default.change-log'     : 'classpath:db/liquibase-changelog.xml',
     ]
 
     @Shared

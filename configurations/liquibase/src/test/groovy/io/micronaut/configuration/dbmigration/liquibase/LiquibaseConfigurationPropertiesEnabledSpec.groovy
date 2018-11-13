@@ -45,19 +45,19 @@ class LiquibaseConfigurationPropertiesEnabledSpec extends Specification {
     void 'if Liquibase configuration then LiquibaseConfigurationProperties is created'() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-            ['spec.name'                         : LiquibaseConfigurationPropertiesEnabledSpec.simpleName,
-             'liquibase.movies.enabled'          : true,
-             'liquibase.movies.change-log'       : 'classpath:db/liquibase-changelog.xml',
-             'datasources.movies.url'            : 'jdbc:h2:mem:liquibaseMoviesDb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
-             'datasources.movies.username'       : 'sa',
-             'datasources.movies.password'       : '',
-             'datasources.movies.driverClassName': 'org.h2.Driver',
-             'liquibase.books.enabled'           : true,
-             'liquibase.books.change-log'        : 'classpath:db/liquibase-changelog.xml',
-             'datasources.books.url'             : 'jdbc:h2:mem:liquibaseBooksDb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
-             'datasources.books.username'        : 'sa',
-             'datasources.books.password'        : '',
-             'datasources.books.driverClassName' : 'org.h2.Driver',
+            ['spec.name'                              : LiquibaseConfigurationPropertiesEnabledSpec.simpleName,
+             'liquibase.datasources.movies.enabled'   : true,
+             'liquibase.datasources.movies.change-log': 'classpath:db/liquibase-changelog.xml',
+             'datasources.movies.url'                 : 'jdbc:h2:mem:liquibaseMoviesDb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
+             'datasources.movies.username'            : 'sa',
+             'datasources.movies.password'            : '',
+             'datasources.movies.driverClassName'     : 'org.h2.Driver',
+             'liquibase.datasources.books.enabled'    : true,
+             'liquibase.datasources.books.change-log' : 'classpath:db/liquibase-changelog.xml',
+             'datasources.books.url'                  : 'jdbc:h2:mem:liquibaseBooksDb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
+             'datasources.books.username'             : 'sa',
+             'datasources.books.password'             : '',
+             'datasources.books.driverClassName'      : 'org.h2.Driver',
             ] as Map
             , Environment.TEST
         )

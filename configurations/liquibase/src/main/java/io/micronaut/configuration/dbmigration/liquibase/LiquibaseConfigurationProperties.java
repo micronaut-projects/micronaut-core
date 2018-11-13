@@ -31,7 +31,7 @@ import java.util.Map;
  * @author Sergio del Amo
  * @since 1.1
  */
-@EachProperty("liquibase")
+@EachProperty("liquibase.datasources")
 public class LiquibaseConfigurationProperties implements Toggleable {
 
     /**

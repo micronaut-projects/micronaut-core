@@ -49,8 +49,9 @@ jpa:
                     auto: none # <1>
                 show_sql: true
 liquibase:
-    default: # <2>
-        change-log: 'classpath:db/liquibase-changelog.xml' # <3> 
+    datasources: # <2>
+        default: # <3>
+            change-log: 'classpath:db/liquibase-changelog.xml' # <4> 
 '''//end::yamlconfig[]
 
     @Shared
@@ -70,9 +71,11 @@ liquibase:
                     ]
             ],
             liquibase: [
+                datasources: [
                     default: [
-                            'change-log': 'classpath:db/liquibase-changelog.xml'
+                        'change-log': 'classpath:db/liquibase-changelog.xml'
                     ]
+                ]
             ],
             datasources: [
                     default: [

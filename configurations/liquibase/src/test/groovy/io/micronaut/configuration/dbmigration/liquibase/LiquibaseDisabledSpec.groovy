@@ -40,7 +40,7 @@ class LiquibaseDisabledSpec extends Specification implements YamlAsciidocTagClea
         'datasources.default.driverClassName'          : 'org.h2.Driver',
 
         'liquibase.enabled'                            : false,
-        'liquibase.default.change-log'                 : 'classpath:db/liquibase-changelog.xml'
+        'liquibase.datasources.default.change-log'     : 'classpath:db/liquibase-changelog.xml'
     ]
 
     @Shared
