@@ -34,13 +34,13 @@ class FlywaySpec extends Specification implements YamlAsciidocTagCleaner {
     String yamlConfig = '''\
 //tag::yamlconfig[]
 datasources:
-    default: # <2>
+    default: # <3>
         url: 'jdbc:h2:mem:flywayDb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE'
         username: 'sa'
         password: ''
         driverClassName: 'org.h2.Driver'
 jpa:
-    default: # <2>
+    default: # <3>
         packages-to-scan:
             - 'example.micronaut'
         properties:
@@ -49,8 +49,9 @@ jpa:
                     auto: none # <1>
                 show_sql: true
 flyway:
-    default: # <2>
-        locations: classpath:databasemigrations # <3>
+    datasources: # <2>
+        default: # <3>
+            locations: classpath:databasemigrations # <4>
 '''//end::yamlconfig[]
 
     @Shared
@@ -69,9 +70,11 @@ flyway:
 
             ]
         ],
-        flyway     : [
-            default: [
-                locations: 'classpath:databasemigrations'
+        flyway: [
+            datasources: [
+                default: [
+                    locations: 'classpath:databasemigrations'
+                ]
             ]
         ],
         datasources: [

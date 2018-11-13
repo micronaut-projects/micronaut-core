@@ -89,7 +89,7 @@ class FlywayEndpointSpec extends Specification {
             ['jpa.default.packages-to-scan'                 : 'example.micronaut',
              'jpa.default.properties.hibernate.hbm2ddl.auto': 'none',
              'jpa.default.properties.hibernate.show_sql'    : true,
-             'flyway.default.locations'                     : 'classpath:databasemigrations',
+             'flyway.datasources.default.locations'         : 'classpath:databasemigrations',
              'endpoints.flyway.sensitive'                   : false,
              'datasources.default.url'                      : 'jdbc:h2:mem:flywayDb1;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
              'datasources.default.username'                 : 'sa',
@@ -125,8 +125,8 @@ class FlywayEndpointSpec extends Specification {
             ['jpa.default.packages-to-scan'                 : 'example.micronaut',
              'jpa.default.properties.hibernate.hbm2ddl.auto': 'none',
              'jpa.default.properties.hibernate.show_sql'    : true,
-             'flyway.default.locations'                     : 'classpath:databasemigrations',
-             'flyway.other.locations'                       : 'classpath:moremigrations',
+             'flyway.datasources.default.locations'         : 'classpath:databasemigrations',
+             'flyway.datasources.other.locations'           : 'classpath:moremigrations',
              'endpoints.flyway.sensitive'                   : false,
              'datasources.default.url'                      : 'jdbc:h2:mem:flywayDb2;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
              'datasources.default.username'                 : 'sa',
@@ -181,7 +181,7 @@ class FlywayEndpointSpec extends Specification {
 
         when:
         HttpResponse<List> response = rxClient.toBlocking()
-            .exchange(HttpRequest.GET("/flyway"), Argument.of(List, FlywayReport))
+            .exchange(HttpRequest.GET("/flyway"), Argument.of(List, Map))
 
         then:
         response.status() == HttpStatus.OK

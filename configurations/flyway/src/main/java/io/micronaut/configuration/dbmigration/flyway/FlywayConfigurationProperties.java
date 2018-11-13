@@ -33,7 +33,7 @@ import javax.sql.DataSource;
  * @see org.flywaydb.core.api.configuration.FluentConfiguration
  * @since 1.1.0
  */
-@EachProperty("flyway")
+@EachProperty("flyway.datasources")
 public class FlywayConfigurationProperties implements Toggleable {
 
     @SuppressWarnings("WeakerAccess")

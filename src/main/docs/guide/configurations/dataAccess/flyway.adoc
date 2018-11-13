@@ -21,12 +21,13 @@ You can define Flyway configuration for each datasource. The following example d
 [source, yaml]
 .src/main/resources/application.yml
 ----
-include::{testsflyway}/groovy/io/micronaut/dbmigration/flyway/FlywaySpec.groovy[tag=yamlconfig,indent=0]
+include::{testsflyway}/groovy/io/micronaut/configuration/dbmigration/flyway/FlywaySpec.groovy[tag=yamlconfig,indent=0]
 ----
 
 <1> Disable schema DDL creation.
-<2> Configure flyway configuration for `default` data source.
-<3> The migrations directory is `src/main/resources/databsemigrations`.
+<2> Define flyway configuration under `flyway.datasources` key.
+<3> Configure flyway configuration for `default` data source.
+<4> The migrations directory is `src/main/resources/databsemigrations`.
 
 
 In that directory you need to include all your migrations, for example:
@@ -39,11 +40,11 @@ include::{testsflyway}/resources/databasemigrations/V1__create-books-schema.sql[
 
 There are several options available for configuration:
 
-include::{includedir}configurationProperties/io.micronaut.dbmigration.flyway.FlywayConfigurationProperties.adoc[]
+include::{includedir}configurationProperties/io.micronaut.configuration.dbmigration.flyway.FlywayConfigurationProperties.adoc[]
 
 NOTE: By default Micronaut will configure Flyway to use the datasources defined under `datasources` configuration key. If
-you want to use a different datasource you need to define the properties `+flyway.*.url+`, `+flyway.*.user+` and
-`+flyway.*.password+`.
+you want to use a different datasource you need to define the properties `+flyway.datasources.*.url+`, `+flyway.datasources.*.user+`
+and `+flyway.datasources.*.password+`.
 
 
 === Endpoint
@@ -98,8 +99,5 @@ $ curl http://localhost:8080/flyway
     }]
 }]
 ----
-
-TIP: `installedOn` is an link:{jdkapi}/java/time/Instant.html[Instant] and by default it is rendered as a long. If you
-want to render as a _human readable_ date, add the following to `application.yml` `jackson.serialization.writeDatesAsTimestamps: false`
 
 NOTE: See the section on <<providedEndpoints, Built-in endpoints>> in the user guide for more information about endpoints.

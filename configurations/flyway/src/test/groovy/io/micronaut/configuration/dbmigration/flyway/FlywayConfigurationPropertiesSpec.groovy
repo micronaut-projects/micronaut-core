@@ -27,12 +27,12 @@ class FlywayConfigurationPropertiesSpec extends Specification {
     void "test change default database migrations locations"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-            ['spec.name'                        : FlywayConfigurationPropertiesSpec.simpleName,
-             'datasources.books.url'            : 'jdbc:h2:mem:flywayBooksDB1;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
-             'datasources.books.username'       : 'sa',
-             'datasources.books.password'       : '',
-             'datasources.books.driverClassName': 'org.h2.Driver',
-             'flyway.books.locations'           : 'classpath:databasemigrations',
+            ['spec.name'                         : FlywayConfigurationPropertiesSpec.simpleName,
+             'datasources.books.url'             : 'jdbc:h2:mem:flywayBooksDB1;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
+             'datasources.books.username'        : 'sa',
+             'datasources.books.password'        : '',
+             'datasources.books.driverClassName' : 'org.h2.Driver',
+             'flyway.datasources.books.locations': 'classpath:databasemigrations',
             ] as Map,
             Environment.TEST
         )
@@ -64,11 +64,11 @@ class FlywayConfigurationPropertiesSpec extends Specification {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
             ['spec.name'                         : FlywayConfigurationPropertiesSpec.simpleName,
-             'datasources.books.url'            : 'jdbc:h2:mem:flywayBooksDB2;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
-             'datasources.books.username'       : 'sa',
-             'datasources.books.password'       : '',
-             'datasources.books.driverClassName': 'org.h2.Driver',
-             'flyway.books.locations'           : 'classpath:databasemigrations,classpath:othermigrations',
+             'datasources.books.url'             : 'jdbc:h2:mem:flywayBooksDB2;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
+             'datasources.books.username'        : 'sa',
+             'datasources.books.password'        : '',
+             'datasources.books.driverClassName' : 'org.h2.Driver',
+             'flyway.datasources.books.locations': 'classpath:databasemigrations,classpath:othermigrations',
             ] as Map,
             Environment.TEST
         )
@@ -99,11 +99,11 @@ class FlywayConfigurationPropertiesSpec extends Specification {
     void 'test define flyway database connection and not use Micronaut datasource'() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
-            ['spec.name'             : FlywayConfigurationPropertiesSpec.simpleName,
-             'flyway.books.locations': 'classpath:databasemigrations',
-             'flyway.books.url'      : 'jdbc:h2:mem:flywayBooksDB3;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
-             'flyway.books.user'     : 'sa',
-             'flyway.books.password' : '',
+            ['spec.name'                         : FlywayConfigurationPropertiesSpec.simpleName,
+             'flyway.datasources.books.locations': 'classpath:databasemigrations',
+             'flyway.datasources.books.url'      : 'jdbc:h2:mem:flywayBooksDB3;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
+             'flyway.datasources.books.user'     : 'sa',
+             'flyway.datasources.books.password' : '',
             ] as Map,
             Environment.TEST
         )

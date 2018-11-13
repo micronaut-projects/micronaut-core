@@ -54,13 +54,13 @@ class FlywayConfigurationPropertiesEnabledSpec extends Specification {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
             ['spec.name'                         : FlywayConfigurationPropertiesEnabledSpec.simpleName,
-             'flyway.movies.enabled'             : true,
+             'flyway.datasources.movies.enabled' : true,
              'datasources.movies.url'            : 'jdbc:h2:mem:flyway2Db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
              'datasources.movies.username'       : 'sa',
              'datasources.movies.password'       : '',
              'datasources.movies.driverClassName': 'org.h2.Driver',
 
-             'flyway.books.enabled'              : true,
+             'flyway.datasources.books.enabled'  : true,
              'datasources.books.url'             : 'jdbc:h2:mem:flywayDb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
              'datasources.books.username'        : 'sa',
              'datasources.books.password'        : '',
@@ -92,7 +92,7 @@ class FlywayConfigurationPropertiesEnabledSpec extends Specification {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
             ['spec.name'                         : FlywayConfigurationPropertiesEnabledSpec.simpleName,
-             'flyway.movies.enabled'             : false,
+             'flyway.datasources.movies.enabled' : false,
              'datasources.movies.url'            : 'jdbc:h2:mem:flyway2Db;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE',
              'datasources.movies.username'       : 'sa',
              'datasources.movies.password'       : '',
