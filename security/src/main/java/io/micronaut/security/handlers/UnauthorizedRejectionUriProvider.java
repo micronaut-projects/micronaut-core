@@ -16,6 +16,8 @@
 
 package io.micronaut.security.handlers;
 
+import javax.validation.constraints.NotNull;
+
 /**
  *
  * Provides a uri to redirect to when a user tries to access a secured resource without authentication.
@@ -29,5 +31,6 @@ public interface UnauthorizedRejectionUriProvider {
      *
      * @return A uri to redirect to when a user tries to access a secured resource without authentication.
      */
+    @NotNull
     String unthorizedRedirectUri();
 }

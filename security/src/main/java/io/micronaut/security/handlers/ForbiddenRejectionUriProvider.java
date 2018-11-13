@@ -16,6 +16,8 @@
 
 package io.micronaut.security.handlers;
 
+import javax.validation.constraints.NotNull;
+
 /**
  *
  * Provides a uri to redirect to when an authenticated user tries to access a resource for which he does not have the
@@ -30,5 +32,6 @@ public interface ForbiddenRejectionUriProvider {
      *
      * @return A uri to redirect to when an authenticated user tries to access a resource for which he does not have the required authorization level.
      */
+    @NotNull
     String forbiddenRedirectUri();
 }
