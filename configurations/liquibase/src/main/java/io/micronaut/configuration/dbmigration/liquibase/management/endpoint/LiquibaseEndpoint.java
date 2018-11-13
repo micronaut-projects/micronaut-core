@@ -64,19 +64,20 @@ public class LiquibaseEndpoint {
     @Read
     public Flowable<LiquibaseReport> liquibaseMigrations() {
         return Flowable.create(emitter -> {
+            DatabaseFactory factory = DatabaseFactory.getInstance();
+
             if (liquibaseConfigurationProperties != null) {
                 for (LiquibaseConfigurationProperties conf : liquibaseConfigurationProperties) {
                     if (conf.isEnabled()) {
-                        DatabaseFactory factory = DatabaseFactory.getInstance();
-                        StandardChangeLogHistoryService service = new StandardChangeLogHistoryService();
-                        DataSource dataSource = conf.getDataSource();
-
                         JdbcConnection jdbcConnection = null;
+
                         try {
+                            DataSource dataSource = conf.getDataSource();
                             Connection connection = dataSource.getConnection();
                             jdbcConnection = new JdbcConnection(connection);
 
                             Database database = factory.findCorrectDatabaseImplementation(jdbcConnection);
+                            StandardChangeLogHistoryService service = new StandardChangeLogHistoryService();
                             service.setDatabase(database);
                             emitter.onNext(new LiquibaseReport(conf.getNameQualifier(), service.getRanChangeSets()));
                         } catch (SQLException | DatabaseException ex) {
