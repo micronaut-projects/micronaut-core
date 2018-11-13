@@ -30,6 +30,7 @@ import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.KeyType;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.SignedJWT;
+import io.micronaut.context.annotation.EachBean;
 import io.micronaut.security.token.jwt.signature.SignatureConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -48,11 +49,12 @@ import java.util.Optional;
 /**
  * Signature configuration which enables verification of remote JSON Web Key Set.
  *
- * A bean of this class is created by {@link io.micronaut.security.token.jwt.signature.jwks.JwksSignatureFactory} for each {@link io.micronaut.security.token.jwt.signature.jwks.JwksSignatureConfigurationProperties}.
+ * A bean of this class is created for each {@link io.micronaut.security.token.jwt.signature.jwks.JwksSignatureConfigurationProperties}.
  *
  * @author Sergio del Amo
  * @since 1.1.0
  */
+@EachBean(JwksSignatureConfigurationProperties.class)
 public class JwksSignatureConfiguration implements SignatureConfiguration {
 
     private static final Logger LOG = LoggerFactory.getLogger(JwksSignatureConfiguration.class);
