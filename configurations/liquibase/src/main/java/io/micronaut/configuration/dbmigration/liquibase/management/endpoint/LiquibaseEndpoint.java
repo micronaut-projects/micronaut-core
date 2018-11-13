@@ -26,8 +26,11 @@ import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
 import liquibase.database.jvm.JdbcConnection;
 import liquibase.exception.DatabaseException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.Collection;
 
@@ -35,12 +38,12 @@ import java.util.Collection;
  * Provides a liquibase endpoint to get all the migrations applied.
  *
  * @author Iván López
- * @see <a href="https://github.com/spring-projects/spring-boot/blob/v2.0.6.RELEASE/spring-boot-project/spring-boot-actuator/src/main/java/org/springframework/boot/actuate/liquibase/LiquibaseEndpoint.java">LiquibaseEndpoint</a>
  * @since 1.1
  */
 @Endpoint(id = LiquibaseEndpoint.NAME)
 public class LiquibaseEndpoint {
 
+    private static final Logger LOG = LoggerFactory.getLogger(LiquibaseEndpoint.class);
     /**
      * Endpoint name.
      */
@@ -68,29 +71,32 @@ public class LiquibaseEndpoint {
                         StandardChangeLogHistoryService service = new StandardChangeLogHistoryService();
                         DataSource dataSource = conf.getDataSource();
 
+                        JdbcConnection jdbcConnection = null;
                         try {
-                            JdbcConnection connection = new JdbcConnection(dataSource.getConnection());
+                            Connection connection = dataSource.getConnection();
+                            jdbcConnection = new JdbcConnection(connection);
 
-                            try {
-                                Database database = factory.findCorrectDatabaseImplementation(connection);
-                                service.setDatabase(database);
-                                emitter.onNext(
-                                        new LiquibaseReport(conf.getNameQualifier(), service.getRanChangeSets())
-                                );
-
-                            } finally {
-                                connection.close();
-                            }
-
+                            Database database = factory.findCorrectDatabaseImplementation(jdbcConnection);
+                            service.setDatabase(database);
+                            emitter.onNext(new LiquibaseReport(conf.getNameQualifier(), service.getRanChangeSets()));
                         } catch (SQLException | DatabaseException ex) {
-                            emitter.onError(new IllegalStateException("Unable to get Liquibase changelog", ex));
+                            emitter.onError(ex);
+                        } finally {
+                            if (jdbcConnection != null) {
+                                try {
+                                    jdbcConnection.close();
+                                } catch (DatabaseException e) {
+                                    if (LOG.isWarnEnabled()) {
+                                        LOG.warn("Failed to close a connection to the liquibase datasource", e);
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             }
 
             emitter.onComplete();
-
         }, BackpressureStrategy.BUFFER);
     }
 }
