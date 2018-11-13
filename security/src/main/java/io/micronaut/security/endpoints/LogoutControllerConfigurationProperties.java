@@ -22,6 +22,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.security.config.SecurityConfigurationProperties;
 
 /**
+ * Implementation of {@link LogoutControllerConfiguration} used to configure the {@link LogoutController}.
  *
  * @author Sergio del Amo
  * @since 1.0
@@ -43,8 +44,15 @@ public class LogoutControllerConfigurationProperties implements LogoutController
     @SuppressWarnings("WeakerAccess")
     public static final String DEFAULT_PATH = "/logout";
 
+    /**
+     * Default Get Allowed.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_GETALLOWED = false;
+
     private boolean enabled = DEFAULT_ENABLED;
     private String path = DEFAULT_PATH;
+    private boolean getAllowed = DEFAULT_GETALLOWED;
 
     /**
      * @return true if you want to enable the {@link LogoutController}
@@ -74,5 +82,21 @@ public class LogoutControllerConfigurationProperties implements LogoutController
      */
     public void setPath(String path) {
         this.path = path;
+    }
+
+    /**
+     * @return true if you want to support HTTP GET invocations in the {@link LogoutController}.
+     */
+    @Override
+    public boolean isGetAllowed() {
+        return this.getAllowed;
+    }
+
+    /**
+    *  Enables HTTP GET invocations of {@link io.micronaut.security.endpoints.LogoutController}. Default value ({@value #DEFAULT_GETALLOWED}).
+     * @param getAllowed Whether Http GET should be supported.
+    */
+    public void setGetAllowed(boolean getAllowed) {
+        this.getAllowed = getAllowed;
     }
 }
