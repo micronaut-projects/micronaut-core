@@ -135,7 +135,7 @@ ext {
                 version: nettyVersion,
                 group:'io.netty',
                 name:'netty-codec-http',
-                modules: ['netty-buffer', 'netty-codec', 'netty-codec-dns', 'netty-codec-haproxy', 
+                modules: ['netty-all', 'netty-buffer', 'netty-codec', 'netty-codec-dns', 'netty-codec-haproxy', 
                           'netty-codec-http2', 'netty-codec-memcache', 'netty-codec-mqtt', 
                           'netty-codec-redis', 'netty-codec-smtp', 'netty-codec-socks', 'netty-codec-stomp', 
                           'netty-codec-xml', 'netty-common', 'netty-dev-tools', 'netty-handler', 
