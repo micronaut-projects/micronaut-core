@@ -16,6 +16,8 @@
 
 package io.micronaut.configuration.dbmigration.liquibase.management.endpoint;
 
+import liquibase.changelog.RanChangeSet;
+
 import java.util.List;
 
 /**
@@ -28,19 +30,13 @@ import java.util.List;
 public class LiquibaseReport {
 
     private String name;
-    private List<ChangeSet> changeSets;
-
-    /**
-     * Default constructor.
-     */
-    public LiquibaseReport() {
-    }
+    private List<RanChangeSet> changeSets;
 
     /**
      * @param name       The name of the data source
      * @param changeSets The list of changes
      */
-    public LiquibaseReport(String name, List<ChangeSet> changeSets) {
+    public LiquibaseReport(String name, List<RanChangeSet> changeSets) {
         this.name = name;
         this.changeSets = changeSets;
     }
@@ -53,23 +49,9 @@ public class LiquibaseReport {
     }
 
     /**
-     * @param name The name of the data source
-     */
-    public void setName(String name) {
-        this.name = name;
-    }
-
-    /**
      * @return The list of change sets
      */
-    public List<ChangeSet> getChangeSets() {
+    public List<RanChangeSet> getChangeSets() {
         return changeSets;
-    }
-
-    /**
-     * @param changeSets The list of the change sets
-     */
-    public void setChangeSets(List<ChangeSet> changeSets) {
-        this.changeSets = changeSets;
     }
 }

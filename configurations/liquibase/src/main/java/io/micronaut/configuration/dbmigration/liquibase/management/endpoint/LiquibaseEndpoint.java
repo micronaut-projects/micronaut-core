@@ -19,6 +19,8 @@ package io.micronaut.configuration.dbmigration.liquibase.management.endpoint;
 import io.micronaut.configuration.dbmigration.liquibase.LiquibaseConfigurationProperties;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
+import io.reactivex.BackpressureStrategy;
+import io.reactivex.Flowable;
 import liquibase.changelog.StandardChangeLogHistoryService;
 import liquibase.database.Database;
 import liquibase.database.DatabaseFactory;
@@ -27,10 +29,7 @@ import liquibase.exception.DatabaseException;
 
 import javax.sql.DataSource;
 import java.sql.SQLException;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Provides a liquibase endpoint to get all the migrations applied.
@@ -50,8 +49,6 @@ public class LiquibaseEndpoint {
     private final Collection<LiquibaseConfigurationProperties> liquibaseConfigurationProperties;
 
     /**
-     * Constructor.
-     *
      * @param liquibaseConfigurationProperties Collection of Liquibase Configurations
      */
     public LiquibaseEndpoint(Collection<LiquibaseConfigurationProperties> liquibaseConfigurationProperties) {
@@ -59,45 +56,41 @@ public class LiquibaseEndpoint {
     }
 
     /**
-     * @return A list of liquibase changes per active configuration
+     * @return A flowable with liquibase changes per active configuration
      */
     @Read
-    public List<LiquibaseReport> liquibaseMigrations() {
-        List<LiquibaseReport> reports = new ArrayList<>();
-
-        if (liquibaseConfigurationProperties != null) {
-            for (LiquibaseConfigurationProperties conf : liquibaseConfigurationProperties) {
-                if (conf.isEnabled()) {
-                    DatabaseFactory factory = DatabaseFactory.getInstance();
-                    StandardChangeLogHistoryService service = new StandardChangeLogHistoryService();
-                    DataSource dataSource = conf.getDataSource();
-
-                    try {
-                        JdbcConnection connection = new JdbcConnection(dataSource.getConnection());
+    public Flowable<LiquibaseReport> liquibaseMigrations() {
+        return Flowable.create(emitter -> {
+            if (liquibaseConfigurationProperties != null) {
+                for (LiquibaseConfigurationProperties conf : liquibaseConfigurationProperties) {
+                    if (conf.isEnabled()) {
+                        DatabaseFactory factory = DatabaseFactory.getInstance();
+                        StandardChangeLogHistoryService service = new StandardChangeLogHistoryService();
+                        DataSource dataSource = conf.getDataSource();
 
                         try {
-                            Database database = factory.findCorrectDatabaseImplementation(connection);
-                            service.setDatabase(database);
-                            reports.add(
-                                    new LiquibaseReport(
-                                            conf.getNameQualifier(),
-                                            service.getRanChangeSets()
-                                                    .stream()
-                                                    .map(ChangeSet::new)
-                                                    .collect(Collectors.toList())
-                                    )
-                            );
-                        } finally {
-                            connection.close();
-                        }
+                            JdbcConnection connection = new JdbcConnection(dataSource.getConnection());
 
-                    } catch (SQLException | DatabaseException ex) {
-                        throw new IllegalStateException("Unable to get Liquibase changelog", ex);
+                            try {
+                                Database database = factory.findCorrectDatabaseImplementation(connection);
+                                service.setDatabase(database);
+                                emitter.onNext(
+                                        new LiquibaseReport(conf.getNameQualifier(), service.getRanChangeSets())
+                                );
+
+                            } finally {
+                                connection.close();
+                            }
+
+                        } catch (SQLException | DatabaseException ex) {
+                            emitter.onError(new IllegalStateException("Unable to get Liquibase changelog", ex));
+                        }
                     }
                 }
             }
-        }
 
-        return reports;
+            emitter.onComplete();
+
+        }, BackpressureStrategy.BUFFER);
     }
 }

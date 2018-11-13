@@ -101,7 +101,7 @@ class LiquibaseEndpointSpec extends Specification {
 
         when:
         HttpResponse<List> response = rxClient.toBlocking()
-            .exchange(HttpRequest.GET("/liquibase"), Argument.of(List, LiquibaseReport))
+            .exchange(HttpRequest.GET("/liquibase"), Argument.of(List, Map))
 
         then:
         response.status() == HttpStatus.OK
@@ -143,7 +143,7 @@ class LiquibaseEndpointSpec extends Specification {
 
         when:
         HttpResponse<List> response = rxClient.toBlocking()
-            .exchange(HttpRequest.GET("/liquibase"), Argument.of(List, LiquibaseReport))
+            .exchange(HttpRequest.GET("/liquibase"), Argument.of(List, Map))
 
         then:
         response.status() == HttpStatus.OK
