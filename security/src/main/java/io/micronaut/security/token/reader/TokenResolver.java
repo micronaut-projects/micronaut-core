@@ -21,7 +21,7 @@ import io.micronaut.http.HttpRequest;
 import java.util.Optional;
 
 /**
- * Returns the first found token in every available {@link io.micronaut.security.token.reader.TokenReader}.
+ * Returns the token from the provided request.
  *
  * @author Sergio del Amo
  * @since 1.1.0
@@ -29,9 +29,10 @@ import java.util.Optional;
 public interface TokenResolver {
 
     /**
+     * Resolves the token from the provided request.
      *
-     * @param request The current HTTP request.
-     * @return the first found token in the supplied request. Empty if none found.
+     * @param request The HTTP request.
+     * @return The token in the supplied request. Empty if no token was found.
      */
-    Optional<String> findFirstToken(HttpRequest<?> request);
+    Optional<String> resolveToken(HttpRequest<?> request);
 }

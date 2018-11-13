@@ -59,7 +59,7 @@ public class TokenAuthenticationFetcher implements AuthenticationFetcher {
     /**
      * @param tokenValidators The list of {@link TokenValidator} which attempt to validate the request
      * @param tokenResolver   The {@link io.micronaut.security.token.reader.TokenResolver} which returns the first found token in the request.
-     * @param eventPublisher  The Application event publiser
+     * @param eventPublisher  The Application event publisher
      */
     @Inject
     public TokenAuthenticationFetcher(Collection<TokenValidator> tokenValidators,
@@ -71,11 +71,12 @@ public class TokenAuthenticationFetcher implements AuthenticationFetcher {
     }
 
     /**
-     * Deprecated. You can called the preferred constructor with new TokenAuthenticationFetcher(tokenValidators, new DefaultTokenResolver(tokenReaders), eventPublisher).
+     * @deprecated Use {@link #TokenAuthenticationFetcher(Collection, TokenResolver, ApplicationEventPublisher)} instead.
+     * A {@link TokenResolver} can be created using {@link DefaultTokenResolver#DefaultTokenResolver(Collection)}.
      *
      * @param tokenValidators The list of {@link TokenValidator} which attempt to validate the request
      * @param tokenReaders    The list {@link TokenReader} which attempt to read the request
-     * @param eventPublisher  The Application event publiser
+     * @param eventPublisher  The Application event publisher
      */
     @Deprecated
     public TokenAuthenticationFetcher(Collection<TokenValidator> tokenValidators,
@@ -88,7 +89,7 @@ public class TokenAuthenticationFetcher implements AuthenticationFetcher {
     @Override
     public Publisher<Authentication> fetchAuthentication(HttpRequest<?> request) {
 
-        Optional<String> token = tokenResolver.findFirstToken(request);
+        Optional<String> token = tokenResolver.resolveToken(request);
 
         if (!token.isPresent()) {
             return Flowable.empty();
