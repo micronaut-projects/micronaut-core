@@ -23,10 +23,11 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.security.annotation.Secured;
 import io.micronaut.security.rules.SecurityRule;
+import io.reactivex.Flowable;
+import io.reactivex.Single;
 import net.minidev.json.JSONObject;
 
 import java.util.Collection;
-import java.util.stream.Collectors;
 
 /**
  * Endpoint which exposes a JSON Web Key Set built with the JWK provided by {@link io.micronaut.security.token.jwt.endpoints.JwkProvider} beans.
@@ -54,9 +55,11 @@ public class KeysController {
      * @return a JSON Web Key Set (JWKS) payload.
      */
     @Get
-    public JSONObject keys() {
-        return new JWKSet(jwkProviders.stream()
+    public Single<JSONObject> keys() {
+        return Flowable.fromIterable(jwkProviders)
                 .map(JwkProvider::retrieveJsonWebKey)
-                .collect(Collectors.toList())).toJSONObject();
+                .toList()
+                .map(JWKSet::new)
+                .map(JWKSet::toJSONObject);
     }
 }
