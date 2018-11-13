@@ -34,6 +34,22 @@ Or use the provided script:
 $ ./docker-build.sh
 ----
 
+Also you can use the multi-stage dockerfile 'DockerfileAllInOne` who build the project in 3 steps
+
+- using a gradle image will build the project
+- using a graalvm image will build the native application
+- using a typical dockerfile structure will build the final image
+
+[source,bash]
+----
+$ docker build . -t hello-world -f DockerfileAllInOne <1>
+$ docker run --rm --name hello-world --network=host hello-world # <2>
+----
+<1> `-f` set the file to use in the build process
+<2> Start the Docker container with `--network=host` makes the application uses the same network as the host so all ports are exposed automatically without needing to map them manually. Also `--rm` remove the container named `hello-world` once finished
+
+With this approach you need to have installed only Docker as it downloads required images, if it's necessary.
+
 
 ==== Build native image without using Docker
 
