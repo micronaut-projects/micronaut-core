@@ -1130,9 +1130,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             nettyHeaders.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
         }
 
-        Optional<NettyCustomizableResponseTypeHandlerInvoker> customizableTypeBody = message.getBody(NettyCustomizableResponseTypeHandlerInvoker.class);
-        if (customizableTypeBody.isPresent()) {
-            NettyCustomizableResponseTypeHandlerInvoker handler = customizableTypeBody.get();
+        final Object body = message.body();
+        if (body instanceof NettyCustomizableResponseTypeHandlerInvoker) {
+            NettyCustomizableResponseTypeHandlerInvoker handler = (NettyCustomizableResponseTypeHandlerInvoker) body;
             handler.invoke(httpRequest, nettyHttpResponse, context);
         } else {
             // close handled by HttpServerKeepAliveHandler
