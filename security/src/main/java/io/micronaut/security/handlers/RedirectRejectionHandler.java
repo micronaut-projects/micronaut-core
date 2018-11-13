@@ -106,7 +106,7 @@ public class RedirectRejectionHandler implements RejectionHandler {
      */
     protected String redirectUri(boolean forbidden) {
         String uri = forbidden ? getForbiddenRejectionUriProvider().forbiddenRedirectUri() :
-                getUnauthorizedRejectionUriProvider().unthorizedRedirectUri();
+                getUnauthorizedRejectionUriProvider().unauthorizedRedirectUri();
         if (LOG.isDebugEnabled()) {
             LOG.debug("redirect uri: {}", uri);
         }

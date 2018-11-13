@@ -159,7 +159,7 @@ public class SecuritySessionConfigurationProperties implements SecuritySessionCo
     }
 
     @Override
-    public String unthorizedRedirectUri() {
+    public String unauthorizedRedirectUri() {
         return this.unauthorizedTargetUrl;
     }
 

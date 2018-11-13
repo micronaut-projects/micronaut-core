@@ -32,5 +32,5 @@ public interface UnauthorizedRejectionUriProvider {
      * @return A uri to redirect to when a user tries to access a secured resource without authentication.
      */
     @NotNull
-    String unthorizedRedirectUri();
+    String unauthorizedRedirectUri();
 }
