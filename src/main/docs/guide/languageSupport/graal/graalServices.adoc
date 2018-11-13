@@ -16,7 +16,7 @@ The `graal-native-image` feature adds four important items:
 4. A `build-native-image.sh` script to build the native image without using Docker.
 
 
-==== Build native image using Docker
+==== Building a Native Image Using Docker
 
 To build your native image using Docker simply run:
 
@@ -34,8 +34,25 @@ Or use the provided script:
 $ ./docker-build.sh
 ----
 
+Also you can use the multi-stage dockerfile 'DockerfileAllInOne` which builds the project in three steps:
 
-==== Build native image without using Docker
+1. A Gradle or Maven image will build the project
+2. A GraalVM official image will build the native image
+3. A typical dockerfile structure will build the final image which in smaller due to layering
+
+[source,bash]
+----
+$ docker build . -t hello-world -f DockerfileAllInOne <1>
+$ docker run --rm --name hello-world --network=host hello-world # <2>
+----
+
+<1> `-f` sets the file to use in the build process
+<2> Starting the Docker container with `--network=host` makes the application use the same network as the host so all ports are exposed automatically without needing to map them manually. Also `--rm` remove the container named `hello-world` once finished
+
+With this approach you need to have installed only Docker as it downloads the required images, if necessary.
+
+
+==== Building a Native Image Without Using Docker
 
 To build your native image without using Docker you need to install GraalVM SDK via the https://www.graalvm.org/docs/getting-started/[Getting Started] instructions or using SDKman:
 
