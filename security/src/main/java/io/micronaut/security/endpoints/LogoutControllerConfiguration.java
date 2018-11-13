@@ -29,4 +29,10 @@ public interface LogoutControllerConfiguration extends Toggleable {
      * @return path
      */
     String getPath();
+
+    /**
+     *
+     * @return Whether HTTP method GET is allowed to invoke {@link LogoutController}.
+     */
+    boolean isGetAllowed();
 }
