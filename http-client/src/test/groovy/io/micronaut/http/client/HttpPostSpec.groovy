@@ -231,6 +231,20 @@ class HttpPostSpec extends Specification {
         body == "a,b"
     }
 
+    void "test url encoded request with a list of params bound to a POJO"() {
+        when:
+        BlockingHttpClient blockingHttpClient = client.toBlocking()
+        String body = blockingHttpClient.retrieve(
+                HttpRequest.POST("/post/multipleParamsBody", [param: ["a", "b"]])
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        )
+
+        then:
+        body == "a,b"
+    }
+
     void "test multipart request with a list of params"() {
         when:
         BlockingHttpClient blockingHttpClient = client.toBlocking()
@@ -315,11 +329,22 @@ class HttpPostSpec extends Specification {
                 return "value=${data.param}"
             }
         }
+
+        @Post(uri = "/multipleParamsBody",
+                consumes = [MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA],
+                produces = MediaType.TEXT_PLAIN)
+        String multipleParams(@Body Params data) {
+            return data.param.join(",")
+        }
     }
 
     @EqualsAndHashCode
     static class Book {
         String title
         Integer pages
+    }
+
+    static class Params {
+        List<String> param
     }
 }
