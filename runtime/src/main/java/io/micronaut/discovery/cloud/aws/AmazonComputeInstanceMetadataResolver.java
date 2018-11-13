@@ -34,10 +34,7 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.readMetadataUrl;
 
@@ -143,6 +140,21 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
         }
         cachedMetadata = ec2InstanceMetadata;
         return Optional.of(ec2InstanceMetadata);
+    }
+
+    /**
+     * Read EC2 metadata from the given URL.
+     *
+     * @param url URL to fetch AWS EC2 metadata information
+     * @param connectionTimeoutMs connection timeout in millis
+     * @param readTimeoutMs read timeout in millis
+     * @return AWS EC2 metadata information
+     * @throws IOException Signals that an I/O exception of some sort has occurred
+     * @deprecated See {@link io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils#readMetadataUrl(URL, int, int, ObjectMapper, Map)}
+     */
+    @Deprecated
+    protected JsonNode readEc2MetadataJson(URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException {
+        return readMetadataUrl(url, connectionTimeoutMs, readTimeoutMs, objectMapper, Collections.emptyMap());
     }
 
     /**

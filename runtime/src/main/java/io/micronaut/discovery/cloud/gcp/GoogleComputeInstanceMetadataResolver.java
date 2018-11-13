@@ -160,4 +160,19 @@ public class GoogleComputeInstanceMetadataResolver implements ComputeInstanceMet
 
         return Optional.empty();
     }
+
+    /**
+     * Get instance Metadata JSON.
+     *
+     * @param url                 The metadata URL
+     * @param connectionTimeoutMs connection timeout in millis
+     * @param readTimeoutMs       read timeout in millis
+     * @return The Metadata JSON
+     * @throws IOException Failed or interrupted I/O operations while reading from input stream.
+     * @deprecated See {@link io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils#readMetadataUrl(URL, int, int, ObjectMapper, Map)}
+     */
+    @Deprecated
+    protected JsonNode readGcMetadataUrl(URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException {
+        return readMetadataUrl(url, connectionTimeoutMs, readTimeoutMs, objectMapper, Collections.emptyMap());
+    }
 }
