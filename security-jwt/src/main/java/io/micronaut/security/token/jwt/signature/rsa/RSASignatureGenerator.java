@@ -69,7 +69,7 @@ public class RSASignatureGenerator extends RSASignature implements SignatureGene
      */
     protected SignedJWT signWithPrivateKey(JWTClaimsSet claims, @NotNull RSAPrivateKey privateKey) throws JOSEException {
         final JWSSigner signer = new RSASSASigner(privateKey);
-        JWSHeader jwsHeader = keyId == null ? new JWSHeader(algorithm) : new JWSHeader.Builder(algorithm).keyID(keyId).build();
+        JWSHeader jwsHeader = new JWSHeader.Builder(algorithm).keyID(keyId).build();
         final SignedJWT signedJWT = new SignedJWT(jwsHeader, claims);
         signedJWT.sign(signer);
         return signedJWT;
