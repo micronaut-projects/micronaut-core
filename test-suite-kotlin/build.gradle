@@ -11,6 +11,8 @@ dependencies {
     testCompileOnly project(':inject-java')
     kaptTest project(':inject-java')
     testCompile "junit:junit:4.7"
+
+    testCompile project(":http-client")
 }
 
 compileTestKotlin {
