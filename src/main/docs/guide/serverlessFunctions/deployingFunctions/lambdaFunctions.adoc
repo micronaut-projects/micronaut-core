@@ -1,28 +1,12 @@
 TIP: Read http://guides.micronaut.io/micronaut-function-aws-lambda/guide/index.html[Micronaut Functions deployed in AWS Lambda] guide for a step by step tutorial.
 
-For Java & Kotlin functions, support for http://aws.amazon.com[AWS Lambda] can be enabled by adding the `function-aws` dependency to your classpath. For example, in `build.gradle`:
+For Java & Kotlin functions, support for http://aws.amazon.com[AWS Lambda] can be enabled by adding the `function-aws` dependency to your classpath.
 
-.build.gradle
-[source,groovy]
-----
-dependencies {
-    ...
-    compile "io.micronaut:micronaut-function-aws"
-    ...
-}
-----
+dependency:micronaut-function-aws[]
 
 For Groovy functions, the `function-groovy` dependency is sufficient for AWS Lambda support.
 
-.build.gradle
-[source,groovy]
-----
-dependencies {
-    ...
-    compile "io.micronaut:micronaut-function-groovy"
-    ...
-}
-----
+dependency:micronaut-function-groovy[]
 
 == Configuration
 
