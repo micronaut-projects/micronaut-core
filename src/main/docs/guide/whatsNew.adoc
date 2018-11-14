@@ -1,97 +1,30 @@
-Apart from https://github.com/micronaut-projects/micronaut-core/milestone/6?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features.
+Apart from https://github.com/micronaut-projects/micronaut-core/milestone/9?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features and improvements.
 
-=== Improvements from RC3 to GA
+=== Micronaut for Spring
 
-GraalVM support has been updated to use Docker instead of a `./build-native-image` script allowing usage of other platforms.
+It is now possible using Ahead of Time compilation to use the Spring annotation based programming model to build Micronaut applications. See the documentation for https://github.com/micronaut-projects/micronaut-spring[Micronaut for Spring] for details.
 
-The official GraalVM Docker images are used, so to build a native image you can simply execute `docker build . -t myimage` in the root of your project.
+=== Improved GraalVM Docker Files
 
-=== Support for GraalVM Native Images
+The Dockerfiles for GraalVM have been improved including a new all-in-one docker file that will build a slimmed down image including only your application using:
 
-Micronaut now includes experimental support for compiling down to https://www.graalvm.org[GraalVM] native images using the `nativeimage` tool shipped as part of Graal (1.0.0 RC6 and above).
-
-This is possible due to to Micronaut's reflection-free approach to Dependency Injection and AOP.
-
-See the section on <<graal, GraalVM support>> in the user guide for more information.
-
-=== Swagger / OpenAPI Documentation Support
-
-Micronaut now includes the ability to generate Swagger (OpenAPI) YAML at compile time using the language neutral visitor API and the interfaces defined by the pkg:io.micronaut.inject.ast[] package.
-
-See the section on <<openapi, OpenAPI / Swagger Support>> in the user guide for more information.
-
-=== Native WebSocket Support
-
-Built-in support for WebSocket for both the client and the server has been added. The following example is a simple server chat implementation:
-
-.WebSocket Chat Example
-[source,java]
-----
-include::{testswebsocket}/ChatServerWebSocket.java[]
-----
-
-See the section on <<websocket, WebSocket Support>> in the user guide for more information.
-
-==== CLI Commands for WebSockets
-
-The Micronaut CLI now includes two new commands for generating WebSocket clients and servers.
-
+.Using `DockerAllInOne`
 [source,bash]
 ----
-$ mn create-websocket-server MyChat
-| Rendered template WebsocketServer.java to destination src/main/java/example/MyChatServer.java
-$ mn create-websocket-client MyChat
-| Rendered template WebsocketClient.java to destination src/main/java/example/MyChatClient.java
+$ docker build . -f DockerfileAllInOne -t hello-world
 ----
 
-=== Compilation Time Validation
+=== Inheritance support for Swagger
 
-The `validation` module can now be added to the `annotationProcessor` classpath and which will result in additional compile time checks, ensuring that users are using the framework correctly. For example, the following route method:
+Compile-time support for Swagger has been improved to support inheritance when building the Swagger models.
 
-[source,java]
-----
-@Get("/hello/{name}")
-public Single<String> hello(@NotBlank String na) {
-     return Single.just("Hello " + na + "!");
-}
-----
+=== Improvements for JDK 11
 
-Will produce the following error at compile time:
+Various improvements have been made to improve the Micronaut experience on JDK 11.
 
-[source]
-----
-hello-world-java/src/main/java/example/HelloController.java:34: error: The route declares a uri variable named [name], but no corresponding method argument is present
-    public Single<String> hello(@NotBlank String na) {
-                          ^
-----
+=== Improved support for OpenFaaS
 
-This lessens the need for IDE support designed specifically for Micronaut.
-
-=== Experimental JMX Support for Endpoints
-
-Experimental support for exposing <<endpoints, management endpoints>> over JMX has been added via the `jmx` module. See the section on <<jmx, JMX Support>> for more information on how to use this feaure.
-
-=== Multitenancy support
-
-Latest release includes <<multitenancy,Multitenancy>> integration into the framework. Features includes tenant resolution, propagation and integration with <<multitenancyGorm,GORM>> which supports discriminator, table and schema multitenancy modes.
-
-=== Token Propagation
-
-Latest release includes <<tokenPropagation,Token Propagation>> capabilities into the security module of the the framework. It enables the propagation of valid tokens to outgoing requests triggered by the original request in a transparent way.
-
-=== Ldap Authentication
-
-Latest release supports <<ldap,authentication with LDAP>> out of the box. Moreover, the LDAP authentication in Micronaut supports configuration of one or more LDAP servers to authenticate with.
-
-=== Documentation Improvements
-
-The documentation you are reading has been improved with a new configuration reference button at the top that contains a reference produced at compile time of all the available configuration options in Micronaut.
-
-
-=== Dependency Upgrades
-
-The following dependency upgrades occurred in this release:
-
+<<<<<<< HEAD
 - Netty `4.1.29` -> `4.1.30`
 - RxJava `2.2.0` -> `2.2.2`
 //- Groovy `2.5.1` -> `2.5.2`
@@ -104,7 +37,10 @@ The following dependency upgrades occurred in this release:
 - Brave `5.2.0` -> `5.4.2`
 - Zipkin Reporter `2.7.7` -> `2.7.9`
 - Spring `5.0.8` -> `5.1.0`
+=======
+The OpenFaaS feature of the CLI now generates an appropriate `function.yml` file so you can use the OpenFaaS CLI to deploy functions implemented in Micronaut.
+>>>>>>> 1.0.x
 
-=== Amazon Route 53 Service Discovery and AWS Systems Manager Parameter Store Support
+=== AOP Advice on Factory Beans
 
-Use Amazon Route 53 Service Discovery directly for service discovery instead of running an instance of tools like Consul. You can also use AWS Systems Manager Parameter Store for shared configuration between nodes.
+It is now possible to apply AOP advice like `@Retryable` at the class level for `@Factory` beans allowing for the container to be dynamic (for example to retry bean creation if it fails in a cloud environment).

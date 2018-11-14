@@ -7,6 +7,10 @@ buildscript {
     }
 }
 
+ext {
+    bomExclude = true
+}
+
 dependencies {
     testCompile project(":http-server-netty")
     testCompile project(":http-client")

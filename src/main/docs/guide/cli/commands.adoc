@@ -135,7 +135,7 @@ $ mn create-controller Book
 |
 |===
 
-The `create-client` command generates a simple api:http.client.Client[] interface. It follows a `*Client` convention for generating the class name. It does not create an associated test.
+The `create-client` command generates a simple api:http.client.annotation.Client[] interface. It follows a `*Client` convention for generating the class name. It does not create an associated test.
 
 [source,bash]
 ----

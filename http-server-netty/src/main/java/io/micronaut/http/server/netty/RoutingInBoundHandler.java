@@ -1130,9 +1130,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             nettyHeaders.add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
         }
 
-        Optional<NettyCustomizableResponseTypeHandlerInvoker> customizableTypeBody = message.getBody(NettyCustomizableResponseTypeHandlerInvoker.class);
-        if (customizableTypeBody.isPresent()) {
-            NettyCustomizableResponseTypeHandlerInvoker handler = customizableTypeBody.get();
+        final Object body = message.body();
+        if (body instanceof NettyCustomizableResponseTypeHandlerInvoker) {
+            NettyCustomizableResponseTypeHandlerInvoker handler = (NettyCustomizableResponseTypeHandlerInvoker) body;
             handler.invoke(httpRequest, nettyHttpResponse, context);
         } else {
             // close handled by HttpServerKeepAliveHandler
@@ -1147,17 +1147,23 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                                        MediaType mediaType,
                                                        ChannelHandlerContext context,
                                                        AtomicReference<HttpRequest<?>> requestReference) {
-        ByteBuf byteBuf = encodeBodyAsByteBuf(body, codec, context, requestReference);
-        int len = byteBuf.readableBytes();
-        MutableHttpHeaders headers = response.getHeaders();
-        if (!headers.contains(HttpHeaders.CONTENT_TYPE)) {
-            headers.add(HttpHeaderNames.CONTENT_TYPE, mediaType);
-        }
-        headers.remove(HttpHeaders.CONTENT_LENGTH);
-        headers.add(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(len));
+        ByteBuf byteBuf;
+        try {
+            byteBuf = encodeBodyAsByteBuf(body, codec, context, requestReference);
+            int len = byteBuf.readableBytes();
+            MutableHttpHeaders headers = response.getHeaders();
+            if (!headers.contains(HttpHeaders.CONTENT_TYPE)) {
+                headers.add(HttpHeaderNames.CONTENT_TYPE, mediaType);
+            }
+            headers.remove(HttpHeaders.CONTENT_LENGTH);
+            headers.add(HttpHeaderNames.CONTENT_LENGTH, String.valueOf(len));
 
-        setBodyContent(response, byteBuf);
-        return response;
+            setBodyContent(response, byteBuf);
+            return response;
+        } catch (LinkageError e) {
+            // rxjava swallows linkage errors for some reasons so if one occurs, rethrow as a internal error
+            throw new InternalServerException("Fatal error encoding bytebuf: " + e.getMessage() , e);
+        }
     }
 
     private MutableHttpResponse<?> setBodyContent(MutableHttpResponse response, Object bodyContent) {
@@ -1252,7 +1258,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     return;
                 }
 
-                if (result == null || (result instanceof Optional && !((Optional) result).isPresent())) {
+                if (result instanceof Optional) {
+                    result = ((Optional<?>) result).orElse(null);
+                }
+
+                if (result == null) {
                     // empty flowable
                     emitter.onComplete();
                 } else {

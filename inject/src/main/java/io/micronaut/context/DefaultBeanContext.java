@@ -1013,7 +1013,14 @@ public class DefaultBeanContext implements BeanContext {
      * @return The bean definition classes
      */
     protected Iterable<BeanConfiguration> resolveBeanConfigurations() {
-        return ServiceLoader.load(BeanConfiguration.class, classLoader);
+        final SoftServiceLoader<BeanConfiguration> definitions = SoftServiceLoader.load(BeanConfiguration.class, classLoader);
+        List<BeanConfiguration> list = new ArrayList<>(20);
+        for (ServiceDefinition<BeanConfiguration> definition : definitions) {
+            if (definition.isPresent()) {
+                list.add(definition.load());
+            }
+        }
+        return list;
     }
 
     /**

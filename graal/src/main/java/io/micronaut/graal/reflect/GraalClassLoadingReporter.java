@@ -17,6 +17,7 @@
 package io.micronaut.graal.reflect;
 
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
+import com.fasterxml.jackson.databind.Module;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import io.micronaut.core.annotation.Experimental;
@@ -62,8 +63,6 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
             "io.micronaut.http.server.netty.NettyHttpResponseFactory",
             "org.hibernate.validator.HibernateValidator",
             "com.fasterxml.jackson.databind.PropertyNamingStrategy$UpperCamelCaseStrategy",
-            "com.fasterxml.jackson.datatype.jdk8.Jdk8Module",
-            "com.fasterxml.jackson.datatype.jsr310.JSR310Module",
             "io.micronaut.context.annotation.Parameter",
             "io.micronaut.context.annotation.Property",
             "io.micronaut.context.annotation.Value"
@@ -160,6 +159,10 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
             } else {
                 file = new File(parent, "reflect.json");
             }
+        }
+        final ServiceLoader<Module> jacksonModules = ServiceLoader.load(Module.class);
+        for (Module jacksonModule : jacksonModules) {
+            classes.add(jacksonModule.getClass().getName());
         }
 
         if (!file.exists()) {
