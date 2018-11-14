@@ -74,15 +74,28 @@ class BuildDependencyMacro extends InlineMacroProcessor {
     protected Object process(AbstractBlock parent, String target, Map<String, Object> attributes) {
 
         String artifactId = target.startsWith(DEPENDENCY_PREFIX) ? target : "${DEPENDENCY_PREFIX}${target}"
-        String groupId = valueAtAttributes('groupId', attributes) ?: GROUPID
-        String version = valueAtAttributes('version', attributes)
+        String groupId
+        String version
+
+        groupId = valueAtAttributes('groupId', attributes) ?: GROUPID
+        version = valueAtAttributes('version', attributes)
         boolean verbose = valueAtAttributes('verbose', attributes) as boolean
 
         String gradleScope = valueAtAttributes('gradleScope', attributes) ?: valueAtAttributes('scope', attributes) ?: SCOPE_COMPILE
+        String mavenScope = valueAtAttributes('mavenScope', attributes) ?: toMavenScope(attributes) ?: SCOPE_COMPILE
         String content = gradleDepependency(BUILD_GRADLE, groupId, artifactId, version, gradleScope, MULTILANGUAGECSSCLASS, verbose)
-        String mavenScope = valueAtAttributes('mavenScope', attributes) ?: valueAtAttributes('scope', attributes) ?: SCOPE_COMPILE
         content += mavenDepependency(BUILD_MAVEN, groupId, artifactId, version, mavenScope, MULTILANGUAGECSSCLASS)
         createBlock(parent, "pass", [content], attributes, config).convert()
+    }
+
+    private String toMavenScope(Map<String, Object> attributes) {
+        String s = valueAtAttributes('scope', attributes)
+        switch (s) {
+            case 'testCompile': return 'test'
+            case 'compileOnly': return 'provided'
+            case 'runtimeOnly': return 'runtime'
+            default: return s
+        }
     }
 
     /**
