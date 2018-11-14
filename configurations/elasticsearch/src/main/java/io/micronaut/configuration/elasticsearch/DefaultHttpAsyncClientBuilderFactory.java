@@ -32,7 +32,7 @@ import javax.inject.Singleton;
  */
 @Requires(classes = {RestHighLevelClient.class})
 @Factory
-public class HttpAsyncClientBuilderFactory {
+public class DefaultHttpAsyncClientBuilderFactory {
 
     /**
      * The http client configuration (e.g. encrypted communication over ssl, or anything that

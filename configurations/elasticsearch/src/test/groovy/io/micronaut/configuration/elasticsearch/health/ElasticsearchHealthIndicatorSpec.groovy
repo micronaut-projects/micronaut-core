@@ -17,7 +17,7 @@
 package io.micronaut.configuration.elasticsearch.health
 
 import groovy.json.JsonSlurper
-import io.micronaut.configuration.elasticsearch.ElasticsearchConfigurationProperties
+import io.micronaut.configuration.elasticsearch.DefaultElasticsearchConfigurationProperties
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.NoSuchBeanException
 import io.micronaut.health.HealthStatus
@@ -47,7 +47,7 @@ class ElasticsearchHealthIndicatorSpec extends Specification {
         ApplicationContext applicationContext = ApplicationContext.run('elasticsearch.httpHosts': "http://${container.getHttpHostAddress()}")
 
         expect:
-        applicationContext.containsBean(ElasticsearchConfigurationProperties)
+        applicationContext.containsBean(DefaultElasticsearchConfigurationProperties)
 
         when:
         ElasticsearchHealthIndicator indicator = applicationContext.getBean(ElasticsearchHealthIndicator)

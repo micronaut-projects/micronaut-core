@@ -40,7 +40,7 @@ import static io.micronaut.configuration.elasticsearch.ElasticsearchSettings.DEF
  */
 @Requires(classes = RestClientBuilder.class)
 @ConfigurationProperties(ElasticsearchSettings.PREFIX)
-public class ElasticsearchConfigurationProperties implements ElasticsearchConfiguration {
+public class DefaultElasticsearchConfigurationProperties implements DefaultElasticsearchConfiguration {
 
     @SuppressWarnings("WeakerAccess")
     protected HttpAsyncClientBuilder httpAsyncClientBuilder;

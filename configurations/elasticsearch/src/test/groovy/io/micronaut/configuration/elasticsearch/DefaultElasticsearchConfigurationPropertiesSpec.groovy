@@ -36,7 +36,7 @@ import javax.inject.Singleton
  * @author puneetbehl
  * @since 1.1.0
  */
-class ElasticsearchConfigurationPropertiesSpec extends Specification {
+class DefaultElasticsearchConfigurationPropertiesSpec extends Specification {
 
     void "Test Elasticsearch high level rest client configrations"() {
 
@@ -50,11 +50,11 @@ class ElasticsearchConfigurationPropertiesSpec extends Specification {
         )
 
         then:
-        applicationContext.containsBean(ElasticsearchConfigurationProperties)
-        applicationContext.getBean(ElasticsearchConfigurationProperties).httpHosts == [new HttpHost('127.0.0.1', 9200, 'http')].toArray()
-        applicationContext.getBean(ElasticsearchConfigurationProperties).defaultHeaders.length == 1
-        applicationContext.getBean(ElasticsearchConfigurationProperties).maxRetryTimeoutMillis == 1000
-        applicationContext.getBean(ElasticsearchConfigurationProperties).nodeSelector == NodeSelector.SKIP_DEDICATED_MASTERS
+        applicationContext.containsBean(DefaultElasticsearchConfigurationProperties)
+        applicationContext.getBean(DefaultElasticsearchConfigurationProperties).httpHosts == [new HttpHost('127.0.0.1', 9200, 'http')].toArray()
+        applicationContext.getBean(DefaultElasticsearchConfigurationProperties).defaultHeaders.length == 1
+        applicationContext.getBean(DefaultElasticsearchConfigurationProperties).maxRetryTimeoutMillis == 1000
+        applicationContext.getBean(DefaultElasticsearchConfigurationProperties).nodeSelector == NodeSelector.SKIP_DEDICATED_MASTERS
 
         cleanup:
         applicationContext.close()
@@ -70,9 +70,9 @@ class ElasticsearchConfigurationPropertiesSpec extends Specification {
         )
 
         then:
-        applicationContext.containsBean(ElasticsearchConfigurationProperties)
-        applicationContext.getBean(ElasticsearchConfigurationProperties).httpHosts == [new HttpHost('127.0.0.1', 9200, 'http'),
-                                                                                       new HttpHost('127.0.1.1', 9200, 'http')].toArray()
+        applicationContext.containsBean(DefaultElasticsearchConfigurationProperties)
+        applicationContext.getBean(DefaultElasticsearchConfigurationProperties).httpHosts == [new HttpHost('127.0.0.1', 9200, 'http'),
+                                                                                              new HttpHost('127.0.1.1', 9200, 'http')].toArray()
 
         cleanup:
         applicationContext.close()
@@ -92,9 +92,9 @@ class ElasticsearchConfigurationPropertiesSpec extends Specification {
         )
 
         then:
-        applicationContext.containsBean(ElasticsearchConfigurationProperties)
-        applicationContext.getBean(ElasticsearchConfigurationProperties).httpHosts == [new HttpHost('127.0.0.1', 9200, 'http'),
-                                                                                       new HttpHost('127.0.1.1', 9200, 'http')].toArray()
+        applicationContext.containsBean(DefaultElasticsearchConfigurationProperties)
+        applicationContext.getBean(DefaultElasticsearchConfigurationProperties).httpHosts == [new HttpHost('127.0.0.1', 9200, 'http'),
+                                                                                              new HttpHost('127.0.1.1', 9200, 'http')].toArray()
 
         cleanup:
         applicationContext.close()
@@ -107,9 +107,9 @@ class ElasticsearchConfigurationPropertiesSpec extends Specification {
         ApplicationContext applicationContext = ApplicationContext.run()
 
         expect:
-        applicationContext.containsBean(ElasticsearchConfigurationProperties)
+        applicationContext.containsBean(DefaultElasticsearchConfigurationProperties)
         applicationContext.containsBean(RestHighLevelClient)
-        applicationContext.getBean(ElasticsearchConfigurationProperties).httpHosts.size() == 2
+        applicationContext.getBean(DefaultElasticsearchConfigurationProperties).httpHosts.size() == 2
 
     }
 
@@ -133,8 +133,8 @@ class ElasticsearchConfigurationPropertiesSpec extends Specification {
 
         then:
         applicationContext.containsBean(HttpAsyncClientBuilder)
-        applicationContext.getBean(ElasticsearchConfigurationProperties).httpAsyncClientBuilder
-        "Bar" == ((MyHttpAsyncClientBuilder) applicationContext.getBean(ElasticsearchConfigurationProperties).httpAsyncClientBuilder).foo
+        applicationContext.getBean(DefaultElasticsearchConfigurationProperties).httpAsyncClientBuilder
+        "Bar" == ((MyHttpAsyncClientBuilder) applicationContext.getBean(DefaultElasticsearchConfigurationProperties).httpAsyncClientBuilder).foo
 
         cleanup:
         applicationContext.close()

@@ -28,7 +28,7 @@ import org.elasticsearch.client.NodeSelector;
  * @author Puneet Behl
  * @since 1.1.0
  */
-public interface ElasticsearchConfiguration {
+public interface DefaultElasticsearchConfiguration {
 
     /**
      * The one or more hosts that the client will communicate with, provided as instances of {@link HttpHost}.

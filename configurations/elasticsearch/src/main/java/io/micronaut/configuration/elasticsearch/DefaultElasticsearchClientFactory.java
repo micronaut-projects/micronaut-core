@@ -30,35 +30,35 @@ import org.elasticsearch.client.RestHighLevelClient;
  * @author Puneet Behl
  * @since 1.1.0
  */
-@Requires(beans = ElasticsearchConfigurationProperties.class)
+@Requires(beans = DefaultElasticsearchConfigurationProperties.class)
 @Factory
-public class ElasticsearchClientFactory {
+public class DefaultElasticsearchClientFactory {
 
     /**
      * Create the {@link RestHighLevelClient} bean for the given configuration.
      *
-     * @param elasticsearchConfiguration The {@link ElasticsearchConfigurationProperties} object
+     * @param elasticsearchConfiguration The {@link DefaultElasticsearchConfigurationProperties} object
      * @return A {@link RestHighLevelClient} bean
      */
     @Bean(preDestroy = "close")
-    RestHighLevelClient restHighLevelClient(ElasticsearchConfigurationProperties elasticsearchConfiguration) {
+    RestHighLevelClient restHighLevelClient(DefaultElasticsearchConfigurationProperties elasticsearchConfiguration) {
         return new RestHighLevelClient(restClientBuilder(elasticsearchConfiguration));
     }
 
     /**
-     * @param elasticsearchConfiguration The {@link ElasticsearchConfigurationProperties} object
+     * @param elasticsearchConfiguration The {@link DefaultElasticsearchConfigurationProperties} object
      * @return The Elasticsearch Rest Client
      */
     @Bean(preDestroy = "close")
-    RestClient restClient(ElasticsearchConfigurationProperties elasticsearchConfiguration) {
+    RestClient restClient(DefaultElasticsearchConfigurationProperties elasticsearchConfiguration) {
         return restClientBuilder(elasticsearchConfiguration).build();
     }
 
     /**
-     * @param elasticsearchConfiguration The {@link ElasticsearchConfigurationProperties} object
+     * @param elasticsearchConfiguration The {@link DefaultElasticsearchConfigurationProperties} object
      * @return The {@link RestClientBuilder}
      */
-    protected RestClientBuilder restClientBuilder(ElasticsearchConfigurationProperties elasticsearchConfiguration) {
+    protected RestClientBuilder restClientBuilder(DefaultElasticsearchConfigurationProperties elasticsearchConfiguration) {
         return RestClient.builder(elasticsearchConfiguration.getHttpHosts())
                 .setRequestConfigCallback(requestConfigBuilder -> {
                     requestConfigBuilder = elasticsearchConfiguration.requestConfigBuilder;
