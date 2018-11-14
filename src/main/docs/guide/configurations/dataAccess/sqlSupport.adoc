@@ -26,11 +26,7 @@ dependencies {
 
 You also need to add a JDBC driver dependency to your classpath. For example to add the http://www.h2database.com[H2 In-Memory Database]:
 
-.build.gradle
-[source,groovy]
-----
-runtime "com.h2database:h2"
-----
+dependency:h2[groupId="com.h2database",scope="runtime"]
 
 == Configuring JDBC Connection Pools
 

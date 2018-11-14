@@ -59,6 +59,7 @@ import org.asciidoctor.extension.InlineMacroProcessor
  *
  */
 class BuildDependencyMacro extends InlineMacroProcessor {
+    static final String MICRONAUT_GROUPID = "io.micronaut."
     static final String DEPENDENCY_PREFIX = 'micronaut-'
     static final String GROUPID = 'io.micronaut'
     static final String MULTILANGUAGECSSCLASS = 'multi-language-sample'
@@ -73,8 +74,9 @@ class BuildDependencyMacro extends InlineMacroProcessor {
     @Override
     protected Object process(AbstractBlock parent, String target, Map<String, Object> attributes) {
 
-        String artifactId = target.startsWith(DEPENDENCY_PREFIX) ? target : "${DEPENDENCY_PREFIX}${target}"
+
         String groupId = valueAtAttributes('groupId', attributes) ?: GROUPID
+        String artifactId = target.startsWith(DEPENDENCY_PREFIX) ? target : groupId.startsWith(MICRONAUT_GROUPID) ? "${DEPENDENCY_PREFIX}${target}" : target
         String version = valueAtAttributes('version', attributes)
         boolean verbose = valueAtAttributes('verbose', attributes) as boolean
 

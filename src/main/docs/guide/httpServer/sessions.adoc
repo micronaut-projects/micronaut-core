@@ -9,11 +9,7 @@ Micronaut comes with a `session` module inspired by https://projects.spring.io/s
 
 To enable support for in-memory sessions you just need the `session` dependency:
 
-.build.gradle
-[source,groovy]
-----
-compile "io.micronaut:micronaut-session"
-----
+dependency:micronaut-session[]
 
 To enable sessions with Redis you must also have the `redis-lettuce` configuration on your classpath:
 
