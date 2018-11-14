@@ -19,7 +19,7 @@ class LanguageSnippetMacro extends BlockMacroProcessor {
         String project = attributes.get("project")
         String[] tags = attributes.get("tags")?.toString()?.split(",")
 
-        StringBuilder content = new StringBuilder()
+        StringBuilder content = new StringBuilder(".${attributes.title}")
         for(lang in ["java", "kotlin", "groovy"]) {
             String projectDir
             String ext = lang == 'kotlin' ? 'kt' : lang
@@ -32,23 +32,31 @@ class LanguageSnippetMacro extends BlockMacroProcessor {
             if (!file.exists()) {
                 file = new File("$projectDir/src/test/groovy/${baseName}.$ext")
             }
-            if (file.exists()) {
-                content << asciidoctor.render("""
+            String includes
+            if (tags) {
+                includes =  tags.collect() { "include::$file.absolutePath[tag=$it]" }.join("\n")
+            } else {
+                includes = "include::$file.absolutePath[]"
+            }
 
+            if (file.exists()) {
+                content << """
 [source.multi-language-sample,$lang]
-.${attributes.title}
+.${Character.toUpperCase(lang.charAt(0))}${lang.substring(1)}
 ----
-include::$file.absolutePath[]
-----
-                        """.toString(), [
-                        'safe': SafeMode.UNSAFE.level,
-                        'source-highlighter':'highlightjs',
-                ])
+$includes
+----"""
+
             }
         }
 
         if (content) {
-            createBlock(parent, "pass", content.toString(), attributes, config)
+            println content
+            String result = asciidoctor.render(content.toString(), [
+                    'safe': SafeMode.UNSAFE.level,
+                    'source-highlighter':'highlightjs',
+            ])
+            createBlock(parent, "pass", result, attributes, config)
         }
     }
 
