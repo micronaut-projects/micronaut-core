@@ -73,7 +73,7 @@ class BuildDependencyMacro extends InlineMacroProcessor {
 
     @Override
     protected Object process(AbstractBlock parent, String target, Map<String, Object> attributes) {
-        
+
         String groupId = valueAtAttributes('groupId', attributes) ?: GROUPID
         String artifactId = target.startsWith(DEPENDENCY_PREFIX) ? target : groupId.startsWith(MICRONAUT_GROUPID) ? "${DEPENDENCY_PREFIX}${target}" : target
         String version = valueAtAttributes('version', attributes)
