@@ -19,6 +19,8 @@ package io.micronaut.security.token.jwt.validator;
 import com.nimbusds.jwt.JWTClaimsSet;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 import java.util.Date;
@@ -32,12 +34,18 @@ import java.util.Date;
 @Singleton
 @Requires(property = JwtClaimsValidator.PREFIX + ".expiration", notEquals = StringUtils.FALSE)
 public class ExpirationJwtClaimsValidator implements JwtClaimsValidator {
+
+    private static final Logger LOG = LoggerFactory.getLogger(ExpirationJwtClaimsValidator.class);
+
     @Override
     public boolean validate(JWTClaimsSet claimsSet) {
         final Date expTime = claimsSet.getExpirationTime();
         if (expTime != null) {
             final Date now = new Date();
             if (expTime.before(now)) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("JWT token has expired");
+                }
                 return false;
             }
         }
