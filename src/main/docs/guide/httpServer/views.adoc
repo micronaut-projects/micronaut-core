@@ -2,13 +2,9 @@ Although Micronaut is primarily designed around message encoding / decoding ther
 
 The `views` module provides support for view rendering on the server side and does so by rendering views on the I/O thread pool in order to avoid blocking the Netty event loop.
 
-To use the view rendering features described in this section, add the following dependency on your classpath. For example, in `build.gradle`
+To use the view rendering features described in this section, add the following dependency on your classpath.
 
-.build.gradle
-[source,groovy]
-----
-compile "io.micronaut:micronaut-views"
-----
+dependency:micronaut-views[]
 
 Views and templates can then be placed in the `src/main/resource/views` directory of your project.
 

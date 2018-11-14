@@ -27,7 +27,6 @@ See the section <<runningSpecificPort, Running Server on a Specific Port>> in th
 In order to create a service that responds to "Hello World" you first need a controller. The following is an example of a controller written in Java and located in `src/main/java/example/helloworld`:
 
 .src/main/java/example/helloworld/HelloController.java
-
 [source.multi-language-sample,java]
 .Java
 ----
@@ -49,6 +48,11 @@ include::{testsuite}/server/intro/groovycode/HelloController.groovy[tags=imports
 
 include::{testsuite}/server/intro/groovycode/HelloController.groovy[tags=class, indent=0]
 ----
+
+Here is another example:
+
+.HelloController Example
+snippet::io.micronaut.docs.server.intro.HelloController[tags=import,class]
 
 <1> The class is defined as a controller with the link:{api}/io/micronaut/http/annotation/Controller.html[@Controller] annotation mapped to the path `/hello`
 <2> The link:{api}/io/micronaut/http/annotation/Get.html[@Get] annotation is used to map the `index` method to all requests that use an HTTP `GET`
