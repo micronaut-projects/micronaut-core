@@ -36,6 +36,7 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.text.ParseException;
 import java.util.ArrayList;
@@ -65,6 +66,7 @@ public class JwtTokenValidator implements TokenValidator {
      * @param encryptionConfigurations List of Encryption configurations which are used to attempt validation.
      * @param jwtClaimsValidators JWT Claims validators.
      */
+    @Inject
     public JwtTokenValidator(Collection<SignatureConfiguration> signatureConfigurations,
                              Collection<EncryptionConfiguration> encryptionConfigurations,
                              Collection<JwtClaimsValidator> jwtClaimsValidators) {
@@ -77,7 +79,7 @@ public class JwtTokenValidator implements TokenValidator {
      *
      * Deprecated Constructor.
      *
-     * Use instead new JwtTokenValidator(signatureConfigurations, encryptionConfigurations, Collections.singleton(new ExpirationJwtClaimsValidator())))
+     * @deprecated Use {@link JwtTokenValidator#JwtTokenValidator(Collection, Collection, Collection)} instead.
      * @param signatureConfigurations List of Signature configurations which are used to attempt validation.
      * @param encryptionConfigurations List of Encryption configurations which are used to attempt validation.
      */
@@ -173,7 +175,7 @@ public class JwtTokenValidator implements TokenValidator {
      */
     protected boolean verifyClaims(JWTClaimsSet jwtClaimsSet) {
         return this.jwtClaimsValidators.stream()
-                .allMatch(jwtClaimsValidator -> jwtClaimsValidator.validate(jwtClaimsSet));
+                .allMatch(jwtClaimsValidator -> jwtClaimsValidator.isValid(jwtClaimsSet));
     }
 
     /**
@@ -230,7 +232,6 @@ public class JwtTokenValidator implements TokenValidator {
     @Override
     public Publisher<Authentication> validateToken(String token) {
         try {
-            // Parse the token
             JWT jwt = JWTParser.parse(token);
 
             if (jwt instanceof PlainJWT) {
@@ -245,14 +246,13 @@ public class JwtTokenValidator implements TokenValidator {
                 return validateSignedJWT(signedJWT);
             }
 
-            return Flowable.empty();
-
         } catch (final ParseException e) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Cannot decrypt / verify JWT: {}", e.getMessage());
             }
-            return Flowable.empty();
         }
+
+        return Flowable.empty();
     }
 
     /**
