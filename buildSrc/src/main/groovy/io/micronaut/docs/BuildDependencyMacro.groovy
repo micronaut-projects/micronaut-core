@@ -47,6 +47,15 @@ import org.asciidoctor.extension.InlineMacroProcessor
  * <artifactId>micronaut-spring</artifactId>
  * </dependency>
  *
+ * By default compile scope is used
+ *
+ * You can use:
+ *
+ * dependency:micronaut-spring[scope="testCompile"]
+ *
+ * or specify a different scope for gradle or maven
+ *
+ * dependency:micronaut-spring[gradleScope="implementation"]
  *
  */
 class BuildDependencyMacro extends InlineMacroProcessor {
@@ -55,6 +64,7 @@ class BuildDependencyMacro extends InlineMacroProcessor {
     static final String MULTILANGUAGECSSCLASS = 'multi-language-sample'
     static final String BUILD_GRADLE = 'gradle'
     static final String BUILD_MAVEN = 'maven'
+    public static final String SCOPE_COMPILE = 'compile'
 
     BuildDependencyMacro(String macroName, Map<String, Object> config) {
         super(macroName, config)
@@ -67,8 +77,11 @@ class BuildDependencyMacro extends InlineMacroProcessor {
         String groupId = valueAtAttributes('groupId', attributes) ?: GROUPID
         String version = valueAtAttributes('version', attributes)
         boolean verbose = valueAtAttributes('verbose', attributes) as boolean
-        String content = gradleDepependency(BUILD_GRADLE, groupId, artifactId, version, MULTILANGUAGECSSCLASS, verbose)
-        content += mavenDepependency(BUILD_MAVEN, groupId, artifactId, version, MULTILANGUAGECSSCLASS)
+
+        String gradleScope = valueAtAttributes('gradleScope', attributes) ?: valueAtAttributes('scope', attributes) ?: SCOPE_COMPILE
+        String content = gradleDepependency(BUILD_GRADLE, groupId, artifactId, version, gradleScope, MULTILANGUAGECSSCLASS, verbose)
+        String mavenScope = valueAtAttributes('mavenScope', attributes) ?: valueAtAttributes('scope', attributes) ?: SCOPE_COMPILE
+        content += mavenDepependency(BUILD_MAVEN, groupId, artifactId, version, mavenScope, MULTILANGUAGECSSCLASS)
         createBlock(parent, "pass", [content], attributes, config).convert()
     }
 
@@ -94,6 +107,7 @@ class BuildDependencyMacro extends InlineMacroProcessor {
                              String groupId,
                              String artifactId,
                              String version,
+                              String scope,
                              String multilanguageCssClass,
                              boolean  verbose) {
 String html = """\
@@ -101,12 +115,12 @@ String html = """\
 <div class=\"content\">
 <pre class=\"highlightjs highlight\"><code class=\"language-groovy hljs" data-lang="${build}">"""
         if (verbose) {
-            html += "compile <span class=\"hljs-string\">group:</span> <span class=\"hljs-string\">'${groupId}'</span>, <span class=\"hljs-string\">name:</span> <span class=\"hljs-string\">'${artifactId}'</span>"
+            html += "${scope} <span class=\"hljs-string\">group:</span> <span class=\"hljs-string\">'${groupId}'</span>, <span class=\"hljs-string\">name:</span> <span class=\"hljs-string\">'${artifactId}'</span>"
             if (version) {
                 html +=", <span class=\"hljs-string\">version:</span> <span class=\"hljs-string\">'${version}'</span>"
             }
         } else {
-            html += "compile <span class=\"hljs-string\">'${groupId}:${artifactId}"
+            html += "${scope} <span class=\"hljs-string\">'${groupId}:${artifactId}"
             if (version) {
                 html += ":${version}"
             }
@@ -123,7 +137,9 @@ String html = """\
                               String groupId,
                               String artifactId,
                               String version,
-                              String multilanguageCssClass) {
+                              String scope,
+                              String multilanguageCssClass
+                             ) {
         String html = """\
 <div class=\"listingblock ${multilanguageCssClass}\">
 <div class=\"content\">
@@ -133,6 +149,10 @@ String html = """\
         if (version) {
             html += "\n    &lt;version&gt;${version}&lt;/version&gt;"
         }
+        if (scope != SCOPE_COMPILE) {
+            html += "\n    &lt;scope&gt;${scope}&lt;/scope&gt;"
+        }
+
         html += """
 &lt;/dependency&gt;</code></pre>
         </div>
