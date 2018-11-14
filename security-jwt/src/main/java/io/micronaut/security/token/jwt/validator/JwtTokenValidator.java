@@ -175,7 +175,7 @@ public class JwtTokenValidator implements TokenValidator {
      */
     protected boolean verifyClaims(JWTClaimsSet jwtClaimsSet) {
         return this.jwtClaimsValidators.stream()
-                .allMatch(jwtClaimsValidator -> jwtClaimsValidator.isValid(jwtClaimsSet));
+                .allMatch(jwtClaimsValidator -> jwtClaimsValidator.validate(jwtClaimsSet));
     }
 
     /**
