@@ -13,8 +13,8 @@ dependencies {
 
     testCompile dependencyVersion("reactive.pg.client")
     testCompile project(":management")
-    testCompile "org.testcontainers:spock:1.8.0"
-    testCompile "org.testcontainers:postgresql:1.8.0"
+    testCompile "org.testcontainers:spock:1.10.1"
+    testCompile "org.testcontainers:postgresql:1.10.1"
     testCompile "io.vertx:vertx-rx-java2:3.5.3", {
         exclude module: "vertx-core"
     }
