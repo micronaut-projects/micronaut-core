@@ -17,6 +17,7 @@ package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
 import io.micronaut.http.annotation.QueryValue
+import io.micronaut.http.client.multipart.MultipartBody
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
@@ -216,6 +217,66 @@ class HttpPostSpec extends Specification {
         book.title == "The Stand"
     }
 
+    void "test url encoded request with a list of params"() {
+        when:
+        BlockingHttpClient blockingHttpClient = client.toBlocking()
+        String body = blockingHttpClient.retrieve(
+                HttpRequest.POST("/post/multipleParams", [param: ["a", "b"]])
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        )
+
+        then:
+        body == "a,b"
+    }
+
+    void "test url encoded request with a list of params bound to a POJO"() {
+        when:
+        BlockingHttpClient blockingHttpClient = client.toBlocking()
+        String body = blockingHttpClient.retrieve(
+                HttpRequest.POST("/post/multipleParamsBody", [param: ["a", "b"]])
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        )
+
+        then:
+        body == "a,b"
+    }
+
+    void "test multipart request with a list of params"() {
+        when:
+        BlockingHttpClient blockingHttpClient = client.toBlocking()
+        String body = blockingHttpClient.retrieve(
+                HttpRequest.POST("/post/multipleParams", MultipartBody.builder()
+                            .addPart("param", "a")
+                            .addPart("param", "b")
+                            .build()
+                        )
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        )
+
+        then:
+        body == "a,b"
+    }
+
+    void "test url encoded request with a string body"() {
+        when:
+        BlockingHttpClient blockingHttpClient = client.toBlocking()
+        String body = blockingHttpClient.retrieve(
+                HttpRequest.POST("/post/multipleParams", "param=a&param=b")
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        )
+
+        then:
+        body == "a,b"
+    }
+
     @Controller('/post')
     static class PostController {
 
@@ -257,11 +318,33 @@ class HttpPostSpec extends Specification {
             assert custom == 'Foo'
             return book
         }
+
+        @Post(uri = "/multipleParams",
+                consumes = [MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA],
+                produces = MediaType.TEXT_PLAIN)
+        String multipleParams(@Body Map data) {
+            if (data.param instanceof Collection) {
+                return ((Collection) data.param).join(",")
+            } else {
+                return "value=${data.param}"
+            }
+        }
+
+        @Post(uri = "/multipleParamsBody",
+                consumes = [MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA],
+                produces = MediaType.TEXT_PLAIN)
+        String multipleParams(@Body Params data) {
+            return data.param.join(",")
+        }
     }
 
     @EqualsAndHashCode
     static class Book {
         String title
         Integer pages
+    }
+
+    static class Params {
+        List<String> param
     }
 }
