@@ -1,4 +1,4 @@
-Micronaut supports automatic configuration of https://www.elastic.co/guide/en/elasticsearch/client/java-rest/current/index.html[Java REST Client] via the `elasticsearch` module.
+Micronaut supports automatic configuration of Elasticsearch https://www.elastic.co/guide/en/elasticsearch/client/java-rest/current/index.html[Java REST Client^] via the `elasticsearch` module.
 
 == Configuring the Elasticsearch Client
 [TIP]
@@ -27,6 +27,8 @@ elasticsearch:
 	httpHosts: "http://localhost:9200,http://127.0.0.2:9200"
 ----
 
+See the API for api:configuration.mongo.reactive.DefaultElasticsearchConfigurationProperties[] for more information on the available configuration options.
+
 Once you have the above configuration in place then you can inject the `org.elasticsearch.client.RestHighLevelClient` or `org.elasticsearch.client.RestClient` bean. The following is the simplest way to get Elasticsearch information using the High Level REST Client:
 
 [source,groovy]
@@ -36,8 +38,37 @@ include::{testsuite}/configuration/elasticsearch/ElasticsearchSpec.groovy[tags=q
 
 <1> `client` is an instance of the `org.elasticsearch.client.RestHighLevelClient` bean.
 
-For more information on executing different operations using the Elasticsearch High Level REST Client please read the the https://www.elastic.co/guide/en/elasticsearch/client/java-rest/current/java-rest-high.html[documentation].
+For more information on executing different operations using Elasticsearch High Level REST Client please read the https://www.elastic.co/guide/en/elasticsearch/client/java-rest/current/java-rest-high.html[Elasticsearch Documentation^].
 
+== Modify the Default Request Configurations
+
+Often times you want to change the default configurations. To achieve this Micronaut, includes the ability to change the default request configurations. You can set the default request configurations under key `elasticsearch.request.default` as:
+
+[source,yaml]
+.application.yml
+----
+elasticsearch:
+	httpHosts: http://localhost:9200,http://127.0.0.2:9200
+	request:
+		default:
+			expectContinueEnabled: true
+			localAddress: 198.57.151.22
+----
+
+See the API https://hc.apache.org/httpcomponents-client-ga/httpclient/apidocs/org/apache/http/client/config/RequestConfig.Builder.html[RequestConfig.Builder^] for more information on the available configuration options.
+
+== Modify the HTTP Client Configurations
+
+To modify the HTTP Client configurations (e.g. request timeouts, authentication, or anything that the http://hc.apache.org/httpcomponents-asyncclient-dev/httpasyncclient/apidocs/org/apache/http/impl/nio/client/HttpAsyncClientBuilder.html[HttpAsyncClientBuilder^] allows to set). You can define a bean using api:io.micronaut.context.annotation.Factory[] which replaces `org.apache.http.impl.nio.client.HttpAsyncClientBuilder`.
+
+Following is an example to change the default credentials provider:
+
+[source,groovy]
+----
+include::{testsuite}/configuration/elasticsearch/ElasticsearchSpec.groovy[tags=httpClientFactoryImports,indent=0]
+include::{testsuite}/configuration/elasticsearch/ElasticsearchSpec.groovy[tags=singletonImports,indent=0]
+include::{testsuite}/configuration/elasticsearch/ElasticsearchSpec.groovy[tags=httpClientFactory,indent=0]
+----
 
 == Elasticsearch Health Checks
 

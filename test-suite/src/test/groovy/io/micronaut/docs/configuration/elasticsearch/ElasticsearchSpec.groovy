@@ -16,7 +16,19 @@
 
 package io.micronaut.docs.configuration.elasticsearch
 
+import io.micronaut.configuration.elasticsearch.DefaultElasticsearchConfigurationProperties
 import io.micronaut.context.ApplicationContext
+//tag::httpClientFactoryImports[]
+import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Replaces
+
+//end::httpClientFactoryImports[]
+import org.apache.http.auth.AuthScope
+import org.apache.http.auth.UsernamePasswordCredentials
+import org.apache.http.client.CredentialsProvider
+import org.apache.http.impl.client.BasicCredentialsProvider
+import org.apache.http.impl.nio.client.HttpAsyncClientBuilder
+import org.apache.http.impl.nio.reactor.IOReactorConfig
 import org.elasticsearch.Version
 import org.elasticsearch.action.main.MainResponse
 import org.elasticsearch.client.RequestOptions
@@ -25,6 +37,10 @@ import org.testcontainers.elasticsearch.ElasticsearchContainer
 import spock.lang.Shared
 import spock.lang.Specification
 
+//tag::singletonImports[]
+import javax.inject.Singleton
+
+//end::singletonImports[]
 /**
  * @author puneetbehl
  * @since 1.0
@@ -64,4 +80,35 @@ class ElasticsearchSpec extends Specification {
         elasticsearch.stop()
     }
     //end::es-dbstats[]
+
+    void "Test overiding HttpAsyncClientBuilder bean"() {
+
+        when:
+        ApplicationContext applicationContext = ApplicationContext.run("elasticsearch.httpHosts": "http://127.0.0.1:9200,http://127.0.1.1:9200")
+
+        then:
+        applicationContext.containsBean(HttpAsyncClientBuilder)
+        applicationContext.getBean(DefaultElasticsearchConfigurationProperties).httpAsyncClientBuilder
+
+        cleanup:
+        applicationContext.close()
+
+    }
+
+    //tag::httpClientFactory[]
+    @Factory
+    static class HttpAsyncClientBuilderFactory {
+
+        @Replaces(HttpAsyncClientBuilder.class)
+        @Singleton
+        HttpAsyncClientBuilder builder() {
+            final CredentialsProvider credentialsProvider = new BasicCredentialsProvider()
+            credentialsProvider.setCredentials(AuthScope.ANY,
+                    new UsernamePasswordCredentials("user", "password"))
+
+            return HttpAsyncClientBuilder.create()
+                    .setDefaultCredentialsProvider(credentialsProvider)
+        }
+    }
+    //end::httpClientFactory[]
 }
