@@ -282,17 +282,11 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 return Optional.empty();
             }
 
-
-
             StringJoiner joiner = new StringJoiner("");
             for (String string : object) {
                 joiner.add(string);
             }
-            if (targetType.isEnum()) {
-                return convert(joiner.toString(), targetType, context);
-            } else {
-                return Optional.of(joiner.toString());
-            }
+            return convert(joiner.toString(), targetType, context);
         });
 
         // CharSequence -> Long for bytes

@@ -13,17 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.server.intro;
+package io.micronaut.docs.server.intro.javacode;
+
+import io.micronaut.context.annotation.Requires;
 
 // tag::imports[]
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
 // end::imports[]
 
-/**
- * @author Graeme Rocher
- * @since 1.0
- */
+@Requires(property = "spec.lang", value = "java")
+@Requires(property = "spec.name", value = "HelloControllerSpec")
 // tag::class[]
 @Controller("/hello") // <1>
 public class HelloController {

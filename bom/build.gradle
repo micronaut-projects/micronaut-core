@@ -1,4 +1,3 @@
-
 publishing {
     publications {
         maven(MavenPublication) {
@@ -38,11 +37,10 @@ publishing {
                             }
 
                             for (Project p : rootProject.subprojects) {
-                                if (p.name == "configurations") continue
-                                if (p.name.contains("test-suite")) continue
-                                if (p.name == "examples") continue
+                                if (!p.subprojects.empty) continue
                                 if (p.name == "bom") continue
-
+                                if (p.hasProperty("bomExclude") && p.property("bomExclude") == true) continue
+                                
                                 mkp.dependency {
                                     mkp.groupId p.group
                                     mkp.artifactId "micronaut-$p.name"

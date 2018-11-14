@@ -14,23 +14,25 @@
  * limitations under the License.
  */
 
-package io.micronaut.docs.server.intro;
+package io.micronaut.security.token.reader;
 
-// tag::imports[]
-import io.micronaut.http.annotation.Get;
-import io.micronaut.http.client.annotation.Client;
-import io.reactivex.Single;
-// end::imports[]
+import io.micronaut.http.HttpRequest;
+
+import java.util.Optional;
 
 /**
- * @author graemerocher
- * @since 1.0
+ * Returns the token from the provided request.
+ *
+ * @author Sergio del Amo
+ * @since 1.1.0
  */
-// tag::class[]
-@Client("/hello") // <1>
-public interface HelloClient {
+public interface TokenResolver {
 
-    @Get // <2>
-    Single<String> hello(); // <3>
+    /**
+     * Resolves the token from the provided request.
+     *
+     * @param request The HTTP request.
+     * @return The token in the supplied request. Empty if no token was found.
+     */
+    Optional<String> resolveToken(HttpRequest<?> request);
 }
-// end::class[]

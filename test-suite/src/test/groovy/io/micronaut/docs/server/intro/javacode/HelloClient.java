@@ -13,14 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.server.intro
 
-import io.micronaut.context.ApplicationContext
-
+package io.micronaut.docs.server.intro.javacode;
 
 // tag::imports[]
-import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.*
+import io.micronaut.http.annotation.Get;
+import io.micronaut.http.client.annotation.Client;
+import io.reactivex.Single;
 // end::imports[]
 
 /**
@@ -28,19 +27,10 @@ import spock.lang.*
  * @since 1.0
  */
 // tag::class[]
-class HelloClientSpec extends Specification {
-    @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer) // <1>
+@Client("/hello") // <1>
+public interface HelloClient {
 
-    @Shared HelloClient client = embeddedServer
-                                        .applicationContext
-                                        .getBean(HelloClient) // <2>
-
-
-    void "test hello world response"() {
-        expect:
-        client.hello().blockingGet() == "Hello World" // <3>
-    }
-
+    @Get // <2>
+    Single<String> hello(); // <3>
 }
 // end::class[]

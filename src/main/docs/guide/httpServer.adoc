@@ -16,14 +16,28 @@ The goal of the HTTP server is to make it as easy as possible to expose APIs tha
 compile "io.micronaut:micronaut-http-server-netty"
 ----
 
-A "Hello World" server application written in Java can be seen below:
+A "Hello World" server application can be seen below:
 
-.Micronaut Server Hello World
-[source,java]
+[source.multi-language-sample,java]
+.Java
 ----
-include::{testsuite}/server/intro/HelloController.java[tags=imports, indent=0]
+include::{testsuite}/server/intro/javacode/HelloController.java[tags=imports, indent=0]
 
-include::{testsuite}/server/intro/HelloController.java[tags=class, indent=0]
+include::{testsuite}/server/intro/javacode/HelloController.java[tags=class, indent=0]
+----
+[source.multi-language-sample,kotlin]
+.Kotlin
+----
+include::{testsuitekotlin}/server/intro/kotlincode/HelloController.kt[tags=imports, indent=0]
+
+include::{testsuitekotlin}/server/intro/kotlincode/HelloController.kt[tags=class, indent=0]
+----
+[source.multi-language-sample,groovy]
+.Groovy
+----
+include::{testsuite}/server/intro/groovycode/HelloController.groovy[tags=imports, indent=0]
+
+include::{testsuite}/server/intro/groovycode/HelloController.groovy[tags=class, indent=0]
 ----
 
 <1> The class is defined as a controller with the link:{api}/io/micronaut/http/annotation/Controller.html[@Controller] annotation mapped to the path `/hello`
