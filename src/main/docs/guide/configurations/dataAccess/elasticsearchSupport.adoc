@@ -1,0 +1,48 @@
+Micronaut supports automatic configuration of https://www.elastic.co/guide/en/elasticsearch/client/java-rest/current/index.html[Java REST Client] via the `elasticsearch` module.
+
+== Configuring the Elasticsearch Client
+[TIP]
+.Using the CLI
+====
+If you are creating your project using the Micronaut CLI, supply the `elasticsearch` feature to configure the Elasticsearch Java REST Client in your project:
+----
+$ mn create-app my-app --features elasticsearch
+----
+====
+
+To configure the Elasticsearch Java REST Client you should first add `elasticsearch` module to your classpath:
+
+[source,groovy]
+.build.gradle
+----
+compile "io.micronaut.configuration:micronaut-elasticsearch"
+----
+
+You should then configure the `httpHosts` of the Elasticsearch server you wish to communicate with in `application.yml` as:
+
+[source,yaml]
+.application.yml
+----
+elasticsearch:
+	httpHosts: "http://localhost:9200,http://127.0.0.2:9200"
+----
+
+Once you have the above configuration in place then you can inject the `org.elasticsearch.client.RestHighLevelClient` or `org.elasticsearch.client.RestClient` bean. The following is the simplest way to get Elasticsearch information using the High Level REST Client:
+
+[source,groovy]
+----
+include::{testsuite}/configuration/elasticsearch/ElasticsearchSpec.groovy[tags=query,indent=0]
+----
+
+<1> `client` is an instance of the `org.elasticsearch.client.RestHighLevelClient` bean.
+
+For more information on executing different operations using the Elasticsearch High Level REST Client please read the the https://www.elastic.co/guide/en/elasticsearch/client/java-rest/current/java-rest-high.html[documentation].
+
+
+== Elasticsearch Health Checks
+
+When the `elasticsearch` module is activated a api:configuration.elasticsearch.health.ElasticsearchHealthIndicator[] is activated resulting in the `/health` endpoint and api:health.CurrentHealthStatus[] interface resolving the health of the Elasticsearch cluster.
+
+The only configuration option supported is to enable or disable the indicator by the `endpoints.health.elasticsearch.enabled` key.
+
+See the section on the <<healthEndpoint, Health Endpoint>> for more information.

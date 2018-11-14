@@ -16,6 +16,7 @@ dependencies {
     testCompile project(":http-client")
     testCompile project(":configurations:hibernate-validator")
     testCompile project(":configurations:postgres-reactive")
+    testCompile project(":configurations:elasticsearch")
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
     testCompile project(":tracing")
@@ -26,6 +27,7 @@ dependencies {
     // tag::testcontainers-dependencies[]
     testCompile "org.testcontainers:spock:1.8.0"
     testCompile "org.testcontainers:postgresql:1.8.0"
+    testCompile "org.testcontainers:elasticsearch:1.10.1"
     // end::testcontainers-dependencies[]
 
     testRuntime dependencyVersion("tomcatJdbc")
