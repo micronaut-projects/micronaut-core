@@ -20,7 +20,7 @@
  * refer to https://www.elastic.co/guide/en/elasticsearch/client/java-rest/6.3/java-rest-high.html
  *
  * @author lishuai
- * @since 1.0.1
+ * @since 1.1.0
  */
 @Configuration
 @RequiresElasticsearch
