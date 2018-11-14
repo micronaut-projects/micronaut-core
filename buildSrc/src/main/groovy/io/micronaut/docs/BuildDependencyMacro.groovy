@@ -129,7 +129,6 @@ String html = """\
             html += "'</span>"
         }
         html += """</code></pre>
-${copyToCliboardHtmlSnippet()}
 </div>
 </div>
 """
@@ -158,15 +157,10 @@ ${copyToCliboardHtmlSnippet()}
 
         html += """
 &lt;/dependency&gt;</code></pre>
-${copyToCliboardHtmlSnippet()}
 </div>
 </div>
 """
         html
-    }
-
-    String copyToCliboardHtmlSnippet() {
-        return '<div><span class="copytoclipboard" onclick="copyToClipboard(this);">Copy to Clipboard</span></div>'
     }
 }
 
