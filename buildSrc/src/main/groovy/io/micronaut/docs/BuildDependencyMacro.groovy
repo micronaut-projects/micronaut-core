@@ -91,7 +91,11 @@ class BuildDependencyMacro extends InlineMacroProcessor {
     private String toMavenScope(Map<String, Object> attributes) {
         String s = valueAtAttributes('scope', attributes)
         switch (s) {
-            case 'testCompile': return 'test'
+            case 'implementation':
+                return 'compile'
+            case 'testCompile':
+            case 'testImplementation':
+                return 'test'
             case 'compileOnly': return 'provided'
             case 'runtimeOnly': return 'runtime'
             default: return s
