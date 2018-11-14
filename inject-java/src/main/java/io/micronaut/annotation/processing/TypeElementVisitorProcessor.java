@@ -105,7 +105,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                             processingEnv
                     ));
                 } catch (TypeNotPresentException | NoClassDefFoundError e) {
-                    warning("TypeElementVisitor [" + definition.getName() + "] could not be loaded. Classpath may include a conflict: " + e.getMessage());
+                    // ignored, means annotations referenced are not on the classpath
                 }
             }
         }
