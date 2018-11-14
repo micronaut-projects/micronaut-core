@@ -1,3 +1,15 @@
+var BUILD_MAVEN = "maven";
+var BUILD_GRADLE = "gradle";
+var LANG_JAVA = "java";
+var LANG_GROOVY = "groovy";
+var LANG_KOTLIN = "kotlin";
+var MICRONAUT_SUPPORTED_BUILDS = [BUILD_MAVEN, BUILD_GRADLE];
+var MICRONAUT_SUPPORTED_LANGS = [LANG_JAVA, LANG_GROOVY, LANG_KOTLIN];
+var DEFAULT_SUPPORTED_LANG = LANG_JAVA;
+var DEFAULT_BUILD = BUILD_GRADLE;
+var LOCALSTORAGE_KEY_LANG = "preferred-micronaut-language";
+var LOCALSTORAGE_KEY_BUILD = "preferred-micronaut-build";
+
 function postProcessCodeBlocks() {
     // Assumptions:
     //  1) All siblings that are marked with class="multi-language-sample" should be grouped
@@ -5,29 +17,46 @@ function postProcessCodeBlocks() {
     //  3) There is exactly 1 small set of languages to choose from. This does not allow for multiple language preferences. For example, users cannot prefer both Kotlin and ZSH.
     //  4) Only 1 sample of each language can exist in the same collection.
 
-    var MICRONAUT_SUPPORTED_LANGS = ["java", "groovy", "kotlin"];
-    var DEFAULT_SUPPORTED_LANG = "java";
-    var preferredBuildScriptLanguage = initPreferredBuildScriptLanguage();
 
-    // Ensure preferred DSL is valid, defaulting to Groovy DSL
-    function initPreferredBuildScriptLanguage() {
-        var lang = window.localStorage.getItem("preferred-micronaut-language");
+    var preferredLanguage = initPreferredLanguage();
+    var preferredBuild = initPreferredBuild();
+
+    function isBuild(optionId) {
+        return MICRONAUT_SUPPORTED_BUILDS.indexOf(optionId) > -1
+    }
+    function isLang(optionId) {
+        return MICRONAUT_SUPPORTED_LANGS.indexOf(optionId) > -1
+    }
+
+    // Ensure preferred Language is valid, defaulting to JAVA
+    function initPreferredLanguage() {
+        var lang = window.localStorage.getItem(LOCALSTORAGE_KEY_LANG);
         if (MICRONAUT_SUPPORTED_LANGS.indexOf(lang) === -1) {
-            window.localStorage.setItem("preferred-micronaut-language", DEFAULT_SUPPORTED_LANG);
+            window.localStorage.setItem(LOCALSTORAGE_KEY_LANG, DEFAULT_SUPPORTED_LANG);
             lang = DEFAULT_SUPPORTED_LANG;
         }
         return lang;
+    }
+
+    // Ensure preferred build is valid, defaulting to GRADLE
+    function initPreferredBuild() {
+        var build = window.localStorage.getItem(LOCALSTORAGE_KEY_BUILD);
+        if (MICRONAUT_SUPPORTED_LANGS.indexOf(build) === -1) {
+            window.localStorage.setItem(LOCALSTORAGE_KEY_BUILD, DEFAULT_BUILD);
+            build = DEFAULT_BUILD;
+        }
+        return build;
     }
 
     function capitalizeFirstLetter(string) {
         return string.charAt(0).toUpperCase() + string.slice(1);
     }
 
-    function processSampleEl(sampleEl, prefLangId) {
+    function processSampleEl(sampleEl, prefLangId, prefBuildId) {
         var codeEl = sampleEl.querySelector("code[data-lang]");
         if (codeEl != null) {
             sampleEl.setAttribute("data-lang", codeEl.getAttribute("data-lang"));
-            if (codeEl.getAttribute("data-lang") !== prefLangId) {
+            if (codeEl.getAttribute("data-lang") !== prefLangId && codeEl.getAttribute("data-lang") !== prefBuildId) {
                 sampleEl.classList.add("hidden");
             } else {
                 sampleEl.classList.remove("hidden");
@@ -35,7 +64,7 @@ function postProcessCodeBlocks() {
         }
     }
 
-    function switchSampleLanguage(languageId) {
+    function switchSampleLanguage(languageId, buildId) {
         var multiLanguageSampleElements = [].slice.call(document.querySelectorAll(".multi-language-sample"));
 
         // Array of Arrays, each top-level array representing a single collection of samples
@@ -43,11 +72,11 @@ function postProcessCodeBlocks() {
         for (var i = 0; i < multiLanguageSampleElements.length; i++) {
             var currentCollection = [multiLanguageSampleElements[i]];
             var currentSampleElement = multiLanguageSampleElements[i];
-            processSampleEl(currentSampleElement, languageId);
+            processSampleEl(currentSampleElement, languageId, buildId);
             while (currentSampleElement.nextElementSibling != null && currentSampleElement.nextElementSibling.classList.contains("multi-language-sample")) {
                 currentCollection.push(currentSampleElement.nextElementSibling);
                 currentSampleElement = currentSampleElement.nextElementSibling;
-                processSampleEl(currentSampleElement, languageId);
+                processSampleEl(currentSampleElement, languageId, buildId);
                 i++;
             }
 
@@ -75,13 +104,17 @@ function postProcessCodeBlocks() {
                     optionEl.innerText = capitalizeFirstLetter(sampleLanguage);
 
                     optionEl.addEventListener("click", function updatePreferredLanguage(evt) {
-                        var preferredLanguageId = optionEl.getAttribute("data-lang");
-                        window.localStorage.setItem("preferred-micronaut-language", preferredLanguageId);
-
+                        var optionId = optionEl.getAttribute("data-lang");
+                        if (isBuild(optionId)) {
+                            window.localStorage.setItem(LOCALSTORAGE_KEY_BUILD, optionId);
+                        }
+                        if (isLang(optionId)) {
+                            window.localStorage.setItem(LOCALSTORAGE_KEY_LANG, optionId);
+                        }
                         // Record how far down the page the clicked element is before switching all samples
                         var beforeOffset = evt.target.offsetTop;
 
-                        switchSampleLanguage(preferredLanguageId);
+                        switchSampleLanguage(isLang(optionId) ? optionId : initPreferredLanguage(), isBuild(optionId) ? optionId : initPreferredBuild());
 
                         // Scroll the window to account for content height differences between different sample languages
                         window.scrollBy(0, evt.target.offsetTop - beforeOffset);
@@ -93,7 +126,7 @@ function postProcessCodeBlocks() {
         });
 
         [].slice.call(document.querySelectorAll(".multi-language-selector .language-option")).forEach(function (optionEl) {
-            if (optionEl.getAttribute("data-lang") === languageId) {
+            if (optionEl.getAttribute("data-lang") === languageId || optionEl.getAttribute("data-lang") === buildId) {
                 optionEl.classList.add("selected");
             } else {
                 optionEl.classList.remove("selected");
@@ -101,7 +134,7 @@ function postProcessCodeBlocks() {
         });
 
         [].slice.call(document.querySelectorAll(".multi-language-text")).forEach(function (el) {
-            if (!el.classList.contains("lang-" + languageId)) {
+            if (!el.classList.contains("lang-" + languageId) && !el.classList.contains("lang-" + buildId)) {
                 el.classList.add("hidden");
             } else {
                 el.classList.remove("hidden");
@@ -109,7 +142,7 @@ function postProcessCodeBlocks() {
         });
     }
 
-    switchSampleLanguage(preferredBuildScriptLanguage);
+    switchSampleLanguage(preferredLanguage, preferredBuild);
 }
 
 document.addEventListener("DOMContentLoaded", function(event) {

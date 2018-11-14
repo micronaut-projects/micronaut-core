@@ -31,6 +31,7 @@ class DocsExtensionRegistry implements ExtensionRegistry{
         javaExtensionRegistry.inlineMacro 'jee', JeeApiMacro
         javaExtensionRegistry.inlineMacro 'rs', ReactiveStreamsApiMacro
         javaExtensionRegistry.inlineMacro 'rx', RxJavaApiMacro
+        javaExtensionRegistry.inlineMacro 'dependency', BuildDependencyMacro
 
 
     }
