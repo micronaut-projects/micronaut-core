@@ -46,11 +46,9 @@ When creating this example project with the Micronaut CLI, use the `create-cli-a
 ----
 $ mn create-cli-app example.git-star --features http-client
 ----
-This will add the `io.micronaut:micronaut-http-client` dependency to the build. You can also manually add this to your `gradle.build`:
+This will add the `io.micronaut:micronaut-http-client` dependency to the build. You can also manually add to your build:
 
-----
-compile "io.micronaut:micronaut-http-client"
-----
+dependency:micronaut-http-client[]
 
 ==== An Example HTTP Client
 To create a picocli `Command` you create a class with fields annotated with `@Option` or `@Parameters` to capture the values of the command line options or positional parameters, respectively.

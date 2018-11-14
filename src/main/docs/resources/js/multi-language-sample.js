@@ -10,6 +10,15 @@ var DEFAULT_BUILD = BUILD_GRADLE;
 var LOCALSTORAGE_KEY_LANG = "preferred-micronaut-language";
 var LOCALSTORAGE_KEY_BUILD = "preferred-micronaut-build";
 
+
+function addCopyToClipboardButtons() {
+    var elements = document.getElementsByClassName("multi-language-sample");
+    console.log("multi-language-sample blocks" + elements.length);
+    for (var y = 0; y < elements.length; y++) {
+        elements[y].appendChild(createCopyToClipboardElement());
+    }
+}
+
 function postProcessCodeBlocks() {
     // Assumptions:
     //  1) All siblings that are marked with class="multi-language-sample" should be grouped
@@ -145,6 +154,17 @@ function postProcessCodeBlocks() {
     switchSampleLanguage(preferredLanguage, preferredBuild);
 }
 
+function createCopyToClipboardElement() {
+    var copyToClipboardDiv = document.createElement("div");
+    var copyToClipboardSpan = document.createElement("span");
+    copyToClipboardSpan.setAttribute("class", "copytoclipboard");
+    copyToClipboardSpan.setAttribute("onclick", "copyToClipboard(this);");
+    copyToClipboardSpan.innerText = "Copy to Clipboard";
+    copyToClipboardDiv.appendChild(copyToClipboardSpan);
+    return copyToClipboardDiv;
+}
+
 document.addEventListener("DOMContentLoaded", function(event) {
+    addCopyToClipboardButtons();
     postProcessCodeBlocks();
 });

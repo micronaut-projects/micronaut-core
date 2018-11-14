@@ -59,6 +59,7 @@ import org.asciidoctor.extension.InlineMacroProcessor
  *
  */
 class BuildDependencyMacro extends InlineMacroProcessor {
+    static final String MICRONAUT_GROUPID = "io.micronaut."
     static final String DEPENDENCY_PREFIX = 'micronaut-'
     static final String GROUPID = 'io.micronaut'
     static final String MULTILANGUAGECSSCLASS = 'multi-language-sample'
@@ -72,13 +73,10 @@ class BuildDependencyMacro extends InlineMacroProcessor {
 
     @Override
     protected Object process(AbstractBlock parent, String target, Map<String, Object> attributes) {
-
-        String artifactId = target.startsWith(DEPENDENCY_PREFIX) ? target : "${DEPENDENCY_PREFIX}${target}"
-        String groupId
-        String version
-
-        groupId = valueAtAttributes('groupId', attributes) ?: GROUPID
-        version = valueAtAttributes('version', attributes)
+        
+        String groupId = valueAtAttributes('groupId', attributes) ?: GROUPID
+        String artifactId = target.startsWith(DEPENDENCY_PREFIX) ? target : groupId.startsWith(MICRONAUT_GROUPID) ? "${DEPENDENCY_PREFIX}${target}" : target
+        String version = valueAtAttributes('version', attributes)
         boolean verbose = valueAtAttributes('verbose', attributes) as boolean
 
         String gradleScope = valueAtAttributes('gradleScope', attributes) ?: valueAtAttributes('scope', attributes) ?: SCOPE_COMPILE
@@ -144,7 +142,6 @@ String html = """\
             html += "'</span>"
         }
         html += """</code></pre>
-${copyToCliboardHtmlSnippet()}
 </div>
 </div>
 """
@@ -173,15 +170,10 @@ ${copyToCliboardHtmlSnippet()}
 
         html += """
 &lt;/dependency&gt;</code></pre>
-${copyToCliboardHtmlSnippet()}
 </div>
 </div>
 """
         html
-    }
-
-    String copyToCliboardHtmlSnippet() {
-        return '<div><span class="copytoclipboard" onclick="copyToClipboard(this);">Copy to Clipboard</span></div>'
     }
 }
 
