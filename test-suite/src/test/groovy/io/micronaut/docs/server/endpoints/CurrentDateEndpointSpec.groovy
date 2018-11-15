@@ -16,7 +16,6 @@
 
 package io.micronaut.docs.server.endpoints
 
-import groovy.transform.NotYetImplemented
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
@@ -26,7 +25,6 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Issue
 import spock.lang.Specification
-
 
 class CurrentDateEndpointSpec extends Specification {
 
@@ -62,7 +60,6 @@ class CurrentDateEndpointSpec extends Specification {
         server.close()
     }
 
-    @NotYetImplemented
     @Issue("https://github.com/micronaut-projects/micronaut-core/issues/883")
     void "test read with produces"() {
         given:

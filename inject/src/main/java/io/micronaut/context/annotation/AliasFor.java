@@ -44,4 +44,10 @@ public @interface AliasFor {
      * If not specified the alias is applied to the current annotation.
      */
     Class<? extends Annotation> annotation() default Annotation.class;
+
+    /**
+     * @return The name of the annotation in which the aliased {@link #member()} is declared.
+     * If not specified the alias is applied to the current annotation.
+     */
+    String annotationName() default "";
 }
