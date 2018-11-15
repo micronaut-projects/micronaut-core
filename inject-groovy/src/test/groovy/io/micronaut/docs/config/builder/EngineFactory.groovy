@@ -36,7 +36,7 @@ class EngineFactory {
     @Bean
     @Singleton
     EngineImpl buildEngine(EngineConfig engineConfig) {
-        engineConfig.builder.build(engineConfig.crankShaft)
+        engineConfig.builder.build(engineConfig.crankShaft, engineConfig.sparkPlug)
     }
 }
 // end::class[]
