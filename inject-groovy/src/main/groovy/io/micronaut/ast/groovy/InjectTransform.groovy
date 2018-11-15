@@ -724,10 +724,19 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
                 if (isConfigurationProperties && isPublic && NameUtils.isSetterName(methodNode.name) && methodNode.parameters.length == 1) {
                     String propertyName = NameUtils.getPropertyNameForSetter(methodNode.name)
-                    if (declaringClass.getField(propertyName) == null) {
-
-                        Parameter parameter = methodNode.parameters[0]
-
+                    Parameter parameter = methodNode.parameters[0]
+                    if (methodAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
+                        getBeanWriter().visitConfigBuilderMethod(
+                                parameter.type.name,
+                                NameUtils.getterNameFor(propertyName),
+                                methodAnnotationMetadata,
+                                configurationMetadataBuilder)
+                        try {
+                            visitConfigurationBuilder(methodAnnotationMetadata, parameter.type, getBeanWriter())
+                        } finally {
+                            getBeanWriter().visitConfigBuilderEnd()
+                        }
+                    } else if (declaringClass.getField(propertyName) == null) {
                         PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
                                 concreteClass,
                                 declaringClass,
