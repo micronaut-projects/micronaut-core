@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.server.intro.javacode;
+package io.micronaut.docs.server.intro;
 
 import io.micronaut.context.annotation.Requires;
 

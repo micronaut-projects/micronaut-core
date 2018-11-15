@@ -17,7 +17,7 @@ package io.micronaut.docs.server.filters
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
-import io.micronaut.docs.server.intro.javacode.HelloControllerSpec
+import io.micronaut.docs.server.intro.HelloControllerSpec
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.client.HttpClient
