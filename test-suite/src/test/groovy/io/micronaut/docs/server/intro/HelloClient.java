@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.docs.server.intro.javacode;
+package io.micronaut.docs.server.intro;
 
 // tag::imports[]
 import io.micronaut.http.annotation.Get;

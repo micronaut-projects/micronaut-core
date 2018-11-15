@@ -13,24 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.server.intro.javacode;
 
-import io.micronaut.context.annotation.Requires;
+package io.micronaut.security.token.jwt.validator;
 
-// tag::imports[]
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Controller;
-import io.micronaut.http.annotation.Get;
-// end::imports[]
+import com.nimbusds.jwt.JWTClaimsSet;
+import io.micronaut.security.token.jwt.config.JwtConfigurationProperties;
 
-@Requires(property = "spec.lang", value = "java")
-@Requires(property = "spec.name", value = "HelloControllerSpec")
-// tag::class[]
-@Controller("/hello") // <1>
-public class HelloController {
-    @Get(produces = MediaType.TEXT_PLAIN) // <2>
-    public String index() {
-        return "Hello World"; // <3>
-    }
+/**
+ * Provides a contract to create custom JWT claims validations.
+ *
+ * @author Sergio del Amo
+ * @since 1.1.0
+ */
+public interface JwtClaimsValidator {
+
+    String PREFIX = JwtConfigurationProperties.PREFIX + ".claims-validators";
+
+    /**
+     *
+     * @param claimsSet JWT Claims
+     * @return whether the JWT claims pass validation.
+     */
+    boolean validate(JWTClaimsSet claimsSet);
 }
-// end::class[]
