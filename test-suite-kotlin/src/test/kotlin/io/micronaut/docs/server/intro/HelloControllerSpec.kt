@@ -1,4 +1,4 @@
-package io.micronaut.docs.server.intro.kotlincode
+package io.micronaut.docs.server.intro
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment

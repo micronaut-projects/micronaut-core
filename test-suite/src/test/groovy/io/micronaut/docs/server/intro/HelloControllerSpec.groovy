@@ -13,34 +13,40 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.server.intro.groovycode
+package io.micronaut.docs.server.intro
 
+// tag::imports[]
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.AutoCleanup
-import spock.lang.Shared
-import spock.lang.Specification
+import spock.lang.*
+// end::imports[]
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
+// tag::class-init[]
 class HelloControllerSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer,
-                    ['spec.name': HelloControllerSpec.simpleName,
-                     'spec.lang': 'groovy'],
-                     Environment.TEST)
-
-    @Shared @AutoCleanup HttpClient client = HttpClient.create(embeddedServer.URL)
+//end::class-init[]
+            ApplicationContext.run(EmbeddedServer, ['spec.name': HelloControllerSpec.simpleName,
+             'spec.lang': 'java'], Environment.TEST)
+    /*
+    //tag::embededdedServer[]
+            ApplicationContext.run(EmbeddedServer) // <1>
+    //end::embededdedServer[]
+    */
+//tag::class-end[]
+    @Shared @AutoCleanup HttpClient client = HttpClient.create(embeddedServer.URL) // <2>
 
     void "test hello world response"() {
         expect:
-        client.toBlocking()
-              .retrieve(HttpRequest.GET('/hello')) == "Hello World"
+        client.toBlocking() // <3>
+              .retrieve(HttpRequest.GET('/hello')) == "Hello World" // <4>
     }
 }
+//end::class-end[]
