@@ -28,8 +28,10 @@ import javax.validation.constraints.NotNull;
  * @author Sergio del Amo
  * @since 1.1.0
  */
-@EachProperty(JwtConfigurationProperties.PREFIX + ".signatures.jwks")
+@EachProperty(JwksSignatureConfigurationProperties.PREFIX)
 public class JwksSignatureConfigurationProperties implements JwksSignatureConfiguration {
+
+    public static final String PREFIX = JwtConfigurationProperties.PREFIX + ".signatures.jwks";
 
     /**
      * The default key type.
@@ -46,6 +48,7 @@ public class JwksSignatureConfigurationProperties implements JwksSignatureConfig
      * @return URL to the remote JSON Web Key Set.
      */
     @Override
+    @NotNull
     public String getUrl() {
         return url;
     }

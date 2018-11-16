@@ -28,6 +28,7 @@ import javax.validation.constraints.NotNull;
  */
 public interface JwksSignatureConfiguration {
 
+    @NotNull
     String getUrl();
 
     @NotNull
