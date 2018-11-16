@@ -50,6 +50,10 @@ The following table summarizes the constants provided by the api:context.env.Env
 |Running on https://www.ibm.com/cloud/[IBM Cloud]
 |`@Requires(env = Environment.IBM)`
 
+|api:context.env.Environment#DIGITAL_OCEAN[]
+|Running on https://www.digitalocean.com/[Digital Ocean]
+|`@Requires(env = Environment.DIGITAL_OCEAN)`
+
 |===
 
 Note that it may be the case that you have multiple active environment names since you may run Kubernetes on AWS for example.
@@ -62,14 +66,13 @@ TIP: Any configuration property in the api:context.env.Environment[] can also be
 == Using Cloud Instance Metadata
 
 
-When Micronaut detects it is running on Google Compute or AWS EC2, upon startup Micronaut will populate the interface api:discovery.cloud.ComputeInstanceMetadata[].
+When Micronaut detects it is running on any of the cloud platforms listed above, such as Google Compute or AWS EC2, upon startup Micronaut will populate the interface api:discovery.cloud.ComputeInstanceMetadata[].
 
-TIP: Depending on the environment you are running in the backing implementation will be either api:io.micronaut.discovery.cloud.gcp.GoogleComputeInstanceMetadata[] or api:io.micronaut.discovery.cloud.aws.AmazonEC2InstanceMetadata[] with metadata found from Google or Amazon's metadata services.
+TIP: Depending on the environment you are running in the backing implementation will be either api:io.micronaut.discovery.cloud.gcp.GoogleComputeInstanceMetadata[], api:io.micronaut.discovery.cloud.aws.AmazonEC2InstanceMetadata[] or api:io.micronaut.discovery.cloud.digitalocean.DigitalOceanInstanceMetadata with metadata found from the cloud provider metadata services.
 
 All of this data is merged together into the `metadata` property for the running api:discovery.ServiceInstance[].
 
 If you need to access the metadata for your application instance you can use the interface api:runtime.server.EmbeddedServerInstance[], and call `getMetadata()` which will get a map of all of the metadata.
-
 
 If you are connecting remotely via client, the instance metadata can be referenced once you have retrieved a api:io.micronaut.discovery.ServiceInstance[] from either the api:http.client.LoadBalancer[] or api:discovery.DiscoveryClient[] APIs.
 

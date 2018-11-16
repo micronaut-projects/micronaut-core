@@ -30,14 +30,13 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+
+import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.readMetadataUrl;
 
 /**
  * Resolves {@link ComputeInstanceMetadata} for Amazon EC2.
@@ -84,30 +83,30 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
             return Optional.empty();
         }
         if (cachedMetadata != null) {
-            cachedMetadata.cached = true;
+            cachedMetadata.setCached(true);
             return Optional.of(cachedMetadata);
         }
         AmazonEC2InstanceMetadata ec2InstanceMetadata = new AmazonEC2InstanceMetadata();
         try {
             String ec2InstanceIdentityDocURL = configuration.getInstanceDocumentUrl();
             String ec2InstanceMetadataURL = configuration.getMetadataUrl();
-            JsonNode metadataJson = readEc2MetadataJson(new URL(ec2InstanceIdentityDocURL), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS);
+            JsonNode metadataJson = readMetadataUrl(new URL(ec2InstanceIdentityDocURL), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS, objectMapper, new HashMap<>());
             if (metadataJson != null) {
-                ec2InstanceMetadata.account = metadataJson.findValue(EC2MetadataKeys.accountId.name()).textValue();
-                ec2InstanceMetadata.availabilityZone = metadataJson.findValue(EC2MetadataKeys.availabilityZone.name()).textValue();
-                ec2InstanceMetadata.instanceId = metadataJson.findValue(EC2MetadataKeys.instanceId.name()).textValue();
-                ec2InstanceMetadata.machineType = metadataJson.findValue(EC2MetadataKeys.instanceType.name()).textValue();
-                ec2InstanceMetadata.region = metadataJson.findValue(EC2MetadataKeys.region.name()).textValue();
-                ec2InstanceMetadata.privateIpV4 = metadataJson.findValue("privateIp").textValue();
-                ec2InstanceMetadata.imageId = metadataJson.findValue("imageId").textValue();
+                ec2InstanceMetadata.setAccount(metadataJson.findValue(EC2MetadataKeys.accountId.name()).textValue());
+                ec2InstanceMetadata.setAvailabilityZone(metadataJson.findValue(EC2MetadataKeys.availabilityZone.name()).textValue());
+                ec2InstanceMetadata.setInstanceId(metadataJson.findValue(EC2MetadataKeys.instanceId.name()).textValue());
+                ec2InstanceMetadata.setMachineType(metadataJson.findValue(EC2MetadataKeys.instanceType.name()).textValue());
+                ec2InstanceMetadata.setRegion(metadataJson.findValue(EC2MetadataKeys.region.name()).textValue());
+                ec2InstanceMetadata.setPrivateIpV4(metadataJson.findValue("privateIp").textValue());
+                ec2InstanceMetadata.setImageId(metadataJson.findValue("imageId").textValue());
             }
             try {
-                ec2InstanceMetadata.localHostname = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + EC2MetadataKeys.localHostname.getName()), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS);
+                ec2InstanceMetadata.setLocalHostname(readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + EC2MetadataKeys.localHostname.getName()), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS));
             } catch (IOException e) {
                 LOG.error("Error getting local hostname from url:" + ec2InstanceMetadataURL + EC2MetadataKeys.localHostname.name(), e);
             }
             try {
-                ec2InstanceMetadata.publicHostname = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + EC2MetadataKeys.publicHostname.getName()), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS);
+                ec2InstanceMetadata.setPublicHostname(readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + EC2MetadataKeys.publicHostname.getName()), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS));
             } catch (IOException e) {
                 LOG.error("error getting public host name from:" + ec2InstanceMetadataURL + EC2MetadataKeys.publicHostname.name(), e);
             }
@@ -120,20 +119,20 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
                 String subnetId = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + "/network/interfaces/macs/" + macAddress + "/subnet-id/"), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS);
                 networkInterface.setNetwork(subnetId);
 
-                ec2InstanceMetadata.publicIpV4 = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + "/network/interfaces/macs/" + macAddress + "/public-ipv4s/"), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS);
-                ec2InstanceMetadata.privateIpV4 = readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + "/network/interfaces/macs/" + macAddress + "/local-ipv4s/"), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS);
-                networkInterface.setIpv4(ec2InstanceMetadata.privateIpV4);
+                ec2InstanceMetadata.setPublicIpV4(readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + "/network/interfaces/macs/" + macAddress + "/public-ipv4s/"), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS));
+                ec2InstanceMetadata.setPrivateIpV4(readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + "/network/interfaces/macs/" + macAddress + "/local-ipv4s/"), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS));
+                networkInterface.setIpv4(ec2InstanceMetadata.getPrivateIpV4());
                 networkInterface.setId(readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + "/network/interfaces/macs/" + macAddress + "/interface-id/"), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS));
                 networkInterface.setGateway(vpcId);
-                ec2InstanceMetadata.interfaces = new ArrayList<>();
-                ec2InstanceMetadata.interfaces.add(networkInterface);
+                ec2InstanceMetadata.setInterfaces(new ArrayList<>());
+                ec2InstanceMetadata.getInterfaces().add(networkInterface);
             } catch (IOException e) {
                 LOG.error("error getting public host name from:" + ec2InstanceMetadataURL + EC2MetadataKeys.publicHostname.getName(), e);
             }
 
-            ec2InstanceMetadata.metadata = objectMapper.convertValue(ec2InstanceMetadata, Map.class);
+            ec2InstanceMetadata.setMetadata(objectMapper.convertValue(ec2InstanceMetadata, Map.class));
             if (LOG.isDebugEnabled()) {
-                LOG.debug("EC2 Metadata found:" + ec2InstanceMetadata.metadata.toString());
+                LOG.debug("EC2 Metadata found:" + ec2InstanceMetadata.getMetadata().toString());
             }
             //TODO make individual calls for building network interfaces.. required recursive http calls for all mac addresses
         } catch (IOException e) {
@@ -151,27 +150,11 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
      * @param readTimeoutMs read timeout in millis
      * @return AWS EC2 metadata information
      * @throws IOException Signals that an I/O exception of some sort has occurred
+     * @deprecated See {@link io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils#readMetadataUrl(URL, int, int, ObjectMapper, Map)}
      */
+    @Deprecated
     protected JsonNode readEc2MetadataJson(URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException {
-        URLConnection urlConnection = url.openConnection();
-
-        if (url.getProtocol().equalsIgnoreCase("file")) {
-            urlConnection.connect();
-            try (InputStream in = urlConnection.getInputStream()) {
-                return objectMapper.readTree(in);
-            }
-        } else {
-            HttpURLConnection uc = (HttpURLConnection) urlConnection;
-
-            uc.setConnectTimeout(connectionTimeoutMs);
-            uc.setReadTimeout(readTimeoutMs);
-            uc.setRequestMethod("GET");
-            uc.setDoOutput(true);
-            int responseCode = uc.getResponseCode();
-            try (InputStream in = uc.getInputStream()) {
-                return objectMapper.readTree(in);
-            }
-        }
+        return readMetadataUrl(url, connectionTimeoutMs, readTimeoutMs, objectMapper, Collections.emptyMap());
     }
 
     /**
