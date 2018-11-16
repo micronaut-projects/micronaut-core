@@ -593,10 +593,19 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             )
                     )
             );
+
+            boolean requiresReflection = modelUtils.isPrivate(method);
+
+           /* if (!requiresReflection && modelUtils.isProtected(method)) {
+                PackageElement declaringPackage = elementUtils.getPackageOf(declaringClass);
+                PackageElement concretePackage = elementUtils.getPackageOf(this.concreteClass);
+                requiresReflection = !declaringPackage.getQualifiedName().equals(concretePackage.getQualifiedName());
+            }*/
+
             writer.visitSetterValue(
                     modelUtils.resolveTypeReference(declaringClass),
                     annotationMetadata,
-                    modelUtils.isPrivate(method),
+                    requiresReflection,
                     fieldType,
                     setterName,
                     genericTypes,
