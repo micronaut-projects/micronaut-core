@@ -36,30 +36,27 @@ import io.micronaut.context.annotation.*;
 @ConfigurationProperties("test")
 class MyProperties {
     
-    Test test;
+    private Test test;
     
-    @ConfigurationBuilder(factoryMethod="build", includes="foo")
+    @ConfigurationBuilder(factoryMethod="build")
     void setTest(Test test) {
         this.test = test;
+    }
+    
+    Test getTest() {
+        return this.test;
     }
      
 }
 
 class Test {
     private String foo;
-    private String bar;
     private Test() {}
     public void setFoo(String s) { 
         this.foo = s;
     }
     public String getFoo() {
         return foo;
-    }
-    public void setBar(String s) { 
-        this.bar = s;
-    }
-    public String getBar() {
-        return bar;
     }
         
     static Test build() {
@@ -71,14 +68,12 @@ class Test {
         when:"The bean was built and a warning was logged"
         BeanFactory factory = beanDefinition
         ApplicationContext applicationContext = ApplicationContext.run(
-                'test.foo':'good',
-                'test.bar':'bad'
+                'test.foo':'good'
         )
         def bean = factory.build(applicationContext, beanDefinition)
 
         then:
         bean.test.foo == 'good'
-        bean.test.bar == null
     }
 
     void "test configuration builder with includes"() {
