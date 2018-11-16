@@ -31,19 +31,18 @@ import com.nimbusds.jose.jwk.KeyType;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.SignedJWT;
 import io.micronaut.context.annotation.EachBean;
+import io.micronaut.core.util.functional.ThrowingFunction;
+import io.micronaut.core.util.functional.ThrowingSupplier;
 import io.micronaut.security.token.jwt.signature.SignatureConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileNotFoundException;
+import javax.annotation.Nullable;
 import java.io.IOException;
 import java.net.URL;
-import java.security.interfaces.ECPublicKey;
-import java.security.interfaces.RSAPublicKey;
 import java.text.ParseException;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -59,20 +58,20 @@ public class JwksSignature implements SignatureConfiguration {
 
     private static final Logger LOG = LoggerFactory.getLogger(JwksSignature.class);
     private static final int REFRESH_JWKS_ATTEMPTS = 1;
-    private JWKSet jwkSet;
-    private KeyType keyType;
-    private String url;
+    private Optional<JWKSet> jwkSet;
+    private final KeyType keyType;
+    private final String url;
 
     /**
      *
      * @param jwksSignatureConfiguration JSON Web Key Set configuration.
      */
     public JwksSignature(JwksSignatureConfiguration jwksSignatureConfiguration) {
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("JWT validation URL: {}", jwksSignatureConfiguration.getUrl());
-        }
         this.url = jwksSignatureConfiguration.getUrl();
-        this.jwkSet = jwkSetByUrl(jwksSignatureConfiguration.getUrl());
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("JWT validation URL: {}", url);
+        }
+        this.jwkSet = loadJwkSet(url);
         this.keyType = jwksSignatureConfiguration.getKeyType();
     }
 
@@ -83,11 +82,14 @@ public class JwksSignature implements SignatureConfiguration {
      */
     @Override
     public String supportedAlgorithmsMessage() {
-        Optional<String> csv = jwkSet.getKeys().stream()
+        List<JWK> keys = jwkSet.map(JWKSet::getKeys).orElse(Collections.emptyList());
+        String message = keys.stream()
                 .map(JWK::getAlgorithm)
                 .map(Algorithm::getName)
-                .reduce((a, b) -> a + ", " + b);
-        return "Only the " + (csv.isPresent() ? csv.get() : "") + " algorithms are supported";
+                .reduce((a, b) -> a + ", " + b)
+                .map(s -> "Only the " + s)
+                .orElse("No");
+        return message + " algorithms are supported";
     }
 
     /**
@@ -98,9 +100,11 @@ public class JwksSignature implements SignatureConfiguration {
      */
     @Override
     public boolean supports(JWSAlgorithm algorithm) {
-        return jwkSet.getKeys().stream()
+        return jwkSet.map(JWKSet::getKeys)
+                .orElse(Collections.emptyList())
+                .stream()
                 .map(JWK::getAlgorithm)
-                .anyMatch(jkwAlgorithm -> algorithm.getName().equals(jkwAlgorithm.getName()));
+                .anyMatch(algorithm::equals);
     }
 
     /**
@@ -112,8 +116,7 @@ public class JwksSignature implements SignatureConfiguration {
      */
     @Override
     public boolean verify(SignedJWT jwt) throws JOSEException {
-
-        List<JWK> matches = matches(jwt, jwkSet, REFRESH_JWKS_ATTEMPTS);
+        List<JWK> matches = matches(jwt, jwkSet.orElse(null), REFRESH_JWKS_ATTEMPTS);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Found {} matching JWKs", matches.size());
         }
@@ -128,20 +131,16 @@ public class JwksSignature implements SignatureConfiguration {
      * @param url JSON Web Key Set Url.
      * @return a JWKSet or null if there was an error.
      */
-    protected JWKSet jwkSetByUrl(String url) {
+    protected Optional<JWKSet> loadJwkSet(String url) {
         try {
-            return JWKSet.load(new URL(url));
-        } catch (FileNotFoundException e) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("FileNotFoundException loading JWK", e);
-            }
+            return Optional.of(JWKSet.load(new URL(url)));
         } catch (IOException | ParseException e) {
             if (LOG.isErrorEnabled()) {
-                LOG.error("Exception loading JWK", e);
+                LOG.error("Exception loading JWK. The JwksSignature will not be used to verify a JWT if further refresh attempts fail", e);
             }
         }
 
-        return null;
+        return Optional.empty();
     }
 
     /**
@@ -155,14 +154,10 @@ public class JwksSignature implements SignatureConfiguration {
      * @param refreshKeysAttempts Number of times to attempt refreshing the JWK Set
      * @return a List of JSON Web Keys
      */
-    protected List<JWK> matches(SignedJWT jwt, JWKSet jwkSet, int refreshKeysAttempts) {
-        if (jwkSet == null) {
-            return Collections.emptyList();
-        }
+    protected List<JWK> matches(SignedJWT jwt, @Nullable JWKSet jwkSet, int refreshKeysAttempts) {
+
         String keyId = jwt.getHeader().getKeyID();
-        if (keyId == null) {
-            return Collections.emptyList();
-        }
+
         List<JWK> matches = new JWKSelector(
                 new JWKMatcher.Builder()
                         .keyType(keyType)
@@ -171,8 +166,8 @@ public class JwksSignature implements SignatureConfiguration {
         ).select(jwkSet);
 
         if (refreshKeysAttempts > 0 && matches.isEmpty()) {
-            this.jwkSet = jwkSetByUrl(url);
-            return matches(jwt, jwkSet, (refreshKeysAttempts - 1));
+            this.jwkSet = loadJwkSet(url);
+            return matches(jwt, jwkSet, refreshKeysAttempts - 1);
         }
         return matches;
     }
@@ -182,61 +177,38 @@ public class JwksSignature implements SignatureConfiguration {
      * @param jwk A JSON Web Key.
      * @return a JWSVerifier for a JWK.
      */
-    protected JWSVerifier verifiersForJwk(JWK jwk) {
+    protected Optional<JWSVerifier> getVerifier(JWK jwk) {
         if (jwk instanceof RSAKey) {
-            return jwsVerifierForRSAKey(((RSAKey) jwk));
-
+            RSAKey rsaKey = (RSAKey) jwk;
+            return getVerifier(rsaKey::toRSAPublicKey, RSASSAVerifier::new);
         } else if (jwk instanceof ECKey) {
-            return jwsVerifierForECKey((ECKey) jwk);
+            ECKey ecKey = (ECKey) jwk;
+            return getVerifier(ecKey::toECPublicKey, ECDSAVerifier::new);
         }
-        return null;
+        return Optional.empty();
     }
 
-    /**
-     *
-     * @param rsaKey A RSA Key.
-     * @return a JWSVerifier for a RSAKey.
-     */
-    protected JWSVerifier jwsVerifierForRSAKey(RSAKey rsaKey) {
-        RSAPublicKey rsaPublicKey = null;
-        try {
-            rsaPublicKey = rsaKey.toRSAPublicKey();
-        } catch (JOSEException e) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("JOSEException when retrieving RSA Public Key", e);
-            }
-        }
-        if (rsaPublicKey == null) {
-            return null;
-        }
-        return new RSASSAVerifier(rsaPublicKey);
-    }
 
-    /**
-     *
-     * @param ecKey A ECKey
-     * @return a JWSVerifier for a ECKey.
-     */
-    protected JWSVerifier jwsVerifierForECKey(ECKey ecKey) {
-        ECPublicKey ecPublicKey = null;
+    private <T, R extends JWSVerifier> Optional<R> getVerifier(ThrowingSupplier<T, JOSEException> supplier, ThrowingFunction<T, R, JOSEException> consumer) {
+        T publicKey = null;
         try {
-            ecPublicKey = ecKey.toECPublicKey();
+            publicKey = supplier.get();
         } catch (JOSEException e) {
             if (LOG.isErrorEnabled()) {
-                LOG.error("JOSEException when retrieving EC Public Key", e);
+                LOG.error("JOSEException when retrieving public key", e);
             }
         }
-        if (ecPublicKey == null) {
-            return null;
-        }
-        try {
-            return new ECDSAVerifier(ecPublicKey);
-        } catch (JOSEException e) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("JOSEException when instantiating ECDSAVerifier", e);
+        if (publicKey != null) {
+            try {
+                return Optional.of(consumer.apply(publicKey));
+            } catch (JOSEException e) {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("JOSEException when instantiating the verifier", e);
+                }
             }
         }
-        return null;
+
+        return Optional.empty();
     }
 
     /**
@@ -248,8 +220,9 @@ public class JwksSignature implements SignatureConfiguration {
      */
     protected boolean verify(List<JWK> matches, SignedJWT jwt) {
         return matches.stream()
-                .map(this::verifiersForJwk)
-                .filter(Objects::nonNull)
+                .map(this::getVerifier)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
                 .anyMatch(verifier -> {
                     try {
                         return jwt.verify(verifier);
