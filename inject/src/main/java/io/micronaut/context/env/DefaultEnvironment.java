@@ -807,6 +807,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     private static class EnvironmentsAndPackage {
         String aPackage;
-        Set<String> enviroments = new HashSet<>(1);
+        Set<String> enviroments = new LinkedHashSet<>(1);
     }
 }
