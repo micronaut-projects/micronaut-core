@@ -18,6 +18,7 @@ package io.micronaut.context.env
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.naming.NameUtils
 import spock.lang.Specification
+import spock.util.environment.RestoreSystemProperties
 
 /**
  * Created by graemerocher on 12/06/2017.
@@ -281,6 +282,21 @@ class DefaultEnvironmentSpec extends Specification {
         System.clearProperty("foo.test")
         System.clearProperty("foo.baz")
         System.clearProperty("micronaut.config.files")
+    }
+
+    @RestoreSystemProperties
+    def "constructor(String... names) should preserve order specified in micronaut.environments system property"() {
+        given: "set environments system property"
+        System.setProperty('micronaut.environments', 'cloud, ec2, foo, bar, foo,baz,ec2,cloud,cloud')
+
+        and: "setup environment"
+        def env = new DefaultEnvironment("x", "x", "y")
+
+        when: "create environment and fetch active env names"
+        def envNames = env.getActiveNames().toList()
+
+        then: "env names should be in the same order as defined in micronaut.environment variable, with test env first"
+        envNames == ["x", "y", "test", "cloud", "ec2", "foo", "bar", "baz"]
     }
 
     private static Environment startEnv(String files) {
