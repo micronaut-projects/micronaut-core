@@ -46,6 +46,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.annotation.Annotation;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -601,6 +602,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                         environments.add(IBM);
                         environments.add(Environment.CLOUD);
                         break;
+                    case DIGITAL_OCEAN:
+                        environments.add(DIGITAL_OCEAN);
+                        environments.add(Environment.CLOUD);
+                        break;
                     case OTHER:
                         // do nothing here
                         break;
@@ -712,6 +717,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         if (isGoogleCompute()) {
             return ComputePlatform.GOOGLE_COMPUTE;
         }
+
+        if (isDigitalOcean()) {
+            return ComputePlatform.DIGITAL_OCEAN;
+        }
+
         //TODO check for azure and IBM
         //Azure - see http://blog.mszcool.com/index.php/2015/04/detecting-if-a-virtual-machine-runs-in-microsoft-azure-linux-windows-to-protect-your-software-when-distributed-via-the-azure-marketplace/
         //IBM - uses cloudfoundry, will have to use that to probe
@@ -793,6 +803,18 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
         }
         return false;
+    }
+
+    private static boolean isDigitalOcean() {
+        try {
+            final URL url = new URL("http://169.254.169.254/metadata/v1.json");
+            final HttpURLConnection con = (HttpURLConnection) url.openConnection();
+            con.setRequestMethod("HEAD");
+            int responseCode = con.getResponseCode();
+            return responseCode == 200;
+        } catch (IOException e) {
+            return false;
+        }
     }
 
     /**
