@@ -87,14 +87,17 @@ public class JwksSignature implements SignatureConfiguration {
         return Optional.ofNullable(jwkSet);
     }
 
+    private List<JWK> getJsonWebKeys() {
+        return getJWKSet().map(JWKSet::getKeys).orElse(Collections.emptyList());
+    }
+
     /**
      *
      * @return A message indicating the supported algorithms.
      */
     @Override
     public String supportedAlgorithmsMessage() {
-        List<JWK> keys = getJWKSet().map(JWKSet::getKeys).orElse(Collections.emptyList());
-        String message = keys.stream()
+        String message = getJsonWebKeys().stream()
                 .map(JWK::getAlgorithm)
                 .map(Algorithm::getName)
                 .reduce((a, b) -> a + ", " + b)
@@ -111,8 +114,7 @@ public class JwksSignature implements SignatureConfiguration {
      */
     @Override
     public boolean supports(JWSAlgorithm algorithm) {
-        return getJWKSet().map(JWKSet::getKeys)
-                .orElse(Collections.emptyList())
+        return getJsonWebKeys()
                 .stream()
                 .map(JWK::getAlgorithm)
                 .anyMatch(algorithm::equals);
