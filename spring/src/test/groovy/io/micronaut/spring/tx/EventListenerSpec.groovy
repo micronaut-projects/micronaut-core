@@ -8,6 +8,7 @@ class EventListenerSpec extends Specification {
     void "test a transactional event listener is invoked once"() {
         given:
         ApplicationContext ctx = ApplicationContext.run()
+        ctx.publishEvent(new FakeEvent())
 
         when:
         TransactionalListener t = ctx.getBean(TransactionalListener)
