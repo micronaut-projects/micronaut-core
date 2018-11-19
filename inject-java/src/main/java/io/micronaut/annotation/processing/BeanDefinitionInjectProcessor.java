@@ -593,7 +593,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         null
                 );
 
-
                 AnnotationMetadata annotationMetadata = DefaultAnnotationMetadata.mutateMember(
                         AnnotationMetadata.EMPTY_METADATA,
                         PropertySource.class.getName(),
