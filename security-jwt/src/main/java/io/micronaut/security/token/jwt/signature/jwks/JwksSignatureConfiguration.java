@@ -28,9 +28,17 @@ import javax.validation.constraints.NotNull;
  */
 public interface JwksSignatureConfiguration {
 
+    /**
+     * Json Web Key Set endpoint url.
+     * @return returns a url where a JWKS is exposed.
+     */
     @NotNull
     String getUrl();
 
+    /**
+     * Representation the KeyType for this JWKS signature configuration. KeyType is the kty parameter in a JSON Web Key (JWK).
+     * @return The KeyType for the JWKS signature configuration.
+     */
     @NotNull
     KeyType getKeyType();
 }
