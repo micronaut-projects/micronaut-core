@@ -37,8 +37,8 @@ import io.micronaut.security.token.jwt.signature.SignatureConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import javax.validation.constraints.NotNull;
 import java.io.IOException;
 import java.net.URL;
 import java.text.ParseException;
@@ -64,10 +64,10 @@ public class JwksSignature implements SignatureConfiguration {
     @Nullable
     private JWKSet jwkSet;
 
-    @NotNull
+    @Nonnull
     private final KeyType keyType;
 
-    @NotNull
+    @Nonnull
     private final String url;
 
     /**

@@ -23,7 +23,7 @@ import com.nimbusds.jose.crypto.RSASSAVerifier;
 import com.nimbusds.jwt.SignedJWT;
 import io.micronaut.security.token.jwt.signature.AbstractSignatureConfiguration;
 
-import javax.validation.constraints.NotNull;
+import javax.annotation.Nonnull;
 import java.security.interfaces.RSAPublicKey;
 
 /**
@@ -64,7 +64,7 @@ public class RSASignature extends AbstractSignatureConfiguration {
         return verifyWithPublicKey(jwt, this.publicKey);
     }
 
-    private boolean verifyWithPublicKey(final SignedJWT jwt, @NotNull RSAPublicKey publicKey) throws JOSEException {
+    private boolean verifyWithPublicKey(final SignedJWT jwt, @Nonnull RSAPublicKey publicKey) throws JOSEException {
         final JWSVerifier verifier = new RSASSAVerifier(publicKey);
         return jwt.verify(verifier);
     }

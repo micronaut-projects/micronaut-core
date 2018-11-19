@@ -26,7 +26,7 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.security.token.jwt.endpoints.JwkProvider;
 import io.micronaut.security.token.jwt.signature.SignatureGeneratorConfiguration;
 
-import javax.validation.constraints.NotNull;
+import javax.annotation.Nonnull;
 import java.security.interfaces.RSAPrivateKey;
 
 /**
@@ -67,7 +67,7 @@ public class RSASignatureGenerator extends RSASignature implements SignatureGene
      * @return A signed JWT
      * @throws JOSEException thrown in the JWT signing
      */
-    protected SignedJWT signWithPrivateKey(JWTClaimsSet claims, @NotNull RSAPrivateKey privateKey) throws JOSEException {
+    protected SignedJWT signWithPrivateKey(JWTClaimsSet claims, @Nonnull RSAPrivateKey privateKey) throws JOSEException {
         final JWSSigner signer = new RSASSASigner(privateKey);
         JWSHeader jwsHeader = new JWSHeader.Builder(algorithm).keyID(keyId).build();
         final SignedJWT signedJWT = new SignedJWT(jwsHeader, claims);

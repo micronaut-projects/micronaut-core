@@ -18,7 +18,7 @@ package io.micronaut.security.token.jwt.signature.jwks;
 
 import com.nimbusds.jose.jwk.KeyType;
 
-import javax.validation.constraints.NotNull;
+import javax.annotation.Nonnull;
 
 /**
  * JSON Web Key Set Configuration.
@@ -32,13 +32,13 @@ public interface JwksSignatureConfiguration {
      * Json Web Key Set endpoint url.
      * @return returns a url where a JWKS is exposed.
      */
-    @NotNull
+    @Nonnull
     String getUrl();
 
     /**
      * Representation the KeyType for this JWKS signature configuration. KeyType is the kty parameter in a JSON Web Key (JWK).
      * @return The KeyType for the JWKS signature configuration.
      */
-    @NotNull
+    @Nonnull
     KeyType getKeyType();
 }
