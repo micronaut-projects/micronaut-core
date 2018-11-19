@@ -38,6 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import javax.validation.constraints.NotNull;
 import java.io.IOException;
 import java.net.URL;
 import java.text.ParseException;
@@ -58,8 +59,14 @@ public class JwksSignature implements SignatureConfiguration {
 
     private static final Logger LOG = LoggerFactory.getLogger(JwksSignature.class);
     private static final int REFRESH_JWKS_ATTEMPTS = 1;
-    private Optional<JWKSet> jwkSet;
+
+    @Nullable
+    private JWKSet jwkSet;
+
+    @NotNull
     private final KeyType keyType;
+
+    @NotNull
     private final String url;
 
     /**
@@ -76,13 +83,17 @@ public class JwksSignature implements SignatureConfiguration {
     }
 
 
+    private Optional<JWKSet> getJWKSet() {
+        return Optional.ofNullable(jwkSet);
+    }
+
     /**
      *
      * @return A message indicating the supported algorithms.
      */
     @Override
     public String supportedAlgorithmsMessage() {
-        List<JWK> keys = jwkSet.map(JWKSet::getKeys).orElse(Collections.emptyList());
+        List<JWK> keys = getJWKSet().map(JWKSet::getKeys).orElse(Collections.emptyList());
         String message = keys.stream()
                 .map(JWK::getAlgorithm)
                 .map(Algorithm::getName)
@@ -100,7 +111,7 @@ public class JwksSignature implements SignatureConfiguration {
      */
     @Override
     public boolean supports(JWSAlgorithm algorithm) {
-        return jwkSet.map(JWKSet::getKeys)
+        return getJWKSet().map(JWKSet::getKeys)
                 .orElse(Collections.emptyList())
                 .stream()
                 .map(JWK::getAlgorithm)
@@ -116,7 +127,7 @@ public class JwksSignature implements SignatureConfiguration {
      */
     @Override
     public boolean verify(SignedJWT jwt) throws JOSEException {
-        List<JWK> matches = matches(jwt, jwkSet.orElse(null), REFRESH_JWKS_ATTEMPTS);
+        List<JWK> matches = matches(jwt, getJWKSet().orElse(null), REFRESH_JWKS_ATTEMPTS);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Found {} matching JWKs", matches.size());
         }
@@ -131,16 +142,16 @@ public class JwksSignature implements SignatureConfiguration {
      * @param url JSON Web Key Set Url.
      * @return a JWKSet or null if there was an error.
      */
-    protected Optional<JWKSet> loadJwkSet(String url) {
+    protected JWKSet loadJwkSet(String url) {
         try {
-            return Optional.of(JWKSet.load(new URL(url)));
+            return JWKSet.load(new URL(url));
         } catch (IOException | ParseException e) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Exception loading JWK. The JwksSignature will not be used to verify a JWT if further refresh attempts fail", e);
             }
         }
 
-        return Optional.empty();
+        return null;
     }
 
     /**
