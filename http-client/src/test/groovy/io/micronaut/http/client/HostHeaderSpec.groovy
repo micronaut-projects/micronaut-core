@@ -13,7 +13,7 @@ import spock.lang.Specification
 
 class HostHeaderSpec extends Specification {
 
-    @IgnoreIf({ System.getenv("TRAVIS")})
+    @IgnoreIf({ System.getProperty("os.name").contains("Linux") })
     // Travis doesn't allow 80
     void "test host header with server on 80"() {
         given:
@@ -53,7 +53,7 @@ class HostHeaderSpec extends Specification {
         embeddedServer.close()
     }
 
-    @IgnoreIf({ System.getenv("TRAVIS")})
+    @IgnoreIf({ System.getProperty("os.name").contains("Linux") })
     // Travis doesn't allow 80
     void "test host header with client authority"() {
         given:
@@ -74,7 +74,7 @@ class HostHeaderSpec extends Specification {
         embeddedServer.close()
     }
 
-    @IgnoreIf({ System.getenv("TRAVIS")})
+    @IgnoreIf({ System.getProperty("os.name").contains("Linux") })
     // Travis doesn't allow 443
     void "test host header with https server on 443"() {
         given:
