@@ -558,7 +558,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             if (!writer.isValidated() && annotationUtils.hasStereotype(method, "javax.validation.Constraint")) {
                 writer.setValidated(true);
             }
-            TypeMirror valueType = method.getParameters().get(0).asType();
+            VariableElement parameter = method.getParameters().get(0);
+            TypeMirror valueType = parameter.asType();
             Object fieldType = modelUtils.resolveTypeReference(valueType);
             Map<String, Object> genericTypes = Collections.emptyMap();
             TypeKind typeKind = valueType.getKind();
@@ -568,40 +569,54 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             TypeElement declaringClass = modelUtils.classElementFor(method);
 
-            String docComment = elementUtils.getDocComment(method);
-            String setterName = method.getSimpleName().toString();
-            PropertyMetadata propertyMetadata = metadataBuilder.visitProperty(
-                    concreteClass,
-                    declaringClass,
-                    getPropertyMetadataTypeReference(valueType),
-                    NameUtils.getPropertyNameForSetter(setterName),
-                    docComment,
-                    null
-            );
+            AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(method);
+            if (methodAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
+                writer.visitConfigBuilderMethod(
+                        fieldType,
+                        NameUtils.getterNameFor(parameter.getSimpleName().toString()),
+                        methodAnnotationMetadata,
+                        metadataBuilder);
+                try {
+                    visitConfigurationBuilder(method, valueType, writer);
+                } finally {
+                    writer.visitConfigBuilderEnd();
+                }
+            } else {
+                String docComment = elementUtils.getDocComment(method);
+                String setterName = method.getSimpleName().toString();
+                PropertyMetadata propertyMetadata = metadataBuilder.visitProperty(
+                        concreteClass,
+                        declaringClass,
+                        getPropertyMetadataTypeReference(valueType),
+                        NameUtils.getPropertyNameForSetter(setterName),
+                        docComment,
+                        null
+                );
 
-            AnnotationMetadata annotationMetadata = DefaultAnnotationMetadata.mutateMember(
-                    AnnotationMetadata.EMPTY_METADATA,
-                    PropertySource.class.getName(),
-                    AnnotationMetadata.VALUE_MEMBER,
-                    Collections.singletonList(
-                            new io.micronaut.core.annotation.AnnotationValue(
-                                    Property.class.getName(),
-                                    Collections.singletonMap(
-                                            "name",
-                                            propertyMetadata.getPath()
-                                    )
-                            )
-                    )
-            );
-            writer.visitSetterValue(
-                    modelUtils.resolveTypeReference(declaringClass),
-                    annotationMetadata,
-                    modelUtils.isPrivate(method),
-                    fieldType,
-                    setterName,
-                    genericTypes,
-                    annotationUtils.getAnnotationMetadata(method.getParameters().get(0)),
-                    true);
+                AnnotationMetadata annotationMetadata = DefaultAnnotationMetadata.mutateMember(
+                        AnnotationMetadata.EMPTY_METADATA,
+                        PropertySource.class.getName(),
+                        AnnotationMetadata.VALUE_MEMBER,
+                        Collections.singletonList(
+                                new io.micronaut.core.annotation.AnnotationValue(
+                                        Property.class.getName(),
+                                        Collections.singletonMap(
+                                                "name",
+                                                propertyMetadata.getPath()
+                                        )
+                                )
+                        )
+                );
+                writer.visitSetterValue(
+                        modelUtils.resolveTypeReference(declaringClass),
+                        annotationMetadata,
+                        modelUtils.isPrivate(method),
+                        fieldType,
+                        setterName,
+                        genericTypes,
+                        annotationUtils.getAnnotationMetadata(method.getParameters().get(0)),
+                        true);
+            }
         }
 
         /**
