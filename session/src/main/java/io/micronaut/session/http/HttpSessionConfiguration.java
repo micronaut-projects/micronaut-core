@@ -70,7 +70,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
      * Default value ({@value #DEFAULT_BASE64ENCODE}).
      * @param base64Encode Enable the Base64 encode for sessions IDs sent back to clients
      */
-    protected void setBase64Encode(boolean base64Encode) {
+    public void setBase64Encode(boolean base64Encode) {
         this.base64Encode = base64Encode;
     }
 
@@ -85,7 +85,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
      * Default value ({@value #DEFAULT_COOKIENAME}).
      * @param cookieName Set the cookie name to use
      */
-    protected void setCookieName(String cookieName) {
+    public void setCookieName(String cookieName) {
         this.cookieName = cookieName;
     }
 
@@ -99,7 +99,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     /**
      * @param prefix Set the prefix to use when serializing session ID
      */
-    protected void setPrefix(String prefix) {
+    public void setPrefix(String prefix) {
         this.prefix = prefix;
     }
 
@@ -114,7 +114,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
      * Default values ([{@value io.micronaut.http.HttpHeaders#AUTHORIZATION_INFO}, {@value io.micronaut.http.HttpHeaders#X_AUTH_TOKEN}]).
      * @param headerNames Set the header names when using a Header strategy
      */
-    protected void setHeaderNames(String[] headerNames) {
+    public void setHeaderNames(String[] headerNames) {
         this.headerNames = headerNames;
     }
 
@@ -128,7 +128,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     /**
      * @param cookiePath Set the cookie path to use
      */
-    protected void setCookiePath(String cookiePath) {
+    public void setCookiePath(String cookiePath) {
         this.cookiePath = cookiePath;
     }
 
@@ -142,7 +142,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     /**
      * @param domainName Set the domain name to use for the cookie
      */
-    protected void setDomainName(String domainName) {
+    public void setDomainName(String domainName) {
         this.domainName = domainName;
     }
 
@@ -156,7 +156,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     /**
      * @param cookieMaxAge Set the max age to use for the cookie
      */
-    protected void setCookieMaxAge(TemporalAmount cookieMaxAge) {
+    public void setCookieMaxAge(TemporalAmount cookieMaxAge) {
         this.cookieMaxAge = cookieMaxAge;
     }
 
@@ -171,7 +171,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
      * Default value ({@value #DEFAULT_REMEMBERME}).
      * @param rememberMe Enable the remember me setting
      */
-    protected void setRememberMe(boolean rememberMe) {
+    public void setRememberMe(boolean rememberMe) {
         this.rememberMe = rememberMe;
     }
 }

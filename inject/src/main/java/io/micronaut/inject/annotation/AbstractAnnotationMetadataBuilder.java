@@ -241,7 +241,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 Object annotationValue = entry.getValue();
                 Optional<?> aliasMember = aliasForValues.get("member");
                 Optional<?> aliasAnnotation = aliasForValues.get("annotation");
-                if (aliasMember.isPresent() && !aliasAnnotation.isPresent()) {
+                Optional<?> aliasAnnotationName = aliasForValues.get("annotationName");
+                if (aliasMember.isPresent() && !(aliasAnnotation.isPresent() || aliasAnnotationName.isPresent())) {
                     String aliasedNamed = aliasMember.get().toString();
                     readAnnotationRawValues(aliasedNamed, annotationValue, resolvedValues);
                 }
@@ -418,11 +419,17 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             Object annotationValue,
             OptionalValues<?> aliasForValues) {
         Optional<?> aliasAnnotation = aliasForValues.get("annotation");
+        Optional<?> aliasAnnotationName = aliasForValues.get("annotationName");
         Optional<?> aliasMember = aliasForValues.get("member");
 
-        if (aliasAnnotation.isPresent()) {
+        if (aliasAnnotation.isPresent() || aliasAnnotationName.isPresent()) {
             if (aliasMember.isPresent()) {
-                String aliasedAnnotationName = aliasAnnotation.get().toString();
+                String aliasedAnnotationName;
+                if (aliasAnnotation.isPresent()) {
+                    aliasedAnnotationName = aliasAnnotation.get().toString();
+                } else {
+                    aliasedAnnotationName = aliasAnnotationName.get().toString();
+                }
                 String aliasedMemberName = aliasMember.get().toString();
                 Object v = readAnnotationValue(aliasedMemberName, annotationValue);
                 if (v != null) {
