@@ -137,6 +137,10 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     String AZURE = "azure";
 
     /**
+     * Cloud provider Digital Ocean
+     */
+    String DIGITAL_OCEAN = "digitalocean";
+    /**
      * Cloud or non cloud provider on bare metal (unknown).
      */
     String BARE_METAL = "baremetal";
@@ -170,6 +174,7 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      * The host name environment variable.
      */
     String HOSTNAME = "HOSTNAME";
+
 
     /**
      * Should respect the order as provided.

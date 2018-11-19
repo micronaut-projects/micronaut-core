@@ -17,99 +17,22 @@
 package io.micronaut.discovery.cloud.gcp;
 
 import io.micronaut.context.env.ComputePlatform;
-import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
-import io.micronaut.discovery.cloud.NetworkInterface;
-
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import io.micronaut.discovery.cloud.AbstractComputeInstanceMetadata;
 
 /**
- * Represents {@link ComputeInstanceMetadata} for Google Cloud Platform.
+ * Represents {@link io.micronaut.discovery.cloud.ComputeInstanceMetadata} for Google Cloud Platform.
  *
  * @author rvanderwerf
  * @author Graeme Rocher
  * @since 1.0
  */
-public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
+public class GoogleComputeInstanceMetadata extends AbstractComputeInstanceMetadata {
 
-    //network interfaces to get ip addresses
-    List<NetworkInterface> interfaces = Collections.emptyList();
-
-    // anything non-standard goes in here
-    Map<String, String> metadata;
-
-    String name;
-    String availabilityZone;
-    String localHostname;
-    String publicHostname;
-    String description;
-    String machineType;
-    String instanceId;
-    String region;
-    final ComputePlatform computePlatform = ComputePlatform.GOOGLE_COMPUTE;
-    String account;
-    String imageId;
-
-    // should we keep these broken out or require people to look in the interfaces?
-    String publicIpV4;
-    String publicIpV6;
-    String privateIpV4;
-    String privateIpV6;
-
-    boolean cached = false;
-
-    // quick way to lookup tags
-    private Map<String, String> tags = Collections.emptyMap();
-
-    @Override
-    public String getImageId() {
-        return imageId;
-    }
-
-    @Override
-    public String getAccount() {
-        return account;
-    }
-
-    @Override
-    public Map<String, String> getMetadata() {
-        return metadata;
-    }
-
-    @Override
-    public List<NetworkInterface> getInterfaces() {
-        return interfaces;
-    }
+    private final ComputePlatform computePlatform = ComputePlatform.GOOGLE_COMPUTE;
 
     @Override
     public ComputePlatform getComputePlatform() {
         return computePlatform;
-    }
-
-    @Override
-    public Map<String, String> getTags() {
-        return tags;
-    }
-
-    @Override
-    public String getName() {
-        return name;
-    }
-
-    @Override
-    public String getInstanceId() {
-        return instanceId;
-    }
-
-    @Override
-    public String getMachineType() {
-        return machineType;
-    }
-
-    @Override
-    public String getAvailabilityZone() {
-        return availabilityZone;
     }
 
     @Override
@@ -120,48 +43,4 @@ public class GoogleComputeInstanceMetadata implements ComputeInstanceMetadata {
         return region;
     }
 
-    @Override
-    public String getLocalHostname() {
-        return localHostname;
-    }
-
-    @Override
-    public String getPrivateHostname() {
-        return localHostname;
-    }
-
-    @Override
-    public String getPublicIpV4() {
-        return publicIpV4;
-    }
-
-    @Override
-    public String getPublicIpV6() {
-        return publicIpV6;
-    }
-
-    @Override
-    public String getPrivateIpV4() {
-        return privateIpV4;
-    }
-
-    @Override
-    public String getPrivateIpV6() {
-        return privateIpV6;
-    }
-
-    @Override
-    public String getDescription() {
-        return description;
-    }
-
-    @Override
-    public String getPublicHostname() {
-        return publicHostname;
-    }
-
-    @Override
-    public boolean isCached() {
-        return cached;
-    }
 }
