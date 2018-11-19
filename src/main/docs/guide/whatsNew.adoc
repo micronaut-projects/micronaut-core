@@ -24,22 +24,7 @@ Various improvements have been made to improve the Micronaut experience on JDK 1
 
 === Improved support for OpenFaaS
 
-<<<<<<< HEAD
-- Netty `4.1.29` -> `4.1.30`
-- RxJava `2.2.0` -> `2.2.2`
-//- Groovy `2.5.1` -> `2.5.2`
-- Hibernate Core `5.3.4` -> `5.3.6.Final`
-- Jackson `2.9.6` -> `2.9.7`
-//- Lettuce `5.0.4` -> `5.1.0`
-- Reactor `3.1.8` -> `3.2.0`
-- SnakeYAML `1.20` -> `1.23`
-- Jaeger `0.30.4` -> `0.31.0`
-- Brave `5.2.0` -> `5.4.2`
-- Zipkin Reporter `2.7.7` -> `2.7.9`
-- Spring `5.0.8` -> `5.1.0`
-=======
 The OpenFaaS feature of the CLI now generates an appropriate `function.yml` file so you can use the OpenFaaS CLI to deploy functions implemented in Micronaut.
->>>>>>> 1.0.x
 
 === AOP Advice on Factory Beans
 
