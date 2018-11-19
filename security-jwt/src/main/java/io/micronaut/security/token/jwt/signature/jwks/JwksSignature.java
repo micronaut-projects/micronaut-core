@@ -58,7 +58,7 @@ import java.util.Optional;
 public class JwksSignature implements SignatureConfiguration {
 
     private static final Logger LOG = LoggerFactory.getLogger(JwksSignature.class);
-    private static final int REFRESH_JWKS_ATTEMPTS = 1;
+    public static final int DEFAULT_REFRESH_JWKS_ATTEMPTS = 1;
 
     @Nullable
     private JWKSet jwkSet;
@@ -129,7 +129,7 @@ public class JwksSignature implements SignatureConfiguration {
      */
     @Override
     public boolean verify(SignedJWT jwt) throws JOSEException {
-        List<JWK> matches = matches(jwt, getJWKSet().orElse(null), REFRESH_JWKS_ATTEMPTS);
+        List<JWK> matches = matches(jwt, getJWKSet().orElse(null), getRefreshJwksAttempts());
         if (LOG.isDebugEnabled()) {
             LOG.debug("Found {} matching JWKs", matches.size());
         }
@@ -246,5 +246,13 @@ public class JwksSignature implements SignatureConfiguration {
                         return false;
                     }
                 });
+    }
+
+    /**
+     * Returns the number of attempts to refresh the cached JWKS.
+     * @return Number of attempts to refresh the cached JWKS.
+     */
+    public int getRefreshJwksAttempts() {
+        return DEFAULT_REFRESH_JWKS_ATTEMPTS;
     }
 }
