@@ -20,6 +20,7 @@ import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.security.authentication.AuthenticationFailed;
+import io.micronaut.security.authentication.AuthenticationUserDetailsAdapter;
 import io.micronaut.security.authentication.UserDetails;
 import io.micronaut.security.handlers.LoginHandler;
 import io.micronaut.security.filters.SecurityFilter;
@@ -57,7 +58,7 @@ public class SessionLoginHandler implements LoginHandler {
     @Override
     public HttpResponse loginSuccess(UserDetails userDetails, HttpRequest<?> request) {
         Session session = findSession(request);
-        session.put(SecurityFilter.AUTHENTICATION, userDetails);
+        session.put(SecurityFilter.AUTHENTICATION, new AuthenticationUserDetailsAdapter(userDetails));
         try {
             URI location = new URI(securitySessionConfiguration.getLoginSuccessTargetUrl());
             return HttpResponse.seeOther(location);

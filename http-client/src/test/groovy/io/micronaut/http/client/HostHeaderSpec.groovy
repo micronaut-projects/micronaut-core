@@ -13,8 +13,8 @@ import spock.lang.Specification
 
 class HostHeaderSpec extends Specification {
 
-    @IgnoreIf({ System.getenv("TRAVIS")})
-    // Travis doesn't allow 80
+    // Unix-like environments (e.g. Travis) may not allow to bind on reserved ports without proper privileges.
+    @IgnoreIf({ os.linux })
     void "test host header with server on 80"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.build(['micronaut.server.port': 80]).run(EmbeddedServer)
@@ -53,8 +53,8 @@ class HostHeaderSpec extends Specification {
         embeddedServer.close()
     }
 
-    @IgnoreIf({ System.getenv("TRAVIS")})
-    // Travis doesn't allow 80
+    // Unix-like environments (e.g. Travis) may not allow to bind on reserved ports without proper privileges.
+    @IgnoreIf({ os.linux })
     void "test host header with client authority"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.build(['micronaut.server.port': 80]).run(EmbeddedServer)
@@ -74,8 +74,8 @@ class HostHeaderSpec extends Specification {
         embeddedServer.close()
     }
 
-    @IgnoreIf({ System.getenv("TRAVIS")})
-    // Travis doesn't allow 443
+    // Unix-like environments (e.g. Travis) may not allow to bind on reserved ports without proper privileges.
+    @IgnoreIf({ os.linux })
     void "test host header with https server on 443"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.build([
