@@ -93,11 +93,11 @@ public class UriTemplate implements Comparable<UriTemplate> {
      *
      * @param baseUrl Base Url
      * @param queryParameters Query Parameters
-     * @param skipEmpty If true for a map such as [offset: 0, max: 10, empty: ''], keys will be consider [offset, max]
+     * @param skipEmptyKeys If true for a map such as [offset: 0, max: 10, empty: ''], keys will be consider [offset, max]
      */
-    public UriTemplate(@Nonnull CharSequence baseUrl, @Nonnull Map<String, Object> queryParameters, boolean skipEmpty) {
+    public UriTemplate(@Nonnull CharSequence baseUrl, @Nonnull Map<String, Object> queryParameters, boolean skipEmptyKeys) {
         this(baseUrl, queryParameters.keySet().stream().filter(queryParam -> {
-            if (skipEmpty) {
+            if (skipEmptyKeys) {
                 Object value = queryParameters.get(queryParam);
                 if (value == null) {
                     return false;
@@ -243,6 +243,20 @@ public class UriTemplate implements Comparable<UriTemplate> {
      */
     public String expand(Object bean) {
         return expand(BeanMap.of(bean));
+    }
+
+    /**
+     *
+     * Expand a base url with a list of query parameters.
+     * e.g. ('http://localhost',[offset: 0, max: 10, empty: ''], true) expands to 'http://example.com:8080/?x=1024&y=768'
+     *
+     * @param baseUrl The Base Url
+     * @param queryParameters URL query parameters
+     * @param skipEmptyKeys If true for a map such as [offset: 0, max: 10, empty: ''], keys will be consider [offset, max]
+     * @return The expanded URI.
+     */
+    public static String expand(String baseUrl, Map<String, Object> queryParameters, boolean skipEmptyKeys) {
+        return new UriTemplate(baseUrl, queryParameters, skipEmptyKeys).expand(queryParameters);
     }
 
     @Override

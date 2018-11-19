@@ -509,15 +509,18 @@ class UriTemplateSpec extends Specification {
     @Unroll("new UriTemplate(http://example.com:8080,#m, #skipEmpty) => #expected")
     def "verify new UriTemplate(http://localhost,[offset: 0, max: 10]) is equivalent to new UriTemplate(http://localhost?{offset,max})"() {
         when:
-        String result = new UriTemplate('http://example.com:8080/', m as Map<String, Object>,  skipEmpty).expand(m)
+        String result = new UriTemplate(baseUrl, m as Map<String, Object>,  skipEmpty).expand(m)
 
         then:
         result == expected
 
+        and:
+        UriTemplate.expand(baseUrl, m, skipEmpty) == expected
+
         where:
-        m                               | skipEmpty | expected
-        [x: 1024, y: 768, empty: '']    | false     | 'http://example.com:8080/?x=1024&y=768&empty='
-        [x: 1024, y: 768, empty: '']    | true      | 'http://example.com:8080/?x=1024&y=768'
-        [:]                             | true      | 'http://example.com:8080'
+        baseUrl                    | m                               | skipEmpty | expected
+        'http://example.com:8080/' | [x: 1024, y: 768, empty: '']    | false     | 'http://example.com:8080/?x=1024&y=768&empty='
+        'http://example.com:8080/' | [x: 1024, y: 768, empty: '']    | true      | 'http://example.com:8080/?x=1024&y=768'
+        'http://example.com:8080/' | [:]                             | true      | 'http://example.com:8080'
     }
 }
