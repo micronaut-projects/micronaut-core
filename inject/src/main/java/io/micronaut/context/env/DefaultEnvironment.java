@@ -73,6 +73,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST";
     private static final String PCF_ENV = "VCAP_SERVICES";
     private static final String HEROKU_DYNO = "DYNO";
+    private static final int DEFAULT_READ_TIMEOUT = 500;
+    private static final int DEFAULT_CONNECT_TIMEOUT = 500;
 
     protected final ClassPathResourceLoader resourceLoader;
 
@@ -734,8 +736,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         try {
             URL url = new URL("http://metadata.google.internal");
             HttpURLConnection con = (HttpURLConnection) url.openConnection();
-            con.setReadTimeout(500);
-            con.setConnectTimeout(500);
+            con.setReadTimeout(DEFAULT_READ_TIMEOUT);
+            con.setConnectTimeout(DEFAULT_READ_TIMEOUT);
             con.setRequestMethod("GET");
             con.setDoOutput(true);
             int responseCode = con.getResponseCode();
@@ -809,6 +811,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         try {
             final URL url = new URL("http://169.254.169.254/metadata/v1.json");
             final HttpURLConnection con = (HttpURLConnection) url.openConnection();
+            con.setReadTimeout(DEFAULT_READ_TIMEOUT);
+            con.setConnectTimeout(DEFAULT_CONNECT_TIMEOUT);
             con.setRequestMethod("HEAD");
             int responseCode = con.getResponseCode();
             return responseCode == 200;
