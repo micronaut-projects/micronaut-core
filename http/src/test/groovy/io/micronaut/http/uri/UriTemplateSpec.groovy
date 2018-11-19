@@ -505,4 +505,19 @@ class UriTemplateSpec extends Specification {
         'http://example.com:8080/{&keys}'             | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | 'http://example.com:8080/&keys=semi,%3B,dot,.,comma,%2C'
         'http://example.com:8080/{&keys*}'            | [keys: ['semi': ';', 'dot': '.', comma: ',']]      | 'http://example.com:8080/&semi=%3B&dot=.&comma=%2C'
     }
+
+    @Unroll("new UriTemplate(http://example.com:8080,#m, #skipEmpty) => #expected")
+    def "verify new UriTemplate(http://localhost,[offset: 0, max: 10]) is equivalent to new UriTemplate(http://localhost?{offset,max})"() {
+        when:
+        String result = new UriTemplate('http://example.com:8080/', m as Map<String, Object>,  skipEmpty).expand(m)
+
+        then:
+        result == expected
+
+        where:
+        m                               | skipEmpty | expected
+        [x: 1024, y: 768, empty: '']    | false     | 'http://example.com:8080/?x=1024&y=768&empty='
+        [x: 1024, y: 768, empty: '']    | true      | 'http://example.com:8080/?x=1024&y=768'
+        [:]                             | true      | 'http://example.com:8080'
+    }
 }

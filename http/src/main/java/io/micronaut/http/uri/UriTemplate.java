@@ -20,6 +20,7 @@ import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
 
+import javax.annotation.Nonnull;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
@@ -28,9 +29,11 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.StringJoiner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * <p>A Fast Implementation of URI Template specification. See https://tools.ietf.org/html/rfc6570 and
@@ -68,6 +71,7 @@ public class UriTemplate implements Comparable<UriTemplate> {
     private static final char AND_OPERATOR = '&';
     private static final String SLASH_STRING = "/";
     private static final char DOT_OPERATOR = '.';
+    private static final char COMMA = ',';
 
     private final String templateString;
     private final List<PathSegment> segments = new ArrayList<>();
@@ -79,6 +83,44 @@ public class UriTemplate implements Comparable<UriTemplate> {
      */
     public UriTemplate(CharSequence templateString) {
         this(templateString, new Object[0]);
+    }
+
+    /**
+     * Construct a new URI template for the given base Url and query parameters.
+     *
+     * e.g. new UriTemplate('http://localhost',[offset: 0, max: 10]) equivalent to
+     *      new UriTemplate('http://localhost?{offset,max}')
+     *
+     * @param baseUrl Base Url
+     * @param queryParameters Query Parameters
+     * @param skipEmpty If true for a map such as [offset: 0, max: 10, empty: ''], keys will be consider [offset, max]
+     */
+    public UriTemplate(@Nonnull CharSequence baseUrl, @Nonnull Map<String, Object> queryParameters, boolean skipEmpty) {
+        this(baseUrl, queryParameters.keySet().stream().filter(queryParam -> {
+            if (skipEmpty) {
+                Object value = queryParameters.get(queryParam);
+                if (value == null) {
+                    return false;
+                }
+                if (value instanceof String && ((String) value).trim().equals("")) {
+                    return false;
+                }
+            }
+            return true;
+        }).collect(Collectors.toSet()));
+    }
+
+    /**
+     * Construct a new URI template for the given base Url and query parameters.
+     *
+     * e.g. new UriTemplate('http://localhost',['offset','max']) equivalent to
+     *      new UriTemplate('http://localhost?{offset,max}')
+     *
+     * @param baseUrl Base Url
+     * @param queryParameters Query Parameters
+     */
+    public UriTemplate(@Nonnull CharSequence baseUrl, @Nonnull Set<String> queryParameters) {
+        this(baseUrl + ((queryParameters.stream().reduce((a, b) -> a + COMMA + b)).map(s -> "{?" + s + "}").orElse("")), new Object[0]);
     }
 
     /**
