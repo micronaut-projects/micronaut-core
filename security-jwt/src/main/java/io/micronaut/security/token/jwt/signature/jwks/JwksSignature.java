@@ -57,8 +57,9 @@ import java.util.Optional;
 @EachBean(JwksSignatureConfiguration.class)
 public class JwksSignature implements SignatureConfiguration {
 
-    private static final Logger LOG = LoggerFactory.getLogger(JwksSignature.class);
     public static final int DEFAULT_REFRESH_JWKS_ATTEMPTS = 1;
+
+    private static final Logger LOG = LoggerFactory.getLogger(JwksSignature.class);
 
     @Nullable
     private JWKSet jwkSet;
@@ -81,7 +82,6 @@ public class JwksSignature implements SignatureConfiguration {
         this.jwkSet = loadJwkSet(url);
         this.keyType = jwksSignatureConfiguration.getKeyType();
     }
-
 
     private Optional<JWKSet> getJWKSet() {
         return Optional.ofNullable(jwkSet);
@@ -200,7 +200,6 @@ public class JwksSignature implements SignatureConfiguration {
         }
         return Optional.empty();
     }
-
 
     private <T, R extends JWSVerifier> Optional<R> getVerifier(ThrowingSupplier<T, JOSEException> supplier, ThrowingFunction<T, R, JOSEException> consumer) {
         T publicKey = null;
