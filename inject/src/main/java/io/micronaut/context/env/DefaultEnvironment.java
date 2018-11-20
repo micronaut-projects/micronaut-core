@@ -46,7 +46,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.annotation.Annotation;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -75,8 +74,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final String HEROKU_DYNO = "DYNO";
     private static final int DEFAULT_READ_TIMEOUT = 500;
     private static final int DEFAULT_CONNECT_TIMEOUT = 500;
-    public static final String DIGITAL_OCEAN_URL = "http://169.254.169.254/metadata/v1.json";
-    public static final String GOOGLE_COMPUTE_METADATA = "http://metadata.google.internal";
+    private static final String DIGITAL_OCEAN_URL = "http://169.254.169.254/metadata/v1.json";
+    private static final String GOOGLE_COMPUTE_METADATA = "http://metadata.google.internal";
 
     protected final ClassPathResourceLoader resourceLoader;
 
@@ -736,7 +735,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @SuppressWarnings("MagicNumber")
     private static boolean isGoogleCompute() {
         try {
-            final HttpURLConnection con = instantiateHttpURLConnectionForEnvironmentCheck(GOOGLE_COMPUTE_METADATA);
+            final HttpURLConnection con = createConnection(GOOGLE_COMPUTE_METADATA);
             con.setRequestMethod("GET");
             con.setDoOutput(true);
             int responseCode = con.getResponseCode();
@@ -806,7 +805,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return false;
     }
 
-    private static HttpURLConnection instantiateHttpURLConnectionForEnvironmentCheck(String spec) throws IOException {
+    private static HttpURLConnection createConnection(String spec) throws IOException {
         final URL url = new URL(spec);
         final HttpURLConnection con = (HttpURLConnection) url.openConnection();
         con.setReadTimeout(DEFAULT_READ_TIMEOUT);
@@ -816,7 +815,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     private static boolean isDigitalOcean() {
         try {
-            final HttpURLConnection con = instantiateHttpURLConnectionForEnvironmentCheck(DIGITAL_OCEAN_URL);
+            final HttpURLConnection con = createConnection(DIGITAL_OCEAN_URL);
             con.setRequestMethod("HEAD");
             int responseCode = con.getResponseCode();
             return responseCode == 200;
