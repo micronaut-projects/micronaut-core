@@ -275,7 +275,8 @@ public final class StringUtils {
      * @param string the string to trim
      * @return the trimmed string or null
      */
-    public static String trimToNull(String string) {
+    @Nullable
+    public static String trimToNull(@Nullable String string) {
         if (string == null) {
             return null;
         }
