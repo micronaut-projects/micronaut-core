@@ -703,9 +703,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             if (isEC2Windows()) {
                 return ComputePlatform.AMAZON_EC2;
             }
-            if (isGoogleCompute()) {
-                return ComputePlatform.GOOGLE_COMPUTE;
-            }
 
         } else {
             // can just read from the file
