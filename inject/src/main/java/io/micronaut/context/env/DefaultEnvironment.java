@@ -46,7 +46,6 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.lang.annotation.Annotation;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -73,6 +72,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST";
     private static final String PCF_ENV = "VCAP_SERVICES";
     private static final String HEROKU_DYNO = "DYNO";
+    private static final String DO_SYS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/sys_vendor";
 
     protected final ClassPathResourceLoader resourceLoader;
 
@@ -807,11 +807,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     private static boolean isDigitalOcean() {
         try {
-            final URL url = new URL("http://169.254.169.254/metadata/v1.json");
-            final HttpURLConnection con = (HttpURLConnection) url.openConnection();
-            con.setRequestMethod("HEAD");
-            int responseCode = con.getResponseCode();
-            return responseCode == 200;
+            String sysVendor = new String(Files.readAllBytes(Paths.get(DO_SYS_VENDOR_FILE)));
+            return "digitalocean".equals(sysVendor.toLowerCase());
         } catch (IOException e) {
             return false;
         }
