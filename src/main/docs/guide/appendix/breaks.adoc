@@ -1,9 +1,5 @@
 This section will document breaking changes that may happen during milestone or release candidate releases, as well as major releases eg (1.x.x -> 2.x.x).
 
-==== 1.1.0
-
-* link:{api}/io/micronaut/security/session/SessionSecurityfilterRejectionHandler.html[SessionSecurityfilterRejectionHandler] has been deprecated. link:{api}/io/micronaut/security/handlers/RedirectRejectionHandler.html[RedirectRejectionHandler] should be used instead.
-
 ==== 1.0.0.RC3
 
 * All Micronaut modules have been renamed to include `micronaut-` prefix to make it easier to manage dependencies. If you are upgrading rename all references modules. Example `bom` -> `micronaut-bom`, `inject` -> `micronaut-inject` etc.

@@ -22,6 +22,8 @@ import io.micronaut.security.config.SecurityConfigurationProperties;
 import io.micronaut.security.handlers.ForbiddenRejectionUriProvider;
 import io.micronaut.security.handlers.UnauthorizedRejectionUriProvider;
 
+import java.util.Optional;
+
 /**
  * Implementation of {@link SecuritySessionConfiguration}. Session-based Authentication configuration properties.
  * @author Sergio del Amo
@@ -159,12 +161,12 @@ public class SecuritySessionConfigurationProperties implements SecuritySessionCo
     }
 
     @Override
-    public String unauthorizedRedirectUri() {
-        return this.unauthorizedTargetUrl;
+    public Optional<String> getUnauthorizedRedirectUri() {
+        return Optional.ofNullable(unauthorizedTargetUrl);
     }
 
     @Override
-    public String forbiddenRedirectUri() {
-        return this.forbiddenTargetUrl;
+    public Optional<String> getForbiddenRedirectUri() {
+        return Optional.ofNullable(forbiddenTargetUrl);
     }
 }

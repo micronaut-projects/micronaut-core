@@ -7,12 +7,13 @@ package io.micronaut.security.handlers;
 
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
+import io.reactivex.BackpressureStrategy;
+import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +21,7 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Singleton;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Optional;
 
 /**
  * If beans {@link UnauthorizedRejectionUriProvider} and {@link ForbiddenRejectionUriProvider} exists provides
@@ -34,6 +36,7 @@ import java.net.URISyntaxException;
 @Replaces(HttpStatusCodeRejectionHandler.class)
 @Requires(beans = {UnauthorizedRejectionUriProvider.class, ForbiddenRejectionUriProvider.class})
 public class RedirectRejectionHandler implements RejectionHandler {
+
     private static final Logger LOG = LoggerFactory.getLogger(RedirectRejectionHandler.class);
 
     private final UnauthorizedRejectionUriProvider unauthorizedRejectionUriProvider;
@@ -60,17 +63,19 @@ public class RedirectRejectionHandler implements RejectionHandler {
      */
     @Override
     public Publisher<MutableHttpResponse<?>> reject(HttpRequest<?> request, boolean forbidden) {
-
-        if (shouldHandleRequest(request)) {
-            try {
-                String uri = redirectUri(forbidden);
-                MutableHttpResponse<?> rsp = httpResponseWithUri(uri);
-                return Publishers.just(rsp);
-            } catch (URISyntaxException e) {
-                return Publishers.just(HttpResponse.serverError());
+        return Flowable.create(emitter -> {
+            if (shouldHandleRequest(request)) {
+                try {
+                    String uri = getRedirectUri(forbidden).orElse("/");
+                    emitter.onNext(httpResponseWithUri(uri));
+                } catch (URISyntaxException e) {
+                    emitter.onError(e);
+                }
+            } else {
+                emitter.onNext(HttpResponse.status(forbidden ? HttpStatus.FORBIDDEN : HttpStatus.UNAUTHORIZED));
             }
-        }
-        return Publishers.just(HttpResponse.status(forbidden ? HttpStatus.FORBIDDEN : HttpStatus.UNAUTHORIZED));
+            emitter.onComplete();
+        }, BackpressureStrategy.ERROR);
     }
 
     /**
@@ -104,29 +109,13 @@ public class RedirectRejectionHandler implements RejectionHandler {
      * @param forbidden if true indicates that although the user was authenticated he did not had the necessary access privileges.
      * @return the uri to redirect to
      */
-    protected String redirectUri(boolean forbidden) {
-        String uri = forbidden ? getForbiddenRejectionUriProvider().forbiddenRedirectUri() :
-                getUnauthorizedRejectionUriProvider().unauthorizedRedirectUri();
+    protected Optional<String> getRedirectUri(boolean forbidden) {
+        Optional<String> uri = forbidden ? forbiddenRejectionUriProvider.getForbiddenRedirectUri() :
+                unauthorizedRejectionUriProvider.getUnauthorizedRedirectUri();
         if (LOG.isDebugEnabled()) {
             LOG.debug("redirect uri: {}", uri);
         }
         return uri;
     }
 
-    /**
-     * unauthorizedRejectionUriProvider Getter.
-     *
-     * @return URI Provider to redirect to if unauthenticated
-     */
-    public UnauthorizedRejectionUriProvider getUnauthorizedRejectionUriProvider() {
-        return this.unauthorizedRejectionUriProvider;
-    }
-
-    /**
-     * forbiddenRejectionUriProvider Getter.
-     * @return URI Provider to redirect to if authenticated but not enough authorization level.
-     */
-    public ForbiddenRejectionUriProvider getForbiddenRejectionUriProvider() {
-        return this.forbiddenRejectionUriProvider;
-    }
 }

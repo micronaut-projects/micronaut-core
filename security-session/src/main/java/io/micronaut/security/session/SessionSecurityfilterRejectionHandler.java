@@ -35,8 +35,7 @@ import java.net.URISyntaxException;
 /**
  * {@link RejectionHandler} implementation for Session-based Authentication.
  *
- * Deprecated use instead {@link io.micronaut.security.handlers.RedirectRejectionHandler}
- *
+ * @deprecated use {@link io.micronaut.security.handlers.RedirectRejectionHandler} instead
  * @author Sergio del Amo
  * @since 1.0
  */
