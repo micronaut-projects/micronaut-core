@@ -699,18 +699,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         boolean isWindows = System.getProperty("os.name")
             .toLowerCase().startsWith("windows");
 
-        if (isWindows) {
-            if (isEC2Windows()) {
-                return ComputePlatform.AMAZON_EC2;
-            }
-
-        } else {
-            // can just read from the file
-            if (isEC2Linux()) {
-                return ComputePlatform.AMAZON_EC2;
-            }
+        if (isWindows ? isEC2Windows() : isEC2Linux()) {
+            return ComputePlatform.AMAZON_EC2;
         }
-        // let's try google
+
         if (isGoogleCompute()) {
             return ComputePlatform.GOOGLE_COMPUTE;
         }
