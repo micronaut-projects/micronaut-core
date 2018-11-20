@@ -177,6 +177,7 @@ public @interface Requires {
     enum Sdk {
         JAVA,
         GROOVY,
+        KOTLIN,
         MICRONAUT
     }
 }
