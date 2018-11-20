@@ -53,7 +53,8 @@ class VisibilityIssuesSpec extends AbstractBeanDefinitionSpec {
         """)
 
         when:
-        def context = ApplicationContext.run('parent.nationality': 'Italian', 'parent.child.name': 'Sally')
+        //not configured with parent.child.name because non public methods are ignored
+        def context = ApplicationContext.run('parent.nationality': 'Italian', 'parent.name': 'Sally')
         def instance = ((BeanFactory)beanDefinition).build(context, beanDefinition)
 
         then:
