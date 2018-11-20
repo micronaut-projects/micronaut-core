@@ -8,63 +8,73 @@ The following table summarizes the constants provided by the api:context.env.Env
 
 .Micronaut Environment Detection
 |===
-|Constant|Description |Requires Example |Config file
+|Constant|Description |Requires Example |Environment name| Config file
 
 |api:context.env.Environment#ANDROID[]
 |The application is running as an Android application
 |`@Requires(env = Environment.ANDROID)`
-|`application-android.{yml|properties|json|groovy}`
+|`android`
+|`application-android.{yml\|properties\|json\|groovy}`
 
 |api:context.env.Environment#TEST[]
 |The application is running within a JUnit or Spock test
 |`@Requires(env = Environment.TEST)`
-|`application-test.{yml|properties|json|groovy}`
+|`test`
+|`application-test.{yml\|properties\|json\|groovy}`
 
 |api:context.env.Environment#CLOUD[]
 |The application is running in a Cloud environment (present for all other cloud platform types)
 |`@Requires(env = Environment.CLOUD)`
-|`application-cloud.{yml|properties|json|groovy}`
-
+|`cloud`
+|`application-cloud.{yml\|properties\|json\|groovy}`
 
 |api:context.env.Environment#AMAZON_EC2[]
 |Running on https://aws.amazon.com/ec2[Amazon EC2]
 |`@Requires(env = Environment.AMAZON_EC2)`
-|`application-ec2.{yml|properties|json|groovy}`
+|`ec2`
+|`application-ec2.{yml\|properties\|json\|groovy}`
 
 |api:context.env.Environment#GOOGLE_COMPUTE[]
 |Running on https://cloud.google.com/compute/[Google Compute]
 |`@Requires(env = Environment.GOOGLE_COMPUTE)`
-|`application-gcp.{yml|properties|json|groovy}`
+|`gcp`
+|`application-gcp.{yml\|properties\|json\|groovy}`
 
 |api:context.env.Environment#KUBERNETES[]
 |Running on https://www.kubernetes.io[Kubernetes]
 |`@Requires(env = Environment.KUBERNETES)`
-|`application-k8s.{yml|properties|json|groovy}`
+|`k8s`
+|`application-k8s.{yml\|properties\|json\|groovy}`
 
 |api:context.env.Environment#HEROKU[]
 |Running on https://heroku.com[Heroku]
 |`@Requires(env = Environment.HEROKU)`
-|`application-heroku.{yml|properties|json|groovy}`
+|`heroku`
+|`application-heroku.{yml\|properties\|json\|groovy}`
 
 |api:context.env.Environment#CLOUD_FOUNDRY[]
 |Running on https://www.cloudfoundry.org[Cloud Foundry]
 |`@Requires(env = Environment.CLOUD_FOUNDRY)`
-|`application-pcf.{yml|properties|json|groovy}`
+|`pcf`
+|`application-pcf.{yml\|properties\|json\|groovy}`
 
 |api:context.env.Environment#AZURE[]
 |Running on https://azure.microsoft.com[Microsoft Azure]
 |`@Requires(env = Environment.AZURE)`
-|`application-azure.{yml|properties|json|groovy}`
+|`azure`
+|`application-azure.{yml\|properties\|json\|groovy}`
 
 |api:context.env.Environment#IBM[]
 |Running on https://www.ibm.com/cloud/[IBM Cloud]
 |`@Requires(env = Environment.IBM)`
-|`application-ibm.{yml|properties|json|groovy}`
+|`ibm`
+|`application-ibm.{yml\|properties\|json\|groovy}`
 
 |api:context.env.Environment#DIGITAL_OCEAN[]
 |Running on https://www.digitalocean.com/[Digital Ocean]
 |`@Requires(env = Environment.DIGITAL_OCEAN)`
-|`application-digitalocean.{yml|properties|json|groovy}`
+|`digitalocean`
+|`application-digitalocean.{yml\|properties\|json\|groovy}`
 
 |===
 
