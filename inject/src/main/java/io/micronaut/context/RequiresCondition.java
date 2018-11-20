@@ -37,6 +37,7 @@ import io.micronaut.core.version.VersionUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import kotlin.KotlinVersion;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -331,6 +332,13 @@ public class RequiresCondition implements Condition {
                         context.fail("Groovy version [" + groovyVersion + "] must be at least " + version);
                     }
                     return versionMatch;
+                case KOTLIN:
+                    String kotlinVersion = KotlinVersion.CURRENT.toString();
+                    boolean isSupported = SemanticVersion.isAtLeast(kotlinVersion, version);
+                    if (!isSupported) {
+                        context.fail("Kotlin version [" + kotlinVersion + "] must be at least " + version);
+                    }
+                    return isSupported;
                 case JAVA:
                     String javaVersion = System.getProperty("java.version");
                     try {
