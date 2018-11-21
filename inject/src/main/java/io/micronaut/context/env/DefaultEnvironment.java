@@ -74,8 +74,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final String HEROKU_DYNO = "DYNO";
     private static final int DEFAULT_READ_TIMEOUT = 500;
     private static final int DEFAULT_CONNECT_TIMEOUT = 500;
-    private static final String DIGITAL_OCEAN_URL = "http://169.254.169.254/metadata/v1.json";
-    private static final String GOOGLE_COMPUTE_METADATA = "http://metadata.google.internal";    
+    private static final String GOOGLE_COMPUTE_METADATA = "http://metadata.google.internal";
     private static final String DO_SYS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/sys_vendor";
 
     protected final ClassPathResourceLoader resourceLoader;
@@ -805,7 +804,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
     private static boolean isDigitalOcean() {
         try {
-
             String sysVendor = new String(Files.readAllBytes(Paths.get(DO_SYS_VENDOR_FILE)));
             return "digitalocean".equals(sysVendor.toLowerCase());
         } catch (IOException e) {
