@@ -8,8 +8,10 @@ package io.micronaut.security.handlers;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Secondary;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpResponseFactory;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
@@ -36,24 +38,29 @@ import java.util.Optional;
 @Singleton
 @Secondary
 @Replaces(HttpStatusCodeRejectionHandler.class)
-@Requires(beans = {UnauthorizedRejectionUriProvider.class, ForbiddenRejectionUriProvider.class})
+@Requires(beans = {UnauthorizedRejectionUriProvider.class, ForbiddenRejectionUriProvider.class, RedirectRejectionHandlerConfiguration.class})
+@Requires(property = RedirectRejectionHandlerConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 public class RedirectRejectionHandler implements RejectionHandler {
 
     private static final Logger LOG = LoggerFactory.getLogger(RedirectRejectionHandler.class);
 
     private final UnauthorizedRejectionUriProvider unauthorizedRejectionUriProvider;
     private final ForbiddenRejectionUriProvider forbiddenRejectionUriProvider;
+    private final RedirectRejectionHandlerConfiguration redirectRejectionHandlerConfiguration;
 
     /**
      * Constructor.
      *
      * @param unauthorizedRejectionUriProvider URI Provider to redirect to if unauthenticated
      * @param forbiddenRejectionUriProvider URI Provider to redirect to if authenticated but not enough authorization level.
+     * @param redirectRejectionHandlerConfiguration Redirect Rejection Handler Configuration
      */
     public RedirectRejectionHandler(UnauthorizedRejectionUriProvider unauthorizedRejectionUriProvider,
-                                    ForbiddenRejectionUriProvider forbiddenRejectionUriProvider) {
+                                    ForbiddenRejectionUriProvider forbiddenRejectionUriProvider,
+                                    RedirectRejectionHandlerConfiguration redirectRejectionHandlerConfiguration) {
         this.unauthorizedRejectionUriProvider = unauthorizedRejectionUriProvider;
         this.forbiddenRejectionUriProvider = forbiddenRejectionUriProvider;
+        this.redirectRejectionHandlerConfiguration = redirectRejectionHandlerConfiguration;
     }
 
     /**
@@ -94,7 +101,7 @@ public class RedirectRejectionHandler implements RejectionHandler {
     }
 
     /**
-     * Builds a 303 HTTP Response to the supplied location.
+     * Builds a HTTP Response redirection to the supplied location.
      *
      * @param uri The Uri to redirect to
      * @return a 303 HTTP response with the Uri as location
@@ -102,7 +109,18 @@ public class RedirectRejectionHandler implements RejectionHandler {
      */
     protected MutableHttpResponse<?> httpResponseWithUri(String uri) throws URISyntaxException {
         URI location = new URI(uri);
-        return HttpResponse.seeOther(location);
+        return HttpResponseFactory.INSTANCE.status(redirectionHttpStatus())
+                .headers((headers) ->
+                        headers.location(location)
+                );
+    }
+
+    /**
+     *
+     * @return return the Http status code which will be used for the redirection
+     */
+    protected HttpStatus redirectionHttpStatus() {
+        return redirectRejectionHandlerConfiguration.getHttpStatus();
     }
 
     /**
