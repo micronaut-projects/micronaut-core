@@ -42,7 +42,7 @@ public class DefaultHttpAsyncClientBuilderFactory {
      */
     @Bean
     @Singleton
-    HttpAsyncClientBuilder httpAsyncClientBuilder() {
+    protected HttpAsyncClientBuilder httpAsyncClientBuilder() {
         return HttpAsyncClientBuilder.create();
     }
 }
