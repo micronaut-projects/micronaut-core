@@ -16,11 +16,15 @@ class RejectionHandlerResolutionSpec extends Specification {
     @Shared
     Map<String, Object> config = [
             'micronaut.security.enabled': true,
-            'micronaut.security.session.enabled': true
+            'micronaut.security.session.enabled': true,
     ]
 
     void "RedirectRejectionHandler is the default rejection handler resolved"() {
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, config, Environment.TEST)
+        Map<String, Object> conf = [
+            'micronaut.security.session.legacy-rejection-handler': false
+        ]
+        conf.putAll(config)
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, conf, Environment.TEST)
         ApplicationContext context = embeddedServer.applicationContext
 
         when:
@@ -30,17 +34,10 @@ class RejectionHandlerResolutionSpec extends Specification {
         thrown(NoSuchBeanException)
 
         when:
-        context.getBean(SessionSecurityfilterRejectionHandlerReplacement)
-
-        then:
-        noExceptionThrown()
-
-        when:
         RejectionHandler rejectionHandler = context.getBean(RejectionHandler)
 
         then:
         noExceptionThrown()
-        rejectionHandler instanceof SessionSecurityfilterRejectionHandlerReplacement
         rejectionHandler instanceof RedirectRejectionHandler
 
         cleanup:

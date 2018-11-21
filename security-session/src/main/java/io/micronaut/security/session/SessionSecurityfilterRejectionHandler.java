@@ -18,17 +18,15 @@ package io.micronaut.security.session;
 
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.annotation.Secondary;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.security.handlers.ForbiddenRejectionUriProvider;
 import io.micronaut.security.handlers.HttpStatusCodeRejectionHandler;
 import io.micronaut.security.handlers.RejectionHandler;
-import io.micronaut.security.handlers.UnauthorizedRejectionUriProvider;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
@@ -43,7 +41,7 @@ import java.net.URISyntaxException;
  * @since 1.0
  */
 @Deprecated
-//@Requires(missingBeans = {UnauthorizedRejectionUriProvider.class, ForbiddenRejectionUriProvider.class})
+@Requires(property = SecuritySessionConfigurationProperties.PREFIX + ".legacy-rejection-handler", notEquals = StringUtils.FALSE)
 @Replaces(HttpStatusCodeRejectionHandler.class)
 @Singleton
 public class SessionSecurityfilterRejectionHandler implements RejectionHandler {
