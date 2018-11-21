@@ -27,6 +27,8 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
+ * Converts String to {@link NodeSelector}.
+ *
  * @author Puneet Behl
  * @since 1.1.0
  */

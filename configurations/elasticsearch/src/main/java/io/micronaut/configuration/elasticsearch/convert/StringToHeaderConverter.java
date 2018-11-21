@@ -27,6 +27,8 @@ import javax.inject.Singleton;
 import java.util.Optional;
 
 /**
+ * Converts String to {@link Header}.
+ *
  * @author Puneet Behl
  * @since 1.1.0
  */

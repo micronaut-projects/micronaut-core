@@ -19,6 +19,8 @@ package io.micronaut.configuration.elasticsearch;
 import org.apache.http.HttpHost;
 
 /**
+ * Common constants for Elasticsearch settings.
+ *
  * @author lishuai
  * @since 1.1.0
  */

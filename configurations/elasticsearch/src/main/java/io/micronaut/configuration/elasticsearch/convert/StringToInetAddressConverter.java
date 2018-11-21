@@ -29,6 +29,8 @@ import java.net.UnknownHostException;
 import java.util.Optional;
 
 /**
+ * Converts String to {@link InetAddress}.
+ *
  * @author Puneet Behl
  * @since 1.1.0
  */

@@ -23,6 +23,8 @@ import org.elasticsearch.client.RestHighLevelClient;
 import java.lang.annotation.*;
 
 /**
+ * Meta annotation for Elasticsearch that can be added to any component that requires Elasticsearch to load.
+ *
  * @author puneetbehl
  * @since 1.1.0
  */
