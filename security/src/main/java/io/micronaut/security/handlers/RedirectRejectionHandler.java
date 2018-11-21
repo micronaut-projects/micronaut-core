@@ -7,6 +7,7 @@ package io.micronaut.security.handlers;
 
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.Secondary;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -33,6 +34,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
+@Secondary
 @Replaces(HttpStatusCodeRejectionHandler.class)
 @Requires(beans = {UnauthorizedRejectionUriProvider.class, ForbiddenRejectionUriProvider.class})
 public class RedirectRejectionHandler implements RejectionHandler {
