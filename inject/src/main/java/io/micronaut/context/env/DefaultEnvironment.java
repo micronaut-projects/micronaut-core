@@ -699,21 +699,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         boolean isWindows = System.getProperty("os.name")
             .toLowerCase().startsWith("windows");
 
-        if (isWindows) {
-            if (isEC2Windows()) {
-                return ComputePlatform.AMAZON_EC2;
-            }
-            if (isGoogleCompute()) {
-                return ComputePlatform.GOOGLE_COMPUTE;
-            }
-
-        } else {
-            // can just read from the file
-            if (isEC2Linux()) {
-                return ComputePlatform.AMAZON_EC2;
-            }
+        if (isWindows ? isEC2Windows() : isEC2Linux()) {
+            return ComputePlatform.AMAZON_EC2;
         }
-        // let's try google
+
         if (isGoogleCompute()) {
             return ComputePlatform.GOOGLE_COMPUTE;
         }
@@ -732,10 +721,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @SuppressWarnings("MagicNumber")
     private static boolean isGoogleCompute() {
         try {
-            URL url = new URL("http://metadata.google.internal");
-            HttpURLConnection con = (HttpURLConnection) url.openConnection();
-            con.setReadTimeout(500);
-            con.setConnectTimeout(500);
+            final HttpURLConnection con = createConnection(GOOGLE_COMPUTE_METADATA);
             con.setRequestMethod("GET");
             con.setDoOutput(true);
             int responseCode = con.getResponseCode();
@@ -805,8 +791,17 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return false;
     }
 
+    private static HttpURLConnection createConnection(String spec) throws IOException {
+        final URL url = new URL(spec);
+        final HttpURLConnection con = (HttpURLConnection) url.openConnection();
+        con.setReadTimeout(DEFAULT_READ_TIMEOUT);
+        con.setConnectTimeout(DEFAULT_CONNECT_TIMEOUT);
+        return con;
+    }
+
     private static boolean isDigitalOcean() {
         try {
+
             String sysVendor = new String(Files.readAllBytes(Paths.get(DO_SYS_VENDOR_FILE)));
             return "digitalocean".equals(sysVendor.toLowerCase());
         } catch (IOException e) {
