@@ -24,7 +24,7 @@ class SmartHttpContentCompressorSpec extends Specification {
 
     void "test should skip"() {
         expect:
-        SmartHttpContentCompressor.shouldSkip(type, length) == expected
+        new SmartHttpContentCompressor(1024).shouldSkip(type, length) == expected
 
         where:
         type           | length | expected
