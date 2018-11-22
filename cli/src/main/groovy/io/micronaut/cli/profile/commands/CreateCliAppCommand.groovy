@@ -58,7 +58,7 @@ class CreateCliAppCommand extends AbstractCreateCommand {
     @Override
     boolean handle(ExecutionContext executionContext) {
         final String appProfile = evaluateProfileName()
-        final String prefix = appProfile == 'cli' ? 'picocli' : appProfile
+        final String prefix = 'picocli'
         final String langFeature = evaluateLangFeature(prefix)
         final String testFeature = evaluateTestFeature(prefix)
 

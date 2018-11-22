@@ -41,13 +41,15 @@ public @interface Put {
      * @return The URI of the PUT route if not specified inferred from the method name and arguments
      */
     @AliasFor(annotation = HttpMethodMapping.class, member = "value")
-    String value() default HttpMethodMapping.DEFAULT_URI;
+    @AliasFor(annotation = UriMapping.class, member = "value")
+    String value() default UriMapping.DEFAULT_URI;
 
     /**
      * @return The URI of the PUT route if not specified inferred from the method name and arguments
      */
     @AliasFor(annotation = HttpMethodMapping.class, member = "value")
-    String uri() default HttpMethodMapping.DEFAULT_URI;
+    @AliasFor(annotation = UriMapping.class, member = "value")
+    String uri() default UriMapping.DEFAULT_URI;
 
     /**
      * @return The default consumes, otherwise override from controller

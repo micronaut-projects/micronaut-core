@@ -34,6 +34,7 @@ import java.io.OutputStream;
  * @since 1.0
  */
 public class MicronautRequestStreamHandler extends StreamFunctionExecutor<Context> implements RequestStreamHandler {
+
     @Override
     public void handleRequest(InputStream input, OutputStream output, Context context) throws IOException {
         execute(input, output, context);

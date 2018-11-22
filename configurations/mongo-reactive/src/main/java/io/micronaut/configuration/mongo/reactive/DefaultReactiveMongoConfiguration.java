@@ -26,8 +26,12 @@ import com.mongodb.connection.SslSettings;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.env.Environment;
 import io.micronaut.runtime.ApplicationConfiguration;
+import org.bson.codecs.Codec;
+import org.bson.codecs.configuration.CodecRegistry;
 
+import javax.inject.Inject;
 import java.util.Collections;
 import java.util.List;
 
@@ -68,6 +72,29 @@ public class DefaultReactiveMongoConfiguration extends AbstractReactiveMongoConf
         super(applicationConfiguration);
     }
 
+    /**
+     * Constructor.
+     * @param applicationConfiguration applicationConfiguration
+     * @param environment the environment
+     */
+    @Inject public DefaultReactiveMongoConfiguration(ApplicationConfiguration applicationConfiguration, Environment environment) {
+        super(applicationConfiguration);
+        if (environment != null) {
+            setPackageNames(environment.getPackages());
+        }
+    }
+
+    @Override
+    @Inject
+    public void codecs(List<Codec<?>> codecList) {
+        super.codecs(codecList);
+    }
+
+    @Override
+    @Inject
+    public void codecRegistries(List<CodecRegistry> codecRegistries) {
+        super.codecRegistries(codecRegistries);
+    }
 
     /**
      * Sets the server MongoDB server address.

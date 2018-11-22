@@ -109,7 +109,7 @@ public class NettyServerWebSocketUpgradeHandler extends SimpleChannelInboundHand
     }
 
     @Override
-    public boolean acceptInboundMessage(Object msg) throws Exception {
+    public boolean acceptInboundMessage(Object msg) {
         if (msg instanceof NettyHttpRequest) {
             NettyHttpRequest<?> request = (NettyHttpRequest) msg;
             HttpHeaders headers = request.getHeaders();

@@ -68,6 +68,7 @@ httpServer:
   routing: HTTP Routing
   binding: Simple Request Binding
   requestResponse: The HttpRequest and HttpResponse
+  statusAnnotation: Response Status
   producesAnnotation: Response Content-Type
   consumesAnnotation: Accepted Request Content-Type
   reactiveServer:
@@ -265,6 +266,7 @@ security:
       title: LDAP Authentication
       configuration: Configuration
       extending: Extending Default Behavior
+  rejection: Rejection Handling
   tokenPropagation: Token Propagation
   endpoints:
     title: Built-In Security Controllers

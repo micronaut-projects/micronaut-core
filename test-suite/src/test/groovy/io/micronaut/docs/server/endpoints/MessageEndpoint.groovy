@@ -56,7 +56,7 @@ class MessageEndpoint {
     }
 
     //tag::writeArg[]
-    @Write(consumes = MediaType.APPLICATION_JSON)
+    @Write(consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
     String updateMessage(String newMessage) {  //<1>
         message = newMessage
 

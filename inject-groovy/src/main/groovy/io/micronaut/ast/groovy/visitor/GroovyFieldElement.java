@@ -20,6 +20,9 @@ import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
+import org.codehaus.groovy.ast.ClassNode;
+import org.codehaus.groovy.ast.FieldNode;
+import org.codehaus.groovy.ast.PropertyNode;
 import org.codehaus.groovy.ast.Variable;
 import org.codehaus.groovy.control.SourceUnit;
 
@@ -93,5 +96,30 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     @Override
     public ClassElement getType() {
         return new GroovyClassElement(sourceUnit, variable.getType(), AstAnnotationUtils.getAnnotationMetadata(sourceUnit, variable.getType()));
+    }
+
+    @Override
+    public ClassElement getDeclaringType() {
+        ClassNode declaringClass = null;
+        if (variable instanceof FieldNode) {
+            FieldNode fn = (FieldNode) variable;
+            declaringClass = fn.getDeclaringClass();
+        } else if (variable instanceof PropertyNode) {
+            PropertyNode pn = (PropertyNode) variable;
+            declaringClass = pn.getDeclaringClass();
+        }
+
+        if (declaringClass == null) {
+            throw new IllegalStateException("Declaring class could not be established");
+        }
+
+        return new GroovyClassElement(
+                sourceUnit,
+                declaringClass,
+                AstAnnotationUtils.getAnnotationMetadata(
+                        sourceUnit,
+                        declaringClass
+                )
+        );
     }
 }

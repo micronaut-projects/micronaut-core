@@ -19,11 +19,12 @@ package io.micronaut.docs.server.endpoints
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.MediaType
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.Issue
 import spock.lang.Specification
-
 
 class CurrentDateEndpointSpec extends Specification {
 
@@ -54,6 +55,22 @@ class CurrentDateEndpointSpec extends Specification {
         then:
         response.code() == HttpStatus.OK.code
         response.body().startsWith("current_date_is: ")
+
+        cleanup:
+        server.close()
+    }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/883")
+    void "test read with produces"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, [:])
+        RxHttpClient rxClient = server.applicationContext.createBean(RxHttpClient, server.getURL())
+
+        when:
+        def response = rxClient.exchange("/date/current_date_is", String).blockingFirst()
+
+        then:
+        response.contentType.get() == MediaType.TEXT_PLAIN_TYPE
 
         cleanup:
         server.close()

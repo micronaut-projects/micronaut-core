@@ -39,7 +39,6 @@ import io.micronaut.websocket.bind.WebSocketState;
 import io.micronaut.websocket.bind.WebSocketStateBinderRegistry;
 import io.micronaut.websocket.context.WebSocketBean;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.SimpleChannelInboundHandler;
 
@@ -67,7 +66,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * @since 1.0
  */
 @Internal
-public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInboundHandler<Object>  {
+public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInboundHandler<Object> {
 
     /**
      * The id of the handler used when adding it to the Netty pipeline.
@@ -90,13 +89,14 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
     /**
      * Default constructor.
-     * @param ctx The channel handler context
-     * @param binderRegistry The request binder registry
-     * @param mediaTypeCodecRegistry The codec registry
-     * @param webSocketBean The websocket bean
-     * @param request The originating request
-     * @param uriVariables The URI variables
-     * @param version The websocket version being used
+     *
+     * @param ctx                        The channel handler context
+     * @param binderRegistry             The request binder registry
+     * @param mediaTypeCodecRegistry     The codec registry
+     * @param webSocketBean              The websocket bean
+     * @param request                    The originating request
+     * @param uriVariables               The URI variables
+     * @param version                    The websocket version being used
      * @param webSocketSessionRepository The web socket repository if they are supported (like on the server), null otherwise
      */
     protected AbstractNettyWebSocketHandler(
@@ -165,7 +165,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         if (Publishers.isConvertibleToPublisher(result)) {
                             Flowable<?> flowable = instrumentPublisher(ctx, result);
                             flowable.subscribe(
-                                    (o) -> { },
+                                    (o) -> {
+                                    },
                                     (error) -> {
                                         if (LOG.isErrorEnabled()) {
                                             LOG.error("Error Opening WebSocket [" + webSocketBean + "]: " + error.getMessage(), error);
@@ -174,7 +175,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                                             session.close(CloseReason.INTERNAL_ERROR);
                                         }
                                     },
-                                    () -> { }
+                                    () -> {
+                                    }
                             );
                         }
                     } catch (Throwable e) {
@@ -256,6 +258,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
     /**
      * Subclasses should implement to create the actual {@link NettyRxWebSocketSession}.
+     *
      * @param ctx The context
      * @return The session
      */
@@ -264,7 +267,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     /**
      * Subclasses can override to customize publishers returned from message handlers.
      *
-     * @param ctx The context
+     * @param ctx    The context
      * @param result The result
      * @return The flowable
      */
@@ -277,7 +280,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * Invokes the given executable.
      *
      * @param boundExecutable The bound executable
-     * @param messageHandler The message handler
+     * @param messageHandler  The message handler
      * @return The result
      */
     protected Object invokeExecutable(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
@@ -306,7 +309,10 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("WebSocket bean [" + webSocketBean.getTarget() + "] received message, but defined no @OnMessage handler. Dropping frame...");
                 }
-                ctx.channel().writeAndFlush(new CloseWebSocketFrame(CloseReason.UNSUPPORTED_DATA.getCode(), CloseReason.UNSUPPORTED_DATA.getReason())).addListener(ChannelFutureListener.CLOSE);
+                writeCloseFrameAndTerminate(
+                        ctx,
+                        CloseReason.UNSUPPORTED_DATA
+                );
             } else {
 
                 Argument<?> bodyArgument = this.getBodyArgument();
@@ -334,12 +340,18 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     );
 
                     try {
-                        BoundExecutable boundExecutable = executableBinder.bind(messageHandler.getExecutableMethod(), webSocketBinder, new WebSocketState(currentSession, originatingRequest));
+                        BoundExecutable boundExecutable = executableBinder.bind(
+                                messageHandler.getExecutableMethod(),
+                                webSocketBinder,
+                                new WebSocketState(currentSession, originatingRequest)
+                        );
+
                         Object result = invokeExecutable(boundExecutable, messageHandler);
                         if (Publishers.isConvertibleToPublisher(result)) {
                             Flowable<?> flowable = instrumentPublisher(ctx, result);
                             flowable.subscribe(
-                                    (o) -> { } ,
+                                    (o) -> {
+                                    },
                                     (error) -> {
                                         if (LOG.isErrorEnabled()) {
                                             LOG.error("Error Processing WebSocket Message [" + webSocketBean + "]: " + error.getMessage(), error);
@@ -359,15 +371,18 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     }
 
                 } else {
-                    ctx.channel().writeAndFlush(new CloseWebSocketFrame(CloseReason.UNSUPPORTED_DATA.getCode(), CloseReason.UNSUPPORTED_DATA.getReason() + ": " + "Cannot convert data [] to target type: "))
-                            .addListener(ChannelFutureListener.CLOSE);
+                    writeCloseFrameAndTerminate(
+                            ctx,
+                            CloseReason.UNSUPPORTED_DATA.getCode(),
+                            CloseReason.UNSUPPORTED_DATA.getReason() + ": " + "Received data cannot be converted to target type: " + bodyArgument
+                    );
                 }
             }
 
         } else if (msg instanceof PingWebSocketFrame) {
             // respond with pong
             PingWebSocketFrame frame = (PingWebSocketFrame) msg;
-            ctx.channel().writeAndFlush(new PongWebSocketFrame(frame.content()));
+            ctx.writeAndFlush(new PongWebSocketFrame(frame.content()));
 
         } else if (msg instanceof PongWebSocketFrame) {
             return;
@@ -375,14 +390,17 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             CloseWebSocketFrame cwsf = (CloseWebSocketFrame) msg;
             handleCloseFrame(ctx, cwsf);
         } else {
-            ctx.channel().writeAndFlush(new CloseWebSocketFrame(CloseReason.UNSUPPORTED_DATA.getCode(), CloseReason.UNSUPPORTED_DATA.getReason())).addListener(ChannelFutureListener.CLOSE);
+            writeCloseFrameAndTerminate(
+                    ctx,
+                    CloseReason.UNSUPPORTED_DATA
+            );
         }
     }
 
     /**
      * Method called once a message has been handled by the handler.
      *
-     * @param ctx The channel handler context
+     * @param ctx     The channel handler context
      * @param session The session
      * @param message The message that was handled
      */
@@ -390,37 +408,56 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         // no-op
     }
 
+    /**
+     * Writes the give close reason and terminates the session.
+     * @param ctx The context
+     * @param closeReason The reason
+     */
+    protected void writeCloseFrameAndTerminate(ChannelHandlerContext ctx, CloseReason closeReason) {
+        final int code = closeReason.getCode();
+        final String reason = closeReason.getReason();
+        writeCloseFrameAndTerminate(ctx, code, reason);
+    }
+
+    /**
+     * Used to close thee session with a given reason.
+     * @param ctx The context
+     * @param cr The reason
+     */
+    private void handleCloseReason(ChannelHandlerContext ctx, CloseReason cr) {
+        if (getSession().isOpen()) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Closing WebSocket session {} with reason {}", getSession(), cr);
+            }
+            Optional<? extends MethodExecutionHandle<?, ?>> opt = webSocketBean.closeMethod();
+            if (opt.isPresent()) {
+                MethodExecutionHandle<?, ?> methodExecutionHandle = opt.get();
+                Object target = methodExecutionHandle.getTarget();
+                try {
+
+                    BoundExecutable boundExecutable = bindMethod(
+                            originatingRequest,
+                            webSocketBinder,
+                            methodExecutionHandle,
+                            Collections.singletonList(cr)
+                    );
+
+                    invokeAndClose(ctx, target, boundExecutable, methodExecutionHandle, true);
+                } catch (Throwable e) {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("Error invoking @OnClose handler for WebSocket bean [" + target + "]: " + e.getMessage(), e);
+                    }
+                }
+            } else {
+                ctx.close();
+            }
+        }
+    }
+
     private void handleCloseFrame(ChannelHandlerContext ctx, CloseWebSocketFrame cwsf) {
         if (closed.compareAndSet(false, true)) {
-            ctx.pipeline().remove(this);
-            Optional<? extends MethodExecutionHandle<?, ?>> opt = webSocketBean.closeMethod();
-            if (getSession().isOpen()) {
-                CloseReason cr = new CloseReason(cwsf.statusCode(), cwsf.reasonText());
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Closing WebSocket session {} with reason {}", getSession(), cr);
-                }
-                if (opt.isPresent()) {
-                    MethodExecutionHandle<?, ?> methodExecutionHandle = opt.get();
-                    Object target = methodExecutionHandle.getTarget();
-                    try {
-
-                        BoundExecutable boundExecutable = bindMethod(
-                                originatingRequest,
-                                webSocketBinder,
-                                methodExecutionHandle,
-                                Collections.singletonList(cr)
-                        );
-
-                        invokeAndClose(ctx, target, boundExecutable, methodExecutionHandle, true);
-                    } catch (Throwable e) {
-                        if (LOG.isErrorEnabled()) {
-                            LOG.error("Error invoking @OnClose handler for WebSocket bean [" + target + "]: " + e.getMessage(), e);
-                        }
-                    }
-                } else {
-                    ctx.close();
-                }
-            }
+            CloseReason cr = new CloseReason(cwsf.statusCode(), cwsf.reasonText());
+            handleCloseReason(ctx, cr);
         }
     }
 
@@ -490,8 +527,14 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         }
         Channel channel = ctx.channel();
         if (channel.isOpen()) {
-            channel.writeAndFlush(new CloseWebSocketFrame(CloseReason.INTERNAL_ERROR.getCode(), CloseReason.INTERNAL_ERROR.getReason()))
-                    .addListener(ChannelFutureListener.CLOSE);
+            final CloseReason internalError = CloseReason.INTERNAL_ERROR;
+            writeCloseFrameAndTerminate(ctx, internalError);
         }
+    }
+
+    private void writeCloseFrameAndTerminate(ChannelHandlerContext ctx, int code, String reason) {
+        final CloseWebSocketFrame closeFrame = new CloseWebSocketFrame(code, reason);
+        ctx.channel().writeAndFlush(closeFrame)
+                     .addListener(future -> handleCloseFrame(ctx, new CloseWebSocketFrame(code, reason)));
     }
 }

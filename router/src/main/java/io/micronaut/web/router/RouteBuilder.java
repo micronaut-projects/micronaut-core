@@ -24,11 +24,13 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.UriMapping;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ProxyBeanDefinition;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.List;
 import java.util.function.Supplier;
@@ -173,10 +175,10 @@ public interface RouteBuilder {
      * Register a route to handle the returned status code. This implementation considers the originatingClass for matching.
      *
      * @param originatingClass The class where the error originates from
-     * @param status         The status code
-     * @param type           The type
-     * @param method         The method
-     * @param parameterTypes The parameter types for the target method
+     * @param status           The status code
+     * @param type             The type
+     * @param method           The method
+     * @param parameterTypes   The parameter types for the target method
      * @return The route
      */
     StatusRoute status(Class originatingClass, HttpStatus status, Class type, String method, Class... parameterTypes);
@@ -224,10 +226,10 @@ public interface RouteBuilder {
      */
     default ErrorRoute error(Class<? extends Throwable> error, Object instance) {
         return error(
-            error,
-            instance.getClass(),
-            NameUtils.decapitalize(NameUtils.trimSuffix(error.getSimpleName(), "Exception", "Error")),
-            error);
+                error,
+                instance.getClass(),
+                NameUtils.decapitalize(NameUtils.trimSuffix(error.getSimpleName(), "Exception", "Error")),
+                error);
     }
 
     /**
@@ -330,8 +332,8 @@ public interface RouteBuilder {
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
-     * @param uri    The URI
-     * @param method The method
+     * @param uri            The URI
+     * @param method         The method
      * @return The route
      */
     default UriRoute GET(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
@@ -441,8 +443,8 @@ public interface RouteBuilder {
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
-     * @param uri    The URI
-     * @param method The method
+     * @param uri            The URI
+     * @param method         The method
      * @return The route
      */
     default UriRoute POST(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
@@ -550,8 +552,8 @@ public interface RouteBuilder {
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
-     * @param uri    The URI
-     * @param method The method
+     * @param uri            The URI
+     * @param method         The method
      * @return The route
      */
     default UriRoute PUT(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
@@ -659,8 +661,8 @@ public interface RouteBuilder {
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
-     * @param uri    The URI
-     * @param method The method
+     * @param uri            The URI
+     * @param method         The method
      * @return The route
      */
     default UriRoute PATCH(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
@@ -768,8 +770,8 @@ public interface RouteBuilder {
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
-     * @param uri    The URI
-     * @param method The method
+     * @param uri            The URI
+     * @param method         The method
      * @return The route
      */
     default UriRoute DELETE(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
@@ -877,8 +879,8 @@ public interface RouteBuilder {
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
-     * @param uri    The URI
-     * @param method The method
+     * @param uri            The URI
+     * @param method         The method
      * @return The route
      */
     default UriRoute OPTIONS(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
@@ -986,8 +988,8 @@ public interface RouteBuilder {
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
-     * @param uri    The URI
-     * @param method The method
+     * @param uri            The URI
+     * @param method         The method
      * @return The route
      */
     default UriRoute HEAD(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
@@ -1095,8 +1097,8 @@ public interface RouteBuilder {
      * <p>The number of variables in the template should match the number of method arguments</p>
      *
      * @param beanDefinition The bean definition
-     * @param uri    The URI
-     * @param method The method
+     * @param uri            The URI
+     * @param method         The method
      * @return The route
      */
     default UriRoute TRACE(String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
@@ -1163,8 +1165,11 @@ public interface RouteBuilder {
          * @param beanDefinition The type
          * @return The URI to use
          */
-        default String resolveUri(BeanDefinition<?> beanDefinition) {
-            String uri = beanDefinition.getValue(Controller.class, String.class).orElse(null);
+        default @Nonnull
+        String resolveUri(BeanDefinition<?> beanDefinition) {
+            String uri = beanDefinition.getValue(UriMapping.class, String.class).orElseGet(() ->
+                    beanDefinition.getValue(Controller.class, String.class).orElse(UriMapping.DEFAULT_URI)
+            );
             uri = normalizeUri(uri);
             if (uri != null) {
                 return uri;
@@ -1185,7 +1190,8 @@ public interface RouteBuilder {
          * @param property The property
          * @return The URI to use
          */
-        default String resolveUri(String property) {
+        default @Nonnull
+        String resolveUri(String property) {
             if (StringUtils.isEmpty(property)) {
                 return "/";
             }
@@ -1202,7 +1208,8 @@ public interface RouteBuilder {
          * @param id   the route id
          * @return The URI to use
          */
-        default String resolveUri(Class type, PropertyConvention id) {
+        default @Nonnull
+        String resolveUri(Class type, PropertyConvention id) {
             return resolveUri(type) + "/{" + id.lowerCaseName() + "}";
         }
 

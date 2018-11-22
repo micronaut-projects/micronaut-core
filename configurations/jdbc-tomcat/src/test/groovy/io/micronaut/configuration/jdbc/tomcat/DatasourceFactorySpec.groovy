@@ -16,7 +16,7 @@
 
 package io.micronaut.configuration.jdbc.tomcat
 
-import io.micronaut.spring.tx.datasource.SpringDataSourceResolver
+import io.micronaut.jdbc.spring.SpringDataSourceResolver
 import org.apache.tomcat.jdbc.pool.DataSource
 import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy
 import spock.lang.Specification

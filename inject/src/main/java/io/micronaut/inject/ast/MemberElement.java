@@ -14,23 +14,19 @@
  * limitations under the License.
  */
 
-package io.micronaut.spring.tx.datasource;
-
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.condition.Condition;
-import io.micronaut.context.condition.ConditionContext;
-import io.micronaut.core.reflect.ClassUtils;
+package io.micronaut.inject.ast;
 
 /**
- * Disables the datasource configuration if Hibernate is present.
+ * A member element is an element that is contained within a {@link ClassElement}.
+ * The {@link #getDeclaringType()} method returns the class that declares the element.
  *
  * @author graemerocher
  * @since 1.0
  */
-public final class HibernatePresenceCondition implements Condition {
-    @Override
-    public boolean matches(ConditionContext context) {
-        BeanContext beanContext = context.getBeanContext();
-        return !ClassUtils.isPresent("io.micronaut.configuration.hibernate.jpa.HibernateTransactionManagerFactory", beanContext.getClassLoader());
-    }
+public interface MemberElement extends Element {
+
+    /**
+     * @return The declaring type of the element.
+     */
+    ClassElement getDeclaringType();
 }

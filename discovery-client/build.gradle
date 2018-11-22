@@ -18,7 +18,7 @@ dependencies {
     // used by AWSParameterStoreConfigClient
     compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-ssm', version: '1.11.308'
 
-    testCompile "org.testcontainers:spock:1.8.0"
+    testCompile "org.testcontainers:spock:1.10.1"
 
     testCompile project(":configurations:aws-common")
     // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-route53

@@ -22,6 +22,7 @@ import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.util.CollectionUtils;
@@ -215,6 +216,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     protected abstract @Nullable String getRepeatableName(A annotationMirror);
 
     /**
+     * Obtain the name of the repeatable annotation if the annotation is is one.
+     *
+     * @param annotationType The annotation mirror
+     * @return Return the name or null
+     */
+    protected abstract @Nullable String getRepeatableNameForType(T annotationType);
+
+    /**
      * @param annotationMirror The annotation
      * @return The annotation value
      */
@@ -232,7 +241,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 Object annotationValue = entry.getValue();
                 Optional<?> aliasMember = aliasForValues.get("member");
                 Optional<?> aliasAnnotation = aliasForValues.get("annotation");
-                if (aliasMember.isPresent() && !aliasAnnotation.isPresent()) {
+                Optional<?> aliasAnnotationName = aliasForValues.get("annotationName");
+                if (aliasMember.isPresent() && !(aliasAnnotation.isPresent() || aliasAnnotationName.isPresent())) {
                     String aliasedNamed = aliasMember.get().toString();
                     readAnnotationRawValues(aliasedNamed, annotationValue, resolvedValues);
                 }
@@ -323,25 +333,44 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                             AnnotationValue av = (AnnotationValue) o;
                             String mappedAnnotationName = av.getAnnotationName();
 
-                            if (isDeclared) {
-                                metadata.addDeclaredAnnotation(
-                                        mappedAnnotationName,
-                                        av.getValues()
-                                );
-                            } else {
-                                metadata.addAnnotation(
-                                        mappedAnnotationName,
-                                        av.getValues()
-                                );
-                            }
                             Optional<T> mappedMirror = getAnnotationMirror(mappedAnnotationName);
-                            mappedMirror.ifPresent(annMirror -> processAnnotationStereotype(
-                                    new ArrayList<>(),
+                            String repeatableName = mappedMirror.map(this::getRepeatableNameForType).orElse(null);
+                            if (repeatableName != null) {
+                                if (isDeclared) {
+                                    metadata.addDeclaredRepeatable(
+                                            repeatableName,
+                                            av
+                                    );
+                                } else {
+                                    metadata.addRepeatable(
+                                            repeatableName,
+                                            av
+                                    );
+                                }
+                            } else {
+                                if (isDeclared) {
+                                    metadata.addDeclaredAnnotation(
+                                            mappedAnnotationName,
+                                            av.getValues()
+                                    );
+                                } else {
+                                    metadata.addAnnotation(
+                                            mappedAnnotationName,
+                                            av.getValues()
+                                    );
+                                }
+                            }
+
+                            mappedMirror.ifPresent(annMirror -> {
+                                final ArrayList<String> parents = new ArrayList<>();
+                                processAnnotationStereotype(
+                                        parents,
                                     annMirror,
                                     mappedAnnotationName,
                                     metadata,
-                                    isDeclared
-                            ));
+                                    isDeclared);
+
+                            });
                         }
                     }
                 }
@@ -349,6 +378,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
         return annotationValues;
     }
+
+    /**
+     * Creates the visitor context for this implementation.
+     *
+     * @return The visitor context
+     */
+    protected abstract VisitorContext createVisitorContext();
 
     private void processAnnotationDefaults(A annotationMirror, DefaultAnnotationMetadata metadata, String annotationName) {
         Map<? extends T, ?> elementDefaultValues = readAnnotationDefaultValues(annotationMirror);
@@ -375,13 +411,6 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
     }
 
-    /**
-     * Creates the visitor context for this implementation.
-     *
-     * @return The visitor context
-     */
-    protected abstract VisitorContext createVisitorContext();
-
     private void processAnnotationAlias(
             DefaultAnnotationMetadata metadata,
             boolean isDeclared,
@@ -390,11 +419,17 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
             Object annotationValue,
             OptionalValues<?> aliasForValues) {
         Optional<?> aliasAnnotation = aliasForValues.get("annotation");
+        Optional<?> aliasAnnotationName = aliasForValues.get("annotationName");
         Optional<?> aliasMember = aliasForValues.get("member");
 
-        if (aliasAnnotation.isPresent()) {
+        if (aliasAnnotation.isPresent() || aliasAnnotationName.isPresent()) {
             if (aliasMember.isPresent()) {
-                String aliasedAnnotationName = aliasAnnotation.get().toString();
+                String aliasedAnnotationName;
+                if (aliasAnnotation.isPresent()) {
+                    aliasedAnnotationName = aliasAnnotation.get().toString();
+                } else {
+                    aliasedAnnotationName = aliasAnnotationName.get().toString();
+                }
                 String aliasedMemberName = aliasMember.get().toString();
                 Object v = readAnnotationValue(aliasedMemberName, annotationValue);
                 if (v != null) {
@@ -554,5 +589,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         List<String> stereoTypeParents = new ArrayList<>(parents);
         stereoTypeParents.add(annotationTypeName);
         buildStereotypeHierarchy(stereoTypeParents, annotationType, metadata, isDeclared);
+    }
+
+    /**
+     * Returns whether the given annotation is a mapped annotation.
+     * @param annotationName The annotation name
+     * @return True if it is
+     */
+    @Internal
+    public static boolean isAnnotationMapped(@Nullable String annotationName) {
+        return annotationName != null && ANNOTATION_MAPPERS.containsKey(annotationName);
     }
 }
