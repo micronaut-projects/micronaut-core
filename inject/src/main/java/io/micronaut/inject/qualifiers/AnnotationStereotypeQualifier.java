@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanType;
 
 import java.lang.annotation.Annotation;
+import java.util.Objects;
 import java.util.stream.Stream;
 
 /**
@@ -50,5 +51,22 @@ class AnnotationStereotypeQualifier<T> implements Qualifier<T> {
     @Override
     public String toString() {
         return "@" + stereotype.getSimpleName();
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        AnnotationStereotypeQualifier<?> that = (AnnotationStereotypeQualifier<?>) o;
+        return Objects.equals(stereotype, that.stereotype);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(stereotype);
     }
 }
