@@ -33,6 +33,12 @@ import java.util.Optional;
 public class HttpSessionConfiguration extends SessionConfiguration {
 
     /**
+     * Default Cookie Path.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_COOKIEPATH = "/";
+
+    /**
      * Cookie name.
      */
     @SuppressWarnings("WeakerAccess")
@@ -53,7 +59,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     private boolean rememberMe = DEFAULT_REMEMBERME;
     private boolean base64Encode = DEFAULT_BASE64ENCODE;
     private TemporalAmount cookieMaxAge;
-    private String cookiePath;
+    private String cookiePath = DEFAULT_COOKIEPATH;
     private String domainName;
     private String cookieName = DEFAULT_COOKIENAME;
     private String prefix;
@@ -126,7 +132,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     }
 
     /**
-     * @param cookiePath Set the cookie path to use
+     * @param cookiePath Set the cookie path to use. Default value ({@value DEFAULT_COOKIEPATH}).
      */
     protected void setCookiePath(String cookiePath) {
         this.cookiePath = cookiePath;
