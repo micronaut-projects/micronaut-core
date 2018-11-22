@@ -2,7 +2,12 @@ Micronaut allows the customization of the response that is sent when a request i
 
 To control this response, it is necessary to register a api:io.micronaut.security.handlers.RejectionHandler[] and ensure your bean replaces the default implementation.
 
-For those using session based security, replace api:io.micronaut.security.session.SessionSecurityfilterRejectionHandler[]. For those using JWT based security, replace api:io.micronaut.security.handlers.HttpStatusCodeRejectionHandler[].
+If both beans (api:io.micronaut.security.handlers.UnauthorizedRejectionUriProvider[], api:io.micronaut.security.handlers.ForbiddenRejectionUriProvider[]) exists, then api:io.micronaut.security.handlers.RedirectRejectionHandler[],
+               a generic redirect handler, is registered as a `RedirectHandler`.
+
+You can create your own `RejectionHandler`. You will need to replace the current `RejectionHandler`.
+
+For those using JWT based security, replace api:io.micronaut.security.handlers.HttpStatusCodeRejectionHandler[].
 
 For example:
 
@@ -10,3 +15,7 @@ For example:
 ----
 include::{testssecurityjwt}/rejection/MyRejectionHandler.java[tag=clazz,indent=0]
 ----
+
+For those using session based security, replace api:io.micronaut.security.session.SessionSecurityfilterRejectionHandler[].
+
+NOTE: If you are using session based security to use the `RedirectRejectionHandler` you will need to disable `SessionSecurityfilterRejectionHandler` with `micronaut.security.session.legacy-redirect-handler: false`.
