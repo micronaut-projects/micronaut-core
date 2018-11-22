@@ -39,15 +39,18 @@ import java.util.Optional;
 public class NettyPartData implements PartData {
 
     private final FileUpload fileUpload;
-    private final Long chunk;
+    private final int start;
+    private final int length;
 
     /**
      * @param fileUpload The file upload
-     * @param chunk      The chunk
+     * @param start      The index where to start reading bytes
+     * @param length     The number of bytes to read
      */
-    public NettyPartData(FileUpload fileUpload, Long chunk) {
+    public NettyPartData(FileUpload fileUpload, int start, int length) {
         this.fileUpload = fileUpload;
-        this.chunk = chunk;
+        this.start = start;
+        this.length = length;
     }
 
     /**
@@ -103,6 +106,6 @@ public class NettyPartData implements PartData {
      * @throws IOException If an error occurs retrieving the buffer
      */
     public ByteBuf getByteBuf() throws IOException {
-        return fileUpload.getChunk(chunk.intValue());
+        return fileUpload.getByteBuf().retainedSlice(start, length);
     }
 }
