@@ -114,7 +114,7 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
             context.write(new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), headers), context.voidPromise());
 
             // Write the content.
-            if (context.pipeline().get(SslHandler.class) == null && SmartHttpContentCompressor.shouldSkip(headers)) {
+            if (context.pipeline().get(SslHandler.class) == null && context.pipeline().get(SmartHttpContentCompressor.class).shouldSkip(headers)) {
                 // SSL not enabled - can use zero-copy file transfer.
                 context.write(new DefaultFileRegion(raf.getChannel(), 0, getLength()), context.newProgressivePromise());
                 context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
