@@ -682,7 +682,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 } else if (StreamingFileUpload.class.isAssignableFrom(typeVariableType)) {
                                     typeVariable = Argument.of(PartData.class);
                                 } else if (!ClassUtils.isJavaLangType(typeVariableType) &&
-                                        !PartData.class.isAssignableFrom(typeVariableType)) {
+                                        !PartData.class.equals(typeVariableType)) {
                                     partialUpload = false;
                                 }
 
