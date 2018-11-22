@@ -242,8 +242,17 @@ ext {
                 version: tomcatJdbcVersion,
                 group: 'org.apache.tomcat',
                 name: 'tomcat-jdbc'
-            ]
-
+            ],
+            liquibase: [
+                version: liquibaseVersion,
+                group: 'org.liquibase',
+                name: 'liquibase-core'
+            ],
+            flyway: [
+                version: flywayVersion,
+                group: 'org.flywaydb',
+                name: 'flyway-core'
+            ],
     ]
 
     dependencyVersion = { String name ->
