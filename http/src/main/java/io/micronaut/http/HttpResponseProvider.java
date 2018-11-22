@@ -14,28 +14,18 @@
  * limitations under the License.
  */
 
-package io.micronaut.spring.tx.datasource;
-
-import io.micronaut.jdbc.DataSourceResolver;
-import org.springframework.jdbc.datasource.DelegatingDataSource;
-
-import javax.inject.Singleton;
-import javax.sql.DataSource;
+package io.micronaut.http;
 
 /**
- * Unwraps spring data source proxies.
+ * A contract to provide an http response.
  *
- * @author graemerocher
+ * @author James Kleeh
  * @since 1.0
  */
-@Singleton
-public final class SpringDataSourceResolver implements DataSourceResolver {
+public interface HttpResponseProvider {
 
-    @Override
-    public DataSource resolve(DataSource dataSource) {
-        while (dataSource instanceof DelegatingDataSource) {
-            dataSource = ((DelegatingDataSource) dataSource).getTargetDataSource();
-        }
-        return dataSource;
-    }
+    /**
+     * @return An http response
+     */
+    HttpResponse<?> getResponse();
 }

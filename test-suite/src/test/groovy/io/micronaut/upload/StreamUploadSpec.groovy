@@ -111,6 +111,32 @@ class StreamUploadSpec extends AbstractMicronautSpec {
 
     }
 
+
+    void "test non-blocking upload with publisher receiving part datas"() {
+        given:
+        def data = 'some data ' * 500
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
+                .addPart("title", "bar")
+                .build()
+
+
+        when:
+        Flowable<HttpResponse<Long>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receive-partdata", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                Long
+        ))
+
+        HttpResponse<Long> response = flowable.blockingFirst()
+        def result = response.getBody().get()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        result == new Long(data.length())
+    }
+
     void "test non-blocking upload with publisher receiving two objects"() {
         given:
         def data = '{"title":"Test"}'
@@ -248,7 +274,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
     }
 
     void "test receiving multiple streaming parts with the same name"() {
-        def val = ('Big ' + 'xxxx' * 200).bytes
+        def val = ('Big ' + 'xxxx' * 20000).bytes
         MultipartBody requestBody = MultipartBody.builder()
                 .addPart("data", "abc.txt", MediaType.TEXT_PLAIN_TYPE, val)
                 .addPart("data", "def.txt", MediaType.TEXT_PLAIN_TYPE, val)
@@ -289,5 +315,9 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         then:
         response.code() == HttpStatus.OK.code
         response.body() == (val.length * 2).toString()
+    }
+
+    Map<String, Object> getConfiguration() {
+        super.getConfiguration() << ['micronaut.http.client.read-timeout': 300]
     }
 }

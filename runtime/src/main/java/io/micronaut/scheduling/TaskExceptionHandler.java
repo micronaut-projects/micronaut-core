@@ -24,7 +24,7 @@ import io.micronaut.core.exceptions.BeanExceptionHandler;
  * @author graemerocher
  * @since 1.0
  * @param <T> The generic type of the task bean
- * @param <E> The generic type of the exceptoin
+ * @param <E> The generic type of the exception
  */
 public interface TaskExceptionHandler<T, E extends Throwable> extends BeanExceptionHandler<T, E> {
 }

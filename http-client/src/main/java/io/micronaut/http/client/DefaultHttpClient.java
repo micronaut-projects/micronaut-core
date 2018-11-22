@@ -36,6 +36,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.*;
+import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
@@ -827,8 +828,12 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         traceBody("Response", byteBuf);
                     }
                     ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
-                    nettyStreamedHttpResponse.setBody(byteBuffer);
-                    return nettyStreamedHttpResponse;
+                    return new HttpResponseWrapper<ByteBuffer<?>>(nettyStreamedHttpResponse) {
+                        @Override
+                        public Optional<ByteBuffer<?>> getBody() {
+                            return Optional.of(byteBuffer);
+                        }
+                    };
                 });
             });
         };
@@ -1386,8 +1391,13 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             boolean hasBody = body.isPresent();
             if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) && hasBody) {
                 Object bodyValue = body.get();
-                postRequestEncoder = buildFormDataRequest(clientHttpRequest, bodyValue);
-                nettyRequest = postRequestEncoder.finalizeRequest();
+                if (bodyValue instanceof CharSequence) {
+                    ByteBuf byteBuf = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
+                    nettyRequest = clientHttpRequest.getFullRequest(byteBuf);
+                } else {
+                    postRequestEncoder = buildFormDataRequest(clientHttpRequest, bodyValue);
+                    nettyRequest = postRequestEncoder.finalizeRequest();
+                }
             } else if (requestContentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE) && hasBody) {
                 Object bodyValue = body.get();
                 postRequestEncoder = buildMultipartRequest(clientHttpRequest, bodyValue);
@@ -1841,13 +1851,24 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         for (Map.Entry<String, Object> entry : formData.entrySet()) {
             Object value = entry.getValue();
             if (value != null) {
-                Optional<String> converted = ConversionService.SHARED.convert(value, String.class);
-                if (converted.isPresent()) {
-                    postRequestEncoder.addBodyAttribute(entry.getKey(), converted.get());
+                if (value instanceof Collection) {
+                    Collection collection = (Collection) value;
+                    for (Object val: collection) {
+                        addBodyAttribute(postRequestEncoder, entry.getKey(), val);
+                    }
+                } else {
+                    addBodyAttribute(postRequestEncoder, entry.getKey(), value);
                 }
             }
         }
         return postRequestEncoder;
+    }
+
+    private void addBodyAttribute(HttpPostRequestEncoder postRequestEncoder, String key, Object value) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+        Optional<String> converted = ConversionService.SHARED.convert(value, String.class);
+        if (converted.isPresent()) {
+            postRequestEncoder.addBodyAttribute(key, converted.get());
+        }
     }
 
     private HttpPostRequestEncoder buildMultipartRequest(NettyClientHttpRequest clientHttpRequest, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
@@ -1906,7 +1927,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {
-        ObjectMapper objectMapper = new ObjectMapperFactory().objectMapper(Optional.empty(), Optional.empty());
+        ObjectMapper objectMapper = new ObjectMapperFactory().objectMapper(null, null);
         ApplicationConfiguration applicationConfiguration = new ApplicationConfiguration();
         return MediaTypeCodecRegistry.of(
                 new JsonMediaTypeCodec(objectMapper, applicationConfiguration, null), new JsonStreamMediaTypeCodec(objectMapper, applicationConfiguration, null)

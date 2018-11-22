@@ -104,8 +104,9 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                     .orElse(null);
 
                 Class<Object> beanType = (Class<Object>) beanDefinition.getBeanType();
-                Object bean = beanContext.getBean(beanType, qualifer);
+                Object bean = null;
                 try {
+                    bean = beanContext.getBean(beanType, qualifer);
                     if (method.getArguments().length == 0) {
                         ((ExecutableMethod) method).invoke(bean);
                     }

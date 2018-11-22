@@ -35,14 +35,10 @@ import io.micronaut.discovery.exceptions.DiscoveryException;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.health.HeartbeatConfiguration;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.ApplicationConfiguration;
 import io.micronaut.runtime.server.EmbeddedServerInstance;
 import io.reactivex.Single;
-import io.reactivex.functions.BiConsumer;
 import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
 
 import javax.inject.Singleton;
 import java.net.MalformedURLException;

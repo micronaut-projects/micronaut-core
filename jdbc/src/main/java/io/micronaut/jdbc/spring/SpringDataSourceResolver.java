@@ -14,10 +14,30 @@
  * limitations under the License.
  */
 
+package io.micronaut.jdbc.spring;
+
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.jdbc.DataSourceResolver;
+import org.springframework.jdbc.datasource.DelegatingDataSource;
+
+import javax.inject.Singleton;
+import javax.sql.DataSource;
+
 /**
- * Classes for configuring transaction management for data sources.
+ * Unwraps spring data source proxies.
  *
  * @author graemerocher
  * @since 1.0
  */
-package io.micronaut.spring.tx.datasource;
+@Singleton
+@Internal
+public final class SpringDataSourceResolver implements DataSourceResolver {
+
+    @Override
+    public DataSource resolve(DataSource dataSource) {
+        while (dataSource instanceof DelegatingDataSource) {
+            dataSource = ((DelegatingDataSource) dataSource).getTargetDataSource();
+        }
+        return dataSource;
+    }
+}

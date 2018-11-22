@@ -26,6 +26,55 @@ import org.neo4j.driver.v1.Config
  * @since 1.0
  */
 class ConfigurationPropertiesBuilderSpec extends AbstractTypeElementSpec {
+    void "test configuration builder on method"() {
+        given:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyProperties', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@ConfigurationProperties("test")
+class MyProperties {
+    
+    private Test test;
+    
+    @ConfigurationBuilder(factoryMethod="build")
+    void setTest(Test test) {
+        this.test = test;
+    }
+    
+    Test getTest() {
+        return this.test;
+    }
+     
+}
+
+class Test {
+    private String foo;
+    private Test() {}
+    public void setFoo(String s) { 
+        this.foo = s;
+    }
+    public String getFoo() {
+        return foo;
+    }
+        
+    static Test build() {
+        return new Test();
+    } 
+}
+''')
+
+        when:"The bean was built and a warning was logged"
+        BeanFactory factory = beanDefinition
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'test.foo':'good'
+        )
+        def bean = factory.build(applicationContext, beanDefinition)
+
+        then:
+        bean.test.foo == 'good'
+    }
 
     void "test configuration builder with includes"() {
         given:

@@ -21,7 +21,6 @@ import io.micronaut.core.util.AntPathMatcher;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.PathMatcher;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.hateos.Resource;
 
 import javax.inject.Singleton;
 import java.net.URL;
@@ -64,15 +63,15 @@ public class StaticResourceResolver {
     /**
      * Resolves a path to a URL.
      *
-     * @param path The Path
+     * @param resourcePath The path to the resource
      * @return The optional URL
      */
-    public Optional<URL> resolve(String path) {
+    public Optional<URL> resolve(String resourcePath) {
         for (Map.Entry<String, List<ResourceLoader>> entry : resourceMappings.entrySet()) {
             List<ResourceLoader> loaders = entry.getValue();
             String mapping = entry.getKey();
-            if (!loaders.isEmpty() && pathMatcher.matches(mapping, path)) {
-                path = pathMatcher.extractPathWithinPattern(mapping, path);
+            if (!loaders.isEmpty() && pathMatcher.matches(mapping, resourcePath)) {
+                String path = pathMatcher.extractPathWithinPattern(mapping, resourcePath);
                 //A request to the root of the mapping
                 if (StringUtils.isEmpty(path)) {
                     path = INDEX_PAGE;

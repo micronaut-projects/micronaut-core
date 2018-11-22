@@ -244,6 +244,19 @@ class RedisSessionSpec extends Specification {
         retrieved.get("foo", Foo).get().name == "Fred"
         retrieved.get("foo", Foo).get().age == 10
     }
+
+    void "test super class properties can be configured"() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'redis.type': 'embedded',
+                'micronaut.session.http.cookiePath':'/foo',
+                'micronaut.session.http.redis.enabled': true
+        )
+
+        expect:
+        applicationContext.getBean(RedisHttpSessionConfiguration).getCookiePath().get() == "/foo"
+    }
+
     static class Foo implements Serializable{
         String name
         Integer age

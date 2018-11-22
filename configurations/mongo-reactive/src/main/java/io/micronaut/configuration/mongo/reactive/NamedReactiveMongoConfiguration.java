@@ -25,7 +25,13 @@ import com.mongodb.connection.SslSettings;
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.env.Environment;
 import io.micronaut.runtime.ApplicationConfiguration;
+import org.bson.codecs.Codec;
+import org.bson.codecs.configuration.CodecRegistry;
+
+import javax.inject.Inject;
+import java.util.List;
 
 /**
  * Creates a named configuration for each entry under {@link MongoSettings#MONGODB_SERVERS}.
@@ -64,6 +70,33 @@ public class NamedReactiveMongoConfiguration extends AbstractReactiveMongoConfig
     public NamedReactiveMongoConfiguration(@Parameter String serverName, ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
         this.serverName = serverName;
+    }
+
+
+    /**
+     * Constructor.
+     * @param serverName serverName from properties
+     * @param applicationConfiguration applicationConfiguration
+     * @param environment The environment
+     */
+    @Inject public NamedReactiveMongoConfiguration(@Parameter String serverName, ApplicationConfiguration applicationConfiguration, Environment environment) {
+        super(applicationConfiguration);
+        this.serverName = serverName;
+        if (environment != null) {
+            setPackageNames(environment.getPackages());
+        }
+    }
+
+    @Override
+    @Inject
+    public void codecs(List<Codec<?>> codecList) {
+        super.codecs(codecList);
+    }
+
+    @Override
+    @Inject
+    public void codecRegistries(List<CodecRegistry> codecRegistries) {
+        super.codecRegistries(codecRegistries);
     }
 
     /**

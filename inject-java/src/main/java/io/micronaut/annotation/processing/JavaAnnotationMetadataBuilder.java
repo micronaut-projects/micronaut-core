@@ -90,7 +90,14 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Nullable
     @Override
     protected String getRepeatableName(AnnotationMirror annotationMirror) {
-        List<? extends AnnotationMirror> mirrors = annotationMirror.getAnnotationType().asElement().getAnnotationMirrors();
+        final Element typeElement = annotationMirror.getAnnotationType().asElement();
+        return getRepeatableNameForType(typeElement);
+    }
+
+    @Nullable
+    @Override
+    protected String getRepeatableNameForType(Element annotationType) {
+        List<? extends AnnotationMirror> mirrors = annotationType.getAnnotationMirrors();
         for (AnnotationMirror mirror : mirrors) {
             String name = mirror.getAnnotationType().toString();
             if (Repeatable.class.getName().equals(name)) {
@@ -255,8 +262,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                         .filter(ExecutableElement.class::isInstance)
                         .map(ExecutableElement.class::cast)
                         .filter(this::isValidDefaultValue)
-                        .forEach(executableElement ->
-                                {
+                        .forEach(executableElement -> {
                                     final AnnotationValue defaultValue = executableElement.getDefaultValue();
                                     defaultValues.put(executableElement, defaultValue);
                                 }
@@ -289,7 +295,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     private void populateTypeHierarchy(Element element, List<Element> hierarchy) {
-        while (element != null && element.getKind() == ElementKind.CLASS) {
+        while (JavaModelUtils.resolveKind(element, ElementKind.CLASS).isPresent()) {
 
             TypeElement typeElement = (TypeElement) element;
             List<? extends TypeMirror> interfaces = typeElement.getInterfaces();
@@ -507,7 +513,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                 if (arrayType != null) {
                     return values.toArray((Object[]) Array.newInstance(arrayType, values.size()));
                 } else {
-                    return values.toArray(new Object[values.size()]);
+                    return values.toArray(new Object[0]);
                 }
             }
 

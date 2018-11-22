@@ -143,6 +143,29 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.getProperty('my.property', Map).get() == [one: '10 + 50 + 10', two: '10', three: '10 + 20']
     }
 
+    void "test resolve placeholders for lists of map"() {
+        given:
+        def values = [
+                'foo.bar' : '10',
+                'foo.bar.list' : [
+                        [
+                                'foo' : '${foo.bar}'
+                        ],
+                        [
+                                'bar' : 'baz'
+                        ]
+                ]
+        ]
+
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect:
+        resolver.getProperty('foo.bar.list', List).isPresent()
+        resolver.getProperty('foo.bar.list', List).get() == [['foo': '10'], ['bar': 'baz']]
+    }
+
     void "test resolve placeholders for properties"() {
         given:
         def values = [

@@ -50,6 +50,16 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
     public static final String PREFIX = "eureka.client";
 
     /**
+     * The configuration name for Eureka context path.
+     */
+    public static final String CONTEXT_PATH = PREFIX + ".context-path";
+
+    /**
+     * The configuration name for Eureka context path.
+     */
+    public static final String CONTEXT_PATH_PLACEHOLDER = "${" + CONTEXT_PATH + ":/eureka}";
+
+    /**
      * The configuration name for Eureka host.
      */
     public static final String HOST = PREFIX + ".host";
@@ -130,6 +140,7 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
     /**
      * The default connection pool configuration.
      */
+    @RequiresEureka
     @ConfigurationProperties(ConnectionPoolConfiguration.PREFIX)
     public static class EurekaConnectionPoolConfiguration extends ConnectionPoolConfiguration {
     }
@@ -138,6 +149,7 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
      * Configuration properties for Eureka client discovery.
      */
     @ConfigurationProperties(DiscoveryConfiguration.PREFIX)
+    @RequiresEureka
     public static class EurekaDiscoveryConfiguration extends DiscoveryConfiguration {
 
         private boolean useSecurePort;
@@ -164,6 +176,7 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
      */
     @ConfigurationProperties(RegistrationConfiguration.PREFIX)
     @Requires(property = ApplicationConfiguration.APPLICATION_NAME)
+    @RequiresEureka
     public static class EurekaRegistrationConfiguration extends RegistrationConfiguration {
 
         /**

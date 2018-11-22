@@ -17,8 +17,10 @@
 package io.micronaut.websocket.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.websocket.WebSocketVersion;
 
+import javax.inject.Singleton;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -37,6 +39,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE})
 @WebSocketComponent
+@DefaultScope(Singleton.class)
 public @interface ServerWebSocket {
 
     /**

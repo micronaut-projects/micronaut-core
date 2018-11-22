@@ -21,7 +21,6 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.discovery.ServiceInstanceList;
 import io.micronaut.discovery.StaticServiceInstanceList;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -65,7 +64,7 @@ public class ServiceHttpClientFactory {
     }
 
     /**
-     * Create a {@link ServiceInstanceList} for each configured client.
+     * Create a {@link io.micronaut.discovery.ServiceInstanceList} for each configured client.
      *
      * @param configuration The configuration
      * @return The instance list
@@ -76,7 +75,7 @@ public class ServiceHttpClientFactory {
         List<URI> originalURLs = configuration.getUrls();
         Collection<URI> loadBalancedURIs = new ConcurrentLinkedQueue<>(originalURLs);
         return new StaticServiceInstanceList(configuration.getServiceId(), loadBalancedURIs);
-    };
+    }
 
     /**
      * Creates {@link HttpClient} instances for each defined {@link ServiceHttpClientConfiguration}.

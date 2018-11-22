@@ -34,7 +34,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Consumes({MediaType.APPLICATION_JSON_STREAM,MediaType.APPLICATION_JSON})
+@Consumes({MediaType.APPLICATION_JSON_STREAM, MediaType.APPLICATION_JSON})
 @Singleton
 @Internal
 public class JsonHttpContentSubscriberFactory implements HttpContentSubscriberFactory {

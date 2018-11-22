@@ -7,6 +7,10 @@ buildscript {
     }
 }
 
+ext {
+    bomExclude = true
+}
+
 dependencies {
     testCompile project(":http-server-netty")
     testCompile project(":http-client")
@@ -20,8 +24,8 @@ dependencies {
     testCompile dependencyVersion("jaeger")
     testCompile dependencyModuleVersion("groovy", "groovy-json")
     // tag::testcontainers-dependencies[]
-    testCompile "org.testcontainers:spock:1.8.0"
-    testCompile "org.testcontainers:postgresql:1.8.0"
+    testCompile "org.testcontainers:spock:1.10.1"
+    testCompile "org.testcontainers:postgresql:1.10.1"
     // end::testcontainers-dependencies[]
 
     testRuntime dependencyVersion("tomcatJdbc")

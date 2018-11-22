@@ -57,7 +57,8 @@ public @interface Controller {
      *
      * @return The base URI of the controller in the case of web applications
      */
-    String value();
+    @AliasFor(annotation = UriMapping.class, member = "value")
+    String value() default UriMapping.DEFAULT_URI;
 
     /**
      * @return The produced MediaType values. Defaults to application/json

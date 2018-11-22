@@ -18,6 +18,7 @@ package io.micronaut.discovery.aws.route53;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.env.Environment;
 import io.micronaut.discovery.registration.RegistrationConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
@@ -28,9 +29,13 @@ import io.micronaut.runtime.ApplicationConfiguration;
  * @since 1.0
  */
 
+@Requires(env = Environment.AMAZON_EC2)
 @Requires(property = ApplicationConfiguration.APPLICATION_NAME)
-@ConfigurationProperties("aws.route53.registration")
+@Requires(property = Route53AutoRegistrationConfiguration.PREFIX + ".enabled", value = "true")
+@ConfigurationProperties(Route53AutoRegistrationConfiguration.PREFIX)
 public class Route53AutoRegistrationConfiguration extends RegistrationConfiguration {
+
+    public static final String PREFIX = "aws.route53.registration";
 
     private String awsServiceId; //ID of the service - REQUIRED
 

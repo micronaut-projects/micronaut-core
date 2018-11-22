@@ -17,8 +17,10 @@
 package io.micronaut.function.executor;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.inject.ExecutableMethod;
 
@@ -34,6 +36,12 @@ import java.util.Optional;
  * @since 1.0
  */
 class AbstractExecutor<C> {
+
+    /**
+     * The current {@link ApplicationContext}.
+     */
+    protected ApplicationContext applicationContext;
+
     /**
      * Resolve a function from the {@link LocalFunctionRegistry}.
      *
@@ -67,7 +75,25 @@ class AbstractExecutor<C> {
      * @return Build the {@link ApplicationContext} to use
      */
     protected ApplicationContext buildApplicationContext(@Nullable C context) {
-        return ApplicationContext.build(Environment.FUNCTION).build();
+        if (applicationContext == null) {
+
+            final ApplicationContextBuilder contextBuilder = ApplicationContext.build(Environment.FUNCTION);
+            final Package pkg = getClass().getPackage();
+            if (pkg != null) {
+                final String name = pkg.getName();
+                if (StringUtils.isNotEmpty(name)) {
+                    contextBuilder.packages(name);
+                }
+            }
+            applicationContext = contextBuilder.build();
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                if (applicationContext != null && applicationContext.isRunning()) {
+                    applicationContext.close();
+                    applicationContext = null;
+                }
+            }));
+        }
+        return applicationContext;
     }
 
     /**
@@ -76,12 +102,16 @@ class AbstractExecutor<C> {
      * @return The environment within the context
      */
     protected Environment startEnvironment(ApplicationContext applicationContext) {
-        if (this instanceof PropertySource) {
-            applicationContext.getEnvironment().addPropertySource((PropertySource) this);
-        }
+        if (!applicationContext.isRunning()) {
+            if (this instanceof PropertySource) {
+                applicationContext.getEnvironment().addPropertySource((PropertySource) this);
+            }
 
-        return applicationContext
-            .start()
-            .getEnvironment();
+            return applicationContext
+                    .start()
+                    .getEnvironment();
+        } else {
+            return applicationContext.getEnvironment();
+        }
     }
 }

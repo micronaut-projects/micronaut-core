@@ -8,10 +8,11 @@ buildscript {
         classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7.3'
         classpath 'com.bmuschko:gradle-nexus-plugin:2.3.1'
         classpath 'io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1'
-        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.2'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:4.0.2'
         classpath "gradle.plugin.io.sdkman:gradle-sdkvendor-plugin:1.0.0"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath "org.codehaus.groovy.modules.http-builder:http-builder:0.7.1"
+        classpath 'javax.xml.bind:jaxb-api:2.2.8'
     }
 }
 
@@ -134,12 +135,12 @@ ext {
                 version: nettyVersion,
                 group:'io.netty',
                 name:'netty-codec-http',
-                modules: ['netty-buffer', 'netty-codec', 'netty-codec-dns', 'netty-codec-haproxy', 
+                modules: ['netty-all', 'netty-buffer', 'netty-codec', 'netty-codec-dns', 'netty-codec-haproxy', 
                           'netty-codec-http2', 'netty-codec-memcache', 'netty-codec-mqtt', 
                           'netty-codec-redis', 'netty-codec-smtp', 'netty-codec-socks', 'netty-codec-stomp', 
                           'netty-codec-xml', 'netty-common', 'netty-dev-tools', 'netty-handler', 
                           'netty-handler-proxy', 'netty-resolver', 'netty-resolver-dns', 'netty-transport', 
-                          'netty-transport-rxtx', 'netty-transport-sctp', 'netty-transport-udt', 'netty-example']
+                          'netty-transport-rxtx', 'netty-transport-sctp', 'netty-transport-udt']
             ],
             opentracing: [
                 version: '0.31.0',
@@ -351,12 +352,14 @@ subprojects { Project subproject ->
 
         sourceCompatibility = '1.8'
         targetCompatibility = '1.8'
-//        compileJava.options.compilerArgs.add '-parameters'
-//        compileTestJava.options.compilerArgs.add '-parameters'
+        compileJava.options.compilerArgs.add '-parameters'
+        compileTestJava.options.compilerArgs.add '-parameters'
+        
         if(
             !subproject.name.startsWith('test-') && 
             !subproject.toString().contains('build-projects')
         ) {
+            
             apply from:"${rootProject.rootDir}/gradle/publishing.gradle"
             apply plugin: 'checkstyle'
             

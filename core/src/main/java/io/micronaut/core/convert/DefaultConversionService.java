@@ -189,6 +189,27 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
         // AnnotationClassValue -> Class
         addConverter(AnnotationClassValue.class, Class.class, (object, targetType, context) -> object.getType());
+        addConverter(AnnotationClassValue[].class, Class.class, (object, targetType, context) -> {
+            if (object.length > 0) {
+                final AnnotationClassValue o = object[0];
+                if (o != null) {
+                    return o.getType();
+                }
+            }
+            return Optional.empty();
+        });
+        addConverter(AnnotationClassValue[].class, Class[].class, (object, targetType, context) -> {
+            List<Class> classes = new ArrayList<>(object.length);
+            for (AnnotationClassValue<?> annotationClassValue : object) {
+                if (annotationClassValue != null) {
+                    final Optional<? extends Class<?>> type = annotationClassValue.getType();
+                    if (type.isPresent()) {
+                        classes.add(type.get());
+                    }
+                }
+            }
+            return Optional.of(classes.toArray(new Class[0]));
+        });
 
         // URI -> URL
         addConverter(URI.class, URL.class, uri -> {
@@ -242,7 +263,20 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         // String -> File
         addConverter(CharSequence.class, File.class, (object, targetType, context) -> Optional.of(new File(object.toString())));
 
-        // String[] -> String
+        // String[] -> Enum
+        addConverter(String[].class, Enum.class, (object, targetType, context) -> {
+            if (object == null || object.length == 0) {
+                return Optional.empty();
+            }
+
+            StringJoiner joiner = new StringJoiner("");
+            for (String string : object) {
+                joiner.add(string);
+            }
+            final String val = joiner.toString();
+            return convert(val, targetType, context);
+        });
+
         addConverter(String[].class, CharSequence.class, (object, targetType, context) -> {
             if (object == null || object.length == 0) {
                 return Optional.empty();
@@ -252,7 +286,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             for (String string : object) {
                 joiner.add(string);
             }
-            return Optional.of(joiner.toString());
+            return convert(joiner.toString(), targetType, context);
         });
 
         // CharSequence -> Long for bytes
@@ -699,7 +733,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                         continue;
                     }
                 }
-                if (!valueType.isInstance(value)) {
+                if (!valueType.isInstance(value) || Map.class.isAssignableFrom(valueType)) {
                     Optional converted = convert(value, valueType, valContext);
                     if (converted.isPresent()) {
                         value = converted.get();

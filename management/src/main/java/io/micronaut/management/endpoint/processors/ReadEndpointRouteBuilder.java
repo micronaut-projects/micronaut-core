@@ -22,6 +22,7 @@ import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.EndpointDefaultConfiguration;
 import io.micronaut.management.endpoint.annotation.Read;
+import io.micronaut.web.router.UriRoute;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Annotation;
@@ -58,6 +59,9 @@ public class ReadEndpointRouteBuilder extends AbstractEndpointRouteBuilder {
     protected void registerRoute(ExecutableMethod<?, ?> method, String id) {
         Class<?> declaringType = method.getDeclaringType();
         UriTemplate template = buildUriTemplate(method, id);
-        GET(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes());
+        final UriRoute uriRoute = GET(template.toString(), declaringType, method.getMethodName(), method.getArgumentTypes());
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Created Route to @Endpoint {}: {}", method.getDeclaringType().getName(), uriRoute);
+        }
     }
 }

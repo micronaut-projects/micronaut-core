@@ -14,13 +14,14 @@
  * limitations under the License.
  */
 
-package io.micronaut.spring.tx.datasource;
+package io.micronaut.jdbc.spring;
 
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
+import io.micronaut.core.annotation.Internal;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.jdbc.datasource.TransactionAwareDataSourceProxy;
 
@@ -36,6 +37,7 @@ import javax.sql.DataSource;
 @Factory
 @Requires(classes = DataSourceTransactionManager.class)
 @Requires(condition = HibernatePresenceCondition.class)
+@Internal
 public class DataSourceTransactionManagerFactory {
 
     /**

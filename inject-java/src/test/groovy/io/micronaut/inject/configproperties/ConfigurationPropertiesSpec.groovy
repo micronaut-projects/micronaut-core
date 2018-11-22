@@ -22,6 +22,44 @@ import spock.lang.Specification
 
 class ConfigurationPropertiesSpec extends Specification {
 
+    void "test submap with generics binding"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                'foo.bar.map.key1.key2.property':10,
+                'foo.bar.map.key1.key2.property2.property':10
+        )
+
+        expect:
+        ctx.getBean(MyConfig).map.containsKey('key1')
+        ctx.getBean(MyConfig).map.get("key1") instanceof Map
+        ctx.getBean(MyConfig).map.get("key1").get("key2") instanceof MyConfig.Value
+        ctx.getBean(MyConfig).map.get("key1").get("key2").property == 10
+        ctx.getBean(MyConfig).map.get("key1").get("key2").property2
+        ctx.getBean(MyConfig).map.get("key1").get("key2").property2.property == 10
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "test submap with generics binding and conversion"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                'foo.bar.map.key1.key2.property':'10',
+                'foo.bar.map.key1.key2.property2.property':'10'
+        )
+
+        expect:
+        ctx.getBean(MyConfig).map.containsKey('key1')
+        ctx.getBean(MyConfig).map.get("key1") instanceof Map
+        ctx.getBean(MyConfig).map.get("key1").get("key2") instanceof MyConfig.Value
+        ctx.getBean(MyConfig).map.get("key1").get("key2").property == 10
+        ctx.getBean(MyConfig).map.get("key1").get("key2").property2
+        ctx.getBean(MyConfig).map.get("key1").get("key2").property2.property == 10
+
+        cleanup:
+        ctx.close()
+    }
+
     void "test configuration properties binding"() {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
