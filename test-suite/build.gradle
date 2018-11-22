@@ -36,9 +36,6 @@ dependencies {
 apply from: "${rootProject.projectDir}/gradle/geb.gradle"
 apply from: "${rootProject.projectDir}/gradle/webdriverbinaries.gradle"
 
-test.jvmArgs('-Dio.netty.leakDetection.level=paranoid')
-
-
 //tasks.withType(Test) {
 //    testLogging {
 //        showStandardStreams = true
