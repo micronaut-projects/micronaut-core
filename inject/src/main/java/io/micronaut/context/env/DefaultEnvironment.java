@@ -66,6 +66,7 @@ import java.util.stream.Stream;
 public class DefaultEnvironment extends PropertySourcePropertyResolver implements Environment {
 
     private static final String EC2_LINUX_HYPERVISOR_FILE = "/sys/hypervisor/uuid";
+    private static final String EC2_LINUX_BIOS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/bios_vendor";
     private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
     private static final String FILE_SEPARATOR = ",";
     private static final Logger LOG = LoggerFactory.getLogger(DefaultEnvironment.class);
@@ -749,15 +750,21 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     private static boolean isEC2Linux() {
-        try {
-            String contents = new String(Files.readAllBytes(Paths.get(EC2_LINUX_HYPERVISOR_FILE)));
-            if (contents.startsWith("ec2")) {
-                return true;
-            }
-        } catch (IOException e) {
-            // well that's not it!
+        if (readFile(EC2_LINUX_HYPERVISOR_FILE).startsWith("ec2")) {
+            return true;
+        } else if (readFile(EC2_LINUX_BIOS_VENDOR_FILE).toLowerCase().startsWith("amazon ec2")) {
+            return true;
         }
+
         return false;
+    }
+
+    private static String readFile(String path) {
+        try {
+            return new String(Files.readAllBytes(Paths.get(path))).trim();
+        } catch (IOException e) {
+            return "";
+        }
     }
 
     private static boolean isEC2Windows() {
@@ -816,6 +823,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     private static class EnvironmentsAndPackage {
         String aPackage;
-        Set<String> enviroments = new HashSet<>(1);
+        Set<String> enviroments = new LinkedHashSet<>(1);
     }
 }

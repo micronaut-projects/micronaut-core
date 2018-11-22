@@ -25,8 +25,12 @@ class VehicleSpec extends Specification {
         // tag::start[]
         ApplicationContext applicationContext = ApplicationContext.run(
                 ['my.engine.cylinders':'4',
-                 'my.engine.manufacturer': 'Subaru',
-                 'my.engine.crank-shaft.rod-length': 4],
+                 'my.engine.manufacturer'          : 'Subaru',
+                 'my.engine.crank-shaft.rod-length': 4,
+                 'my.engine.spark-plug.name'       : '6619 LFR6AIX',
+                 'my.engine.spark-plug.type'       : 'Iridium',
+                 'my.engine.spark-plug.companyName': 'NGK'
+                ],
                 "test"
         )
 
@@ -36,7 +40,10 @@ class VehicleSpec extends Specification {
         // end::start[]
 
         then:
-        vehicle.start() == "Subaru Engine Starting V4 [rodLength=4.0]"
+        vehicle.start() == "Subaru Engine Starting V4 [rodLength=4.0, sparkPlug=Iridium(NGK 6619 LFR6AIX)]"
+
+        cleanup:
+        applicationContext.close()
     }
 
 }

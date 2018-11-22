@@ -18,14 +18,12 @@ package io.micronaut.security.session;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.security.authentication.Authentication;
-import io.micronaut.security.authentication.AuthenticationUserDetailsAdapter;
-import io.micronaut.security.authentication.UserDetails;
 import io.micronaut.security.filters.AuthenticationFetcher;
 import io.micronaut.security.filters.SecurityFilter;
 import io.micronaut.security.token.TokenAuthenticationFetcher;
 import io.micronaut.session.Session;
 import io.micronaut.session.http.HttpSessionFilter;
-import io.reactivex.Flowable;
+import io.reactivex.Maybe;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
@@ -48,20 +46,15 @@ public class SessionAuthenticationFetcher implements AuthenticationFetcher {
 
     @Override
     public Publisher<Authentication> fetchAuthentication(HttpRequest<?> request) {
-        Optional<Session> opt = request.getAttributes().get(HttpSessionFilter.SESSION_ATTRIBUTE, Session.class);
-        if (opt.isPresent()) {
-            Session session = opt.get();
-            Optional<Object> optObj = session.get(SecurityFilter.AUTHENTICATION);
-            if (optObj.isPresent()) {
-                Object obj = optObj.get();
-                if (obj instanceof Authentication) {
-                    return Flowable.just((Authentication) obj);
-                } else if (obj instanceof UserDetails) {
-                    return Flowable.just(new AuthenticationUserDetailsAdapter((UserDetails) obj));
-                }
+        return Maybe.<Authentication>create(emitter -> {
+            Optional<Session> opt = request.getAttributes().get(HttpSessionFilter.SESSION_ATTRIBUTE, Session.class);
+            if (opt.isPresent()) {
+                Session session = opt.get();
+                Optional<Authentication> authentication = session.get(SecurityFilter.AUTHENTICATION, Authentication.class);
+                authentication.ifPresent(emitter::onSuccess);
             }
-        }
-        return Flowable.empty();
+            emitter.onComplete();
+        }).toFlowable();
     }
 
     @Override

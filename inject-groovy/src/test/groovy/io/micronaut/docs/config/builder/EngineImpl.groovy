@@ -27,11 +27,13 @@ class EngineImpl implements Engine {
     private final int cylinders
     private final String manufacturer
     private final CrankShaft crankShaft
+    private final SparkPlug sparkPlug
 
-    EngineImpl(String manufacturer, int cylinders, CrankShaft crankShaft) {
+    EngineImpl(String manufacturer, int cylinders, CrankShaft crankShaft, SparkPlug sparkPlug) {
         this.crankShaft = crankShaft
         this.cylinders = cylinders
         this.manufacturer = manufacturer
+        this.sparkPlug = sparkPlug
     }
 
     @Override
@@ -40,7 +42,7 @@ class EngineImpl implements Engine {
     }
 
     String start() {
-        "${manufacturer} Engine Starting V${cylinders} [rodLength=${crankShaft.rodLength.orElse(6.0d)}]"
+        "${manufacturer} Engine Starting V${cylinders} [rodLength=${crankShaft.rodLength.orElse(6.0d)}, sparkPlug=${sparkPlug}]"
     }
 
     static Builder builder() {
@@ -61,8 +63,8 @@ class EngineImpl implements Engine {
             this
         }
 
-        EngineImpl build(CrankShaft.Builder crankShaft) {
-            new EngineImpl(manufacturer, cylinders, crankShaft.build())
+        EngineImpl build(CrankShaft.Builder crankShaft, SparkPlug.Builder sparkPlug) {
+            new EngineImpl(manufacturer, cylinders, crankShaft.build(), sparkPlug.build())
         }
     }
 }

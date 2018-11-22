@@ -171,6 +171,17 @@ public class UploadController {
                 });
     }
 
+    @Post(value = "/receive-partdata", consumes = MediaType.MULTIPART_FORM_DATA)
+    public Single<HttpResponse> receivePartdata(
+            Flowable<PartData> data) {
+        return data.subscribeOn(Schedulers.io())
+                .map(PartData::getBytes)
+                .collect(LongAdder::new, (adder, bytes) -> adder.add((long)bytes.length))
+                .map((adder) -> {
+                    return HttpResponse.ok(adder.longValue());
+                });
+    }
+
     @Post(value = "/receive-multiple-publishers", consumes = MediaType.MULTIPART_FORM_DATA)
     public Single<HttpResponse> receiveMultiplePublishers(Flowable<Flowable<byte[]>> data) {
         return data.subscribeOn(Schedulers.io()).flatMap((Flowable<byte[]> upload) -> {

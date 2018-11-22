@@ -61,9 +61,8 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             Route route = GET(resolveUri(bean, uri,
                 method,
                 uriNamingStrategy),
-                method.getDeclaringType(),
-                method.getMethodName(),
-                method.getArgumentTypes()).produces(produces);
+                bean,
+                method).produces(produces);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Created Route: {}", route);
             }
@@ -77,9 +76,8 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             Route route = POST(resolveUri(bean, uri,
                 method,
                 uriNamingStrategy),
-                method.getDeclaringType(),
-                method.getMethodName(),
-                method.getArgumentTypes());
+                bean,
+                method);
             route = route.consumes(consumes).produces(produces);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Created Route: {}", route);
@@ -94,9 +92,8 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             Route route = PUT(resolveUri(bean, uri,
                 method,
                 uriNamingStrategy),
-                method.getDeclaringType(),
-                method.getMethodName(),
-                method.getArgumentTypes());
+                bean,
+                method);
             route = route.consumes(consumes).produces(produces);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Created Route: {}", route);
@@ -111,9 +108,8 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             Route route = PATCH(resolveUri(bean, uri,
                 method,
                 uriNamingStrategy),
-                method.getDeclaringType(),
-                method.getMethodName(),
-                method.getArgumentTypes());
+                bean,
+                method);
             route = route.consumes(consumes).produces(produces);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Created Route: {}", route);
@@ -128,9 +124,8 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             Route route = DELETE(resolveUri(bean, uri,
                 method,
                 uriNamingStrategy),
-                method.getDeclaringType(),
-                method.getMethodName(),
-                method.getArgumentTypes());
+                bean,
+                method);
             route = route.consumes(consumes).produces(produces);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Created Route: {}", route);
@@ -144,9 +139,8 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             Route route = HEAD(resolveUri(bean, uri,
                 method,
                 uriNamingStrategy),
-                method.getDeclaringType(),
-                method.getMethodName(),
-                method.getArgumentTypes());
+                bean,
+                method);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Created Route: {}", route);
             }
@@ -160,9 +154,8 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             Route route = OPTIONS(resolveUri(bean, uri,
                 method,
                 uriNamingStrategy),
-                method.getDeclaringType(),
-                method.getMethodName(),
-                method.getArgumentTypes());
+                bean,
+                method);
             route = route.consumes(consumes).produces(produces);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Created Route: {}", route);
@@ -175,9 +168,8 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             Route route = TRACE(resolveUri(bean, uri,
                 method,
                 uriNamingStrategy),
-                method.getDeclaringType(),
-                method.getMethodName(),
-                method.getArgumentTypes());
+                bean,
+                method);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Created Route: {}", route);
             }
@@ -185,7 +177,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
 
         httpMethodsHandlers.put(Error.class, (BeanDefinition bean, ExecutableMethod method) -> {
                 boolean isGlobal = method.getValue(Error.class, "global", boolean.class).orElse(false);
-                Class declaringType = method.getDeclaringType();
+                Class declaringType = bean.getBeanType();
                 if (method.isPresent(Error.class, "status")) {
                     Optional<HttpStatus> value = method.getValue(Error.class, "status", HttpStatus.class);
                     value.ifPresent(httpStatus -> {
