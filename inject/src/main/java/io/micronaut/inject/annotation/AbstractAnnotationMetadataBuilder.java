@@ -83,11 +83,21 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     public AnnotationMetadata build(T element) {
         DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
-        AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, true);
-        if (metadata.isEmpty()) {
-            return AnnotationMetadata.EMPTY_METADATA;
+
+        try {
+            AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, true);
+            if (metadata.isEmpty()) {
+                return AnnotationMetadata.EMPTY_METADATA;
+            }
+            return metadata;
+        } catch(RuntimeException e) {
+            if("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
+                // workaround for a bug in the Eclipse APT implementation. See bug 541466 on their Bugzilla.
+                return AnnotationMetadata.EMPTY_METADATA;
+            } else {
+                throw e;
+            }
         }
-        return metadata;
     }
 
     /**
