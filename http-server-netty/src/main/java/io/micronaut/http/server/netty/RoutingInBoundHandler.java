@@ -611,7 +611,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         return new CompletionAwareSubscriber<Object>() {
             RouteMatch<?> routeMatch = finalRoute;
             AtomicBoolean executed = new AtomicBoolean(false);
-            ConcurrentHashMap<Integer, LongAdder> partPositions = new ConcurrentHashMap<>();
+            ConcurrentHashMap<Integer, Long> partPositions = new ConcurrentHashMap<>();
             ConcurrentHashMap<String, ReplaySubject> subjects = new ConcurrentHashMap<>();
             ConcurrentHashMap<Integer, ReplaySubject> childSubjects = new ConcurrentHashMap<>();
             ConcurrentHashMap<Integer, StreamingFileUpload> streamingUploads = new ConcurrentHashMap<>();
@@ -681,7 +681,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     typeVariable = typeVariable.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                                 } else if (StreamingFileUpload.class.isAssignableFrom(typeVariableType)) {
                                     typeVariable = Argument.of(PartData.class);
-                                } else if (!ClassUtils.isJavaLangType(typeVariableType)) {
+                                } else if (!ClassUtils.isJavaLangType(typeVariableType) &&
+                                        !PartData.class.equals(typeVariableType)) {
                                     partialUpload = false;
                                 }
 
@@ -691,10 +692,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     FileUpload fileUpload = (FileUpload) data;
 
                                     if (partialUpload) {
-                                        partPositions.putIfAbsent(dataKey, new LongAdder());
-                                        LongAdder position = partPositions.get(dataKey);
-                                        position.add(fileUpload.length());
-                                        part = new NettyPartData(fileUpload, position.longValue());
+                                        partPositions.putIfAbsent(dataKey, 0L);
+                                        int start = partPositions.get(dataKey).intValue();
+                                        int length = new Long(fileUpload.length() - start).intValue();
+                                        partPositions.put(dataKey, fileUpload.length());
+
+                                        part = new NettyPartData(fileUpload, start, length);
                                     }
 
                                     if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {

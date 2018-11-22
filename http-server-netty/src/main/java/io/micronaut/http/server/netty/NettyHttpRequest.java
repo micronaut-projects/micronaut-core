@@ -45,12 +45,7 @@ import io.netty.util.ReferenceCounted;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -281,7 +276,22 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             if (body instanceof Map) {
                 Attribute attribute = (Attribute) httpContent;
                 try {
-                    ((Map) body).put(attribute.getName(), attribute.getValue());
+                    String newValue = attribute.getValue();
+                    //noinspection unchecked
+                    ((Map) body).compute(attribute.getName(), (key, oldValue) -> {
+                        if (oldValue == null) {
+                            return newValue;
+                        } else if (oldValue instanceof Collection) {
+                            //noinspection unchecked
+                            ((Collection) oldValue).add(newValue);
+                            return oldValue;
+                        } else {
+                            ArrayList<Object> values = new ArrayList<>(2);
+                            values.add(oldValue);
+                            values.add(newValue);
+                            return values;
+                        }
+                    });
                 } catch (IOException e) {
                     // ignore
                 }

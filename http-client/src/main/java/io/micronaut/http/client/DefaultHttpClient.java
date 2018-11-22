@@ -1391,8 +1391,13 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             boolean hasBody = body.isPresent();
             if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) && hasBody) {
                 Object bodyValue = body.get();
-                postRequestEncoder = buildFormDataRequest(clientHttpRequest, bodyValue);
-                nettyRequest = postRequestEncoder.finalizeRequest();
+                if (bodyValue instanceof CharSequence) {
+                    ByteBuf byteBuf = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
+                    nettyRequest = clientHttpRequest.getFullRequest(byteBuf);
+                } else {
+                    postRequestEncoder = buildFormDataRequest(clientHttpRequest, bodyValue);
+                    nettyRequest = postRequestEncoder.finalizeRequest();
+                }
             } else if (requestContentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE) && hasBody) {
                 Object bodyValue = body.get();
                 postRequestEncoder = buildMultipartRequest(clientHttpRequest, bodyValue);
@@ -1846,13 +1851,24 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         for (Map.Entry<String, Object> entry : formData.entrySet()) {
             Object value = entry.getValue();
             if (value != null) {
-                Optional<String> converted = ConversionService.SHARED.convert(value, String.class);
-                if (converted.isPresent()) {
-                    postRequestEncoder.addBodyAttribute(entry.getKey(), converted.get());
+                if (value instanceof Collection) {
+                    Collection collection = (Collection) value;
+                    for (Object val: collection) {
+                        addBodyAttribute(postRequestEncoder, entry.getKey(), val);
+                    }
+                } else {
+                    addBodyAttribute(postRequestEncoder, entry.getKey(), value);
                 }
             }
         }
         return postRequestEncoder;
+    }
+
+    private void addBodyAttribute(HttpPostRequestEncoder postRequestEncoder, String key, Object value) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+        Optional<String> converted = ConversionService.SHARED.convert(value, String.class);
+        if (converted.isPresent()) {
+            postRequestEncoder.addBodyAttribute(key, converted.get());
+        }
     }
 
     private HttpPostRequestEncoder buildMultipartRequest(NettyClientHttpRequest clientHttpRequest, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {

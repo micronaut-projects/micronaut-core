@@ -10,10 +10,10 @@ dependencies {
     compile dependencyModuleVersion("mongo", "mongodb-driver-async")
 
     compileOnly dependencyModuleVersion("mongo", "mongo-java-driver")
-    compileOnly "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.0.1"
+    compileOnly "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.1.1"
 
     testCompile project(":inject-groovy")
-    testCompile "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.0.1"
+    testCompile "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.1.1"
     testCompile dependencyVersion("rxjava2")
     testCompile project(":management")
     testCompile dependencyModuleVersion("mongo", "mongo-java-driver")
