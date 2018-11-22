@@ -29,3 +29,9 @@ The OpenFaaS feature of the CLI now generates an appropriate `function.yml` file
 === AOP Advice on Factory Beans
 
 It is now possible to apply AOP advice like `@Retryable` at the class level for `@Factory` beans allowing for the container to be dynamic (for example to retry bean creation if it fails in a cloud environment).
+
+=== Added support for Flyway and Liquibase
+
+It is now possible to use https://flywaydb.org/[Flyway] and http://www.liquibase.org/[Liquibase] to manage database migrations.
+See https://github.com/micronaut-projects/micronaut-configuration-flyway[Micronaut Flyway] and
+https://github.com/micronaut-projects/micronaut-configuration-liquibase[Micronaut Liquibase] documentation for details.
