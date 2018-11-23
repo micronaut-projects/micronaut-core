@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContentCompressor;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -41,8 +42,23 @@ public class SmartHttpContentCompressor extends HttpContentCompressor {
     private boolean skipEncoding = false;
     private final int compressionThreshold;
 
+    /**
+     * Creates a SmartHttpContentCompressor with the given threshold.
+     *
+     * @param compressionThreshold The compression threshold. Files below this size will not be compressed
+     */
     SmartHttpContentCompressor(int compressionThreshold) {
         this.compressionThreshold = compressionThreshold;
+    }
+
+    /**
+     * Creates a SmartHttpContentCompressor with the default compression threshold.
+     *
+     * @see #SmartHttpContentCompressor(int)
+     */
+    @Internal
+    public SmartHttpContentCompressor() {
+        this(NettyHttpServerConfiguration.DEFAULT_COMPRESSIONTHRESHOLD);
     }
 
     /**
