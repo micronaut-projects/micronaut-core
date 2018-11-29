@@ -299,6 +299,35 @@ class DefaultEnvironmentSpec extends Specification {
         envNames == ["x", "y", "test", "cloud", "ec2", "foo", "bar", "baz"]
     }
 
+    @RestoreSystemProperties
+    void "test environments supplied should be a higher priority than deduced and system property"() {
+        when:
+        def env = new DefaultEnvironment()
+
+        then:
+        env.activeNames.size() == 1
+        env.activeNames[0] == "test"
+
+        when:
+        env = new DefaultEnvironment("explicit")
+
+        then:
+        env.activeNames.size() == 2
+        env.activeNames[0] == "test"
+        env.activeNames[1] == "explicit"
+
+        when:
+        System.setProperty("micronaut.environments", "system,property")
+        env = new DefaultEnvironment("explicit")
+
+        then:
+        env.activeNames.size() == 4
+        env.activeNames[0] == "test"
+        env.activeNames[1] == "system"
+        env.activeNames[2] == "property"
+        env.activeNames[3] == "explicit"
+    }
+
     private static Environment startEnv(String files) {
         new DefaultEnvironment("test") {
             protected String readPropertySourceListKeyFromEnvironment() {
