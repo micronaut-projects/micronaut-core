@@ -21,10 +21,10 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.StringUtils;
 
 import java.util.Collections;
 import java.util.Locale;
@@ -56,7 +56,7 @@ public class JacksonConfiguration {
     private Map<JsonParser.Feature, Boolean> parser = Collections.emptyMap();
     private Map<JsonGenerator.Feature, Boolean> generator = Collections.emptyMap();
     private JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_EMPTY;
-    private JacksonPropertyNamingStrategy propertyNamingStrategy = JacksonPropertyNamingStrategy.LOWER_CAMEL_CASE;
+    private PropertyNamingStrategy propertyNamingStrategy = null;
 
     /**
      * @return The default serialization inclusion settings
@@ -131,7 +131,7 @@ public class JacksonConfiguration {
     /**
      * @return The property naming strategy
      */
-    public JacksonPropertyNamingStrategy getPropertyNamingStrategy() {
+    public PropertyNamingStrategy getPropertyNamingStrategy() {
         return propertyNamingStrategy;
     }
 
@@ -231,11 +231,9 @@ public class JacksonConfiguration {
     /**
      * Sets the property naming strategy.
      *
-     * @return
+     * @param propertyNamingStrategy The property naming strategy
      */
-    public void setPropertyNamingStrategy(String propertyNamingStrategy) {
-        if (StringUtils.isNotEmpty(propertyNamingStrategy)) {
-            this.propertyNamingStrategy = JacksonPropertyNamingStrategy.valueOf(propertyNamingStrategy);
-        }
+    public void setPropertyNamingStrategy(PropertyNamingStrategy propertyNamingStrategy) {
+        this.propertyNamingStrategy = propertyNamingStrategy;
     }
 }

@@ -36,11 +36,10 @@ class JacksonSetupSpec extends Specification {
 
         expect:
         applicationContext.containsBean(ObjectMapper.class)
-        applicationContext.getBean(ObjectMapper.class).getPropertyNamingStrategy() == PropertyNamingStrategy.LOWER_CAMEL_CASE
 
         applicationContext.containsBean(JacksonConfiguration)
-        applicationContext.getBean(ObjectMapper.class).valueToTree([foo:'bar']).get('foo').textValue() == 'bar'
-        applicationContext.getBean(JacksonConfiguration).propertyNamingStrategy == JacksonPropertyNamingStrategy.LOWER_CAMEL_CASE
+        applicationContext.getBean(ObjectMapper.class).valueToTree([foo: 'bar']).get('foo').textValue() == 'bar'
+        !applicationContext.getBean(JacksonConfiguration).propertyNamingStrategy
 
         cleanup:
         applicationContext?.close()
@@ -52,14 +51,14 @@ class JacksonSetupSpec extends Specification {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
-                'jackson.dateFormat':'yyMMdd',
-                'jackson.serialization.indentOutput':true
+                'jackson.dateFormat': 'yyMMdd',
+                'jackson.serialization.indentOutput': true
         ))
         applicationContext.start()
 
         expect:
         applicationContext.containsBean(ObjectMapper.class)
-        applicationContext.getBean(ObjectMapper.class).valueToTree([foo:'bar']).get('foo').textValue() == 'bar'
+        applicationContext.getBean(ObjectMapper.class).valueToTree([foo: 'bar']).get('foo').textValue() == 'bar'
 
         applicationContext.containsBean(JacksonConfiguration)
         applicationContext.getBean(JacksonConfiguration).dateFormat == 'yyMMdd'
@@ -70,7 +69,7 @@ class JacksonSetupSpec extends Specification {
     }
 
     @Unroll
-    void 'Configuring JacksonPropertyNamingStrategy.#configuredJackonPropertyNamingStrategy sets PropertyNamingStrategy on the Context ObjectMapper.'() {
+    void 'Configuring #configuredJackonPropertyNamingStrategy sets PropertyNamingStrategy on the Context ObjectMapper.'() {
         when:
         ApplicationContext applicationContext = ApplicationContext.run(MapPropertySource.of(
                 'jackson.property-naming-strategy': configuredJackonPropertyNamingStrategy.toString()
@@ -78,7 +77,7 @@ class JacksonSetupSpec extends Specification {
 
         then:
         applicationContext.containsBean(JacksonConfiguration)
-        applicationContext.getBean(JacksonConfiguration).propertyNamingStrategy == configuredJackonPropertyNamingStrategy
+        applicationContext.getBean(JacksonConfiguration).propertyNamingStrategy == expectedPropertyNamingStrategy
 
         applicationContext.containsBean(ObjectMapper.class)
         applicationContext.getBean(ObjectMapper.class).getPropertyNamingStrategy() == expectedPropertyNamingStrategy
@@ -87,11 +86,11 @@ class JacksonSetupSpec extends Specification {
         applicationContext?.close()
 
         where:
-        configuredJackonPropertyNamingStrategy         | expectedPropertyNamingStrategy
-        JacksonPropertyNamingStrategy.SNAKE_CASE       | PropertyNamingStrategy.SNAKE_CASE
-        JacksonPropertyNamingStrategy.UPPER_CAMEL_CASE | PropertyNamingStrategy.UPPER_CAMEL_CASE
-        JacksonPropertyNamingStrategy.LOWER_CAMEL_CASE | PropertyNamingStrategy.LOWER_CAMEL_CASE
-        JacksonPropertyNamingStrategy.LOWER_CASE       | PropertyNamingStrategy.LOWER_CASE
-        JacksonPropertyNamingStrategy.KEBAB_CASE       | PropertyNamingStrategy.KEBAB_CASE
+        configuredJackonPropertyNamingStrategy | expectedPropertyNamingStrategy
+        'SNAKE_CASE'                           | PropertyNamingStrategy.SNAKE_CASE
+        'UPPER_CAMEL_CASE'                     | PropertyNamingStrategy.UPPER_CAMEL_CASE
+        'LOWER_CAMEL_CASE'                     | PropertyNamingStrategy.LOWER_CAMEL_CASE
+        'LOWER_CASE'                           | PropertyNamingStrategy.LOWER_CASE
+        'KEBAB_CASE'                           | PropertyNamingStrategy.KEBAB_CASE
     }
 }
