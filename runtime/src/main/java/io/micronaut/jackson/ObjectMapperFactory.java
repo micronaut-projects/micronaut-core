@@ -155,6 +155,8 @@ public class ObjectMapperFactory {
             jacksonConfiguration.getMapperSettings().forEach(objectMapper::configure);
             jacksonConfiguration.getParserSettings().forEach(objectMapper::configure);
             jacksonConfiguration.getGeneratorSettings().forEach(objectMapper::configure);
+
+            objectMapper.setPropertyNamingStrategy(jacksonConfiguration.getPropertyNamingStrategy().propertyNamingStrategy);
         }
         return objectMapper;
     }
