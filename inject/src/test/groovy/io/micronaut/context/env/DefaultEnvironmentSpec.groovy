@@ -296,7 +296,7 @@ class DefaultEnvironmentSpec extends Specification {
         def envNames = env.getActiveNames().toList()
 
         then: "env names should be in the same order as defined in micronaut.environment variable, with test env first"
-        envNames == ["x", "y", "test", "cloud", "ec2", "foo", "bar", "baz"]
+        envNames == ["test", "cloud", "ec2", "foo", "bar", "baz", "x", "y"]
     }
 
     @RestoreSystemProperties
