@@ -263,10 +263,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             errorRoute = requestArgumentSatisfier.fulfillArgumentRequirements(errorRoute, nettyHttpRequest, false);
             MediaType defaultResponseMediaType = errorRoute.getProduces().stream().findFirst().orElse(MediaType.APPLICATION_JSON_TYPE);
             try {
-                Object result = errorRoute.execute();
-                io.micronaut.http.MutableHttpResponse<?> response = errorResultToResponse(result);
-                MethodBasedRouteMatch<?, ?> methodBasedRoute = (MethodBasedRouteMatch) errorRoute;
-                response.setAttribute(HttpAttributes.ROUTE_MATCH, errorRoute);
+                final MethodBasedRouteMatch<?, ?> methodBasedRoute = (MethodBasedRouteMatch) errorRoute;
+                Flowable resultFlowable = Flowable.defer(() -> {
+                      Object result = methodBasedRoute.execute();
+                      io.micronaut.http.MutableHttpResponse<?> response = errorResultToResponse(result);
+                      response.setAttribute(HttpAttributes.ROUTE_MATCH, methodBasedRoute);
+                      return Flowable.just(response);
+                });
 
                 AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(nettyHttpRequest);
                 Flowable<MutableHttpResponse<?>> routePublisher = buildRoutePublisher(
@@ -274,7 +277,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         methodBasedRoute.getReturnType().getType(),
                         methodBasedRoute.getAnnotationMetadata(),
                         requestReference,
-                        Flowable.just(response));
+                        resultFlowable);
 
                 Flowable<? extends MutableHttpResponse<?>> filteredPublisher = filterPublisher(
                         requestReference,
@@ -307,15 +310,19 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 ExceptionHandler handler = exceptionHandler.get();
                 MediaType defaultResponseMediaType = MediaType.fromType(exceptionHandler.getClass()).orElse(MediaType.APPLICATION_JSON_TYPE);
                 try {
-                    Object result = handler.handle(nettyHttpRequest, cause);
+                    Flowable resultFlowable = Flowable.defer(() -> {
+                        Object result = handler.handle(nettyHttpRequest, cause);
+                        io.micronaut.http.MutableHttpResponse<?> response = errorResultToResponse(result);
+                        return Flowable.just(response);
+                    });
+
                     AtomicReference<HttpRequest<?>> requestReference = new AtomicReference<>(nettyHttpRequest);
-                    io.micronaut.http.MutableHttpResponse response = errorResultToResponse(result);
                     Flowable<MutableHttpResponse<?>> routePublisher = buildRoutePublisher(
                             handler.getClass(),
-                            result != null ? result.getClass() : HttpResponse.class,
+                            HttpResponse.class,
                             AnnotationMetadata.EMPTY_METADATA,
                             requestReference,
-                            Flowable.just(response));
+                            resultFlowable);
 
                     Flowable<? extends MutableHttpResponse<?>> filteredPublisher = filterPublisher(
                             requestReference,
