@@ -31,7 +31,7 @@ class RedisCacheSpec extends Specification {
     @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.run(
             'redis.type':'embedded',
             'redis.caches.test.enabled':'true',
-            'redis.maxHeap':'1024M'
+            'redis.maxmemory':'1024M'
     )
 
     void "test read/write object from redis sync cache"() {

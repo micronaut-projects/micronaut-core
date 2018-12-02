@@ -32,7 +32,7 @@ class SyncCacheSpec extends Specification{
             'redis.uri':"redis://localhost:${SocketUtils.findAvailableTcpPort()}",
             'redis.caches.counter.enabled':'true',
             'redis.caches.counter2.enabled':'true',
-            'redis.maxHeap':'1024M'
+            'redis.maxmemory':'1024M'
     )
 
     void "test cacheable annotations"() {

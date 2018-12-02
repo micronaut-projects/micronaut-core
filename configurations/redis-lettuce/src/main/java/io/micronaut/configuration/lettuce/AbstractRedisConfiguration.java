@@ -33,7 +33,7 @@ public abstract class AbstractRedisConfiguration extends RedisURI {
 
     private RedisURI uri;
     private List<RedisURI> uris = Collections.emptyList();
-    private String maxHeap = "";
+    private String maxmemory = "";
 
     /**
      * Constructor.
@@ -83,15 +83,15 @@ public abstract class AbstractRedisConfiguration extends RedisURI {
      * Gets the max heap for the Redis server.
      * @return the maximum heap setting, for example "1024M".
      */
-    public String getMaxHeap() {
-        return maxHeap;
+    public String getMaxmemory() {
+        return maxmemory;
     }
 
     /**
      * Sets the max heap for the Redis server.
-     * @param maxHeap the maximum heap setting, for example "1024M".
+     * @param maxmemory the maximum heap setting, for example "1024M".
      */
-    public void setMaxHeap(String maxHeap) {
-        this.maxHeap = maxHeap;
+    public void setMaxmemory(String maxmemory) {
+        this.maxmemory = maxmemory;
     }
 }

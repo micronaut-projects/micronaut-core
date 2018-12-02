@@ -31,7 +31,7 @@ import spock.lang.Specification
  */
 class RedisHealthIndicatorSpec extends Specification {
 
-    private static String MAX_HEAP_SETTING = "maxheap 1024M"
+    private static String MAX_HEAP_SETTING = "maxmemory 1024M"
 
     void "test redis health indicator"() {
         given:

@@ -30,7 +30,7 @@ import spock.lang.Specification
 class RedisClientFactorySpec extends Specification{
 
 
-    private static final String MAX_HEAP_SETTING = "maxheap 1024M"
+    private static final String MAX_HEAP_SETTING = "maxmemory 1024M"
 
     void "test redis server config by port"() {
         given:
