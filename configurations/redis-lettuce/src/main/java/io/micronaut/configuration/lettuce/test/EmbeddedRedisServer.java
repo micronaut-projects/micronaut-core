@@ -73,7 +73,7 @@ public class EmbeddedRedisServer implements BeanCreatedEventListener<AbstractRed
             RedisServerBuilder builder = embeddedConfiguration.builder;
             builder.port(port);
             if (configuration.getMaxmemory() != null) {
-                builder.setting("maxheap " + configuration.getMaxmemory());
+                builder.setting("maxmemory " + configuration.getMaxmemory());
             }
             redisServer = builder.build();
             redisServer.start();
