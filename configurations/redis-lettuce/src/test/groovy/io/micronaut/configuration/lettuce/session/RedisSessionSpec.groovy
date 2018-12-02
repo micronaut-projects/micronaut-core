@@ -16,9 +16,9 @@
 
 package io.micronaut.configuration.lettuce.session
 
-import io.micronaut.jackson.serialize.JacksonObjectSerializer
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.event.ApplicationEventListener
+import io.micronaut.jackson.serialize.JacksonObjectSerializer
 import io.micronaut.session.Session
 import io.micronaut.session.event.AbstractSessionEvent
 import io.micronaut.session.event.SessionCreatedEvent
@@ -43,6 +43,7 @@ class RedisSessionSpec extends Specification {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
                 'redis.type':'embedded',
+                'redis.maxHeap':'1024M',
                 'micronaut.session.http.redis.enabled':'true'
         )
         RedisSessionStore sessionStore = applicationContext.getBean(RedisSessionStore)
@@ -135,6 +136,7 @@ class RedisSessionSpec extends Specification {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
                 'redis.type':'embedded',
+                'redis.maxHeap':'1024M',
                 'micronaut.session.http.redis.enabled':'true'
         )
         RedisSessionStore sessionStore = applicationContext.getBean(RedisSessionStore)
@@ -165,6 +167,7 @@ class RedisSessionSpec extends Specification {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
                 'redis.type':'embedded',
+                'redis.maxHeap':'1024M',
                 'micronaut.session.http.redis.enabled':'true',
                 'micronaut.session.http.redis.writeMode':'background',
         )
@@ -201,6 +204,7 @@ class RedisSessionSpec extends Specification {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
                 'redis.type':'embedded',
+                'redis.maxHeap':'1024M',
                 'micronaut.session.http.redis.valueSerializer':JacksonObjectSerializer.name,
                 'micronaut.session.http.redis.enabled':'true'
         )

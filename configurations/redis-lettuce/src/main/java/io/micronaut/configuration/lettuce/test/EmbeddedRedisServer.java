@@ -72,6 +72,9 @@ public class EmbeddedRedisServer implements BeanCreatedEventListener<AbstractRed
         if (StringUtils.isNotEmpty(host) && host.equals("localhost") && SocketUtils.isTcpPortAvailable(port)) {
             RedisServerBuilder builder = embeddedConfiguration.builder;
             builder.port(port);
+            if (configuration.getMaxHeap() != null) {
+                builder.setting("maxheap " + configuration.getMaxHeap());
+            }
             redisServer = builder.build();
             redisServer.start();
 
