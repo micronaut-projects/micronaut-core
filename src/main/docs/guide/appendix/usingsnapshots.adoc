@@ -1,11 +1,13 @@
 Micronaut milestone and stable releases are distributed to https://bintray.com/micronaut[Bintray].
 
-The following snippet shows how to use Micronaut `BUILD-SNAPSHOT` with Gradle:
+The following snippet shows how to use Micronaut `BUILD-SNAPSHOT` with Gradle, please use the currently
+latest release version (e.g. `1.0.1`) and add 1
+(therefore, if latest release is `1.0.1`, then use `1.0.2.BUILD-SNAPSHOT`):
 
 [source, groovy]
 ----
 ext {
-  micronautVersion = '1.0.0.BUILD-SNAPSHOT'
+  micronautVersion = '1.0.2.BUILD-SNAPSHOT'
 }
 repositories {
   mavenLocal()
