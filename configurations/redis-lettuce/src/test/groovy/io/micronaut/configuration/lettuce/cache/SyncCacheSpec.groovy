@@ -31,8 +31,7 @@ class SyncCacheSpec extends Specification{
     @Shared @AutoCleanup ApplicationContext applicationContext = ApplicationContext.run(
             'redis.uri':"redis://localhost:${SocketUtils.findAvailableTcpPort()}",
             'redis.caches.counter.enabled':'true',
-            'redis.caches.counter2.enabled':'true',
-            'redis.maxmemory':'1024M'
+            'redis.caches.counter2.enabled':'true'
     )
 
     void "test cacheable annotations"() {

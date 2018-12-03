@@ -39,7 +39,6 @@ class SessionBindingSpec extends Specification {
         given:
         ApplicationContext context = ApplicationContext.run([
                 'redis.type':'embedded',
-                'redis.maxmemory':'1024M',
                 'micronaut.session.http.redis.enabled':'true'
         ])
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
@@ -77,7 +76,6 @@ class SessionBindingSpec extends Specification {
         given:
         ApplicationContext context = ApplicationContext.run([
                 'redis.type':'embedded',
-                'redis.maxmemory':'1024M',
                 'micronaut.session.http.redis.enabled':'true'
         ])
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
@@ -114,7 +112,6 @@ class SessionBindingSpec extends Specification {
         given:
         ApplicationContext context = ApplicationContext.run([
                 'redis.type':'embedded',
-                'redis.maxmemory':'1024M',
                 'micronaut.session.http.redis.enabled':'true'
         ])
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()

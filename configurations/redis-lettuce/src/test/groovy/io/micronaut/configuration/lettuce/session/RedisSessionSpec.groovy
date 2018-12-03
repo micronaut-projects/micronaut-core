@@ -43,7 +43,6 @@ class RedisSessionSpec extends Specification {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
                 'redis.type':'embedded',
-                'redis.maxmemory':'1024M',
                 'micronaut.session.http.redis.enabled':'true'
         )
         RedisSessionStore sessionStore = applicationContext.getBean(RedisSessionStore)
@@ -136,7 +135,6 @@ class RedisSessionSpec extends Specification {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
                 'redis.type':'embedded',
-                'redis.maxmemory':'1024M',
                 'micronaut.session.http.redis.enabled':'true'
         )
         RedisSessionStore sessionStore = applicationContext.getBean(RedisSessionStore)
@@ -167,7 +165,6 @@ class RedisSessionSpec extends Specification {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
                 'redis.type':'embedded',
-                'redis.maxmemory':'1024M',
                 'micronaut.session.http.redis.enabled':'true',
                 'micronaut.session.http.redis.writeMode':'background',
         )
@@ -204,7 +201,6 @@ class RedisSessionSpec extends Specification {
         given:
         ApplicationContext applicationContext = ApplicationContext.run(
                 'redis.type':'embedded',
-                'redis.maxmemory':'1024M',
                 'micronaut.session.http.redis.valueSerializer':JacksonObjectSerializer.name,
                 'micronaut.session.http.redis.enabled':'true'
         )

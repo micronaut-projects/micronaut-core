@@ -35,7 +35,7 @@ class RedisClientFactorySpec extends Specification{
     void "test redis server config by port"() {
         given:
         def port = SocketUtils.findAvailableTcpPort()
-        RedisServer redisServer = RedisServer.builder().port(port).setting(MAX_HEAP_SETTING).build()
+        RedisServer redisServer = new RedisServer(port).builder().port(port).setting(MAX_HEAP_SETTING).build()
         redisServer.start()
 
         when:
