@@ -18,18 +18,21 @@ package io.micronaut.jackson.bind
 
 
 import com.fasterxml.jackson.databind.PropertyNamingStrategy
+import io.micronaut.core.convert.ArgumentConversionContext
+import io.micronaut.core.convert.ConversionContext
+import io.micronaut.core.convert.ConversionError
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
-class StringToPropertyNamingStrategyConverterSpec extends Specification {
+class CharSequencePropertyNamingStrategyConverterSpec extends Specification {
     @Shared
-    StringToPropertyNamingStrategyConverter stringToPropertyNamingStrategyConverter = new StringToPropertyNamingStrategyConverter()
+    CharSequencePropertyNamingStrategyConverter converter = new CharSequencePropertyNamingStrategyConverter()
 
     @Unroll
-    void 'Configuring #propertyNaminStrategyString converts to correct PropertyNamingStrategy'() {
+    void 'test configuring #propertyNaminStrategyString converts to correct PropertyNamingStrategy'() {
         when:
-        Optional<PropertyNamingStrategy> actualPropertyNamingStrategy = stringToPropertyNamingStrategyConverter.convert(
+        Optional<PropertyNamingStrategy> actualPropertyNamingStrategy = converter.convert(
                 propertyNaminStrategyString, PropertyNamingStrategy)
 
         then:
@@ -45,18 +48,18 @@ class StringToPropertyNamingStrategyConverterSpec extends Specification {
         'KEBAB_CASE'                | PropertyNamingStrategy.KEBAB_CASE
     }
 
-    void 'Invalid String #invalidString throws IllegalArgumentException'() {
+    @Unroll
+    void 'test invalid String #invalidString throws IllegalArgumentException'() {
         when:
-        stringToPropertyNamingStrategyConverter.convert(invalidString, PropertyNamingStrategy)
+        ConversionContext ctx = ArgumentConversionContext.of(CharSequence)
+        converter.convert(invalidString, PropertyNamingStrategy, ctx)
+        ConversionError conversionError = ctx.last()
 
         then:
-        Throwable exception = thrown()
-        exception.class == IllegalArgumentException
-        exception.message == "Unable to convert '$invalidString' to a PropertyNamingStrategy"
-
+        conversionError.cause instanceof IllegalArgumentException
+        conversionError.cause.message == "Unable to convert '$invalidString' to a com.fasterxml.jackson.databind.PropertyNamingStrategy"
 
         where:
-
         invalidString | _
         null          | _
         ''            | _
