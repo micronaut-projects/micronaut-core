@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
@@ -149,7 +150,11 @@ public class ObjectMapperFactory {
             if (timeZone != null) {
                 objectMapper.setTimeZone(timeZone);
             }
-
+            PropertyNamingStrategy propertyNamingStrategy = jacksonConfiguration.getPropertyNamingStrategy();
+            if (propertyNamingStrategy != null) {
+                objectMapper.setPropertyNamingStrategy(propertyNamingStrategy);
+            }
+            
             jacksonConfiguration.getSerializationSettings().forEach(objectMapper::configure);
             jacksonConfiguration.getDeserializationSettings().forEach(objectMapper::configure);
             jacksonConfiguration.getMapperSettings().forEach(objectMapper::configure);
