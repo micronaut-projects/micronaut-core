@@ -33,13 +33,13 @@ If you absolutely require a reference to an annotation instance you can use the 
 Controller controllerAnn = definition.synthesize(Controller.class);
 ----
 
-This approach is not recommended however, as it requires reflection and increases memory consumption due to the use of runtime created proxies and should be used as a last resort (for example if you need to an instance of the annotation to integrate with a third party library).
+This approach is not recommended however, as it requires reflection and increases memory consumption due to the use of runtime created proxies and should be used as a last resort (for example if you need an instance of the annotation to integrate with a third party library).
 
 === Aliasing / Mapping Annotations
 
-There are times when you may want to alias the value one of annotation member to the value of annotation annotation member. To do this you can use the ann:io.micronaut.context.annotation.AliasFor[] annotation to alias the value of one member to the value of another.
+There are times when you may want to alias the value of an annotation member to the value of another annotation member. To do this you can use the ann:io.micronaut.context.annotation.AliasFor[] annotation to alias the value of one member to the value of another.
 
-A common use case is for example when an annotation defines `value()` member, but also supports other members. For example the ann:io.micronaut.http.client.annotation.Client[] annotation:
+A common use case is for example when an annotation defines the `value()` member, but also supports other members. For example the ann:io.micronaut.http.client.annotation.Client[] annotation:
 
 .The @Client Annotation
 [source,java]
@@ -52,7 +52,6 @@ include::http-client/src/main/java/io/micronaut/http/client/annotation/Client.ja
 <2> The `id` member also sets the `value` member
 
 With these aliases in place, regardless whether you define `@Client("foo")` or `@Client(id="foo")` both the `value` and `id` members are always set, making it much easier to parse and deal with the annotation.
-
 
 If you do not have control over the annotation then another approach is to use a api:io.micronaut.inject.annotation.AnnotationMapper[]. To create a `AnnotationMapper` you must following the following steps:
 
