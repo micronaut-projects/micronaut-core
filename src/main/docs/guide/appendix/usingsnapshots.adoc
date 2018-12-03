@@ -1,8 +1,6 @@
 Micronaut milestone and stable releases are distributed to https://bintray.com/micronaut[Bintray].
 
-The following snippet shows how to use Micronaut `BUILD-SNAPSHOT` with Gradle, please use the currently
-latest release version (e.g. `1.0.1`) and add 1
-(therefore, if latest release is `1.0.1`, then use `1.0.2.BUILD-SNAPSHOT`):
+The following snippet shows how to use Micronaut `BUILD-SNAPSHOT` with Gradle. The latest snapshot will always be the next patch version plus 1 with `.BUILD-SNAPSHOT` appended. For example if the latest release is "1.0.1", the current snapshot would be "1.0.2.BUILD-SNAPSHOT".
 
 [source, groovy]
 ----
