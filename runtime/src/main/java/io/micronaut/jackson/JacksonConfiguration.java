@@ -21,6 +21,7 @@ import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.CollectionUtils;
@@ -55,6 +56,7 @@ public class JacksonConfiguration {
     private Map<JsonParser.Feature, Boolean> parser = Collections.emptyMap();
     private Map<JsonGenerator.Feature, Boolean> generator = Collections.emptyMap();
     private JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_EMPTY;
+    private PropertyNamingStrategy propertyNamingStrategy = null;
 
     /**
      * @return The default serialization inclusion settings
@@ -124,6 +126,13 @@ public class JacksonConfiguration {
      */
     public int getArraySizeThreshold() {
         return arraySizeThreshold;
+    }
+
+    /**
+     * @return The property naming strategy
+     */
+    public PropertyNamingStrategy getPropertyNamingStrategy() {
+        return propertyNamingStrategy;
     }
 
     /**
@@ -217,5 +226,14 @@ public class JacksonConfiguration {
         if (serializationInclusion != null) {
             this.serializationInclusion = serializationInclusion;
         }
+    }
+
+    /**
+     * Sets the property naming strategy.
+     *
+     * @param propertyNamingStrategy The property naming strategy
+     */
+    public void setPropertyNamingStrategy(PropertyNamingStrategy propertyNamingStrategy) {
+        this.propertyNamingStrategy = propertyNamingStrategy;
     }
 }
