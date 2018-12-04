@@ -24,35 +24,35 @@ package io.micronaut.http.pagination;
  */
 public class PageImpl implements Pageable {
 
-    private final int pageNumber;
+    private final long offset;
     private final int size;
 
     /**
      * Creates a Pageable object.
-     * 
-     * @param pageNumber number of the page
-     * @param size       size of the page
-     * @throws IllegalArgumentException if params have incorrect bounds 
+     *
+     * @param offset number of the page
+     * @param size   size of the page
+     * @throws IllegalArgumentException if params have incorrect bounds
      */
-    public PageImpl(int pageNumber, int size) {
+    public PageImpl(long offset, int size) {
 
-        if (pageNumber < 0) {
-            throw new IllegalArgumentException("Page number cannot be less then 0");
+        if (offset < 0) {
+            throw new IllegalArgumentException("Offset cannot be less then 0");
         }
 
         if (size < 1) {
             throw new IllegalArgumentException("Page size cannot be less then 1");
         }
 
-        this.pageNumber = pageNumber;
+        this.offset = offset;
         this.size = size;
     }
 
     /**
-     * @return the page number
+     * @return the collection offset
      */
-    public int getPageNumber() {
-        return pageNumber;
+    public long getOffset() {
+        return offset;
     }
 
     /**
