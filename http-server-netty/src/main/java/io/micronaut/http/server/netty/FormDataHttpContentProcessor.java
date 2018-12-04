@@ -91,7 +91,9 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
                                 // no-op
                         }
                     } finally {
-                        data.release();
+                        if (!(data instanceof FileUpload) || ((FileUpload) data).isInMemory()) {
+                            data.release();
+                        }
                     }
                 }
 

@@ -28,6 +28,7 @@ import io.micronaut.http.multipart.StreamingFileUpload;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
+import io.reactivex.exceptions.Exceptions;
 import io.reactivex.functions.Function;
 import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.ReplaySubject;
@@ -101,17 +102,17 @@ public class UploadController {
         );
     }
 
-    @Post(value = "/receive-flow-data", consumes = MediaType.MULTIPART_FORM_DATA)
+    @Post(value = "/receive-flow-data", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public Publisher<HttpResponse> receiveFlowData(Data data) {
         return Flowable.just(HttpResponse.ok(data.toString()));
     }
 
-    @Post(value = "/receive-multiple-flow-data", consumes = MediaType.MULTIPART_FORM_DATA)
+    @Post(value = "/receive-multiple-flow-data", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public Single<HttpResponse> receiveMultipleFlowData(Publisher<Data> data) {
         return Flowable.fromPublisher(data).toList().map(list -> HttpResponse.ok(list.toString()));
     }
 
-    @Post(value = "/receive-two-flow-parts", consumes = MediaType.MULTIPART_FORM_DATA)
+    @Post(value = "/receive-two-flow-parts", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public Publisher<HttpResponse> receiveTwoFlowParts(
             @Part("data") Flowable<String> dataPublisher,
             @Part("title") Flowable<String> titlePublisher) {
@@ -164,7 +165,14 @@ public class UploadController {
     public Single<HttpResponse> receiveMultipleStreaming(
             Flowable<StreamingFileUpload> data) {
         return data.subscribeOn(Schedulers.io()).flatMap((StreamingFileUpload upload) -> {
-            return Flowable.fromPublisher(upload).map(PartData::getBytes);
+            return Flowable.fromPublisher(upload)
+                    .map((pd) -> {
+                        try {
+                            return pd.getBytes();
+                        } catch (IOException e) {
+                            throw Exceptions.propagate(e);
+                        }
+                    });
         }).collect(LongAdder::new, (adder, bytes) -> adder.add((long)bytes.length))
                 .map((adder) -> {
                     return HttpResponse.ok(adder.longValue());
@@ -175,7 +183,13 @@ public class UploadController {
     public Single<HttpResponse> receivePartdata(
             Flowable<PartData> data) {
         return data.subscribeOn(Schedulers.io())
-                .map(PartData::getBytes)
+                .map((pd) -> {
+                    try {
+                        return pd.getBytes();
+                    } catch (IOException e) {
+                        throw Exceptions.propagate(e);
+                    }
+                })
                 .collect(LongAdder::new, (adder, bytes) -> adder.add((long)bytes.length))
                 .map((adder) -> {
                     return HttpResponse.ok(adder.longValue());
