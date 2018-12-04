@@ -406,7 +406,7 @@ class MetricsEndpointSpec extends Specification {
 
         where:
         name << [
-                "load.average.1m"]
+                "system.load.average.1m"]
     }
 
     @Unroll
