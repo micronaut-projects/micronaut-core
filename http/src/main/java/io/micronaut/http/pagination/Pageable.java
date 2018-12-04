@@ -31,9 +31,9 @@ public interface Pageable {
     int getSize();
 
     /**
-     * Number of the page.
-     * @return number of the requested page of items
+     * Offset in the requested collection.
+     * @return offset in the requested collection
      */
-    int getPageNumber();
+    long getOffset();
 
 }

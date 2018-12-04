@@ -30,7 +30,7 @@ public class PaginationConfiguration {
     public static final String PREFIX = "micronaut.pagination";
 
     private PaginationSizeConfiguration size = new PaginationSizeConfiguration();
-    private PaginationPageConfiguration page = new PaginationPageConfiguration();
+    private PaginationOffsetConfiguration offset = new PaginationOffsetConfiguration();
 
     /**
      * @return the page size configuration
@@ -40,18 +40,18 @@ public class PaginationConfiguration {
     }
 
     /**
-     * @return the page number configuration
+     * @return the page offset configuration
      */
-    public PaginationPageConfiguration getPageConfiguration() {
-        return page;
+    public PaginationOffsetConfiguration getOffsetConfiguration() {
+        return offset;
     }
 
     /**
-     * @param pageConfiguration the page number configuration
+     * @param offsetConfiguration the page offset configuration
      */
-    public void setPage(PaginationPageConfiguration pageConfiguration) {
-        if (pageConfiguration != null) {
-            this.page = pageConfiguration;
+    public void setOffset(PaginationOffsetConfiguration offsetConfiguration) {
+        if (offsetConfiguration != null) {
+            this.offset = offsetConfiguration;
         }
     }
 
@@ -149,18 +149,18 @@ public class PaginationConfiguration {
     }
 
     /**
-     * Page number configuration.
+     * Page offset configuration.
      */
-    @ConfigurationProperties("page")
-    public static class PaginationPageConfiguration {
+    @ConfigurationProperties("offset")
+    public static class PaginationOffsetConfiguration {
 
-        private static final String DEFAULT_NAME = "page";
+        private static final String DEFAULT_NAME = "offset";
         private static final int DEFAULT_VALUE = 0;
 
         private String name = DEFAULT_NAME;
 
         /**
-         * @return the name of the page number request parameter
+         * @return the name of the page offset request parameter
          */
         public String getName() {
             return name;
@@ -176,7 +176,7 @@ public class PaginationConfiguration {
         /**
          * @return default page number
          */
-        public int getDefault() {
+        public long getDefault() {
             return DEFAULT_VALUE;
         }
 

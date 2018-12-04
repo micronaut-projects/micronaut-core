@@ -26,10 +26,10 @@ import io.micronaut.http.pagination.PaginationConfiguration;
 
 import javax.inject.Singleton;
 import java.util.Optional;
-import java.util.function.Function;
+import java.util.function.Supplier;
 
-import static java.lang.Math.max;
-import static java.lang.Math.min;
+import static java.lang.Integer.max;
+import static java.lang.Integer.min;
 
 /**
  * An {@link io.micronaut.http.bind.binders.TypedRequestArgumentBinder} implementation that binds a
@@ -42,14 +42,14 @@ import static java.lang.Math.min;
 public class PageableArgumentBinder implements TypedRequestArgumentBinder<Pageable> {
 
     private final PaginationConfiguration.PaginationSizeConfiguration sizeConfiguration;
-    private final PaginationConfiguration.PaginationPageConfiguration pageConfiguration;
+    private final PaginationConfiguration.PaginationOffsetConfiguration offsetConfiguration;
 
     /**
      * @param paginationConfiguration the pagination configuration
      */
     public PageableArgumentBinder(PaginationConfiguration paginationConfiguration) {
         this.sizeConfiguration = paginationConfiguration.getSizeConfiguration();
-        this.pageConfiguration = paginationConfiguration.getPageConfiguration();
+        this.offsetConfiguration = paginationConfiguration.getOffsetConfiguration();
     }
 
     @Override
@@ -57,15 +57,15 @@ public class PageableArgumentBinder implements TypedRequestArgumentBinder<Pageab
         HttpParameters parameters = source.getParameters();
 
         int size = Optional.ofNullable(parameters.get(sizeConfiguration.getName()))
-                .map(parsePaginationProperty(sizeConfiguration.getDefault()))
+                .map(s -> parse(() -> Integer.parseInt(s)))
                 .map(l -> min(max(l, sizeConfiguration.getMin()), sizeConfiguration.getMax()))
                 .orElse(sizeConfiguration.getDefault());
 
-        int page = Optional.ofNullable(parameters.get(pageConfiguration.getName()))
-                .map(parsePaginationProperty(pageConfiguration.getDefault()))
-                .orElse(pageConfiguration.getDefault());
+        long offset = Optional.ofNullable(parameters.get(offsetConfiguration.getName()))
+                .map(s -> parse(() -> Long.parseLong(s)))
+                .orElse(offsetConfiguration.getDefault());
 
-        return () -> Optional.of(new PageImpl(page, size));
+        return () -> Optional.of(new PageImpl(offset, size));
     }
 
     @Override
@@ -73,14 +73,12 @@ public class PageableArgumentBinder implements TypedRequestArgumentBinder<Pageab
         return Argument.of(Pageable.class);
     }
 
-    private Function<String, Integer> parsePaginationProperty(int defaultValue) {
-        return property -> {
-            try {
-                return Integer.parseInt(property);
-            } catch (NumberFormatException ex) {
-                return defaultValue;
-            }
-        };
+    private <T> T parse(Supplier<T> parser) {
+        try {
+            return parser.get();
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
 }
