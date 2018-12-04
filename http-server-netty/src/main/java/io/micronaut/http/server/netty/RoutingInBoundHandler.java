@@ -24,6 +24,7 @@ import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.StreamUtils;
@@ -671,7 +672,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 ReplaySubject namedSubject = subjects.computeIfAbsent(name, (key) -> ReplaySubject.create());
 
                                 boolean partialUpload = PartData.class.equals(typeVariableType) ||
-                                        Publishers.isConvertibleToPublisher(typeVariableType);
+                                        Publishers.isConvertibleToPublisher(typeVariableType) ||
+                                        ClassUtils.isJavaLangType(typeVariableType);
 
                                 if (Publishers.isConvertibleToPublisher(typeVariableType)) {
                                     boolean streamingFileUpload = StreamingFileUpload.class.isAssignableFrom(typeVariableType);
