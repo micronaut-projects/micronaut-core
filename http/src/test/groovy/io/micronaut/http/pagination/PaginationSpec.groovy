@@ -22,7 +22,7 @@ class PaginationSpec extends Specification {
     @Shared
     def sizeParamName = "size"
     @Shared
-    def pageParamName = "page"
+    def offsetParamName = "offset"
     @Shared
     def defaultSize = 10
     @Shared
@@ -35,7 +35,7 @@ class PaginationSpec extends Specification {
         setup:
 
         def binder = new PageableArgumentBinder(
-                getPaginationConfig(sizeParamName, pageParamName, defaultSize, maxSize, minSize)
+                getPaginationConfig(sizeParamName, offsetParamName, defaultSize, maxSize, minSize)
         )
         when:
         def request = HttpRequest.create(GET, "http://localhost")
@@ -47,22 +47,33 @@ class PaginationSpec extends Specification {
         bindedPageable.isPresentAndSatisfied()
         def pageable = bindedPageable.get()
         pageable.size == expectedSize
-        pageable.pageNumber == expectedPage
+        pageable.offset == expectedOffset
         where:
-        sizeName | pageName | size  | page || expectedPage | expectedSize
-        "size"   | "page"   | "50"  | "1"  || 1            | 50
-        "size"   | "page"   | "120" | "1"   | 1            | maxSize
-        "size"   | "page"   | "5"   | "1"   | 1            | minSize
-        "s"      | "page"   | "5"   | "1"   | 1            | defaultSize
-        "s"      | "p"      | "5"   | "1"   | 0            | defaultSize
-
+        sizeName | pageName | size  | page || expectedOffset | expectedSize
+        "size"   | "offset" | "50"  | "10" || 10             | 50
+        "size"   | "offset" | "120" | "0"   | 0              | maxSize
+        "size"   | "offset" | "5"   | "10"  | 10             | minSize
+        "s"      | "offset" | "5"   | "11"  | 11             | defaultSize
+        "s"      | "o"      | "5"   | "12"  | 0              | defaultSize
 
     }
 
-    def getPaginationConfig(String sizeName, String pageName,
+    def 'PageImpl validates all input params'() {
+        when:
+        new PageImpl(offset, size)
+        then:
+        thrown IllegalArgumentException
+        where:
+        offset | size
+        0      | 0
+        -1     | 0
+        -1     | 1
+    }
+
+    def getPaginationConfig(String sizeName, String offsetName,
                             int defaultSize, int max, int min) {
-        def pageConf = new PaginationConfiguration.PaginationPageConfiguration().with {
-            pageName = pageName
+        def offsetConf = new PaginationConfiguration.PaginationOffsetConfiguration().with {
+            offsetName = offsetName
             it
         }
         def sizeConf = new PaginationConfiguration.PaginationSizeConfiguration().with {
@@ -74,7 +85,7 @@ class PaginationSpec extends Specification {
         }
         return new PaginationConfiguration().with {
             size = sizeConf
-            page = pageConf
+            offset = offsetConf
             it
         }
     }
