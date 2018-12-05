@@ -8,6 +8,10 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.client.multipart.MultipartBody
 import io.reactivex.Flowable
 
+/**
+ * Any changes or additions to this test should also be done
+ * in {@link StreamUploadSpec} and {@link MixedUploadSpec}
+ */
 class DiskUploadSpec extends AbstractMicronautSpec {
 
     void "test upload FileUpload object via transferTo"() {
@@ -296,6 +300,27 @@ class DiskUploadSpec extends AbstractMicronautSpec {
         then:
         response.code() == HttpStatus.OK.code
         response.body() == (val.length * 2).toString()
+    }
+
+    void "test receiving a flowable that controls flow with a large file"() {
+        def val = ('Big ' + 'xxxx' * 200000).bytes
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("file", "def.txt", MediaType.TEXT_PLAIN_TYPE, val)
+                .addPart("title", "bar")
+                .build()
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receive-flow-control", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body() == (val.length).toString()
     }
 
     Map<String, Object> getConfiguration() {

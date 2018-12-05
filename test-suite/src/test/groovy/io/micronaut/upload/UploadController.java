@@ -206,6 +206,37 @@ public class UploadController {
                 });
     }
 
+    @Post(value =  "/receive-flow-control", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+    Single<String> go(Flowable<byte[]> file) {
+        return Single.create(singleEmitter -> {
+            file.subscribe(new Subscriber<byte[]>() {
+                private Subscription subscription;
+                private LongAdder longAdder = new LongAdder();
+                @Override
+                public void onSubscribe(Subscription subscription) {
+                    this.subscription = subscription;
+                    subscription.request(1);
+                }
+
+                @Override
+                public void onNext(byte[] bytes) {
+                    longAdder.add(bytes.length);
+                    subscription.request(1);
+                }
+
+                @Override
+                public void onError(Throwable throwable) {
+                    singleEmitter.onError(throwable);
+                }
+
+                @Override
+                public void onComplete() {
+                    singleEmitter.onSuccess(Long.toString(longAdder.longValue()));
+                }
+            });
+        });
+    }
+
     public static class Data {
         String title;
 
