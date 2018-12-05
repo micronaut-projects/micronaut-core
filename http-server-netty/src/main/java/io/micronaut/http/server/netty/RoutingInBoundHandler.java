@@ -624,7 +624,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             Subscription s;
             LongConsumer onRequest = (num) -> pressureRequested.updateAndGet((p) -> {
                 long newVal = p - num;
-                if (newVal <= 0) {
+                if (newVal < 0) {
                     s.request(num - p);
                     return 0;
                 } else {
@@ -723,7 +723,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                                     if (partialUpload) {
                                         partPositions.putIfAbsent(dataKey, 0L);
-                                        int start = partPositions.get(dataKey).intValue();
+                                        long start = partPositions.get(dataKey);
                                         int length = new Long(fileUpload.length() - start).intValue();
                                         partPositions.put(dataKey, fileUpload.length());
 

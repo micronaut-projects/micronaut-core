@@ -43,7 +43,7 @@ public class NettyPartData implements PartData {
     private static final Logger LOG = LoggerFactory.getLogger(NettyPartData.class);
 
     private final FileUpload fileUpload;
-    private final int start;
+    private final long start;
     private final int length;
     private final FileChannel channel;
 
@@ -52,7 +52,7 @@ public class NettyPartData implements PartData {
      * @param start      The index where to start reading bytes
      * @param length     The number of bytes to read
      */
-    public NettyPartData(FileUpload fileUpload, int start, int length, @Nullable FileChannel channel) {
+    public NettyPartData(FileUpload fileUpload, long start, int length, @Nullable FileChannel channel) {
         this.fileUpload = fileUpload;
         this.start = start;
         this.length = length;
@@ -116,7 +116,7 @@ public class NettyPartData implements PartData {
      */
     public ByteBuf getByteBuf() throws IOException {
         if (fileUpload.isInMemory()) {
-            return fileUpload.getByteBuf().retainedSlice(start, length);
+            return fileUpload.getByteBuf().retainedSlice((int)start, length);
         } else {
             byte[] data = new byte[length];
             channel.read(ByteBuffer.wrap(data), start);

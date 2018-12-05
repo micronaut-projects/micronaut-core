@@ -1,18 +1,3 @@
-/*
- * Copyright 2017-2018 original authors
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
 package io.micronaut.upload
 
 import io.micronaut.AbstractMicronautSpec
@@ -25,9 +10,9 @@ import io.reactivex.Flowable
 
 /**
  * Any changes or additions to this test should also be done
- * in {@link DiskUploadSpec} and {@link MixedUploadSpec}
+ * in {@link StreamUploadSpec} and {@link DiskUploadSpec}
  */
-class StreamUploadSpec extends AbstractMicronautSpec {
+class MixedUploadSpec extends AbstractMicronautSpec {
 
     void "test upload FileUpload object via transferTo"() {
         given:
@@ -195,8 +180,8 @@ class StreamUploadSpec extends AbstractMicronautSpec {
                 .build()
         flowable = Flowable.fromPublisher(client.exchange(
                 HttpRequest.POST("/upload/receive-flow-data", requestBody)
-                .contentType(MediaType.MULTIPART_FORM_DATA)
-                .accept(MediaType.APPLICATION_JSON_TYPE.TEXT_PLAIN_TYPE),
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.APPLICATION_JSON_TYPE.TEXT_PLAIN_TYPE),
                 String
         ))
         response = flowable.blockingFirst()
@@ -339,6 +324,8 @@ class StreamUploadSpec extends AbstractMicronautSpec {
     }
 
     Map<String, Object> getConfiguration() {
-        super.getConfiguration() << ['micronaut.http.client.read-timeout': 300]
+        super.getConfiguration() << ['micronaut.http.client.read-timeout': 300,
+                                     'micronaut.server.multipart.mixed': true,
+                                     'micronaut.server.multipart.threshold': 20000]
     }
 }

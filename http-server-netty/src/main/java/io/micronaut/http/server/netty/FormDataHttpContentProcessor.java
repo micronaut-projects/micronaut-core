@@ -18,15 +18,11 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.multipart.Attribute;
-import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
-import io.netty.handler.codec.http.multipart.FileUpload;
-import io.netty.handler.codec.http.multipart.HttpData;
-import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
-import io.netty.handler.codec.http.multipart.InterfaceHttpData;
+import io.netty.handler.codec.http.multipart.*;
 import org.reactivestreams.Subscriber;
 
 import java.nio.charset.Charset;
@@ -52,11 +48,19 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
     FormDataHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, NettyHttpServerConfiguration configuration) {
         super(nettyHttpRequest, configuration);
         Charset characterEncoding = nettyHttpRequest.getCharacterEncoding();
-        DefaultHttpDataFactory factory = new DefaultHttpDataFactory(configuration.getMultipart().isDisk(), characterEncoding);
-        factory.setMaxLimit(configuration.getMultipart().getMaxFileSize());
+        HttpServerConfiguration.MultipartConfiguration multipart = configuration.getMultipart();
+        DefaultHttpDataFactory factory;
+        if (multipart.isDisk()) {
+            factory = new DefaultHttpDataFactory(true, characterEncoding);
+        } else if (multipart.isMixed()) {
+            factory = new DefaultHttpDataFactory(multipart.getThreshold(), characterEncoding);
+        } else {
+            factory = new DefaultHttpDataFactory(false, characterEncoding);
+        }
+        factory.setMaxLimit(multipart.getMaxFileSize());
         this.decoder = new HttpPostRequestDecoder(factory, nettyHttpRequest.getNativeRequest(), characterEncoding);
         this.enabled = nettyHttpRequest.getContentType().map(type -> type.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)).orElse(false) ||
-            configuration.getMultipart().isEnabled();
+            multipart.isEnabled();
     }
 
     @Override
@@ -91,7 +95,8 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
                                 // no-op
                         }
                     } finally {
-                        if (!(data instanceof FileUpload) || ((FileUpload) data).isInMemory()) {
+                        //mixed and disk uploads get cleaned up in `doAfterComplete`, however memory does not
+                        if (!(data instanceof FileUpload) || (data instanceof MemoryFileUpload)) {
                             data.release();
                         }
                     }
