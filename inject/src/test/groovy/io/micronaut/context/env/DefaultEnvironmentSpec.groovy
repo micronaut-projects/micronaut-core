@@ -34,7 +34,6 @@ class DefaultEnvironmentSpec extends Specification {
         env.getProperty("test.foo.bar", Integer).get() == 10
         env.getRequiredProperty("test.foo.bar", Integer) == 10
         env.getProperty("test.foo.bar", Integer, 20) == 10
-        env.getProperty("user", String).isPresent()
 
         cleanup:
         System.setProperty("test.foo.bar", "")

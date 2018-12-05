@@ -32,10 +32,7 @@ import javax.inject.Singleton;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
-import java.net.URL;
-import java.net.URLConnection;
+import java.net.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -155,7 +152,7 @@ public class GoogleComputeInstanceMetadataResolver implements ComputeInstanceMet
             if (LOG.isDebugEnabled()) {
                 LOG.debug("No metadata found at: " + configuration.getMetadataUrl() + "?recursive=true", fnfe);
             }
-        } catch (IOException ioe) {
+        } catch (IOException | URISyntaxException ioe) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error connecting to" + configuration.getMetadataUrl() + "?recursive=true reading instance metadata", ioe);
             }
@@ -172,16 +169,20 @@ public class GoogleComputeInstanceMetadataResolver implements ComputeInstanceMet
      * @param readTimeoutMs       read timeout in millis
      * @return The Metadata JSON
      * @throws IOException Failed or interrupted I/O operations while reading from input stream.
+     * @throws URISyntaxException if the URI is malformed.
      */
-    protected JsonNode readGcMetadataUrl(URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException {
-        URLConnection urlConnection = url.openConnection();
+    protected JsonNode readGcMetadataUrl(URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException, URISyntaxException {
 
         if (url.getProtocol().equalsIgnoreCase("file")) {
+            URI uri = new URI(url.getProtocol(), url.getUserInfo(), url.getHost(), url.getPort(), url.getPath(), null, "");
+            url = uri.toURL();
+            URLConnection urlConnection = url.openConnection();
             urlConnection.connect();
             try (InputStream in = urlConnection.getInputStream()) {
                 return objectMapper.readTree(in);
             }
         } else {
+            URLConnection urlConnection = url.openConnection();
             HttpURLConnection uc = (HttpURLConnection) urlConnection;
 
             uc.setConnectTimeout(connectionTimeoutMs);
