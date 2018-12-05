@@ -207,7 +207,7 @@ public class UploadController {
     }
 
     @Post(value =  "/receive-flow-control", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
-    Single<String> go(Flowable<byte[]> file) {
+    Single<String> go(Map json, Flowable<byte[]> file) {
         return Single.create(singleEmitter -> {
             file.subscribe(new Subscriber<byte[]>() {
                 private Subscription subscription;

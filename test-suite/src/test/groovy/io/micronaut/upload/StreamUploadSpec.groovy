@@ -320,6 +320,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
     void "test receiving a flowable that controls flow with a large file"() {
         def val = ('Big ' + 'xxxx' * 200000).bytes
         MultipartBody requestBody = MultipartBody.builder()
+                .addPart("json", "abc.json", MediaType.TEXT_JSON_TYPE, '{"hello": "world"}'.bytes)
                 .addPart("file", "def.txt", MediaType.TEXT_PLAIN_TYPE, val)
                 .addPart("title", "bar")
                 .build()

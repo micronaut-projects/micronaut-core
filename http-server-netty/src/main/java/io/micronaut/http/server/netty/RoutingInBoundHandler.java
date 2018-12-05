@@ -657,8 +657,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         if (requiredInput.isPresent()) {
                             Argument<?> argument = requiredInput.get();
                             Supplier<Object> value;
+                            boolean isPublisher = Publishers.isConvertibleToPublisher(argument.getType());
 
-                            if (Publishers.isConvertibleToPublisher(argument.getType())) {
+                            if (isPublisher) {
                                 Integer dataKey = System.identityHashCode(data);
                                 Argument typeVariable;
 
@@ -777,7 +778,9 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 if (!routeMatch.isSatisfied(argumentName)) {
                                     routeMatch = routeMatch.fulfill(Collections.singletonMap(argumentName, value.get()));
                                 }
-                                pressureRequested.incrementAndGet();
+                                if (isPublisher) {
+                                    pressureRequested.incrementAndGet();
+                                }
                                 s.request(1);
                             }
 
