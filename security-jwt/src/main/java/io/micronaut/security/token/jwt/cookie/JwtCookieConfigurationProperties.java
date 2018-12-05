@@ -45,7 +45,7 @@ public class JwtCookieConfigurationProperties implements JwtCookieConfiguration 
      * The default cookie path.
      */
     @SuppressWarnings("WeakerAccess")
-    public static final String DEFAULT_COOKIEPATH = null;
+    public static final String DEFAULT_COOKIEPATH = "/";
 
     /**
      * The default logout target URL.
