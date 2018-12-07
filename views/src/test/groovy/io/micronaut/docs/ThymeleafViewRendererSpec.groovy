@@ -26,6 +26,7 @@ class ThymeleafViewRendererSpec extends Specification {
                     'spec.name': 'thymeleaf',
                     'micronaut.views.velocity.enabled': false,
                     'micronaut.views.handlebars.enabled': false,
+                    'micronaut.views.freemarker.enabled': false,
             ],
             "test")
 
