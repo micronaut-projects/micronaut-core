@@ -46,11 +46,11 @@ import io.micronaut.views.ViewsRenderer;
 import io.micronaut.views.exceptions.ViewRenderingException;
 
 /**
- * Renders Views with with FreeMarker.
+ * Renders Views with FreeMarker Java template engine.
  *
  * @author Jerónimo López
  * @see <a href= "https://freemarker.apache.org/">freemarker.apache.org</a>
- * @since 1.0.2
+ * @since 1.1
  */
 @Produces(MediaType.TEXT_HTML)
 @Requires(property = FreemarkerViewsRendererConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
