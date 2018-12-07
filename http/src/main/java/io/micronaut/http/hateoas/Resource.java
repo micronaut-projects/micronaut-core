@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.hateos;
+package io.micronaut.http.hateoas;
 
 import io.micronaut.core.value.OptionalMultiValues;
 
 /**
- * Represents a REST resource in a HATEOS architecture.
+ * Represents a REST resource in a hateoas architecture.
  *
  * @author Graeme Rocher
  * @since 1.0
