@@ -8,21 +8,21 @@ import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.views.ViewsFilter
-import io.micronaut.views.velocity.VelocityViewsRenderer
+import io.micronaut.views.freemarker.FreemarkerViewsRenderer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
-class VelocityViewRendererSpec extends Specification {
+class FreemarkerViewRendererSpec extends Specification {
 
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
             [
-                    'spec.name': 'velocity',
+                    'spec.name': 'freemarker',
                     'micronaut.views.thymeleaf.enabled': false,
+                    'micronaut.views.velocity.enabled': false,
                     'micronaut.views.handlebars.enabled': false,
-                    'micronaut.views.freemarker.enabled': false,
             ],
             "test")
 
@@ -32,16 +32,16 @@ class VelocityViewRendererSpec extends Specification {
 
     def "bean is loaded"() {
         when:
-        embeddedServer.applicationContext.getBean(VelocityViewsRenderer)
+        embeddedServer.applicationContext.getBean(FreemarkerViewsRenderer)
         embeddedServer.applicationContext.getBean(ViewsFilter)
 
         then:
         noExceptionThrown()
     }
 
-    def "invoking /velocity/home does not specify @View, thus, regular JSON rendering is used"() {
+    def "invoking /freemarker/home does not specify @View, thus, regular JSON rendering is used"() {
         when:
-        HttpResponse<String> rsp = client.toBlocking().exchange('/velocity/home', String)
+        HttpResponse<String> rsp = client.toBlocking().exchange('/freemarker/home', String)
 
         then:
         noExceptionThrown()
@@ -57,9 +57,9 @@ class VelocityViewRendererSpec extends Specification {
         rsp.contentType.get() == MediaType.APPLICATION_JSON_TYPE
     }
 
-    def "invoking /velocity renders velocity template from a controller returning a map"() {
+    def "invoking /freemarker renders freemarker template from a controller returning a map"() {
         when:
-        HttpResponse<String> rsp = client.toBlocking().exchange('/velocity', String)
+        HttpResponse<String> rsp = client.toBlocking().exchange('/freemarker', String)
 
         then:
         noExceptionThrown()
@@ -73,9 +73,9 @@ class VelocityViewRendererSpec extends Specification {
         rsp.body().contains("<h1>username: <span>sdelamo</span></h1>")
     }
 
-    def "invoking /velocity/pogo renders velocity template from a controller returning a pogo"() {
+    def "invoking /freemarker/pogo renders freemarker template from a controller returning a pogo"() {
         when:
-        HttpResponse<String> rsp = client.toBlocking().exchange('/velocity/pogo', String)
+        HttpResponse<String> rsp = client.toBlocking().exchange('/freemarker/pogo', String)
 
         then:
         noExceptionThrown()
@@ -89,9 +89,9 @@ class VelocityViewRendererSpec extends Specification {
         rsp.body().contains("<h1>username: <span>sdelamo</span></h1>")
     }
 
-    def "invoking /velocity/reactive renders velocity template from a controller returning a reactive type"() {
+    def "invoking /freemarker/reactive renders freemarker template from a controller returning a reactive type"() {
         when:
-        HttpResponse<String> rsp = client.toBlocking().exchange('/velocity/reactive', String)
+        HttpResponse<String> rsp = client.toBlocking().exchange('/freemarker/reactive', String)
 
         then:
         noExceptionThrown()
@@ -105,9 +105,9 @@ class VelocityViewRendererSpec extends Specification {
         rsp.body().contains("<h1>username: <span>sdelamo</span></h1>")
     }
 
-    def "invoking /velocity/modelAndView renders velocity template from a controller returning a ModelAndView instance"() {
+    def "invoking /freemarker/modelAndView renders freemarker template from a controller returning a ModelAndView instance"() {
         when:
-        HttpResponse<String> rsp = client.toBlocking().exchange('/velocity/modelAndView', String)
+        HttpResponse<String> rsp = client.toBlocking().exchange('/freemarker/modelAndView', String)
 
         then:
         noExceptionThrown()
@@ -121,9 +121,9 @@ class VelocityViewRendererSpec extends Specification {
         rsp.body().contains("<h1>username: <span>sdelamo</span></h1>")
     }
 
-    def "invoking /velocity/viewWithNoViewRendererForProduces skips view rendering since controller specifies a media type with no available ViewRenderer"() {
+    def "invoking /freemarker/viewWithNoViewRendererForProduces skips view rendering since controller specifies a media type with no available ViewRenderer"() {
         when:
-        HttpResponse<String> rsp = client.toBlocking().exchange('/velocity/viewWithNoViewRendererForProduces', String)
+        HttpResponse<String> rsp = client.toBlocking().exchange('/freemarker/viewWithNoViewRendererForProduces', String)
 
         then:
         noExceptionThrown()
@@ -137,9 +137,9 @@ class VelocityViewRendererSpec extends Specification {
         rsp.body() == 'io.micronaut.docs.Person(sdelamo, true)'
     }
 
-    def "invoking /velocity/bogus returns 404 if you attempt to render a template which does not exist"() {
+    def "invoking /freemarker/bogus returns 404 if you attempt to render a template which does not exist"() {
         when:
-        client.toBlocking().exchange('/velocity/bogus', String)
+        client.toBlocking().exchange('/freemarker/bogus', String)
 
         then:
         def e = thrown(HttpClientResponseException)
@@ -148,9 +148,9 @@ class VelocityViewRendererSpec extends Specification {
         e.status == HttpStatus.NOT_FOUND
     }
 
-    def "invoking /velocity/nullbody renders view even if the response body is null"() {
+    def "invoking /freemarker/nullbody renders view even if the response body is null"() {
         when:
-        HttpResponse<String> rsp = client.toBlocking().exchange('/velocity/nullbody', String)
+        HttpResponse<String> rsp = client.toBlocking().exchange('/freemarker/nullbody', String)
 
         then:
         noExceptionThrown()
