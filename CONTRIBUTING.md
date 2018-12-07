@@ -68,7 +68,7 @@ Once you are satisfied with your changes:
 
 - Commit your changes in your local branch
 - Push your changes to your remote branch on GitHub
-- Send us a (pull request)[https://help.github.com/articles/creating-a-pull-request]
+- Send us a [pull request](https://help.github.com/articles/creating-a-pull-request)
 
 ## Checkstyle
 
