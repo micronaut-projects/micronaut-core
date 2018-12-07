@@ -41,6 +41,7 @@ import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.io.Writable;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.server.exceptions.InternalServerException;
 import io.micronaut.views.ViewsConfiguration;
 import io.micronaut.views.ViewsRenderer;
 import io.micronaut.views.exceptions.ViewRenderingException;
@@ -66,10 +67,9 @@ public class FreemarkerViewsRenderer implements ViewsRenderer {
     /**
      * @param viewsConfiguration               Views Configuration
      * @param freemarkerMicronautConfiguration Freemarker Configuration
-     * @throws TemplateException               When template doesn't exist or can not be parsed
      */
     FreemarkerViewsRenderer(ViewsConfiguration viewsConfiguration,
-            FreemarkerViewsRendererConfiguration freemarkerMicronautConfiguration) throws TemplateException {
+            FreemarkerViewsRendererConfiguration freemarkerMicronautConfiguration) {
         this.viewsConfiguration = viewsConfiguration;
         this.freemarkerMicronautConfiguration = freemarkerMicronautConfiguration;
         this.freemarkerConfiguration = createConfiguration(freemarkerMicronautConfiguration);
@@ -124,11 +124,10 @@ public class FreemarkerViewsRenderer implements ViewsRenderer {
         return EXTENSION_SEPARATOR + freemarkerMicronautConfiguration.getDefaultExtension();
     }
 
-    private Configuration createConfiguration(FreemarkerViewsRendererConfiguration micronautConfig)
-            throws TemplateException {
-        
+    private Configuration createConfiguration(FreemarkerViewsRendererConfiguration micronautConfig) {
+
         Map<String, Supplier<String>> mapper = createConfigurationMapper(micronautConfig);
-        
+
         String incompatibleImprovements = micronautConfig.getIncompatibleImprovements();
         Version version = DEFAULT_INCOMPATIBLE_IMPROVEMENTS;
         if (incompatibleImprovements != null) {
@@ -140,12 +139,16 @@ public class FreemarkerViewsRenderer implements ViewsRenderer {
         for (Entry<String, Supplier<String>> mapEntry : mapper.entrySet()) {
             String value = mapEntry.getValue().get();
             if (value != null) {
-                freemarkerConfiguration.setSetting(mapEntry.getKey(), value);
+                try {
+                    freemarkerConfiguration.setSetting(mapEntry.getKey(), value);
+                } catch (TemplateException e) {
+                    throw new InternalServerException("Invalid configuration for Freemarker property " + value, e);
+                }
             }
         }
         return freemarkerConfiguration;
     }
-    
+
     private Map<String, Supplier<String>> createConfigurationMapper(
             FreemarkerViewsRendererConfiguration micronautConfig) {
         Map<String, Supplier<String>> mapper = new HashMap<>();
