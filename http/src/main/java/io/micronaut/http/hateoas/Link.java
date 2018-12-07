@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.hateos;
+package io.micronaut.http.hateoas;
 
 import io.micronaut.http.MediaType;
 
@@ -23,7 +23,7 @@ import java.net.URI;
 import java.util.Optional;
 
 /**
- * <p>Interface for a HATEOS link.</p>
+ * <p>Interface for a hateoas link.</p>
  * <p>
  * <p>See https://tools.ietf.org/html/draft-kelly-json-hal-08#section-5</p>
  *

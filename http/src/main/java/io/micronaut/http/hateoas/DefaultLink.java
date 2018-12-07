@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.hateos;
+package io.micronaut.http.hateoas;
 
 import io.micronaut.http.MediaType;
 

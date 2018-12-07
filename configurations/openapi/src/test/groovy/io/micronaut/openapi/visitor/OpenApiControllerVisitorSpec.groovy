@@ -26,7 +26,7 @@ import io.swagger.v3.oas.annotations.enums.*;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.*;
 import com.fasterxml.jackson.core.*;
-import io.micronaut.http.hateos.*;
+import io.micronaut.http.hateoas.*;
 import java.util.List;
 import javax.validation.constraints.*;
 
