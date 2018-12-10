@@ -121,7 +121,7 @@ class JwtCookieAuthenticationSpec extends GebSpec {
         then:
         cookie
         cookie.contains('JWT=')
-        !cookie.contains('Path=/')
+        cookie.contains('Path=/')
 
         when:
         String sessionId = cookie.substring('JWT='.size(), cookie.indexOf(';'))
