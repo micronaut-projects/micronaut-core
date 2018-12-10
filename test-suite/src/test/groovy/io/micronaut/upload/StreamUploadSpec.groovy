@@ -33,10 +33,9 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         given:
         def data = '{"title":"Test"}'
         MultipartBody requestBody = MultipartBody.builder()
-                .addPart("title", "bar")
+                .addPart("title", "bar-stream")
                 .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
                 .build()
-
 
         when:
         Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
@@ -46,10 +45,14 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         ))
         HttpResponse<String> response = flowable.blockingFirst()
         def result = response.getBody().get()
+        File file = new File(uploadDir, "bar-stream.json")
+        file.deleteOnExit()
 
         then:
         response.code() == HttpStatus.OK.code
         result == "Uploaded ${data.size()}"
+        file.exists()
+        file.length() == data.size()
     }
 
     void "test upload big FileUpload object via transferTo"() {
@@ -76,6 +79,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         def result = response.getBody().get()
 
         def file = new File(uploadDir, "bar.json")
+        file.deleteOnExit()
 
         then:
         response.code() == HttpStatus.OK.code
@@ -230,7 +234,7 @@ class StreamUploadSpec extends AbstractMicronautSpec {
         response.getBody().get() == '[Data{title=\'Test\'}, Data{title=\'Test2\'}]'
 
         when: "a large document with partial data is uploaded"
-        def val = 'xxxx' * 200
+        def val = 'xxxx' * 20000
         data = '{"title":"Big ' + val + '"}'
         data2 = '{"title":"Big2 ' + val + '"}'
         requestBody = MultipartBody.builder()

@@ -109,7 +109,33 @@ public class UploadController {
 
     @Post(value = "/receive-multiple-flow-data", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
     public Single<HttpResponse> receiveMultipleFlowData(Publisher<Data> data) {
-        return Flowable.fromPublisher(data).toList().map(list -> HttpResponse.ok(list.toString()));
+        return Single.create(emitter -> {
+           data.subscribe(new Subscriber<Data>() {
+               private Subscription s;
+               List<Data> datas = new ArrayList<>();
+               @Override
+               public void onSubscribe(Subscription s) {
+                   this.s = s;
+                   s.request(1);
+               }
+
+               @Override
+               public void onNext(Data data) {
+                   datas.add(data);
+                   s.request(1);
+               }
+
+               @Override
+               public void onError(Throwable t) {
+                    emitter.onError(t);
+               }
+
+               @Override
+               public void onComplete() {
+                    emitter.onSuccess(HttpResponse.ok(datas.toString()));
+               }
+           });
+        });
     }
 
     @Post(value = "/receive-two-flow-parts", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
