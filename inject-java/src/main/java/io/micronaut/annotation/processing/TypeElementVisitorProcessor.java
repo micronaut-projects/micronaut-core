@@ -16,7 +16,6 @@
 
 package io.micronaut.annotation.processing;
 
-import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.annotation.processing.visitor.LoadedVisitor;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -27,7 +26,6 @@ import io.micronaut.core.version.VersionUtils;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
-import javax.annotation.processing.Messager;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.element.Element;
@@ -62,14 +60,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             return false;
         }
 
-        final Messager messager = processingEnv.getMessager();
-        JavaVisitorContext visitorContext = new JavaVisitorContext(
-                messager,
-                elementUtils,
-                annotationUtils,
-                typeUtils,
-                modelUtils,
-                filer);
+
         SoftServiceLoader<TypeElementVisitor> serviceLoader = SoftServiceLoader.load(TypeElementVisitor.class, getClass().getClassLoader());
         Map<String, LoadedVisitor> loadedVisitors = new HashMap<>();
         for (ServiceDefinition<TypeElementVisitor> definition : serviceLoader) {
@@ -100,7 +91,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 try {
                     loadedVisitors.put(definition.getName(), new LoadedVisitor(
                             visitor,
-                            visitorContext,
+                            javaVisitorContext,
                             genericUtils,
                             processingEnv
                     ));
@@ -112,7 +103,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         for (LoadedVisitor loadedVisitor : loadedVisitors.values()) {
             try {
-                loadedVisitor.getVisitor().start(visitorContext);
+                loadedVisitor.getVisitor().start(javaVisitorContext);
             } catch (Throwable e) {
                 error("Error initializing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage());
             }
@@ -125,9 +116,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 .stream()
                 .filter(JavaModelUtils::isClassOrInterface)
                 .map(modelUtils::classElementFor)
-                .filter(typeElement -> {
-                    return groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType);
-                })
+                .filter(typeElement -> groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType))
                 .forEach((typeElement) -> {
                     String className = typeElement.getQualifiedName().toString();
                     List<LoadedVisitor> matchedVisitors = loadedVisitors.values().stream().filter((v) -> v.matches(typeElement)).collect(Collectors.toList());
@@ -136,7 +125,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
 
         for (LoadedVisitor loadedVisitor : loadedVisitors.values()) {
             try {
-                loadedVisitor.getVisitor().finish(visitorContext);
+                loadedVisitor.getVisitor().finish(javaVisitorContext);
             } catch (Throwable e) {
                 error("Error finalizing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage());
             }
