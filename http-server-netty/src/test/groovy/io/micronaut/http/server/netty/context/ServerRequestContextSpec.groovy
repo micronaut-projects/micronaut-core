@@ -43,12 +43,12 @@ class ServerRequestContextSpec extends Specification {
 
         where:
         method          | uri
+        "handlerError"  | '/test-context/handler-error'
         "method"        | '/test-context/method'
         "rxjava"        | '/test-context/rxjava'
         "reactor"       | '/test-context/reactor'
         "thread"        | '/test-context/thread'
         "error"         | '/test-context/error'
-        "handlerError"  | '/test-context/handler-error'
     }
 
     @Client('/test-context')
@@ -90,8 +90,7 @@ class ServerRequestContextSpec extends Specification {
         @Get("/rxjava")
         Single<String> rxjava() {
             Single.fromCallable({ ->
-                def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request")
-                }
+                def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request") }
                 request.uri
             }).subscribeOn(Schedulers.computation())
         }
@@ -99,8 +98,7 @@ class ServerRequestContextSpec extends Specification {
         @Get("/reactor")
         Mono<String> reactor() {
             Mono.fromCallable({ ->
-                def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request")
-                }
+                def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request") }
                 request.uri
             }).subscribeOn(reactor.core.scheduler.Schedulers.elastic())
         }
@@ -109,8 +107,7 @@ class ServerRequestContextSpec extends Specification {
         String thread() {
             CompletableFuture future = new CompletableFuture()
             executorService.submit({ ->
-                def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request")
-                }
+                def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request") }
                 future.complete request.uri
             })
 
@@ -131,8 +128,7 @@ class ServerRequestContextSpec extends Specification {
         HttpResponse<String> errorHandler() {
             CompletableFuture future = new CompletableFuture()
             executorService.submit({ ->
-                def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request")
-                }
+                def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request") }
                 future.complete HttpResponse.ok(request.uri)
             })
 
@@ -150,8 +146,7 @@ class ServerRequestContextSpec extends Specification {
         HttpResponse<String> handle(HttpRequest r, TestExceptionHandlerException exception) {
             CompletableFuture future = new CompletableFuture()
             executorService.submit({ ->
-                def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request")
-                }
+                def request = ServerRequestContext.currentRequest().orElseThrow { -> new RuntimeException("no request") }
                 future.complete HttpResponse.ok(request.uri).contentType(MediaType.TEXT_PLAIN_TYPE)
             })
 
