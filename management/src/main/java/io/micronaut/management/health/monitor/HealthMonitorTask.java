@@ -31,6 +31,7 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.Arrays;
 import java.util.List;
@@ -51,15 +52,24 @@ public class HealthMonitorTask {
     private static final Logger LOG = LoggerFactory.getLogger(HealthMonitorTask.class);
 
     private final CurrentHealthStatus currentHealthStatus;
-    private final HealthIndicator[] healthIndicators;
+    private final List<HealthIndicator> healthIndicators;
+
+    /**
+     * @param currentHealthStatus The current health status
+     * @param healthIndicators    Health indicators
+     */
+    @Inject
+    public HealthMonitorTask(CurrentHealthStatus currentHealthStatus, List<HealthIndicator> healthIndicators) {
+        this.currentHealthStatus = currentHealthStatus;
+        this.healthIndicators = healthIndicators;
+    }
 
     /**
      * @param currentHealthStatus The current health status
      * @param healthIndicators    Health indicators
      */
     public HealthMonitorTask(CurrentHealthStatus currentHealthStatus, HealthIndicator... healthIndicators) {
-        this.currentHealthStatus = currentHealthStatus;
-        this.healthIndicators = healthIndicators;
+        this(currentHealthStatus, Arrays.asList(healthIndicators));
     }
 
     /**
@@ -72,8 +82,8 @@ public class HealthMonitorTask {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Starting health monitor check");
         }
-        List<Publisher<HealthResult>> healthResults = Arrays
-            .stream(healthIndicators)
+        List<Publisher<HealthResult>> healthResults = healthIndicators
+            .stream()
             .map(HealthIndicator::getResult)
             .collect(Collectors.toList());
 
