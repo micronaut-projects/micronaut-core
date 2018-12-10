@@ -13,7 +13,6 @@ endpoints:
     info:
         enabled: Boolean
         sensitive: Boolean
-        id: String
 ----
 
 == Customization

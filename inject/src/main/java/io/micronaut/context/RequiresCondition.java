@@ -255,7 +255,7 @@ public class RequiresCondition implements Condition {
                     ApplicationContext applicationContext = (ApplicationContext) beanContext;
                     Environment environment = applicationContext.getEnvironment();
                     Set<String> activeNames = environment.getActiveNames();
-                    boolean result = Arrays.stream(env).anyMatch(s -> !activeNames.contains(s));
+                    boolean result = Arrays.stream(env).noneMatch(activeNames::contains);
                     if (!result) {
                         context.fail("Disallowed environments [" + ArrayUtils.toString(env) + "] are active: " + activeNames);
                     }

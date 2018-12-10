@@ -46,11 +46,13 @@ import java.util.Optional;
 @Factory
 public class EmbeddedRedisServer implements BeanCreatedEventListener<AbstractRedisConfiguration>, Closeable {
 
+    private static final String DEFAULT_MAXMEMORY_SETTING = "maxmemory 256M";
     private final Configuration embeddedConfiguration;
     private RedisServer redisServer;
 
     /**
      * Constructor.
+     *
      * @param embeddedConfiguration embeddedConfiguration
      */
     public EmbeddedRedisServer(Configuration embeddedConfiguration) {
@@ -72,6 +74,7 @@ public class EmbeddedRedisServer implements BeanCreatedEventListener<AbstractRed
         if (StringUtils.isNotEmpty(host) && host.equals("localhost") && SocketUtils.isTcpPortAvailable(port)) {
             RedisServerBuilder builder = embeddedConfiguration.builder;
             builder.port(port);
+            builder.setting(DEFAULT_MAXMEMORY_SETTING);
             redisServer = builder.build();
             redisServer.start();
 
@@ -94,7 +97,7 @@ public class EmbeddedRedisServer implements BeanCreatedEventListener<AbstractRed
     @Requires(classes = RedisServerBuilder.class)
     public static class Configuration {
         @ConfigurationBuilder(
-            prefixes = ""
+                prefixes = ""
         )
         RedisServerBuilder builder = new RedisServerBuilder().port(SocketUtils.findAvailableTcpPort());
     }
