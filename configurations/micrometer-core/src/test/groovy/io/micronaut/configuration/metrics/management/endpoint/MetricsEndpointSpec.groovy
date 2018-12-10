@@ -9,6 +9,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.IgnoreIf
 import spock.lang.Specification
 import spock.lang.Unroll
 
@@ -34,9 +35,9 @@ class MetricsEndpointSpec extends Specification {
     void "test metrics endpoint disabled"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'micronaut.http.client.read-timeout':'5m',
-                'endpoints.metrics.sensitive': false,
-                (MICRONAUT_METRICS_ENABLED)  : false
+                'micronaut.http.client.read-timeout': '5m',
+                'endpoints.metrics.sensitive'       : false,
+                (MICRONAUT_METRICS_ENABLED)         : false
         ])
 
         when:
@@ -374,10 +375,38 @@ class MetricsEndpointSpec extends Specification {
         embeddedServer.close()
 
         where:
-        name << ["system.load.average.1m",
-                 "system.cpu.usage",
-                 "system.cpu.count",
-                 "process.cpu.usage"]
+        name << [
+                "system.cpu.usage",
+                "system.cpu.count",
+                "process.cpu.usage"]
+    }
+
+    @Unroll
+    @IgnoreIf({ os.windows })
+    void "test metrics endpoint get processor details unix-specific #name success"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'endpoints.metrics.sensitive'                : false,
+                (MICRONAUT_METRICS_ENABLED)                  : true,
+                "micronaut.metrics.binders.processor.enabled": true
+        ])
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        when:
+        def response = rxClient.exchange("/metrics/$name", Map).blockingFirst()
+        Map result = response.body() as Map
+
+        then:
+        result
+
+        cleanup:
+        rxClient.close()
+        embeddedServer.close()
+
+        where:
+        name << [
+                "system.load.average.1m"]
     }
 
     @Unroll
@@ -409,6 +438,7 @@ class MetricsEndpointSpec extends Specification {
     }
 
     @Unroll
+    @IgnoreIf({ os.windows })
     void "test metrics endpoint get file details #name success"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
