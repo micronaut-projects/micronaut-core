@@ -93,6 +93,7 @@ import io.netty.handler.timeout.IdleStateEvent;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
 import io.reactivex.functions.LongConsumer;
+import io.reactivex.internal.operators.flowable.FlowableReplay;
 import io.reactivex.schedulers.Schedulers;
 import io.reactivex.subjects.ReplaySubject;
 import org.reactivestreams.Publisher;
@@ -107,7 +108,6 @@ import java.io.RandomAccessFile;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.channels.FileChannel;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -615,11 +615,8 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             RouteMatch<?> routeMatch = finalRoute;
             AtomicBoolean executed = new AtomicBoolean(false);
             AtomicLong pressureRequested = new AtomicLong(0);
-            ConcurrentHashMap<Integer, Long> partPositions = new ConcurrentHashMap<>();
-            ConcurrentHashMap<Integer, FileChannel> partChannels = new ConcurrentHashMap<>();
             ConcurrentHashMap<String, ReplaySubject> subjects = new ConcurrentHashMap<>();
-            ConcurrentHashMap<Integer, ReplaySubject> childSubjects = new ConcurrentHashMap<>();
-            ConcurrentHashMap<Integer, StreamingFileUpload> streamingUploads = new ConcurrentHashMap<>();
+            ConcurrentHashMap<Integer, HttpDataReference> dataReferences = new ConcurrentHashMap<>();
             ConversionService conversionService = ConversionService.SHARED;
             Subscription s;
             LongConsumer onRequest = (num) -> pressureRequested.updateAndGet((p) -> {
@@ -632,6 +629,19 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 }
             });
 
+            Flowable buildFlowable(ReplaySubject subject, Integer dataKey, boolean controlsFlow) {
+                Flowable flowable = FlowableReplay.createFrom(subject.toFlowable(BackpressureStrategy.BUFFER)).refCount();
+                if (controlsFlow) {
+                    flowable = flowable.doOnRequest(onRequest);
+                }
+                return flowable
+                        .doAfterTerminate(() -> {
+                            if (controlsFlow) {
+                                HttpDataReference dataReference = dataReferences.get(dataKey);
+                                dataReference.destroy();
+                            }
+                        });
+            }
 
             @Override
             protected void doOnSubscribe(Subscription subscription) {
@@ -641,7 +651,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             @Override
             protected void doOnNext(Object message) {
-
                 boolean executed = this.executed.get();
                 if (message instanceof ByteBufHolder) {
                     if (message instanceof HttpData) {
@@ -658,9 +667,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             Argument<?> argument = requiredInput.get();
                             Supplier<Object> value;
                             boolean isPublisher = Publishers.isConvertibleToPublisher(argument.getType());
+                            boolean chunkedProcessing = false;
 
                             if (isPublisher) {
                                 Integer dataKey = System.identityHashCode(data);
+                                HttpDataReference dataReference = dataReferences.computeIfAbsent(dataKey, (key) -> {
+                                    return new HttpDataReference(data);
+                                });
                                 Argument typeVariable;
 
                                 if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
@@ -672,7 +685,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                                 ReplaySubject namedSubject = subjects.computeIfAbsent(name, (key) -> ReplaySubject.create());
 
-                                boolean partialUpload = PartData.class.equals(typeVariableType) ||
+                                chunkedProcessing = PartData.class.equals(typeVariableType) ||
                                         Publishers.isConvertibleToPublisher(typeVariableType) ||
                                         ClassUtils.isJavaLangType(typeVariableType);
 
@@ -683,29 +696,28 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     } else {
                                         typeVariable = typeVariable.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
                                     }
-                                    childSubjects.computeIfAbsent(dataKey, (key) -> {
-                                        ReplaySubject childSubject = ReplaySubject.create();
-                                        Flowable flowable = childSubject.toFlowable(BackpressureStrategy.BUFFER)
-                                                .doOnRequest(onRequest);
-                                        if (streamingFileUpload && data instanceof FileUpload) {
-                                            namedSubject.onNext(new NettyStreamingFileUpload(
-                                                (FileUpload) data,
-                                                serverConfiguration.getMultipart(),
-                                                ioExecutor,
-                                                flowable));
-                                        } else {
-                                            namedSubject.onNext(flowable);
+                                    dataReference.subject.getAndUpdate(subject -> {
+                                        if (subject == null) {
+                                            ReplaySubject childSubject = ReplaySubject.create();
+                                            Flowable flowable = buildFlowable(childSubject, dataKey, true);
+                                            if (streamingFileUpload && data instanceof FileUpload) {
+                                                namedSubject.onNext(new NettyStreamingFileUpload(
+                                                        (FileUpload) data,
+                                                        serverConfiguration.getMultipart(),
+                                                        ioExecutor,
+                                                        flowable));
+                                            } else {
+                                                namedSubject.onNext(flowable);
+                                            }
+
+                                            return childSubject;
                                         }
-
-                                        return childSubject;
+                                        return subject;
                                     });
+
                                 }
 
-                                ReplaySubject subject = childSubjects.getOrDefault(dataKey, namedSubject);
-
-                                if (data.refCnt() <= 1) {
-                                    data.retain();
-                                }
+                                ReplaySubject subject = Optional.ofNullable(dataReference.subject.get()).orElse(namedSubject);
 
                                 Object part = data;
 
@@ -713,53 +725,52 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     FileUpload fileUpload = (FileUpload) data;
 
                                     if (!fileUpload.isInMemory()) {
-                                        partChannels.computeIfAbsent(dataKey, (key) -> {
-                                            try {
-                                                return new RandomAccessFile(fileUpload.getFile(), "r").getChannel();
-                                            } catch (IOException e) {
-                                                return null;
+                                        dataReference.fileChannel.getAndUpdate(channel -> {
+                                            if (channel == null) {
+                                                try {
+                                                    return new RandomAccessFile(fileUpload.getFile(), "r").getChannel();
+                                                } catch (IOException e) {
+                                                    subject.onError(e);
+                                                    s.cancel();
+                                                }
                                             }
+                                            return channel;
                                         });
                                     }
 
-                                    if (partialUpload) {
-                                        partPositions.putIfAbsent(dataKey, 0L);
-                                        long start = partPositions.get(dataKey);
-                                        int length = new Long(fileUpload.length() - start).intValue();
-                                        partPositions.put(dataKey, fileUpload.length());
-
-                                        part = new NettyPartData(fileUpload, start, length, partChannels.get(dataKey));
+                                    if (chunkedProcessing) {
+                                        HttpDataReference.Component component = dataReference.addComponent();
+                                        part = new NettyPartData(dataReference, component);
                                     }
 
                                     if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
-                                        streamingUploads.computeIfAbsent(dataKey, (key) ->
-                                            new NettyStreamingFileUpload(
-                                                fileUpload,
-                                                serverConfiguration.getMultipart(),
-                                                ioExecutor,
-                                                subject.toFlowable(BackpressureStrategy.BUFFER).doOnRequest(onRequest)));
+                                        dataReference.upload.getAndUpdate(upload -> {
+                                            if (upload == null) {
+                                                return new NettyStreamingFileUpload(
+                                                        fileUpload,
+                                                        serverConfiguration.getMultipart(),
+                                                        ioExecutor,
+                                                        buildFlowable(subject, dataKey, true));
+                                            }
+                                            return upload;
+                                        });
                                     }
                                 }
 
                                 Optional<?> converted = conversionService.convert(part, typeVariable);
 
-                                if (converted.isPresent()) {
-                                    subject.onNext(converted.get());
-                                }
+                                converted.ifPresent(subject::onNext);
 
-                                if (data.isCompleted() && partialUpload) {
+                                if (data.isCompleted() && chunkedProcessing) {
                                     subject.onComplete();
                                 }
 
                                 value = () -> {
-                                    if (streamingUploads.containsKey(dataKey)) {
-                                        return streamingUploads.get(dataKey);
+                                    StreamingFileUpload upload = dataReference.upload.get();
+                                    if (upload != null) {
+                                        return upload;
                                     } else {
-                                        Flowable namedFlowable = namedSubject.toFlowable(BackpressureStrategy.BUFFER);
-                                        if (!childSubjects.containsKey(dataKey)) {
-                                            namedFlowable = namedFlowable.doOnRequest(onRequest);
-                                        }
-                                        return namedFlowable;
+                                        return buildFlowable(namedSubject, dataKey, dataReference.subject.get() == null);
                                     }
                                 };
 
@@ -773,14 +784,23 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 };
                             }
 
+
                             if (!executed) {
                                 String argumentName = argument.getName();
                                 if (!routeMatch.isSatisfied(argumentName)) {
                                     routeMatch = routeMatch.fulfill(Collections.singletonMap(argumentName, value.get()));
                                 }
-                                if (isPublisher) {
+                                if (isPublisher && chunkedProcessing) {
+                                    //accounting for the previous request
                                     pressureRequested.incrementAndGet();
                                 }
+                                if (routeMatch.isExecutable() || message instanceof LastHttpContent) {
+                                    executeRoute();
+                                    executed = true;
+                                }
+                            }
+
+                            if (!executed || !chunkedProcessing) {
                                 s.request(1);
                             }
 
@@ -791,37 +811,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                     } else {
                         request.addContent((ByteBufHolder) message);
-                        if (!routeMatch.isExecutable() && message instanceof LastHttpContent) {
-                            Optional<Argument<?>> bodyArgument = routeMatch.getBodyArgument();
-                            if (bodyArgument.isPresent()) {
-                                Argument<?> argument = bodyArgument.get();
-                                String bodyArgumentName = argument.getName();
-                                if (routeMatch.isRequiredInput(bodyArgumentName)) {
-                                    Optional body = request.getBody();
-                                    if (body.isPresent()) {
-                                        routeMatch = routeMatch.fulfill(
-                                            Collections.singletonMap(
-                                                bodyArgumentName,
-                                                body.get()
-                                            )
-                                        );
-                                    }
-                                }
-                            }
-                        } else {
-                            s.request(1);
-                        }
+                        s.request(1);
                     }
                 } else {
                     request.setBody(message);
                     s.request(1);
-                }
-
-                if (!executed) {
-                    if (routeMatch.isExecutable() || message instanceof LastHttpContent) {
-                        // we have enough data to satisfy the route, continue
-                        executeRoute();
-                    }
                 }
             }
 
@@ -838,23 +832,46 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             @Override
             protected void doOnComplete() {
-                subjects.forEachValue(0, (subject) -> {
+                for (ReplaySubject subject: subjects.values()) {
                     if (!subject.hasComplete()) {
                         subject.onComplete();
                     }
-                });
+                }
                 executeRoute();
             }
 
             private void executeRoute() {
                 if (executed.compareAndSet(false, true)) {
                     try {
+                        if (!routeMatch.isExecutable()) {
+                            routeMatch = attemptBodyBind();
+                        }
                         routeMatch = prepareRouteForExecution(routeMatch, request);
                         routeMatch.execute();
                     } catch (Exception e) {
                         context.pipeline().fireExceptionCaught(e);
                     }
                 }
+            }
+
+            private RouteMatch<? extends Object> attemptBodyBind() {
+                Optional<Argument<?>> bodyArgument = routeMatch.getBodyArgument();
+                if (bodyArgument.isPresent()) {
+                    Argument<?> argument = bodyArgument.get();
+                    String bodyArgumentName = argument.getName();
+                    if (routeMatch.isRequiredInput(bodyArgumentName)) {
+                        Optional body = request.getBody();
+                        if (body.isPresent()) {
+                            return routeMatch.fulfill(
+                                    Collections.singletonMap(
+                                            bodyArgumentName,
+                                            body.get()
+                                    )
+                            );
+                        }
+                    }
+                }
+                return routeMatch;
             }
         };
     }

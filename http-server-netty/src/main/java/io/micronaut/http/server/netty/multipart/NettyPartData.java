@@ -19,16 +19,12 @@ package io.micronaut.http.server.netty.multipart;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.PartData;
+import io.micronaut.http.server.netty.HttpDataReference;
 import io.netty.buffer.*;
-import io.netty.handler.codec.http.multipart.FileUpload;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.Optional;
 
 /**
@@ -40,26 +36,16 @@ import java.util.Optional;
 @Internal
 public class NettyPartData implements PartData {
 
-    private static final Logger LOG = LoggerFactory.getLogger(NettyPartData.class);
-
-    private final FileUpload fileUpload;
-    private final long start;
-    private final int length;
-    private final FileChannel channel;
+    private final HttpDataReference httpData;
+    private final HttpDataReference.Component component;
 
     /**
-     * @param fileUpload The file upload
-     * @param start      The index where to start reading bytes
-     * @param length     The number of bytes to read
+     * @param httpData   The data reference
+     * @param component  The component reference
      */
-    public NettyPartData(FileUpload fileUpload, long start, int length, @Nullable FileChannel channel) {
-        this.fileUpload = fileUpload;
-        this.start = start;
-        this.length = length;
-        this.channel = channel;
-        if (!fileUpload.isInMemory() && channel == null) {
-            throw new IllegalArgumentException("Creating a NettyPartData with a disk file upload without a channel is not allowed.");
-        }
+    public NettyPartData(HttpDataReference httpData, HttpDataReference.Component component) {
+        this.httpData = httpData;
+        this.component = component;
     }
 
     /**
@@ -107,7 +93,7 @@ public class NettyPartData implements PartData {
      */
     @Override
     public Optional<MediaType> getContentType() {
-        return Optional.of(MediaType.of(fileUpload.getContentType()));
+        return httpData.getContentType();
     }
 
     /**
@@ -115,19 +101,6 @@ public class NettyPartData implements PartData {
      * @throws IOException If an error occurs retrieving the buffer
      */
     public ByteBuf getByteBuf() throws IOException {
-        if (fileUpload.isInMemory()) {
-            return fileUpload.getByteBuf().retainedSlice((int)start, length);
-        } else {
-            byte[] data = new byte[length];
-            channel.read(ByteBuffer.wrap(data), start);
-            try {
-                if (start + length == fileUpload.definedLength()) {
-                    channel.close();
-                }
-            } catch (IOException e) {
-                LOG.warn("Error closing file channel for file upload", e);
-            }
-            return Unpooled.wrappedBuffer(data);
-        }
+        return component.getByteBuf();
     }
 }

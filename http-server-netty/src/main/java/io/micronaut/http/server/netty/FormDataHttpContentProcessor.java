@@ -24,8 +24,12 @@ import io.netty.buffer.ByteBufHolder;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.handler.codec.http.multipart.*;
 import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
 import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * <p>Decodes {@link MediaType#MULTIPART_FORM_DATA} in a non-blocking manner.</p>
@@ -68,49 +72,77 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
         return enabled;
     }
 
+    private AtomicLong extraMessages = new AtomicLong(0);
+
+    @Override
+    protected void doOnSubscribe(Subscription subscription, Subscriber<? super HttpData> subscriber) {
+        subscriber.onSubscribe(new Subscription() {
+
+            @Override
+            public void request(long n) {
+                extraMessages.updateAndGet((p) -> {
+                    long newVal = p - n;
+                    if (newVal < 0) {
+                        subscription.request(n - p);
+                        return 0;
+                    } else {
+                        return newVal;
+                    }
+                });
+            }
+
+            @Override
+            public void cancel() {
+                subscription.cancel();
+            }
+        });
+    }
+
     @Override
     protected void onData(ByteBufHolder message) {
         Subscriber<? super HttpData> subscriber = getSubscriber();
 
         if (message instanceof HttpContent) {
             HttpContent httpContent = (HttpContent) message;
+            List<InterfaceHttpData> messages = new ArrayList<>(1);
+
             try {
                 HttpPostRequestDecoder postRequestDecoder = this.decoder;
                 postRequestDecoder.offer(httpContent);
+
                 while (postRequestDecoder.hasNext()) {
                     InterfaceHttpData data = postRequestDecoder.next();
-                    try {
-                        switch (data.getHttpDataType()) {
-                            case Attribute:
-                                Attribute attribute = (Attribute) data;
-                                subscriber.onNext(attribute);
-                                break;
-                            case FileUpload:
-                                FileUpload fileUpload = (FileUpload) data;
-                                if (fileUpload.isCompleted()) {
-                                    subscriber.onNext(fileUpload);
-                                }
-                                break;
-                            default:
-                                // no-op
-                        }
-                    } finally {
-                        //mixed and disk uploads get cleaned up in `doAfterComplete`, however memory does not
-                        if (!(data instanceof FileUpload) || (data instanceof MemoryFileUpload)) {
-                            data.release();
-                        }
+                    switch (data.getHttpDataType()) {
+                        case Attribute:
+                            Attribute attribute = (Attribute) data;
+                            messages.add(attribute);
+                            break;
+                        case FileUpload:
+                            FileUpload fileUpload = (FileUpload) data;
+                            if (fileUpload.isCompleted()) {
+                                messages.add(fileUpload);
+                            }
+                            break;
+                        default:
+                            // no-op
                     }
                 }
 
                 InterfaceHttpData currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
                 if (currentPartialHttpData instanceof HttpData) {
-                    subscriber.onNext((HttpData) currentPartialHttpData);
+                    messages.add(currentPartialHttpData);
                 }
+
             } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {
                 // ok, ignore
             } catch (Throwable e) {
                 onError(e);
             } finally {
+                int size = messages.size();
+                extraMessages.updateAndGet((p) -> p + size - 1);
+
+                messages.stream().map(HttpData.class::cast).forEach(subscriber::onNext);
+
                 httpContent.release();
             }
         } else {

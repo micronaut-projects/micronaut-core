@@ -114,8 +114,6 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
                 return destination != null && fileUpload.renameTo(destination);
             } catch (IOException e) {
                 throw new MultipartException("Error transferring file: " + fileUpload.getName(), e);
-            } finally {
-                fileUpload.release();
             }
         };
 

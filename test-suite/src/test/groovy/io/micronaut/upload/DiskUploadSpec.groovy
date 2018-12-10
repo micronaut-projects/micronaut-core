@@ -18,7 +18,7 @@ class DiskUploadSpec extends AbstractMicronautSpec {
         given:
         def data = '{"title":"Test"}'
         MultipartBody requestBody = MultipartBody.builder()
-                .addPart("title", "bar")
+                .addPart("title", "bar-disk")
                 .addPart("data", "data.json", MediaType.APPLICATION_JSON_TYPE, data.bytes)
                 .build()
 
@@ -31,10 +31,14 @@ class DiskUploadSpec extends AbstractMicronautSpec {
         ))
         HttpResponse<String> response = flowable.blockingFirst()
         def result = response.getBody().get()
+        File file = new File(uploadDir, "bar-disk.json")
+        file.deleteOnExit()
 
         then:
         response.code() == HttpStatus.OK.code
         result == "Uploaded ${data.size()}"
+        file.exists()
+        file.length() == data.size()
     }
 
     void "test upload big FileUpload object via transferTo"() {
