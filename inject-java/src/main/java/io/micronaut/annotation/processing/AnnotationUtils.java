@@ -18,9 +18,13 @@ package io.micronaut.annotation.processing;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
+import io.micronaut.inject.visitor.VisitorContext;
 
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
@@ -50,22 +54,49 @@ public class AnnotationUtils {
     private final Types types;
     private final ModelUtils modelUtils;
     private final Filer filer;
+    private final MutableConvertibleValues<Object> visitorAttributes;
 
     /**
      * Default constructor.
      *
-     * @param elementUtils The elements
-     * @param messager     The messager
-     * @param types        The types
-     * @param modelUtils   The model utils
-     * @param filer        The filer
+     * @param elementUtils      The elements
+     * @param messager          The messager
+     * @param types             The types
+     * @param modelUtils        The model utils
+     * @param filer             The filer
+     * @param visitorAttributes The visitor attributes
      */
-    protected AnnotationUtils(Elements elementUtils, Messager messager, Types types, ModelUtils modelUtils, Filer filer) {
+    protected AnnotationUtils(
+            Elements elementUtils,
+            Messager messager,
+            Types types,
+            ModelUtils modelUtils,
+            Filer filer,
+            MutableConvertibleValues<Object> visitorAttributes) {
         this.elementUtils = elementUtils;
         this.messager = messager;
         this.types = types;
         this.modelUtils = modelUtils;
         this.filer = filer;
+        this.visitorAttributes = visitorAttributes;
+    }
+
+    /**
+     * Default constructor.
+     *
+     * @param elementUtils      The elements
+     * @param messager          The messager
+     * @param types             The types
+     * @param modelUtils        The model utils
+     * @param filer             The filer
+     */
+    protected AnnotationUtils(
+            Elements elementUtils,
+            Messager messager,
+            Types types,
+            ModelUtils modelUtils,
+            Filer filer) {
+        this(elementUtils, messager, types, modelUtils, filer, new MutableConvertibleValuesMap<>());
     }
 
     /**
@@ -158,6 +189,7 @@ public class AnnotationUtils {
 
     /**
      * Creates a new annotation builder.
+     *
      * @return The builder
      */
     public JavaAnnotationMetadataBuilder newAnnotationBuilder() {
@@ -167,7 +199,25 @@ public class AnnotationUtils {
                 this,
                 types,
                 modelUtils,
-                filer);
+                filer
+        );
+    }
+
+    /**
+     * Creates a new {@link JavaVisitorContext}.
+     *
+     * @return The visitor context
+     */
+    public JavaVisitorContext newVisitorContext() {
+        return new JavaVisitorContext(
+                messager,
+                elementUtils,
+                this,
+                types,
+                modelUtils,
+                filer,
+                visitorAttributes
+        );
     }
 
     /**
