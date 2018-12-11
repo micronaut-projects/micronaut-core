@@ -28,7 +28,7 @@ import java.util.Optional;
  * <p>See https://tools.ietf.org/html/draft-kelly-json-hal-08#section-5</p>
  *
  * @author Graeme Rocher
- * @since 1.0
+ * @since 1.1
  */
 public interface Link {
 

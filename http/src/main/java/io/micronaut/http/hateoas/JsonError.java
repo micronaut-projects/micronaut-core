@@ -27,7 +27,7 @@ import java.util.Optional;
  * A class that can be used to represent JSON errors that complies to Vnd.Error without the content type requirements.
  *
  * @author Graeme Rocher
- * @since 1.0
+ * @since 1.1
  */
 @Produces(MediaType.APPLICATION_JSON)
 public class JsonError extends AbstractResource<JsonError> {

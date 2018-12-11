@@ -37,7 +37,7 @@ import java.util.Optional;
  *
  * @param <Impl> An Abstract resource implementation
  * @author Graeme Rocher
- * @since 1.0
+ * @since 1.1
  */
 @Produces(MediaType.APPLICATION_HAL_JSON)
 public abstract class AbstractResource<Impl extends AbstractResource> implements Resource {

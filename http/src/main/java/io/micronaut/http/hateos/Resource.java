@@ -14,32 +14,15 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.hateoas;
-
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Produces;
+package io.micronaut.http.hateos;
 
 /**
- * A type that can be used to represent JSON errors that returns a content type of Vnd.Error.
+ * Deprecated. Please use io.micronaut.http.hateoas.Resource
  *
- * @author graemerocher
- * @since 1.1
+ * @author Graeme Rocher
+ * @since 1.0
  */
-@Produces(MediaType.APPLICATION_VND_ERROR)
-public class VndError extends JsonError {
+@Deprecated
+public interface Resource extends io.micronaut.http.hateoas.Resource {
 
-    /**
-     * @param message The message
-     */
-    public VndError(String message) {
-        super(message);
-    }
-
-    /**
-     * Used by Jackson.
-     */
-    @Internal
-    VndError() {
-    }
 }

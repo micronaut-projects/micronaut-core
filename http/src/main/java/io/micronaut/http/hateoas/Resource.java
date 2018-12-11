@@ -22,7 +22,7 @@ import io.micronaut.core.value.OptionalMultiValues;
  * Represents a REST resource in a hateoas architecture.
  *
  * @author Graeme Rocher
- * @since 1.0
+ * @since 1.1
  */
 public interface Resource {
 
