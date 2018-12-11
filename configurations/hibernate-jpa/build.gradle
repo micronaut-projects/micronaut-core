@@ -1,5 +1,7 @@
 dependencies {
     compile 'org.hibernate:hibernate-core:5.3.6.Final'
+    // included for Java 11
+    runtime 'javax.xml.bind:jaxb-api:2.3.1'
 
     compile project(":aop")
     compile project(":jdbc")
