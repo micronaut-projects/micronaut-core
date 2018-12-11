@@ -29,6 +29,7 @@ import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.naming.Named;
+import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
@@ -36,6 +37,8 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -156,6 +159,12 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     @Override
     public <T> Optional<T> getProperty(String name, ArgumentConversionContext<T> conversionContext) {
         return getEnvironment().getProperty(name, conversionContext);
+    }
+
+    @Nonnull
+    @Override
+    public Map<String, Object> getProperties(@Nullable String name, @Nullable StringConvention keyFormat) {
+        return getEnvironment().getProperties(name, keyFormat);
     }
 
     @Override

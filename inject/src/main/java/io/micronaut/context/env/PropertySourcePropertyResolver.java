@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Property;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.io.socket.SocketUtils;
@@ -33,6 +34,7 @@ import io.micronaut.core.value.PropertyResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -161,6 +163,26 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 }
             }
         }
+    }
+
+    @Override
+    public @Nonnull Map<String, Object> getProperties(String name, StringConvention keyFormat) {
+        if (keyFormat == null) {
+            keyFormat = StringConvention.RAW;
+        }
+        if (!StringUtils.isEmpty(name)) {
+            Map<String, Object> entries = resolveEntriesForKey(name, false);
+            if (entries != null) {
+                return resolveSubMap(
+                        name,
+                        entries,
+                        ConversionContext.of(Map.class),
+                        keyFormat,
+                        MapFormat.MapTransformation.FLAT
+                );
+            }
+        }
+        return Collections.emptyMap();
     }
 
     @Override
@@ -330,7 +352,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
      */
     protected Map<String, Object> resolveSubMap(String name, Map<String, Object> entries, ArgumentConversionContext<?> conversionContext) {
         // special handling for maps for resolving sub keys
-        Map<String, Object> subMap = new LinkedHashMap<>(entries.size());
         AnnotationMetadata annotationMetadata = conversionContext.getAnnotationMetadata();
         StringConvention keyConvention = annotationMetadata.getValue(MapFormat.class, "keyFormat", StringConvention.class).orElse(StringConvention.RAW);
         MapFormat.MapTransformation transformation = annotationMetadata.getValue(
@@ -338,7 +359,28 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 "transformation",
                 MapFormat.MapTransformation.class)
                 .orElse(conversionContext.isAnnotationPresent(Property.class) ? MapFormat.MapTransformation.FLAT : MapFormat.MapTransformation.NESTED);
+        return resolveSubMap(name, entries, conversionContext, keyConvention, transformation);
+    }
+
+    /**
+     * Resolves a submap for the given name and parameters.
+     *
+     * @param name The name
+     * @param entries The entries
+     * @param conversionContext The conversion context
+     * @param keyConvention The key convention to use
+     * @param transformation The map transformation to apply
+     * @return The resulting map
+     */
+    @Nonnull
+    protected Map<String, Object> resolveSubMap(
+            String name,
+            Map<String, Object> entries,
+            ArgumentConversionContext<?> conversionContext,
+            StringConvention keyConvention,
+            MapFormat.MapTransformation transformation) {
         final Argument<?> valueType = conversionContext.getTypeVariable("V").orElse(Argument.OBJECT_ARGUMENT);
+        Map<String, Object> subMap = new LinkedHashMap<>(entries.size());
 
         String prefix = name + '.';
         for (Map.Entry<String, Object> entry : entries.entrySet()) {
