@@ -130,6 +130,28 @@ class GormConfigSpec extends Specification {
         then:
         count == 1
 
+        when:
+        Book book = transactionService.withTransaction {
+            Book.first()
+        }
+
+        then:
+        book
+        book.dateCreated
+        book.title == 'the stand'
+
+        when:
+        Book updatedBook = transactionService.withTransaction {
+            def b = Book.first()
+            b.title = 'the shining'
+            b.save(flush:true)
+        }
+
+        then:
+        updatedBook
+        updatedBook.dateCreated
+        updatedBook.dateCreated < updatedBook.lastUpdated
+
         cleanup:
         applicationContext.stop()
     }
@@ -138,6 +160,8 @@ class GormConfigSpec extends Specification {
 @Entity
 class Book {
     String title
+    Date dateCreated
+    Date lastUpdated
 
     static constraints = {
         title blank:false
