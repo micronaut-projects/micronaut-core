@@ -25,7 +25,7 @@ import java.util.Optional;
  * Default implementation of {@link Link}.
  *
  * @author Graeme Rocher
- * @since 1.0
+ * @since 1.1
  */
 class DefaultLink implements Link, Link.Builder {
 
