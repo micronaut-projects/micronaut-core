@@ -16,6 +16,7 @@
 
 package io.micronaut.ast.groovy
 
+import groovy.transform.CompileDynamic
 import io.micronaut.aop.Adapter
 import io.micronaut.ast.groovy.utils.AstClassUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
@@ -1284,6 +1285,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
+        @CompileDynamic
         private void visitAdaptedMethod(MethodNode method, AnnotationMetadata methodAnnotationMetadata) {
             Optional<ClassNode> adaptedType = methodAnnotationMetadata.getValue(Adapter.class, String.class).flatMap({ String s ->
                 ClassNode cn = sourceUnit.AST.classes.find { ClassNode cn -> cn.name == s }
