@@ -41,6 +41,9 @@ public class ByteBufDelegate extends ByteBuf {
 
     private final ByteBuf byteBuf;
 
+    /**
+     * @param byteBuf The buffer to delegate to
+     */
     public ByteBufDelegate(ByteBuf byteBuf) {
         this.byteBuf = byteBuf;
     }
@@ -77,11 +80,13 @@ public class ByteBufDelegate extends ByteBuf {
     }
 
     @Override
+    @Deprecated
     public final ByteOrder order() {
         return byteBuf.order();
     }
 
     @Override
+    @Deprecated
     public ByteBuf order(ByteOrder endianness) {
         return byteBuf.order(endianness);
     }

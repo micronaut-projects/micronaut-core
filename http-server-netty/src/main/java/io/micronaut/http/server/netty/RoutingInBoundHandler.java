@@ -104,7 +104,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -724,22 +723,14 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 if (data instanceof FileUpload) {
                                     FileUpload fileUpload = (FileUpload) data;
 
-                                    if (!fileUpload.isInMemory()) {
-                                        dataReference.fileChannel.getAndUpdate(channel -> {
-                                            if (channel == null) {
-                                                try {
-                                                    return new RandomAccessFile(fileUpload.getFile(), "r").getChannel();
-                                                } catch (IOException e) {
-                                                    subject.onError(e);
-                                                    s.cancel();
-                                                }
-                                            }
-                                            return channel;
-                                        });
-                                    }
-
                                     if (chunkedProcessing) {
-                                        HttpDataReference.Component component = dataReference.addComponent();
+                                        HttpDataReference.Component component = dataReference.addComponent((e) -> {
+                                            subject.onError(e);
+                                            s.cancel();
+                                        });
+                                        if (component == null) {
+                                            return;
+                                        }
                                         part = new NettyPartData(dataReference, component);
                                     }
 

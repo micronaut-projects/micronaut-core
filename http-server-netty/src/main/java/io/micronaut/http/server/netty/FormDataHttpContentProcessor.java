@@ -44,6 +44,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
 
     private final HttpPostRequestDecoder decoder;
     private final boolean enabled;
+    private AtomicLong extraMessages = new AtomicLong(0);
 
     /**
      * @param nettyHttpRequest The {@link NettyHttpRequest}
@@ -71,8 +72,6 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
     public boolean isEnabled() {
         return enabled;
     }
-
-    private AtomicLong extraMessages = new AtomicLong(0);
 
     @Override
     protected void doOnSubscribe(Subscription subscription, Subscriber<? super HttpData> subscriber) {
