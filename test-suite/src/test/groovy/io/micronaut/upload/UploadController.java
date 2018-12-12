@@ -38,6 +38,7 @@ import org.reactivestreams.Subscription;
 
 import javax.inject.Singleton;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -258,6 +259,42 @@ public class UploadController {
                 @Override
                 public void onComplete() {
                     singleEmitter.onSuccess(Long.toString(longAdder.longValue()));
+                }
+            });
+        });
+    }
+
+    @Post(value = "/receive-big-attribute", consumes = MediaType.MULTIPART_FORM_DATA, produces = MediaType.TEXT_PLAIN)
+    public Single<HttpResponse> receiveBigAttribute(Publisher<PartData> data) {
+        return Single.create(emitter -> {
+            data.subscribe(new Subscriber<PartData>() {
+                private Subscription s;
+                List<String> datas = new ArrayList<>();
+                @Override
+                public void onSubscribe(Subscription s) {
+                    this.s = s;
+                    s.request(1);
+                }
+
+                @Override
+                public void onNext(PartData data) {
+                    try {
+                        datas.add(new String(data.getBytes(), StandardCharsets.UTF_8));
+                        s.request(1);
+                    } catch (IOException e) {
+                        s.cancel();
+                        emitter.onError(e);
+                    }
+                }
+
+                @Override
+                public void onError(Throwable t) {
+                    emitter.onError(t);
+                }
+
+                @Override
+                public void onComplete() {
+                    emitter.onSuccess(HttpResponse.ok(String.join("", datas)));
                 }
             });
         });
