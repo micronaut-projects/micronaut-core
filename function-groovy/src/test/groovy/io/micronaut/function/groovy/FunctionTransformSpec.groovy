@@ -274,7 +274,7 @@ Test test(Test test) {
 
     void "test run function as REST service"() {
         given:
-        ApplicationContext context = ApplicationContext.run(['math.multiplier':'2'], Environment.TEST)
+        ApplicationContext context = ApplicationContext.run(['math.multiplier':'2', 'micronaut.http.client.read-timeout':'5m'], Environment.TEST)
         EmbeddedServer server = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, server.getURL())
 

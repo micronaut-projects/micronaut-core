@@ -36,6 +36,7 @@ import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.multipart.AbstractMemoryHttpData;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.MemoryAttribute;
 import io.netty.handler.ssl.SslHandler;
@@ -262,7 +263,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     void addContent(ByteBufHolder httpContent) {
-        if (httpContent instanceof MemoryAttribute) {
+        if (httpContent instanceof AbstractMemoryHttpData) {
             Object body = this.body;
             if (body == null) {
                 synchronized (this) { // double check
@@ -274,28 +275,25 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                 }
             }
             if (body instanceof Map) {
-                Attribute attribute = (Attribute) httpContent;
-                try {
-                    String newValue = attribute.getValue();
-                    //noinspection unchecked
-                    ((Map) body).compute(attribute.getName(), (key, oldValue) -> {
-                        if (oldValue == null) {
-                            return newValue;
-                        } else if (oldValue instanceof Collection) {
-                            //noinspection unchecked
-                            ((Collection) oldValue).add(newValue);
-                            return oldValue;
-                        } else {
-                            ArrayList<Object> values = new ArrayList<>(2);
-                            values.add(oldValue);
-                            values.add(newValue);
-                            return values;
-                        }
-                    });
-                } catch (IOException e) {
-                    // ignore
-                }
+                AbstractMemoryHttpData data = (AbstractMemoryHttpData) httpContent;
+                String newValue = data.getString(serverConfiguration.getDefaultCharset());
+                //noinspection unchecked
+                ((Map) body).compute(data.getName(), (key, oldValue) -> {
+                    if (oldValue == null) {
+                        return newValue;
+                    } else if (oldValue instanceof Collection) {
+                        //noinspection unchecked
+                        ((Collection) oldValue).add(newValue);
+                        return oldValue;
+                    } else {
+                        ArrayList<Object> values = new ArrayList<>(2);
+                        values.add(oldValue);
+                        values.add(newValue);
+                        return values;
+                    }
+                });
             }
+            httpContent.release();
         } else {
             receivedContent.add(httpContent);
         }
