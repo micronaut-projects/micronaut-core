@@ -328,6 +328,26 @@ class DiskUploadSpec extends AbstractMicronautSpec {
         response.body() == (val.length).toString()
     }
 
+    void "test receiving a flowable that controls flow with a large attribute"() {
+        def val = ('Big ' + 'xxxx' * 200000)
+        MultipartBody requestBody = MultipartBody.builder()
+                .addPart("data", val)
+                .build()
+
+        when:
+        Flowable<HttpResponse<String>> flowable = Flowable.fromPublisher(client.exchange(
+                HttpRequest.POST("/upload/receive-big-attribute", requestBody)
+                        .contentType(MediaType.MULTIPART_FORM_DATA)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        ))
+        HttpResponse<String> response = flowable.blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body() == val
+    }
+
     Map<String, Object> getConfiguration() {
         super.getConfiguration() << ['micronaut.http.client.read-timeout': 300, 'micronaut.server.multipart.disk': true]
     }

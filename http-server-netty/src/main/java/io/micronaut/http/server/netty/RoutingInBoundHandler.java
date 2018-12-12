@@ -720,32 +720,29 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
                                 Object part = data;
 
-                                if (data instanceof FileUpload) {
-                                    FileUpload fileUpload = (FileUpload) data;
+                                if (chunkedProcessing) {
+                                    HttpDataReference.Component component = dataReference.addComponent((e) -> {
+                                        subject.onError(e);
+                                        s.cancel();
+                                    });
+                                    if (component == null) {
+                                        return;
+                                    }
+                                    part = new NettyPartData(dataReference, component);
+                                }
 
-                                    if (chunkedProcessing) {
-                                        HttpDataReference.Component component = dataReference.addComponent((e) -> {
-                                            subject.onError(e);
-                                            s.cancel();
-                                        });
-                                        if (component == null) {
-                                            return;
+                                if (data instanceof FileUpload &&
+                                        StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
+                                    dataReference.upload.getAndUpdate(upload -> {
+                                        if (upload == null) {
+                                            return new NettyStreamingFileUpload(
+                                                    (FileUpload) data,
+                                                    serverConfiguration.getMultipart(),
+                                                    ioExecutor,
+                                                    buildFlowable(subject, dataKey, true));
                                         }
-                                        part = new NettyPartData(dataReference, component);
-                                    }
-
-                                    if (StreamingFileUpload.class.isAssignableFrom(argument.getType())) {
-                                        dataReference.upload.getAndUpdate(upload -> {
-                                            if (upload == null) {
-                                                return new NettyStreamingFileUpload(
-                                                        fileUpload,
-                                                        serverConfiguration.getMultipart(),
-                                                        ioExecutor,
-                                                        buildFlowable(subject, dataKey, true));
-                                            }
-                                            return upload;
-                                        });
-                                    }
+                                        return upload;
+                                    });
                                 }
 
                                 Optional<?> converted = conversionService.convert(part, typeVariable);
@@ -774,7 +771,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                     }
                                 };
                             }
-
 
                             if (!executed) {
                                 String argumentName = argument.getName();

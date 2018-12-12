@@ -200,9 +200,8 @@ public class HttpDataReference {
             if (length == 0) {
                 return Unpooled.EMPTY_BUFFER;
             }
-            FileUpload fileUpload = (FileUpload) data;
             if (data.isInMemory()) {
-                ByteBuf byteBuf = fileUpload.getByteBuf();
+                ByteBuf byteBuf = data.getByteBuf();
                 int index = components.indexOf(this);
                 if (byteBuf instanceof CompositeByteBuf) {
                     CompositeByteBuf compositeByteBuf = (CompositeByteBuf) byteBuf;
@@ -213,7 +212,7 @@ public class HttpDataReference {
                     });
                 } else {
                     return createDelegate(byteBuf, (buf, count) -> {
-                        fileUpload.delete();
+                        data.delete();
                         removeComponent(index);
                         return true;
                     });
