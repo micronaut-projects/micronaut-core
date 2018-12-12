@@ -805,10 +805,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                             }
 
                         } else {
-                            request.addContent(data);
+                            if (data.isCompleted()) {
+                                request.addContent(data);
+                            }
                             s.request(1);
                         }
-
                     } else {
                         request.addContent((ByteBufHolder) message);
                         s.request(1);
@@ -843,35 +844,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             private void executeRoute() {
                 if (executed.compareAndSet(false, true)) {
                     try {
-                        if (!routeMatch.isExecutable()) {
-                            routeMatch = attemptBodyBind();
-                        }
                         routeMatch = prepareRouteForExecution(routeMatch, request);
                         routeMatch.execute();
                     } catch (Exception e) {
                         context.pipeline().fireExceptionCaught(e);
                     }
                 }
-            }
-
-            private RouteMatch<? extends Object> attemptBodyBind() {
-                Optional<Argument<?>> bodyArgument = routeMatch.getBodyArgument();
-                if (bodyArgument.isPresent()) {
-                    Argument<?> argument = bodyArgument.get();
-                    String bodyArgumentName = argument.getName();
-                    if (routeMatch.isRequiredInput(bodyArgumentName)) {
-                        Optional body = request.getBody();
-                        if (body.isPresent()) {
-                            return routeMatch.fulfill(
-                                    Collections.singletonMap(
-                                            bodyArgumentName,
-                                            body.get()
-                                    )
-                            );
-                        }
-                    }
-                }
-                return routeMatch;
             }
         };
     }
