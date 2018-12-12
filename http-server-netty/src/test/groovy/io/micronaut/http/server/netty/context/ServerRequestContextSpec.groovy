@@ -43,12 +43,12 @@ class ServerRequestContextSpec extends Specification {
 
         where:
         method          | uri
-        "handlerError"  | '/test-context/handler-error'
         "method"        | '/test-context/method'
         "rxjava"        | '/test-context/rxjava'
         "reactor"       | '/test-context/reactor'
         "thread"        | '/test-context/thread'
         "error"         | '/test-context/error'
+        "handlerError"  | '/test-context/handler-error'
     }
 
     @Client('/test-context')
