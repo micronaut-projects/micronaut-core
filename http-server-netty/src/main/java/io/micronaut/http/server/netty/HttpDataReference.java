@@ -220,7 +220,14 @@ public class HttpDataReference {
                     });
                 } else {
                     return createDelegate(byteBuf, (buf, count) -> {
-                        data.delete();
+                        //needs to be retrieved again because the internal reference
+                        //may have changed
+                        ByteBuf currentBuffer = data.getByteBuf();
+                        if (currentBuffer instanceof CompositeByteBuf) {
+                            ((CompositeByteBuf) currentBuffer).removeComponent(index);
+                        } else {
+                            data.delete();
+                        }
                         removeComponent(index);
                         return true;
                     });
@@ -232,4 +239,10 @@ public class HttpDataReference {
             }
         }
     }
+
+    @FunctionalInterface
+    private interface BiFunction<T, U, R> {
+        R apply(T t, U u) throws IOException;
+    }
+
 }
