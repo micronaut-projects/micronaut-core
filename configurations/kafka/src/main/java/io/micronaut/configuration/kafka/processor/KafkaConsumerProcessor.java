@@ -323,10 +323,9 @@ public class KafkaConsumerProcessor implements ExecutableMethodProcessor<KafkaLi
 
                         //noinspection InfiniteLoopStatement
                         while (true) {
-                            ConsumerRecords<?, ?> consumerRecords = kafkaConsumer.poll(pollTimeout.toMillis());
-                            Map<TopicPartition, OffsetAndMetadata> currentOffsets = trackPartitions ? new HashMap<>() : null;
-
                             try {
+                                ConsumerRecords<?, ?> consumerRecords = kafkaConsumer.poll(pollTimeout);
+                                Map<TopicPartition, OffsetAndMetadata> currentOffsets = trackPartitions ? new HashMap<>() : null;
                                 if (consumerRecords != null && consumerRecords.count() > 0) {
 
                                     if (isBatch) {

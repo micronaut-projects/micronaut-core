@@ -16,6 +16,7 @@
 
 package io.micronaut.configuration.kafka.exceptions;
 
+import io.micronaut.context.annotation.Primary;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,6 +32,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @Singleton
+@Primary
 public class DefaultKafkaListenerExceptionHandler implements KafkaListenerExceptionHandler {
     private static final Logger LOG = LoggerFactory.getLogger(KafkaListenerExceptionHandler.class);
 
