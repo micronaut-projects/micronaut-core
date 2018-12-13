@@ -17,7 +17,9 @@
 package io.micronaut.configuration.kafka.serde;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.core.reflect.ClassUtils;
 import org.apache.kafka.common.serialization.Serde;
+import org.apache.kafka.common.serialization.Serdes;
 
 import javax.inject.Singleton;
 import java.util.Map;
@@ -47,13 +49,17 @@ public class JsonSerdeRegistry implements SerdeRegistry {
     @SuppressWarnings("unchecked")
     @Override
     public <T> Serde<T> getSerde(Class<T> type) {
-        JsonSerde jsonSerde = serdes.get(type);
-        if (jsonSerde != null) {
-            return jsonSerde;
+        if (ClassUtils.isJavaBasicType(type)) {
+            return (Serde<T>) Serdes.serdeFrom(String.class);
         } else {
-            jsonSerde = beanContext.createBean(JsonSerde.class, type);
-            serdes.put(type, jsonSerde);
-            return jsonSerde;
+            JsonSerde jsonSerde = serdes.get(type);
+            if (jsonSerde != null) {
+                return jsonSerde;
+            } else {
+                jsonSerde = beanContext.createBean(JsonSerde.class, type);
+                serdes.put(type, jsonSerde);
+                return jsonSerde;
+            }
         }
     }
 }
