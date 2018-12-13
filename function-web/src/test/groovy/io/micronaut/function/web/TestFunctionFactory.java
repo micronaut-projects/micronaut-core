@@ -2,6 +2,9 @@ package io.micronaut.function.web;
 
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.function.FunctionBean;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.Produces;
 
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -17,6 +20,12 @@ public class TestFunctionFactory {
     @FunctionBean("java/supplier/string")
     Supplier<String> get() {
         return () -> "myvalue";
+    }
+
+    @FunctionBean("java/supplier/xml")
+    @Produces(MediaType.TEXT_XML)
+    Supplier<String> getXml() {
+        return () -> "<hello></hello>";
     }
 
     // This should work but is currently not implemented
@@ -40,6 +49,12 @@ public class TestFunctionFactory {
             name.setName(s + " " + s2);
             return name;
         };
+    }
+
+    @FunctionBean("java/function/xml")
+    @Consumes(MediaType.TEXT_XML)
+    Function<String, String> roundXml() {
+        return (str) -> str;
     }
 
     static class Name {
