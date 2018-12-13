@@ -87,7 +87,7 @@ public class HttpDataReference {
     Component addComponent(Consumer<IOException> onError) {
         Component component;
         try {
-            long readable = data.getByteBuf().readableBytes();
+            long readable = readableBytes(data);
             long offset = position.getAndUpdate(p -> readable);
             int length = new Long(readable - offset).intValue();
             component = new Component(length, offset);
@@ -124,6 +124,14 @@ public class HttpDataReference {
         components.remove(index);
         updateComponentOffsets(index);
         position.getAndUpdate((offset) -> offset - component.length);
+    }
+
+    private long readableBytes(HttpData httpData) throws IOException {
+        if (httpData.isInMemory()) {
+            return httpData.getByteBuf().readableBytes();
+        } else {
+            return httpData.length();
+        }
     }
 
     private ByteBuf createDelegate(ByteBuf byteBuf, BiFunction<ByteBuf, Integer, Boolean> onRelease) {
