@@ -15,6 +15,7 @@
  */
 package io.micronaut.cache
 
+import io.micronaut.core.async.annotation.SingleResult
 import io.reactivex.Flowable
 import io.reactivex.Single
 import io.micronaut.cache.annotation.CacheConfig
@@ -234,6 +235,7 @@ class SyncCacheSpec extends Specification {
         }
 
         @Cacheable
+        @SingleResult
         Flowable<Integer> flowableValue(String name) {
             return Flowable.just(counters.computeIfAbsent(name, { 0 }))
         }

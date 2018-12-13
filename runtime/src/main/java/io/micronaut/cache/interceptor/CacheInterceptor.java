@@ -19,11 +19,7 @@ package io.micronaut.cache.interceptor;
 import io.micronaut.aop.InterceptPhase;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
-import io.micronaut.cache.AsyncCache;
-import io.micronaut.cache.AsyncCacheErrorHandler;
-import io.micronaut.cache.CacheErrorHandler;
-import io.micronaut.cache.CacheManager;
-import io.micronaut.cache.SyncCache;
+import io.micronaut.cache.*;
 import io.micronaut.cache.annotation.CacheConfig;
 import io.micronaut.cache.annotation.CacheInvalidate;
 import io.micronaut.cache.annotation.CachePut;
@@ -31,20 +27,22 @@ import io.micronaut.cache.annotation.Cacheable;
 import io.micronaut.cache.exceptions.CacheSystemException;
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.async.publisher.SingleSubscriberPublisher;
-import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.TaskExecutors;
+import io.reactivex.BackpressureStrategy;
+import io.reactivex.Flowable;
+import io.reactivex.FlowableEmitter;
+import io.reactivex.FlowableOnSubscribe;
+import io.reactivex.functions.Function;
 import org.reactivestreams.Publisher;
-import org.reactivestreams.Subscriber;
-import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -213,7 +211,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                 boolean async = cachePut.get(MEMBER_ASYNC, Boolean.class, false);
                 if (async) {
                     ioExecutor.submit(() ->
-                        processCachePut(context, wrapper, cachePut, cacheOperation)
+                            processCachePut(context, wrapper, cachePut, cacheOperation)
                     );
                 } else {
                     processCachePut(context, wrapper, cachePut, cacheOperation);
@@ -227,12 +225,12 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                 boolean async = cacheInvalidate.get(MEMBER_ASYNC, Boolean.class, false);
                 if (async) {
                     ioExecutor.submit(() -> {
-                            try {
-                                processCacheEvict(context, cacheInvalidate, cacheOperation, async);
-                            } catch (Exception e) {
-                                throw new CacheSystemException("Cache invalidate operation failed: " + e.getMessage(), e);
+                                try {
+                                    processCacheEvict(context, cacheInvalidate, cacheOperation, async);
+                                } catch (Exception e) {
+                                    throw new CacheSystemException("Cache invalidate operation failed: " + e.getMessage(), e);
+                                }
                             }
-                        }
                     );
                 } else {
                     processCacheEvict(context, cacheInvalidate, cacheOperation, async);
@@ -334,109 +332,224 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
     }
 
     private Object interceptPublisher(MethodInvocationContext<Object, Object> context, ReturnType returnTypeObject, Class returnType) {
+        if (!Publishers.isSingle(returnType) && !context.isAnnotationPresent(SingleResult.class)) {
+            throw new CacheSystemException("Only Reactive types that emit a single result can currently be cached. Use either Single, Maybe or Mono for operations that cache.");
+        }
         CacheOperation cacheOperation = new CacheOperation(context, returnType);
         AnnotationValue<Cacheable> cacheable = cacheOperation.cacheable;
         if (cacheable != null) {
 
-            SingleSubscriberPublisher<Object> publisher = buildPublisher(context, returnTypeObject, cacheOperation, cacheable);
-            Optional converted = ConversionService.SHARED.convert(publisher, ConversionContext.of(returnTypeObject.asArgument()));
-            if (converted.isPresent()) {
-                return converted.get();
-            } else {
-                throw new UnsupportedOperationException("Cannot convert publisher into target type: " + returnType);
-            }
+            Publisher<Object> publisher = buildCacheablePublisher(context, returnTypeObject, cacheOperation, cacheable);
+            return Publishers.convertPublisher(publisher, returnType);
         } else {
-            return context.proceed();
+            final List<AnnotationValue<CachePut>> putOperations = cacheOperation.putOperations;
+            if (CollectionUtils.isNotEmpty(putOperations)) {
+                final Publisher<Object> publisher = buildCachePutPublisher(context, cacheOperation, putOperations);
+                return Publishers.convertPublisher(publisher, returnType);
+            } else {
+                final List<AnnotationValue<CacheInvalidate>> invalidateOperations = cacheOperation.invalidateOperations;
+                if (CollectionUtils.isNotEmpty(invalidateOperations)) {
+                    final Publisher<Object> publisher = buildCacheInvalidatePublisher(context, cacheOperation, invalidateOperations);
+                    return Publishers.convertPublisher(publisher, returnType);
+                } else {
+                    return context.proceed();
+                }
+            }
         }
     }
 
-    private SingleSubscriberPublisher<Object> buildPublisher(MethodInvocationContext<Object, Object> context, ReturnType returnTypeObject, CacheOperation cacheOperation, AnnotationValue<Cacheable> cacheable) {
-        return new SingleSubscriberPublisher<Object>() {
+    private Publisher<Object> buildCacheInvalidatePublisher(
+            MethodInvocationContext<Object, Object> context,
+            CacheOperation cacheOperation,
+            List<AnnotationValue<CacheInvalidate>> invalidateOperations) {
+        final Flowable<Object> originalFlowable = Publishers.convertPublisher(context.proceed(), Flowable.class);
 
-            @Override
-            protected void doSubscribe(Subscriber<? super Object> subscriber) {
-                subscriber.onSubscribe(new Subscription() {
-                    CompletableFuture future = null; // for cancellation
+        return originalFlowable.flatMap((o) -> {
+            List<Flowable<?>> cacheInvalidates = new ArrayList<>();
+            for (AnnotationValue<CacheInvalidate> invalidateOperation : invalidateOperations) {
+                String[] cacheNames = cacheOperation.getCacheInvalidateNames(invalidateOperation);
 
-                    @Override
-                    public void request(long n) {
-                        if (n > 0) {
-                            AsyncCache<?> asyncCache = cacheManager.getCache(cacheOperation.cacheableCacheName).async();
-                            CacheKeyGenerator keyGenerator = resolveKeyGenerator(cacheOperation.defaultKeyGenerator, cacheable);
-                            Object[] params = resolveParams(context, cacheable.get(MEMBER_PARAMETERS, String[].class, StringUtils.EMPTY_STRING_ARRAY));
-                            Object key = keyGenerator.generateKey(context, params);
-                            Argument<?> firstTypeVariable = returnTypeObject.getFirstTypeVariable().orElse(Argument.of(Object.class));
-                            future = asyncCache.get(key, firstTypeVariable).whenComplete((BiConsumer<Optional<?>, Throwable>) (o, throwable) -> {
-                                if (throwable == null && o.isPresent()) {
-                                    // cache hit, return to original subscriber
-                                    if (LOG.isDebugEnabled()) {
-                                        LOG.debug("Value found in cache [" + asyncCache.getName() + "] for invocation: " + context);
-                                    }
-                                    subscriber.onNext(o.get());
-                                    subscriber.onComplete();
-                                } else {
+                if (ArrayUtils.isNotEmpty(cacheNames)) {
+                    boolean invalidateAll = invalidateOperation.getRequiredValue(MEMBER_ALL, Boolean.class);
+                    boolean isAsync = invalidateOperation.get(MEMBER_ASYNC, Boolean.class, false);
+                    if (isAsync) {
+                        if (invalidateAll) {
+                            for (String cacheName : cacheNames) {
+                                AsyncCache<?> asyncCache = cacheManager.getCache(cacheName).async();
+                                asyncCache.invalidateAll().whenCompleteAsync((aBoolean, throwable) -> {
                                     if (throwable != null) {
-                                        if (errorHandler.handleLoadError(asyncCache, key, asRuntimeException(throwable))) {
-                                            subscriber.onError(throwable);
-                                            return;
-                                        }
+                                        asyncCacheErrorHandler.handleInvalidateError(asyncCache, asRuntimeException(throwable));
                                     }
+                                }, ioExecutor);
+                            }
+                        } else {
+                            CacheKeyGenerator keyGenerator = cacheOperation.getCacheInvalidateKeyGenerator(invalidateOperation);
+                            String[] parameterNames = invalidateOperation.get(MEMBER_PARAMETERS, String[].class, StringUtils.EMPTY_STRING_ARRAY);
+                            Object[] parameterValues = resolveParams(context, parameterNames);
+                            Class<? extends CacheKeyGenerator> alternateKeyGen = invalidateOperation.get(MEMBER_KEY_GENERATOR, Class.class).orElse(null);
+                            if (alternateKeyGen != null && keyGenerator.getClass() != alternateKeyGen) {
+                                keyGenerator = resolveKeyGenerator(alternateKeyGen);
+                            }
+                            Object key = keyGenerator.generateKey(context, parameterValues);
+                            for (String cacheName : cacheNames) {
+                                AsyncCache<?> asyncCache = cacheManager.getCache(cacheName).async();
+                                asyncCache.invalidate(key).whenCompleteAsync((aBoolean, throwable) -> {
+                                    if (throwable != null) {
+                                        asyncCacheErrorHandler.handleInvalidateError(asyncCache, asRuntimeException(throwable));
+                                    }
+                                }, ioExecutor);
+                            }
+                        }
+                    } else {
+                        final Flowable<Boolean> cacheInvalidateFlowable = Flowable.create(new FlowableOnSubscribe<Boolean>() {
+                            @Override
+                            public void subscribe(FlowableEmitter<Boolean> emitter) throws Exception {
+                                if (invalidateAll) {
+                                    final CompletableFuture<Void> allFutures = buildInvalidateAllFutures(cacheNames);
+                                    allFutures.whenCompleteAsync((aBoolean, throwable) -> {
+                                        if (throwable != null) {
+                                            SyncCache cache = cacheManager.getCache(cacheNames[0]);
+                                            if (asyncCacheErrorHandler.handleInvalidateError(cache, asRuntimeException(throwable))) {
+                                                emitter.onError(throwable);
+                                                return;
+                                            }
+                                        }
+                                        emitter.onNext(true);
+                                        emitter.onComplete();
+                                    }, ioExecutor);
+                                } else {
+                                    CacheKeyGenerator keyGenerator = cacheOperation.getCacheInvalidateKeyGenerator(invalidateOperation);
+                                    String[] parameterNames = invalidateOperation.get(MEMBER_PARAMETERS, String[].class, StringUtils.EMPTY_STRING_ARRAY);
+                                    Object[] parameterValues = resolveParams(context, parameterNames);
+                                    Class<? extends CacheKeyGenerator> alternateKeyGen = invalidateOperation.get(MEMBER_KEY_GENERATOR, Class.class).orElse(null);
+                                    if (alternateKeyGen != null && keyGenerator.getClass() != alternateKeyGen) {
+                                        keyGenerator = resolveKeyGenerator(alternateKeyGen);
+                                    }
+                                    Object key = keyGenerator.generateKey(context, parameterValues);
+                                    final CompletableFuture<Void> allFutures = buildInvalidateFutures(cacheNames, key);
+                                    allFutures.whenCompleteAsync((aBoolean, throwable) -> {
+                                        if (throwable != null) {
+                                            SyncCache cache = cacheManager.getCache(cacheNames[0]);
+                                            if (asyncCacheErrorHandler.handleInvalidateError(cache,key, asRuntimeException(throwable))) {
+                                                emitter.onError(throwable);
+                                                return;
+                                            }
+                                        }
+                                        emitter.onNext(true);
+                                        emitter.onComplete();
+                                    }, ioExecutor);
+                                }
+                            }
+                        }, BackpressureStrategy.ERROR);
+                        cacheInvalidates.add(cacheInvalidateFlowable);
+                    }
+                }
+            }
+            if (!cacheInvalidates.isEmpty()) {
+                return Flowable.concat(cacheInvalidates).toList().map(flowables -> Flowable.just(o)).toFlowable();
+            } else {
+                return Flowable.just(o);
+            }
+        });
+    }
 
-                                    Publisher<?> actualPublisher = (Publisher) context.proceed();
-                                    if (actualPublisher == null) {
-                                        // no publisher, simply complete
-                                        subscriber.onComplete();
+    private Publisher<Object> buildCachePutPublisher(
+            MethodInvocationContext<Object, Object> context,
+            CacheOperation cacheOperation,
+            List<AnnotationValue<CachePut>> putOperations) {
+        final Flowable<?> originalFlowable = Publishers.convertPublisher(context.proceed(), Flowable.class);
+        return originalFlowable.flatMap((Function<Object, Publisher<?>>) o -> {
+            List<Flowable<?>> cachePuts = new ArrayList<>();
+            for (AnnotationValue<CachePut> putOperation : putOperations) {
+                String[] cacheNames = cacheOperation.getCachePutNames(putOperation);
+
+                if (ArrayUtils.isNotEmpty(cacheNames)) {
+                    boolean isAsync = putOperation.get(MEMBER_ASYNC, Boolean.class, false);
+                    if (isAsync) {
+                        putResultAsync(context, cacheOperation, putOperation, cacheNames, o);
+                    } else {
+                        final Flowable<Object> cachePutFlowable = Flowable.create(emitter -> {
+                            CacheKeyGenerator keyGenerator = cacheOperation.getCachePutKeyGenerator(putOperation);
+                            Object[] parameterValues = resolveParams(context, putOperation.get(MEMBER_PARAMETERS, String[].class, StringUtils.EMPTY_STRING_ARRAY));
+                            Object key = keyGenerator.generateKey(context, parameterValues);
+                            CompletableFuture<Void> putOperationFuture = buildPutFutures(cacheNames, o, key);
+                            putOperationFuture.whenComplete((aVoid, throwable) -> {
+                                if (throwable == null) {
+                                    emitter.onNext(true);
+                                    emitter.onComplete();
+                                } else {
+                                    SyncCache cache = cacheManager.getCache(cacheNames[0]);
+                                    if (errorHandler.handlePutError(cache, key, o, asRuntimeException(throwable))) {
+                                        emitter.onError(throwable);
                                     } else {
-                                        // cache miss, subscribe to original publisher
-                                        actualPublisher.subscribe(new Subscriber<Object>() {
-                                            boolean hasData = false;
-
-                                            @Override
-                                            public void onSubscribe(Subscription s) {
-                                                s.request(n);
-                                            }
-
-                                            @Override
-                                            public void onNext(Object o) {
-                                                hasData = true;
-                                                // got result, cache it
-                                                asyncCache.put(key, o).whenComplete((aBoolean, throwable1) -> {
-                                                    if (throwable1 == null) {
-                                                        subscriber.onNext(o);
-                                                        subscriber.onComplete();
-                                                    } else {
-                                                        subscriber.onError(throwable1);
-                                                    }
-                                                });
-                                            }
-
-                                            @Override
-                                            public void onError(Throwable t) {
-                                                subscriber.onError(t);
-                                            }
-
-                                            @Override
-                                            public void onComplete() {
-                                                if (!hasData) {
-                                                    subscriber.onComplete();
-                                                }
-                                            }
-                                        });
+                                        emitter.onNext(true);
+                                        emitter.onComplete();
                                     }
                                 }
                             });
-                        }
+                        }, BackpressureStrategy.ERROR);
+                        cachePuts.add(cachePutFlowable);
                     }
-
-                    @Override
-                    public void cancel() {
-                        if (future != null) {
-                            future.cancel(false);
-                        }
-                    }
-                });
+                }
             }
-        };
+
+            if (!cachePuts.isEmpty()) {
+                return Flowable.concat(cachePuts).toList().map(flowables -> Flowable.just(o)).toFlowable();
+            } else {
+                return Flowable.just(o);
+            }
+        });
+    }
+
+    private Publisher<Object> buildCacheablePublisher(
+            MethodInvocationContext<Object, Object> context,
+            ReturnType returnTypeObject,
+            CacheOperation cacheOperation,
+            AnnotationValue<Cacheable> cacheable) {
+        AsyncCache<?> asyncCache = cacheManager.getCache(cacheOperation.cacheableCacheName).async();
+        CacheKeyGenerator keyGenerator = resolveKeyGenerator(cacheOperation.defaultKeyGenerator, cacheable);
+        Object[] params = resolveParams(context, cacheable.get(MEMBER_PARAMETERS, String[].class, StringUtils.EMPTY_STRING_ARRAY));
+        Object key = keyGenerator.generateKey(context, params);
+
+        final Flowable<?> originalFlowable = Publishers.convertPublisher(context.proceed(), Flowable.class);
+        return Flowable.create(emitter -> {
+            Argument<?> firstTypeVariable = returnTypeObject.getFirstTypeVariable().orElse(Argument.of(Object.class));
+            asyncCache.get(key, firstTypeVariable).whenComplete((BiConsumer<Optional<?>, Throwable>) (o, throwable) -> {
+                if (throwable == null && o.isPresent()) {
+                    // cache hit, return to original subscriber
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Value found in cache [" + asyncCache.getName() + "] for invocation: " + context);
+                    }
+                    emitter.onNext(o.get());
+                    emitter.onComplete();
+                } else {
+                    if (throwable != null) {
+                        if (errorHandler.handleLoadError(asyncCache, key, asRuntimeException(throwable))) {
+                            emitter.onError(throwable);
+                        } else {
+                            emitter.onComplete();
+                        }
+                    } else {
+                        emitter.onComplete();
+                    }
+                }
+            });
+        }, BackpressureStrategy.BUFFER).switchIfEmpty(originalFlowable.flatMap((Function<Object, Publisher<?>>) o ->
+                Flowable.create(emitter -> asyncCache.put(key, o).whenComplete((aBoolean, throwable1) -> {
+                    if (throwable1 == null) {
+                        emitter.onNext(o);
+                        emitter.onComplete();
+                    } else {
+                        if (errorHandler.handleLoadError(asyncCache, key, asRuntimeException(throwable1))) {
+
+                            emitter.onError(throwable1);
+                        } else {
+                            emitter.onNext(o);
+                            emitter.onComplete();
+
+                        }
+                    }
+                }), BackpressureStrategy.ERROR)));
     }
 
     private CompletableFuture<Object> processFuturePutOperations(MethodInvocationContext<Object, Object> context, CacheOperation cacheOperation, CompletableFuture<Object> returnFuture) {
@@ -480,23 +593,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                     } else {
                         returnFuture.whenCompleteAsync((result, throwable) -> {
                             if (throwable == null) {
-                                try {
-                                    CacheKeyGenerator keyGenerator = cacheOperation.getCachePutKeyGenerator(putOperation);
-                                    Object[] parameterValues = resolveParams(context, putOperation.get(MEMBER_PARAMETERS, String[].class, StringUtils.EMPTY_STRING_ARRAY));
-                                    Object key = keyGenerator.generateKey(context, parameterValues);
-                                    CompletableFuture<Void> putOperationFuture = buildPutFutures(cacheNames, result, key);
-
-                                    putOperationFuture.whenComplete((aVoid, error) -> {
-                                        if (error != null) {
-                                            SyncCache cache = cacheManager.getCache(cacheNames[0]);
-                                            asyncCacheErrorHandler.handlePutError(cache, key, result, asRuntimeException(error));
-                                        }
-                                    });
-                                } catch (Exception e) {
-                                    if (LOG.isErrorEnabled()) {
-                                        LOG.error("Cache put operation failed: " + e.getMessage(), e);
-                                    }
-                                }
+                                putResultAsync(context, cacheOperation, putOperation, cacheNames, result);
                             }
                         }, ioExecutor);
                     }
@@ -504,6 +601,26 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
             }
         }
         return returnFuture;
+    }
+
+    private void putResultAsync(MethodInvocationContext<Object, Object> context, CacheOperation cacheOperation, AnnotationValue<CachePut> putOperation, String[] cacheNames, Object result) {
+        try {
+            CacheKeyGenerator keyGenerator = cacheOperation.getCachePutKeyGenerator(putOperation);
+            Object[] parameterValues = resolveParams(context, putOperation.get(MEMBER_PARAMETERS, String[].class, StringUtils.EMPTY_STRING_ARRAY));
+            Object key = keyGenerator.generateKey(context, parameterValues);
+            CompletableFuture<Void> putOperationFuture = buildPutFutures(cacheNames, result, key);
+
+            putOperationFuture.whenComplete((aVoid, error) -> {
+                if (error != null) {
+                    SyncCache cache = cacheManager.getCache(cacheNames[0]);
+                    asyncCacheErrorHandler.handlePutError(cache, key, result, asRuntimeException(error));
+                }
+            });
+        } catch (Exception e) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Cache put operation failed: " + e.getMessage(), e);
+            }
+        }
     }
 
     /**
@@ -531,7 +648,27 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
             AsyncCache<?> asyncCache = cacheManager.getCache(cacheName).async();
             futures.add(asyncCache.put(key, result));
         }
-        CompletableFuture[] futureArray = futures.toArray(new CompletableFuture[futures.size()]);
+        CompletableFuture[] futureArray = futures.toArray(new CompletableFuture[0]);
+        return CompletableFuture.allOf(futureArray);
+    }
+
+    private CompletableFuture<Void> buildInvalidateFutures(String[] cacheNames, Object key) {
+        List<CompletableFuture<Boolean>> futures = new ArrayList<>();
+        for (String cacheName : cacheNames) {
+            AsyncCache<?> asyncCache = cacheManager.getCache(cacheName).async();
+            futures.add(asyncCache.invalidate(key));
+        }
+        CompletableFuture[] futureArray = futures.toArray(new CompletableFuture[0]);
+        return CompletableFuture.allOf(futureArray);
+    }
+
+    private CompletableFuture<Void> buildInvalidateAllFutures(String[] cacheNames) {
+        List<CompletableFuture<Boolean>> futures = new ArrayList<>();
+        for (String cacheName : cacheNames) {
+            AsyncCache<?> asyncCache = cacheManager.getCache(cacheName).async();
+            futures.add(asyncCache.invalidateAll());
+        }
+        CompletableFuture[] futureArray = futures.toArray(new CompletableFuture[0]);
         return CompletableFuture.allOf(futureArray);
     }
 
@@ -618,10 +755,10 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
     }
 
     private void processCacheEvict(
-        MethodInvocationContext context,
-        AnnotationValue<CacheInvalidate> cacheConfig,
-        CacheOperation cacheOperation,
-        boolean async) {
+            MethodInvocationContext context,
+            AnnotationValue<CacheInvalidate> cacheConfig,
+            CacheOperation cacheOperation,
+            boolean async) {
 
         String[] cacheNames = cacheOperation.getCacheInvalidateNames(cacheConfig);
         CacheKeyGenerator keyGenerator = cacheOperation.getCacheInvalidateKeyGenerator(cacheConfig);

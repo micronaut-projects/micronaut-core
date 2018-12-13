@@ -19,6 +19,7 @@ package io.micronaut.http.annotation;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.core.async.annotation.SingleResult;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -79,6 +80,7 @@ public @interface Delete {
      */
     @AliasFor(annotation = Produces.class, member = "single")
     @AliasFor(annotation = Consumes.class, member = "single")
+    @AliasFor(annotation = SingleResult.class, member = "value")
     boolean single() default false;
 
 }
