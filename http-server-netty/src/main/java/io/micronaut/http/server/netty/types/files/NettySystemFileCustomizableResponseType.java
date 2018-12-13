@@ -23,8 +23,7 @@ import io.micronaut.http.server.netty.SmartHttpContentCompressor;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
 import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.DefaultFileRegion;
+import io.netty.channel.*;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
@@ -32,6 +31,7 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedFile;
+import io.netty.util.concurrent.GenericFutureListener;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -113,21 +113,30 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
             HttpHeaders headers = nettyResponse.headers();
             context.write(new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), headers), context.voidPromise());
 
+            ChannelFuture sendFileFuture;
             // Write the content.
             if (context.pipeline().get(SslHandler.class) == null && SmartHttpContentCompressor.shouldSkip(headers)) {
                 // SSL not enabled - can use zero-copy file transfer.
-                context.write(new DefaultFileRegion(raf.getChannel(), 0, getLength()), context.newProgressivePromise());
+                sendFileFuture = context.write(new DefaultFileRegion(raf.getChannel(), 0, getLength()), context.newProgressivePromise());
                 context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
             } else {
                 // SSL enabled - cannot use zero-copy file transfer.
                 try {
                     // HttpChunkedInput will write the end marker (LastHttpContent) for us.
-                    context.writeAndFlush(new HttpChunkedInput(new ChunkedFile(raf, 0, getLength(), LENGTH_8K)),
+                    sendFileFuture = context.writeAndFlush(new HttpChunkedInput(new ChunkedFile(raf, 0, getLength(), LENGTH_8K)),
                         context.newProgressivePromise());
                 } catch (IOException e) {
                     throw new CustomizableResponseTypeException("Could not read file", e);
                 }
             }
+
+            sendFileFuture.addListener((future) -> {
+                try {
+                    raf.close();
+                } catch (IOException e) {
+                    throw new Error(e);
+                }
+            });
 
         } else {
             throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + response);
