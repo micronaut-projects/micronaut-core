@@ -40,4 +40,16 @@ public class CacheSystemException extends RuntimeException {
     public CacheSystemException(String message, Throwable cause) {
         super(message, cause);
     }
+
+    /**
+     * Constructs a new CacheSystem exception with the specified detail message.  <p>Note that the detail message associated with
+     * {@code cause} is <i>not</i> automatically incorporated in
+     * this exception's detail message.
+     *
+     * @param message The detail message (which is saved for later retrieval
+     *                by the {@link #getMessage()} method).
+     */
+    public CacheSystemException(String message) {
+        super(message);
+    }
 }
