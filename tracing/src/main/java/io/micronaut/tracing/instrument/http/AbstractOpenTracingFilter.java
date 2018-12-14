@@ -115,13 +115,6 @@ public abstract class AbstractOpenTracingFilter implements HttpFilter  {
 
         spanBuilder.withTag(TAG_METHOD, request.getMethod().name());
         String path = request.getPath();
-        Optional<Object> serviceIdOptional = request.getAttribute(HttpAttributes.SERVICE_ID);
-        if (serviceIdOptional.isPresent()) {
-            String serviceId = serviceIdOptional.get().toString();
-            if (StringUtils.isNotEmpty(serviceId) && serviceId.startsWith("/")) {
-                path = StringUtils.prependUri(serviceId, path);
-            }
-        }
         spanBuilder.withTag(TAG_PATH, path);
         return spanBuilder;
     }

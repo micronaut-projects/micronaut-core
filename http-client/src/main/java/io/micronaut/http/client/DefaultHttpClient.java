@@ -987,7 +987,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             Channel channel = (Channel) future.get();
                             try {
                                 sendRequestThroughChannel(
-                                        requestURI,
                                         requestWrapper,
                                         bodyType,
                                         errorType,
@@ -1014,7 +1013,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             try {
                                 Channel channel = connectionFuture.channel();
                                 sendRequestThroughChannel(
-                                        requestURI,
                                         requestWrapper,
                                         bodyType,
                                         errorType,
@@ -1349,6 +1347,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
             Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher) {
 
+        if (request instanceof MutableHttpRequest) {
+            ((MutableHttpRequest<I>) request).uri(requestURI);
+        }
         if (CollectionUtils.isNotEmpty(filters)) {
             List<HttpClientFilter> httpClientFilters = resolveFilters(parentRequest, request, requestURI);
             OrderUtil.reverseSort(httpClientFilters);
@@ -1504,7 +1505,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     private <I, O, E> void sendRequestThroughChannel(
-            URI requestURI,
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
             Argument<O> bodyType,
             Argument<E> errorType,
@@ -1512,6 +1512,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             Channel channel,
             ChannelPool channelPool) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         io.micronaut.http.HttpRequest<I> finalRequest = requestWrapper.get();
+        URI requestURI = finalRequest.getUri();
         MediaType requestContentType = finalRequest
                 .getContentType()
                 .orElse(MediaType.APPLICATION_JSON_TYPE);
