@@ -26,6 +26,7 @@ import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.reactivex.Flowable;
 import io.reactivex.Observable;
+import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -117,7 +118,7 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
             }
         };
 
-        return Observable.<Boolean>create((emitter) -> {
+        return Single.<Boolean>create((emitter) -> {
 
             subject.subscribeOn(Schedulers.from(ioExecutor))
                 .subscribe(new Subscriber() {
@@ -141,14 +142,13 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
                     @Override
                     public void onComplete() {
                         if (fileUpload.isCompleted()) {
-                            emitter.onNext(transferOperation.get());
-                            emitter.onComplete();
+                            emitter.onSuccess(transferOperation.get());
                         } else {
                             emitter.onError(new MultipartException("Transfer did not complete"));
                         }
                     }
                 });
-        }).firstOrError().toFlowable();
+        }).toFlowable();
 
     }
 

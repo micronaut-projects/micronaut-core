@@ -19,6 +19,7 @@ package io.micronaut.http.server.netty.types.files;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
+import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.server.netty.SmartHttpContentCompressor;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
@@ -32,6 +33,8 @@ import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedFile;
 import io.netty.util.concurrent.GenericFutureListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -49,6 +52,7 @@ import java.util.Optional;
 public class NettySystemFileCustomizableResponseType extends SystemFileCustomizableResponseType implements NettyFileCustomizableResponseType {
 
     private static final int LENGTH_8K = 8192;
+    private static final Logger LOG = LoggerFactory.getLogger(NettySystemFileCustomizableResponseType.class);
 
     protected final RandomAccessFile raf;
     protected final long rafLength;
@@ -134,7 +138,7 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
                 try {
                     raf.close();
                 } catch (IOException e) {
-                    throw new Error(e);
+                    LOG.warn("An error occurred closing the file reference: " + file.getAbsolutePath(), e);
                 }
             });
 
