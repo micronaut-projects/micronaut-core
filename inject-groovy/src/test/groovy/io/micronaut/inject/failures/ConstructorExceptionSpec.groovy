@@ -39,10 +39,10 @@ class ConstructorExceptionSpec extends Specification {
         then:"The implementation is injected"
         def e = thrown(DependencyInjectionException)
         //e.cause.message == 'bad'
-        LineEndingStripper.strip(e.message) == LineEndingStripper.strip('''\
+        e.message.normalize() == '''\
 Failed to inject value for parameter [c] of class: io.micronaut.inject.failures.ConstructorExceptionSpec$A
 
-Path Taken: B.a --> new A([C c])''')
+Path Taken: B.a --> new A([C c])'''
     }
 
     @Singleton
