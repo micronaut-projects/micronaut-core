@@ -41,14 +41,14 @@ class ValidatedBeanSpec extends Specification {
 
         then:
         def e = thrown(BeanInstantiationException)
-        LineEndingStripper.strip(e.message) == LineEndingStripper.strip('''\
+        e.message.normalize() == '''\
 Error instantiating bean of type  [io.micronaut.configuration.hibernate.validator.ValidatedBeanSpec$A]
 
 Message: Validation failed for bean definition [io.micronaut.configuration.hibernate.validator.ValidatedBeanSpec$A]
 List of constraint violations:[
 \turl - must be a valid URL
 ]
-''')
+'''
 
     }
 
