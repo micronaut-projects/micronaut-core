@@ -86,4 +86,9 @@ public class MutableConvertibleMultiValuesMap<V> extends ConvertibleMultiValuesM
         this.values.clear();
         return this;
     }
+
+    @Override
+    protected Map<CharSequence, List<V>> wrapValues(Map<CharSequence, List<V>> values) {
+        return values;
+    }
 }
