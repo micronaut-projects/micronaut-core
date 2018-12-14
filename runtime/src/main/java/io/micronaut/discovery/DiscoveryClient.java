@@ -16,6 +16,7 @@
 
 package io.micronaut.discovery;
 
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.naming.Described;
 import org.reactivestreams.Publisher;
 
@@ -36,10 +37,12 @@ public interface DiscoveryClient extends Closeable, AutoCloseable, Described {
      * @param serviceId The service id
      * @return A {@link Publisher} that emits a list of {@link ServiceInstance}
      */
+    @SingleResult
     Publisher<List<ServiceInstance>> getInstances(String serviceId);
 
     /**
      * @return The known service IDs
      */
+    @SingleResult
     Publisher<List<String>> getServiceIds();
 }

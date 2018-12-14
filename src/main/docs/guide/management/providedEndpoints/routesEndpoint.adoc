@@ -13,7 +13,6 @@ endpoints:
     routes:
         enabled: Boolean
         sensitive: Boolean
-        id: String
 ----
 
 == Customization

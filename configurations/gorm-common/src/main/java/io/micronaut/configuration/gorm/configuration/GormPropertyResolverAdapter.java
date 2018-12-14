@@ -17,9 +17,12 @@
 package io.micronaut.configuration.gorm.configuration;
 
 import io.micronaut.context.env.PropertyPlaceholderResolver;
+import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.spring.core.env.PropertyResolverAdapter;
 import org.grails.datastore.mapping.config.Settings;
+
+import java.util.Map;
 
 /**
  * @author graemerocher
@@ -40,7 +43,9 @@ public class GormPropertyResolverAdapter extends PropertyResolverAdapter {
     @SuppressWarnings("unchecked")
     @Override
     public <T> T getProperty(String key, Class<T> targetType, T defaultValue) {
-        if (Settings.SETTING_FAIL_ON_ERROR.equals(key) && defaultValue == null) {
+        if ("hibernate".equalsIgnoreCase(key) && targetType == Map.class) {
+            return (T) super.getPropertyResolver().getProperties(key, StringConvention.UNDER_SCORE_SEPARATED_LOWER_CASE);
+        } else if (Settings.SETTING_FAIL_ON_ERROR.equals(key) && defaultValue == null) {
             return (T) super.getProperty(key, Boolean.class, Boolean.TRUE);
         } else {
             return super.getProperty(key, targetType, defaultValue);

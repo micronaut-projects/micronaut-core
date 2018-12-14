@@ -77,4 +77,5 @@ public abstract class AbstractRedisConfiguration extends RedisURI {
     public void setUris(URI... uris) {
         this.uris = Arrays.stream(uris).map(RedisURI::create).collect(Collectors.toList());
     }
+
 }

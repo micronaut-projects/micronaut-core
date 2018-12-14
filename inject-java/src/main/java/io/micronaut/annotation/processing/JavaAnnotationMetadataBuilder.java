@@ -73,7 +73,13 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      * @param modelUtils The model utils
      * @param filer The filer
      */
-    public JavaAnnotationMetadataBuilder(Elements elements, Messager messager, AnnotationUtils annotationUtils, Types types, ModelUtils modelUtils, Filer filer) {
+    public JavaAnnotationMetadataBuilder(
+            Elements elements,
+            Messager messager,
+            AnnotationUtils annotationUtils,
+            Types types,
+            ModelUtils modelUtils,
+            Filer filer) {
         this.elementUtils = elements;
         this.messager = messager;
         this.annotationUtils = annotationUtils;
@@ -124,14 +130,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected VisitorContext createVisitorContext() {
-        return new JavaVisitorContext(
-                messager,
-                elementUtils,
-                annotationUtils,
-                types,
-                modelUtils,
-                filer
-        );
+        return annotationUtils.newVisitorContext();
     }
 
     @Override

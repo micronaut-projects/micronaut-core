@@ -126,20 +126,24 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @SuppressWarnings("MagicNumber")
     public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... names) {
         super(conversionService);
-        Set<String> specifiedNames = new LinkedHashSet<>(3);
-        specifiedNames.addAll(Arrays.asList(names));
+        Set<String> environments = new LinkedHashSet<>(3);
+        List<String> specifiedNames = Arrays.asList(names);
 
         if (!specifiedNames.contains(Environment.FUNCTION) && shouldDeduceEnvironments()) {
             EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage();
-            specifiedNames.addAll(environmentsAndPackage.enviroments);
+            environments.addAll(environmentsAndPackage.enviroments);
             String aPackage = environmentsAndPackage.aPackage;
             if (aPackage != null) {
                 packages.add(aPackage);
             }
         }
+        environments.addAll(specifiedNames);
 
         this.classLoader = resourceLoader.getClassLoader();
-        this.names = specifiedNames;
+        this.names = environments;
+        if (LOG.isInfoEnabled() && !environments.isEmpty()) {
+            LOG.info("Established active environments: {}", environments);
+        }
         conversionService.addConverter(
             CharSequence.class, Class.class, new StringToClassConverter(classLoader)
         );
@@ -625,10 +629,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             .flatMap(s -> Arrays.stream(s.split(",")))
             .map(String::trim)
             .forEach(environments::add);
-
-        if (LOG.isInfoEnabled() && !environments.isEmpty()) {
-            LOG.info("Established active environments: {}", environments);
-        }
 
         return environmentsAndPackage;
     }

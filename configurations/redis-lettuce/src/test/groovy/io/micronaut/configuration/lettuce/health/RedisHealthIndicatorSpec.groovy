@@ -30,11 +30,13 @@ import spock.lang.Specification
  * @since 1.0
  */
 class RedisHealthIndicatorSpec extends Specification {
-    
+
+    private static String MAX_HEAP_SETTING = "maxmemory 256M"
+
     void "test redis health indicator"() {
         given:
         def port = SocketUtils.findAvailableTcpPort()
-        RedisServer redisServer = new RedisServer(port)
+        RedisServer redisServer = RedisServer.builder().port(port).setting(MAX_HEAP_SETTING).build()
         redisServer.start()
 
         when:

@@ -25,6 +25,7 @@ import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.annotation.Value
 import io.micronaut.context.env.PropertySource
 import org.springframework.transaction.PlatformTransactionManager
+import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.annotation.PostConstruct
@@ -37,12 +38,17 @@ import javax.sql.DataSource
  */
 class GormConfigSpec extends Specification {
 
+    @Shared Map sharedConfig = ['hibernate.cache.use_second_level_cache':true,
+                                'hibernate.cache.use_query_cache':false,
+                                'hibernate.cache.region.factory_class':'org.hibernate.cache.ehcache.SingletonEhCacheRegionFactory'
+    ]
+
     void "test beans for custom data source"() {
         given:
         ApplicationContext applicationContext = ApplicationContext.build(
                 [(Settings.SETTING_DB_CREATE):'create-drop',
                  'dataSource.url':'jdbc:h2:mem:someOtherDb',
-                 'dataSource.properties.initialSize':25]
+                 'dataSource.properties.initialSize':25] + sharedConfig
                 )
                 .mainClass(GormConfigSpec)
                 .start()
@@ -58,8 +64,10 @@ class GormConfigSpec extends Specification {
     }
 
     void "test gorm configured correctly"() {
+
         given:
-        ApplicationContext applicationContext = ApplicationContext.build([(Settings.SETTING_DB_CREATE):'create-drop'])
+        def config = [(Settings.SETTING_DB_CREATE): 'create-drop'] + sharedConfig
+        ApplicationContext applicationContext = ApplicationContext.build(config)
                                                                   .mainClass(GormConfigSpec)
                                                                   .start()
 
@@ -91,7 +99,7 @@ class GormConfigSpec extends Specification {
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment
                 .addPackage(getClass().getPackage())
-                .addPropertySource(PropertySource.of("test",[(Settings.SETTING_DB_CREATE):'create-drop']))
+                .addPropertySource(PropertySource.of("test",[(Settings.SETTING_DB_CREATE):'create-drop'] + sharedConfig))
         applicationContext.start()
 
         when:
@@ -122,6 +130,28 @@ class GormConfigSpec extends Specification {
         then:
         count == 1
 
+        when:
+        Book book = transactionService.withTransaction {
+            Book.first()
+        }
+
+        then:
+        book
+        book.dateCreated
+        book.title == 'the stand'
+
+        when:
+        Book updatedBook = transactionService.withTransaction {
+            def b = Book.first()
+            b.title = 'the shining'
+            b.save(flush:true)
+        }
+
+        then:
+        updatedBook
+        updatedBook.dateCreated
+        updatedBook.dateCreated < updatedBook.lastUpdated
+
         cleanup:
         applicationContext.stop()
     }
@@ -130,9 +160,15 @@ class GormConfigSpec extends Specification {
 @Entity
 class Book {
     String title
+    Date dateCreated
+    Date lastUpdated
 
     static constraints = {
         title blank:false
+    }
+
+    static mapping = {
+        cache true
     }
 }
 
