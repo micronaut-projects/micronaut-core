@@ -16,6 +16,7 @@
 
 package io.micronaut.http.server.netty;
 
+import io.micronaut.core.annotation.Internal;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.util.ByteProcessor;
@@ -37,6 +38,7 @@ import java.nio.charset.Charset;
  * @author James Kleeh
  * @since 1.1.0
  */
+@Internal
 public class ByteBufDelegate extends ByteBuf {
 
     private final ByteBuf byteBuf;
