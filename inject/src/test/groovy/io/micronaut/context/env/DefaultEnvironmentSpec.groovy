@@ -34,7 +34,6 @@ class DefaultEnvironmentSpec extends Specification {
         env.getProperty("test.foo.bar", Integer).get() == 10
         env.getRequiredProperty("test.foo.bar", Integer) == 10
         env.getProperty("test.foo.bar", Integer, 20) == 10
-        env.getProperty("user", String).isPresent()
 
         cleanup:
         System.setProperty("test.foo.bar", "")
@@ -296,7 +295,36 @@ class DefaultEnvironmentSpec extends Specification {
         def envNames = env.getActiveNames().toList()
 
         then: "env names should be in the same order as defined in micronaut.environment variable, with test env first"
-        envNames == ["x", "y", "test", "cloud", "ec2", "foo", "bar", "baz"]
+        envNames == ["test", "cloud", "ec2", "foo", "bar", "baz", "x", "y"]
+    }
+
+    @RestoreSystemProperties
+    void "test environments supplied should be a higher priority than deduced and system property"() {
+        when:
+        def env = new DefaultEnvironment()
+
+        then:
+        env.activeNames.size() == 1
+        env.activeNames[0] == "test"
+
+        when:
+        env = new DefaultEnvironment("explicit")
+
+        then:
+        env.activeNames.size() == 2
+        env.activeNames[0] == "test"
+        env.activeNames[1] == "explicit"
+
+        when:
+        System.setProperty("micronaut.environments", "system,property")
+        env = new DefaultEnvironment("explicit")
+
+        then:
+        env.activeNames.size() == 4
+        env.activeNames[0] == "test"
+        env.activeNames[1] == "system"
+        env.activeNames[2] == "property"
+        env.activeNames[3] == "explicit"
     }
 
     private static Environment startEnv(String files) {

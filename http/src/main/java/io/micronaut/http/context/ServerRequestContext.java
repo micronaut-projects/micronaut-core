@@ -46,7 +46,7 @@ public final class ServerRequestContext {
         HttpRequest existing = REQUEST.get();
         boolean isSet = false;
         try {
-            if (existing == null) {
+            if (request != existing) {
                 isSet = true;
                 REQUEST.set(request);
             }
@@ -81,7 +81,7 @@ public final class ServerRequestContext {
         HttpRequest existing = REQUEST.get();
         boolean isSet = false;
         try {
-            if (existing == null) {
+            if (request != existing) {
                 isSet = true;
                 REQUEST.set(request);
             }
@@ -106,7 +106,7 @@ public final class ServerRequestContext {
         HttpRequest existing = REQUEST.get();
         boolean isSet = false;
         try {
-            if (existing == null) {
+            if (request != existing) {
                 isSet = true;
                 REQUEST.set(request);
             }

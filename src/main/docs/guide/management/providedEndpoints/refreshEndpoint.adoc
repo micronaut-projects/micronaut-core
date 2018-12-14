@@ -26,5 +26,4 @@ endpoints:
     refresh:
         enabled: Boolean
         sensitive: Boolean
-        id: String
 ----

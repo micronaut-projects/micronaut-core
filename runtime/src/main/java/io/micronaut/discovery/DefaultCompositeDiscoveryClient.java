@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Primary;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.util.List;
 
 /**
  * The default {@link CompositeDiscoveryClient} that is activated when caching is disabled.
@@ -37,7 +38,16 @@ public class DefaultCompositeDiscoveryClient extends CompositeDiscoveryClient {
      * @param discoveryClients The Discovery clients used for service discovery
      */
     @Inject
-    public DefaultCompositeDiscoveryClient(DiscoveryClient[] discoveryClients) {
+    public DefaultCompositeDiscoveryClient(List<DiscoveryClient> discoveryClients) {
+        super(discoveryClients.toArray(new DiscoveryClient[0]));
+    }
+
+    /**
+     * Create a default composite discovery for the discovery clients.
+     *
+     * @param discoveryClients The Discovery clients used for service discovery
+     */
+    public DefaultCompositeDiscoveryClient(DiscoveryClient... discoveryClients) {
         super(discoveryClients);
     }
 }

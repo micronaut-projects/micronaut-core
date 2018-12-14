@@ -18,13 +18,11 @@ package io.micronaut.cache;
 
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Default implementation of the {@link CacheManager} interface.
@@ -44,15 +42,29 @@ public class DefaultCacheManager<C> implements CacheManager<C> {
      *
      * @param caches List of synchronous cache implementations
      */
-    public DefaultCacheManager(SyncCache<C>... caches) {
-        if (ArrayUtils.isEmpty(caches)) {
+    @Inject public DefaultCacheManager(List<SyncCache<C>> caches) {
+        if (CollectionUtils.isEmpty(caches)) {
             this.cacheMap = Collections.emptyMap();
         } else {
-            this.cacheMap = new LinkedHashMap<>(caches.length);
+            this.cacheMap = new LinkedHashMap<>(caches.size());
             for (SyncCache<C> cache : caches) {
-                this.cacheMap.put(cache.getName(), cache);
+                final String cacheName = cache.getName();
+                if (cacheMap.containsKey(cacheName)) {
+                    throw new ConfigurationException("Cannot registry duplicate cache [" + cache + "] with cache manager. Ensure configured cache names are unique. Cache already configured for name [" + cacheName + "]: " + cacheMap.get(cacheName));
+                } else {
+                    this.cacheMap.put(cacheName, cache);
+                }
             }
         }
+    }
+
+    /**
+     * Create default cache manager for the given caches.
+     *
+     * @param caches List of synchronous cache implementations
+     */
+    public DefaultCacheManager(SyncCache<C>... caches) {
+        this(Arrays.asList(caches));
     }
 
     @Override

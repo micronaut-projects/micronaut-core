@@ -15,11 +15,11 @@
  */
 package io.micronaut.configuration.hibernate.validator
 
-import org.hibernate.validator.constraints.URL
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.annotation.Value
 import io.micronaut.context.exceptions.BeanInstantiationException
+import org.hibernate.validator.constraints.URL
 import spock.lang.Specification
 
 import javax.inject.Singleton
@@ -41,14 +41,14 @@ class ValidatedBeanSpec extends Specification {
 
         then:
         def e = thrown(BeanInstantiationException)
-        e.message == '''\
+        LineEndingStripper.strip(e.message) == LineEndingStripper.strip('''\
 Error instantiating bean of type  [io.micronaut.configuration.hibernate.validator.ValidatedBeanSpec$A]
 
 Message: Validation failed for bean definition [io.micronaut.configuration.hibernate.validator.ValidatedBeanSpec$A]
 List of constraint violations:[
 \turl - must be a valid URL
 ]
-'''
+''')
 
     }
 

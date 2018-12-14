@@ -32,9 +32,11 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.*;
+import java.util.regex.Pattern;
 
 import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.readMetadataUrl;
 
@@ -52,6 +54,8 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
     private static final Logger LOG = LoggerFactory.getLogger(AmazonComputeInstanceMetadataResolver.class);
     private static final int READ_TIMEOUT_IN_MILLS = 5000;
     private static final int CONNECTION_TIMEOUT_IN_MILLS = 5000;
+
+    private static final Pattern DRIVE_LETTER_PATTERN = Pattern.compile("^\\/*[a-zA-z]:.*$");
 
     private final ObjectMapper objectMapper;
     private final AmazonMetadataConfiguration configuration;
@@ -166,22 +170,18 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
      * @return AWS EC2 metadata information
      * @throws IOException Signals that an I/O exception of some sort has occurred
      */
-    protected String readEc2MetadataUrl(URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException {
-
-        URLConnection urlConnection = url.openConnection();
+    private String readEc2MetadataUrl(URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException {
 
         if (url.getProtocol().equalsIgnoreCase("file")) {
-            if (url.getPath().indexOf(':') != -1) {
-                //rebuild url path because windows can't have paths with colons
-                url = new URL(url.getProtocol(), url.getHost(), url.getFile().replace(':', '_'));
-                urlConnection = url.openConnection();
-            }
+            url = rewriteUrl(url);
+            URLConnection urlConnection = url.openConnection();
             urlConnection.connect();
             try (BufferedReader in = new BufferedReader(
                 new InputStreamReader(urlConnection.getInputStream()))) {
                 return IOUtils.readText(in);
             }
         } else {
+            URLConnection urlConnection = url.openConnection();
             HttpURLConnection uc = (HttpURLConnection) urlConnection;
 
             uc.setConnectTimeout(connectionTimeoutMs);
@@ -194,5 +194,18 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
                 return IOUtils.readText(in);
             }
         }
+    }
+
+    private URL rewriteUrl(URL url) throws MalformedURLException {
+        String path = url.getPath();
+        if (path.indexOf(':') != -1) {
+            boolean driveLetterFound = DRIVE_LETTER_PATTERN.matcher(path).matches();
+            path = path.replace(':', '_');
+            if (driveLetterFound) {
+                path = path.replaceFirst("_", ":");
+            }
+            url = new URL(url.getProtocol(), url.getHost(), path);
+        }
+        return url;
     }
 }

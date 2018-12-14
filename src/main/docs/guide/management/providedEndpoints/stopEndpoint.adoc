@@ -13,7 +13,6 @@ endpoints:
     stop:
         enabled: Boolean
         sensitive: Boolean
-        id: String
 ----
 
 NOTE: By default, the stop endpoint is disabled and needs to be explicitly enabled to be used.

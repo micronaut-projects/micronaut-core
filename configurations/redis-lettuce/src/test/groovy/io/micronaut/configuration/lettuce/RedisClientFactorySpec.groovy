@@ -29,10 +29,13 @@ import spock.lang.Specification
  */
 class RedisClientFactorySpec extends Specification{
 
+
+    private static final String MAX_HEAP_SETTING = "maxmemory 256M"
+
     void "test redis server config by port"() {
         given:
         def port = SocketUtils.findAvailableTcpPort()
-        RedisServer redisServer = new RedisServer(port)
+        RedisServer redisServer = new RedisServer(port).builder().port(port).setting(MAX_HEAP_SETTING).build()
         redisServer.start()
 
         when:
@@ -52,7 +55,7 @@ class RedisClientFactorySpec extends Specification{
     void "test redis server config by URI"() {
         given:
         def port = SocketUtils.findAvailableTcpPort()
-        RedisServer redisServer = new RedisServer(port)
+        RedisServer redisServer = RedisServer.builder().port(port).setting(MAX_HEAP_SETTING).build()
         redisServer.start()
 
         when:

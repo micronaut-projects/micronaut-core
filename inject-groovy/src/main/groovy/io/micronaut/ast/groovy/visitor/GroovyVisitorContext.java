@@ -30,7 +30,6 @@ import io.micronaut.inject.writer.GeneratedFile;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.ModuleNode;
 import org.codehaus.groovy.control.ErrorCollector;
 import org.codehaus.groovy.control.Janitor;
 import org.codehaus.groovy.control.SourceUnit;
@@ -54,7 +53,7 @@ import java.util.Set;
  * @since 1.0
  */
 public class GroovyVisitorContext implements VisitorContext {
-    private static final String ATTR_VISITOR_ATTRIBUTES = "micronaut.visitor.attributes";
+    private static final MutableConvertibleValues<Object> VISITOR_ATTRIBUTES = new MutableConvertibleValuesMap<>();
     private final ErrorCollector errorCollector;
     private final SourceUnit sourceUnit;
     private final MutableConvertibleValues<Object> attributes;
@@ -65,17 +64,7 @@ public class GroovyVisitorContext implements VisitorContext {
     public GroovyVisitorContext(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit;
         this.errorCollector = sourceUnit.getErrorCollector();
-        final ModuleNode ast = sourceUnit.getAST();
-        final boolean hasModule = ast != null;
-        final Object attrs = hasModule ? ast.getNodeMetaData(ATTR_VISITOR_ATTRIBUTES) : null;
-        if (attrs instanceof MutableConvertibleValues) {
-            this.attributes = (MutableConvertibleValues<Object>) attrs;
-        } else {
-            this.attributes = new MutableConvertibleValuesMap<>();
-            if (hasModule) {
-                ast.putNodeMetaData(ATTR_VISITOR_ATTRIBUTES, this.attributes);
-            }
-        }
+        this.attributes = VISITOR_ATTRIBUTES;
     }
 
     @Override

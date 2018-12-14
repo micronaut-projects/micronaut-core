@@ -16,9 +16,9 @@
 
 package io.micronaut.configuration.lettuce.session
 
-import io.micronaut.jackson.serialize.JacksonObjectSerializer
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.event.ApplicationEventListener
+import io.micronaut.jackson.serialize.JacksonObjectSerializer
 import io.micronaut.session.Session
 import io.micronaut.session.event.AbstractSessionEvent
 import io.micronaut.session.event.SessionCreatedEvent
