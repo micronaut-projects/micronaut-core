@@ -128,13 +128,6 @@ class HttpClientTracingPublisher implements Publisher<HttpResponse<?>> {
         span.kind(Span.Kind.CLIENT);
         span.tag(AbstractOpenTracingFilter.TAG_METHOD, request.getMethod().name());
         String path = request.getPath();
-        Optional<Object> serviceIdOptional = request.getAttribute(HttpAttributes.SERVICE_ID);
-        if (serviceIdOptional.isPresent()) {
-            String serviceId = serviceIdOptional.get().toString();
-            if (StringUtils.isNotEmpty(serviceId) && serviceId.startsWith("/")) {
-                path = StringUtils.prependUri(serviceId, path);
-            }
-        }
         span.tag(AbstractOpenTracingFilter.TAG_PATH, path);
     }
 
