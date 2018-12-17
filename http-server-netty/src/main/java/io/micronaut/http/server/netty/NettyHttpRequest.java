@@ -30,6 +30,7 @@ import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.cookies.NettyCookies;
 import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.http.server.exceptions.InternalServerException;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
@@ -43,8 +44,11 @@ import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCounted;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -277,21 +281,36 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
                 Attribute attribute = (Attribute) httpContent;
                 try {
                     String newValue = attribute.getValue();
-                    //noinspection unchecked
-                    ((Map) body).compute(attribute.getName(), (key, oldValue) -> {
-                        if (oldValue == null) {
-                            return newValue;
-                        } else if (oldValue instanceof Collection) {
-                            //noinspection unchecked
-                            ((Collection) oldValue).add(newValue);
-                            return oldValue;
-                        } else {
-                            ArrayList<Object> values = new ArrayList<>(2);
-                            values.add(oldValue);
-                            values.add(newValue);
-                            return values;
-                        }
-                    });
+                    if (newValue != null) {
+
+                        //noinspection unchecked
+                        ((Map) body).compute(attribute.getName(), (key, oldValue) -> {
+                            if (oldValue == null || !attribute.isCompleted()) {
+                                try {
+                                    return URLDecoder.decode(newValue, StandardCharsets.UTF_8.name());
+                                } catch (UnsupportedEncodingException e) {
+                                    throw new InternalServerException("No available codec: " + StandardCharsets.UTF_8.name());
+                                }
+                            } else if (oldValue instanceof Collection) {
+                                //noinspection unchecked
+                                try {
+                                    ((Collection) oldValue).add(URLDecoder.decode(newValue, StandardCharsets.UTF_8.name()));
+                                } catch (UnsupportedEncodingException e) {
+                                    throw new InternalServerException("No available codec: " + StandardCharsets.UTF_8.name());
+                                }
+                                return oldValue;
+                            } else {
+                                ArrayList<Object> values = new ArrayList<>(2);
+                                values.add(oldValue);
+                                try {
+                                    values.add(URLDecoder.decode(newValue, StandardCharsets.UTF_8.name()));
+                                } catch (UnsupportedEncodingException e) {
+                                    throw new InternalServerException("No available codec: " + StandardCharsets.UTF_8.name());
+                                }
+                                return values;
+                            }
+                        });
+                    }
                 } catch (IOException e) {
                     // ignore
                 }
