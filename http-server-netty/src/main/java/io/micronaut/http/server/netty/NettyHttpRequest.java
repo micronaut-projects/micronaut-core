@@ -39,15 +39,11 @@ import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.multipart.AbstractHttpData;
-import io.netty.handler.codec.http.multipart.AbstractMemoryHttpData;
-import io.netty.handler.codec.http.multipart.Attribute;
-import io.netty.handler.codec.http.multipart.MemoryAttribute;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCounted;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.Charset;
@@ -74,7 +70,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final MutableConvertibleValues<Object> attributes;
     private NettyCookies nettyCookies;
     private List<ByteBufHolder> receivedContent = new ArrayList<>();
-    private Set<AbstractHttpData> receivedData = Collections.newSetFromMap(new IdentityHashMap<>());
+    private Map<Integer, AbstractHttpData> receivedData = new LinkedHashMap<>();
 
     private Object body;
     private RouteMatch<?> matchedRoute;
@@ -189,10 +185,10 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     protected Object buildBody() {
         if (!receivedData.isEmpty()) {
-            Map body = new HashMap(receivedData.size());
+            Map body = new LinkedHashMap(receivedData.size());
             boolean isUrlEncoded = getContentType().map(ct -> ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)).orElse(false);
 
-            for (AbstractHttpData data: receivedData) {
+            for (AbstractHttpData data: receivedData.values()) {
                 String newValue = getContent(data, isUrlEncoded);
                 //noinspection unchecked
                 body.compute(data.getName(), (key, oldValue) -> {
@@ -262,7 +258,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         for (ByteBufHolder byteBuf : receivedContent) {
             releaseIfNecessary(byteBuf);
         }
-        for (ByteBufHolder byteBuf : receivedData) {
+        for (ByteBufHolder byteBuf : receivedData.values()) {
             releaseIfNecessary(byteBuf);
         }
         if (this.body != null && body instanceof ReferenceCounted) {
@@ -318,7 +314,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
             if (httpContent.refCnt() == 1) {
                 httpContent.retain();
             }
-            receivedData.add((AbstractHttpData) httpContent);
+            receivedData.putIfAbsent(System.identityHashCode(httpContent), (AbstractHttpData) httpContent);
         } else {
             receivedContent.add(httpContent);
         }
