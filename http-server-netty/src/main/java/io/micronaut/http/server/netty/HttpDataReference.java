@@ -229,7 +229,7 @@ public class HttpDataReference {
                             } else {
                                 data.delete();
                             }
-                        } catch (IOException e) {}
+                        } catch (IOException e) { }
                         removeComponent(index);
                         return true;
                     });

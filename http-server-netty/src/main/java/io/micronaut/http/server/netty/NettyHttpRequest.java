@@ -101,7 +101,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         this.attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4), conversionService);
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
-        this.body = SupplierUtil.memoizedNonEmpty(() -> Optional.ofNullable((T)buildBody()));
+        this.body = SupplierUtil.memoizedNonEmpty(() -> Optional.ofNullable((T) buildBody()));
     }
 
     @Override

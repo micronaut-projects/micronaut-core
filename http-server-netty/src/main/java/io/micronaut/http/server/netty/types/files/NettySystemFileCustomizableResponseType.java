@@ -19,7 +19,6 @@ package io.micronaut.http.server.netty.types.files;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
-import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.http.server.netty.SmartHttpContentCompressor;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
@@ -32,7 +31,6 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedFile;
-import io.netty.util.concurrent.GenericFutureListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
