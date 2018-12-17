@@ -38,7 +38,7 @@ class ConstructorCircularDependencyFailureSpec extends Specification {
 
         then:"The implementation is injected"
         def e = thrown(CircularDependencyException)
-        LineEndingStripper.strip(e.message) == LineEndingStripper.strip('''\
+        e.message.normalize() == '''\
 Failed to inject value for field [a] of class: io.micronaut.inject.failures.ConstructorCircularDependencyFailureSpec$B
 
 Message: Circular dependency detected
@@ -47,7 +47,7 @@ B.a --> new A([C c]) --> new C([B b])
 ^                                  |
 |                                  |
 |                                  |
-+----------------------------------+''')
++----------------------------------+'''
     }
 
     static class C {

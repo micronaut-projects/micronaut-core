@@ -65,7 +65,7 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
      * @param conversionService The conversion service
      */
     public ConvertibleMultiValuesMap(Map<CharSequence, List<V>> values, ConversionService<?> conversionService) {
-        this.values = Collections.unmodifiableMap(values);
+        this.values = wrapValues(values);
         this.conversionService = conversionService;
     }
 
@@ -133,4 +133,14 @@ public class ConvertibleMultiValuesMap<V> implements ConvertibleMultiValues<V> {
     public Collection<List<V>> values() {
         return Collections.unmodifiableCollection(values.values());
     }
+
+    /**
+     * Wraps the values (by default in an unmodifiable map).
+     * @param values The values
+     * @return The wrapped values.
+     */
+    protected Map<CharSequence, List<V>> wrapValues(Map<CharSequence, List<V>> values) {
+        return Collections.unmodifiableMap(values);
+    }
+
 }
