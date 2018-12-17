@@ -86,6 +86,7 @@ import io.netty.handler.codec.DecoderResult;
 import io.netty.handler.codec.TooLongFrameException;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.HttpHeaderValues;
+import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.FileUpload;
 import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.timeout.IdleState;
@@ -736,13 +737,19 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 };
 
                             } else {
-                                value = () -> {
-                                    if (data.refCnt() > 0) {
-                                        return data;
-                                    } else {
-                                        return null;
-                                    }
-                                };
+                                if (data instanceof Attribute && !data.isCompleted()) {
+                                    request.addContent(data);
+                                    s.request(1);
+                                    return;
+                                } else {
+                                    value = () -> {
+                                        if (data.refCnt() > 0) {
+                                            return data;
+                                        } else {
+                                            return null;
+                                        }
+                                    };
+                                }
                             }
 
                             if (!executed) {

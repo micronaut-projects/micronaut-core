@@ -1698,7 +1698,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             Emitter<io.micronaut.http.HttpResponse<O>> emitter,
             Argument<O> bodyType, Argument<E> errorType) {
         ChannelPipeline pipeline = channel.pipeline();
-        pipeline.addLast(HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, new SimpleChannelInboundHandler<FullHttpResponse>() {
+        pipeline.addLast(HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, new SimpleChannelInboundHandler<FullHttpResponse>(false) {
 
             AtomicBoolean complete = new AtomicBoolean(false);
 
@@ -1773,7 +1773,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     }
                 } finally {
                     pipeline.remove(this);
-                    if (fullResponse.refCnt() > 1) {
+                    if (fullResponse.refCnt() > 0) {
                         try {
                             ReferenceCountUtil.release(fullResponse);
                         } catch (Throwable e) {
