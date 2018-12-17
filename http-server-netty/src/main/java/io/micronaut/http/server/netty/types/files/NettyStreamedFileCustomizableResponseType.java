@@ -17,6 +17,7 @@
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
@@ -38,12 +39,24 @@ import java.net.URL;
  */
 public class NettyStreamedFileCustomizableResponseType extends StreamedFile implements NettyFileCustomizableResponseType {
 
+    private final StreamedFile delegate;
+
     /**
      * @param inputStream The input stream
-     * @param name        The name
+     * @param name        The file name
      */
     public NettyStreamedFileCustomizableResponseType(InputStream inputStream, String name) {
-        super(inputStream, name);
+        super(inputStream, MediaType.forFilename(name));
+        this.delegate = null;
+    }
+
+    /**
+     * @param inputStream The input stream
+     * @param mediaType   The file media type
+     */
+    public NettyStreamedFileCustomizableResponseType(InputStream inputStream, MediaType mediaType) {
+        super(inputStream, mediaType);
+        this.delegate = null;
     }
 
     /**
@@ -51,17 +64,20 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
      */
     public NettyStreamedFileCustomizableResponseType(URL url) {
         super(url);
+        this.delegate = null;
     }
 
     /**
      * @param delegate The streamed file
      */
     public NettyStreamedFileCustomizableResponseType(StreamedFile delegate) {
-        super(delegate.getInputStream(), delegate.getName(), delegate.getLastModified(), delegate.getLength());
+        super(delegate.getInputStream(), delegate.getMediaType(), delegate.getLastModified(), delegate.getLength());
+        this.delegate = delegate;
     }
 
     @Override
     public void process(MutableHttpResponse response) {
+        delegate.process(response);
         long length = getLength();
         if (length > -1) {
             response.header(io.micronaut.http.HttpHeaders.CONTENT_LENGTH, String.valueOf(length));

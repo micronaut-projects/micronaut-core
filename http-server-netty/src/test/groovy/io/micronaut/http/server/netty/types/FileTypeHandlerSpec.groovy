@@ -31,6 +31,7 @@ import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableR
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType
 import io.micronaut.http.server.types.files.AttachedFile
 import io.micronaut.http.server.types.files.StreamedFile
+import io.micronaut.http.server.types.files.SystemFile
 import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType
 
 import java.time.Instant
@@ -117,9 +118,53 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         response.body() == tempFileContents
     }
 
+    void "test when a system file is returned"() {
+        when:
+        def response = rxClient.exchange('/test-system/download', String).blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.header(CONTENT_TYPE) == "text/html"
+        response.header(CONTENT_DISPOSITION).startsWith("attachment; filename=\"fileTypeHandlerSpec")
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.header(CACHE_CONTROL) == "private, max-age=60"
+        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(tempFile.lastModified()), ZoneId.of("GMT")).truncatedTo(ChronoUnit.SECONDS)
+        response.body() == tempFileContents
+    }
+
+    void "test when an attached streamed file is returned"() {
+        when:
+        def response = rxClient.exchange('/test-stream/download', String).blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.header(CONTENT_TYPE) == "text/html"
+        response.header(CONTENT_DISPOSITION).startsWith("attachment; filename=\"fileTypeHandlerSpec")
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.header(CACHE_CONTROL) == "private, max-age=60"
+        response.body() == tempFileContents
+    }
+
     void "test when an attached file is returned with a name"() {
         when:
         def response = rxClient.exchange('/test/different-name', String).blockingFirst()
+
+        then: "the content type is still based on the file extension"
+        response.code() == HttpStatus.OK.code
+        response.header(CONTENT_TYPE) == "text/html"
+        response.header(CONTENT_DISPOSITION) == "attachment; filename=\"abc.xyz\""
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.header(CACHE_CONTROL) == "private, max-age=60"
+        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(tempFile.lastModified()), ZoneId.of("GMT")).truncatedTo(ChronoUnit.SECONDS)
+        response.body() == tempFileContents
+    }
+
+    void "test when a system file is returned with a name"() {
+        when:
+        def response = rxClient.exchange('/test-system/different-name', String).blockingFirst()
 
         then: "the content type is still based on the file extension"
         response.code() == HttpStatus.OK.code
@@ -147,6 +192,35 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         response.body() == tempFileContents
     }
 
+    void "test the content type is honored when a system file response is returned"() {
+        when:
+        def response = rxClient.exchange('/test-system/custom-content-type', String).blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.header(CONTENT_TYPE) == "text/plain"
+        response.header(CONTENT_DISPOSITION) == "attachment; filename=\"temp.html\""
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.header(CACHE_CONTROL) == "private, max-age=60"
+        response.headers.getDate(LAST_MODIFIED) == ZonedDateTime.ofInstant(Instant.ofEpochMilli(tempFile.lastModified()), ZoneId.of("GMT")).truncatedTo(ChronoUnit.SECONDS)
+        response.body() == tempFileContents
+    }
+
+    void "test the content type is honored when a streamed file response is returned"() {
+        when:
+        def response = rxClient.exchange('/test-stream/custom-content-type', String).blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.header(CONTENT_TYPE) == "text/plain"
+        response.header(CONTENT_DISPOSITION) == "attachment; filename=\"temp.html\""
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        response.headers.getDate(DATE) < response.headers.getDate(EXPIRES)
+        response.header(CACHE_CONTROL) == "private, max-age=60"
+        response.body() == tempFileContents
+    }
+
     void "test supports"() {
         when:
         FileTypeHandler fileTypeHandler = new FileTypeHandler(new FileTypeHandlerConfiguration())
@@ -162,6 +236,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         StreamedFile                              | true
         File                                      | true
         AttachedFile                              | true
+        SystemFile                                | true
     }
 
     @Controller('/test')
@@ -197,6 +272,44 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         @Get('/custom-content-type')
         HttpResponse<AttachedFile> customContentType() {
             HttpResponse.ok(new AttachedFile(tempFile, "temp.html")).contentType(MediaType.TEXT_PLAIN_TYPE)
+        }
+    }
+
+    @Controller('/test-system')
+    @Requires(property = 'spec.name', value = 'FileTypeHandlerSpec')
+    static class TestSystemController {
+
+        @Get('/download')
+        SystemFile download() {
+            new SystemFile(tempFile).attach()
+        }
+
+        @Get('/different-name')
+        SystemFile differentName() {
+            new SystemFile(tempFile).attach("abc.xyz")
+        }
+
+        @Get('/custom-content-type')
+        HttpResponse<SystemFile> customContentType() {
+            HttpResponse.ok(new SystemFile(tempFile, MediaType.TEXT_PLAIN_TYPE).attach("temp.html"))
+        }
+    }
+
+    @Controller('/test-stream')
+    @Requires(property = 'spec.name', value = 'FileTypeHandlerSpec')
+    static class TestStreamController {
+
+
+        @Get('/download')
+        StreamedFile download() {
+            new StreamedFile(new FileInputStream(tempFile), "abc.html").attach("fileTypeHandlerSpec.html")
+        }
+
+
+        @Get('/custom-content-type')
+        HttpResponse<StreamedFile> customContentType() {
+            HttpResponse.ok(new StreamedFile(new FileInputStream(tempFile), "abc.html").attach("temp.html"))
+                    .contentType(MediaType.TEXT_PLAIN_TYPE)
         }
     }
 }
