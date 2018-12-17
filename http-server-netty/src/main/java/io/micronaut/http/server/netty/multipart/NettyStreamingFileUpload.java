@@ -25,7 +25,6 @@ import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.reactivex.Flowable;
-import io.reactivex.Observable;
 import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
 import org.reactivestreams.Publisher;
