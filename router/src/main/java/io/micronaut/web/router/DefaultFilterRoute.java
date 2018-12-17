@@ -77,7 +77,7 @@ class DefaultFilterRoute implements FilterRoute {
         if (httpMethods != null && !httpMethods.contains(method)) {
             return Optional.empty();
         }
-        String uriStr = uri.toString();
+        String uriStr = uri.getPath();
         for (String pattern : patterns) {
             if (PathMatcher.ANT.matches(pattern, uriStr)) {
                 HttpFilter filter = getFilter();
