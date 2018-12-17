@@ -21,6 +21,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
+import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
@@ -72,12 +73,23 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1032')
-    void "test POST SAML form"() {
+    void "test POST SAML form url encoded"() {
         given:
         SamlClient client = embeddedServer.applicationContext.getBean(SamlClient)
 
         expect:
         client.process(SAML_DATA) == SAML_DATA
+    }
+
+    @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1032')
+    void "test POST SAML form multipart form data"() {
+        given:
+        MultipartBody body = MultipartBody.builder().addPart("SAMLResponse", SAML_DATA).build()
+        String data = rxClient.retrieve(HttpRequest.POST("/form/saml/test/form-data", body)
+                .contentType(MediaType.MULTIPART_FORM_DATA_TYPE), String).blockingFirst()
+
+        expect:
+        data == SAML_DATA
     }
     
     @Controller(value = '/form', consumes = MediaType.APPLICATION_FORM_URLENCODED)
@@ -101,10 +113,20 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
 
     @Controller('/form/saml/test')
     static class MainController {
+
         @Post(consumes = MediaType.APPLICATION_FORM_URLENCODED)
         public String process(String SAMLResponse) {
-            System.out.println("Response: " + SAMLResponse);
-            System.out.println("Response length: " + SAMLResponse.length());
+            System.out.println("Response: " + SAMLResponse)
+            System.out.println("Response length: " + SAMLResponse.length())
+            assert SAMLResponse == FormDataBindingSpec.SAML_DATA
+            assert SAMLResponse.length() == FormDataBindingSpec.SAML_DATA.length()
+            return SAMLResponse
+        }
+
+        @Post(uri = "/form-data", consumes = MediaType.MULTIPART_FORM_DATA)
+        public String processFormData(String SAMLResponse) {
+            System.out.println("Response: " + SAMLResponse)
+            System.out.println("Response length: " + SAMLResponse.length())
             assert SAMLResponse == FormDataBindingSpec.SAML_DATA
             assert SAMLResponse.length() == FormDataBindingSpec.SAML_DATA.length()
             return SAMLResponse

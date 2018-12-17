@@ -25,6 +25,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpHeaders;
@@ -37,6 +38,8 @@ import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.handler.codec.http.multipart.AbstractHttpData;
+import io.netty.handler.codec.http.multipart.AbstractMemoryHttpData;
 import io.netty.handler.codec.http.multipart.Attribute;
 import io.netty.handler.codec.http.multipart.MemoryAttribute;
 import io.netty.handler.ssl.SslHandler;
@@ -71,6 +74,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final MutableConvertibleValues<Object> attributes;
     private NettyCookies nettyCookies;
     private List<ByteBufHolder> receivedContent = new ArrayList<>();
+    private Set<AbstractHttpData> receivedData = Collections.newSetFromMap(new IdentityHashMap<>());
 
     private Object body;
     private RouteMatch<?> matchedRoute;
@@ -173,7 +177,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @Override
     public Optional<T> getBody() {
         Object body = this.body;
-        if (body == null && !receivedContent.isEmpty()) {
+        if (body == null) {
             body = buildBody();
             this.body = body;
         }
@@ -183,16 +187,57 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     /**
      * @return A {@link CompositeByteBuf}
      */
-    protected CompositeByteBuf buildBody() {
-        int size = receivedContent.size();
-        CompositeByteBuf byteBufs = channelHandlerContext.alloc().compositeBuffer(size);
-        for (ByteBufHolder holder : receivedContent) {
-            ByteBuf content = holder.content();
-            if (content != null) {
-                byteBufs.addComponent(true, content);
+    protected Object buildBody() {
+        if (!receivedData.isEmpty()) {
+            Map body = new HashMap(receivedData.size());
+            boolean isUrlEncoded = getContentType().map(ct -> ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)).orElse(false);
+
+            for (AbstractHttpData data: receivedData) {
+                String newValue = getContent(data, isUrlEncoded);
+                //noinspection unchecked
+                body.compute(data.getName(), (key, oldValue) -> {
+                    if (oldValue == null) {
+                        return newValue;
+                    } else if (oldValue instanceof Collection) {
+                        //noinspection unchecked
+                        ((Collection) oldValue).add(newValue);
+                        return oldValue;
+                    } else {
+                        ArrayList<Object> values = new ArrayList<>(2);
+                        values.add(oldValue);
+                        values.add(newValue);
+                        return values;
+                    }
+                });
+                data.release();
             }
+            return body;
+        } else if (!receivedContent.isEmpty()) {
+            int size = receivedContent.size();
+            CompositeByteBuf byteBufs = channelHandlerContext.alloc().compositeBuffer(size);
+            for (ByteBufHolder holder : receivedContent) {
+                ByteBuf content = holder.content();
+                if (content != null) {
+                    byteBufs.addComponent(true, content);
+                }
+            }
+            return byteBufs;
+        } else {
+            return null;
         }
-        return byteBufs;
+    }
+
+    private String getContent(AbstractHttpData data, boolean urlDecode) {
+        String newValue;
+        try {
+            newValue = data.getString(serverConfiguration.getDefaultCharset());
+            if (urlDecode) {
+                newValue = URLDecoder.decode(newValue, StandardCharsets.UTF_8.name());
+            }
+        } catch (IOException e) {
+            throw new InternalServerException("Error retrieving or decoding the value for: " + data.getName());
+        }
+        return newValue;
     }
 
     @SuppressWarnings("unchecked")
@@ -215,6 +260,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @Internal
     public void release() {
         for (ByteBufHolder byteBuf : receivedContent) {
+            releaseIfNecessary(byteBuf);
+        }
+        for (ByteBufHolder byteBuf : receivedData) {
             releaseIfNecessary(byteBuf);
         }
         if (this.body != null && body instanceof ReferenceCounted) {
@@ -266,55 +314,11 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     void addContent(ByteBufHolder httpContent) {
-        if (httpContent instanceof MemoryAttribute) {
-            Object body = this.body;
-            if (body == null) {
-                synchronized (this) { // double check
-                    body = this.body;
-                    if (body == null) {
-                        body = new LinkedHashMap<String, Object>();
-                        this.body = body;
-                    }
-                }
+        if (httpContent instanceof AbstractHttpData) {
+            if (httpContent.refCnt() == 1) {
+                httpContent.retain();
             }
-            if (body instanceof Map) {
-                Attribute attribute = (Attribute) httpContent;
-                try {
-                    String newValue = attribute.getValue();
-                    if (newValue != null) {
-
-                        //noinspection unchecked
-                        ((Map) body).compute(attribute.getName(), (key, oldValue) -> {
-                            if (oldValue == null || !attribute.isCompleted()) {
-                                try {
-                                    return URLDecoder.decode(newValue, StandardCharsets.UTF_8.name());
-                                } catch (UnsupportedEncodingException e) {
-                                    throw new InternalServerException("No available codec: " + StandardCharsets.UTF_8.name());
-                                }
-                            } else if (oldValue instanceof Collection) {
-                                //noinspection unchecked
-                                try {
-                                    ((Collection) oldValue).add(URLDecoder.decode(newValue, StandardCharsets.UTF_8.name()));
-                                } catch (UnsupportedEncodingException e) {
-                                    throw new InternalServerException("No available codec: " + StandardCharsets.UTF_8.name());
-                                }
-                                return oldValue;
-                            } else {
-                                ArrayList<Object> values = new ArrayList<>(2);
-                                values.add(oldValue);
-                                try {
-                                    values.add(URLDecoder.decode(newValue, StandardCharsets.UTF_8.name()));
-                                } catch (UnsupportedEncodingException e) {
-                                    throw new InternalServerException("No available codec: " + StandardCharsets.UTF_8.name());
-                                }
-                                return values;
-                            }
-                        });
-                    }
-                } catch (IOException e) {
-                    // ignore
-                }
-            }
+            receivedData.add((AbstractHttpData) httpContent);
         } else {
             receivedContent.add(httpContent);
         }
