@@ -44,7 +44,7 @@ public class NettyPartDataToArrayConverter implements TypeConverter<NettyPartDat
     @Override
     public Optional<byte[]> convert(NettyPartData object, Class<byte[]> targetType, ConversionContext context) {
         try {
-            return conversionService.convert(object.getByteBuf(), targetType, context);
+            return Optional.of(object.getBytes());
         } catch (IOException e) {
             context.reject(e);
             return Optional.empty();
