@@ -52,22 +52,22 @@ public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintVi
 
         if (constraintViolations.size() == 1) {
             ConstraintViolation<?> violation = constraintViolations.iterator().next();
-            JsonError error = new JsonError(createMessage(violation));
+            JsonError error = new JsonError(buildMessage(violation));
             error.link(Link.SELF, Link.of(request.getUri()));
             return HttpResponse.badRequest(error);
         } else {
             JsonError error = new JsonError(HttpStatus.BAD_REQUEST.getReason());
             List<Resource> errors = new ArrayList<>();
             for (ConstraintViolation<?> violation : constraintViolations) {
-                errors.add(new JsonError(createMessage(violation)));
+                errors.add(new JsonError(buildMessage(violation)));
             }
-            error.embedded(Resource.EMBEDDED, errors);
+            error.embedded("errors", errors);
             error.link(Link.SELF, Link.of(request.getUri()));
             return HttpResponse.badRequest(error);
         }
     }
 
-    protected String createMessage(ConstraintViolation violation) {
+    protected String buildMessage(ConstraintViolation violation) {
         Path propertyPath = violation.getPropertyPath();
         StringBuilder message = new StringBuilder();
         boolean first = true;
