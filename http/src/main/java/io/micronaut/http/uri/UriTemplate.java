@@ -52,12 +52,6 @@ public class UriTemplate implements Comparable<UriTemplate> {
     private static final String STRING_PATTERN_PATH = "([^#]*)";
     private static final String STRING_PATTERN_QUERY = "([^#]*)";
     private static final String STRING_PATTERN_REMAINING = "(.*)";
-
-    // Regex patterns that matches URIs. See RFC 3986, appendix B
-    private static final Pattern PATTERN_SCHEME = Pattern.compile("^" + STRING_PATTERN_SCHEME + "//.*");
-    private static final Pattern PATTERN_FULL_URI = Pattern.compile(
-        "^(" + STRING_PATTERN_SCHEME + ")?" + "(//(" + STRING_PATTERN_USER_INFO + "@)?" + STRING_PATTERN_HOST + "(:" + STRING_PATTERN_PORT +
-            ")?" + ")?" + STRING_PATTERN_PATH + "(\\?" + STRING_PATTERN_QUERY + ")?" + "(#" + STRING_PATTERN_REMAINING + ")?");
     private static final char QUERY_OPERATOR = '?';
     private static final char SLASH_OPERATOR = '/';
     private static final char HASH_OPERATOR = '#';
@@ -68,6 +62,13 @@ public class UriTemplate implements Comparable<UriTemplate> {
     private static final char AND_OPERATOR = '&';
     private static final String SLASH_STRING = "/";
     private static final char DOT_OPERATOR = '.';
+
+    // Regex patterns that matches URIs. See RFC 3986, appendix B
+    static final Pattern PATTERN_SCHEME = Pattern.compile("^" + STRING_PATTERN_SCHEME + "//.*");
+    static final Pattern PATTERN_FULL_PATH = Pattern.compile("^([^#\\?]*)(\\?([^#]*))?(\\#(.*))?$");
+    static final Pattern PATTERN_FULL_URI = Pattern.compile(
+            "^(" + STRING_PATTERN_SCHEME + ")?" + "(//(" + STRING_PATTERN_USER_INFO + "@)?" + STRING_PATTERN_HOST + "(:" + STRING_PATTERN_PORT +
+                    ")?" + ")?" + STRING_PATTERN_PATH + "(\\?" + STRING_PATTERN_QUERY + ")?" + "(#" + STRING_PATTERN_REMAINING + ")?");
 
     private final String templateString;
     private final List<PathSegment> segments = new ArrayList<>();
@@ -172,24 +173,22 @@ public class UriTemplate implements Comparable<UriTemplate> {
      */
     public String expand(Map<String, Object> parameters) {
         StringBuilder builder = new StringBuilder();
-        if (segments != null) {
-            boolean previousHasContent = false;
-            boolean anyPreviousHasOperator = false;
-            for (PathSegment segment : segments) {
-                String result = segment.expand(parameters, previousHasContent, anyPreviousHasOperator);
-                if (result == null) {
-                    break;
-                }
-                if (segment instanceof UriTemplateParser.VariablePathSegment) {
-                    if (result.contains(String.valueOf(((UriTemplateParser.VariablePathSegment) segment).getOperator()))) {
-                        anyPreviousHasOperator = true;
-                    }
-                }
-                previousHasContent = result.length() > 0;
-                builder.append(result);
+        boolean previousHasContent = false;
+        boolean anyPreviousHasOperator = false;
+        for (PathSegment segment : segments) {
+            String result = segment.expand(parameters, previousHasContent, anyPreviousHasOperator);
+            if (result == null) {
+                break;
             }
-
+            if (segment instanceof UriTemplateParser.VariablePathSegment) {
+                if (result.contains(String.valueOf(((UriTemplateParser.VariablePathSegment) segment).getOperator()))) {
+                    anyPreviousHasOperator = true;
+                }
+            }
+            previousHasContent = result.length() > 0;
+            builder.append(result);
         }
+
         return builder.toString();
     }
 

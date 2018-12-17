@@ -42,6 +42,18 @@ public final class StringUtils {
      */
     public static final String[] EMPTY_STRING_ARRAY = new String[0];
 
+
+    /**
+     * Constant for an empty String.
+     */
+    public static final String EMPTY_STRING = "";
+
+    /**
+     * a space.
+     */
+    public static final char SPACE = 0x20;
+
+
     private static final Pattern DIGIT_PATTERN = Pattern.compile("\\d+");
 
 

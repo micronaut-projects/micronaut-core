@@ -38,10 +38,10 @@ class PropertyDependencyMissingSpec  extends Specification {
 
         then:"The correct error is thrown"
         def e = thrown(DependencyInjectionException)
-        LineEndingStripper.strip(e.message) == LineEndingStripper.strip('''\
+        e.message.normalize() == '''\
 Failed to inject value for parameter [a] of method [setA] of class: io.micronaut.inject.failures.PropertyDependencyMissingSpec$B
 
-Path Taken: B.setA([A a])''')
+Path Taken: B.setA([A a])'''
     }
 
     static interface A {

@@ -40,11 +40,11 @@ class PropertyExceptionSpec extends Specification {
         then:"The implementation is injected"
         def e = thrown(BeanInstantiationException)
         e.cause.message == 'bad'
-        LineEndingStripper.strip(e.message) == LineEndingStripper.strip('''\
+        e.message.normalize() == '''\
 Error instantiating bean of type  [io.micronaut.inject.failures.PropertyExceptionSpec$B]
 
 Message: bad
-Path Taken: B.a''')
+Path Taken: B.a'''
     }
 
     @Singleton
