@@ -311,10 +311,10 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     @Internal
     void addContent(ByteBufHolder httpContent) {
         if (httpContent instanceof AbstractHttpData) {
-            if (httpContent.refCnt() == 1) {
+            receivedData.computeIfAbsent(System.identityHashCode(httpContent), (key) -> {
                 httpContent.retain();
-            }
-            receivedData.putIfAbsent(System.identityHashCode(httpContent), (AbstractHttpData) httpContent);
+                return (AbstractHttpData) httpContent;
+            });
         } else {
             receivedContent.add(httpContent);
         }
