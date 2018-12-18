@@ -1,31 +1,10 @@
-Apart from https://github.com/micronaut-projects/micronaut-core/milestone/9?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features and improvements.
+Micronaut {version} includes the following changes:
 
-=== Micronaut for Spring
+* https://github.com/micronaut-projects/micronaut-core/issues?q=is%3Aissue+milestone%3A1.0.2+is%3Aclosed+label%3A%22type%3A+bug%22[Issues Resolved]
+* https://github.com/micronaut-projects/micronaut-core/issues?utf8=✓&q=is%3Aissue+milestone%3A1.0.2+is%3Aclosed+label%3A%22type%3A+improvement%22+[Improvements]
+* https://github.com/micronaut-projects/micronaut-core/issues?utf8=✓&q=is%3Aissue+milestone%3A1.0.2+is%3Aclosed+label%3A%22type%3A+enhancement%22+[Enhancements]
 
-It is now possible using Ahead of Time compilation to use the Spring annotation based programming model to build Micronaut applications. See the documentation for https://github.com/micronaut-projects/micronaut-spring[Micronaut for Spring] for details.
+=== Liquibase and Flyway
 
-=== Improved GraalVM Docker Files
+New configurations have been added to support https://micronaut-projects.github.io/micronaut-configuration-flyway/latest/guide/index.html[Flyway] and https://micronaut-projects.github.io/micronaut-configuration-liquibase/latest/guide/index.html[Liquibase] database migrations.
 
-The Dockerfiles for GraalVM have been improved including a new all-in-one docker file that will build a slimmed down image including only your application using:
-
-.Using `DockerAllInOne`
-[source,bash]
-----
-$ docker build . -f DockerfileAllInOne -t hello-world
-----
-
-=== Inheritance support for Swagger
-
-Compile-time support for Swagger has been improved to support inheritance when building the Swagger models.
-
-=== Improvements for JDK 11
-
-Various improvements have been made to improve the Micronaut experience on JDK 11.
-
-=== Improved support for OpenFaaS
-
-The OpenFaaS feature of the CLI now generates an appropriate `function.yml` file so you can use the OpenFaaS CLI to deploy functions implemented in Micronaut.
-
-=== AOP Advice on Factory Beans
-
-It is now possible to apply AOP advice like `@Retryable` at the class level for `@Factory` beans allowing for the container to be dynamic (for example to retry bean creation if it fails in a cloud environment).
