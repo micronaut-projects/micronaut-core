@@ -1,37 +1,5 @@
 Apart from https://github.com/micronaut-projects/micronaut-core/milestone/9?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features and improvements.
 
-=== Micronaut for Spring
+=== Support for Freemarker Views
 
-It is now possible using Ahead of Time compilation to use the Spring annotation based programming model to build Micronaut applications. See the documentation for https://github.com/micronaut-projects/micronaut-spring[Micronaut for Spring] for details.
-
-=== Improved GraalVM Docker Files
-
-The Dockerfiles for GraalVM have been improved including a new all-in-one docker file that will build a slimmed down image including only your application using:
-
-.Using `DockerAllInOne`
-[source,bash]
-----
-$ docker build . -f DockerfileAllInOne -t hello-world
-----
-
-=== Inheritance support for Swagger
-
-Compile-time support for Swagger has been improved to support inheritance when building the Swagger models.
-
-=== Improvements for JDK 11
-
-Various improvements have been made to improve the Micronaut experience on JDK 11.
-
-=== Improved support for OpenFaaS
-
-The OpenFaaS feature of the CLI now generates an appropriate `function.yml` file so you can use the OpenFaaS CLI to deploy functions implemented in Micronaut.
-
-=== AOP Advice on Factory Beans
-
-It is now possible to apply AOP advice like `@Retryable` at the class level for `@Factory` beans allowing for the container to be dynamic (for example to retry bean creation if it fails in a cloud environment).
-
-=== Added support for Flyway and Liquibase
-
-It is now possible to use https://flywaydb.org/[Flyway] and http://www.liquibase.org/[Liquibase] to manage database migrations.
-See https://github.com/micronaut-projects/micronaut-configuration-flyway[Micronaut Flyway] and
-https://github.com/micronaut-projects/micronaut-configuration-liquibase[Micronaut Liquibase] documentation for details.
+Support for rendering <<freemarker,Freemaker Views>> has been added.

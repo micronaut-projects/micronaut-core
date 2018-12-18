@@ -101,6 +101,7 @@ httpServer:
     thymeleaf: Thymeleaf
     handlebars: Handlebars.java
     velocity: Apache Velocity
+    freemarker: Apache Freemarker
   openapi: OpenAPI / Swagger Support
 httpClient:
   title: The HTTP Client
