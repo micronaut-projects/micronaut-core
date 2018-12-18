@@ -83,7 +83,7 @@ class ValidatedSpec extends Specification {
 
         when:
         HttpResponse<String> response = client.toBlocking().exchange(
-                HttpRequest.POST("/validated/pojo", '{"email":"abc"}')
+                HttpRequest.POST("/validated/pojo", '{"email":"abc","name":"Micronaut"}')
                         .contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE),
                 String
         )
@@ -97,6 +97,39 @@ class ValidatedSpec extends Specification {
 
         then:
         result.message == 'pojo.email: Email should be valid'
+
+        cleanup:
+        server.close()
+    }
+
+    def "test validated controller with multiple violations"() {
+        given:
+        ApplicationContext context = ApplicationContext.run([
+                'spec.name': getClass().simpleName
+        ])
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange(
+                HttpRequest.POST("/validated/pojo", '{"email":"abc"}')
+                        .contentType(io.micronaut.http.MediaType.APPLICATION_JSON_TYPE),
+                String
+        )
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.response.code() == HttpStatus.BAD_REQUEST.code
+
+        when:
+        def result = new JsonSlurper().parseText((String) e.response.getBody().get())
+
+        then:
+        result.message == 'Bad Request'
+        result._embedded.errors.size == 2
+        result._embedded.errors.find{it.message == 'pojo.email: Email should be valid'}
+        result._embedded.errors.find{it.message == 'pojo.name: must not be blank'}
 
         cleanup:
         server.close()

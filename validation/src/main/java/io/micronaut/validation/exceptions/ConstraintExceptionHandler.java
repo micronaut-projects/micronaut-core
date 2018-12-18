@@ -52,46 +52,38 @@ public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintVi
 
         if (constraintViolations.size() == 1) {
             ConstraintViolation<?> violation = constraintViolations.iterator().next();
-            StringBuilder message = new StringBuilder();
-            Path propertyPath = violation.getPropertyPath();
-            boolean first = true;
-            Iterator<Path.Node> i = propertyPath.iterator();
-            while (i.hasNext()) {
-                Path.Node node = i.next();
-                if (first) {
-                    first = false;
-                    continue;
-                }
-                message.append(node);
-                if (i.hasNext()) {
-                    message.append('.');
-                }
-            }
-            message.append(": ").append(violation.getMessage());
-            JsonError error = new JsonError(message.toString());
+            JsonError error = new JsonError(buildMessage(violation));
             error.link(Link.SELF, Link.of(request.getUri()));
             return HttpResponse.badRequest(error);
         } else {
             JsonError error = new JsonError(HttpStatus.BAD_REQUEST.getReason());
             List<Resource> errors = new ArrayList<>();
             for (ConstraintViolation<?> violation : constraintViolations) {
-
-                StringBuilder message = new StringBuilder();
-                Path propertyPath = violation.getPropertyPath();
-                boolean first = true;
-                for (Path.Node node : propertyPath) {
-                    if (first) {
-                        first = false;
-                        continue;
-                    }
-                    message.append(node).append('.');
-                }
-                message.append(':').append(violation.getMessage());
-                errors.add(new JsonError(message.toString()));
+                errors.add(new JsonError(buildMessage(violation)));
             }
-            error.embedded(Resource.EMBEDDED, errors);
+            error.embedded("errors", errors);
             error.link(Link.SELF, Link.of(request.getUri()));
             return HttpResponse.badRequest(error);
         }
+    }
+
+    protected String buildMessage(ConstraintViolation violation) {
+        Path propertyPath = violation.getPropertyPath();
+        StringBuilder message = new StringBuilder();
+        boolean first = true;
+        Iterator<Path.Node> i = propertyPath.iterator();
+        while (i.hasNext()) {
+            Path.Node node = i.next();
+            if (first) {
+                first = false;
+                continue;
+            }
+            message.append(node);
+            if (i.hasNext()) {
+                message.append('.');
+            }
+        }
+        message.append(": ").append(violation.getMessage());
+        return message.toString();
     }
 }
