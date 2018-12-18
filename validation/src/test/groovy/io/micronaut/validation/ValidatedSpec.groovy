@@ -26,13 +26,21 @@ import io.micronaut.core.order.OrderUtil
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.MediaType
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import spock.lang.Specification
 
+import javax.validation.ConstraintViolation
 import javax.validation.ConstraintViolationException
+import javax.validation.ValidatorFactory
+import javax.validation.constraints.NotNull
+import javax.validation.constraints.Size
 import java.util.concurrent.ExecutorService
 
 /**
@@ -43,7 +51,7 @@ class ValidatedSpec extends Specification {
 
     def "test order"() {
         given:
-        def list = [new CacheInterceptor(Mock(CacheManager),Mock(CacheErrorHandler),Mock(AsyncCacheErrorHandler), Mock(ExecutorService), Mock(BeanContext)), new ValidatingInterceptor(Optional.empty())]
+        def list = [new CacheInterceptor(Mock(CacheManager), Mock(CacheErrorHandler), Mock(AsyncCacheErrorHandler), Mock(ExecutorService), Mock(BeanContext)), new ValidatingInterceptor(Optional.empty())]
         OrderUtil.sort(list)
 
         expect:
@@ -56,7 +64,7 @@ class ValidatedSpec extends Specification {
         ApplicationContext beanContext = ApplicationContext.run()
         Foo foo = beanContext.getBean(Foo)
 
-        when:"invalid data is passed"
+        when: "invalid data is passed"
 
         foo.testMe("aaa")
 
@@ -64,7 +72,7 @@ class ValidatedSpec extends Specification {
         def e = thrown(ConstraintViolationException)
         e.message == 'testMe.number: numeric value out of bounds (<3 digits>.<2 digits> expected)'
 
-        when:"valid data is passed"
+        when: "valid data is passed"
         def result = foo.testMe("100.00")
 
         then:
@@ -128,8 +136,8 @@ class ValidatedSpec extends Specification {
         then:
         result.message == 'Bad Request'
         result._embedded.errors.size == 2
-        result._embedded.errors.find{it.message == 'pojo.email: Email should be valid'}
-        result._embedded.errors.find{it.message == 'pojo.name: must not be blank'}
+        result._embedded.errors.find { it.message == 'pojo.email: Email should be valid' }
+        result._embedded.errors.find { it.message == 'pojo.name: must not be blank' }
 
         cleanup:
         server.close()
@@ -164,6 +172,144 @@ class ValidatedSpec extends Specification {
 
         cleanup:
         server.close()
+    }
+
+    void "test validated response with annotation"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        TestClient client = server.applicationContext.getBean(TestClient)
+
+        when:
+        client.test1("x")
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.message == 'value: size must be between 2 and 2147483647'
+
+
+        cleanup:
+        server.close()
+    }
+
+    void "test validated response manual rejection"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        TestClient client = server.applicationContext.getBean(TestClient)
+
+        when:
+        client.test2("x")
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.message == 'thing: must not be null'
+
+
+        cleanup:
+        server.close()
+    }
+
+    void "test validated response raw exception creation and null"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        TestClient client = server.applicationContext.getBean(TestClient)
+
+        when:
+        client.test3()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.message == 'something is invalid'
+
+
+        cleanup:
+        server.close()
+    }
+
+    void "test validated response raw exception creation and empty"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        TestClient client = server.applicationContext.getBean(TestClient)
+
+        when:
+        client.test4()
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.message == 'another thing is invalid'
+
+
+        cleanup:
+        server.close()
+    }
+
+    @Client("/validated/tests")
+    static interface TestClient {
+        @Get(value = "/test1/{value}", produces = MediaType.TEXT_PLAIN)
+        String test1(String value)
+
+        @Get(value = "/test2/{value}", produces = MediaType.TEXT_PLAIN)
+        String test2(String value)
+
+        @Get(value = "/test3", produces = MediaType.TEXT_PLAIN)
+        String test3()
+
+        @Get(value = "/test4", produces = MediaType.TEXT_PLAIN)
+        String test4()
+    }
+
+    @Controller("/validated/tests")
+    @Validated
+    static class TestController {
+
+        private final ValidatorFactory validatorFactory
+
+        TestController(ValidatorFactory validatorFactory) {
+            this.validatorFactory = validatorFactory
+        }
+
+        @Get(value = "/test1/{value}", produces = MediaType.TEXT_PLAIN)
+        String test1(@Size(min = 2) String value) {
+            return "got some " + value
+        }
+
+        @Get(value = "/test2/{value}", produces = MediaType.TEXT_PLAIN)
+        String test2(String value) {
+            // here we do validation manually (e.g. within a controller method like here
+            // or maybe in a custom TypeConverter etc.)
+            Some some = new Some()
+
+            // this produces constraint-validation because some.thing is null
+            Set<ConstraintViolation<Some>> violations = validatorFactory.getValidator().validate(some)
+            if (!violations.isEmpty()) {
+                throw new ConstraintViolationException(violations)
+            }
+            return "will never reach this statement"
+        }
+
+        @Get(value = "/test3", produces = MediaType.TEXT_PLAIN)
+        String test3() {
+            throw new ConstraintViolationException("something is invalid", null)
+        }
+
+        @Get(value = "/test4", produces = MediaType.TEXT_PLAIN)
+        String test4() {
+            throw new ConstraintViolationException("another thing is invalid", Collections.emptySet())
+        }
+
+
+        static class Some {
+
+            private String thing
+
+            @NotNull
+            String getThing() {
+                return thing
+            }
+
+            void setThing(String thing) {
+                this.thing = thing
+            }
+        }
     }
 }
 
