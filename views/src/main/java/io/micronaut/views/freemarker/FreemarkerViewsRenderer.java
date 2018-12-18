@@ -63,7 +63,7 @@ public class FreemarkerViewsRenderer implements ViewsRenderer {
         this.viewsConfiguration = viewsConfiguration;
         this.freemarkerMicronautConfiguration = freemarkerMicronautConfiguration;
         this.freemarkerConfiguration = freemarkerMicronautConfiguration.getConfiguration();
-        this.extension = freemarkerMicronautConfiguration.getDefaultExtension();
+        this.extension = EXTENSION_SEPARATOR + freemarkerMicronautConfiguration.getDefaultExtension();
     }
 
     @Override
