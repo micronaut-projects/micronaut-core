@@ -9,6 +9,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.views.ViewsFilter
 import io.micronaut.views.freemarker.FreemarkerViewsRenderer
+import io.micronaut.views.freemarker.FreemarkerViewsRendererConfigurationProperties
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -23,6 +24,7 @@ class FreemarkerViewRendererSpec extends Specification {
                     'micronaut.views.thymeleaf.enabled': false,
                     'micronaut.views.velocity.enabled': false,
                     'micronaut.views.handlebars.enabled': false,
+                    'micronaut.views.freemarker.lazy-imports': true
             ],
             "test")
 
@@ -37,6 +39,13 @@ class FreemarkerViewRendererSpec extends Specification {
 
         then:
         noExceptionThrown()
+
+        when:
+        FreemarkerViewsRendererConfigurationProperties props = embeddedServer.applicationContext.getBean(FreemarkerViewsRendererConfigurationProperties)
+
+        then:
+        !props.configuration.isCacheStorageExplicitlySet()
+        props.configuration.lazyImports
     }
 
     def "invoking /freemarker/home does not specify @View, thus, regular JSON rendering is used"() {
