@@ -22,6 +22,7 @@ class ViewsFilterSpec extends Specification {
                     'micronaut.views.thymeleaf.enabled': false,
                     'micronaut.views.handlebars.enabled': false,
                     'micronaut.views.velocity.enabled': false,
+                    'micronaut.views.freemarker.enabled': false,
             ],
             "test")
 
