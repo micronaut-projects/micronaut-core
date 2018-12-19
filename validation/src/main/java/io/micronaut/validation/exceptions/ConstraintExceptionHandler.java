@@ -29,6 +29,7 @@ import io.micronaut.http.server.exceptions.ExceptionHandler;
 import javax.inject.Singleton;
 import javax.validation.ConstraintViolation;
 import javax.validation.ConstraintViolationException;
+import javax.validation.ElementKind;
 import javax.validation.Path;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -49,8 +50,11 @@ public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintVi
     @Override
     public HttpResponse<JsonError> handle(HttpRequest request, ConstraintViolationException exception) {
         Set<ConstraintViolation<?>> constraintViolations = exception.getConstraintViolations();
-
-        if (constraintViolations.size() == 1) {
+        if (constraintViolations == null || constraintViolations.isEmpty()) {
+            JsonError error = new JsonError(exception.getMessage() == null ? HttpStatus.BAD_REQUEST.getReason() : exception.getMessage());
+            error.link(Link.SELF, Link.of(request.getUri()));
+            return HttpResponse.badRequest(error);
+        } else if (constraintViolations.size() == 1) {
             ConstraintViolation<?> violation = constraintViolations.iterator().next();
             JsonError error = new JsonError(buildMessage(violation));
             error.link(Link.SELF, Link.of(request.getUri()));
@@ -70,12 +74,10 @@ public class ConstraintExceptionHandler implements ExceptionHandler<ConstraintVi
     protected String buildMessage(ConstraintViolation violation) {
         Path propertyPath = violation.getPropertyPath();
         StringBuilder message = new StringBuilder();
-        boolean first = true;
         Iterator<Path.Node> i = propertyPath.iterator();
         while (i.hasNext()) {
             Path.Node node = i.next();
-            if (first) {
-                first = false;
+            if (node.getKind() == ElementKind.METHOD || node.getKind() == ElementKind.CONSTRUCTOR) {
                 continue;
             }
             message.append(node);
