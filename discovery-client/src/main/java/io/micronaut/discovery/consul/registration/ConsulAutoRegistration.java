@@ -32,6 +32,7 @@ import io.micronaut.discovery.consul.client.v1.NewCheck;
 import io.micronaut.discovery.consul.client.v1.NewServiceEntry;
 import io.micronaut.discovery.consul.client.v1.TTLCheck;
 import io.micronaut.discovery.exceptions.DiscoveryException;
+import io.micronaut.discovery.registration.RegistrationException;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.health.HeartbeatConfiguration;
 import io.micronaut.http.HttpStatus;
@@ -41,8 +42,10 @@ import io.reactivex.Single;
 import org.reactivestreams.Publisher;
 
 import javax.inject.Singleton;
+import java.net.InetAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -162,7 +165,23 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
             if (StringUtils.isNotEmpty(applicationName)) {
                 NewServiceEntry serviceEntry = new NewServiceEntry(applicationName);
                 List<String> tags = new ArrayList<>(registration.getTags());
-                serviceEntry.address(instance.getHost())
+
+                String address;
+                if (registration.isPreferIpAddress()) {
+                    address = registration.getIpAddr().orElseGet(() -> {
+                        final String host = instance.getHost();
+                        try {
+                            final InetAddress inetAddress = InetAddress.getByName(host);
+                            return inetAddress.getHostAddress();
+                        } catch (UnknownHostException e) {
+                            throw new RegistrationException("Failed to lookup IP address for host [" + host + "]: " + e.getMessage(), e);
+                        }
+                    });
+                } else {
+                    address = instance.getHost();
+                }
+
+                serviceEntry.address(address)
                     .port(instance.getPort())
                     .tags(tags);
 
