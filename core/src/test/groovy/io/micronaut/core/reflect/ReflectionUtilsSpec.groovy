@@ -15,16 +15,12 @@
  */
 package io.micronaut.core.reflect
 
-import io.micronaut.core.io.ResourceResolver
-import io.micronaut.core.util.StringUtils
 import spock.lang.Specification
-import spock.lang.Unroll
 
 import java.lang.reflect.Field
 
 class ReflectionUtilsSpec extends Specification {
 
-    @Unroll
     void "test findField"() {
         given:
         Optional<Field> field = ReflectionUtils.findField(ArrayList, fieldName)
