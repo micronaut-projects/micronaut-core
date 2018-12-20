@@ -224,29 +224,52 @@ Synchronizing with Maven central. This may take a few minutes ...
 If this fails, log on to http://oss.sonatype.org/ using the centralUser credentials
 and progress through process manually -> Close -> Publish ... under staging repositories
 """
+        List<String> versions = []
+
         try {
-            try {
-                def mavenClent = new RESTClient("https://repo.maven.apache.org/maven2/")
-                mavenClent.get(path:"${project.group.replace('.','/')}/micronaut-$project.name/$projectVersion/micronaut-$project.name-${projectVersion}.jar")
-            } catch(groovyx.net.http.HttpResponseException e) {
-                // doesn't exist.. try sync
-                def client = new RESTClient('https://api.bintray.com/maven_central_sync/micronaut/core-releases-local/')
-                client.headers['Authorization'] = 'Basic ' + "$bintrayUser:$bintrayKey".getBytes('iso-8859-1').encodeBase64()
-                def body = /{}/
-                def resp = client.post(
-                        path: "$bintray.pkg.name/versions/$projectVersion",
-                        body: body,
-                        requestContentType: JSON
-                )
-                assert resp.status == 200
-                println resp.data.status
-                println resp.data.messages.join('\n')
+            for(r in fetch("https://api.github.com/repos/micronaut-projects/micronaut-core/releases")) {
+                if (r.'tag_name') {
+                    versions.add(r.'tag_name')
+                }
             }
-        } catch (groovyx.net.http.HttpResponseException e) {
-            println "Error: $e"
-            println "Message: $e.message"
-            println "Body: $e.response.data"
-            throw e
+
+        } catch(e) {
+            println "Error $e.message Using Default Version"
+            versions = [projectVersion]
         }
+
+        for(v in versions) {
+            try {
+                try {
+                    def mavenClent = new RESTClient("https://repo.maven.apache.org/maven2/")
+                    mavenClent.get(path:"${project.group.replace('.','/')}/micronaut-$project.name/$v/micronaut-$project.name-${v}.jar")
+                } catch(groovyx.net.http.HttpResponseException e) {
+                    // doesn't exist.. try sync
+                    def client = new RESTClient('https://api.bintray.com/maven_central_sync/micronaut/core-releases-local/')
+                    client.headers['Authorization'] = 'Basic ' + "$bintrayUser:$bintrayKey".getBytes('iso-8859-1').encodeBase64()
+                    def body = /{}/
+                    def resp = client.post(
+                            path: "$bintray.pkg.name/versions/$v",
+                            body: body,
+                            requestContentType: JSON
+                    )
+                    assert resp.status == 200
+                    println resp.data.status
+                    println resp.data.messages.join('\n')
+                }
+            } catch (groovyx.net.http.HttpResponseException e) {
+                println "Error: $e"
+                println "Message: $e.message"
+                println "Body: $e.response.data"
+                throw e
+            }
+        }
+
     }
+}
+
+def fetch(addr, params = [:]) {
+    def auth = "<personal api token>"
+    def json = new groovy.json.JsonSlurper()
+    return json.parse(addr.toURL().newReader(requestProperties: ["Authorization": "token ${System.getenv("GH_TOKEN")}".toString(), "Accept": "application/json"]))
 }
