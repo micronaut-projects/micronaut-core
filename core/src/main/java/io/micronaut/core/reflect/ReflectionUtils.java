@@ -308,8 +308,7 @@ public class ReflectionUtils {
     public static Optional<Field> findField(Class type, String name) {
         Optional<Field> declaredField = findDeclaredField(type, name);
         if (!declaredField.isPresent()) {
-            type = type.getSuperclass();
-            while (type != null) {
+            while ((type = type.getSuperclass()) != null) {
                 declaredField = findField(type, name);
                 if (declaredField.isPresent()) {
                     break;
