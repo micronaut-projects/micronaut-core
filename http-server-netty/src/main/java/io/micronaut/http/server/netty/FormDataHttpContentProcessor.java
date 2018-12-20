@@ -137,10 +137,12 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
             } catch (Throwable e) {
                 onError(e);
             } finally {
-                int size = messages.size();
-                extraMessages.updateAndGet((p) -> p + size - 1);
-
-                messages.stream().map(HttpData.class::cast).forEach(subscriber::onNext);
+                if (messages.isEmpty()) {
+                    subscription.request(1);
+                } else {
+                    extraMessages.updateAndGet((p) -> p + messages.size() - 1);
+                    messages.stream().map(HttpData.class::cast).forEach(subscriber::onNext);
+                }
 
                 httpContent.release();
             }

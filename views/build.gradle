@@ -3,6 +3,7 @@ ext {
     velocityEngine = '2.0'
     handlebarsVersion='4.1.0'
     thymeleafVersion='3.0.9.RELEASE'
+    freemarkerVersion='2.3.28'
 }
 
 dependencies {
@@ -10,6 +11,7 @@ dependencies {
     compileOnly "org.apache.velocity:velocity-engine-core:$velocityEngine"
     compileOnly "com.github.jknack:handlebars:${handlebarsVersion}"
     compileOnly "org.thymeleaf:thymeleaf:$thymeleafVersion"
+    compileOnly "org.freemarker:freemarker:$freemarkerVersion"
     compileOnly project(":security")
 
     compile project(":runtime")
@@ -23,6 +25,7 @@ dependencies {
     testRuntime "org.apache.velocity:velocity-engine-core:$velocityEngine"
     testRuntime "com.github.jknack:handlebars:${handlebarsVersion}"
     testRuntime "org.thymeleaf:thymeleaf:$thymeleafVersion"
+    testRuntime "org.freemarker:freemarker:$freemarkerVersion"
 }
 
 bintray.pkg.name = "micronaut-views"
