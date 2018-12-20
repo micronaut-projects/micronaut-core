@@ -27,7 +27,9 @@ import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
+import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
+import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.FullHttpResponse;
@@ -49,7 +51,7 @@ import java.util.Optional;
 @Singleton
 public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Object> {
 
-    private static final Class<?>[] SUPPORTED_TYPES = new Class[]{File.class, SystemFileCustomizableResponseType.class, StreamedFile.class, NettyFileCustomizableResponseType.class};
+    private static final Class<?>[] SUPPORTED_TYPES = new Class[]{File.class, SystemFileCustomizableResponseType.class, StreamedFile.class, NettyFileCustomizableResponseType.class, SystemFile.class};
     private final FileTypeHandlerConfiguration configuration;
 
     /**
@@ -71,6 +73,8 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
             type = new NettySystemFileCustomizableResponseType((SystemFileCustomizableResponseType) obj);
         } else if (obj instanceof StreamedFile) {
             type = new NettyStreamedFileCustomizableResponseType((StreamedFile) obj);
+        } else if (obj instanceof SystemFile) {
+            type = new NettySystemFileCustomizableResponseType((SystemFile) obj);
         } else {
             throw new CustomizableResponseTypeException("FileTypeHandler only supports File or FileCustomizableResponseType types");
         }
@@ -93,7 +97,7 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
         }
 
         if (!response.getHeaders().contains(HttpHeaders.CONTENT_TYPE)) {
-            response.header(HttpHeaders.CONTENT_TYPE, getMediaType(type.getName()));
+            response.header(HttpHeaders.CONTENT_TYPE, type.getMediaType().toString());
         }
         setDateAndCacheHeaders(response, lastModified);
 
@@ -110,13 +114,13 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
 
     /**
      * @param filename The filename
+     * @deprecated The media type now comes from the file types.
+     * @see FileCustomizableResponseType#getMediaType()
      * @return The {@link MediaType}
      */
+    @Deprecated
     protected MediaType getMediaType(String filename) {
-        String extension = NameUtils.extension(filename);
-        Optional<MediaType> mediaType = MediaType.forExtension(extension);
-        return mediaType.orElse(MediaType.TEXT_PLAIN_TYPE);
-
+        return MediaType.TEXT_PLAIN_TYPE;
     }
 
     /**

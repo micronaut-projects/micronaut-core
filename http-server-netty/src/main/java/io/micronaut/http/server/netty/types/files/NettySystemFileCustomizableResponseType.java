@@ -17,11 +17,15 @@
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.SmartHttpContentCompressor;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
+import io.micronaut.http.server.types.CustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
+import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.DefaultHttpResponse;
@@ -54,7 +58,7 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
 
     protected final RandomAccessFile raf;
     protected final long rafLength;
-    protected Optional<SystemFileCustomizableResponseType> delegate = Optional.empty();
+    protected Optional<FileCustomizableResponseType> delegate = Optional.empty();
 
     /**
      * @param file The file
@@ -81,6 +85,14 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
         this.delegate = Optional.of(delegate);
     }
 
+    /**
+     * @param delegate The system file customizable response type
+     */
+    public NettySystemFileCustomizableResponseType(SystemFile delegate) {
+        this(delegate.getFile());
+        this.delegate = Optional.of(delegate);
+    }
+
     @Override
     public long getLength() {
         return rafLength;
@@ -88,12 +100,18 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
 
     @Override
     public long getLastModified() {
-        return delegate.map(SystemFileCustomizableResponseType::getLastModified).orElse(super.getLastModified());
+        return delegate.map(FileCustomizableResponseType::getLastModified).orElse(super.getLastModified());
     }
 
     @Override
+    @Deprecated
     public String getName() {
-        return delegate.map(SystemFileCustomizableResponseType::getName).orElse(super.getName());
+        return delegate.map(FileCustomizableResponseType::getName).orElse(super.getName());
+    }
+
+    @Override
+    public MediaType getMediaType() {
+        return delegate.map(FileCustomizableResponseType::getMediaType).orElse(super.getMediaType());
     }
 
     /**

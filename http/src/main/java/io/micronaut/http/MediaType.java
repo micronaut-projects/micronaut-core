@@ -17,6 +17,7 @@
 package io.micronaut.http;
 
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.http.annotation.Produces;
@@ -554,6 +555,20 @@ public class MediaType implements CharSequence {
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Resolve the {@link MediaType} for the given file name. Defaults
+     * to text/plain.
+     *
+     * @param filename The file name
+     * @return The {@link MediaType}
+     */
+    public static MediaType forFilename(String filename) {
+        if (StringUtils.isNotEmpty(filename)) {
+            return forExtension(NameUtils.extension(filename)).orElse(MediaType.TEXT_PLAIN_TYPE);
+        }
+        return MediaType.TEXT_PLAIN_TYPE;
     }
 
     @SuppressWarnings("MagicNumber")

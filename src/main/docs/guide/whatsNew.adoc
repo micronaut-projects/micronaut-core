@@ -1,5 +1,9 @@
 Micronaut {version} includes the following changes:
 
+=== Refactoring of File Responses
+
+In an effort to make a more consistent and understandable API, some methods and classes related to sending file responses have been deprecated. SystemFile is the replacement for AttachedFile and the constructors of StreamedFile have been deprecated in favor of new constructors that better convey the intended functionality.
+
 === Support for Freemarker Views
 
 Support for rendering <<freemarker,Freemaker Views>> has been added.
