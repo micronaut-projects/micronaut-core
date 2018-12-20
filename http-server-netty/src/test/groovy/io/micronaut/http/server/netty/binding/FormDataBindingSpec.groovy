@@ -19,6 +19,8 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
+import io.micronaut.http.client.DefaultHttpClientConfiguration
+import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.http.client.multipart.MultipartBody
@@ -91,6 +93,22 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
         expect:
         data == SAML_DATA
     }
+
+    void "test url encoded request with very small chunk size"() {
+        when:
+        URL url = new URL(embeddedServer.getURL(), '/form/saml/test/small-form')
+        HttpURLConnection conn = url.openConnection()
+        conn.readTimeout = 30000
+        conn.chunkedStreamingMode = 18 // A value of 18 will fail, 19 is enough to get the '='
+        conn.setDoOutput(true)
+        conn.setRequestProperty ("Content-Type", MediaType.APPLICATION_FORM_URLENCODED)
+        def requestStream = conn.getOutputStream()
+        requestStream.write('aaa0123456789=ABC%20%20%20%20&bbb0123456789=DEF%20%20%20%20'.getBytes())
+        requestStream.close()
+        def response = conn.getInputStream().text
+        then:
+        response == 'ABC    DEF    '
+    }
     
     @Controller(value = '/form', consumes = MediaType.APPLICATION_FORM_URLENCODED)
     static class FormController {
@@ -130,6 +148,11 @@ class FormDataBindingSpec extends AbstractMicronautSpec {
             assert SAMLResponse == FormDataBindingSpec.SAML_DATA
             assert SAMLResponse.length() == FormDataBindingSpec.SAML_DATA.length()
             return SAMLResponse
+        }
+
+        @Post(uri = "/small-form", consumes = MediaType.APPLICATION_FORM_URLENCODED)
+        public String processTempFormData(String aaa0123456789, String bbb0123456789) {
+            return aaa0123456789 + bbb0123456789
         }
     }
 
