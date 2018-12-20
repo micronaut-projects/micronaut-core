@@ -34,10 +34,13 @@ import io.micronaut.http.server.types.files.StreamedFile
 import io.micronaut.http.server.types.files.SystemFile
 import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType
 
+import javax.inject.Inject
+import javax.inject.Named
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
+import java.util.concurrent.ExecutorService
 
 import static io.micronaut.http.HttpHeaders.*
 
@@ -221,6 +224,17 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         response.body() == tempFileContents
     }
 
+    void "test using a piped stream"() {
+        when:
+        def response = rxClient.exchange('/test-stream/piped-stream', String).blockingFirst()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.header(CONTENT_TYPE) == "text/plain"
+        Integer.parseInt(response.header(CONTENT_LENGTH)) > 0
+        response.body() == ("a".."z").join('')
+    }
+
     void "test supports"() {
         when:
         FileTypeHandler fileTypeHandler = new FileTypeHandler(new FileTypeHandlerConfiguration())
@@ -299,17 +313,34 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
     @Requires(property = 'spec.name', value = 'FileTypeHandlerSpec')
     static class TestStreamController {
 
+        @Named("io")
+        @Inject
+        ExecutorService executorService
 
         @Get('/download')
         StreamedFile download() {
             new StreamedFile(new FileInputStream(tempFile), "abc.html").attach("fileTypeHandlerSpec.html")
         }
 
-
         @Get('/custom-content-type')
         HttpResponse<StreamedFile> customContentType() {
             HttpResponse.ok(new StreamedFile(new FileInputStream(tempFile), "abc.html").attach("temp.html"))
                     .contentType(MediaType.TEXT_PLAIN_TYPE)
         }
+
+        @Get('/piped-stream')
+        StreamedFile pipedStream() {
+            def output = new PipedOutputStream()
+            def input = new PipedInputStream(output)
+            executorService.execute({ ->
+                ("a".."z").each {
+                    output.write(it.bytes)
+                }
+                output.flush()
+                output.close()
+            })
+            return new StreamedFile(input, MediaType.TEXT_PLAIN_TYPE)
+        }
+
     }
 }
