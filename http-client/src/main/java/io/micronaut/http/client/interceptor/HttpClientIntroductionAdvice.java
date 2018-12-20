@@ -547,6 +547,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     private HttpClient getClient(MethodInvocationContext<Object, Object> context, AnnotationValue<Client> clientAnn) {
         String clientId = clientAnn.getValue(String.class).orElse(null);
+        if (clientId == null) {
+            throw new HttpClientException("Either the id or value of the @Client annotation must be specified");
+        }
         String path = clientAnn.get("path", String.class).orElse(null);
         String clientKey = computeClientKey(clientId, path);
         if (clientKey == null) {
