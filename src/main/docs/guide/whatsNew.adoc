@@ -1,5 +1,10 @@
-Apart from https://github.com/micronaut-projects/micronaut-core/milestone/9?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features and improvements.
+Micronaut {version} includes the following changes:
 
 === Support for Freemarker Views
 
 Support for rendering <<freemarker,Freemaker Views>> has been added.
+
+=== Liquibase and Flyway
+
+New configurations have been added to support https://micronaut-projects.github.io/micronaut-configuration-flyway/latest/guide/index.html[Flyway] and https://micronaut-projects.github.io/micronaut-configuration-liquibase/latest/guide/index.html[Liquibase] database migrations.
+
