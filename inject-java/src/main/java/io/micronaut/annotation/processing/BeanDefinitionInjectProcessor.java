@@ -857,7 +857,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             // shouldn't visit around advice on an introduction advice instance
             if (!(beanWriter instanceof AopProxyWriter)) {
-                boolean hasAround = methodAnnotationMetadata.hasDeclaredStereotype(AROUND_TYPE);
+                boolean hasAround = methodAnnotationMetadata.hasStereotype(AROUND_TYPE);
                 if (isAopProxyType || hasAround) {
                     if (isAopProxyType && !hasAround && !method.getModifiers().contains(Modifier.PUBLIC)) {
                         // ignore methods that are not public and have no explicit advise
