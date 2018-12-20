@@ -277,14 +277,9 @@ public final class StringUtils {
      */
     @Nullable
     public static String trimToNull(@Nullable String string) {
-        if (string == null) {
-            return null;
-        }
-        String returnString = string.trim();
-        if (returnString.isEmpty()) {
-            return null;
-        } else {
-            return returnString;
-        }
+        return Optional.ofNullable(string)
+                .map(String::trim)
+                .filter(StringUtils::isNotEmpty)
+                .orElse(null);
     }
 }

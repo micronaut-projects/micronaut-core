@@ -61,7 +61,7 @@ class StringUtilsSpec extends Specification {
     }
 
     @Unroll
-    void 'test trim a string'() {
+    void 'test trim the string "#input" == #expected'() {
         expect:
         StringUtils.trimToNull(input) == expected
 
