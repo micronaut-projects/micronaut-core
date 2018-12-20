@@ -1,5 +1,9 @@
 Apart from https://github.com/micronaut-projects/micronaut-core/milestone/9?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features and improvements.
 
+=== Refactoring of File Responses
+
+In an effort to make a more consistent and understandable API, some methods and classes related to sending file responses have been deprecated. SystemFile is the replacement for AttachedFile and the constructors of StreamedFile have been deprecated in favor of new constructors that better convey the intended functionality.
+
 === Micronaut for Spring
 
 It is now possible using Ahead of Time compilation to use the Spring annotation based programming model to build Micronaut applications. See the documentation for https://github.com/micronaut-projects/micronaut-spring[Micronaut for Spring] for details.
