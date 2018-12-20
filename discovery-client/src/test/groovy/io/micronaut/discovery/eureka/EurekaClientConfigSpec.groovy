@@ -20,6 +20,7 @@ import io.micronaut.discovery.ServiceInstance
 import io.micronaut.discovery.eureka.client.v2.EurekaClient
 import io.micronaut.runtime.ApplicationConfiguration
 import spock.lang.Specification
+import spock.lang.Unroll
 
 /**
  * @author graemerocher
@@ -87,11 +88,119 @@ class EurekaClientConfigSpec extends Specification {
         !config.registration.enabled
         config.registration.instanceInfo.asgName == 'myAsg'
         config.registration.instanceInfo.app == 'foo'
-        config.registration.instanceInfo.id == 'foo-1'
+        config.registration.instanceInfo.id.matches('^.+:foo:\\d+$')
         config.registration.instanceInfo.ipAddr == '10.10.10.10'
         config.registration.instanceInfo.countryId == 10
         config.registration.instanceInfo.vipAddress == 'something'
         config.registration.instanceInfo.leaseInfo.durationInSecs == 60
         config.registration.instanceInfo.metadata == [foo: 'bar']
+    }
+
+    @Unroll
+    def "should correctly setup instance info (prefer ip-addr: #preferIpAddr)"() {
+        given:
+        def appName = "some-app-name"
+        def serverPort = 8089
+
+        when: "setup app context, run it, extract config bean"
+        def applicationContext = ApplicationContext.run(
+                // eureka stuff
+                'eureka.client.registration.enabled': false,
+                'eureka.client.discovery.enabled': false,
+                'eureka.client.registration.prefer-ip-address': preferIpAddr.toString(),
+
+                // server stuff
+                'micronaut.server.port': serverPort,
+
+                // app name and instance id
+                (ApplicationConfiguration.APPLICATION_NAME): appName,
+                (ApplicationConfiguration.InstanceConfiguration.INSTANCE_ID): 'foo-1',
+        )
+
+        def config = applicationContext.getBean(EurekaConfiguration)
+        def registration = config.getRegistration()
+        def instanceInfo = registration.getInstanceInfo()
+
+        then:
+        registration.isExplicitInstanceId() == true
+
+        instanceInfo.getApp() == appName
+        instanceInfo.getInstanceId().endsWith(":${appName}:${serverPort}")
+        !instanceInfo.getHostName().isEmpty()
+        !instanceInfo.getIpAddr().isEmpty()
+        if (preferIpAddr) {
+            assert instanceInfo.getHostName() == instanceInfo.getIpAddr()
+        }
+
+        instanceInfo.getPort() == serverPort
+
+        instanceInfo.getVipAddress() == appName
+        instanceInfo.getSecureVipAddress() == appName
+
+        instanceInfo.getMetadata().isEmpty()
+
+        where:
+        preferIpAddr << [true, false]
+    }
+
+    @Unroll
+    def "should correctly setup instance info with overrides from configuration properties (prefer ip-addr: #preferIpAddr)"() {
+        given:
+        def appName = "some-app-name"
+        def serverPort = 8089
+
+        def exposedAppName = "my-super-app"
+        def exposedHostname = "host.example.org"
+        def exposedIpAddr = "1.2.3.4"
+        def exposedPort = 9091
+
+        def exposedVipAddr = "some-vip-addr"
+        def exposedSecureVipAddr = "some-secure-vip-addr"
+
+        and: "setup expected values"
+        def expectedHostname = preferIpAddr ? exposedIpAddr : exposedHostname
+        def expectedInstanceId = expectedHostname + ":" + exposedAppName + ":" + exposedPort
+
+        when: "setup app context, run it, extract config bean"
+        def applicationContext = ApplicationContext.run(
+                // eureka stuff
+                'eureka.client.registration.enabled': false,
+                'eureka.client.registration.appname': exposedAppName,
+                'eureka.client.registration.hostname': exposedHostname,
+                'eureka.client.registration.ip-addr': exposedIpAddr,
+                'eureka.client.registration.port': exposedPort,
+                'eureka.client.registration.vipAddress': exposedVipAddr,
+                'eureka.client.registration.secureVipAddress': exposedSecureVipAddr,
+                'eureka.client.registration.prefer-ip-address': preferIpAddr.toString(),
+                'eureka.client.registration.leaseInfo.durationInSecs': '60',
+                'eureka.client.registration.metadata.foo': 'bar',
+                'eureka.client.discovery.enabled': false,
+
+                // micronaut stuff
+                (ApplicationConfiguration.APPLICATION_NAME): appName,
+                (ApplicationConfiguration.InstanceConfiguration.INSTANCE_ID): 'some-instance-id-1',
+                'micronaut.server.port': serverPort,
+        )
+
+        def config = applicationContext.getBean(EurekaConfiguration)
+        def registration = config.getRegistration()
+        def instanceInfo = registration.getInstanceInfo()
+
+        then:
+        registration.isExplicitInstanceId() == true
+
+        instanceInfo.getApp() == exposedAppName
+        instanceInfo.getInstanceId() == expectedInstanceId
+        instanceInfo.getHostName() == expectedHostname
+        instanceInfo.getIpAddr() == exposedIpAddr
+        instanceInfo.getPort() == exposedPort
+
+        instanceInfo.getVipAddress() == exposedVipAddr
+        instanceInfo.getSecureVipAddress() == exposedSecureVipAddr
+
+        instanceInfo.getMetadata() == [foo: 'bar']
+
+        where:
+        preferIpAddr << [true, false]
     }
 }

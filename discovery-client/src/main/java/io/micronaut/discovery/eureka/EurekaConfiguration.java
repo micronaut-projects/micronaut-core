@@ -16,8 +16,12 @@
 
 package io.micronaut.discovery.eureka;
 
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.annotation.ConfigurationBuilder;
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.discovery.DiscoveryConfiguration;
 import io.micronaut.discovery.client.DiscoveryClientConfiguration;
 import io.micronaut.discovery.eureka.client.v2.DataCenterInfo;
@@ -33,6 +37,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Optional;
 
 /**
  * Configuration options for the Eureka client.
@@ -185,14 +190,34 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
         public static final String PREFIX = EurekaConfiguration.PREFIX + "." + RegistrationConfiguration.PREFIX;
 
         /**
-         * Configuration name property for Eureka IP address.
+         * Configuration property name for Eureka instance IP address.
          */
         public static final String IP_ADDRESS = PREFIX + ".ip-addr";
 
         /**
-         * Configuration name property for preferring Eureka IP address registration.
+         * Configuration property name for preferring Eureka instance IP address registration.
          */
         public static final String PREFER_IP_ADDRESS = PREFIX + ".prefer-ip-address";
+
+        /**
+         * Configuration property name for Eureka instance app name (value: <b>{@value}</b>).
+         */
+        public static final String APPNAME = PREFIX + ".appname";
+
+        /**
+         * Configuration property name for Eureka instance id (value: <b>{@value}</b>).
+         */
+        public static final String INSTANCE_ID = PREFIX + ".instance-id";
+
+        /**
+         * Configuration property name for Eureka instance hostname (value: <b>{@value}</b>).
+         */
+        public static final String HOSTNAME = PREFIX + ".hostname";
+
+        /**
+         * Configuration property name for Eureka instance port (value: <b>{@value}</b>).
+         */
+        public static final String PORT = PREFIX + ".port";
 
         @ConfigurationBuilder
         InstanceInfo instanceInfo;
@@ -200,65 +225,148 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
         @ConfigurationBuilder(configurationPrefix = "lease-info")
         LeaseInfo.Builder leaseInfo = LeaseInfo.Builder.newBuilder();
 
-        private final boolean explicitInstanceId;
-        private final boolean preferIpAddress;
-
         /**
          * @param embeddedServer           The embedded server
          * @param applicationConfiguration The application configuration
-         * @param ipAddress                The IP address
          * @param dataCenterInfo           The data center info
          */
         public EurekaRegistrationConfiguration(
-            EmbeddedServer embeddedServer,
-            ApplicationConfiguration applicationConfiguration,
-            @Property(name = EurekaRegistrationConfiguration.IP_ADDRESS) @Nullable String ipAddress,
-            @Nullable DataCenterInfo dataCenterInfo) {
-            String instanceId = applicationConfiguration.getInstance().getId().orElse(null);
-            String applicationName = applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME);
-            this.explicitInstanceId = instanceId != null;
-            this.preferIpAddress = embeddedServer.getApplicationContext().get(PREFER_IP_ADDRESS, Boolean.class).orElse(false);
-            String serverHost = embeddedServer.getHost();
-            int serverPort = embeddedServer.getPort();
-            if (ipAddress != null) {
-                this.instanceInfo = new InstanceInfo(
-                    preferIpAddress ? ipAddress : serverHost,
-                        serverPort,
-                    ipAddress,
-                    applicationName,
-                    explicitInstanceId ? instanceId : applicationName
-                );
-
-            } else {
-                if (preferIpAddress) {
-                    ipAddress = lookupIp(serverHost);
-                    this.instanceInfo = new InstanceInfo(
-                            ipAddress,
-                            serverPort,
-                            ipAddress,
-                            applicationName,
-                            explicitInstanceId ? instanceId : applicationName
-                    );
-                } else {
-                    this.instanceInfo = new InstanceInfo(
-                            serverHost,
-                            serverPort,
-                            applicationName,
-                            explicitInstanceId ? instanceId : applicationName
-                    );
-                }
-            }
-
+                EmbeddedServer embeddedServer,
+                ApplicationConfiguration applicationConfiguration,
+                @Nullable DataCenterInfo dataCenterInfo) {
+            this.instanceInfo = createInstanceInfo(applicationConfiguration, embeddedServer);
             if (dataCenterInfo != null) {
                 this.instanceInfo.setDataCenterInfo(dataCenterInfo);
             }
+        }
+
+        private InstanceInfo createInstanceInfo(ApplicationConfiguration appConfig, EmbeddedServer server) {
+            ApplicationContext appCtx = server.getApplicationContext();
+            boolean preferIpAddress = appCtx.get(PREFER_IP_ADDRESS, Boolean.class).orElse(false);
+
+            String appName = selectApplicationName(appCtx, appConfig);
+            String hostname = selectEurekaHostname(appCtx, server);
+            String ipAddr = selectEurekaIpAddress(appCtx, server);
+            int port = selectEurekaPort(appCtx, server);
+
+            String instanceIdHostname = preferIpAddress ? ipAddr : hostname;
+            String instanceId = selectEurekaInstanceId(appCtx, appConfig, appName, instanceIdHostname, port);
+
+            return createInstanceInfo(appName, instanceId, hostname, ipAddr, port, preferIpAddress);
+        }
+
+        private InstanceInfo createInstanceInfo(String appName, String instanceId, String hostname, String ipAddr,
+                                                int port,
+                                                boolean preferIpAddress) {
+            String appHostname = preferIpAddress ? ipAddr : hostname;
+            return new InstanceInfo(appHostname, port, ipAddr, appName, instanceId);
+        }
+
+        /**
+         * Selects eureka instance port.
+         *
+         * @param appCtx application context
+         * @param server embedded server
+         * @return eureka instance port
+         * @see #PORT
+         */
+        private int selectEurekaPort(ApplicationContext appCtx, EmbeddedServer server) {
+            return appCtx.get(PORT, String.class)
+                    .flatMap(this::optString)
+                    .map(Integer::parseInt)
+                    .orElseGet(server::getPort);
+        }
+
+        /**
+         * Selects eureka instance ip address.
+         *
+         * @param appCtx application context
+         * @param server embedded server
+         * @return eureka instance ip address
+         * @see #IP_ADDRESS
+         */
+        private String selectEurekaIpAddress(ApplicationContext appCtx, EmbeddedServer server) {
+            return appCtx.get(IP_ADDRESS, String.class)
+                    .flatMap(this::optString)
+                    .orElseGet(() -> lookupIp(server.getHost()));
+        }
+
+        /**
+         * Selects eureka instance hostname.
+         *
+         * @param appCtx hostname defined in application configuration properties
+         * @param server embedded server
+         * @return eureka instance hostname
+         * @see #HOSTNAME
+         */
+        private String selectEurekaHostname(ApplicationContext appCtx, EmbeddedServer server) {
+            return appCtx.get(HOSTNAME, String.class)
+                    .flatMap(this::optString)
+                    .map(Optional::of)
+                    .orElseGet(() -> optString(server.getHost()))
+                    .orElse(SocketUtils.LOCALHOST);
+        }
+
+        /**
+         * Selects eureka instance id.
+         *
+         * @param appCtx    application context
+         * @param appConfig application config
+         * @param appName   overridden app name
+         * @return eureka instance id
+         * @see #INSTANCE_ID
+         */
+        private String selectEurekaInstanceId(ApplicationContext appCtx,
+                                              ApplicationConfiguration appConfig, String appName, String host, int port) {
+            return appCtx.get(INSTANCE_ID, String.class)
+                    .flatMap(this::optString)
+                    .orElseGet(() -> defaultInstanceId(appConfig, appName, host, port));
+        }
+
+        /**
+         * Creates eureka default instance id.
+         *
+         * @param appConfig application config
+         * @param appName   eureka instance app name
+         * @param host      eureka instance hostname
+         * @param port      eureka instance port
+         * @return default eureka instance id
+         */
+        private String defaultInstanceId(ApplicationConfiguration appConfig, String appName, String host, int port) {
+            String finalAppName = optString(appName)
+                    .map(Optional::of)
+                    .orElseGet(() -> appConfig.getName().flatMap(this::optString))
+                    .orElse(Environment.DEFAULT_NAME);
+            return host + ":" + finalAppName + ":" + port;
+        }
+
+        /**
+         * Chooses eureka service application name.
+         *
+         * @param appCtx    application context
+         * @param appConfig application config
+         * @return eureka service name
+         * @see #APPNAME
+         */
+        private String selectApplicationName(ApplicationContext appCtx, ApplicationConfiguration appConfig) {
+            return appCtx.get(APPNAME, String.class)
+                    .flatMap(this::optString)
+                    .map(Optional::of)
+                    .orElseGet(appConfig::getName)
+                    .orElse(Environment.DEFAULT_NAME);
+        }
+
+        private Optional<String> optString(String s) {
+            return Optional.ofNullable(s)
+                    .map(String::trim)
+                    .filter(e -> !e.isEmpty());
         }
 
         /**
          * @return Is an instance ID explicitly specified
          */
         public boolean isExplicitInstanceId() {
-            return explicitInstanceId;
+            return true;
         }
 
         /**
