@@ -269,8 +269,8 @@ public final class StringUtils {
     }
 
     /**
-     * Returns the trimmed (left and right) form of the input string. If the string is empty after trimming (or null
-     * was passed in the first place), null is returned, i.e. the input string is reduced to nothing.
+     * Trims the supplied string. If the string is empty or null before or after
+     * trimming, null is returned.
      *
      * @param string the string to trim
      * @return the trimmed string or null
