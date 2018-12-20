@@ -23,9 +23,10 @@ import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.security.token.jwt.endpoints.JwkProvider;
 import io.micronaut.security.token.jwt.signature.SignatureGeneratorConfiguration;
 
-import javax.validation.constraints.NotNull;
+import javax.annotation.Nonnull;
 import java.security.interfaces.RSAPrivateKey;
 
 /**
@@ -37,6 +38,7 @@ import java.security.interfaces.RSAPrivateKey;
  */
 public class RSASignatureGenerator extends RSASignature implements SignatureGeneratorConfiguration {
     private RSAPrivateKey privateKey;
+    private String keyId;
 
     /**
      * @param config Instance of {@link RSASignatureConfiguration}
@@ -48,6 +50,9 @@ public class RSASignatureGenerator extends RSASignature implements SignatureGene
         }
         this.algorithm = config.getJwsAlgorithm();
         this.privateKey = config.getPrivateKey();
+        if (config instanceof JwkProvider) {
+            this.keyId = ((JwkProvider) config).retrieveJsonWebKey().getKeyID();
+        }
     }
 
     @Override
@@ -62,9 +67,10 @@ public class RSASignatureGenerator extends RSASignature implements SignatureGene
      * @return A signed JWT
      * @throws JOSEException thrown in the JWT signing
      */
-    protected SignedJWT signWithPrivateKey(JWTClaimsSet claims, @NotNull RSAPrivateKey privateKey) throws JOSEException {
+    protected SignedJWT signWithPrivateKey(JWTClaimsSet claims, @Nonnull RSAPrivateKey privateKey) throws JOSEException {
         final JWSSigner signer = new RSASSASigner(privateKey);
-        final SignedJWT signedJWT = new SignedJWT(new JWSHeader(algorithm), claims);
+        JWSHeader jwsHeader = new JWSHeader.Builder(algorithm).keyID(keyId).build();
+        final SignedJWT signedJWT = new SignedJWT(jwsHeader, claims);
         signedJWT.sign(signer);
         return signedJWT;
     }

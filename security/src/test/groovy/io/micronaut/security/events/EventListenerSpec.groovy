@@ -74,7 +74,6 @@ class EventListenerSpec extends Specification {
 
     def "successful login publishes LoginSuccessfulEvent"() {
         when:
-        println "sending request to login with user/password"
         HttpRequest request = HttpRequest.POST("/login", new UsernamePasswordCredentials("user", "password"))
         client.toBlocking().exchange(request)
 
