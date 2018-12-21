@@ -279,4 +279,19 @@ public final class StringUtils {
         }
         return new String(array);
     }
+
+    /**
+     * Trims the supplied string. If the string is empty or null before or after
+     * trimming, null is returned.
+     *
+     * @param string the string to trim
+     * @return the trimmed string or null
+     */
+    @Nullable
+    public static String trimToNull(@Nullable String string) {
+        return Optional.ofNullable(string)
+                .map(String::trim)
+                .filter(StringUtils::isNotEmpty)
+                .orElse(null);
+    }
 }

@@ -58,6 +58,35 @@ class FinalModifierMyBean2 {
 ''')
         then:
         def e = thrown(RuntimeException)
-        e.message.contains 'Public method defines AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on class.'
+        e.message.contains 'Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.'
+    }
+
+    void "test final modifier on method with explicit AOP advice doesn't compile"() {
+        when:
+        buildBeanDefinition('test.$FinalModifierMyBean2Definition$Intercepted', '''
+package test;
+
+import io.micronaut.aop.proxytarget.*;
+import io.micronaut.context.annotation.*;
+
+@javax.inject.Singleton
+class FinalModifierMyBean2 {
+
+    private String myValue;
+    
+    FinalModifierMyBean2(String val) {
+        this.myValue = val;
+    }
+    
+    @Mutating("someVal")
+    public final String someMethod() {
+        return myValue;
+    }
+
+}
+''')
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains 'Method defines AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.'
     }
 }
