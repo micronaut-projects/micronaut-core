@@ -973,7 +973,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
                     path.pop();
                     return bean;
-                } catch (NoSuchBeanException | BeanInstantiationException e) {
+                } catch (NoSuchBeanException e) {
                     if (isNullable) {
                         path.pop();
                         return null;
