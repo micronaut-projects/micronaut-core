@@ -16,8 +16,14 @@
 
 package io.micronaut.discovery.eureka;
 
-import io.micronaut.context.annotation.*;
+import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.annotation.ConfigurationBuilder;
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.io.socket.SocketUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.DiscoveryConfiguration;
 import io.micronaut.discovery.client.DiscoveryClientConfiguration;
 import io.micronaut.discovery.eureka.client.v2.DataCenterInfo;
@@ -31,8 +37,10 @@ import io.micronaut.runtime.server.EmbeddedServer;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Optional;
 
 /**
  * Configuration options for the Eureka client.
@@ -77,13 +85,13 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
 
     /**
      * @param eurekaConnectionPoolConfiguration The connection pool configuration
-     * @param applicationConfiguration        The application configuration
-     * @param eurekaRegistrationConfiguration The optional Eureka registration configuration
+     * @param applicationConfiguration          The application configuration
+     * @param eurekaRegistrationConfiguration   The optional Eureka registration configuration
      */
     public EurekaConfiguration(
-        EurekaConnectionPoolConfiguration eurekaConnectionPoolConfiguration,
-        ApplicationConfiguration applicationConfiguration,
-        @Nullable EurekaRegistrationConfiguration eurekaRegistrationConfiguration) {
+            EurekaConnectionPoolConfiguration eurekaConnectionPoolConfiguration,
+            ApplicationConfiguration applicationConfiguration,
+            @Nullable EurekaRegistrationConfiguration eurekaRegistrationConfiguration) {
         super(applicationConfiguration);
         this.registration = eurekaRegistrationConfiguration;
         this.eurekaConnectionPoolConfiguration = eurekaConnectionPoolConfiguration;
@@ -185,14 +193,34 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
         public static final String PREFIX = EurekaConfiguration.PREFIX + "." + RegistrationConfiguration.PREFIX;
 
         /**
-         * Configuration name property for Eureka IP address.
+         * Configuration property name for Eureka instance IP address.
          */
         public static final String IP_ADDRESS = PREFIX + ".ip-addr";
 
         /**
-         * Configuration name property for preferring Eureka IP address registration.
+         * Configuration property name for preferring Eureka instance IP address registration.
          */
         public static final String PREFER_IP_ADDRESS = PREFIX + ".prefer-ip-address";
+
+        /**
+         * Configuration property name for Eureka instance app name (value: <b>{@value}</b>).
+         */
+        public static final String APPNAME = PREFIX + ".appname";
+
+        /**
+         * Configuration property name for Eureka instance id (value: <b>{@value}</b>).
+         */
+        public static final String INSTANCE_ID = PREFIX + ".instance-id";
+
+        /**
+         * Configuration property name for Eureka instance hostname (value: <b>{@value}</b>).
+         */
+        public static final String HOSTNAME = PREFIX + ".hostname";
+
+        /**
+         * Configuration property name for Eureka instance port (value: <b>{@value}</b>).
+         */
+        public static final String PORT = PREFIX + ".port";
 
         @ConfigurationBuilder
         InstanceInfo instanceInfo;
@@ -201,32 +229,34 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
         LeaseInfo.Builder leaseInfo = LeaseInfo.Builder.newBuilder();
 
         private final boolean explicitInstanceId;
-        private final boolean preferIpAddress;
 
         /**
          * @param embeddedServer           The embedded server
          * @param applicationConfiguration The application configuration
          * @param ipAddress                The IP address
          * @param dataCenterInfo           The data center info
+         * @deprecated Use {@link #EurekaConfiguration(EurekaConnectionPoolConfiguration, ApplicationConfiguration, EurekaRegistrationConfiguration)} instead
          */
+        @Deprecated
         public EurekaRegistrationConfiguration(
-            EmbeddedServer embeddedServer,
-            ApplicationConfiguration applicationConfiguration,
-            @Property(name = EurekaRegistrationConfiguration.IP_ADDRESS) @Nullable String ipAddress,
-            @Nullable DataCenterInfo dataCenterInfo) {
+                EmbeddedServer embeddedServer,
+                ApplicationConfiguration applicationConfiguration,
+                @Property(name = EurekaRegistrationConfiguration.IP_ADDRESS) @Nullable String ipAddress,
+                @Nullable DataCenterInfo dataCenterInfo) {
             String instanceId = applicationConfiguration.getInstance().getId().orElse(null);
             String applicationName = applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME);
-            this.explicitInstanceId = instanceId != null;
-            this.preferIpAddress = embeddedServer.getApplicationContext().get(PREFER_IP_ADDRESS, Boolean.class).orElse(false);
+            boolean explicitInstanceId = instanceId != null;
+            setPreferIpAddress(embeddedServer.getApplicationContext().get(PREFER_IP_ADDRESS, Boolean.class).orElse(false));
             String serverHost = embeddedServer.getHost();
             int serverPort = embeddedServer.getPort();
+            final boolean preferIpAddress = isPreferIpAddress();
             if (ipAddress != null) {
                 this.instanceInfo = new InstanceInfo(
-                    preferIpAddress ? ipAddress : serverHost,
+                        preferIpAddress ? ipAddress : serverHost,
                         serverPort,
-                    ipAddress,
-                    applicationName,
-                    explicitInstanceId ? instanceId : applicationName
+                        ipAddress,
+                        applicationName,
+                        explicitInstanceId ? instanceId : applicationName
                 );
 
             } else {
@@ -248,10 +278,66 @@ public class EurekaConfiguration extends DiscoveryClientConfiguration {
                     );
                 }
             }
-
             if (dataCenterInfo != null) {
                 this.instanceInfo.setDataCenterInfo(dataCenterInfo);
             }
+            this.explicitInstanceId = false;
+        }
+
+        /**
+         * @param embeddedServer           The embedded server
+         * @param applicationConfiguration The application configuration
+         * @param dataCenterInfo           The data center info
+         * @param appName                  The application name
+         * @param hostname                 The hostname
+         * @param port                     The port
+         * @param ipAddr                The IP address
+         * @param instanceId               The instance ID
+         * @param preferIpAddress          Whether the IP address is prefered
+         */
+        @Inject
+        public EurekaRegistrationConfiguration(
+                EmbeddedServer embeddedServer,
+                ApplicationConfiguration applicationConfiguration,
+                @Nullable DataCenterInfo dataCenterInfo,
+                @Property(name = APPNAME) @Nullable String appName,
+                @Property(name = HOSTNAME) @Nullable String hostname,
+                @Property(name = PORT) @Nullable Integer port,
+                @Property(name = IP_ADDRESS) @Nullable String ipAddr,
+                @Property(name = INSTANCE_ID) @Nullable String instanceId,
+                @Property(name = PREFER_IP_ADDRESS) @Nullable Boolean preferIpAddress) {
+            if (preferIpAddress == null) {
+                preferIpAddress = false;
+            }
+            if (StringUtils.isEmpty(appName)) {
+                appName = applicationConfiguration.getName().orElse(Environment.DEFAULT_NAME);
+            }
+            if (StringUtils.isEmpty(hostname)) {
+                hostname = embeddedServer.getHost();
+            }
+            if (StringUtils.isEmpty(ipAddr)) {
+                ipAddr = lookupIp(hostname);
+            }
+            if (port == null) {
+                port = embeddedServer.getPort();
+            }
+
+            this.explicitInstanceId = StringUtils.isNotEmpty(instanceId) || preferIpAddress;
+            if (!explicitInstanceId || StringUtils.isEmpty(instanceId)) {
+                String appHostname = preferIpAddress ? ipAddr : hostname;
+                instanceId = appHostname + ":" + appName + ":" + port;
+            }
+            this.instanceInfo = createInstanceInfo(appName, instanceId, hostname, ipAddr, port, preferIpAddress);
+            if (dataCenterInfo != null) {
+                this.instanceInfo.setDataCenterInfo(dataCenterInfo);
+            }
+        }
+
+        private InstanceInfo createInstanceInfo(String appName, String instanceId, String hostname, String ipAddr,
+                                                int port,
+                                                boolean preferIpAddress) {
+            String appHostname = preferIpAddress ? ipAddr : hostname;
+            return new InstanceInfo(appHostname, port, ipAddr, appName, instanceId);
         }
 
         /**

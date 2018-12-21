@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.resources
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
+import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.context.exceptions.DependencyInjectionException
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
@@ -287,7 +288,8 @@ class StaticResourceResolutionSpec extends AbstractMicronautSpec {
                 'micronaut.router.static-resources.default.mapping': '/static/**'], Environment.TEST)
 
         then:
-        thrown(DependencyInjectionException)
+        def e = thrown(BeanInstantiationException)
+        e.message.contains("A path value of [classpath:] will allow access to class files!")
 
         cleanup:
         embeddedServer?.stop()
