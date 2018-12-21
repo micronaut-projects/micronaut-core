@@ -122,7 +122,7 @@ class EurekaClientConfigSpec extends Specification {
         def instanceInfo = registration.getInstanceInfo()
 
         then:
-        registration.isExplicitInstanceId() == true
+        registration.isExplicitInstanceId() == preferIpAddr
 
         instanceInfo.getApp() == appName
         instanceInfo.getInstanceId().endsWith(":${appName}:${serverPort}")
@@ -187,7 +187,7 @@ class EurekaClientConfigSpec extends Specification {
         def instanceInfo = registration.getInstanceInfo()
 
         then:
-        registration.isExplicitInstanceId() == true
+        registration.isExplicitInstanceId() == preferIpAddr
 
         instanceInfo.getApp() == exposedAppName
         instanceInfo.getInstanceId() == expectedInstanceId
