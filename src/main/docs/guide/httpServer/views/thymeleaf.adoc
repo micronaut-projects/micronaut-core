@@ -5,7 +5,7 @@ In addition to the <<views, Views>> dependency, add the following dependency on 
 
 [source, groovy]
 ----
-runtime "org.thymeleaf:thymeleaf:3.0.9.RELEASE"
+runtime "org.thymeleaf:thymeleaf:3.0.11.RELEASE"
 ----
 
 Thymeleaf integration instantiates a `ClassLoaderTemplateResolver`.
