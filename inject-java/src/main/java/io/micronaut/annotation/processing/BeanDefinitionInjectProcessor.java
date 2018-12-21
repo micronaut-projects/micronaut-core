@@ -857,9 +857,9 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             // shouldn't visit around advice on an introduction advice instance
             if (!(beanWriter instanceof AopProxyWriter)) {
-                boolean hasExplicitAround = methodAnnotationMetadata.hasStereotype(AROUND_TYPE);
-                if (isAopProxyType || hasExplicitAround) {
-                    if (isAopProxyType && !hasExplicitAround && !method.getModifiers().contains(Modifier.PUBLIC)) {
+                boolean hasAround = methodAnnotationMetadata.hasStereotype(AROUND_TYPE);
+                if (isAopProxyType || hasAround) {
+                    if (isAopProxyType && !hasAround && !method.getModifiers().contains(Modifier.PUBLIC)) {
                         // ignore methods that are not public and have no explicit advise
                         return;
                     }
@@ -890,7 +890,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     }
 
                     if (modelUtils.isFinal(method)) {
-                        error(method, "Public method defines AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on class.");
+                        if (methodAnnotationMetadata.hasDeclaredStereotype(AROUND_TYPE)) {
+                            error(method, "Method defines AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.");
+                        } else {
+                            error(method, "Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.");
+                        }
                     } else {
                         aopProxyWriter.visitAroundMethod(
                                 typeRef,

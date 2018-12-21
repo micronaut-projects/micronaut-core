@@ -808,8 +808,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                 if ((isAopProxyType && isPublic) || (methodAnnotationMetadata.hasStereotype(AROUND_TYPE) && !concreteClass.isAbstract())) {
 
+                    boolean hasExplicitAround = methodAnnotationMetadata.hasDeclaredStereotype(AROUND_TYPE)
+
                     if (methodNode.isFinal()) {
-                        addError("Public method defines AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on class.", methodNode)
+                        if (hasExplicitAround) {
+                            addError("Method defines AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.", methodNode)
+                        } else {
+                            addError("Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.", methodNode)
+                        }
                     } else {
                         Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
                         OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean)
