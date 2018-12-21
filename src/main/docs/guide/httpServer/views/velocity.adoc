@@ -3,7 +3,7 @@ the http://velocity.apache.org[Apache Velocity] Java-based template engine.
 
 In addition to the <<views, Views>> dependency, add the following dependency on your classpath.
 
-dependency:velocity-engine-core[groupsId="org.apache.velocity",scope="runtime",version="2.0"]
+dependency:velocity-engine-core[groupId="org.apache.velocity",scope="runtime",version="2.0"]
 
 The example shown in the <<views, Views>> section, could be rendered with the following Velocity template:
 
