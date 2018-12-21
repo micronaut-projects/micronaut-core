@@ -1,7 +1,6 @@
 dependencies {
-    compile 'org.hibernate:hibernate-core:5.3.6.Final'
     // included for Java 11
-    runtime 'javax.xml.bind:jaxb-api:2.3.1'
+    compile dependencyVersion("hibernate")
 
     compile project(":aop")
     compile project(":jdbc")
@@ -12,10 +11,13 @@ dependencies {
     compileOnly project(":inject-java")
     compileOnly project(":management")
     compileOnly project(":configurations:micrometer-core")
+    compile dependencyModuleVersion("hibernate", "hibernate-jcache")
+    runtime 'javax.xml.bind:jaxb-api:2.3.1'
 
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
     testRuntime project(":configurations:jdbc-tomcat")
     testRuntime dependencyVersion("h2")
     testCompile project(":configurations:micrometer-core")
+    testCompile dependencyModuleVersion("hibernate", "hibernate-jcache")
 }
