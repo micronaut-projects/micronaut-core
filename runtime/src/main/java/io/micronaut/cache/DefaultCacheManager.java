@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.util.CollectionUtils;
 
+import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.*;
@@ -68,11 +69,13 @@ public class DefaultCacheManager<C> implements CacheManager<C> {
     }
 
     @Override
+    @Nonnull
     public Set<String> getCacheNames() {
         return cacheMap.keySet();
     }
 
     @Override
+    @Nonnull
     public SyncCache<C> getCache(String name) {
         SyncCache<C> cache = cacheMap.get(name);
         if (cache == null) {

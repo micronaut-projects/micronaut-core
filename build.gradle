@@ -131,6 +131,11 @@ ext {
                 group:'org.neo4j.driver',
                 name:'neo4j-java-driver'
             ],
+            'jcache': [
+                    version: jcacheVersion,
+                    group:'javax.cache',
+                    name:'cache-api'
+            ],
             netty: [
                 version: nettyVersion,
                 group:'io.netty',
