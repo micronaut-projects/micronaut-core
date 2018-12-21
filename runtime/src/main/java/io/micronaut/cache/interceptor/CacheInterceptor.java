@@ -401,44 +401,41 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                             }
                         }
                     } else {
-                        final Flowable<Boolean> cacheInvalidateFlowable = Flowable.create(new FlowableOnSubscribe<Boolean>() {
-                            @Override
-                            public void subscribe(FlowableEmitter<Boolean> emitter) throws Exception {
-                                if (invalidateAll) {
-                                    final CompletableFuture<Void> allFutures = buildInvalidateAllFutures(cacheNames);
-                                    allFutures.whenCompleteAsync((aBoolean, throwable) -> {
-                                        if (throwable != null) {
-                                            SyncCache cache = cacheManager.getCache(cacheNames[0]);
-                                            if (asyncCacheErrorHandler.handleInvalidateError(cache, asRuntimeException(throwable))) {
-                                                emitter.onError(throwable);
-                                                return;
-                                            }
+                        final Flowable<Boolean> cacheInvalidateFlowable = Flowable.create(emitter -> {
+                            if (invalidateAll) {
+                                final CompletableFuture<Void> allFutures = buildInvalidateAllFutures(cacheNames);
+                                allFutures.whenCompleteAsync((aBoolean, throwable) -> {
+                                    if (throwable != null) {
+                                        SyncCache cache = cacheManager.getCache(cacheNames[0]);
+                                        if (asyncCacheErrorHandler.handleInvalidateError(cache, asRuntimeException(throwable))) {
+                                            emitter.onError(throwable);
+                                            return;
                                         }
-                                        emitter.onNext(true);
-                                        emitter.onComplete();
-                                    }, ioExecutor);
-                                } else {
-                                    CacheKeyGenerator keyGenerator = cacheOperation.getCacheInvalidateKeyGenerator(invalidateOperation);
-                                    String[] parameterNames = invalidateOperation.get(MEMBER_PARAMETERS, String[].class, StringUtils.EMPTY_STRING_ARRAY);
-                                    Object[] parameterValues = resolveParams(context, parameterNames);
-                                    Class<? extends CacheKeyGenerator> alternateKeyGen = invalidateOperation.get(MEMBER_KEY_GENERATOR, Class.class).orElse(null);
-                                    if (alternateKeyGen != null && keyGenerator.getClass() != alternateKeyGen) {
-                                        keyGenerator = resolveKeyGenerator(alternateKeyGen);
                                     }
-                                    Object key = keyGenerator.generateKey(context, parameterValues);
-                                    final CompletableFuture<Void> allFutures = buildInvalidateFutures(cacheNames, key);
-                                    allFutures.whenCompleteAsync((aBoolean, throwable) -> {
-                                        if (throwable != null) {
-                                            SyncCache cache = cacheManager.getCache(cacheNames[0]);
-                                            if (asyncCacheErrorHandler.handleInvalidateError(cache,key, asRuntimeException(throwable))) {
-                                                emitter.onError(throwable);
-                                                return;
-                                            }
-                                        }
-                                        emitter.onNext(true);
-                                        emitter.onComplete();
-                                    }, ioExecutor);
+                                    emitter.onNext(true);
+                                    emitter.onComplete();
+                                }, ioExecutor);
+                            } else {
+                                CacheKeyGenerator keyGenerator = cacheOperation.getCacheInvalidateKeyGenerator(invalidateOperation);
+                                String[] parameterNames = invalidateOperation.get(MEMBER_PARAMETERS, String[].class, StringUtils.EMPTY_STRING_ARRAY);
+                                Object[] parameterValues = resolveParams(context, parameterNames);
+                                Class<? extends CacheKeyGenerator> alternateKeyGen = invalidateOperation.get(MEMBER_KEY_GENERATOR, Class.class).orElse(null);
+                                if (alternateKeyGen != null && keyGenerator.getClass() != alternateKeyGen) {
+                                    keyGenerator = resolveKeyGenerator(alternateKeyGen);
                                 }
+                                Object key = keyGenerator.generateKey(context, parameterValues);
+                                final CompletableFuture<Void> allFutures = buildInvalidateFutures(cacheNames, key);
+                                allFutures.whenCompleteAsync((aBoolean, throwable) -> {
+                                    if (throwable != null) {
+                                        SyncCache cache = cacheManager.getCache(cacheNames[0]);
+                                        if (asyncCacheErrorHandler.handleInvalidateError(cache,key, asRuntimeException(throwable))) {
+                                            emitter.onError(throwable);
+                                            return;
+                                        }
+                                    }
+                                    emitter.onNext(true);
+                                    emitter.onComplete();
+                                }, ioExecutor);
                             }
                         }, BackpressureStrategy.ERROR);
                         cacheInvalidates.add(cacheInvalidateFlowable);

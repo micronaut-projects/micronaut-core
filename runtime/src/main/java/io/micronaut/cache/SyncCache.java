@@ -17,6 +17,8 @@
 package io.micronaut.cache;
 
 import io.micronaut.core.type.Argument;
+
+import javax.annotation.Nonnull;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
@@ -47,7 +49,8 @@ public interface SyncCache<C> extends Cache<C> {
      * @param <T>          The concrete type
      * @return An optional containing the value if it exists and is able to be converted to the specified type
      */
-    <T> Optional<T> get(Object key, Argument<T> requiredType);
+    @Nonnull
+    <T> Optional<T> get(@Nonnull Object key, @Nonnull Argument<T> requiredType);
 
     /**
      * Resolve the given value for the given key. If the value is not found the specified {@link Supplier} will
@@ -59,7 +62,7 @@ public interface SyncCache<C> extends Cache<C> {
      * @param <T>          The concrete type
      * @return An optional containing the value if it exists and is able to be converted to the specified type
      */
-    <T> T get(Object key, Argument<T> requiredType, Supplier<T> supplier);
+    <T> T get(@Nonnull Object key, @Nonnull Argument<T> requiredType, @Nonnull Supplier<T> supplier);
 
     /**
      * <p>Cache the specified value using the specified key if it is not already present.</p>
@@ -69,7 +72,8 @@ public interface SyncCache<C> extends Cache<C> {
      * @param <T>   The concrete type
      * @return An optional of the existing value or {@link Optional#empty()} if the specified value parameter was cached
      */
-    <T> Optional<T> putIfAbsent(Object key, T value);
+    @Nonnull
+    <T> Optional<T> putIfAbsent(@Nonnull Object key, @Nonnull T value);
 
     /**
      * <p>Cache the specified value using the specified key.</p>
@@ -77,14 +81,14 @@ public interface SyncCache<C> extends Cache<C> {
      * @param key   the key with which the specified value is to be associated
      * @param value the value to be associated with the specified key
      */
-    void put(Object key, Object value);
+    void put(@Nonnull Object key, @Nonnull Object value);
 
     /**
      * Invalidate the value for the given key.
      *
      * @param key The key to invalid
      */
-    void invalidate(Object key);
+    void invalidate(@Nonnull Object key);
 
     /**
      * Invalidate all cached values within this cache.
@@ -101,7 +105,7 @@ public interface SyncCache<C> extends Cache<C> {
      * @param <T>          The concrete type
      * @return An optional containing the value if it exists and is able to be converted to the specified type
      */
-    default <T> T get(Object key, Class<T> requiredType, Supplier<T> supplier) {
+    default <T> T get(@Nonnull Object key, @Nonnull Class<T> requiredType, @Nonnull Supplier<T> supplier) {
         return get(key, Argument.of(requiredType), supplier);
     }
 
@@ -113,7 +117,8 @@ public interface SyncCache<C> extends Cache<C> {
      * @param <T>          The concrete type
      * @return An optional containing the value if it exists and is able to be converted to the specified type
      */
-    default <T> Optional<T> get(Object key, Class<T> requiredType) {
+    @Nonnull
+    default <T> Optional<T> get(@Nonnull Object key, @Nonnull Class<T> requiredType) {
         return get(key, Argument.of(requiredType));
     }
 
@@ -127,6 +132,7 @@ public interface SyncCache<C> extends Cache<C> {
      *
      * @return The {@link AsyncCache} implementation for this cache
      */
+    @Nonnull
     default AsyncCache<C> async() {
         return new AsyncCache<C>() {
             @Override

@@ -8,6 +8,28 @@ In an effort to make a more consistent and understandable API, some methods and 
 
 Support for rendering <<freemarker,Freemaker Views>> has been added.
 
+=== Support for JCache Caching
+
+Support has been added for the JCache specification. If you define a `javax.cache.CacheManager` bean it will be used for caching. For example:
+
+.Using JCache Caching
+[source,java]
+----
+@Factory
+class CacheFactory {
+
+    @Singleton
+    @Bean
+    CacheManager cacheManager() {
+        CacheManager cacheManager = Caching.getCachingProvider()
+                                           .getCacheManager();
+        cacheManager.createCache('my-cache', new MutableConfiguration());
+        return cacheManager;
+    }
+}
+
+----
+
 === Liquibase and Flyway
 
 New configurations have been added to support https://micronaut-projects.github.io/micronaut-configuration-flyway/latest/guide/index.html[Flyway] and https://micronaut-projects.github.io/micronaut-configuration-liquibase/latest/guide/index.html[Liquibase] database migrations.
