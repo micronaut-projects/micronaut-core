@@ -55,6 +55,11 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     }
 
     @Override
+    public Optional<Class<? extends Annotation>> getAnnotationType(String name) {
+        return annotationMetadata.getAnnotationType(name);
+    }
+
+    @Override
     public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(Class<T> annotationType) {
         Environment environment = getEnvironment();
         List<AnnotationValue<T>> values = annotationMetadata.getAnnotationValuesByType(annotationType);
