@@ -3,7 +3,7 @@ the https://www.thymeleaf.org[Thymeleaf] Java template engine.
 
 In addition to the <<views, Views>> dependency, add the following dependency on your classpath.
 
-dependency:thymeleaf[groupId="org.thymeleaf",scope="runtime",version="3.0.9.RELEASE"]
+dependency:thymeleaf[groupId="org.thymeleaf",scope="runtime",version="3.0.11.RELEASE"]
 
 Thymeleaf integration instantiates a `ClassLoaderTemplateResolver`.
 

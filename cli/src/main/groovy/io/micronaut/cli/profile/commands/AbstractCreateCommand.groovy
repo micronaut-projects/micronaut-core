@@ -686,7 +686,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             defaultpackagename = establishGroupAndAppName(groupAndAppName)
 
             if (!NameUtils.isValidServiceId(appname)) {
-                MicronautConsole.instance.error("Application name should be all lower case and separated by underscores. For example: hello-world")
+                MicronautConsole.instance.error("Application name should be all lower case and separated by dashes. For example: hello-world")
                 return false
             } else {
                 return true

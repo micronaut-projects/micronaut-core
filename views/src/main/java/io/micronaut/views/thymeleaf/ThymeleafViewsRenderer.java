@@ -101,10 +101,7 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
                                                                    ThymeleafViewsRendererConfiguration thConfiguration) {
         ClassLoaderTemplateResolver templateResolver = new ClassLoaderTemplateResolver();
 
-        String sb = viewsConfiguration.getFolder() +
-                FILE_SEPARATOR;
-        templateResolver.setPrefix(sb);
-
+        templateResolver.setPrefix(normalizeFolder(viewsConfiguration.getFolder()));
         templateResolver.setCharacterEncoding(thConfiguration.getCharacterEncoding());
         templateResolver.setTemplateMode(thConfiguration.getTemplateMode());
         templateResolver.setSuffix(thConfiguration.getSuffix());
@@ -128,18 +125,10 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
     }
 
     private String viewLocation(final String name) {
-        final StringBuilder sb = new StringBuilder();
-        String prefix = templateResolver.getPrefix();
-        if (prefix != null) {
-            sb.append(prefix);
-            if (!prefix.endsWith(FILE_SEPARATOR)) {
-                sb.append(FILE_SEPARATOR);
-            }
-        }
-        sb.append(name.replace("/", FILE_SEPARATOR));
-        if (templateResolver.getSuffix() != null) {
-            sb.append(templateResolver.getSuffix());
-        }
-        return sb.toString();
+        return new StringBuilder()
+                .append(templateResolver.getPrefix())
+                .append(normalizeFile(name, templateResolver.getSuffix()))
+                .append(templateResolver.getSuffix())
+                .toString();
     }
 }

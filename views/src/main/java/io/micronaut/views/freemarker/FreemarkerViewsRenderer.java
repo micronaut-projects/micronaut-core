@@ -23,6 +23,7 @@ import freemarker.template.Template;
 import freemarker.template.TemplateException;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.beans.BeanMap;
+import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.Writable;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
@@ -50,6 +51,7 @@ import java.util.Map;
 public class FreemarkerViewsRenderer implements ViewsRenderer {
 
     protected final ViewsConfiguration viewsConfiguration;
+    private final ResourceLoader resourceLoader;
     protected final FreemarkerViewsRendererConfigurationProperties freemarkerMicronautConfiguration;
     protected final Configuration freemarkerConfiguration;
     protected final String extension;
@@ -59,19 +61,21 @@ public class FreemarkerViewsRenderer implements ViewsRenderer {
      * @param freemarkerConfiguration Freemarker Configuration
      */
     FreemarkerViewsRenderer(ViewsConfiguration viewsConfiguration,
+                            ResourceLoader resourceLoader,
                             FreemarkerViewsRendererConfigurationProperties freemarkerConfiguration) {
         this.viewsConfiguration = viewsConfiguration;
+        this.resourceLoader = resourceLoader;
         this.freemarkerMicronautConfiguration = freemarkerConfiguration;
         this.freemarkerConfiguration = freemarkerConfiguration.getConfiguration();
-        this.extension = EXTENSION_SEPARATOR + freemarkerConfiguration.getDefaultExtension();
+        this.extension = freemarkerConfiguration.getDefaultExtension();
     }
 
     @Override
-    public Writable render(String view, @Nullable Object data) {
+    public Writable render(String viewName, @Nullable Object data) {
         return (writer) -> {
             Map<String, Object> context = context(data);
-            String viewName = viewName(view);
-            Template template = freemarkerConfiguration.getTemplate(viewName);
+            String location = viewLocation(viewName);
+            Template template = freemarkerConfiguration.getTemplate(location);
             try {
                 template.process(context, writer);
             } catch (TemplateException e) {
@@ -83,14 +87,7 @@ public class FreemarkerViewsRenderer implements ViewsRenderer {
 
     @Override
     public boolean exists(String view) {
-        try {
-            freemarkerConfiguration.getTemplate(viewName(view));
-        } catch (ParseException | MalformedTemplateNameException e) {
-            return true;
-        } catch (IOException e) {
-            return false;
-        }
-        return true;
+        return resourceLoader.getResource(viewLocation(view)).isPresent();
     }
 
     private Map<String, Object> context(@Nullable Object data) {
@@ -103,11 +100,13 @@ public class FreemarkerViewsRenderer implements ViewsRenderer {
         return BeanMap.of(data);
     }
 
-    private String viewName(String name) {
-        if (!name.endsWith(extension)) {
-            return name + extension;
-        }
-        return name;
+    private String viewLocation(String name) {
+        return new StringBuilder()
+                .append(normalizeFolder(viewsConfiguration.getFolder()))
+                .append(normalizeFile(name, extension))
+                .append(EXTENSION_SEPARATOR)
+                .append(extension)
+                .toString();
     }
 
 }
