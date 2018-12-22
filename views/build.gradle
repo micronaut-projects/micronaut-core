@@ -2,7 +2,7 @@ ext {
     snakeYamlVersion = '1.19'
     velocityEngine = '2.0'
     handlebarsVersion='4.1.0'
-    thymeleafVersion='3.0.9.RELEASE'
+    thymeleafVersion='3.0.11.RELEASE'
     freemarkerVersion='2.3.28'
 }
 

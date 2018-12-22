@@ -56,6 +56,7 @@ public class VelocityViewsRenderer implements ViewsRenderer {
     protected final VelocityEngine velocityEngine;
     protected final ViewsConfiguration viewsConfiguration;
     protected final VelocityViewsRendererConfiguration velocityConfiguration;
+    protected final String folder;
 
     /**
      * @param viewsConfiguration    Views Configuration
@@ -66,6 +67,7 @@ public class VelocityViewsRenderer implements ViewsRenderer {
         this.viewsConfiguration = viewsConfiguration;
         this.velocityConfiguration = velocityConfiguration;
         this.velocityEngine = initializeVelocityEngine();
+        this.folder = normalizeFolder(viewsConfiguration.getFolder());
     }
 
     @Override
@@ -110,23 +112,15 @@ public class VelocityViewsRenderer implements ViewsRenderer {
     }
 
     private String viewName(final String name) {
-        final StringBuilder sb = new StringBuilder();
-        if (viewsConfiguration.getFolder() != null) {
-            sb.append(viewsConfiguration.getFolder());
-            sb.append(FILE_SEPARATOR);
-        }
-        sb.append(name.replace("/", FILE_SEPARATOR));
-        final String extension = extension();
-        if (!name.endsWith(extension)) {
-            sb.append(extension);
-        }
-        return sb.toString();
+        return new StringBuilder()
+                .append(folder)
+                .append(normalizeFile(name, extension()))
+                .append(".")
+                .append(extension())
+                .toString();
     }
 
     private String extension() {
-        StringBuilder sb = new StringBuilder();
-        sb.append(EXTENSION_SEPARATOR);
-        sb.append(velocityConfiguration.getDefaultExtension());
-        return sb.toString();
+        return velocityConfiguration.getDefaultExtension();
     }
 }
