@@ -16,9 +16,7 @@
 
 package io.micronaut.views.freemarker;
 
-import freemarker.core.ParseException;
 import freemarker.template.Configuration;
-import freemarker.template.MalformedTemplateNameException;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
 import io.micronaut.context.annotation.Requires;
@@ -33,7 +31,6 @@ import io.micronaut.views.exceptions.ViewRenderingException;
 
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -51,13 +48,14 @@ import java.util.Map;
 public class FreemarkerViewsRenderer implements ViewsRenderer {
 
     protected final ViewsConfiguration viewsConfiguration;
-    private final ResourceLoader resourceLoader;
     protected final FreemarkerViewsRendererConfigurationProperties freemarkerMicronautConfiguration;
     protected final Configuration freemarkerConfiguration;
     protected final String extension;
+    private final ResourceLoader resourceLoader;
 
     /**
      * @param viewsConfiguration      Views Configuration
+     * @param resourceLoader          The resource loader
      * @param freemarkerConfiguration Freemarker Configuration
      */
     FreemarkerViewsRenderer(ViewsConfiguration viewsConfiguration,
