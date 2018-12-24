@@ -17,11 +17,14 @@
 package io.micronaut.views.freemarker;
 
 import freemarker.template.Configuration;
+import freemarker.template.MalformedTemplateNameException;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.cli.exceptions.ParseException;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.Writable;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
@@ -32,6 +35,7 @@ import io.micronaut.views.exceptions.ViewRenderingException;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
+import java.io.IOException;
 import java.util.Map;
 
 /**
@@ -51,18 +55,14 @@ public class FreemarkerViewsRenderer implements ViewsRenderer {
     protected final FreemarkerViewsRendererConfigurationProperties freemarkerMicronautConfiguration;
     protected final Configuration freemarkerConfiguration;
     protected final String extension;
-    private final ResourceLoader resourceLoader;
 
     /**
      * @param viewsConfiguration      Views Configuration
-     * @param resourceLoader          The resource loader
      * @param freemarkerConfiguration Freemarker Configuration
      */
     FreemarkerViewsRenderer(ViewsConfiguration viewsConfiguration,
-                            ResourceLoader resourceLoader,
                             FreemarkerViewsRendererConfigurationProperties freemarkerConfiguration) {
         this.viewsConfiguration = viewsConfiguration;
-        this.resourceLoader = resourceLoader;
         this.freemarkerMicronautConfiguration = freemarkerConfiguration;
         this.freemarkerConfiguration = freemarkerConfiguration.getConfiguration();
         this.extension = freemarkerConfiguration.getDefaultExtension();
@@ -86,16 +86,18 @@ public class FreemarkerViewsRenderer implements ViewsRenderer {
 
     @Override
     public boolean exists(@Nonnull String view) {
-        //noinspection ConstantConditions
-        if (view == null) {
+        try {
+            freemarkerConfiguration.getTemplate(viewLocation(view));
+        } catch (ParseException | MalformedTemplateNameException e) {
+            return true;
+        } catch (IOException e) {
             return false;
         }
-        return resourceLoader.getResource(viewLocation(view)).isPresent();
+        return true;
     }
 
     private String viewLocation(String name) {
-        return normalizeFolder(viewsConfiguration.getFolder()) +
-                normalizeFile(name, extension) +
+        return normalizeFile(name, extension) +
                 EXTENSION_SEPARATOR +
                 extension;
     }
