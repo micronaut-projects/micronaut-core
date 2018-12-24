@@ -1436,6 +1436,10 @@ public class DefaultBeanContext implements BeanContext {
         if (!replacedTypes.isEmpty()) {
 
             candidates.removeIf(definition -> {
+                if (!definition.isEnabled(this)) {
+                    return true;
+                }
+                
                 final AnnotationMetadata annotationMetadata = definition.getAnnotationMetadata();
                 if (annotationMetadata.hasDeclaredStereotype(Infrastructure.class)) {
                     return false;
