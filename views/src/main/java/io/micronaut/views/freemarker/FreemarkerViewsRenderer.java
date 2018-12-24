@@ -20,18 +20,18 @@ import freemarker.template.Configuration;
 import freemarker.template.Template;
 import freemarker.template.TemplateException;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.Writable;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.views.ViewsConfiguration;
 import io.micronaut.views.ViewsRenderer;
 import io.micronaut.views.exceptions.ViewRenderingException;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -69,9 +69,10 @@ public class FreemarkerViewsRenderer implements ViewsRenderer {
     }
 
     @Override
-    public Writable render(String viewName, @Nullable Object data) {
+    public @Nonnull Writable render(@Nonnull String viewName, @Nullable Object data) {
+        ArgumentUtils.requireNonNull("viewName", viewName);
         return (writer) -> {
-            Map<String, Object> context = context(data);
+            Map<String, Object> context = modelOf(data);
             String location = viewLocation(viewName);
             Template template = freemarkerConfiguration.getTemplate(location);
             try {
@@ -84,27 +85,19 @@ public class FreemarkerViewsRenderer implements ViewsRenderer {
     }
 
     @Override
-    public boolean exists(String view) {
+    public boolean exists(@Nonnull String view) {
+        //noinspection ConstantConditions
+        if (view == null) {
+            return false;
+        }
         return resourceLoader.getResource(viewLocation(view)).isPresent();
     }
 
-    private Map<String, Object> context(@Nullable Object data) {
-        if (data == null) {
-            return new HashMap<>();
-        }
-        if (data instanceof Map) {
-            return (Map<String, Object>) data;
-        }
-        return BeanMap.of(data);
-    }
-
     private String viewLocation(String name) {
-        return new StringBuilder()
-                .append(normalizeFolder(viewsConfiguration.getFolder()))
-                .append(normalizeFile(name, extension))
-                .append(EXTENSION_SEPARATOR)
-                .append(extension)
-                .toString();
+        return normalizeFolder(viewsConfiguration.getFolder()) +
+                normalizeFile(name, extension) +
+                EXTENSION_SEPARATOR +
+                extension;
     }
 
 }

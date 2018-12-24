@@ -16,11 +16,14 @@
 
 package io.micronaut.views;
 
+import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.io.Writable;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.File;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Interface to be implemented by View Engines implementations.
@@ -55,6 +58,21 @@ public interface ViewsRenderer {
      * @return true if a template can be found for the supplied view name.
      */
     boolean exists(@Nonnull String viewName);
+
+    /**
+     * Creates a view model for the given data.
+     * @param data The data
+     * @return The model
+     */
+    default @Nonnull Map<String, Object> modelOf(@Nullable Object data) {
+        if (data == null) {
+            return new HashMap<>(0);
+        }
+        if (data instanceof Map) {
+            return (Map<String, Object>) data;
+        }
+        return BeanMap.of(data);
+    }
 
     /**
      * Returns a path with unix style folder
