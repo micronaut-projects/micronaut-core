@@ -16,19 +16,10 @@
 
 package io.micronaut.views.velocity;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import javax.inject.Singleton;
-import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
-
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.io.Writable;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.views.ViewsConfiguration;
@@ -39,6 +30,13 @@ import org.apache.velocity.app.VelocityEngine;
 import org.apache.velocity.exception.MethodInvocationException;
 import org.apache.velocity.exception.ParseErrorException;
 import org.apache.velocity.exception.ResourceNotFoundException;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import javax.inject.Singleton;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+import java.util.Properties;
 
 /**
  * Renders with templates with Apache Velocity Project.
@@ -76,7 +74,7 @@ public class VelocityViewsRenderer implements ViewsRenderer {
     @Nonnull public Writable render(@Nonnull String view, @Nullable Object data) {
         ArgumentUtils.requireNonNull("view", view);
         return (writer) -> {
-            Map<String, Object> context = context(data);
+            Map<String, Object> context = modelOf(data);
             final VelocityContext velocityContext = new VelocityContext(context);
             String viewName = viewName(view);
             try {
@@ -102,16 +100,6 @@ public class VelocityViewsRenderer implements ViewsRenderer {
         p.setProperty("resource.loader", "class");
         p.setProperty("class.resource.loader.class", "org.apache.velocity.runtime.resource.loader.ClasspathResourceLoader");
         return new VelocityEngine(p);
-    }
-
-    private Map<String, Object> context(@Nullable Object data) {
-        if (data == null) {
-            return new HashMap<>();
-        }
-        if (data instanceof Map) {
-            return (Map<String, Object>) data;
-        }
-        return BeanMap.of(data);
     }
 
     private String viewName(final String name) {
