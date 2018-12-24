@@ -48,13 +48,13 @@ public interface ViewsRenderer {
      * @param data     response body to render it with a view
      * @return A writable where the view will be written to.
      */
-    Writable render(String viewName, @Nullable Object data);
+    @Nonnull Writable render(@Nonnull String viewName, @Nullable Object data);
 
     /**
      * @param viewName view name to be render
      * @return true if a template can be found for the supplied view name.
      */
-    boolean exists(String viewName);
+    boolean exists(@Nonnull String viewName);
 
     /**
      * Returns a path with unix style folder

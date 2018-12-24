@@ -16,6 +16,7 @@
 
 package io.micronaut.views.velocity;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
 import java.nio.charset.StandardCharsets;
@@ -26,6 +27,7 @@ import java.util.Properties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.io.Writable;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.views.ViewsConfiguration;
@@ -70,7 +72,8 @@ public class VelocityViewsRenderer implements ViewsRenderer {
     }
 
     @Override
-    public Writable render(String view, @Nullable Object data) {
+    @Nonnull public Writable render(@Nonnull String view, @Nullable Object data) {
+        ArgumentUtils.requireNonNull("view", view);
         return (writer) -> {
             Map<String, Object> context = context(data);
             final VelocityContext velocityContext = new VelocityContext(context);
@@ -84,7 +87,7 @@ public class VelocityViewsRenderer implements ViewsRenderer {
     }
 
     @Override
-    public boolean exists(String viewName) {
+    public boolean exists(@Nonnull String viewName) {
         try {
             velocityEngine.getTemplate(viewName(viewName));
         } catch (ResourceNotFoundException | ParseErrorException e) {
@@ -111,12 +114,10 @@ public class VelocityViewsRenderer implements ViewsRenderer {
     }
 
     private String viewName(final String name) {
-        return new StringBuilder()
-                .append(folder)
-                .append(normalizeFile(name, extension()))
-                .append(".")
-                .append(extension())
-                .toString();
+        return folder +
+                normalizeFile(name, extension()) +
+                "." +
+                extension();
     }
 
     private String extension() {
