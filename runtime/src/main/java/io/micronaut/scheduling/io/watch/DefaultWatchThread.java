@@ -14,16 +14,18 @@
  * limitations under the License.
  */
 
-package io.micronaut.runtime.server.restart;
+package io.micronaut.scheduling.io.watch;
 
 import io.micronaut.context.LifeCycle;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.runtime.server.EmbeddedServer;
+import io.micronaut.scheduling.io.watch.event.FileChangedEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
 import java.io.File;
@@ -36,36 +38,40 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
- * Simple watch service that simply stops the server if any changes occur. It is up to an external tool to restart the server.
+ * Simple watch service that simply stops the server if any changes occur. It is up to an external tool to watch the server.
  *
  * <p>For example with Gradle you use <code>./gradlew run --continuous</code></p>
  *
  * @author graemerocher
  * @since 1.1.0
  */
-@Requires(property = DevelopmentRestartWatch.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
-@Requires(beans = EmbeddedServer.class)
+@Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
+@Requires(property = FileWatchConfiguration.PATHS)
 @Context
-public class DevelopmentRestartWatch implements LifeCycle<DevelopmentRestartWatch> {
-    /**
-     * Setting to enable and disable server watch.
-     */
-    public static final String ENABLED = "micronaut.server.watch.enabled";
+public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DevelopmentRestartWatch.class);
-    private WatchService watchService;
-    private Collection<WatchKey> watchKeys = new ConcurrentLinkedQueue<>();
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultWatchThread.class);
+    private final FileWatchConfiguration configuration;
     private final AtomicBoolean active = new AtomicBoolean(true);
-    private final EmbeddedServer embeddedServer;
-    private long sleepTime = 500;
+    private final ApplicationEventPublisher eventPublisher;
+    private final WatchService watchService;
+    private Collection<WatchKey> watchKeys = new ConcurrentLinkedQueue<>();
 
     /**
      * Default constructor.
      *
-     * @param embeddedServer The embedded server
+     * @param eventPublisher The event publisher
+     * @param configuration the configuration
+     * @param watchService the watch service
      */
-    public DevelopmentRestartWatch(EmbeddedServer embeddedServer) {
-        this.embeddedServer = embeddedServer;
+    public DefaultWatchThread(
+            ApplicationEventPublisher eventPublisher,
+            FileWatchConfiguration configuration,
+            WatchService watchService) {
+        this.eventPublisher = eventPublisher;
+        this.configuration = configuration;
+        this.watchService = watchService;
+
     }
 
     @Override
@@ -75,19 +81,18 @@ public class DevelopmentRestartWatch implements LifeCycle<DevelopmentRestartWatc
 
     @Override
     @PostConstruct
-    public DevelopmentRestartWatch start() {
+    public DefaultWatchThread start() {
         try {
-
-            File dir = new File("src/main");
-            if (dir.exists()) {
-                this.watchService = FileSystems.getDefault().newWatchService();
-                final Path p = dir.toPath();
-                addWatchDirectory(p);
+            final List<Path> paths = configuration.getPaths();
+            if (!paths.isEmpty()) {
+                for (Path path : paths) {
+                    addWatchDirectory(path);
+                }
             }
             new Thread(() -> {
                 while (active.get()) {
                     try {
-                        WatchKey watchKey = watchService.poll(sleepTime, TimeUnit.MILLISECONDS);
+                        WatchKey watchKey = watchService.poll(configuration.getCheckInterval().toMillis(), TimeUnit.MILLISECONDS);
                         if (watchKey != null && watchKeys.contains(watchKey)) {
                             List<WatchEvent<?>> watchEvents = watchKey.pollEvents();
                             for (WatchEvent<?> watchEvent : watchEvents) {
@@ -96,11 +101,15 @@ public class DevelopmentRestartWatch implements LifeCycle<DevelopmentRestartWatc
                                     if (LOG.isWarnEnabled()) {
                                         LOG.warn("WatchService Overflow occurred");
                                     }
-                                    continue;
-                                }
-                                if (kind == StandardWatchEventKinds.ENTRY_CREATE || kind == StandardWatchEventKinds.ENTRY_MODIFY) {
-                                    active.set(false);
-                                    embeddedServer.stop();
+                                } else {
+                                    final Object context = watchEvent.context();
+                                    if (context instanceof Path) {
+
+                                        eventPublisher.publishEvent(new FileChangedEvent(
+                                                (Path) context,
+                                                kind
+                                        ));
+                                    }
                                 }
                             }
                             watchKey.reset();
@@ -114,18 +123,42 @@ public class DevelopmentRestartWatch implements LifeCycle<DevelopmentRestartWatc
                 } catch (IOException e) {
                     LOG.debug("Exception while closing watchService", e);
                 }
-            }, "micronaut-development-filewatch").start();
+            }, "micronaut-filewatch-thread").start();
         } catch (IOException e) {
-            e.printStackTrace();
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Error starting file watch service: " + e.getMessage(), e);
+            }
         }
         return this;
     }
 
     @Override
     @PreDestroy
-    public DevelopmentRestartWatch stop() {
+    public DefaultWatchThread stop() {
         active.set(false);
         return this;
+    }
+
+    /**
+     * @return The watch service used.
+     */
+    public @Nonnull WatchService getWatchService() {
+        return watchService;
+    }
+
+    /**
+     * Registers a patch to watch.
+     *
+     * @param dir The directory to watch
+     * @return The watch key
+     * @throws IOException if an error occurs.
+     */
+    protected @Nonnull WatchKey registerPath(@Nonnull Path dir) throws IOException {
+        return dir.register(watchService,
+                StandardWatchEventKinds.ENTRY_CREATE,
+                StandardWatchEventKinds.ENTRY_DELETE,
+                StandardWatchEventKinds.ENTRY_MODIFY
+        );
     }
 
     private boolean isValidDirectoryToMonitor(File file) {
@@ -137,10 +170,11 @@ public class DevelopmentRestartWatch implements LifeCycle<DevelopmentRestartWatc
             @Override
             public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs)
                     throws IOException {
+
                 if (!isValidDirectoryToMonitor(dir.toFile())) {
                     return FileVisitResult.SKIP_SUBTREE;
                 }
-                WatchKey watchKey = dir.register(watchService, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE, StandardWatchEventKinds.ENTRY_MODIFY);
+                WatchKey watchKey = registerPath(dir);
                 watchKeys.add(watchKey);
                 return FileVisitResult.CONTINUE;
             }

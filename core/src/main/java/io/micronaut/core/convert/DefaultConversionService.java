@@ -33,6 +33,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -52,6 +53,8 @@ import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.UnsupportedCharsetException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -316,6 +319,21 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                     return Optional.of(format.format(object));
                 }
         );
+
+        // String -> Path
+        addConverter(
+                CharSequence.class,
+                Path.class, (object, targetType, context) -> {
+                    if (StringUtils.isEmpty(object)) {
+                        return Optional.empty();
+                    }
+                    try {
+                        return Optional.ofNullable(Paths.get(object.toString()));
+                    } catch (Exception e) {
+                        context.reject("Invalid path [" + object + " ]: " + e.getMessage(), e);
+                        return Optional.empty();
+                    }
+                });
 
         // String -> Integer
         addConverter(CharSequence.class, Integer.class, (CharSequence object, Class<Integer> targetType, ConversionContext context) -> {

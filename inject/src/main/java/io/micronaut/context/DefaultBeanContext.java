@@ -1043,7 +1043,8 @@ public class DefaultBeanContext implements BeanContext {
             List<BeanDefinitionReference> contextScopeBeans,
             List<BeanDefinitionReference> processedBeans) {
 
-
+        //noinspection unchecked
+        filterReplacedBeans((Collection) contextScopeBeans);
         for (BeanDefinitionReference contextScopeBean : contextScopeBeans) {
             try {
                 loadContextScopeBean(contextScopeBean);
