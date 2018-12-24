@@ -24,10 +24,12 @@ import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
@@ -128,7 +130,11 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public <T> Optional<T> getValue(Class<? extends Annotation> annotation, String member, Class<T> requiredType) {
+    public @Nonnull <T> Optional<T> getValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, @Nonnull Class<T> requiredType) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+        ArgumentUtils.requireNonNull("requiredType", requiredType);
+
         final Repeatable repeatable = annotation.getAnnotation(Repeatable.class);
         final boolean isRepeatable = repeatable != null;
         if (isRepeatable) {
@@ -144,7 +150,11 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public <T> Optional<T> getValue(String annotation, String member, Argument<T> requiredType) {
+    public @Nonnull <T> Optional<T> getValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Argument<T> requiredType) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+        ArgumentUtils.requireNonNull("requiredType", requiredType);
+
         Optional<T> resolved = Optional.empty();
         if (allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
             Map<CharSequence, Object> values = allAnnotations.get(annotation);
@@ -172,7 +182,11 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public <T> Optional<T> getDefaultValue(String annotation, String member, Class<T> requiredType) {
+    public @Nonnull <T> Optional<T> getDefaultValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Class<T> requiredType) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+        ArgumentUtils.requireNonNull("requiredType", requiredType);
+
         Map<String, Object> defaultValues = AnnotationMetadataSupport.getDefaultValues(annotation);
         if (defaultValues.containsKey(member)) {
             return ConversionService.SHARED.convert(defaultValues.get(member), requiredType);
@@ -182,7 +196,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(Class<T> annotationType) {
+    public @Nonnull <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(@Nullable Class<T> annotationType) {
         if (annotationType != null) {
             List<AnnotationValue<T>> results = annotationValuesByType.get(annotationType);
             if (results == null) {
@@ -200,7 +214,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(Class<T> annotationType) {
+    public @Nonnull <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(@Nonnull Class<T> annotationType) {
         if (annotationType != null) {
             Map<String, Map<CharSequence, Object>> sourceAnnotations = this.declaredAnnotations;
             Map<String, Map<CharSequence, Object>> sourceStereotypes = this.declaredStereotypes;
@@ -215,7 +229,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T extends Annotation> T[] synthesizeAnnotationsByType(Class<T> annotationClass) {
+    public <T extends Annotation> T[] synthesizeAnnotationsByType(@Nonnull Class<T> annotationClass) {
 
         if (annotationClass != null) {
             List<AnnotationValue<T>> values = getAnnotationValuesByType(annotationClass);
@@ -230,7 +244,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(Class<T> annotationClass) {
+    public <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(@Nonnull Class<T> annotationClass) {
         if (annotationClass != null) {
             List<AnnotationValue<T>> values = getAnnotationValuesByType(annotationClass);
 
@@ -269,7 +283,10 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public List<String> getAnnotationNamesByStereotype(String stereotype) {
+    public @Nonnull List<String> getAnnotationNamesByStereotype(@Nullable String stereotype) {
+        if (stereotype == null) {
+            return Collections.emptyList();
+        }
         if (annotationsByStereotype != null) {
             List<String> annotations = annotationsByStereotype.get(stereotype);
             if (annotations != null) {
@@ -286,7 +303,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public Set<String> getAnnotationNames() {
+    public @Nonnull Set<String> getAnnotationNames() {
         if (allAnnotations != null) {
             return allAnnotations.keySet();
         }
@@ -294,7 +311,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public Set<String> getDeclaredAnnotationNames() {
+    public @Nonnull Set<String> getDeclaredAnnotationNames() {
         if (declaredAnnotations != null) {
             return declaredAnnotations.keySet();
         }
@@ -302,7 +319,10 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public List<String> getDeclaredAnnotationNamesByStereotype(String stereotype) {
+    public @Nonnull List<String> getDeclaredAnnotationNamesByStereotype(@Nullable String stereotype) {
+        if (stereotype == null) {
+            return Collections.emptyList();
+        }
         if (annotationsByStereotype != null) {
             List<String> annotations = annotationsByStereotype.get(stereotype);
             if (annotations != null) {
@@ -323,13 +343,14 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public Optional<Class<? extends Annotation>> getAnnotationType(String name) {
+    public @Nonnull Optional<Class<? extends Annotation>> getAnnotationType(@Nonnull String name) {
         return AnnotationMetadataSupport.getAnnotationType(name);
     }
 
     @SuppressWarnings("Duplicates")
     @Override
-    public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
+    public @Nonnull <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@Nonnull String annotation) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
         if (allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
             Map<CharSequence, Object> values = allAnnotations.get(annotation);
             if (values != null) {
@@ -346,7 +367,8 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
 
     @SuppressWarnings("Duplicates")
     @Override
-    public <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(String annotation) {
+    public @Nonnull <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(@Nonnull String annotation) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
         if (declaredAnnotations != null && StringUtils.isNotEmpty(annotation)) {
             Map<CharSequence, Object> values = declaredAnnotations.get(annotation);
             if (values != null) {
@@ -362,7 +384,9 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public <T> OptionalValues<T> getValues(String annotation, Class<T> valueType) {
+    public @Nonnull <T> OptionalValues<T> getValues(@Nonnull String annotation, @Nonnull Class<T> valueType) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("valueType", valueType);
         if (allAnnotations != null && StringUtils.isNotEmpty(annotation)) {
             Map<CharSequence, Object> values = allAnnotations.get(annotation);
             if (values != null) {
@@ -378,7 +402,10 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     @Override
-    public <T> Optional<T> getDefaultValue(String annotation, String member, Argument<T> requiredType) {
+    public @Nonnull <T> Optional<T> getDefaultValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Argument<T> requiredType) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("member", member);
+        ArgumentUtils.requireNonNull("requiredType", requiredType);
         // Note this method should never reference the "annotationDefaultValues" field, which is used only at compile time
         Map<String, Object> defaultValues = AnnotationMetadataSupport.getDefaultValues(annotation);
         if (defaultValues.containsKey(member)) {
@@ -759,10 +786,6 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             }
             currentAnnotationValues.put(annotation, existing);
         }
-    }
-
-    private ConvertibleValues<Object> convertibleValuesOf(Map<CharSequence, Object> values) {
-        return ConvertibleValues.of(values);
     }
 
     @SuppressWarnings("MagicNumber")
