@@ -253,6 +253,16 @@ public class MediaType implements CharSequence {
     public static final MediaType APPLICATION_OCTET_STREAM_TYPE = new MediaType(APPLICATION_OCTET_STREAM);
 
     /**
+     * GraphQL: application/graphql.
+     */
+    public static final String APPLICATION_GRAPHQL = "application/graphql";
+
+    /**
+     * GraphQL: application/graphql.
+     */
+    public static final MediaType APPLICATION_GRAPHQL_TYPE = new MediaType(APPLICATION_GRAPHQL);
+
+    /**
      * Parameter {@code "charset"}.
      */
     public static final String CHARSET_PARAMETER = "charset";
