@@ -258,11 +258,21 @@ ext {
                     group  : 'org.flywaydb',
                     name   : 'flyway-core'
             ],
+            jna                 : [
+                    version: jnaVersion,
+                    group  : 'net.java.dev.jna',
+                    name   : 'jna'
+            ],
             hibernate              : [
                     version: hibernateVersion,
                     group  : 'org.hibernate',
                     name   : 'hibernate-core',
                     modules: ['hibernate-jcache', 'hibernate-ehcache']
+            ],
+            'methvin.directory-watcher': [
+                    version: methvinDirectoryWatcherVersion,
+                    group  : 'io.methvin',
+                    name   : 'directory-watcher'
             ]
     ]
 
