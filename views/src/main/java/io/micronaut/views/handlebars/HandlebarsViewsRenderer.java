@@ -45,12 +45,10 @@ import javax.inject.Singleton;
 public class HandlebarsViewsRenderer implements ViewsRenderer {
 
     protected final ViewsConfiguration viewsConfiguration;
-
     protected final ResourceLoader resourceLoader;
-
     protected HandlebarsViewsRendererConfiguration handlebarsViewsRendererConfiguration;
-
     protected Handlebars handlebars = new Handlebars();
+    protected String folder;
 
 
     /**
@@ -64,6 +62,7 @@ public class HandlebarsViewsRenderer implements ViewsRenderer {
         this.viewsConfiguration = viewsConfiguration;
         this.resourceLoader = resourceLoader;
         this.handlebarsViewsRendererConfiguration = handlebarsViewsRendererConfiguration;
+        this.folder = normalizeFolder(viewsConfiguration.getFolder());
     }
 
     @Override
@@ -81,32 +80,19 @@ public class HandlebarsViewsRenderer implements ViewsRenderer {
 
     @Override
     public boolean exists(String viewName) {
-        String location = viewLocation(viewName);
-        StringBuilder sb = new StringBuilder(location);
-        final String extension = extension();
-        if (!location.endsWith(extension)) {
-            sb.append(extension);
-        }
-        return resourceLoader.getResourceAsStream(sb.toString()).isPresent();
+        String location = viewLocation(viewName) + EXTENSION_SEPARATOR + extension();
+        return resourceLoader.getResource(location).isPresent();
     }
 
     private String viewLocation(final String name) {
-        final StringBuilder sb = new StringBuilder();
-        if (viewsConfiguration.getFolder() != null) {
-            sb.append(viewsConfiguration.getFolder());
-        }
-        sb.append(FILE_SEPARATOR);
-        sb.append(name.replace("/", FILE_SEPARATOR));
-        int index = sb.indexOf(extension());
-        if (index != -1) {
-            return sb.substring(0, index);
-        }
-        return sb.toString();
+        return new StringBuilder()
+                .append(folder)
+                .append(normalizeFile(name, extension()))
+                .toString();
     }
 
     private String extension() {
-        return EXTENSION_SEPARATOR +
-                handlebarsViewsRendererConfiguration.getDefaultExtension();
+        return handlebarsViewsRendererConfiguration.getDefaultExtension();
     }
 
 }
