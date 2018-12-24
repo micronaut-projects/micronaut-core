@@ -22,12 +22,14 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.views.ViewsConfiguration;
 import io.micronaut.views.ViewsRenderer;
 import io.micronaut.views.exceptions.ViewRenderingException;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
 
@@ -66,7 +68,8 @@ public class HandlebarsViewsRenderer implements ViewsRenderer {
     }
 
     @Override
-    public Writable render(String viewName, @Nullable Object data) {
+    @Nonnull public Writable render(@Nonnull String viewName, @Nullable Object data) {
+        ArgumentUtils.requireNonNull("viewName", viewName);
         return (writer) -> {
             String location = viewLocation(viewName);
             try {
@@ -79,16 +82,18 @@ public class HandlebarsViewsRenderer implements ViewsRenderer {
     }
 
     @Override
-    public boolean exists(String viewName) {
+    public boolean exists(@Nonnull String viewName) {
+        //noinspection ConstantConditions
+        if (viewName == null) {
+            return false;
+        }
         String location = viewLocation(viewName) + EXTENSION_SEPARATOR + extension();
         return resourceLoader.getResource(location).isPresent();
     }
 
     private String viewLocation(final String name) {
-        return new StringBuilder()
-                .append(folder)
-                .append(normalizeFile(name, extension()))
-                .toString();
+        return folder +
+                normalizeFile(name, extension());
     }
 
     private String extension() {

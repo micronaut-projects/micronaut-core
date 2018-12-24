@@ -21,6 +21,7 @@ import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.views.ViewsConfiguration;
@@ -32,6 +33,7 @@ import org.thymeleaf.context.IContext;
 import org.thymeleaf.exceptions.TemplateEngineException;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
 import java.util.HashMap;
@@ -73,7 +75,9 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
     }
 
     @Override
-    public Writable render(String viewName, @Nullable Object data) {
+    @Nonnull
+    public Writable render(@Nonnull String viewName, @Nullable Object data) {
+        ArgumentUtils.requireNonNull("viewName", viewName);
         return (writer) -> {
             final IContext context = new Context(Locale.US, variables(data));
             try {
@@ -85,7 +89,7 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
     }
 
     @Override
-    public boolean exists(String viewName) {
+    public boolean exists(@Nonnull String viewName) {
         String location = viewLocation(viewName);
         return resourceLoader.getResourceAsStream(location).isPresent();
     }
@@ -124,10 +128,8 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
     }
 
     private String viewLocation(final String name) {
-        return new StringBuilder()
-                .append(templateResolver.getPrefix())
-                .append(normalizeFile(name, templateResolver.getSuffix()))
-                .append(templateResolver.getSuffix())
-                .toString();
+        return templateResolver.getPrefix() +
+                normalizeFile(name, templateResolver.getSuffix()) +
+                templateResolver.getSuffix();
     }
 }
