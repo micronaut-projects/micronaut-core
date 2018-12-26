@@ -181,7 +181,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         Environment defaultEnvironment = getEnvironment();
         defaultEnvironment.start();
         registerSingleton(Environment.class, defaultEnvironment);
-        registerSingleton(new ExecutableMethodProcessorListener());
+        registerSingleton(new AnnotationProcessorListener());
     }
 
     @Override
@@ -514,7 +514,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             if (activeNames.contains(Environment.FUNCTION)) {
                 return super.readPropertySourceList(name);
             } else {
-                String[] environmentNamesArray = activeNames.toArray(new String[activeNames.size()]);
+                String[] environmentNamesArray = activeNames.toArray(new String[0]);
                 if (this.bootstrapEnvironment == null) {
                     this.bootstrapEnvironment = createBootstrapEnvironment(environmentNamesArray);
                 }
