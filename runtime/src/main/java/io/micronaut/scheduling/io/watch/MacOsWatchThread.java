@@ -19,7 +19,6 @@ package io.micronaut.scheduling.io.watch;
 import com.sun.jna.Library;
 import io.methvin.watchservice.MacOSXListeningWatchService;
 import io.methvin.watchservice.WatchablePath;
-import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
@@ -67,4 +66,8 @@ public class MacOsWatchThread extends DefaultWatchThread {
         );
     }
 
+    @Override
+    protected void closeWatchService() {
+        // no-op - for some reason this causes a JVM crash if not overridden
+    }
 }

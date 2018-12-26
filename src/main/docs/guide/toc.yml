@@ -292,6 +292,7 @@ cli:
   commands: Commands
   reloading:
     title: Reloading
+    automaticRestart: Automatic Restart
     jrebel: JRebel
     springloaded: Spring-Loaded
     gradleReload: Reloading with Gradle
