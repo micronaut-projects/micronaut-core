@@ -39,7 +39,6 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -491,15 +490,19 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      */
     private class RuntimeConfiguredEnvironment extends DefaultEnvironment {
 
+        private final boolean isRuntimeConfigured;
         private BootstrapPropertySourceLocator bootstrapPropertySourceLocator;
         private BootstrapEnvironment bootstrapEnvironment;
 
         RuntimeConfiguredEnvironment(String... environmentNames) {
             super(DefaultApplicationContext.this.resourceLoader, DefaultApplicationContext.this.conversionService, environmentNames);
+            this.isRuntimeConfigured = Boolean.getBoolean(Environment.BOOTSTRAP_CONTEXT_PROPERTY) ||
+                    DefaultApplicationContext.this.resourceLoader.getResource(Environment.BOOTSTRAP_NAME + ".yml").isPresent() ||
+                    DefaultApplicationContext.this.resourceLoader.getResource(Environment.BOOTSTRAP_NAME + ".properties").isPresent();
         }
 
         boolean isRuntimeConfigured() {
-            return bootstrapPropertySourceLocator != BootstrapPropertySourceLocator.EMPTY_LOCATOR;
+            return isRuntimeConfigured;
         }
 
         @Override
@@ -509,8 +512,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
         @Override
         protected synchronized List<PropertySource> readPropertySourceList(String name) {
-            final Optional<URL> bootstrapYaml = DefaultApplicationContext.this.resourceLoader.getResource(Environment.BOOTSTRAP_NAME + ".yml");
-            if (bootstrapYaml.isPresent()) {
+
+            if (isRuntimeConfigured) {
                 if (LOG.isInfoEnabled()) {
                     LOG.info("Reading Startup environment from bootstrap.yml");
                 }
