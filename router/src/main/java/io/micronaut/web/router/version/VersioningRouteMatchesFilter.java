@@ -26,7 +26,6 @@ import io.micronaut.web.router.version.strategy.VersionExtractingStrategy;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -45,6 +44,7 @@ public class VersioningRouteMatchesFilter implements RouteMatchesFilter {
 
     /**
      * Creates a {@link VersioningRouteMatchesFilter} with a collection of {@link VersionExtractingStrategy}.
+     *
      * @param resolvingStrategies A list of {@link VersionExtractingStrategy} beans to extract version from HTTP request
      */
     @Inject
@@ -64,8 +64,8 @@ public class VersioningRouteMatchesFilter implements RouteMatchesFilter {
     @Override
     public <T, R> List<UriRouteMatch<T, R>> filter(List<UriRouteMatch<T, R>> matches, HttpRequest<?> request) {
 
-        Objects.requireNonNull(matches, "'matches' list should be not null");
-        Objects.requireNonNull(request, "'request' should be not null");
+        ArgumentUtils.requireNonNull("matches", matches);
+        ArgumentUtils.requireNonNull("request", request);
 
         return resolvingStrategies.stream()
                 .map(strategy -> strategy.extract(request))
