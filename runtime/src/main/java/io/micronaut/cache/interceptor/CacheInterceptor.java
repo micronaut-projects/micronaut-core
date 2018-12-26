@@ -39,8 +39,6 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
-import io.reactivex.FlowableEmitter;
-import io.reactivex.FlowableOnSubscribe;
 import io.reactivex.functions.Function;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -428,7 +426,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                                 allFutures.whenCompleteAsync((aBoolean, throwable) -> {
                                     if (throwable != null) {
                                         SyncCache cache = cacheManager.getCache(cacheNames[0]);
-                                        if (asyncCacheErrorHandler.handleInvalidateError(cache,key, asRuntimeException(throwable))) {
+                                        if (asyncCacheErrorHandler.handleInvalidateError(cache, key, asRuntimeException(throwable))) {
                                             emitter.onError(throwable);
                                             return;
                                         }

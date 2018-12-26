@@ -18,7 +18,6 @@ package io.micronaut.scheduling.io.watch.event;
 
 import io.micronaut.context.event.ApplicationEvent;
 import io.micronaut.core.util.ArgumentUtils;
-import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
 
 import javax.annotation.Nonnull;
 import javax.annotation.concurrent.Immutable;
@@ -30,7 +29,7 @@ import java.nio.file.WatchEvent;
  *
  * @author graemerocher
  * @since 1.1.0
- * @see FileWatchConfiguration
+ * @see io.micronaut.scheduling.io.watch.FileWatchConfiguration
  */
 @Immutable
 public class FileChangedEvent extends ApplicationEvent {
