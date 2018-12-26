@@ -62,8 +62,13 @@ class ConsulMockConfigurationClientFilesSpec extends Specification {
     ConsulClient client = someContext.getBean(ConsulClient)
 
     def setup() {
+        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, "true")
         consulServer.applicationContext.getBean(MockConsulServer)
                 .keyvalues.clear()
+    }
+
+    def cleanup() {
+        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, "")
     }
 
     void "test discovery property sources from Consul with YAML handling"() {

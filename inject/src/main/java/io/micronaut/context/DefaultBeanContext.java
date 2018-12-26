@@ -1093,36 +1093,32 @@ public class DefaultBeanContext implements BeanContext {
             // Find ExecutableMethodProcessor for each annotation and process the BeanDefinitionMethodReference
             for (Map.Entry<Class<? extends Annotation>, List<BeanDefinitionMethodReference<?, ?>>> entry : byAnnotation.entrySet()) {
                 Class<? extends Annotation> annotationType = entry.getKey();
-                streamOfType(AnnotationProcessor.class, Qualifiers.byTypeArguments(annotationType))
+                streamOfType(ExecutableMethodProcessor.class, Qualifiers.byTypeArguments(annotationType))
                         .forEach(processor -> {
+                            for (BeanDefinitionMethodReference<?, ?> method : entry.getValue()) {
 
-                            if (processor instanceof ExecutableMethodProcessor) {
+                                BeanDefinition<?> beanDefinition = method.getBeanDefinition();
 
-                                for (BeanDefinitionMethodReference<?, ?> method : entry.getValue()) {
-
-                                    BeanDefinition<?> beanDefinition = method.getBeanDefinition();
-
-                                    // Only process the method if the the annotation is not declared at the class level
-                                    // If declared at the class level it will already have been processed by AnnotationProcessorListener
-                                    if (!beanDefinition.hasStereotype(annotationType)) {
-                                        //noinspection unchecked
-                                        if (method.hasDeclaredStereotype(Parallel.class)) {
-                                            ForkJoinPool.commonPool().execute(() -> {
-                                                try {
-                                                    processor.process(beanDefinition, method);
-                                                } catch (Throwable e) {
-                                                    if (LOG.isErrorEnabled()) {
-                                                        LOG.error("Error processing bean method " + beanDefinition + "." + method + " with processor (" + processor + "): " + e.getMessage(), e);
-                                                    }
-                                                    Boolean shutdownOnError = method.getValue(Parallel.class, "shutdownOnError", Boolean.class).orElse(true);
-                                                    if (shutdownOnError) {
-                                                        stop();
-                                                    }
+                                // Only process the method if the the annotation is not declared at the class level
+                                // If declared at the class level it will already have been processed by AnnotationProcessorListener
+                                if (!beanDefinition.hasStereotype(annotationType)) {
+                                    //noinspection unchecked
+                                    if (method.hasDeclaredStereotype(Parallel.class)) {
+                                        ForkJoinPool.commonPool().execute(() -> {
+                                            try {
+                                                processor.process(beanDefinition, method);
+                                            } catch (Throwable e) {
+                                                if (LOG.isErrorEnabled()) {
+                                                    LOG.error("Error processing bean method " + beanDefinition + "." + method + " with processor (" + processor + "): " + e.getMessage(), e);
                                                 }
-                                            });
-                                        } else {
-                                            processor.process(beanDefinition, method);
-                                        }
+                                                Boolean shutdownOnError = method.getValue(Parallel.class, "shutdownOnError", Boolean.class).orElse(true);
+                                                if (shutdownOnError) {
+                                                    stop();
+                                                }
+                                            }
+                                        });
+                                    } else {
+                                        processor.process(beanDefinition, method);
                                     }
                                 }
                             }
