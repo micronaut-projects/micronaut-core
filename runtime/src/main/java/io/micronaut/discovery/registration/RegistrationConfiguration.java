@@ -101,6 +101,7 @@ public abstract class RegistrationConfiguration implements Toggleable {
     public boolean isPreferIpAddress() {
         return preferIpAddress;
     }
+
     /**
      * Sets whether the IP address by used to register with the discovery server. Defaults to false.
      * @param preferIpAddress True if the IP address should be used
