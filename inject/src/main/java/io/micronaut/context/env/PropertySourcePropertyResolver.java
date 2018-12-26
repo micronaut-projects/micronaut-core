@@ -59,7 +59,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     // properties are stored in an array of maps organized by character in the alphabet
     // this allows optimization of searches by prefix
     @SuppressWarnings("MagicNumber")
-    protected final Map<String, Object>[] catalog = new Map[57];
+    protected final Map<String, Object>[] catalog = new Map[58];
     private final Random random = new Random();
     private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
     private final Map<String, Optional<?>> resolvedValueCache = new ConcurrentHashMap<>(20);
