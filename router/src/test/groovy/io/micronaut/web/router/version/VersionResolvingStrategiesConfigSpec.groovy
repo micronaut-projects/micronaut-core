@@ -17,6 +17,7 @@ package io.micronaut.web.router.version
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
+import io.micronaut.web.router.DefaultRouter
 import io.micronaut.web.router.Router
 import io.micronaut.web.router.version.strategy.HeaderVersionExtractingStrategy
 import io.micronaut.web.router.version.strategy.ParameterVersionExtractingStrategy
@@ -71,7 +72,7 @@ class VersionResolvingStrategiesConfigSpec extends Specification {
                 ["micronaut.router.versioning.enabled": "false"]
         ))
         then:
-        context.getBean(Router).class != VersionedRouter
+        context.getBean(Router).class != FilteredRouter
     }
 
     def "'Router' is instance of 'VersionedRouter'"() {
@@ -81,7 +82,7 @@ class VersionResolvingStrategiesConfigSpec extends Specification {
                 ["micronaut.router.versioning.enabled": "true"]
         ))
         then:
-        context.getBean(Router).class == VersionedRouter
+        context.getBean(Router).class == FilteredRouter
     }
 
     def "'Configuration' picked up the header name"() {
@@ -95,6 +96,17 @@ class VersionResolvingStrategiesConfigSpec extends Specification {
         def bean = context.getBean(RoutesVersioningConfiguration.HeaderBasedVersioningConfiguration)
         then:
         bean.getName() == "X-API"
+    }
+
+    def "Decorating the existing router bean works properly"() {
+        when:
+        def context = ApplicationContext.run(PropertySource.of(
+                "test",
+                ["micronaut.router.versioning.enabled": "true"]
+        ))
+        def bean = context.getBean(DefaultRouter)
+        then:
+        bean instanceof FilteredRouter
     }
 
 }
