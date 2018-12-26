@@ -37,7 +37,7 @@ public class VersionedRouterDecoratorConfiguration implements BeanCreatedEventLi
     private final RouteMatchesFilter versionedUrlFilter;
 
     /**
-     * Creates a configuration to decorate existing {@link Router} beans with a {@link VersionedRouter}.
+     * Creates a configuration to decorate existing {@link Router} beans with a {@link FilteredRouter}.
      *
      * @param filter A {@link RouteMatchesFilter} to delegate routes filtering
      */
@@ -47,14 +47,14 @@ public class VersionedRouterDecoratorConfiguration implements BeanCreatedEventLi
     }
 
     /**
-     * Returns a wrapped {@link Router} to {@link VersionedRouter}.
+     * Returns a wrapped {@link Router} to {@link FilteredRouter}.
      *
      * @param event The {@link Router} bean created event
      * @return The wrapper router bean
      */
     @Override
     public Router onCreated(BeanCreatedEvent<Router> event) {
-        return new VersionedRouter(
+        return new FilteredRouter(
                 event.getBean(), versionedUrlFilter
         );
     }

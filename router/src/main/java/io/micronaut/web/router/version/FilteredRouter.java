@@ -32,12 +32,12 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Decorated router with version matching.
+ * Decorated {@link Router} with filtering capabilities.
  *
  * @author Bogdan Oros
  * @since 1.1.0
  */
-public class VersionedRouter implements Router {
+public class FilteredRouter implements Router {
 
     private final Router router;
     private final RouteMatchesFilter routeFilter;
@@ -48,8 +48,8 @@ public class VersionedRouter implements Router {
      * @param router      A {@link Router} to delegate to
      * @param routeFilter A {@link RouteMatchesFilter} to filter non matching routes
      */
-    VersionedRouter(Router router,
-                    RouteMatchesFilter routeFilter) {
+    FilteredRouter(Router router,
+                   RouteMatchesFilter routeFilter) {
         this.router = router;
         this.routeFilter = routeFilter;
     }
