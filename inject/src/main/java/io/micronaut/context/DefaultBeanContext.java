@@ -1043,13 +1043,14 @@ public class DefaultBeanContext implements BeanContext {
             List<BeanDefinitionReference> contextScopeBeans,
             List<BeanDefinitionReference> processedBeans) {
 
-        //noinspection unchecked
-        filterReplacedBeans((Collection) contextScopeBeans);
-        for (BeanDefinitionReference contextScopeBean : contextScopeBeans) {
-            try {
-                loadContextScopeBean(contextScopeBean);
-            } catch (Throwable e) {
-                throw new BeanInstantiationException("Bean definition [" + contextScopeBean.getName() + "] could not be loaded: " + e.getMessage(), e);
+        if (CollectionUtils.isNotEmpty(contextScopeBeans)) {
+            filterReplacedBeans((Collection) contextScopeBeans);
+            for (BeanDefinitionReference contextScopeBean : contextScopeBeans) {
+                try {
+                    loadContextScopeBean(contextScopeBean);
+                } catch (Throwable e) {
+                    throw new BeanInstantiationException("Bean definition [" + contextScopeBean.getName() + "] could not be loaded: " + e.getMessage(), e);
+                }
             }
         }
 
@@ -1406,23 +1407,29 @@ public class DefaultBeanContext implements BeanContext {
      * Processes parallel bean definitions.
      */
     protected void processParallelBeans() {
-        new Thread(() -> beanDefinitionsClasses.stream()
-                .filter(bd -> bd.getAnnotationMetadata().hasDeclaredStereotype(Parallel.class))
-                .forEach(beanDefinitionReference -> ForkJoinPool.commonPool().execute(() -> {
-                    try {
-                        if (isRunning()) {
-                            synchronized (singletonObjects) {
-                                loadContextScopeBean(beanDefinitionReference);
-                            }
-                        }
-                    } catch (Throwable e) {
-                        LOG.error("Parallel Bean definition [" + beanDefinitionReference.getName() + "] could not be loaded: " + e.getMessage(), e);
-                        Boolean shutdownOnError = beanDefinitionReference.getAnnotationMetadata().getValue(Parallel.class, "shutdownOnError", Boolean.class).orElse(true);
-                        if (shutdownOnError) {
-                            stop();
+        new Thread(() -> {
+            final List<BeanDefinitionReference> parallelBeans = beanDefinitionsClasses.stream()
+                    .filter(bd -> bd.getAnnotationMetadata().hasDeclaredStereotype(Parallel.class) && bd.isEnabled(this))
+                    .collect(Collectors.toList());
+
+            filterReplacedBeans((Collection) parallelBeans);
+
+            parallelBeans.forEach(beanDefinitionReference -> ForkJoinPool.commonPool().execute(() -> {
+                try {
+                    if (isRunning()) {
+                        synchronized (singletonObjects) {
+                            loadContextScopeBean(beanDefinitionReference);
                         }
                     }
-                }))).start();
+                } catch (Throwable e) {
+                    LOG.error("Parallel Bean definition [" + beanDefinitionReference.getName() + "] could not be loaded: " + e.getMessage(), e);
+                    Boolean shutdownOnError = beanDefinitionReference.getAnnotationMetadata().getValue(Parallel.class, "shutdownOnError", Boolean.class).orElse(true);
+                    if (shutdownOnError) {
+                        stop();
+                    }
+                }
+            }));
+        }).start();
     }
 
     private <T> void filterReplacedBeans(Collection<? extends BeanType<T>> candidates) {
@@ -1439,7 +1446,11 @@ public class DefaultBeanContext implements BeanContext {
                 if (!definition.isEnabled(this)) {
                     return true;
                 }
+<<<<<<< HEAD
                 
+=======
+
+>>>>>>> 1.0.x
                 final AnnotationMetadata annotationMetadata = definition.getAnnotationMetadata();
                 if (annotationMetadata.hasDeclaredStereotype(Infrastructure.class)) {
                     return false;
