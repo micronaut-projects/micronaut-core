@@ -1446,11 +1446,6 @@ public class DefaultBeanContext implements BeanContext {
                 if (!definition.isEnabled(this)) {
                     return true;
                 }
-<<<<<<< HEAD
-                
-=======
-
->>>>>>> 1.0.x
                 final AnnotationMetadata annotationMetadata = definition.getAnnotationMetadata();
                 if (annotationMetadata.hasDeclaredStereotype(Infrastructure.class)) {
                     return false;
