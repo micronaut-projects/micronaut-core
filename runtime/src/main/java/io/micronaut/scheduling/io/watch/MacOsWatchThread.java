@@ -20,6 +20,7 @@ import com.sun.jna.Library;
 import io.methvin.watchservice.MacOSXListeningWatchService;
 import io.methvin.watchservice.WatchablePath;
 import io.micronaut.context.annotation.Context;
+import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventPublisher;
@@ -39,7 +40,7 @@ import java.nio.file.WatchService;
  * @since 1.1.0
  */
 @Replaces(DefaultWatchThread.class)
-@Context
+@Parallel
 @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 @Requires(property = FileWatchConfiguration.PATHS)
 @Requires(classes = {MacOSXListeningWatchService.class, Library.class})
