@@ -302,8 +302,11 @@ abstract class AbstractOpenApiVisitor  {
             if (type != null) {
 
                 String typeName = type.getName();
+                PrimitiveType primitiveType = PrimitiveType.fromName(typeName);
                 if (ClassUtils.isJavaLangType(typeName)) {
                     schema = getPrimitiveType(typeName);
+                } else if (primitiveType != null) {
+                    schema = primitiveType.createProperty();
                 } else if (type.isIterable()) {
                     Optional<ClassElement> componentType = type.getFirstTypeArgument();
                     if (componentType.isPresent()) {
