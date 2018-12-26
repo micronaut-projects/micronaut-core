@@ -21,6 +21,9 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 
+import java.util.Collections;
+import java.util.List;
+
 import static io.micronaut.web.router.version.RoutesVersioningConfiguration.PREFIX;
 
 /**
@@ -107,24 +110,24 @@ public class RoutesVersioningConfiguration implements Toggleable {
     private abstract static class AbstractVersioningConfiguration implements Toggleable {
 
         private boolean enabled;
-        private String name;
+        private List<String> names;
 
-        AbstractVersioningConfiguration(String name) {
-            this.name = name;
+        AbstractVersioningConfiguration(List<String> names) {
+            this.names = names;
         }
 
         /**
-         * @return the property name to extract specified version from.
+         * @return property names to extract specified version from.
          */
-        public String getName() {
-            return name;
+        public List<String> getNames() {
+            return names;
         }
 
         /**
-         * @param name The property name to extract specified version from.
+         * @param names property names to extract specified version from.
          */
-        public void setName(String name) {
-            this.name = name;
+        public void setNames(List<String> names) {
+            this.names = names;
         }
 
         /**
@@ -156,7 +159,7 @@ public class RoutesVersioningConfiguration implements Toggleable {
          * Specifies the default name of the request header.
          */
         public HeaderBasedVersioningConfiguration() {
-            super("X-API-VERSION");
+            super(Collections.singletonList("X-API-VERSION"));
         }
 
     }
@@ -174,7 +177,7 @@ public class RoutesVersioningConfiguration implements Toggleable {
          * Specifies the default name of the request parameter.
          */
         public ParameterBasedVersioningConfiguration() {
-            super("api-version");
+            super(Collections.singletonList("api-version"));
         }
 
     }

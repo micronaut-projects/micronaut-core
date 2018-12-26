@@ -23,6 +23,8 @@ import io.micronaut.web.router.version.RoutesVersioningConfiguration;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import static io.micronaut.web.router.version.RoutesVersioningConfiguration.HeaderBasedVersioningConfiguration.PREFIX;
@@ -38,20 +40,23 @@ import static io.micronaut.web.router.version.RoutesVersioningConfiguration.Head
 @Requires(property = PREFIX + ".enabled", value = StringUtils.TRUE)
 public class HeaderVersionExtractingStrategy implements VersionExtractingStrategy {
 
-    private final String header;
+    private final List<String> headerNames;
 
     /**
      * Creates a {@link VersionExtractingStrategy} to extract version from request header.
      *
-     * @param configuration A configuration to pick correct request header name.
+     * @param configuration A configuration to pick correct request header names.
      */
     @Inject
     public HeaderVersionExtractingStrategy(RoutesVersioningConfiguration.HeaderBasedVersioningConfiguration configuration) {
-        this.header = configuration.getName();
+        this.headerNames = configuration.getNames();
     }
 
     @Override
     public Optional<String> extract(HttpRequest<?> request) {
-        return Optional.ofNullable(request.getHeaders().get(header));
+        return headerNames.stream()
+                .map(name -> request.getHeaders().get(name))
+                .filter(Objects::nonNull)
+                .findFirst();
     }
 }

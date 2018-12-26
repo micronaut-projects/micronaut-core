@@ -91,11 +91,12 @@ class VersionResolvingStrategiesConfigSpec extends Specification {
                 "test",
                 ["micronaut.router.versioning.enabled"       : "true",
                  "micronaut.router.versioning.header.enabled": "true",
-                 "micronaut.router.versioning.header.name"   : "X-API"]
+                 "micronaut.router.versioning.header.names"   : ["X-API", "X-VERSION"]]
         ))
         def bean = context.getBean(RoutesVersioningConfiguration.HeaderBasedVersioningConfiguration)
         then:
-        bean.getName() == "X-API"
+        bean.getNames().contains("X-API")
+        bean.getNames().contains("X-VERSION")
     }
 
     def "Decorating the existing router bean works properly"() {
