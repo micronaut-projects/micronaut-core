@@ -108,8 +108,8 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
                                         final Object context = watchEvent.context();
                                         if (context instanceof Path) {
 
-                                            if (LOG.isInfoEnabled()) {
-                                                LOG.info("File at path {} changed. Firing change event: {}", context, kind);
+                                            if (LOG.isDebugEnabled()) {
+                                                LOG.debug("File at path {} changed. Firing change event: {}", context, kind);
                                             }
                                             eventPublisher.publishEvent(new FileChangedEvent(
                                                     (Path) context,
@@ -123,11 +123,6 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
                         } catch (InterruptedException | ClosedWatchServiceException e) {
                             // ignore
                         }
-                    }
-                    try {
-                        watchService.close();
-                    } catch (IOException e) {
-                        LOG.debug("Exception while closing watchService", e);
                     }
                 }, "micronaut-filewatch-thread").start();
             }
@@ -143,13 +138,7 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
     @PreDestroy
     public DefaultWatchThread stop() {
         active.set(false);
-        try {
-            watchService.close();
-        } catch (IOException e) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("Error stopping file watch service: " + e.getMessage(), e);
-            }
-        }
+        closeWatchService();
         return this;
     }
 
@@ -158,6 +147,19 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
      */
     public @Nonnull WatchService getWatchService() {
         return watchService;
+    }
+
+    /**
+     * Closes the watch service.
+     */
+    protected void closeWatchService() {
+        try {
+            getWatchService().close();
+        } catch (IOException e) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Error stopping file watch service: " + e.getMessage(), e);
+            }
+        }
     }
 
     /**
