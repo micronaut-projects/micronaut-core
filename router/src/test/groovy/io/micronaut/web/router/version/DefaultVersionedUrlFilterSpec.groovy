@@ -16,6 +16,7 @@
 package io.micronaut.web.router.version
 
 import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.core.version.annotation.Version
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller

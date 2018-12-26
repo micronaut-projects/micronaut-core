@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.web.router.version;
+package io.micronaut.core.version.annotation;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -22,7 +22,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Annotation to specify the version of route.
+ * Annotation to specify an abstract version.
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
