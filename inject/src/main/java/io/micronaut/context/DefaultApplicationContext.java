@@ -39,6 +39,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -508,12 +509,13 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
         @Override
         protected synchronized List<PropertySource> readPropertySourceList(String name) {
-            Set<String> activeNames = getActiveNames();
+            final Optional<URL> bootstrapYaml = DefaultApplicationContext.this.resourceLoader.getResource(Environment.BOOTSTRAP_NAME + ".yml");
+            if (bootstrapYaml.isPresent()) {
+                if (LOG.isInfoEnabled()) {
+                    LOG.info("Reading Startup environment from bootstrap.yml");
+                }
 
-            // fast path for functions
-            if (activeNames.contains(Environment.FUNCTION)) {
-                return super.readPropertySourceList(name);
-            } else {
+                Set<String> activeNames = getActiveNames();
                 String[] environmentNamesArray = activeNames.toArray(new String[0]);
                 if (this.bootstrapEnvironment == null) {
                     this.bootstrapEnvironment = createBootstrapEnvironment(environmentNamesArray);
@@ -528,6 +530,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 for (PropertySource bootstrapPropertySource : bootstrapPropertySources) {
                     addPropertySource(new BootstrapPropertySource(bootstrapPropertySource));
                 }
+                return super.readPropertySourceList(name);
+            } else {
                 return super.readPropertySourceList(name);
             }
         }
