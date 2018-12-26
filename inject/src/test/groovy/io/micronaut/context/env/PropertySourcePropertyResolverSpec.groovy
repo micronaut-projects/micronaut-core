@@ -275,4 +275,17 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.getProperty("single", String).get() == "some default with `something` in backticks"
         resolver.getProperty("start", String).get() == "`startswithtick"
     }
+
+    void "test properties starting with z"() {
+        given:
+        def values = [
+                'z': true
+        ]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("zprops", values)
+        )
+
+        expect:
+        resolver.getProperty("z", Boolean).isPresent()
+    }
 }
