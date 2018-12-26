@@ -17,7 +17,7 @@
 package io.micronaut.scheduling.io.watch;
 
 import io.micronaut.context.LifeCycle;
-import io.micronaut.context.annotation.Context;
+import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.util.StringUtils;
@@ -47,7 +47,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 @Requires(property = FileWatchConfiguration.PATHS)
-@Context
+@Parallel
 public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultWatchThread.class);
@@ -64,14 +64,13 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
      * @param configuration the configuration
      * @param watchService the watch service
      */
-    public DefaultWatchThread(
+    protected DefaultWatchThread(
             ApplicationEventPublisher eventPublisher,
             FileWatchConfiguration configuration,
             WatchService watchService) {
         this.eventPublisher = eventPublisher;
         this.configuration = configuration;
         this.watchService = watchService;
-
     }
 
     @Override
@@ -86,44 +85,52 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
             final List<Path> paths = configuration.getPaths();
             if (!paths.isEmpty()) {
                 for (Path path : paths) {
-                    addWatchDirectory(path);
-                }
-            }
-            new Thread(() -> {
-                while (active.get()) {
-                    try {
-                        WatchKey watchKey = watchService.poll(configuration.getCheckInterval().toMillis(), TimeUnit.MILLISECONDS);
-                        if (watchKey != null && watchKeys.contains(watchKey)) {
-                            List<WatchEvent<?>> watchEvents = watchKey.pollEvents();
-                            for (WatchEvent<?> watchEvent : watchEvents) {
-                                WatchEvent.Kind<?> kind = watchEvent.kind();
-                                if (kind == StandardWatchEventKinds.OVERFLOW) {
-                                    if (LOG.isWarnEnabled()) {
-                                        LOG.warn("WatchService Overflow occurred");
-                                    }
-                                } else {
-                                    final Object context = watchEvent.context();
-                                    if (context instanceof Path) {
-
-                                        eventPublisher.publishEvent(new FileChangedEvent(
-                                                (Path) context,
-                                                kind
-                                        ));
-                                    }
-                                }
-                            }
-                            watchKey.reset();
-                        }
-                    } catch (InterruptedException | ClosedWatchServiceException e) {
-                        // ignore
+                    if (path.toFile().exists()) {
+                        addWatchDirectory(path);
                     }
                 }
-                try {
-                    watchService.close();
-                } catch (IOException e) {
-                    LOG.debug("Exception while closing watchService", e);
-                }
-            }, "micronaut-filewatch-thread").start();
+            }
+
+            if (!watchKeys.isEmpty()) {
+                new Thread(() -> {
+                    while (active.get()) {
+                        try {
+                            WatchKey watchKey = watchService.poll(configuration.getCheckInterval().toMillis(), TimeUnit.MILLISECONDS);
+                            if (watchKey != null && watchKeys.contains(watchKey)) {
+                                List<WatchEvent<?>> watchEvents = watchKey.pollEvents();
+                                for (WatchEvent<?> watchEvent : watchEvents) {
+                                    WatchEvent.Kind<?> kind = watchEvent.kind();
+                                    if (kind == StandardWatchEventKinds.OVERFLOW) {
+                                        if (LOG.isWarnEnabled()) {
+                                            LOG.warn("WatchService Overflow occurred");
+                                        }
+                                    } else {
+                                        final Object context = watchEvent.context();
+                                        if (context instanceof Path) {
+
+                                            if (LOG.isInfoEnabled()) {
+                                                LOG.info("File at path {} changed. Firing change event: {}", context, kind);
+                                            }
+                                            eventPublisher.publishEvent(new FileChangedEvent(
+                                                    (Path) context,
+                                                    kind
+                                            ));
+                                        }
+                                    }
+                                }
+                                watchKey.reset();
+                            }
+                        } catch (InterruptedException | ClosedWatchServiceException e) {
+                            // ignore
+                        }
+                    }
+                    try {
+                        watchService.close();
+                    } catch (IOException e) {
+                        LOG.debug("Exception while closing watchService", e);
+                    }
+                }, "micronaut-filewatch-thread").start();
+            }
         } catch (IOException e) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Error starting file watch service: " + e.getMessage(), e);
@@ -136,6 +143,13 @@ public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
     @PreDestroy
     public DefaultWatchThread stop() {
         active.set(false);
+        try {
+            watchService.close();
+        } catch (IOException e) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Error stopping file watch service: " + e.getMessage(), e);
+            }
+        }
         return this;
     }
 

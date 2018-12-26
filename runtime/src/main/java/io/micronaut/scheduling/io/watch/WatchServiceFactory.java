@@ -18,10 +18,7 @@ package io.micronaut.scheduling.io.watch;
 
 import com.sun.jna.Library;
 import io.methvin.watchservice.MacOSXListeningWatchService;
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.annotation.*;
 import io.micronaut.core.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,7 +48,7 @@ public class WatchServiceFactory {
      * @throws IOException if an error occurs creating the watch service
      */
     @Bean(preDestroy = "close")
-    @Singleton
+    @Prototype
     @Requires(missing = MacOSXListeningWatchService.class)
     @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
     @Requires(property = FileWatchConfiguration.PATHS)
@@ -72,7 +69,7 @@ public class WatchServiceFactory {
      * @throws IOException if an error occurs creating the watch service
      */
     @Bean(preDestroy = "close")
-    @Singleton
+    @Prototype
     @Requires(classes = {MacOSXListeningWatchService.class, Library.class})
     @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
     @Requires(property = FileWatchConfiguration.PATHS)
