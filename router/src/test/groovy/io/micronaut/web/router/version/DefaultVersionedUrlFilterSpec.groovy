@@ -36,7 +36,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
 
     def strategies = [new HeaderVersionExtractingStrategy(
             new RoutesVersioningConfiguration.HeaderBasedVersioningConfiguration().with {
-                name = "API-VERSION"
+                names = ["API-VERSION"]
                 it
             })]
 
@@ -60,7 +60,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
         when:
         def strategy = new HeaderVersionExtractingStrategy(
                 new RoutesVersioningConfiguration.HeaderBasedVersioningConfiguration().with {
-                    name = specifiedHeader
+                    names = [specifiedHeader]
                     it
                 }
         )
@@ -77,7 +77,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
         when:
         def strategy = new ParameterVersionExtractingStrategy(
                 new RoutesVersioningConfiguration.ParameterBasedVersioningConfiguration().with {
-                    name = specifiedParameter
+                    names = [specifiedParameter]
                     it
                 }
         )
@@ -91,6 +91,27 @@ class DefaultVersionedUrlFilterSpec extends Specification {
         specifiedParameter | exactParameter || result
         "version"          | "version"      || Optional.of("1")
         "version"          | "vrsn"         || Optional.empty()
+    }
+
+    def "should extract parameter from multiple provided"() {
+        when:
+        def strategy = new ParameterVersionExtractingStrategy(
+                new RoutesVersioningConfiguration.ParameterBasedVersioningConfiguration().with {
+                    names = specifiedParameters
+                    it
+                }
+        )
+        def request = HttpRequest.GET("/test").with {
+            parameters.add(exactParameter, "1")
+            it
+        }
+        then:
+        result == strategy.extract(request)
+        where:
+        specifiedParameters      | exactParameter || result
+        ["x-version", "version"] | "version"      || Optional.of("1")
+        ["x-version", "version"] | "vrsn"         || Optional.empty()
+        []                       | "vrsn"         || Optional.empty()
     }
 
     def "should return initial routes ignoring version"() {

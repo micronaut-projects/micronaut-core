@@ -23,6 +23,8 @@ import io.micronaut.web.router.version.RoutesVersioningConfiguration;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import static io.micronaut.web.router.version.RoutesVersioningConfiguration.ParameterBasedVersioningConfiguration.PREFIX;
@@ -38,21 +40,24 @@ import static io.micronaut.web.router.version.RoutesVersioningConfiguration.Para
 @Requires(property = PREFIX + ".enabled", value = StringUtils.TRUE)
 public class ParameterVersionExtractingStrategy implements VersionExtractingStrategy {
 
-    private final String parameter;
+    private final List<String> parameterNames;
 
 
     /**
      * Creates a {@link VersionExtractingStrategy} to extract version from request parameter.
      *
-     * @param configuration A configuration to pick correct request parameter name.
+     * @param configuration A configuration to pick correct request parameter names.
      */
     @Inject
     public ParameterVersionExtractingStrategy(RoutesVersioningConfiguration.ParameterBasedVersioningConfiguration configuration) {
-        this.parameter = configuration.getName();
+        this.parameterNames = configuration.getNames();
     }
 
     @Override
     public Optional<String> extract(HttpRequest<?> request) {
-        return Optional.ofNullable(request.getParameters().get(parameter));
+        return parameterNames.stream()
+                .map(name -> request.getParameters().get(name))
+                .filter(Objects::nonNull)
+                .findFirst();
     }
 }
