@@ -95,7 +95,10 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      * The default bootstrap name.
      */
     String BOOTSTRAP_NAME_PROPERTY = "micronaut.bootstrap.name";
-
+    /**
+     * Whether the bootstrap context is enabled.
+     */
+    String BOOTSTRAP_CONTEXT_PROPERTY = "micronaut.bootstrap.context";
     /**
      * The default bootstrap name.
      */
