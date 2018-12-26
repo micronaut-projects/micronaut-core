@@ -23,6 +23,9 @@ import java.lang.annotation.Target;
 
 /**
  * Annotation to specify an abstract version.
+ *
+ * @author Bogdan Oros
+ * @since 1.1.0
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
