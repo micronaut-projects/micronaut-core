@@ -231,6 +231,34 @@ public class CollectionUtils {
     }
 
     /**
+     * Converts an {@link Iterable} to a {@link Set}.
+     *
+     * @param iterable The iterable
+     * @param <T>      The generic type
+     * @return The set
+     */
+    public static <T> Set<T> iterableToSet(Iterable<T> iterable) {
+        if (iterable == null) {
+            return Collections.emptySet();
+        } else {
+            if (iterable instanceof Set) {
+                return (Set<T>) iterable;
+            } else {
+                Iterator<T> i = iterable.iterator();
+                if (i.hasNext()) {
+                    Set<T> list = new HashSet<>();
+                    while (i.hasNext()) {
+                        list.add(i.next());
+                    }
+                    return list;
+                } else {
+                    return Collections.emptySet();
+                }
+            }
+        }
+    }
+
+    /**
      * Null safe version of {@link Collections#unmodifiableList(List)}.
      *
      * @param list The list

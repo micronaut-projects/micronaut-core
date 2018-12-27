@@ -40,11 +40,10 @@ if [[ $EXIT_STATUS -eq 0 ]]; then
       cd gh-pages
 
       # If this is the master branch then update the snapshot
-      if [[ $TRAVIS_BRANCH =~ ^master|[12]\..\.x$ ]]; then
+      if [[ $TRAVIS_BRANCH =~ ^master$ ]]; then
          mkdir -p snapshot
          cp -r ../build/docs/. ./snapshot/
-
-         git add snapshot/*
+          git add snapshot/*
       fi
 
       # If there is a tag present then this becomes the latest

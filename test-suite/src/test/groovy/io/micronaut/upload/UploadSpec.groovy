@@ -146,7 +146,7 @@ class UploadSpec extends AbstractMicronautSpec {
                         .accept(MediaType.TEXT_PLAIN_TYPE),
                 String
         ))
-        flowable.blockingFirst()
+        def resp = flowable.blockingFirst()
 
         then:
         def e = thrown(HttpClientResponseException)

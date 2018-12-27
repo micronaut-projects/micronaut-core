@@ -24,6 +24,7 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.http.annotation.Get
 import spock.lang.AutoCleanup
+import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -34,6 +35,7 @@ import javax.inject.Singleton
  * @author Graeme Rocher
  * @since 1.0
  */
+@Retry
 class ClientScopeSpec extends Specification {
     @Shared int port = SocketUtils.findAvailableTcpPort()
 

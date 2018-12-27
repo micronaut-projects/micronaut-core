@@ -66,12 +66,17 @@ import java.util.stream.Stream;
 public class DefaultEnvironment extends PropertySourcePropertyResolver implements Environment {
 
     private static final String EC2_LINUX_HYPERVISOR_FILE = "/sys/hypervisor/uuid";
+    private static final String EC2_LINUX_BIOS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/bios_vendor";
     private static final String EC2_WINDOWS_HYPERVISOR_CMD = "wmic path win32_computersystemproduct get uuid";
     private static final String FILE_SEPARATOR = ",";
     private static final Logger LOG = LoggerFactory.getLogger(DefaultEnvironment.class);
     private static final String K8S_ENV = "KUBERNETES_SERVICE_HOST";
     private static final String PCF_ENV = "VCAP_SERVICES";
     private static final String HEROKU_DYNO = "DYNO";
+    private static final int DEFAULT_READ_TIMEOUT = 500;
+    private static final int DEFAULT_CONNECT_TIMEOUT = 500;
+    private static final String GOOGLE_COMPUTE_METADATA = "http://metadata.google.internal";
+    private static final String DO_SYS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/sys_vendor";
 
     protected final ClassPathResourceLoader resourceLoader;
 
@@ -121,20 +126,24 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @SuppressWarnings("MagicNumber")
     public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... names) {
         super(conversionService);
-        Set<String> specifiedNames = new LinkedHashSet<>(3);
-        specifiedNames.addAll(Arrays.asList(names));
+        Set<String> environments = new LinkedHashSet<>(3);
+        List<String> specifiedNames = Arrays.asList(names);
 
         if (!specifiedNames.contains(Environment.FUNCTION) && shouldDeduceEnvironments()) {
             EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage();
-            specifiedNames.addAll(environmentsAndPackage.enviroments);
+            environments.addAll(environmentsAndPackage.enviroments);
             String aPackage = environmentsAndPackage.aPackage;
             if (aPackage != null) {
                 packages.add(aPackage);
             }
         }
+        environments.addAll(specifiedNames);
 
         this.classLoader = resourceLoader.getClassLoader();
-        this.names = specifiedNames;
+        this.names = environments;
+        if (LOG.isInfoEnabled() && !environments.isEmpty()) {
+            LOG.info("Established active environments: {}", environments);
+        }
         conversionService.addConverter(
             CharSequence.class, Class.class, new StringToClassConverter(classLoader)
         );
@@ -601,6 +610,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                         environments.add(IBM);
                         environments.add(Environment.CLOUD);
                         break;
+                    case DIGITAL_OCEAN:
+                        environments.add(DIGITAL_OCEAN);
+                        environments.add(Environment.CLOUD);
+                        break;
                     case OTHER:
                         // do nothing here
                         break;
@@ -616,10 +629,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             .flatMap(s -> Arrays.stream(s.split(",")))
             .map(String::trim)
             .forEach(environments::add);
-
-        if (LOG.isInfoEnabled() && !environments.isEmpty()) {
-            LOG.info("Established active environments: {}", environments);
-        }
 
         return environmentsAndPackage;
     }
@@ -694,24 +703,18 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         boolean isWindows = System.getProperty("os.name")
             .toLowerCase().startsWith("windows");
 
-        if (isWindows) {
-            if (isEC2Windows()) {
-                return ComputePlatform.AMAZON_EC2;
-            }
-            if (isGoogleCompute()) {
-                return ComputePlatform.GOOGLE_COMPUTE;
-            }
-
-        } else {
-            // can just read from the file
-            if (isEC2Linux()) {
-                return ComputePlatform.AMAZON_EC2;
-            }
+        if (isWindows ? isEC2Windows() : isEC2Linux()) {
+            return ComputePlatform.AMAZON_EC2;
         }
-        // let's try google
+
         if (isGoogleCompute()) {
             return ComputePlatform.GOOGLE_COMPUTE;
         }
+
+        if (isDigitalOcean()) {
+            return ComputePlatform.DIGITAL_OCEAN;
+        }
+
         //TODO check for azure and IBM
         //Azure - see http://blog.mszcool.com/index.php/2015/04/detecting-if-a-virtual-machine-runs-in-microsoft-azure-linux-windows-to-protect-your-software-when-distributed-via-the-azure-marketplace/
         //IBM - uses cloudfoundry, will have to use that to probe
@@ -722,10 +725,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     @SuppressWarnings("MagicNumber")
     private static boolean isGoogleCompute() {
         try {
-            URL url = new URL("http://metadata.google.internal");
-            HttpURLConnection con = (HttpURLConnection) url.openConnection();
-            con.setReadTimeout(500);
-            con.setConnectTimeout(500);
+            final HttpURLConnection con = createConnection(GOOGLE_COMPUTE_METADATA);
             con.setRequestMethod("GET");
             con.setDoOutput(true);
             int responseCode = con.getResponseCode();
@@ -750,15 +750,21 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     private static boolean isEC2Linux() {
-        try {
-            String contents = new String(Files.readAllBytes(Paths.get(EC2_LINUX_HYPERVISOR_FILE)));
-            if (contents.startsWith("ec2")) {
-                return true;
-            }
-        } catch (IOException e) {
-            // well that's not it!
+        if (readFile(EC2_LINUX_HYPERVISOR_FILE).startsWith("ec2")) {
+            return true;
+        } else if (readFile(EC2_LINUX_BIOS_VENDOR_FILE).toLowerCase().startsWith("amazon ec2")) {
+            return true;
         }
+
         return false;
+    }
+
+    private static String readFile(String path) {
+        try {
+            return new String(Files.readAllBytes(Paths.get(path))).trim();
+        } catch (IOException e) {
+            return "";
+        }
     }
 
     private static boolean isEC2Windows() {
@@ -795,11 +801,28 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return false;
     }
 
+    private static HttpURLConnection createConnection(String spec) throws IOException {
+        final URL url = new URL(spec);
+        final HttpURLConnection con = (HttpURLConnection) url.openConnection();
+        con.setReadTimeout(DEFAULT_READ_TIMEOUT);
+        con.setConnectTimeout(DEFAULT_CONNECT_TIMEOUT);
+        return con;
+    }
+
+    private static boolean isDigitalOcean() {
+        try {
+            String sysVendor = new String(Files.readAllBytes(Paths.get(DO_SYS_VENDOR_FILE)));
+            return "digitalocean".equals(sysVendor.toLowerCase());
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
     /**
      * Helper class for handling environments and package.
      */
     private static class EnvironmentsAndPackage {
         String aPackage;
-        Set<String> enviroments = new HashSet<>(1);
+        Set<String> enviroments = new LinkedHashSet<>(1);
     }
 }

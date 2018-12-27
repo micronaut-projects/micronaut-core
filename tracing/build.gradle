@@ -21,6 +21,7 @@ dependencies {
 
     testCompile project(":configurations:netflix-hystrix")
     testCompile project(":inject-groovy")
+    testCompile project(":discovery-client")
     testCompile project(":inject-java")
     testCompile project(":http-server-netty")
 

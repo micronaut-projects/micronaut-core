@@ -7,6 +7,66 @@ import io.micronaut.inject.BeanFactory
 import org.neo4j.driver.v1.Config
 
 class ConfigurationPropertiesBuilderSpec extends AbstractBeanDefinitionSpec {
+    void "test configuration builder on method"() {
+        given:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyPropertiesAA', '''
+package test;
+
+import io.micronaut.context.annotation.*
+
+@ConfigurationProperties("test")
+class MyPropertiesAA {
+    
+    TestAA test
+    
+    @ConfigurationBuilder(factoryMethod="build", includes="foo")
+    void setTest(TestAA test) {
+      this.test = test;
+    }
+    
+    TestAA getTest() {
+      return this.test
+    }
+}
+
+class TestAA {
+    private String foo
+    private String bar
+    
+    private TestAA() {}
+    
+    public void setFoo(String s) { 
+        this.foo = s;
+    }
+    public String getFoo() {
+        return foo;
+    }
+    public void setBar(String s) { 
+        this.bar = s;
+    }
+    public String getBar() {
+        return bar;
+    }
+    
+    static TestAA build() {
+        new TestAA()
+    } 
+}
+''')
+
+        when:
+        BeanFactory factory = beanDefinition
+        ApplicationContext applicationContext = ApplicationContext.run(
+                'test.foo':'good',
+                'test.bar':'bad'
+        )
+        def bean = factory.build(applicationContext, beanDefinition)
+
+        then:
+        bean.test.foo == 'good'
+        bean.test.bar == null
+    }
+
     void "test configuration builder with includes"() {
         given:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyPropertiesA', '''

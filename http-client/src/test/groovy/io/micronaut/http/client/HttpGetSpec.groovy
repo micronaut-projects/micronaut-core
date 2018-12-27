@@ -367,6 +367,24 @@ class HttpGetSpec extends Specification {
         client.close()
     }
 
+    void "test a non empty optional should return the value"() {
+        given:
+        HttpClient client = HttpClient.create(embeddedServer.getURL())
+
+        when:
+        String body = client.toBlocking().retrieve(
+                HttpRequest.GET("/get/notEmpty"), String
+        )
+
+
+        then:
+        body == "not empty"
+
+        cleanup:
+        client.stop()
+        client.close()
+    }
+
     void 'test format dates with @Format'() {
         given:
         MyGetClient client = embeddedServer.applicationContext.getBean(MyGetClient)
@@ -421,6 +439,11 @@ class HttpGetSpec extends Specification {
         @Get("/empty")
         Optional<String> empty() {
             return Optional.empty()
+        }
+
+        @Get("/notEmpty")
+        Optional<String> notEmpty() {
+            return Optional.of("not empty")
         }
 
         @Get("/date/{myDate}")

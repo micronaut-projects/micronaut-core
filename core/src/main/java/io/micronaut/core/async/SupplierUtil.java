@@ -16,6 +16,7 @@
 
 package io.micronaut.core.async;
 
+import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
@@ -45,6 +46,42 @@ public class SupplierUtil {
             private synchronized T initialize() {
                 if (!initialized) {
                     T value = actual.get();
+                    delegate = () -> value;
+                    initialized = true;
+                }
+                return delegate.get();
+            }
+        };
+    }
+
+    /**
+     * Caches the result of supplier in a thread safe manner. The result
+     * is only cached if it is non null or non empty if an optional.
+     *
+     * @param actual The supplier providing the result
+     * @param <T> The type of result
+     * @return A new supplier that will cache the result
+     */
+    public static <T> Supplier<T> memoizedNonEmpty(Supplier<T> actual) {
+        return new Supplier<T>() {
+            Supplier<T> delegate = this::initialize;
+            boolean initialized;
+
+            public T get() {
+                return delegate.get();
+            }
+
+            private synchronized T initialize() {
+                if (!initialized) {
+                    T value = actual.get();
+                    if (value == null) {
+                        return null;
+                    }
+                    if (value instanceof Optional) {
+                        if (!((Optional) value).isPresent()) {
+                            return value;
+                        }
+                    }
                     delegate = () -> value;
                     initialized = true;
                 }

@@ -25,6 +25,7 @@ import io.micronaut.configuration.metrics.annotation.RequiresMetrics;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.scheduling.instrument.InstrumentedExecutorService;
 import io.micronaut.scheduling.instrument.InstrumentedScheduledExecutorService;
@@ -47,7 +48,7 @@ import static io.micronaut.configuration.metrics.micrometer.MeterRegistryFactory
  */
 @Singleton
 @RequiresMetrics
-@Requires(property = MICRONAUT_METRICS_BINDERS + ".executor.enabled", value = "true", defaultValue = "true")
+@Requires(property = MICRONAUT_METRICS_BINDERS + ".executor.enabled", value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 public class ExecutorServiceMetricsBinder implements BeanCreatedEventListener<ExecutorService> {
 
     private final Provider<MeterRegistry> meterRegistryProvider;

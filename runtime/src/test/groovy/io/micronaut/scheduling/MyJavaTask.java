@@ -16,6 +16,7 @@
 package io.micronaut.scheduling;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.annotation.Scheduled;
 
 import javax.inject.Singleton;
@@ -25,7 +26,7 @@ import javax.inject.Singleton;
  * @since 1.0
  */
 @Singleton
-@Requires(property = "scheduled-test.task.enabled", value = "true")
+@Requires(property = "scheduled-test.task.enabled", value = StringUtils.TRUE)
 public class MyJavaTask {
     private boolean wasRun = false;
 

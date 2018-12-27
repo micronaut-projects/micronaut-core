@@ -24,19 +24,17 @@ By default the Micronaut HTTP server is configured to run on port 8080.
 
 See the section <<runningSpecificPort, Running Server on a Specific Port>> in the user guide for more options.
 
-In order to create a service that responds to "Hello World" you first need a controller. The following is an example of a controller written in Java and located in `src/main/java/example/helloworld`:
+In order to create a service that responds to "Hello World" you first need a controller. The following is an example of a controller:
 
-.src/main/java/example/helloworld/HelloController.java
-[source,java]
-----
-include::{testsuite}/server/intro/HelloController.java[tags=imports, indent=0]
-
-include::{testsuite}/server/intro/HelloController.java[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.server.intro.HelloController[tags="imports,class"]
 
 <1> The class is defined as a controller with the link:{api}/io/micronaut/http/annotation/Controller.html[@Controller] annotation mapped to the path `/hello`
 <2> The link:{api}/io/micronaut/http/annotation/Get.html[@Get] annotation is used to map the `index` method to all requests that use an HTTP `GET`
 <3> A String "Hello World" is returned as the result
+
+If you are using Java, place the previous file in `src/main/java/hello/world`.
+If you are using Groovy, place the previous file in `src/main/groovy/hello/world`.
+If you are using Kotlin, place the previous file in `src/main/kotlin/hello/world`.
 
 If you start the application and send a request to the `/hello` URI then the text "Hello World" is returned:
 

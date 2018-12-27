@@ -3,10 +3,7 @@ the http://jknack.github.io/handlebars.java/[Handlebars.java] project.
 
 In addition to the <<views, Views>> dependency, add the following dependency on your classpath. For example, in `build.gradle`
 
-[source, groovy]
-----
-runtime "com.github.jknack:handlebars:4.1.0"
-----
+dependency:handlebars[groupId="com.github.jknack",scope="runtime",version="4.1.0"]
 
 The example shown in the <<views, Views>> section, could be rendered with the following Handlebars template:
 

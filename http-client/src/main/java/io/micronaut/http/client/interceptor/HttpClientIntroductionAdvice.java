@@ -144,6 +144,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         this.loadBalancerResolver = loadBalancerResolver;
         this.transformers = transformers != null ? transformers : Collections.emptyList();
     }
+
     /**
      * Interceptor to apply headers, cookies, parameter and body arguements.
      *
@@ -546,6 +547,9 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      */
     private HttpClient getClient(MethodInvocationContext<Object, Object> context, AnnotationValue<Client> clientAnn) {
         String clientId = clientAnn.getValue(String.class).orElse(null);
+        if (clientId == null) {
+            throw new HttpClientException("Either the id or value of the @Client annotation must be specified");
+        }
         String path = clientAnn.get("path", String.class).orElse(null);
         String clientKey = computeClientKey(clientId, path);
         if (clientKey == null) {
@@ -597,7 +601,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                         }
                     }
                     if (objectMapper == null) {
-                        objectMapper = new ObjectMapperFactory().objectMapper(Optional.empty(), Optional.empty());
+                        objectMapper = new ObjectMapperFactory().objectMapper(null, null);
                     }
 
                     SerializationFeature[] enabledSerializationFeatures = jacksonFeatures.get("enabledSerializationFeatures", SerializationFeature[].class).orElse(null);

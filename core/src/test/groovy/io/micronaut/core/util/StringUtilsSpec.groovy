@@ -59,4 +59,18 @@ class StringUtilsSpec extends Specification {
         "/a"  | "/b/" | "/a/b/"
         "/a/" | "/b/" | "/a/b/"
     }
+
+    @Unroll
+    void 'test trim the string "#input" == #expected'() {
+        expect:
+        StringUtils.trimToNull(input) == expected
+
+        where:
+        input | expected
+        'a'   | 'a'
+        ' a ' | 'a'
+        '  '  | null
+        ''    | null
+        null  | null
+    }
 }

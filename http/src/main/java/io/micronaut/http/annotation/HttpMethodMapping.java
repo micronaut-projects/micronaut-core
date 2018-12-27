@@ -37,10 +37,14 @@ import java.lang.annotation.Target;
 @Executable
 public @interface HttpMethodMapping {
 
-    String DEFAULT_URI = "/";
+    /**
+     * @deprecated Use {@link UriMapping#DEFAULT_URI} instead
+     */
+    @Deprecated
+    String DEFAULT_URI = UriMapping.DEFAULT_URI;
 
     /**
      * @return The URI of the action
      */
-    String value() default DEFAULT_URI;
+    String value() default UriMapping.DEFAULT_URI;
 }

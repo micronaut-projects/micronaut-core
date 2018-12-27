@@ -17,7 +17,9 @@
 package io.micronaut.security.session;
 
 import io.micronaut.context.annotation.Replaces;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -33,12 +35,15 @@ import java.net.URISyntaxException;
 
 /**
  * {@link RejectionHandler} implementation for Session-based Authentication.
-
+ *
+ * @deprecated use {@link io.micronaut.security.handlers.RedirectRejectionHandler} instead
  * @author Sergio del Amo
  * @since 1.0
  */
-@Singleton
+@Deprecated
+@Requires(property = SecuritySessionConfigurationProperties.PREFIX + ".legacy-rejection-handler", notEquals = StringUtils.FALSE)
 @Replaces(HttpStatusCodeRejectionHandler.class)
+@Singleton
 public class SessionSecurityfilterRejectionHandler implements RejectionHandler {
 
     protected final SecuritySessionConfiguration securitySessionConfiguration;

@@ -30,21 +30,13 @@ abstract class AbstractMicronautSpec extends Specification {
 
     static final SPEC_NAME_PROPERTY = 'spec.name'
 
-
     @Shared File uploadDir = File.createTempDir()
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
             getConfiguration() << [(SPEC_NAME_PROPERTY):getClass().simpleName]
     )
     @Shared @AutoCleanup EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
-    @Shared int serverPort = embeddedServer.getPort()
-    @Shared URL server = embeddedServer.getURL()
-
     @Shared @AutoCleanup HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
-
-    Collection<String> configurationNames() {
-        ['io.micronaut.configuration.jackson','io.micronaut.web.router']
-    }
 
     Map<String, Object> getConfiguration() {
         ['micronaut.server.multipart.location':uploadDir.absolutePath]

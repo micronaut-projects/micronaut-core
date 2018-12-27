@@ -40,6 +40,7 @@ import io.micronaut.web.router.exceptions.RoutingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Qualifier;
 import java.nio.charset.Charset;
@@ -65,15 +66,18 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     /**
      * A {@link io.micronaut.web.router.RouteBuilder.UriNamingStrategy} whereby hyphenated naming conventions are used.
+     *
+     * @deprecated Dynamic naming conventions are no longer supported
      */
+    @Deprecated
     public static final UriNamingStrategy HYPHENATED_NAMING_STRATEGY = new UriNamingStrategy() {
         @Override
-        public String resolveUri(Class type) {
+        public @Nonnull String resolveUri(Class type) {
             return '/' + TypeConvention.CONTROLLER.asHyphenatedName(type);
         }
 
         @Override
-        public String resolveUri(String property) {
+        public @Nonnull String resolveUri(String property) {
             if (StringUtils.isEmpty(property)) {
                 return "/";
             }
@@ -491,7 +495,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * Default Error Route.
      */
-    class DefaultErrorRoute extends AbstractRoute implements ErrorRoute, Comparable<ErrorRoute> {
+    class DefaultErrorRoute extends AbstractRoute implements ErrorRoute {
 
         private final Class<? extends Throwable> error;
         private final Class originatingClass;
@@ -601,30 +605,12 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 .append(targetMethod)
                 .toString();
         }
-
-        @Override
-        public int compareTo(ErrorRoute o) {
-            if (o == this) {
-                return 0;
-            }
-            Class<? extends Throwable> thatExceptionType = o.exceptionType();
-            Class<? extends Throwable> thisExceptionType = this.error;
-
-            if (thisExceptionType == thatExceptionType) {
-                return 0;
-            } else if (thisExceptionType.isAssignableFrom(thatExceptionType)) {
-                return 1;
-            } else if (thatExceptionType.isAssignableFrom(thisExceptionType)) {
-                return -1;
-            }
-            return -1;
-        }
     }
 
     /**
      * Represents a route for an {@link io.micronaut.http.HttpStatus} code.
      */
-    class DefaultStatusRoute extends AbstractRoute implements StatusRoute, Comparable<StatusRoute> {
+    class DefaultStatusRoute extends AbstractRoute implements StatusRoute {
 
         private final HttpStatus status;
         private final Class originatingClass;
@@ -728,21 +714,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             int result = status != null ? status.hashCode() : 0;
             result = 31 * result + (originatingClass != null ? originatingClass.hashCode() : 0);
             return result;
-        }
-
-        @Override
-        public int compareTo(StatusRoute o) {
-            if (o == this) {
-                return 0;
-            }
-            Class<?> thatType = o.originatingType();
-            Class<?> thisType = this.originatingType();
-
-            if (thisType == thatType && this.status().equals(o.status())) {
-                return 0;
-            } else {
-                return -1;
-            }
         }
     }
 

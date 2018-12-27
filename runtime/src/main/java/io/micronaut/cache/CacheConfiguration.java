@@ -16,7 +16,6 @@
 
 package io.micronaut.cache;
 
-import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.runtime.ApplicationConfiguration;
 
@@ -32,7 +31,6 @@ import java.util.OptionalLong;
  * @author Graeme Rocher
  * @since 1.0
  */
-@EachProperty(CacheConfiguration.PREFIX)
 public class CacheConfiguration {
 
     /**

@@ -6,8 +6,9 @@ For example, the following test is written using http://spockframework.org[Spock
 [source,groovy]
 ----
 include::{testsuite}/server/intro/HelloControllerSpec.groovy[tags=imports, indent=0]
-
-include::{testsuite}/server/intro/HelloControllerSpec.groovy[tags=class, indent=0]
+include::{testsuite}/server/intro/HelloControllerSpec.groovy[tags=class-init, indent=0]
+include::{testsuite}/server/intro/HelloControllerSpec.groovy[tags=embededdedServer, indent=0]
+include::{testsuite}/server/intro/HelloControllerSpec.groovy[tags=class-end, indent=0]
 ----
 
 <1> The api:runtime.server.EmbeddedServer[] is configured as a shared and automatically cleaned up test field
@@ -16,7 +17,7 @@ include::{testsuite}/server/intro/HelloControllerSpec.groovy[tags=class, indent=
 <4> The `retrieve` method returns the response of the controller as a `String`
 
 
-In addition to a low-level client, Micronaut features a <<clientAnnotation,declarative, compile-time HTTP client>>, powered by the api:http.client.Client[] annotation.
+In addition to a low-level client, Micronaut features a <<clientAnnotation,declarative, compile-time HTTP client>>, powered by the api:http.client.annotation.Client[] annotation.
 
 To create a client, simply create an interface annotated with `@Client`. For example:
 
@@ -38,15 +39,17 @@ To test the `HelloClient` simply retrieve it from the api:context.ApplicationCon
 .Testing HelloClient
 [source,groovy]
 ----
-include::{testsuite}/server/intro/HelloClientSpec.groovy[tags=imports, indent=0]
+include::{testsuite}/server/intro/HelloClientSpec.groovy[tags=class-init, indent=0]
 
-include::{testsuite}/server/intro/HelloClientSpec.groovy[tags=class, indent=0]
+include::{testsuite}/server/intro/HelloClientSpec.groovy[tags=embeddedServer, indent=0]
+
+include::{testsuite}/server/intro/HelloClientSpec.groovy[tags=class-end, indent=0]
 ----
 
 <1> The api:runtime.server.EmbeddedServer[] is run
 <2> The `HelloClient` is retrieved from the api:context.ApplicationContext[]
 <3> The client is invoked using RxJava's `blockingGet` method
 
-The api:http.client.Client[] annotation produces an implementation automatically for you at compile time without the need to use proxies or runtime reflection.
+The api:http.client.annotation.Client[] annotation produces an implementation automatically for you at compile time without the need to use proxies or runtime reflection.
 
-The api:http.client.Client[] annotation is very flexible. See the section on the <<httpClient, Micronaut HTTP Client>> for more information.
+The api:http.client.annotation.Client[] annotation is very flexible. See the section on the <<httpClient, Micronaut HTTP Client>> for more information.

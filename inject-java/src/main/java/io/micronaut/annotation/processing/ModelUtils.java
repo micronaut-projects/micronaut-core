@@ -85,7 +85,7 @@ public class ModelUtils {
      * @return The {@link TypeElement}
      */
     final TypeElement classElementFor(Element element) {
-        while (!(element.getKind().isClass() || element.getKind().isInterface())) {
+        while (!(JavaModelUtils.isClass(element) || JavaModelUtils.isInterface(element))) {
             element = element.getEnclosingElement();
         }
         return (TypeElement) element;
@@ -113,7 +113,11 @@ public class ModelUtils {
      */
     Optional<ExecutableElement> findSetterMethodFor(Element field) {
         String name = field.getSimpleName().toString();
-        name = name.replaceFirst("^(is).+", "");
+        if (field.asType().getKind() == TypeKind.BOOLEAN) {
+            if (name.length() > 2 && Character.isUpperCase(name.charAt(2))) {
+                name = name.replaceFirst("^(is)(.+)", "$2");
+            }
+        }
         String setterName = setterNameFor(name);
         // FIXME refine this to discover one of possible overloaded methods with correct signature (i.e. single arg of field type)
         TypeElement typeElement = classElementFor(field);

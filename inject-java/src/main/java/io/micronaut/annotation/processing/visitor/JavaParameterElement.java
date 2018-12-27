@@ -31,7 +31,7 @@ import javax.lang.model.type.TypeMirror;
  * @since 1.0
  */
 @Internal
-public class JavaParameterElement extends AbstractJavaElement implements ParameterElement {
+class JavaParameterElement extends AbstractJavaElement implements ParameterElement {
 
     private final JavaVisitorContext visitorContext;
 

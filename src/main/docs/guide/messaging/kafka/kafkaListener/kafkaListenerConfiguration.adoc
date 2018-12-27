@@ -24,7 +24,7 @@ kafka:
         default:
             session:
                 timeout:
-                    ms: 5000
+                    ms: 30000
 ----
 
 The above example will set the default `session.timeout.ms` that Kafka uses to decide whether a consumer is alive or not and applies it to all created `KafkaConsumer` instances.
@@ -39,7 +39,7 @@ kafka:
         myGroup:
             session:
                 timeout:
-                    ms: 5000
+                    ms: 30000
 ----
 
 The above configuration will pass properties to only the `@KafkaListener` beans that apply to the consumer group `myGroup`.

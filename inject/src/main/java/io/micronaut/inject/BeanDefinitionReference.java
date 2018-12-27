@@ -29,8 +29,14 @@ import io.micronaut.core.annotation.Internal;
  * <p>The actual bean will be loaded upon calling the {@link #load()} method. Note that consumers of this interface
  * should call {@link #isPresent()} prior to loading to ensure an error does not occur</p>
  *
- * <p>The class can also decided whether to abort loading the definition by returning null</p>
+ * <p>The class can also decide whether to abort loading the definition by returning null</p>
  *
+ * <p>This interface extends the {@link BeanType} interface which is shared between {@link BeanDefinition} and this type. In addition a
+ * reference can be enabled or disabled (see {@link BeanContextConditional#isEnabled(BeanContext)})</p>
+ *
+ * @see BeanType
+ * @see BeanDefinition
+ * @see BeanContextConditional
  * @param <T> The bean type
  * @author Graeme Rocher
  * @since 1.0

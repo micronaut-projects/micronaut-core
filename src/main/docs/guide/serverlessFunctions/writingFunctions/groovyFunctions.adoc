@@ -2,17 +2,9 @@ As is typical in Groovy, writing functions is much simpler than in Java or Kotli
 
 TIP: If you have the Micronaut CLI installed you can quickly create a Groovy function with `mn create-function hello-world --lang groovy`
 
-To begin, add the `function-groovy` dependency (instead of the provider-specific dependency) which provides additional AST transformations that make writing functions simpler. For example, in `build.gradle`:
+To begin, add the `function-groovy` dependency (instead of the provider-specific dependency) which provides additional AST transformations that make writing functions simpler.
 
-.Example build.gradle
-[source,groovy]
-----
-dependencies {
-    ...
-    compile "io.micronaut:micronaut-function-groovy"
-    ...
-}
-----
+dependency:micronaut-function-groovy[]
 
 You can now create your function as a Groovy script, under `src/main/groovy`. You will set your project's *main* class property to this function (instead of `FunctionApplication` as in Java/Kotlin). For example:
 

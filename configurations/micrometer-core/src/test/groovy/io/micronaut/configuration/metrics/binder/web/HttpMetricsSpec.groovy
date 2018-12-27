@@ -4,9 +4,12 @@ import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Timer
 import io.micrometer.core.instrument.search.MeterNotFoundException
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 import spock.lang.Unroll
@@ -50,12 +53,21 @@ class HttpMetricsSpec extends Specification {
         then:
         thrown(MeterNotFoundException)
 
+        when:"A request is made that returns an error response"
+        client.error()
+
+        then:
+        thrown(HttpClientResponseException)
+
+        when:
+        registry.get(WebMetricsPublisher.METRIC_HTTP_CLIENT_REQUESTS).tags("status", "409").timer()
+
+        then:
+        noExceptionThrown()
 
         cleanup:
         embeddedServer.close()
-
     }
-
 
     @Unroll
     def "test getting the beans #cfg #setting"() {
@@ -86,6 +98,9 @@ class HttpMetricsSpec extends Specification {
 
         @Get("/{id}")
         String template(String id)
+
+        @Get("/error")
+        HttpResponse error()
     }
 
     @Controller('/test-http-metrics')
@@ -98,6 +113,11 @@ class HttpMetricsSpec extends Specification {
         @Get("/{id}")
         String template(String id) {
             return "ok " + id
+        }
+
+        @Get("/error")
+        HttpResponse error() {
+            HttpResponse.status(HttpStatus.CONFLICT)
         }
     }
 }

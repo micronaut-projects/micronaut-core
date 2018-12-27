@@ -539,10 +539,10 @@ public class KafkaClientIntroductionAdvice implements MethodInterceptor<Object, 
                 if (namedConfig.isPresent()) {
                     configuration = namedConfig.get();
                 } else {
-                    configuration = beanContext.getBean(DefaultKafkaProducerConfiguration.class);
+                    configuration = beanContext.getBean(AbstractKafkaProducerConfiguration.class);
                 }
             } else {
-                configuration = beanContext.getBean(DefaultKafkaProducerConfiguration.class);
+                configuration = beanContext.getBean(AbstractKafkaProducerConfiguration.class);
             }
 
             DefaultKafkaProducerConfiguration<?, ?> newConfiguration = new DefaultKafkaProducerConfiguration<>(

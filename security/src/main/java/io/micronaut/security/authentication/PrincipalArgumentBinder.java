@@ -49,7 +49,7 @@ public class PrincipalArgumentBinder implements TypedRequestArgumentBinder<Princ
             MutableConvertibleValues<Object> attrs = source.getAttributes();
             Optional<Authentication> existing = attrs.get(SecurityFilter.AUTHENTICATION, Authentication.class);
             if (existing.isPresent()) {
-                return () -> existing.map(e -> (Principal) e::getName);
+                return () -> existing.map(Principal.class::cast);
             }
         }
 

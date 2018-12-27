@@ -22,12 +22,15 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.views.ViewsConfiguration;
 import io.micronaut.views.ViewsRenderer;
 import io.micronaut.views.exceptions.ViewRenderingException;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
 
@@ -39,18 +42,16 @@ import javax.inject.Singleton;
  * @since 1.0
  */
 @Produces(MediaType.TEXT_HTML)
-@Requires(property = HandlebarsViewsRendererConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
+@Requires(property = HandlebarsViewsRendererConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 @Requires(classes = Handlebars.class)
 @Singleton
 public class HandlebarsViewsRenderer implements ViewsRenderer {
 
     protected final ViewsConfiguration viewsConfiguration;
-
     protected final ResourceLoader resourceLoader;
-
     protected HandlebarsViewsRendererConfiguration handlebarsViewsRendererConfiguration;
-
     protected Handlebars handlebars = new Handlebars();
+    protected String folder;
 
 
     /**
@@ -64,10 +65,12 @@ public class HandlebarsViewsRenderer implements ViewsRenderer {
         this.viewsConfiguration = viewsConfiguration;
         this.resourceLoader = resourceLoader;
         this.handlebarsViewsRendererConfiguration = handlebarsViewsRendererConfiguration;
+        this.folder = normalizeFolder(viewsConfiguration.getFolder());
     }
 
     @Override
-    public Writable render(String viewName, @Nullable Object data) {
+    @Nonnull public Writable render(@Nonnull String viewName, @Nullable Object data) {
+        ArgumentUtils.requireNonNull("viewName", viewName);
         return (writer) -> {
             String location = viewLocation(viewName);
             try {
@@ -80,33 +83,22 @@ public class HandlebarsViewsRenderer implements ViewsRenderer {
     }
 
     @Override
-    public boolean exists(String viewName) {
-        String location = viewLocation(viewName);
-        StringBuilder sb = new StringBuilder(location);
-        final String extension = extension();
-        if (!location.endsWith(extension)) {
-            sb.append(extension);
+    public boolean exists(@Nonnull String viewName) {
+        //noinspection ConstantConditions
+        if (viewName == null) {
+            return false;
         }
-        return resourceLoader.getResourceAsStream(sb.toString()).isPresent();
+        String location = viewLocation(viewName) + EXTENSION_SEPARATOR + extension();
+        return resourceLoader.getResource(location).isPresent();
     }
 
     private String viewLocation(final String name) {
-        final StringBuilder sb = new StringBuilder();
-        if (viewsConfiguration.getFolder() != null) {
-            sb.append(viewsConfiguration.getFolder());
-        }
-        sb.append(FILE_SEPARATOR);
-        sb.append(name.replace("/", FILE_SEPARATOR));
-        int index = sb.indexOf(extension());
-        if (index != -1) {
-            return sb.substring(0, index);
-        }
-        return sb.toString();
+        return folder +
+                normalizeFile(name, extension());
     }
 
     private String extension() {
-        return EXTENSION_SEPARATOR +
-                handlebarsViewsRendererConfiguration.getDefaultExtension();
+        return handlebarsViewsRendererConfiguration.getDefaultExtension();
     }
 
 }

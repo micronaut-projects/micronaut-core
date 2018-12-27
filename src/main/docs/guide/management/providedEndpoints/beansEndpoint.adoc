@@ -13,7 +13,6 @@ endpoints:
     beans:
         enabled: Boolean
         sensitive: Boolean
-        id: String
 ----
 
 == Customization

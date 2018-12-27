@@ -51,7 +51,7 @@ public class JsonNodeToObjectConverter implements TypeConverter<JsonNode, Object
                 return Optional.of(node.toString());
             } else {
                 Object result = objectMapper.treeToValue(node, targetType);
-                return Optional.of(result);
+                return Optional.ofNullable(result);
             }
         } catch (JsonProcessingException e) {
             context.reject(e);

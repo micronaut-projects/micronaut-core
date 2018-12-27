@@ -17,6 +17,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.async.SupplierUtil;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
@@ -25,33 +26,32 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.netty.AbstractNettyHttpRequest;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.micronaut.http.netty.cookies.NettyCookies;
 import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.http.server.exceptions.InternalServerException;
 import io.micronaut.web.router.RouteMatch;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.handler.codec.http.multipart.Attribute;
-import io.netty.handler.codec.http.multipart.MemoryAttribute;
+import io.netty.handler.codec.http.multipart.AbstractHttpData;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCounted;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.Charset;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 /**
  * Delegates to the Netty {@link io.netty.handler.codec.http.HttpRequest} instance.
@@ -72,8 +72,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     private final MutableConvertibleValues<Object> attributes;
     private NettyCookies nettyCookies;
     private List<ByteBufHolder> receivedContent = new ArrayList<>();
+    private Map<Integer, AbstractHttpData> receivedData = new LinkedHashMap<>();
 
-    private Object body;
+    private Supplier<Optional<T>> body;
     private RouteMatch<?> matchedRoute;
     private boolean bodyRequired;
 
@@ -100,6 +101,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         this.attributes = new MutableConvertibleValuesMap<>(new ConcurrentHashMap<>(4), conversionService);
         this.channelHandlerContext = ctx;
         this.headers = new NettyHttpHeaders(nettyRequest.headers(), conversionService);
+        this.body = SupplierUtil.memoizedNonEmpty(() -> Optional.ofNullable((T) buildBody()));
     }
 
     @Override
@@ -173,27 +175,63 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
 
     @Override
     public Optional<T> getBody() {
-        Object body = this.body;
-        if (body == null && !receivedContent.isEmpty()) {
-            body = buildBody();
-            this.body = body;
-        }
-        return Optional.ofNullable((T) body);
+        return this.body.get();
     }
 
     /**
      * @return A {@link CompositeByteBuf}
      */
-    protected CompositeByteBuf buildBody() {
-        int size = receivedContent.size();
-        CompositeByteBuf byteBufs = channelHandlerContext.alloc().compositeBuffer(size);
-        for (ByteBufHolder holder : receivedContent) {
-            ByteBuf content = holder.content();
-            if (content != null) {
-                byteBufs.addComponent(true, content);
+    protected Object buildBody() {
+        if (!receivedData.isEmpty()) {
+            Map body = new LinkedHashMap(receivedData.size());
+            boolean isUrlEncoded = getContentType().map(ct -> ct.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)).orElse(false);
+
+            for (AbstractHttpData data: receivedData.values()) {
+                String newValue = getContent(data, isUrlEncoded);
+                //noinspection unchecked
+                body.compute(data.getName(), (key, oldValue) -> {
+                    if (oldValue == null) {
+                        return newValue;
+                    } else if (oldValue instanceof Collection) {
+                        //noinspection unchecked
+                        ((Collection) oldValue).add(newValue);
+                        return oldValue;
+                    } else {
+                        ArrayList<Object> values = new ArrayList<>(2);
+                        values.add(oldValue);
+                        values.add(newValue);
+                        return values;
+                    }
+                });
+                data.release();
             }
+            return body;
+        } else if (!receivedContent.isEmpty()) {
+            int size = receivedContent.size();
+            CompositeByteBuf byteBufs = channelHandlerContext.alloc().compositeBuffer(size);
+            for (ByteBufHolder holder : receivedContent) {
+                ByteBuf content = holder.content();
+                if (content != null) {
+                    byteBufs.addComponent(true, content);
+                }
+            }
+            return byteBufs;
+        } else {
+            return null;
         }
-        return byteBufs;
+    }
+
+    private String getContent(AbstractHttpData data, boolean urlDecode) {
+        String newValue;
+        try {
+            newValue = data.getString(serverConfiguration.getDefaultCharset());
+            if (urlDecode) {
+                newValue = URLDecoder.decode(newValue, StandardCharsets.UTF_8.name());
+            }
+        } catch (IOException e) {
+            throw new InternalServerException("Error retrieving or decoding the value for: " + data.getName());
+        }
+        return newValue;
     }
 
     @SuppressWarnings("unchecked")
@@ -218,8 +256,11 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
         for (ByteBufHolder byteBuf : receivedContent) {
             releaseIfNecessary(byteBuf);
         }
-        if (this.body != null && body instanceof ReferenceCounted) {
-            ReferenceCounted body = (ReferenceCounted) this.body;
+        for (ByteBufHolder byteBuf : receivedData.values()) {
+            releaseIfNecessary(byteBuf);
+        }
+        Object body = getBody().orElse(null);
+        if (body instanceof ReferenceCounted) {
             releaseIfNecessary(body);
         }
         for (Map.Entry<String, Object> attribute : attributes) {
@@ -250,7 +291,7 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     public void setBody(T body) {
-        this.body = body;
+        this.body = () -> Optional.ofNullable(body);
         this.convertedBodies.clear();
     }
 
@@ -267,25 +308,11 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     void addContent(ByteBufHolder httpContent) {
-        if (httpContent instanceof MemoryAttribute) {
-            Object body = this.body;
-            if (body == null) {
-                synchronized (this) { // double check
-                    body = this.body;
-                    if (body == null) {
-                        body = new LinkedHashMap<String, Object>();
-                        this.body = body;
-                    }
-                }
-            }
-            if (body instanceof Map) {
-                Attribute attribute = (Attribute) httpContent;
-                try {
-                    ((Map) body).put(attribute.getName(), attribute.getValue());
-                } catch (IOException e) {
-                    // ignore
-                }
-            }
+        if (httpContent instanceof AbstractHttpData) {
+            receivedData.computeIfAbsent(System.identityHashCode(httpContent), (key) -> {
+                httpContent.retain();
+                return (AbstractHttpData) httpContent;
+            });
         } else {
             receivedContent.add(httpContent);
         }

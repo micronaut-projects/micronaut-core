@@ -16,6 +16,7 @@
 
 package io.micronaut.ast.groovy
 
+import groovy.transform.CompileDynamic
 import io.micronaut.aop.Adapter
 import io.micronaut.ast.groovy.utils.AstClassUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
@@ -501,6 +502,10 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             AnnotationMetadata methodAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, methodNode)
             if (isFactoryClass && !isConstructor && methodAnnotationMetadata.hasDeclaredStereotype(Bean, Scope)) {
                 methodAnnotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit).buildForMethod(methodNode)
+                if (annotationMetadata.hasDeclaredStereotype(Around)) {
+                    visitExecutableMethod(declaringClass, methodNode, methodAnnotationMetadata, methodName, methodNode.isPublic())
+                }
+
                 ClassNode producedType = methodNode.returnType
                 String beanDefinitionPackage = concreteClass.packageName
                 String upperCaseMethodName = NameUtils.capitalize(methodNode.getName())
@@ -716,72 +721,23 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 boolean isPublic = methodNode.isPublic() && !hasInvalidModifiers
                 boolean isExecutable = ((isExecutableType && isPublic) || methodAnnotationMetadata.hasStereotype(Executable)) && !hasInvalidModifiers
                 if (isExecutable) {
-                    if (declaringClass != ClassHelper.OBJECT_TYPE) {
-
-                        defineBeanDefinition(concreteClass)
-                        Map<String, Object> returnTypeGenerics = AstGenericUtils.buildGenericTypeInfo(methodNode.returnType, GenericsUtils.createGenericsSpec(concreteClass))
-
-                        Map<String, Object> paramsToType = [:]
-                        Map<String, AnnotationMetadata> qualifierTypes = [:]
-                        Map<String, Map<String, Object>> genericTypeMap = [:]
-                        populateParameterData(methodNode, paramsToType, qualifierTypes, genericTypeMap)
-
-                        boolean preprocess = methodAnnotationMetadata.getValue(Executable.class, "processOnStartup", Boolean.class).orElse(false)
-                        if (preprocess) {
-                            getBeanWriter().setRequiresMethodProcessing(true)
-                        }
-                        ExecutableMethodWriter executableMethodWriter = getBeanWriter().visitExecutableMethod(
-                                AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
-                                AstGenericUtils.resolveTypeReference(methodNode.returnType),
-                                AstGenericUtils.resolveTypeReference(methodNode.returnType),
-                                returnTypeGenerics,
-                                methodName,
-                                paramsToType,
-                                qualifierTypes,
-                                genericTypeMap, methodAnnotationMetadata)
-
-                        if (methodAnnotationMetadata.hasStereotype(Adapter.class)) {
-                            visitAdaptedMethod(methodNode, methodAnnotationMetadata)
-                        }
-
-                        if ((isAopProxyType && isPublic) || (methodAnnotationMetadata.hasStereotype(AROUND_TYPE) && !concreteClass.isAbstract())) {
-
-                            if (methodNode.isFinal()) {
-                                addError("Public method defines AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on class.", methodNode)
-                                return
-                            }
-                            Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
-                            OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean)
-                            AopProxyWriter proxyWriter = resolveProxyWriter(
-                                    aopSettings,
-                                    false,
-                                    interceptorTypeReferences
-                            )
-
-                            if (proxyWriter != null && !methodNode.isFinal()) {
-
-                                proxyWriter.visitInterceptorTypes(interceptorTypeReferences)
-                                proxyWriter.visitAroundMethod(
-                                        AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
-                                        AstGenericUtils.resolveTypeReference(methodNode.returnType),
-                                        AstGenericUtils.resolveTypeReference(methodNode.returnType),
-                                        returnTypeGenerics,
-                                        methodName,
-                                        paramsToType,
-                                        qualifierTypes,
-                                        genericTypeMap,
-                                        new AnnotationMetadataReference(executableMethodWriter.getClassName(), methodAnnotationMetadata)
-                                )
-                            }
-                        }
-                    }
+                    visitExecutableMethod(declaringClass, methodNode, methodAnnotationMetadata, methodName, isPublic)
                 }
                 if (isConfigurationProperties && isPublic && NameUtils.isSetterName(methodNode.name) && methodNode.parameters.length == 1) {
                     String propertyName = NameUtils.getPropertyNameForSetter(methodNode.name)
-                    if (declaringClass.getField(propertyName) == null) {
-
-                        Parameter parameter = methodNode.parameters[0]
-
+                    Parameter parameter = methodNode.parameters[0]
+                    if (methodAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
+                        getBeanWriter().visitConfigBuilderMethod(
+                                parameter.type.name,
+                                NameUtils.getterNameFor(propertyName),
+                                methodAnnotationMetadata,
+                                configurationMetadataBuilder)
+                        try {
+                            visitConfigurationBuilder(methodAnnotationMetadata, parameter.type, getBeanWriter())
+                        } finally {
+                            getBeanWriter().visitConfigBuilderEnd()
+                        }
+                    } else if (declaringClass.getField(propertyName) == null) {
                         PropertyMetadata propertyMetadata = configurationMetadataBuilder.visitProperty(
                                 concreteClass,
                                 declaringClass,
@@ -816,6 +772,74 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 AstAnnotationUtils.getAnnotationMetadata(sourceUnit, parameter),
                                 true
                         )
+                    }
+                }
+            }
+        }
+
+        private void visitExecutableMethod(ClassNode declaringClass, MethodNode methodNode, AnnotationMetadata methodAnnotationMetadata, String methodName, boolean isPublic) {
+            if (declaringClass != ClassHelper.OBJECT_TYPE) {
+
+                defineBeanDefinition(concreteClass)
+                Map<String, Object> returnTypeGenerics = AstGenericUtils.buildGenericTypeInfo(methodNode.returnType, GenericsUtils.createGenericsSpec(concreteClass))
+
+                Map<String, Object> paramsToType = [:]
+                Map<String, AnnotationMetadata> qualifierTypes = [:]
+                Map<String, Map<String, Object>> genericTypeMap = [:]
+                populateParameterData(methodNode, paramsToType, qualifierTypes, genericTypeMap)
+
+                boolean preprocess = methodAnnotationMetadata.getValue(Executable.class, "processOnStartup", Boolean.class).orElse(false)
+                if (preprocess) {
+                    getBeanWriter().setRequiresMethodProcessing(true)
+                }
+                ExecutableMethodWriter executableMethodWriter = getBeanWriter().visitExecutableMethod(
+                        AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
+                        AstGenericUtils.resolveTypeReference(methodNode.returnType),
+                        AstGenericUtils.resolveTypeReference(methodNode.returnType),
+                        returnTypeGenerics,
+                        methodName,
+                        paramsToType,
+                        qualifierTypes,
+                        genericTypeMap, methodAnnotationMetadata)
+
+                if (methodAnnotationMetadata.hasStereotype(Adapter.class)) {
+                    visitAdaptedMethod(methodNode, methodAnnotationMetadata)
+                }
+
+                if ((isAopProxyType && isPublic) || (methodAnnotationMetadata.hasStereotype(AROUND_TYPE) && !concreteClass.isAbstract())) {
+
+                    boolean hasExplicitAround = methodAnnotationMetadata.hasDeclaredStereotype(AROUND_TYPE)
+
+                    if (methodNode.isFinal()) {
+                        if (hasExplicitAround) {
+                            addError("Method defines AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.", methodNode)
+                        } else {
+                            addError("Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.", methodNode)
+                        }
+                    } else {
+                        Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
+                        OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean)
+                        AopProxyWriter proxyWriter = resolveProxyWriter(
+                                aopSettings,
+                                false,
+                                interceptorTypeReferences
+                        )
+
+                        if (proxyWriter != null && !methodNode.isFinal()) {
+
+                            proxyWriter.visitInterceptorTypes(interceptorTypeReferences)
+                            proxyWriter.visitAroundMethod(
+                                    AstGenericUtils.resolveTypeReference(methodNode.declaringClass),
+                                    AstGenericUtils.resolveTypeReference(methodNode.returnType),
+                                    AstGenericUtils.resolveTypeReference(methodNode.returnType),
+                                    returnTypeGenerics,
+                                    methodName,
+                                    paramsToType,
+                                    qualifierTypes,
+                                    genericTypeMap,
+                                    new AnnotationMetadataReference(executableMethodWriter.getClassName(), methodAnnotationMetadata)
+                            )
+                        }
                     }
                 }
             }
@@ -1267,6 +1291,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
+        @CompileDynamic
         private void visitAdaptedMethod(MethodNode method, AnnotationMetadata methodAnnotationMetadata) {
             Optional<ClassNode> adaptedType = methodAnnotationMetadata.getValue(Adapter.class, String.class).flatMap({ String s ->
                 ClassNode cn = sourceUnit.AST.classes.find { ClassNode cn -> cn.name == s }

@@ -33,6 +33,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -52,6 +53,8 @@ import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
 import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.UnsupportedCharsetException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -189,6 +192,27 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
         // AnnotationClassValue -> Class
         addConverter(AnnotationClassValue.class, Class.class, (object, targetType, context) -> object.getType());
+        addConverter(AnnotationClassValue[].class, Class.class, (object, targetType, context) -> {
+            if (object.length > 0) {
+                final AnnotationClassValue o = object[0];
+                if (o != null) {
+                    return o.getType();
+                }
+            }
+            return Optional.empty();
+        });
+        addConverter(AnnotationClassValue[].class, Class[].class, (object, targetType, context) -> {
+            List<Class> classes = new ArrayList<>(object.length);
+            for (AnnotationClassValue<?> annotationClassValue : object) {
+                if (annotationClassValue != null) {
+                    final Optional<? extends Class<?>> type = annotationClassValue.getType();
+                    if (type.isPresent()) {
+                        classes.add(type.get());
+                    }
+                }
+            }
+            return Optional.of(classes.toArray(new Class[0]));
+        });
 
         // URI -> URL
         addConverter(URI.class, URL.class, uri -> {
@@ -242,7 +266,20 @@ public class DefaultConversionService implements ConversionService<DefaultConver
         // String -> File
         addConverter(CharSequence.class, File.class, (object, targetType, context) -> Optional.of(new File(object.toString())));
 
-        // String[] -> String
+        // String[] -> Enum
+        addConverter(String[].class, Enum.class, (object, targetType, context) -> {
+            if (object == null || object.length == 0) {
+                return Optional.empty();
+            }
+
+            StringJoiner joiner = new StringJoiner("");
+            for (String string : object) {
+                joiner.add(string);
+            }
+            final String val = joiner.toString();
+            return convert(val, targetType, context);
+        });
+
         addConverter(String[].class, CharSequence.class, (object, targetType, context) -> {
             if (object == null || object.length == 0) {
                 return Optional.empty();
@@ -252,7 +289,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             for (String string : object) {
                 joiner.add(string);
             }
-            return Optional.of(joiner.toString());
+            return convert(joiner.toString(), targetType, context);
         });
 
         // CharSequence -> Long for bytes
@@ -282,6 +319,21 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                     return Optional.of(format.format(object));
                 }
         );
+
+        // String -> Path
+        addConverter(
+                CharSequence.class,
+                Path.class, (object, targetType, context) -> {
+                    if (StringUtils.isEmpty(object)) {
+                        return Optional.empty();
+                    }
+                    try {
+                        return Optional.ofNullable(Paths.get(object.toString()));
+                    } catch (Exception e) {
+                        context.reject("Invalid path [" + object + " ]: " + e.getMessage(), e);
+                        return Optional.empty();
+                    }
+                });
 
         // String -> Integer
         addConverter(CharSequence.class, Integer.class, (CharSequence object, Class<Integer> targetType, ConversionContext context) -> {
@@ -699,7 +751,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                         continue;
                     }
                 }
-                if (!valueType.isInstance(value)) {
+                if (!valueType.isInstance(value) || Map.class.isAssignableFrom(valueType)) {
                     Optional converted = convert(value, valueType, valContext);
                     if (converted.isPresent()) {
                         value = converted.get();

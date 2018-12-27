@@ -58,7 +58,13 @@ some.bootstrap.config=yyy
 
             @Override
             Optional<URL> getResource(String path) {
-                return null
+                if(path == "bootstrap.properties") {
+                    return Optional.of(new URL("file://bootstrap.properties"))
+                }
+                if(path == "application.properties") {
+                    return Optional.of(new URL("file://application.properties"))
+                }
+                return Optional.empty()
             }
 
             @Override

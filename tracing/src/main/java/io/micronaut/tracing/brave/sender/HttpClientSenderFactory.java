@@ -23,6 +23,7 @@ import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.tracing.brave.BraveTracerConfiguration;
 import zipkin2.reporter.Sender;
 
+import javax.inject.Provider;
 import javax.inject.Singleton;
 
 /**
@@ -52,7 +53,7 @@ public class HttpClientSenderFactory {
     @Bean
     @Singleton
     @Requires(missingBeans = Sender.class)
-    Sender zipkinSender(LoadBalancerResolver loadBalancerResolver) {
+    Sender zipkinSender(Provider<LoadBalancerResolver> loadBalancerResolver) {
         return configuration.getBuilder().build(loadBalancerResolver);
     }
 }

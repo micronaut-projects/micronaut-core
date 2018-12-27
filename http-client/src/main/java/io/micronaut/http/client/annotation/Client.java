@@ -60,7 +60,8 @@ public @interface Client {
     String id() default "";
 // end::value[]
     /**
-     * The base URI for the client.
+     * The base URI for the client. Only to be used in
+     * conjunction with {@link #id()}.
      *
      * @return The base URI
      */

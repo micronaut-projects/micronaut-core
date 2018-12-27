@@ -18,6 +18,7 @@ package io.micronaut.management.endpoint.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Executable;
 
 import java.lang.annotation.Documented;
@@ -45,5 +46,6 @@ public @interface Read {
     /**
      * @return The produced MediaType values. Defaults to application/json
      */
+    @AliasFor(annotationName = "io.micronaut.http.annotation.Produces", member = "value")
     String[] produces() default {"application/json"};
 }

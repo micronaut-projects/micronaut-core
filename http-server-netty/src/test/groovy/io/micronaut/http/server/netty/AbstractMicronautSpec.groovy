@@ -43,7 +43,7 @@ abstract class AbstractMicronautSpec extends Specification {
     }
 
     Map<String, Object> getConfiguration() {
-        ['micronaut.server.multipart.location':uploadDir.absolutePath]
+        ['micronaut.server.multipart.location': uploadDir.absolutePath]
     }
 
     void cleanupSpec()  {

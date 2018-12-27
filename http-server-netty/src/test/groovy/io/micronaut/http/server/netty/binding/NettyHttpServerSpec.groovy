@@ -65,8 +65,7 @@ class NettyHttpServerSpec extends Specification {
 
     void "test run Micronaut server on same port as another server"() {
         when:
-        int port = SocketUtils.findAvailableTcpPort()
-        PropertySource propertySource = PropertySource.of('micronaut.server.port':port)
+        PropertySource propertySource = PropertySource.of('micronaut.server.port':-1)
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, propertySource, Environment.TEST)
 
         RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
@@ -77,7 +76,7 @@ class NettyHttpServerSpec extends Specification {
 
         when: "Run another server with same port"
         sleep(1_000) // wait for port to be not available
-        ApplicationContext.run(EmbeddedServer, propertySource, Environment.TEST)
+        ApplicationContext.run(EmbeddedServer, PropertySource.of('micronaut.server.port':embeddedServer.getPort()), Environment.TEST)
 
         then:"An error is thrown"
         def e = thrown(ServerStartupException)

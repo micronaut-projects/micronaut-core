@@ -19,6 +19,7 @@ package io.micronaut.http.client.exceptions;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.HttpResponseProvider;
 
 import java.util.Optional;
 
@@ -28,7 +29,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public class HttpClientResponseException extends HttpClientException {
+public class HttpClientResponseException extends HttpClientException implements HttpResponseProvider {
     private final HttpResponse<?> response;
     private final HttpClientErrorDecoder errorDecoder;
 

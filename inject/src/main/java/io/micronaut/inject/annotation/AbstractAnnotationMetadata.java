@@ -22,8 +22,10 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.*;
@@ -65,8 +67,9 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T extends Annotation> T synthesize(Class<T> annotationClass) {
-        if (annotationClass == null || annotationMap == null) {
+    public @Nullable <T extends Annotation> T synthesize(@Nonnull Class<T> annotationClass) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        if (annotationMap == null) {
             return null;
         }
         if (hasAnnotation(annotationClass) || hasStereotype(annotationClass)) {
@@ -82,8 +85,9 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
 
     @SuppressWarnings("unchecked")
     @Override
-    public <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass) {
-        if (annotationClass == null || declaredAnnotationMap == null) {
+    public @Nullable <T extends Annotation> T synthesizeDeclared(@Nonnull Class<T> annotationClass) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
+        if (declaredAnnotationMap == null) {
             return null;
         }
         String annotationName = annotationClass.getName().intern();
@@ -98,7 +102,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public Annotation[] synthesizeAll() {
+    public @Nonnull Annotation[] synthesizeAll() {
         if (annotationMap == null) {
             return AnnotationUtil.ZERO_ANNOTATIONS;
         }
@@ -116,7 +120,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
     }
 
     @Override
-    public Annotation[] synthesizeDeclared() {
+    public @Nonnull Annotation[] synthesizeDeclared() {
         if (declaredAnnotationMap == null) {
             return AnnotationUtil.ZERO_ANNOTATIONS;
         }

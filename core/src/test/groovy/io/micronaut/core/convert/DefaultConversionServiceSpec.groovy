@@ -39,26 +39,28 @@ class DefaultConversionServiceSpec extends Specification {
         conversionService.convert(sourceObject, targetType).get() == result
 
         where:
-        sourceObject      | targetType | result
-        10                | Long       | 10L
-        10                | Float      | 10.0f
-        10                | String     | "10"
-        "1,2"             | int[]      | [1, 2] as int[]
-        "10"              | Integer    | 10
-        "${5 + 5}"        | Integer    | 10
-        "yes"             | Boolean    | true
-        "Y"               | Boolean    | true
-        "yes"             | boolean    | true
-        "on"              | boolean    | true
-        "off"             | boolean    | false
-        "false"           | boolean    | false
-        "n"               | boolean    | false
-        Boolean.TRUE      | boolean    | true
-        "USD"             | Currency   | Currency.getInstance("USD")
-        "CET"             | TimeZone   | TimeZone.getTimeZone("CET")
-        "http://test.com" | URL        | new URL("http://test.com")
-        "http://test.com" | URI        | new URI("http://test.com")
-        "monday"          | DayOfWeek  | DayOfWeek.MONDAY
+        sourceObject           | targetType  | result
+        10                     | Long        | 10L
+        10                     | Float       | 10.0f
+        10                     | String      | "10"
+        "1,2"                  | int[]       | [1, 2] as int[]
+        "10"                   | Integer     | 10
+        "${5 + 5}"             | Integer     | 10
+        "yes"                  | Boolean     | true
+        "Y"                    | Boolean     | true
+        "yes"                  | boolean     | true
+        "on"                   | boolean     | true
+        "off"                  | boolean     | false
+        "false"                | boolean     | false
+        "n"                    | boolean     | false
+        Boolean.TRUE           | boolean     | true
+        "USD"                  | Currency    | Currency.getInstance("USD")
+        "CET"                  | TimeZone    | TimeZone.getTimeZone("CET")
+        "http://test.com"      | URL         | new URL("http://test.com")
+        "http://test.com"      | URI         | new URI("http://test.com")
+        "monday"               | DayOfWeek   | DayOfWeek.MONDAY
+        ["monday"] as String[] | DayOfWeek   | DayOfWeek.MONDAY
+        ["monday"] as String[] | DayOfWeek[] | [DayOfWeek.MONDAY] as DayOfWeek[]
 
     }
 

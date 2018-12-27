@@ -38,6 +38,11 @@ public enum ComputePlatform {
     AZURE,
 
     /**
+     * Digital Ocean
+     */
+    DIGITAL_OCEAN,
+
+    /**
      * Cloud or non cloud provider on bare metal (unknown).
      */
     BARE_METAL,

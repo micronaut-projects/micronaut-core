@@ -3,6 +3,10 @@ plugins {
     id "org.jetbrains.kotlin.kapt" version "1.2.30"
 }
 
+ext {
+    bomExclude = true
+}
+
 dependencies {
     compile "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.2.30"
     compile project(':http-server-netty')
@@ -11,6 +15,8 @@ dependencies {
     testCompileOnly project(':inject-java')
     kaptTest project(':inject-java')
     testCompile "junit:junit:4.7"
+
+    testCompile project(":http-client")
 }
 
 compileTestKotlin {
