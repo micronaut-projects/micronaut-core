@@ -30,10 +30,11 @@ import io.micronaut.inject.writer.GeneratedFile;
 import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.ModuleNode;
 import org.codehaus.groovy.control.ErrorCollector;
 import org.codehaus.groovy.control.Janitor;
 import org.codehaus.groovy.control.SourceUnit;
+import org.codehaus.groovy.control.messages.Message;
+import org.codehaus.groovy.control.messages.SimpleMessage;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
@@ -52,7 +53,7 @@ import java.util.Set;
  * @since 1.0
  */
 public class GroovyVisitorContext implements VisitorContext {
-    private static final String ATTR_VISITOR_ATTRIBUTES = "micronaut.visitor.attributes";
+    private static final MutableConvertibleValues<Object> VISITOR_ATTRIBUTES = new MutableConvertibleValuesMap<>();
     private final ErrorCollector errorCollector;
     private final SourceUnit sourceUnit;
     private final MutableConvertibleValues<Object> attributes;
@@ -63,17 +64,7 @@ public class GroovyVisitorContext implements VisitorContext {
     public GroovyVisitorContext(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit;
         this.errorCollector = sourceUnit.getErrorCollector();
-        final ModuleNode ast = sourceUnit.getAST();
-        final boolean hasModule = ast != null;
-        final Object attrs = hasModule ? ast.getNodeMetaData(ATTR_VISITOR_ATTRIBUTES) : null;
-        if (attrs instanceof MutableConvertibleValues) {
-            this.attributes = (MutableConvertibleValues<Object>) attrs;
-        } else {
-            this.attributes = new MutableConvertibleValuesMap<>();
-            if (hasModule) {
-                ast.putNodeMetaData(ATTR_VISITOR_ATTRIBUTES, this.attributes);
-            }
-        }
+        this.attributes = VISITOR_ATTRIBUTES;
     }
 
     @Override
@@ -99,10 +90,14 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     @Override
-    public void info(String message, Element element) {
-        ASTNode expr = (ASTNode) element.getNativeType();
-        final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
-        System.err.println("Note: " + message + "\n\n" + sample);
+    public void info(String message, @Nullable Element element) {
+        StringBuilder msg = new StringBuilder("Note: ").append(message);
+        if (element != null) {
+            ASTNode expr = (ASTNode) element.getNativeType();
+            final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
+            msg.append("\n\n").append(sample);
+        }
+        System.out.println(msg.toString());
     }
 
     @Override
@@ -111,15 +106,25 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     @Override
-    public void fail(String message, Element element) {
-        errorCollector.addError(buildErrorMessage(message, element));
+    public void fail(String message, @Nullable Element element) {
+        Message msg;
+        if (element != null) {
+            msg = buildErrorMessage(message, element);
+        } else {
+            msg = new SimpleMessage(message, sourceUnit);
+        }
+        errorCollector.addError(msg);
     }
 
     @Override
-    public void warn(String message, Element element) {
-        ASTNode expr = (ASTNode) element.getNativeType();
-        final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
-        System.err.println("WARNING: " + message + "\n\n" + sample);
+    public void warn(String message, @Nullable Element element) {
+        StringBuilder msg = new StringBuilder("WARNING: ").append(message);
+        if (element != null) {
+            ASTNode expr = (ASTNode) element.getNativeType();
+            final String sample = sourceUnit.getSample(expr.getLineNumber(), expr.getColumnNumber(), new Janitor());
+            msg.append("\n\n").append(sample);
+        }
+        System.out.println(msg.toString());
 
     }
 

@@ -47,18 +47,22 @@ public class MapToObjectConverter implements TypeConverter<Map, Object> {
 
     @Override
     public Optional<Object> convert(Map map, Class<Object> targetType, ConversionContext context) {
-        return InstantiationUtils
-            .tryInstantiate(targetType)
+        if (targetType.isInstance(map)) {
+            return Optional.of(map);
+        } else {
+            return InstantiationUtils
+                    .tryInstantiate(targetType)
 
-            .map(object -> {
-                    Map<?, ?> theMap = map;
-                    Map bindMap = new LinkedHashMap(map.size());
-                    for (Map.Entry<?, ?> entry : theMap.entrySet()) {
-                        Object key = entry.getKey();
-                        bindMap.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), entry.getValue());
-                    }
-                    return beanPropertyBinder.bind(object, bindMap);
-                }
-            );
+                    .map(object -> {
+                                Map<?, ?> theMap = map;
+                                Map bindMap = new LinkedHashMap(map.size());
+                                for (Map.Entry<?, ?> entry : theMap.entrySet()) {
+                                    Object key = entry.getKey();
+                                    bindMap.put(NameUtils.decapitalize(NameUtils.dehyphenate(key.toString())), entry.getValue());
+                                }
+                                return beanPropertyBinder.bind(object, bindMap);
+                            }
+                    );
+        }
     }
 }

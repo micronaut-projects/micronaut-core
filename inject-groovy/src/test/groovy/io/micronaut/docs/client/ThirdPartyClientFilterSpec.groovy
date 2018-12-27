@@ -51,6 +51,7 @@ import io.micronaut.http.filter.HttpClientFilter
 import io.micronaut.runtime.server.EmbeddedServer
 import org.reactivestreams.Publisher
 import spock.lang.AutoCleanup
+import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -61,6 +62,7 @@ import javax.inject.Singleton
  * @author Sergio del Amo
  * @since 1.0
  */
+@Retry
 class ThirdPartyClientFilterSpec extends Specification {
     private static String token = 'XXXX'
     private static String username = 'john'

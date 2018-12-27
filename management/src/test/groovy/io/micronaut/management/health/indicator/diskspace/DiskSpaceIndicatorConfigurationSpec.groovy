@@ -36,7 +36,7 @@ class DiskSpaceIndicatorConfigurationSpec extends Specification {
         ApplicationContext context = ApplicationContext.run(['endpoints.health.disk-space.path': '/foo'])
 
         expect:
-        context.getBean(DiskSpaceIndicatorConfiguration).path.absolutePath == "/foo"
+        context.getBean(DiskSpaceIndicatorConfiguration).path.absolutePath.replace("\\", "/").endsWith("/foo")
 
         cleanup:
         context.close()

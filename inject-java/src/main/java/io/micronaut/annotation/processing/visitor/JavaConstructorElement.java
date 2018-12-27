@@ -17,6 +17,7 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ConstructorElement;
 
 import javax.lang.model.element.ExecutableElement;
@@ -27,7 +28,8 @@ import javax.lang.model.element.ExecutableElement;
  * @author graemerocher
  * @since 1.0
  */
-public class JavaConstructorElement extends JavaMethodElement implements ConstructorElement {
+@Internal
+class JavaConstructorElement extends JavaMethodElement implements ConstructorElement {
 
     /**
      * @param executableElement  The {@link ExecutableElement}

@@ -15,8 +15,10 @@ To run the application from a unit test you can use the link:{api}/io/micronaut/
 [source,groovy]
 ----
 include::{testsuite}/server/intro/HelloControllerSpec.groovy[tags=imports, indent=0]
+include::{testsuite}/server/intro/HelloControllerSpec.groovy[tags=class-init, indent=0]
+include::{testsuite}/server/intro/HelloControllerSpec.groovy[tags=embededdedServer, indent=0]
 
-include::{testsuite}/server/intro/HelloControllerSpec.groovy[tags=class, indent=0]
+include::{testsuite}/server/intro/HelloControllerSpec.groovy[tags=class-end, indent=0]
 ----
 
 <1> The `EmbeddedServer` is run and Spock's `@AutoCleanup` annotation ensures the server is stopped after the specification completes.

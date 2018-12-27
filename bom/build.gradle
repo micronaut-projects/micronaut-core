@@ -1,4 +1,3 @@
-
 publishing {
     publications {
         maven(MavenPublication) {
@@ -8,6 +7,8 @@ publishing {
                 def profiles = new Properties()
                 profiles.load(new StringReader(new File("$projectDir/profiles.properties").text))
 
+                def configurations = new Properties()
+                configurations.load(new StringReader(new File("$projectDir/configurations.properties").text))
 
                 xml.children().last() + {
                     def mkp = delegate
@@ -37,12 +38,23 @@ publishing {
                                 }
                             }
 
-                            for (Project p : rootProject.subprojects) {
-                                if (p.name == "configurations") continue
-                                if (p.name.contains("test-suite")) continue
-                                if (p.name == "examples") continue
-                                if (p.name == "bom") continue
+                            for (configuration in configurations) {
+                                mkp.dependency {
+                                    mkp.groupId 'io.micronaut.configuration'
+                                    mkp.artifactId "micronaut-${configuration.key}"
+                                    def version = configuration.value
+                                    if (!isBuildSnapshot && version.toString().endsWith("-SNAPSHOT")) {
+                                        throw new RuntimeException("Cannot have a snapshot dependency on a configuration [$configuration.key] for a release!")
+                                    }
+                                    mkp.version(version)
+                                }
+                            }
 
+                            for (Project p : rootProject.subprojects) {
+                                if (!p.subprojects.empty) continue
+                                if (p.name == "bom") continue
+                                if (p.hasProperty("bomExclude") && p.property("bomExclude") == true) continue
+                                
                                 mkp.dependency {
                                     mkp.groupId p.group
                                     mkp.artifactId "micronaut-$p.name"

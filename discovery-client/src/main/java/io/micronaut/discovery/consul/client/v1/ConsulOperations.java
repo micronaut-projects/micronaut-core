@@ -174,6 +174,22 @@ public interface ConsulOperations {
     Publisher<Map<String, ServiceEntry>> getServices();
 
     /**
+     * Returns the members the agent sees in the cluster gossip pool.
+     *
+     * @return the {@link MemberEntry} instances
+     */
+    @Get(uri = "/agent/members", single = true)
+    Publisher<List<MemberEntry>> getMembers();
+
+    /**
+     * Returns the configuration and member information of the local agent.
+     *
+     * @return the {@link LocalAgentConfiguration} instance
+     */
+    @Get(uri = "/agent/self", single = true)
+    Publisher<LocalAgentConfiguration> getSelf();
+
+    /**
      * Gets the healthy services that are passing health checks.
      *
      * @param service The service

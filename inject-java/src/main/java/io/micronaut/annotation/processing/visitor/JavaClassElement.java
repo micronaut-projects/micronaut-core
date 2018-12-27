@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
@@ -69,13 +70,35 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     }
 
     @Override
+    public Optional<ClassElement> getSuperType() {
+        final TypeMirror superclass = classElement.getSuperclass();
+        if (superclass != null) {
+            final Element element = visitorContext.getTypes().asElement(superclass);
+
+            if (element instanceof TypeElement) {
+                TypeElement superElement = (TypeElement) element;
+                if (!Object.class.getName().equals(superElement.getQualifiedName().toString())) {
+                    return Optional.of(
+                            new JavaClassElement(
+                                    superElement,
+                                    visitorContext.getAnnotationUtils().getAnnotationMetadata(superElement),
+                                    visitorContext
+                            )
+                    );
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    @Override
     public boolean isAbstract() {
         return classElement.getModifiers().contains(Modifier.ABSTRACT);
     }
 
     @Override
     public boolean isInterface() {
-        return classElement.getKind() == ElementKind.INTERFACE;
+        return JavaModelUtils.isInterface(classElement);
     }
 
     @Override
@@ -110,15 +133,17 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
             }
 
             @Override
-            protected void accept(DeclaredType type, javax.lang.model.element.Element element, Object o) {
+            protected void accept(DeclaredType declaringType, javax.lang.model.element.Element element, Object o) {
 
                 if (element instanceof VariableElement) {
                     fields.put(element.getSimpleName().toString(), (VariableElement) element);
                     return;
                 }
 
+
                 ExecutableElement executableElement = (ExecutableElement) element;
                 String methodName = executableElement.getSimpleName().toString();
+                final TypeElement declaringTypeElement = (TypeElement) executableElement.getEnclosingElement();
 
                 if (NameUtils.isGetterName(methodName) && executableElement.getParameters().size() == 0) {
                     String propertyName = NameUtils.getPropertyNameForGetter(methodName);
@@ -140,6 +165,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                     if (getterReturnType != null) {
 
                         BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
+                        configureDeclaringType(declaringTypeElement, beanPropertyData);
                         beanPropertyData.type = getterReturnType;
                         beanPropertyData.getter = executableElement;
                         if (beanPropertyData.setter != null) {
@@ -158,6 +184,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                     if (setterParameterType != null) {
 
                         BeanPropertyData beanPropertyData = props.computeIfAbsent(propertyName, BeanPropertyData::new);
+                        configureDeclaringType(declaringTypeElement, beanPropertyData);
                         ClassElement propertyType = beanPropertyData.type;
                         if (propertyType != null) {
                             if (propertyType.getName().equals(setterParameterType.getName())) {
@@ -167,6 +194,16 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                             beanPropertyData.setter = executableElement;
                         }
                     }
+                }
+            }
+
+            private void configureDeclaringType(TypeElement declaringTypeElement, BeanPropertyData beanPropertyData) {
+                if (beanPropertyData.declaringType == null && !classElement.equals(declaringTypeElement)) {
+                    beanPropertyData.declaringType = new JavaClassElement(
+                            declaringTypeElement,
+                            visitorContext.getAnnotationUtils().getAnnotationMetadata(declaringTypeElement),
+                            visitorContext
+                    );
                 }
             }
         }, null);
@@ -185,7 +222,13 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                     } else {
                         annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(value.getter);
                     }
-                    JavaPropertyElement propertyElement = new JavaPropertyElement(value.getter, annotationMetadata, propertyName, value.type, value.setter == null) {
+                    JavaPropertyElement propertyElement = new JavaPropertyElement(
+                            value.declaringType == null ? this : value.declaringType,
+                            value.getter,
+                            annotationMetadata,
+                            propertyName,
+                            value.type,
+                            value.setter == null) {
                         @Override
                         public Optional<String> getDocumentation() {
                             Elements elements = visitorContext.getElements();
@@ -253,6 +296,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
      */
     private class BeanPropertyData {
         ClassElement type;
+        ClassElement declaringType;
         ExecutableElement getter;
         ExecutableElement setter;
         final String propertyName;

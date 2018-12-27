@@ -23,6 +23,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.Blocking;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.config.ConfigurationClient;
 import io.reactivex.Flowable;
 import org.slf4j.Logger;
@@ -45,7 +46,7 @@ import java.util.concurrent.TimeoutException;
  * @since 1.0
  */
 @Singleton
-@Requires(property = ConfigurationClient.ENABLED, value = "true", defaultValue = "false")
+@Requires(property = ConfigurationClient.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 public class DistributedPropertySourceLocator implements BootstrapPropertySourceLocator {
     private static final Logger LOG = LoggerFactory.getLogger(DistributedPropertySourceLocator.class);
     private final ConfigurationClient configurationClient;

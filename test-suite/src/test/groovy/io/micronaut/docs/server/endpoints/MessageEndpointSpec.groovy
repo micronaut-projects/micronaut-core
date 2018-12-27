@@ -19,6 +19,7 @@ package io.micronaut.docs.server.endpoints
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
+import io.micronaut.http.MediaType
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
@@ -50,11 +51,14 @@ class MessageEndpointSpec extends Specification {
         RxHttpClient rxClient = server.applicationContext.createBean(RxHttpClient, server.getURL())
 
         when:
-        def response = rxClient.exchange(HttpRequest.POST("/message", [newMessage: "A new message"]), String).blockingFirst()
+        def response = rxClient.exchange(HttpRequest.POST("/message", [newMessage: "A new message"])
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED), String)
+                .blockingFirst()
 
         then:
         response.code() == HttpStatus.OK.code
         response.body() == "Message updated"
+        response.contentType.get() == MediaType.TEXT_PLAIN_TYPE
 
         when:
         response = rxClient.exchange("/message", String).blockingFirst()

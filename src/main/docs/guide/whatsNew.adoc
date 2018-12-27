@@ -1,110 +1,40 @@
-Apart from https://github.com/micronaut-projects/micronaut-core/milestone/6?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features.
+Micronaut {version} includes the following changes:
 
-=== Improvements from RC3 to GA
+=== File Watch and Server Restart
 
-GraalVM support has been updated to use Docker instead of a `./build-native-image` script allowing usage of other platforms.
+A new <<automaticRestart,Automatic Restart>> feature is included that allows the server to restart if a change occurs to a file. This feature can be used both in production and at development time to achieve automatic application restarts when changing source code.
 
-The official GraalVM Docker images are used, so to build a native image you can simply execute `docker build . -t myimage` in the root of your project.
+=== Refactoring of File Responses
 
-=== Support for GraalVM Native Images
+In an effort to make a more consistent and understandable API, some methods and classes related to sending file responses have been deprecated. api:http.server.types.files.SystemFile[] is the replacement for api:http.server.types.files.AttachedFile[] and the constructors of api:http.server.types.files.StreamedFile[] have been deprecated in favor of new constructors that better convey the intended functionality.
 
-Micronaut now includes experimental support for compiling down to https://www.graalvm.org[GraalVM] native images using the `nativeimage` tool shipped as part of Graal (1.0.0 RC6 and above).
+=== Support for Freemarker Views
 
-This is possible due to to Micronaut's reflection-free approach to Dependency Injection and AOP.
+Support for rendering <<freemarker,Freemaker Views>> has been added.
 
-See the section on <<graal, GraalVM support>> in the user guide for more information.
+=== Support for JCache Caching
 
-=== Swagger / OpenAPI Documentation Support
+Support has been added for the JCache specification. If you define a `javax.cache.CacheManager` bean it will be used for caching. For example:
 
-Micronaut now includes the ability to generate Swagger (OpenAPI) YAML at compile time using the language neutral visitor API and the interfaces defined by the pkg:io.micronaut.inject.ast[] package.
-
-See the section on <<openapi, OpenAPI / Swagger Support>> in the user guide for more information.
-
-=== Native WebSocket Support
-
-Built-in support for WebSocket for both the client and the server has been added. The following example is a simple server chat implementation:
-
-.WebSocket Chat Example
+.Using JCache Caching
 [source,java]
 ----
-include::{testswebsocket}/ChatServerWebSocket.java[]
-----
+@Factory
+class CacheFactory {
 
-See the section on <<websocket, WebSocket Support>> in the user guide for more information.
-
-==== CLI Commands for WebSockets
-
-The Micronaut CLI now includes two new commands for generating WebSocket clients and servers.
-
-[source,bash]
-----
-$ mn create-websocket-server MyChat
-| Rendered template WebsocketServer.java to destination src/main/java/example/MyChatServer.java
-$ mn create-websocket-client MyChat
-| Rendered template WebsocketClient.java to destination src/main/java/example/MyChatClient.java
-----
-
-=== Compilation Time Validation
-
-The `validation` module can now be added to the `annotationProcessor` classpath and which will result in additional compile time checks, ensuring that users are using the framework correctly. For example, the following route method:
-
-[source,java]
-----
-@Get("/hello/{name}")
-public Single<String> hello(@NotBlank String na) {
-     return Single.just("Hello " + na + "!");
+    @Singleton
+    @Bean
+    CacheManager cacheManager() {
+        CacheManager cacheManager = Caching.getCachingProvider()
+                                           .getCacheManager();
+        cacheManager.createCache('my-cache', new MutableConfiguration());
+        return cacheManager;
+    }
 }
+
 ----
 
-Will produce the following error at compile time:
+=== Liquibase and Flyway
 
-[source]
-----
-hello-world-java/src/main/java/example/HelloController.java:34: error: The route declares a uri variable named [name], but no corresponding method argument is present
-    public Single<String> hello(@NotBlank String na) {
-                          ^
-----
+New configurations have been added to support https://micronaut-projects.github.io/micronaut-configuration-flyway/latest/guide/index.html[Flyway] and https://micronaut-projects.github.io/micronaut-configuration-liquibase/latest/guide/index.html[Liquibase] database migrations.
 
-This lessens the need for IDE support designed specifically for Micronaut.
-
-=== Experimental JMX Support for Endpoints
-
-Experimental support for exposing <<endpoints, management endpoints>> over JMX has been added via the `jmx` module. See the section on <<jmx, JMX Support>> for more information on how to use this feaure.
-
-=== Multitenancy support
-
-Latest release includes <<multitenancy,Multitenancy>> integration into the framework. Features includes tenant resolution, propagation and integration with <<multitenancyGorm,GORM>> which supports discriminator, table and schema multitenancy modes.
-
-=== Token Propagation
-
-Latest release includes <<tokenPropagation,Token Propagation>> capabilities into the security module of the the framework. It enables the propagation of valid tokens to outgoing requests triggered by the original request in a transparent way.
-
-=== Ldap Authentication
-
-Latest release supports <<ldap,authentication with LDAP>> out of the box. Moreover, the LDAP authentication in Micronaut supports configuration of one or more LDAP servers to authenticate with.
-
-=== Documentation Improvements
-
-The documentation you are reading has been improved with a new configuration reference button at the top that contains a reference produced at compile time of all the available configuration options in Micronaut.
-
-
-=== Dependency Upgrades
-
-The following dependency upgrades occurred in this release:
-
-- Netty `4.1.29` -> `4.1.30`
-- RxJava `2.2.0` -> `2.2.2`
-//- Groovy `2.5.1` -> `2.5.2`
-- Hibernate Core `5.3.4` -> `5.3.6.Final`
-- Jackson `2.9.6` -> `2.9.7`
-//- Lettuce `5.0.4` -> `5.1.0`
-- Reactor `3.1.8` -> `3.2.0`
-- SnakeYAML `1.20` -> `1.23`
-- Jaeger `0.30.4` -> `0.31.0`
-- Brave '5.2.0` -> `5.4.2`
-- Zipkin Reporter `2.7.7` -> `2.7.9`
-- Spring `5.0.8` -> `5.1.0`
-
-=== Amazon Route 53 Service Discovery and AWS Systems Manager Parameter Store Support
-
-Use Amazon Route 53 Service Discovery directly for service discovery instead of running an instance of tools like Consul. You can also use AWS Systems Manager Parameter Store for shared configuration between nodes.

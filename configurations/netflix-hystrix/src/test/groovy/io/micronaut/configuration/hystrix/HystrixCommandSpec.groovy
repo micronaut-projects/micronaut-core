@@ -31,6 +31,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.inject.Singleton
+import java.util.concurrent.CompletableFuture
 
 /**
  * @author graemerocher
@@ -178,6 +179,15 @@ class HystrixCommandSpec extends Specification {
         myHook.fallbacks.size() == 0
         myHook.executed.size() == 1
 
+        when:
+        myHook.reset()
+        value = bookOperations.findTitleFuture("The Stand").get()
+
+        then:
+        value == "Default Future"
+        myHook.executed.size() == 1
+        myHook.fallbacks.size() == 1
+
     }
 
     @Singleton
@@ -230,6 +240,8 @@ class HystrixCommandSpec extends Specification {
         Observable<String> findTitleRx(String author)
 
         Maybe<String> findTitleMaybe(String author)
+
+        CompletableFuture<String> findTitleFuture(String author)
     }
 
     @Fallback
@@ -248,6 +260,11 @@ class HystrixCommandSpec extends Specification {
         @Override
         Maybe<String> findTitleMaybe(String author) {
             return Maybe.empty()
+        }
+
+        @Override
+        CompletableFuture<String> findTitleFuture(String author) {
+            return CompletableFuture.completedFuture("Default Future")
         }
     }
 
@@ -270,6 +287,14 @@ class HystrixCommandSpec extends Specification {
         @io.micronaut.configuration.hystrix.annotation.HystrixCommand
         Maybe<String> findTitleMaybe(String author) {
             return Maybe.error(new IllegalStateException("Down"))
+        }
+
+        @Override
+        @io.micronaut.configuration.hystrix.annotation.HystrixCommand
+        CompletableFuture<String> findTitleFuture(String author) {
+            return CompletableFuture.supplyAsync({ ->
+                throw new IllegalStateException("Down")
+            })
         }
     }
 

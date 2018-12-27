@@ -16,6 +16,8 @@
 package io.micronaut.docs.server.filters
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
+import io.micronaut.docs.server.intro.HelloControllerSpec
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.client.HttpClient
@@ -31,7 +33,8 @@ import spock.lang.Specification
 class TraceFilterSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer)
+            ApplicationContext.run(EmbeddedServer,['spec.name': HelloControllerSpec.simpleName,
+                                                   'spec.lang': 'java'], Environment.TEST)
     @Shared @AutoCleanup HttpClient httpClient =
             embeddedServer.getApplicationContext()
                     .createBean(HttpClient, embeddedServer.getURL())

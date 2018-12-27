@@ -20,9 +20,12 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.http.server.netty.multipart.NettyPartData;
+import io.netty.buffer.ByteBuf;
 
 import javax.inject.Singleton;
 import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.Optional;
 
 /**
@@ -44,7 +47,18 @@ public class NettyPartDataToObjectConverter implements TypeConverter<NettyPartDa
     @Override
     public Optional<Object> convert(NettyPartData object, Class<Object> targetType, ConversionContext context) {
         try {
-            return conversionService.convert(object.getByteBuf(), targetType, context);
+            if (targetType.isAssignableFrom(ByteBuffer.class)) {
+                return Optional.of(object.getByteBuffer());
+            } else if (targetType.isAssignableFrom(InputStream.class)) {
+                return Optional.of(object.getInputStream());
+            } else {
+                ByteBuf byteBuf = object.getByteBuf();
+                try {
+                    return conversionService.convert(byteBuf, targetType, context);
+                } finally {
+                    byteBuf.release();
+                }
+            }
         } catch (IOException e) {
             context.reject(e);
             return Optional.empty();

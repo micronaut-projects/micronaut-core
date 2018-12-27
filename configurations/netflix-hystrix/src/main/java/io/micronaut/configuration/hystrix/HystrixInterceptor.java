@@ -121,6 +121,9 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
                     @Override
                     protected Observable<Object> construct() {
                         Object result = context.proceed();
+                        if (isFuture) {
+                            result = Publishers.fromCompletableFuture((CompletableFuture) result);
+                        }
                         return ConversionService.SHARED.convert(result, Observable.class)
                             .orElseThrow(() -> new IllegalStateException("Unsupported Reactive type: " + javaReturnType));
                     }
@@ -137,6 +140,9 @@ public class HystrixInterceptor implements MethodInterceptor<Object, Object> {
                         if (fallbackMethod.isPresent()) {
                             MethodExecutionHandle<?, Object> handle = fallbackMethod.get();
                             Object result = handle.invoke(context.getParameterValues());
+                            if (isFuture) {
+                                result = Publishers.fromCompletableFuture((CompletableFuture) result);
+                            }
                             Optional<Observable> converted = ConversionService.SHARED.convert(result, Observable.class);
                             if (converted.isPresent()) {
                                 return converted.get();

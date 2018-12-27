@@ -42,6 +42,18 @@ public final class StringUtils {
      */
     public static final String[] EMPTY_STRING_ARRAY = new String[0];
 
+
+    /**
+     * Constant for an empty String.
+     */
+    public static final String EMPTY_STRING = "";
+
+    /**
+     * a space.
+     */
+    public static final char SPACE = 0x20;
+
+
     private static final Pattern DIGIT_PATTERN = Pattern.compile("\\d+");
 
 
@@ -266,5 +278,20 @@ public final class StringUtils {
             array[0] = Character.toUpperCase(array[0]);
         }
         return new String(array);
+    }
+
+    /**
+     * Trims the supplied string. If the string is empty or null before or after
+     * trimming, null is returned.
+     *
+     * @param string the string to trim
+     * @return the trimmed string or null
+     */
+    @Nullable
+    public static String trimToNull(@Nullable String string) {
+        return Optional.ofNullable(string)
+                .map(String::trim)
+                .filter(StringUtils::isNotEmpty)
+                .orElse(null);
     }
 }

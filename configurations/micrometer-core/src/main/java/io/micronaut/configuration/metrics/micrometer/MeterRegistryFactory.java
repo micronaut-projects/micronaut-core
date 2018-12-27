@@ -26,6 +26,7 @@ import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 
 import javax.inject.Singleton;
 import java.util.Collection;
@@ -52,7 +53,7 @@ public class MeterRegistryFactory {
     @Bean
     @Primary
     @Singleton
-    @Requires(property = MICRONAUT_METRICS_ENABLED, value = "true", defaultValue = "true")
+    @Requires(property = MICRONAUT_METRICS_ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
     CompositeMeterRegistry compositeMeterRegistry() {
         return new CompositeMeterRegistry();
     }

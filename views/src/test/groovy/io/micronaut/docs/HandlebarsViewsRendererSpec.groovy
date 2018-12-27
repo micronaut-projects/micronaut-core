@@ -26,6 +26,7 @@ class HandlebarsViewsRendererSpec extends Specification {
                     'micronaut.views.handlebars.enabled': true,
                     'micronaut.views.thymeleaf.enabled': false,
                     'micronaut.views.velocity.enabled': false,
+                    'micronaut.views.freemarker.enabled': false,
             ],
             "test")
 

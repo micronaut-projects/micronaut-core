@@ -41,6 +41,15 @@ public interface ClassElement extends TypedElement {
      */
     boolean isAssignable(String type);
 
+    /**
+     * Returns the super type of this element or empty if the element has no super type.
+     *
+     * @return An optional of the super type
+     */
+    default Optional<ClassElement> getSuperType() {
+        return Optional.empty();
+    }
+
     @Nullable
     @Override
     default ClassElement getType() {

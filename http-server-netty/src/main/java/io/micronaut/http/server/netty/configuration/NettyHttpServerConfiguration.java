@@ -74,6 +74,12 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_INITIALBUFFERSIZE = 128;
 
+    /**
+     * The default compression threshold.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final int DEFAULT_COMPRESSIONTHRESHOLD = 1024;
+
     private Map<ChannelOption, Object> childOptions = Collections.emptyMap();
     private Map<ChannelOption, Object> options = Collections.emptyMap();
     private Worker worker;
@@ -85,6 +91,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private boolean validateHeaders = DEFAULT_VALIDATEHEADERS;
     private int initialBufferSize = DEFAULT_INITIALBUFFERSIZE;
     private LogLevel logLevel;
+    private int compressionThreshold = DEFAULT_COMPRESSIONTHRESHOLD;
 
     /**
      * Default empty constructor.
@@ -161,6 +168,15 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public int getInitialBufferSize() {
         return initialBufferSize;
+    }
+
+    /**
+     * The default compression threshold. Defaults to 1024.
+     *
+     * @return The compression threshold.
+     */
+    public int getCompressionThreshold() {
+        return compressionThreshold;
     }
 
     /**
@@ -280,6 +296,14 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setLogLevel(LogLevel logLevel) {
         this.logLevel = logLevel;
+    }
+
+    /**
+     * Sets the minimum size of a request body must be in order to be compressed. Default value ({@value #DEFAULT_COMPRESSIONTHRESHOLD}).
+     * @param compressionThreshold The size request bodies must be in order to be a candidate for compression.
+     */
+    public void setCompressionThreshold(@ReadableBytes int compressionThreshold) {
+        this.compressionThreshold = compressionThreshold;
     }
 
     /**

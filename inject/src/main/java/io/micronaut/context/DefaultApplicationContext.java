@@ -29,6 +29,7 @@ import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.naming.Named;
+import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanConfiguration;
@@ -36,6 +37,8 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -158,6 +161,12 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         return getEnvironment().getProperty(name, conversionContext);
     }
 
+    @Nonnull
+    @Override
+    public Map<String, Object> getProperties(@Nullable String name, @Nullable StringConvention keyFormat) {
+        return getEnvironment().getProperties(name, keyFormat);
+    }
+
     @Override
     protected void registerConfiguration(BeanConfiguration configuration) {
         if (getEnvironment().isActive(configuration)) {
@@ -172,7 +181,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         Environment defaultEnvironment = getEnvironment();
         defaultEnvironment.start();
         registerSingleton(Environment.class, defaultEnvironment);
-        registerSingleton(new ExecutableMethodProcessorListener());
+        registerSingleton(new AnnotationProcessorListener());
     }
 
     @Override
@@ -481,15 +490,19 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      */
     private class RuntimeConfiguredEnvironment extends DefaultEnvironment {
 
+        private final boolean isRuntimeConfigured;
         private BootstrapPropertySourceLocator bootstrapPropertySourceLocator;
         private BootstrapEnvironment bootstrapEnvironment;
 
         RuntimeConfiguredEnvironment(String... environmentNames) {
             super(DefaultApplicationContext.this.resourceLoader, DefaultApplicationContext.this.conversionService, environmentNames);
+            this.isRuntimeConfigured = Boolean.getBoolean(Environment.BOOTSTRAP_CONTEXT_PROPERTY) ||
+                    DefaultApplicationContext.this.resourceLoader.getResource(Environment.BOOTSTRAP_NAME + ".yml").isPresent() ||
+                    DefaultApplicationContext.this.resourceLoader.getResource(Environment.BOOTSTRAP_NAME + ".properties").isPresent();
         }
 
         boolean isRuntimeConfigured() {
-            return bootstrapPropertySourceLocator != BootstrapPropertySourceLocator.EMPTY_LOCATOR;
+            return isRuntimeConfigured;
         }
 
         @Override
@@ -499,13 +512,14 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
         @Override
         protected synchronized List<PropertySource> readPropertySourceList(String name) {
-            Set<String> activeNames = getActiveNames();
 
-            // fast path for functions
-            if (activeNames.contains(Environment.FUNCTION)) {
-                return super.readPropertySourceList(name);
-            } else {
-                String[] environmentNamesArray = activeNames.toArray(new String[activeNames.size()]);
+            if (isRuntimeConfigured) {
+                if (LOG.isInfoEnabled()) {
+                    LOG.info("Reading Startup environment from bootstrap.yml");
+                }
+
+                Set<String> activeNames = getActiveNames();
+                String[] environmentNamesArray = activeNames.toArray(new String[0]);
                 if (this.bootstrapEnvironment == null) {
                     this.bootstrapEnvironment = createBootstrapEnvironment(environmentNamesArray);
                 }
@@ -519,6 +533,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                 for (PropertySource bootstrapPropertySource : bootstrapPropertySources) {
                     addPropertySource(new BootstrapPropertySource(bootstrapPropertySource));
                 }
+                return super.readPropertySourceList(name);
+            } else {
                 return super.readPropertySourceList(name);
             }
         }

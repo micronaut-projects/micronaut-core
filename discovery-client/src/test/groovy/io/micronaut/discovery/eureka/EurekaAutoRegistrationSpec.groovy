@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit
  * @author graemerocher
  * @since 1.0
  */
+@IgnoreIf({System.getenv("TRAVIS")})
 class EurekaAutoRegistrationSpec extends Specification{
 
     @Shared

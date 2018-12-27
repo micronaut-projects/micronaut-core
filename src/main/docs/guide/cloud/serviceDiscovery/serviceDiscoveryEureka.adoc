@@ -6,7 +6,7 @@ Micronaut features a native non-blocking api:discovery.eureka.client.v2.EurekaCl
 
 The quickest way to start a Eureka server is to use to use https://spring.io/guides/gs/service-registration-and-discovery/#initial[Spring Boot's Eureka starters].
 
-NOTE: As of this writing the Docker images for Eureka are significantly out-of-date so it is recommended to create a Eureka server following the steps above.
+NOTE: As of this writing the official Docker images for Eureka are significantly out-of-date so it is recommended to create a Eureka server following the steps above.
 
 == Auto Registering with Eureka
 
@@ -45,6 +45,11 @@ eureka:
             foo: bar
          retry-count: 10 # How many times to retry
          retry-delay: 5s # How long to wait between retries
+
+         appname: some-app-name     # optional, eureka instance application name, defaults to ${micronaut.application.name}
+         hostname: foo.example.com  # optional, exposed eureka instance hostname, useful in docker bridged network environments
+         ip-addr: 1.2.3.4           # optional, exposed eureka instance ip address, useful in docker bridged network environments
+         port: 9090                 # optional, exposed eureka instance port, useful in docker bridged network environments
 ----
 
 

@@ -2,7 +2,12 @@
 
 Micronaut features a Dependency Injection and Aspect-Oriented Programming runtime that uses no reflection. This makes it easier for Micronaut applications to run on GraalVM since there are https://github.com/oracle/graal/blob/master/substratevm/LIMITATIONS.md[limitations] particularly around https://github.com/oracle/graal/blob/master/substratevm/REFLECTION.md[reflection] on SubstrateVM.
 
-==== What about Third-Party Libraries?
+==== How can I make a Micronaut application that uses picocli run on GraalVM?
+
+Picocli provides a `picocli-codegen` module with a tool for generating a GraalVM reflection configuration file. The tool can be run https://picocli.info/picocli-on-graalvm.html[manually] or automatically as part of the build. The module's https://github.com/remkop/picocli/tree/master/picocli-codegen[README] has usage instructions with code snippets for configuring Gradle and Maven to generate a `cli-reflect.json` file automatically as part of the build. Add the generated file to the `-H:ReflectionConfigurationFiles` option when running the `native-image` tool.
+
+
+==== What about other Third-Party Libraries?
 
 Micronaut cannot guarantee that third-party libraries work on GraalVM SubstrateVM, that is down to each individual library to implement support.
 

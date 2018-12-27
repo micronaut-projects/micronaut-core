@@ -18,6 +18,7 @@ package io.micronaut.security.token.basicauth;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaderValues;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.security.token.config.TokenConfigurationProperties;
@@ -28,7 +29,7 @@ import io.micronaut.security.token.config.TokenConfigurationProperties;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(property = TokenConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
+@Requires(property = TokenConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 @ConfigurationProperties(BasicAuthTokenReaderConfigurationProperties.PREFIX)
 public class BasicAuthTokenReaderConfigurationProperties implements BasicAuthTokenReaderConfiguration {
 

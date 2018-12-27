@@ -8,10 +8,11 @@ buildscript {
         classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:1.7.3'
         classpath 'com.bmuschko:gradle-nexus-plugin:2.3.1'
         classpath 'io.github.groovylang.groovydoc:groovydoc-gradle-plugin:1.0.1'
-        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.2'
+        classpath 'com.github.jengelman.gradle.plugins:shadow:4.0.2'
         classpath "gradle.plugin.io.sdkman:gradle-sdkvendor-plugin:1.0.0"
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath "org.codehaus.groovy.modules.http-builder:http-builder:0.7.1"
+        classpath 'javax.xml.bind:jaxb-api:2.2.8'
     }
 }
 
@@ -39,222 +40,252 @@ ext {
 ext {
 
     dependencyVersions = [
-            groovy: [
-                    version:groovyVersion,
-                    group:'org.codehaus.groovy',
-                    name: 'groovy',
-                    modules:['groovy-test','groovy-ant','groovy-json','groovy-jmx', 'groovy-templates']
+            groovy                 : [
+                    version: groovyVersion,
+                    group  : 'org.codehaus.groovy',
+                    name   : 'groovy',
+                    modules: ['groovy-test', 'groovy-ant', 'groovy-json', 'groovy-jmx', 'groovy-templates']
             ],
-            gorm: [
-                    version:gormVersion,
-                    group:'org.grails',
-                    name: 'grails-datastore-core',
-                    modules:['grails-datastore-gorm','grails-datastore-gorm-hibernate5']
+            gorm                   : [
+                    version: gormVersion,
+                    group  : 'org.grails',
+                    name   : 'grails-datastore-core',
+                    modules: ['grails-datastore-gorm', 'grails-datastore-gorm-hibernate5']
             ],
-            jackson: [
-                version: jacksonVersion,
-                group:'com.fasterxml.jackson.core',
-                name:'jackson-databind',
-                modules:['jackson-core', 'jackson-annotations']
-            ],
-            'jackson.modules': [
+            jackson                : [
                     version: jacksonVersion,
-                    group:'com.fasterxml.jackson.module',
-                    name:'jackson-module-afterburner'
+                    group  : 'com.fasterxml.jackson.core',
+                    name   : 'jackson-databind',
+                    modules: ['jackson-core', 'jackson-annotations']
             ],
-            'jackson.datatype': [
+            'jackson.modules'      : [
                     version: jacksonVersion,
-                    group:'com.fasterxml.jackson.datatype',
-                    name:'jackson-datatype-jdk8',
-                    modules:['jackson-datatype-jsr310']
+                    group  : 'com.fasterxml.jackson.module',
+                    name   : 'jackson-module-afterburner'
             ],
-            jaeger: [
+            'jackson.datatype'     : [
+                    version: jacksonVersion,
+                    group  : 'com.fasterxml.jackson.datatype',
+                    name   : 'jackson-datatype-jdk8',
+                    modules: ['jackson-datatype-jsr310']
+            ],
+            jaeger                 : [
                     version: jaegerVersion,
-                    group:'io.jaegertracing',
-                    name:'jaeger-thrift'
+                    group  : 'io.jaegertracing',
+                    name   : 'jaeger-thrift'
             ],
-            'zipkin.reporter': [
+            'zipkin.reporter'      : [
                     version: zipkinReporterVersion,
-                    group:'io.zipkin.reporter2',
-                    name:'zipkin-reporter'
+                    group  : 'io.zipkin.reporter2',
+                    name   : 'zipkin-reporter'
             ],
             'brave.instrumentation': [
                     version: braveInstrumentationHttpVersion,
-                    group:'io.zipkin.brave',
-                    name:'brave-instrumentation-http'
+                    group  : 'io.zipkin.brave',
+                    name   : 'brave-instrumentation-http'
             ],
-            'brave.opentracing': [
+            'brave.opentracing'    : [
                     version: braveOpentracingVersion,
-                    group: 'io.opentracing.brave',
-                    name: 'brave-opentracing'
+                    group  : 'io.opentracing.brave',
+                    name   : 'brave-opentracing'
             ],
-            'javax.annotation-api': [
+            'javax.annotation-api' : [
                     version: javaxAnnotationApiVersion,
-                    group:'javax.annotation',
-                    name:'javax.annotation-api'
+                    group  : 'javax.annotation',
+                    name   : 'javax.annotation-api'
             ],
-            jsr305:[
-                    version:jsr305Version,
-                    group:'com.google.code.findbugs',
-                    name:'jsr305'
+            jsr305                 : [
+                    version: jsr305Version,
+                    group  : 'com.google.code.findbugs',
+                    name   : 'jsr305'
             ],
-            kafka: [
-                    version:kafkaVersion,
-                    group:'org.apache.kafka',
-                    name:'kafka-clients',
+            kafka                  : [
+                    version: kafkaVersion,
+                    group  : 'org.apache.kafka',
+                    name   : 'kafka-clients',
                     modules: ['kafka_2.12', 'kafka-streams']
             ],
-            'micrometer'    : [
+            'micrometer'           : [
                     version: micrometerVersion,
                     group  : 'io.micrometer',
                     name   : 'micrometer-core',
-                    modules :['micrometer-registry-atlas', 'micrometer-registry-graphite', 'micrometer-registry-prometheus', 'micrometer-registry-statsd']
+                    modules: ['micrometer-registry-atlas', 'micrometer-registry-graphite', 'micrometer-registry-prometheus', 'micrometer-registry-statsd']
             ],
-            'mongo' : [
+            'mongo'                : [
                     version: mongoVersion,
-                    group: 'org.mongodb',
+                    group  : 'org.mongodb',
                     modules: ['mongodb-driver-async', 'mongo-java-driver']
             ],
-            'mongo.reactive': [
+            'mongo.reactive'       : [
                     version: '1.8.0',
-                    group: 'org.mongodb',
-                    name: 'mongodb-driver-reactivestreams'
+                    group  : 'org.mongodb',
+                    name   : 'mongodb-driver-reactivestreams'
             ],
-            neo4j: [
-                version: neo4jVersion,
-                group:'org.neo4j.test',
-                name:'neo4j-harness'
+            neo4j                  : [
+                    version: neo4jVersion,
+                    group  : 'org.neo4j.test',
+                    name   : 'neo4j-harness'
             ],
-            'neo4j.bolt': [
-                version: '1.6.2',
-                group:'org.neo4j.driver',
-                name:'neo4j-java-driver'
+            'neo4j.bolt'           : [
+                    version: '1.6.2',
+                    group  : 'org.neo4j.driver',
+                    name   : 'neo4j-java-driver'
             ],
-            netty: [
-                version: nettyVersion,
-                group:'io.netty',
-                name:'netty-codec-http',
-                modules: ['netty-buffer', 'netty-codec', 'netty-codec-dns', 'netty-codec-haproxy', 
-                          'netty-codec-http2', 'netty-codec-memcache', 'netty-codec-mqtt', 
-                          'netty-codec-redis', 'netty-codec-smtp', 'netty-codec-socks', 'netty-codec-stomp', 
-                          'netty-codec-xml', 'netty-common', 'netty-dev-tools', 'netty-handler', 
-                          'netty-handler-proxy', 'netty-resolver', 'netty-resolver-dns', 'netty-transport', 
-                          'netty-transport-rxtx', 'netty-transport-sctp', 'netty-transport-udt', 'netty-example']
+            'jcache'               : [
+                    version: jcacheVersion,
+                    group  : 'javax.cache',
+                    name   : 'cache-api'
             ],
-            opentracing: [
-                version: '0.31.0',
-                group: 'io.opentracing',
-                name: 'opentracing-api',
-                modules:['opentracing-util']
+            netty                  : [
+                    version: nettyVersion,
+                    group  : 'io.netty',
+                    name   : 'netty-codec-http',
+                    modules: ['netty-all', 'netty-buffer', 'netty-codec', 'netty-codec-dns', 'netty-codec-haproxy',
+                              'netty-codec-http2', 'netty-codec-memcache', 'netty-codec-mqtt',
+                              'netty-codec-redis', 'netty-codec-smtp', 'netty-codec-socks', 'netty-codec-stomp',
+                              'netty-codec-xml', 'netty-common', 'netty-dev-tools', 'netty-handler',
+                              'netty-handler-proxy', 'netty-resolver', 'netty-resolver-dns', 'netty-transport',
+                              'netty-transport-rxtx', 'netty-transport-sctp', 'netty-transport-udt']
             ],
-            picocli: [
+            opentracing            : [
+                    version: '0.31.0',
+                    group  : 'io.opentracing',
+                    name   : 'opentracing-api',
+                    modules: ['opentracing-util']
+            ],
+            picocli                : [
                     version: picocliVersion,
-                    group:'info.picocli',
-                    name:'picocli'
+                    group  : 'info.picocli',
+                    name   : 'picocli'
             ],
-            lettuce: [
-                version: lettuceVersion,
-                group:'io.lettuce',
-                name:'lettuce-core'
+            lettuce                : [
+                    version: lettuceVersion,
+                    group  : 'io.lettuce',
+                    name   : 'lettuce-core'
 
             ],
-            spring: [
-                version: springVersion,
-                group:'org.springframework',
-                name: 'spring-core',
-                modules:['spring-context', 'spring-tx', 'spring-orm', 'spring-jdbc']
+            spring                 : [
+                    version: springVersion,
+                    group  : 'org.springframework',
+                    name   : 'spring-core',
+                    modules: ['spring-context', 'spring-tx', 'spring-orm', 'spring-jdbc']
             ],
-            snakeyaml: [
-                version: yamlVersion,
-                group:'org.yaml',
-                name: 'snakeyaml'
+            snakeyaml              : [
+                    version: yamlVersion,
+                    group  : 'org.yaml',
+                    name   : 'snakeyaml'
             ],
-            slf4j: [
-                version: slf4jVersion,
-                group:'org.slf4j',
-                name: 'slf4j-api',
-                modules: ['slf4j-simple']
+            slf4j                  : [
+                    version: slf4jVersion,
+                    group  : 'org.slf4j',
+                    name   : 'slf4j-api',
+                    modules: ['slf4j-simple']
             ],
-            spock: [
-                version: spockVersion,
-                group:'org.spockframework',
-                name: 'spock-core'
+            spock                  : [
+                    version: spockVersion,
+                    group  : 'org.spockframework',
+                    name   : 'spock-core'
             ],
-            swagger: [
-                version: '2.0.4',
-                group: 'io.swagger.core.v3',
-                name: 'swagger-core',
-                modules: ['swagger-models', 'swagger-annotations']
+            swagger                : [
+                    version: '2.0.4',
+                    group  : 'io.swagger.core.v3',
+                    name   : 'swagger-core',
+                    modules: ['swagger-models', 'swagger-annotations']
             ],
-            'reactive.streams':[
-                version:reactiveStreamsVersion,
-                group:'org.reactivestreams',
-                name:'reactive-streams'
+            'reactive.streams'     : [
+                    version: reactiveStreamsVersion,
+                    group  : 'org.reactivestreams',
+                    name   : 'reactive-streams'
             ],
-            'reactive.pg.client': [
+            'reactive.pg.client'   : [
                     version: reactivePgClientVersion,
-                    group:'io.reactiverse',
-                    name:'reactive-pg-client'
+                    group  : 'io.reactiverse',
+                    name   : 'reactive-pg-client'
             ],
-            rxjava1: [
-                version: rxJava1Version,
-                group:'io.reactivex',
-                name: 'rxjava'
+            rxjava1                : [
+                    version: rxJava1Version,
+                    group  : 'io.reactivex',
+                    name   : 'rxjava'
             ],
-            'rxjava1.interop': [
+            'rxjava1.interop'      : [
                     version: rxJavaInteropVersion,
-                    group:'com.github.akarnokd',
-                    name: 'rxjava2-interop'
+                    group  : 'com.github.akarnokd',
+                    name   : 'rxjava2-interop'
             ],
-            rxjava2: [
-                version: rxJava2Version,
-                group:'io.reactivex.rxjava2',
-                name: 'rxjava'
+            rxjava2                : [
+                    version: rxJava2Version,
+                    group  : 'io.reactivex.rxjava2',
+                    name   : 'rxjava'
             ],
-            reactor:[
-                version: reactorVersion,
-                group:'io.projectreactor',
-                name: 'reactor-core'
+            reactor                : [
+                    version: reactorVersion,
+                    group  : 'io.projectreactor',
+                    name   : 'reactor-core'
             ],
-            validation: [
-                version: validationVersion,
-                group:'javax.validation',
-                name: 'validation-api'
+            validation             : [
+                    version: validationVersion,
+                    group  : 'javax.validation',
+                    name   : 'validation-api'
             ],
-            hystrix: [
+            hystrix                : [
                     version: hystrixVersion,
-                    group:'com.netflix.hystrix',
-                    name: 'hystrix-core',
-                    modules:['hystrix-serialization']
+                    group  : 'com.netflix.hystrix',
+                    name   : 'hystrix-core',
+                    modules: ['hystrix-serialization']
             ],
-            graal: [
-                version: graalVersion,
-                group: 'com.oracle.substratevm',
-                name: 'svm'
+            graal                  : [
+                    version: graalVersion,
+                    group  : 'com.oracle.substratevm',
+                    name   : 'svm'
             ],
-            h2: [
-                version: h2Version,
-                group: 'com.h2database',
-                name: 'h2'
+            h2                     : [
+                    version: h2Version,
+                    group  : 'com.h2database',
+                    name   : 'h2'
             ],
-            tomcatJdbc: [
-                version: tomcatJdbcVersion,
-                group: 'org.apache.tomcat',
-                name: 'tomcat-jdbc'
+            tomcatJdbc             : [
+                    version: tomcatJdbcVersion,
+                    group  : 'org.apache.tomcat',
+                    name   : 'tomcat-jdbc'
+            ],
+            liquibase              : [
+                    version: liquibaseVersion,
+                    group  : 'org.liquibase',
+                    name   : 'liquibase-core'
+            ],
+            flyway                 : [
+                    version: flywayVersion,
+                    group  : 'org.flywaydb',
+                    name   : 'flyway-core'
+            ],
+            jna                 : [
+                    version: jnaVersion,
+                    group  : 'net.java.dev.jna',
+                    name   : 'jna'
+            ],
+            hibernate              : [
+                    version: hibernateVersion,
+                    group  : 'org.hibernate',
+                    name   : 'hibernate-core',
+                    modules: ['hibernate-jcache', 'hibernate-ehcache']
+            ],
+            'methvin.directory-watcher': [
+                    version: methvinDirectoryWatcherVersion,
+                    group  : 'io.methvin',
+                    name   : 'directory-watcher'
             ]
-
     ]
 
     dependencyVersion = { String name ->
         def dep = dependencyVersions[name]
-        if(dep == null) {
+        if (dep == null) {
             throw new IllegalArgumentException("No core dependency defined for name: $name")
         }
         return "$dep.group:$dep.name:$dep.version".toString()
     }
     dependencyModuleVersion = { String name, String module ->
         def dep = dependencyVersions[name]
-        if(dep == null) {
+        if (dep == null) {
             throw new IllegalArgumentException("No core dependency defined for name: $name")
         }
         return "$dep.group:$module:$dep.version".toString()
@@ -273,14 +304,14 @@ task testReportsAggregate {
         int titlePad = 35
         String separator = " | "
         subprojects.each { subproject ->
-            if ( subproject.tasks.find { Task task -> task.name == 'test' } ) {
+            if (subproject.tasks.find { Task task -> task.name == 'test' }) {
                 if (new File("${subproject.buildDir}/test-results/test").exists()) {
                     int failures = 0
                     int errors = 0
                     int skipped = 0
                     int tests = 0
                     new File("${subproject.buildDir}/test-results/test").eachFile() { file ->
-                        if ( file.name.endsWith('.xml') ) {
+                        if (file.name.endsWith('.xml')) {
                             def testsuite = new XmlSlurper().parseText(file.text)
                             failures += "${testsuite['@failures']}" as int
                             errors += "${testsuite['@errors']}" as int
@@ -301,13 +332,13 @@ task testReportsAggregate {
                 }
             }
         }
-        String title  = "All Tests".padRight(titlePad)
+        String title = "All Tests".padRight(titlePad)
         String testStr = "tests: $totalTests".padRight(itemPad)
         String skippedStr = "skipped: $totalSkipped".padRight(itemPad)
         String errorsStr = "errors: $totalErrors".padRight(itemPad)
         String failuresStr = "failures: $totalFailures".padRight(itemPad)
         int itemsSize = [totalTests, totalSkipped, totalErrors, totalFailures].size()
-        logger.quiet("="* ((itemPad * itemsSize) + titlePad + (separator.length() * itemsSize)))
+        logger.quiet("=" * ((itemPad * itemsSize) + titlePad + (separator.length() * itemsSize)))
         logger.quiet("${title}${separator}${testStr}${separator}${skippedStr}${separator}${errorsStr}${separator}${failuresStr}")
     }
 }
@@ -327,10 +358,9 @@ subprojects { Project subproject ->
         return
     }
 
-    if(isConfiguration) {
+    if (isConfiguration) {
         group "io.micronaut.configuration"
-    }
-    else {
+    } else {
         group projectGroupId
     }
 
@@ -339,27 +369,27 @@ subprojects { Project subproject ->
         maven { url "http://oss.sonatype.org/content/repositories/snapshots/" }
         maven { url "https://repo.grails.org/grails/core" }
     }
-    
+
     if (subproject.name.startsWith("examples")) {
         // apply plugin:"org.grails.grails-web"
-    }
-    else {
-        apply plugin:"groovy"
-        apply plugin:"java"
-
+    } else {
+        apply plugin: "groovy"
+        apply plugin: "java"
 
 
         sourceCompatibility = '1.8'
         targetCompatibility = '1.8'
-//        compileJava.options.compilerArgs.add '-parameters'
-//        compileTestJava.options.compilerArgs.add '-parameters'
-        if(
-            !subproject.name.startsWith('test-') && 
-            !subproject.toString().contains('build-projects')
+        compileJava.options.compilerArgs.add '-parameters'
+        compileTestJava.options.compilerArgs.add '-parameters'
+
+        if (
+        !subproject.name.startsWith('test-') &&
+                !subproject.toString().contains('build-projects')
         ) {
-            apply from:"${rootProject.rootDir}/gradle/publishing.gradle"
+
+            apply from: "${rootProject.rootDir}/gradle/publishing.gradle"
             apply plugin: 'checkstyle'
-            
+
             checkstyle {
                 toolVersion = 8.10
                 configFile = rootProject.file('config/checkstyle/checkstyle.xml')
@@ -413,10 +443,10 @@ subprojects { Project subproject ->
         all {
             resolutionStrategy.eachDependency { DependencyResolveDetails details ->
                 String group = details.requested.group
-                if(group == 'org.codehaus.groovy') {
+                if (group == 'org.codehaus.groovy') {
                     details.useVersion(groovyVersion)
                 }
-                if(group == 'org.ow2.asm') {
+                if (group == 'org.ow2.asm') {
                     details.useVersion(asmVersion)
                 }
             }
@@ -440,7 +470,7 @@ subprojects { Project subproject ->
         testCompile "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
         testCompile dependencyVersion("groovy")
         testCompile(dependencyVersion("spock")) {
-            exclude module:'groovy-all'
+            exclude module: 'groovy-all'
         }
         testCompile "cglib:cglib-nodep:2.2.2"
         testCompile "org.objenesis:objenesis:1.4"
@@ -457,8 +487,8 @@ subprojects { Project subproject ->
     task moveConfigProps() {
         group 'documentation'
         doLast {
-            ant.mkdir(dir:"${rootProject.buildDir}/config-props")
-            ant.move(file: "${subproject.buildDir}/classes/java/main/META-INF/config-properties.adoc", tofile:"${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc", failonerror:false, quiet:true)
+            ant.mkdir(dir: "${rootProject.buildDir}/config-props")
+            ant.move(file: "${subproject.buildDir}/classes/java/main/META-INF/config-properties.adoc", tofile: "${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc", failonerror: false, quiet: true)
         }
     }
 
@@ -472,10 +502,10 @@ subprojects { Project subproject ->
 
         doLast {
             File file = new File("${rootProject.buildDir}/config-props/${subproject.name}-config-properties.adoc")
-            if ( file.exists()) {
+            if (file.exists()) {
                 def atLinkReplacer = { String str ->
                     String newLine = str.substring(0, str.indexOf('{@link io.micronaut.'))
-                    String sub = "api:"+str.substring(str.indexOf('{@link io.micronaut.') + '{@link io.micronaut.'.length())
+                    String sub = "api:" + str.substring(str.indexOf('{@link io.micronaut.') + '{@link io.micronaut.'.length())
                     newLine += sub.substring(0, sub.indexOf('}')) + '[]'
                     newLine += sub.substring(sub.indexOf('}') + '}'.length())
                     newLine
@@ -500,10 +530,10 @@ subprojects { Project subproject ->
             individualConfigPropsFolder = "${rootProject.buildDir}/generated/configurationProperties"
         }
         doFirst {
-            if(!new File("${rootProject.buildDir}/generated").exists()) {
+            if (!new File("${rootProject.buildDir}/generated").exists()) {
                 new File("${rootProject.buildDir}/generated").mkdir()
             }
-            if(!new File("${rootProject.buildDir}/generated/configurationProperties").exists()) {
+            if (!new File("${rootProject.buildDir}/generated/configurationProperties").exists()) {
                 new File("${rootProject.buildDir}/generated/configurationProperties").mkdir()
             }
         }
@@ -543,7 +573,7 @@ subprojects { Project subproject ->
     task allDeps(type: DependencyReportTask) {}
 }
 
-apply from:"gradle/docs.gradle"
+apply from: "gradle/docs.gradle"
 
 // IDEA 2017.2 made a breaking change with IDE build output vs gradle build output
 // [see https://youtrack.jetbrains.com/issue/IDEA-175172]
@@ -575,7 +605,7 @@ sdkman {
 
 htmlSanityCheck {
     sourceDir = new File("${rootProject.buildDir}/docs/")
-    sourceDocuments = [ "index.html"]
+    sourceDocuments = ["index.html"]
 
 }
 docs.finalizedBy(htmlSanityCheck)

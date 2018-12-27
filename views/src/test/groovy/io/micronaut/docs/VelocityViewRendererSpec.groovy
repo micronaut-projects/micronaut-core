@@ -22,6 +22,7 @@ class VelocityViewRendererSpec extends Specification {
                     'spec.name': 'velocity',
                     'micronaut.views.thymeleaf.enabled': false,
                     'micronaut.views.handlebars.enabled': false,
+                    'micronaut.views.freemarker.enabled': false,
             ],
             "test")
 

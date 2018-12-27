@@ -110,3 +110,33 @@ You can then inject a api:configuration.kafka.streams.ConfiguredStreamBuilder[] 
 include::{testskafkastreams}/WordCountStream.java[tags=namedStream, indent=0]
 }
 ----
+
+=== Kafka Streams State Store
+
+You can use a state store in your stream and leverage the concept of a https://cwiki.apache.org/confluence/display/KAFKA/KIP-67%3A+Queryable+state+for+Kafka+Streams[state store].  Micronaut provides a bean of type `QueryableStoreRegistry` to allow you to query a state store.
+
+.Create Materialized Store For Stream
+To query the store you will first need to tell your stream to use a materialized store.
+
+.Kafka Streams Word Count w/Store
+[source,java]
+----
+include::{testskafkastreams}/registry/WordCountStateStoreStream.java[tags=stateStore, indent=0]
+----
+
+<1> Output the count to a state store
+
+.Query State Store
+You can query your store by using the `QueryableStoreRegistry` bean.  This contrived helper class illustrates how to inject the `QueryableStoreRegistry` bean, get a read only key value store and a value from the store.
+
+[NOTE]
+The `getQueryableStoreType` method can produce a null so make sure to check that a store was returned before invoking get operation.
+
+[source,java]
+----
+include::{testskafkastreams}/registry/QueryableStoreRegistryExample.java[]
+----
+
+<1> Inject the `QueryableStoreRegistry` bean
+<2> Method to get a ReadOnlyKeyValueStore
+<3> Get the store and lookup value

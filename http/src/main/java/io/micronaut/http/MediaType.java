@@ -17,6 +17,7 @@
 package io.micronaut.http;
 
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.http.annotation.Produces;
@@ -252,6 +253,16 @@ public class MediaType implements CharSequence {
     public static final MediaType APPLICATION_OCTET_STREAM_TYPE = new MediaType(APPLICATION_OCTET_STREAM);
 
     /**
+     * GraphQL: application/graphql.
+     */
+    public static final String APPLICATION_GRAPHQL = "application/graphql";
+
+    /**
+     * GraphQL: application/graphql.
+     */
+    public static final MediaType APPLICATION_GRAPHQL_TYPE = new MediaType(APPLICATION_GRAPHQL);
+
+    /**
      * Parameter {@code "charset"}.
      */
     public static final String CHARSET_PARAMETER = "charset";
@@ -293,6 +304,7 @@ public class MediaType implements CharSequence {
         textTypePatterns.add(Pattern.compile("^.*\\+json$"));
         textTypePatterns.add(Pattern.compile("^.*\\+text$"));
         textTypePatterns.add(Pattern.compile("^.*\\+xml$"));
+        textTypePatterns.add(Pattern.compile("^application/javascript$"));
     }
 
     /**
@@ -553,6 +565,20 @@ public class MediaType implements CharSequence {
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Resolve the {@link MediaType} for the given file name. Defaults
+     * to text/plain.
+     *
+     * @param filename The file name
+     * @return The {@link MediaType}
+     */
+    public static MediaType forFilename(String filename) {
+        if (StringUtils.isNotEmpty(filename)) {
+            return forExtension(NameUtils.extension(filename)).orElse(MediaType.TEXT_PLAIN_TYPE);
+        }
+        return MediaType.TEXT_PLAIN_TYPE;
     }
 
     @SuppressWarnings("MagicNumber")

@@ -278,6 +278,25 @@ class MyBean {
         !beanDefinition.isEnabled(context)
     }
 
+    void "test requires not multiple environment with environment present"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(notEnv={"foo", "bar"})
+@javax.inject.Singleton
+class MyBean {
+}
+''')
+
+        def context = ApplicationContext.build("foo").build()
+
+        then:
+        !beanDefinition.isEnabled(context)
+    }
+
     void "test requires not environment with environment not present"() {
         when:
         BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
@@ -286,6 +305,25 @@ package test;
 import io.micronaut.context.annotation.*;
 
 @Requires(notEnv="foo")
+@javax.inject.Singleton
+class MyBean {
+}
+''')
+
+        def context = ApplicationContext.build().build()
+
+        then:
+        beanDefinition.isEnabled(context)
+    }
+
+    void "test requires not multiple environments with environment not present"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(notEnv={"foo", "bar"})
 @javax.inject.Singleton
 class MyBean {
 }

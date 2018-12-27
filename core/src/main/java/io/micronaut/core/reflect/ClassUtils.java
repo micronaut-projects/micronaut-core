@@ -20,6 +20,15 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.Toggleable;
 
 import javax.annotation.Nullable;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.net.URI;
+import java.net.URL;
+import java.nio.charset.Charset;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.*;
 
 /**
@@ -31,7 +40,8 @@ import java.util.*;
 public class ClassUtils {
 
     public static final int EMPTY_OBJECT_ARRAY_HASH_CODE = Arrays.hashCode(ArrayUtils.EMPTY_OBJECT_ARRAY);
-    public static final Map<String, Class> COMMON_CLASS_MAP = new HashMap<>();
+    public static final Map<String, Class> COMMON_CLASS_MAP = new HashMap<>(25);
+    public static final Map<String, Class> BASIC_TYPE_MAP = new HashMap<>(10);
     public static final String CLASS_EXTENSION = ".class";
     
     static final List<ClassLoadingReporter> CLASS_LOADING_REPORTERS;
@@ -65,6 +75,20 @@ public class ClassUtils {
         COMMON_CLASS_MAP.put(Float.class.getName(), Float.class);
         COMMON_CLASS_MAP.put(Character.class.getName(), Character.class);
         COMMON_CLASS_MAP.put(String.class.getName(), String.class);
+
+        BASIC_TYPE_MAP.put(UUID.class.getName(), UUID.class);
+        BASIC_TYPE_MAP.put(BigDecimal.class.getName(), BigDecimal.class);
+        BASIC_TYPE_MAP.put(BigInteger.class.getName(), BigInteger.class);
+        BASIC_TYPE_MAP.put(URL.class.getName(), URL.class);
+        BASIC_TYPE_MAP.put(URI.class.getName(), URI.class);
+        BASIC_TYPE_MAP.put(TimeZone.class.getName(), TimeZone.class);
+        BASIC_TYPE_MAP.put(Charset.class.getName(), Charset.class);
+        BASIC_TYPE_MAP.put(Locale.class.getName(), Locale.class);
+        BASIC_TYPE_MAP.put(Duration.class.getName(), Duration.class);
+        BASIC_TYPE_MAP.put(Date.class.getName(), Date.class);
+        BASIC_TYPE_MAP.put(LocalDate.class.getName(), LocalDate.class);
+        BASIC_TYPE_MAP.put(Instant.class.getName(), Instant.class);
+        BASIC_TYPE_MAP.put(ZonedDateTime.class.getName(), ZonedDateTime.class);
 
         List<ClassLoadingReporter> reporterList = new ArrayList<>();
         try {
@@ -132,6 +156,19 @@ public class ClassUtils {
      */
     public static boolean isJavaLangType(String typeName) {
         return COMMON_CLASS_MAP.containsKey(typeName);
+    }
+
+    /**
+     * Expanded version of {@link #isJavaLangType(Class)} that includes common Java types like {@link URI}.
+     *
+     * @param type The URI
+     * @return True if is a Java basic type
+     */
+    public static boolean isJavaBasicType(@Nullable Class<?> type) {
+        if (type == null) {
+            return false;
+        }
+        return isJavaLangType(type) || BASIC_TYPE_MAP.containsKey(type.getName());
     }
 
     /**

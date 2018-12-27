@@ -70,7 +70,7 @@ public class RxJava1TracingInstrumentation {
 
         @Override
         public Action0 call(Action0 action0) {
-            return () -> instrumenter.apply(action0::call);
+            return () -> instrumenter.apply(action0::call).run();
         }
     }
 }

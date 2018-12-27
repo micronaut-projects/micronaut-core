@@ -64,7 +64,7 @@ public class JsonConfigurationMetadataWriter implements ConfigurationMetadataWri
      * @return The file name
      */
     protected String getFileName() {
-        return "configuration-metadata.json";
+        return "spring-configuration-metadata.json";
     }
 
     private void writeMetadata(String attr, List<? extends Writable> configurations, Writer writer) throws IOException {

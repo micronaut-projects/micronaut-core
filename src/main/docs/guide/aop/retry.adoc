@@ -20,7 +20,7 @@ With the above example if the `listBooks()` method throws an exception it will b
 
 The `multiplier` value of the `@Retryable` annotation can be used to configure a multiplier used to calculate the delay between retries, thus allowing exponential retry support.
 
-Note also that the `@Retryable` annotation can be applied on interfaces and the behaviour will be inherited through annotation metadata. The implication of this is that `@Retryable` can be used in combination with <<introductionAdvice, Introduction Advice>> such as the HTTP api:http.client.Client[] annotation.
+Note also that the `@Retryable` annotation can be applied on interfaces and the behaviour will be inherited through annotation metadata. The implication of this is that `@Retryable` can be used in combination with <<introductionAdvice, Introduction Advice>> such as the HTTP api:http.client.annotation.Client[] annotation.
 
 To customize retry behaviour you can set the `attempts` and `delay` members, For example to configure 5 attempts with a 2 second delay:
 

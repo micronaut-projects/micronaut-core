@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpContentCompressor;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -38,8 +39,27 @@ import java.util.List;
 @Internal
 public class SmartHttpContentCompressor extends HttpContentCompressor {
 
-    private static final int LENGTH_1KB = 1024;
     private boolean skipEncoding = false;
+    private final int compressionThreshold;
+
+    /**
+     * Creates a SmartHttpContentCompressor with the given threshold.
+     *
+     * @param compressionThreshold The compression threshold. Files below this size will not be compressed
+     */
+    SmartHttpContentCompressor(int compressionThreshold) {
+        this.compressionThreshold = compressionThreshold;
+    }
+
+    /**
+     * Creates a SmartHttpContentCompressor with the default compression threshold.
+     *
+     * @see #SmartHttpContentCompressor(int)
+     */
+    @Internal
+    public SmartHttpContentCompressor() {
+        this(NettyHttpServerConfiguration.DEFAULT_COMPRESSIONTHRESHOLD);
+    }
 
     /**
      * Determines if encoding should occur based on the content type and length.
@@ -48,11 +68,11 @@ public class SmartHttpContentCompressor extends HttpContentCompressor {
      * @param contentLength The content length
      * @return True if the content is compressible and larger than 1KB
      */
-    public static boolean shouldSkip(@Nullable String contentType, @Nullable Integer contentLength) {
+    public boolean shouldSkip(@Nullable String contentType, @Nullable Integer contentLength) {
         if (contentType == null) {
             return true;
         }
-        return !MediaType.isTextBased(contentType) || (contentLength != null && contentLength >= 0 && contentLength < LENGTH_1KB);
+        return !MediaType.isTextBased(contentType) || (contentLength != null && contentLength >= 0 && contentLength < compressionThreshold);
     }
 
     /**
@@ -61,7 +81,7 @@ public class SmartHttpContentCompressor extends HttpContentCompressor {
      * @param headers The headers that contain the content type and length
      * @return True if the content is compressible and larger than 1KB
      */
-    public static boolean shouldSkip(HttpHeaders headers) {
+    public boolean shouldSkip(HttpHeaders headers) {
         return shouldSkip(headers.get(HttpHeaderNames.CONTENT_TYPE), headers.getInt(HttpHeaderNames.CONTENT_LENGTH));
     }
 

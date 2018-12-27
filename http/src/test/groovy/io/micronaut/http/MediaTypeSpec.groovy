@@ -64,6 +64,7 @@ class MediaTypeSpec extends Specification {
         "text/html;charset=utf-8"    | true
         "text/foo"                   | true
         "application/hal+text"       | true
+        "application/javascript"     | true
         "image/png"                  | false
         "image/jpg"                  | false
         "multipart/form-data"        | false

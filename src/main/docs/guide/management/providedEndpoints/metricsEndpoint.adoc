@@ -138,10 +138,9 @@ To configure the metrics endpoint, supply configuration through `endpoints.metri
 [source,yaml]
 ----
 endpoints:
-  metrics:
-    enabled: Boolean
-    sensitive: Boolean
-    id: String
+    metrics:
+        enabled: Boolean
+        sensitive: Boolean
 ----
 
 == Metric Concepts

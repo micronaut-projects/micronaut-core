@@ -172,6 +172,16 @@ public class AnnotationValueBuilder<T extends Annotation> {
     }
 
     /**
+     * Sets the value member to the given type objects.
+     *
+     * @param types The type[]
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T> values(@Nullable AnnotationClassValue<?>... types) {
+        return member(AnnotationMetadata.VALUE_MEMBER, types);
+    }
+
+    /**
      * Sets the value member to the given annotation value.
      *
      * @param annotation The annotation
@@ -320,7 +330,7 @@ public class AnnotationValueBuilder<T extends Annotation> {
      */
     public AnnotationValueBuilder<T> member(String name, @Nullable Class<?> type) {
         if (type != null) {
-            values.put(name, type);
+            values.put(name, new AnnotationClassValue<>(type));
         }
         return this;
     }
@@ -334,7 +344,12 @@ public class AnnotationValueBuilder<T extends Annotation> {
      */
     public AnnotationValueBuilder<T> member(String name, @Nullable Class<?>... types) {
         if (types != null) {
-            values.put(name, types);
+            AnnotationClassValue[] classValues = new AnnotationClassValue[types.length];
+            for (int i = 0; i < types.length; i++) {
+                Class<?> type = types[i];
+                classValues[i] = new AnnotationClassValue<>(type);
+            }
+            values.put(name, classValues);
         }
         return this;
     }
@@ -367,4 +382,17 @@ public class AnnotationValueBuilder<T extends Annotation> {
         return this;
     }
 
+    /**
+     * Sets the value member to the given annotation class values.
+     *
+     * @param name The name of the member
+     * @param classValues The annotation[]
+     * @return This builder
+     */
+    public AnnotationValueBuilder<T> member(String name, @Nullable AnnotationClassValue<?>... classValues) {
+        if (classValues != null) {
+            values.put(name, classValues);
+        }
+        return this;
+    }
 }

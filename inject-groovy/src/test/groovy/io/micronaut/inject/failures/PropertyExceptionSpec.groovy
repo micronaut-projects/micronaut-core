@@ -40,7 +40,7 @@ class PropertyExceptionSpec extends Specification {
         then:"The implementation is injected"
         def e = thrown(BeanInstantiationException)
         e.cause.message == 'bad'
-        e.message == '''\
+        e.message.normalize() == '''\
 Error instantiating bean of type  [io.micronaut.inject.failures.PropertyExceptionSpec$B]
 
 Message: bad

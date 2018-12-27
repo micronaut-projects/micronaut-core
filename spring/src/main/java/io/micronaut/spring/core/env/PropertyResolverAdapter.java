@@ -45,6 +45,13 @@ public class PropertyResolverAdapter implements PropertyResolver {
         this.placeholderResolver = placeholderResolver;
     }
 
+    /**
+     * @return The micronaut property resolver
+     */
+    public io.micronaut.core.value.PropertyResolver getPropertyResolver() {
+        return propertyResolver;
+    }
+
     @Override
     public boolean containsProperty(String key) {
         return propertyResolver.getProperty(NameUtils.hyphenate(key), String.class).isPresent();

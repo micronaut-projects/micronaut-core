@@ -116,7 +116,7 @@ The above method responds to the following request:
 
 [source,bash]
 ----
-$ curl -X POST http://localhost:65013/message -H 'Content-Type: application/json' -d $'{"newMessage": "A new message"}'
+$ curl -X POST http://localhost:65013/message -H 'Content-Type: application/x-www-form-urlencoded' -d $'newMessage=A new message'
 
 Message updated
 ----

@@ -24,7 +24,8 @@ import com.nimbusds.jose.JWEEncrypter;
 import com.nimbusds.jose.crypto.ECDHDecrypter;
 import com.nimbusds.jose.crypto.ECDHEncrypter;
 import io.micronaut.security.token.jwt.encryption.AbstractEncryptionConfiguration;
-import javax.validation.constraints.NotNull;
+
+import javax.annotation.Nonnull;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 
@@ -79,7 +80,7 @@ public class ECEncryption extends AbstractEncryptionConfiguration {
      * @return Instance of {@link ECDHEncrypter}
      * @throws JOSEException if the {@link ECDHEncrypter} cannot be intantiated
      */
-    protected JWEEncrypter buildEncrypterWithPublicKey(@NotNull ECPublicKey publicKey) throws JOSEException {
+    protected JWEEncrypter buildEncrypterWithPublicKey(@Nonnull ECPublicKey publicKey) throws JOSEException {
         return new ECDHEncrypter(publicKey);
     }
 

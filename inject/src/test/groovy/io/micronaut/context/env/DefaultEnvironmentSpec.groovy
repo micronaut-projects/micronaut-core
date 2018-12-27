@@ -18,6 +18,7 @@ package io.micronaut.context.env
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.naming.NameUtils
 import spock.lang.Specification
+import spock.util.environment.RestoreSystemProperties
 
 /**
  * Created by graemerocher on 12/06/2017.
@@ -33,7 +34,6 @@ class DefaultEnvironmentSpec extends Specification {
         env.getProperty("test.foo.bar", Integer).get() == 10
         env.getRequiredProperty("test.foo.bar", Integer) == 10
         env.getProperty("test.foo.bar", Integer, 20) == 10
-        env.getProperty("user", String).isPresent()
 
         cleanup:
         System.setProperty("test.foo.bar", "")
@@ -281,6 +281,50 @@ class DefaultEnvironmentSpec extends Specification {
         System.clearProperty("foo.test")
         System.clearProperty("foo.baz")
         System.clearProperty("micronaut.config.files")
+    }
+
+    @RestoreSystemProperties
+    def "constructor(String... names) should preserve order specified in micronaut.environments system property"() {
+        given: "set environments system property"
+        System.setProperty('micronaut.environments', 'cloud, ec2, foo, bar, foo,baz,ec2,cloud,cloud')
+
+        and: "setup environment"
+        def env = new DefaultEnvironment("x", "x", "y")
+
+        when: "create environment and fetch active env names"
+        def envNames = env.getActiveNames().toList()
+
+        then: "env names should be in the same order as defined in micronaut.environment variable, with test env first"
+        envNames == ["test", "cloud", "ec2", "foo", "bar", "baz", "x", "y"]
+    }
+
+    @RestoreSystemProperties
+    void "test environments supplied should be a higher priority than deduced and system property"() {
+        when:
+        def env = new DefaultEnvironment()
+
+        then:
+        env.activeNames.size() == 1
+        env.activeNames[0] == "test"
+
+        when:
+        env = new DefaultEnvironment("explicit")
+
+        then:
+        env.activeNames.size() == 2
+        env.activeNames[0] == "test"
+        env.activeNames[1] == "explicit"
+
+        when:
+        System.setProperty("micronaut.environments", "system,property")
+        env = new DefaultEnvironment("explicit")
+
+        then:
+        env.activeNames.size() == 4
+        env.activeNames[0] == "test"
+        env.activeNames[1] == "system"
+        env.activeNames[2] == "property"
+        env.activeNames[3] == "explicit"
     }
 
     private static Environment startEnv(String files) {

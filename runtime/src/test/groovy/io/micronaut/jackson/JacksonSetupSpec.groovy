@@ -16,11 +16,13 @@
 package io.micronaut.jackson
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.PropertyNamingStrategy
 import com.fasterxml.jackson.databind.SerializationFeature
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
 import spock.lang.Specification
+import spock.lang.Unroll
 
 /**
  * Created by graemerocher on 31/08/2017.
@@ -34,8 +36,10 @@ class JacksonSetupSpec extends Specification {
 
         expect:
         applicationContext.containsBean(ObjectMapper.class)
+
         applicationContext.containsBean(JacksonConfiguration)
-        applicationContext.getBean(ObjectMapper.class).valueToTree([foo:'bar']).get('foo').textValue() == 'bar'
+        applicationContext.getBean(ObjectMapper.class).valueToTree([foo: 'bar']).get('foo').textValue() == 'bar'
+        !applicationContext.getBean(JacksonConfiguration).propertyNamingStrategy
 
         cleanup:
         applicationContext?.close()
@@ -47,21 +51,46 @@ class JacksonSetupSpec extends Specification {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
-                'jackson.dateFormat':'yyMMdd',
-                'jackson.serialization.indentOutput':true,
-//                'jackson.deserialization.UNWRAP_ROOT_VALUE': true
+                'jackson.dateFormat': 'yyMMdd',
+                'jackson.serialization.indentOutput': true
         ))
         applicationContext.start()
 
         expect:
         applicationContext.containsBean(ObjectMapper.class)
+        applicationContext.getBean(ObjectMapper.class).valueToTree([foo: 'bar']).get('foo').textValue() == 'bar'
+
         applicationContext.containsBean(JacksonConfiguration)
         applicationContext.getBean(JacksonConfiguration).dateFormat == 'yyMMdd'
         applicationContext.getBean(JacksonConfiguration).serializationSettings.get(SerializationFeature.INDENT_OUTPUT)
-//        applicationContext.getBean(JacksonConfiguration).deserializationSettings.get(DeserializationFeature.UNWRAP_ROOT_VALUE)
-        applicationContext.getBean(ObjectMapper.class).valueToTree([foo:'bar']).get('foo').textValue() == 'bar'
 
         cleanup:
         applicationContext?.close()
+    }
+
+    @Unroll
+    void 'Configuring #configuredJackonPropertyNamingStrategy sets PropertyNamingStrategy on the Context ObjectMapper.'() {
+        when:
+        ApplicationContext applicationContext = ApplicationContext.run(MapPropertySource.of(
+                'jackson.property-naming-strategy': configuredJackonPropertyNamingStrategy.toString()
+        ))
+
+        then:
+        applicationContext.containsBean(JacksonConfiguration)
+        applicationContext.getBean(JacksonConfiguration).propertyNamingStrategy == expectedPropertyNamingStrategy
+
+        applicationContext.containsBean(ObjectMapper.class)
+        applicationContext.getBean(ObjectMapper.class).getPropertyNamingStrategy() == expectedPropertyNamingStrategy
+
+        cleanup:
+        applicationContext?.close()
+
+        where:
+        configuredJackonPropertyNamingStrategy | expectedPropertyNamingStrategy
+        'SNAKE_CASE'                           | PropertyNamingStrategy.SNAKE_CASE
+        'UPPER_CAMEL_CASE'                     | PropertyNamingStrategy.UPPER_CAMEL_CASE
+        'LOWER_CAMEL_CASE'                     | PropertyNamingStrategy.LOWER_CAMEL_CASE
+        'LOWER_CASE'                           | PropertyNamingStrategy.LOWER_CASE
+        'KEBAB_CASE'                           | PropertyNamingStrategy.KEBAB_CASE
     }
 }

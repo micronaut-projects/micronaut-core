@@ -36,6 +36,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.*;
+import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
@@ -827,8 +828,12 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         traceBody("Response", byteBuf);
                     }
                     ByteBuffer<?> byteBuffer = byteBufferFactory.wrap(byteBuf);
-                    nettyStreamedHttpResponse.setBody(byteBuffer);
-                    return nettyStreamedHttpResponse;
+                    return new HttpResponseWrapper<ByteBuffer<?>>(nettyStreamedHttpResponse) {
+                        @Override
+                        public Optional<ByteBuffer<?>> getBody() {
+                            return Optional.of(byteBuffer);
+                        }
+                    };
                 });
             });
         };
@@ -982,7 +987,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             Channel channel = (Channel) future.get();
                             try {
                                 sendRequestThroughChannel(
-                                        requestURI,
                                         requestWrapper,
                                         bodyType,
                                         errorType,
@@ -1009,7 +1013,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                             try {
                                 Channel channel = connectionFuture.channel();
                                 sendRequestThroughChannel(
-                                        requestURI,
                                         requestWrapper,
                                         bodyType,
                                         errorType,
@@ -1344,6 +1347,9 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
             Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher) {
 
+        if (request instanceof MutableHttpRequest) {
+            ((MutableHttpRequest<I>) request).uri(requestURI);
+        }
         if (CollectionUtils.isNotEmpty(filters)) {
             List<HttpClientFilter> httpClientFilters = resolveFilters(parentRequest, request, requestURI);
             OrderUtil.reverseSort(httpClientFilters);
@@ -1386,8 +1392,13 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             boolean hasBody = body.isPresent();
             if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) && hasBody) {
                 Object bodyValue = body.get();
-                postRequestEncoder = buildFormDataRequest(clientHttpRequest, bodyValue);
-                nettyRequest = postRequestEncoder.finalizeRequest();
+                if (bodyValue instanceof CharSequence) {
+                    ByteBuf byteBuf = charSequenceToByteBuf((CharSequence) bodyValue, requestContentType);
+                    nettyRequest = clientHttpRequest.getFullRequest(byteBuf);
+                } else {
+                    postRequestEncoder = buildFormDataRequest(clientHttpRequest, bodyValue);
+                    nettyRequest = postRequestEncoder.finalizeRequest();
+                }
             } else if (requestContentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE) && hasBody) {
                 Object bodyValue = body.get();
                 postRequestEncoder = buildMultipartRequest(clientHttpRequest, bodyValue);
@@ -1494,7 +1505,6 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     private <I, O, E> void sendRequestThroughChannel(
-            URI requestURI,
             AtomicReference<io.micronaut.http.HttpRequest> requestWrapper,
             Argument<O> bodyType,
             Argument<E> errorType,
@@ -1502,6 +1512,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             Channel channel,
             ChannelPool channelPool) throws HttpPostRequestEncoder.ErrorDataEncoderException {
         io.micronaut.http.HttpRequest<I> finalRequest = requestWrapper.get();
+        URI requestURI = finalRequest.getUri();
         MediaType requestContentType = finalRequest
                 .getContentType()
                 .orElse(MediaType.APPLICATION_JSON_TYPE);
@@ -1641,9 +1652,20 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         ).asNativeBuffer();
     }
 
+    private String getHostHeader(URI requestURI) {
+        StringBuilder host = new StringBuilder(requestURI.getHost());
+        int port = requestURI.getPort();
+        if (port > -1) {
+            if (port != 80 && port != 443) {
+                host.append(":").append(port);
+            }
+        }
+        return host.toString();
+    }
+
     private <I> void prepareHttpHeaders(URI requestURI, io.micronaut.http.HttpRequest<I> request, io.netty.handler.codec.http.HttpRequest nettyRequest, boolean permitsBody, boolean closeConnection) {
         HttpHeaders headers = nettyRequest.headers();
-        headers.set(HttpHeaderNames.HOST, requestURI.getHost());
+        headers.set(HttpHeaderNames.HOST, getHostHeader(requestURI));
 
         if (closeConnection) {
             headers.set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
@@ -1676,7 +1698,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             Emitter<io.micronaut.http.HttpResponse<O>> emitter,
             Argument<O> bodyType, Argument<E> errorType) {
         ChannelPipeline pipeline = channel.pipeline();
-        pipeline.addLast(HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, new SimpleChannelInboundHandler<FullHttpResponse>() {
+        pipeline.addLast(HANDLER_MICRONAUT_FULL_HTTP_RESPONSE, new SimpleChannelInboundHandler<FullHttpResponse>(false) {
 
             AtomicBoolean complete = new AtomicBoolean(false);
 
@@ -1751,7 +1773,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                     }
                 } finally {
                     pipeline.remove(this);
-                    if (fullResponse.refCnt() > 1) {
+                    if (fullResponse.refCnt() > 0) {
                         try {
                             ReferenceCountUtil.release(fullResponse);
                         } catch (Throwable e) {
@@ -1830,13 +1852,24 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         for (Map.Entry<String, Object> entry : formData.entrySet()) {
             Object value = entry.getValue();
             if (value != null) {
-                Optional<String> converted = ConversionService.SHARED.convert(value, String.class);
-                if (converted.isPresent()) {
-                    postRequestEncoder.addBodyAttribute(entry.getKey(), converted.get());
+                if (value instanceof Collection) {
+                    Collection collection = (Collection) value;
+                    for (Object val: collection) {
+                        addBodyAttribute(postRequestEncoder, entry.getKey(), val);
+                    }
+                } else {
+                    addBodyAttribute(postRequestEncoder, entry.getKey(), value);
                 }
             }
         }
         return postRequestEncoder;
+    }
+
+    private void addBodyAttribute(HttpPostRequestEncoder postRequestEncoder, String key, Object value) throws HttpPostRequestEncoder.ErrorDataEncoderException {
+        Optional<String> converted = ConversionService.SHARED.convert(value, String.class);
+        if (converted.isPresent()) {
+            postRequestEncoder.addBodyAttribute(key, converted.get());
+        }
     }
 
     private HttpPostRequestEncoder buildMultipartRequest(NettyClientHttpRequest clientHttpRequest, Object bodyValue) throws HttpPostRequestEncoder.ErrorDataEncoderException {
@@ -1895,7 +1928,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     }
 
     private static MediaTypeCodecRegistry createDefaultMediaTypeRegistry() {
-        ObjectMapper objectMapper = new ObjectMapperFactory().objectMapper(Optional.empty(), Optional.empty());
+        ObjectMapper objectMapper = new ObjectMapperFactory().objectMapper(null, null);
         ApplicationConfiguration applicationConfiguration = new ApplicationConfiguration();
         return MediaTypeCodecRegistry.of(
                 new JsonMediaTypeCodec(objectMapper, applicationConfiguration, null), new JsonStreamMediaTypeCodec(objectMapper, applicationConfiguration, null)

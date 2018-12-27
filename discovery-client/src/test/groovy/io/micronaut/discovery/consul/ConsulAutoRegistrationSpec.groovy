@@ -16,9 +16,14 @@
 package io.micronaut.discovery.consul
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.discovery.DiscoveryClient
 import io.micronaut.discovery.ServiceInstance
+import io.micronaut.discovery.aws.route53.AWSServiceDiscoveryClientResolver
+import io.micronaut.discovery.aws.route53.Route53AutoRegistrationConfiguration
+import io.micronaut.discovery.aws.route53.Route53DiscoveryConfiguration
 import io.micronaut.discovery.consul.client.v1.ConsulClient
+import io.micronaut.discovery.eureka.EurekaConfiguration
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import org.testcontainers.containers.GenericContainer
@@ -181,5 +186,32 @@ class ConsulAutoRegistrationSpec extends Specification {
         cleanup:
         anotherClient.close()
         discoveryClient.close()
+    }
+
+    void "test that when Consul is explicitly configured, no AWS service discovery stuff is registered"() {
+        when: "A new server is bootstrapped"
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
+            ['micronaut.application.name': 'test-consul-aws',
+             'consul.client.host'        : consulHost,
+             'consul.client.port'        : consulPort],
+            Environment.AMAZON_EC2, Environment.TEST, Environment.CLOUD
+        )
+
+        then: "there is a consul client in the application context"
+        embeddedServer.applicationContext.containsBean(ConsulClient)
+        embeddedServer.applicationContext.containsBean(ConsulConfiguration.ConsulRegistrationConfiguration)
+        embeddedServer.applicationContext.containsBean(ConsulConfiguration.ConsulDiscoveryConfiguration)
+
+        and: "those beans doesn't exist"
+        !embeddedServer.applicationContext.containsBean(Route53AutoRegistrationConfiguration)
+        !embeddedServer.applicationContext.containsBean(EurekaConfiguration.EurekaRegistrationConfiguration)
+
+        !embeddedServer.applicationContext.containsBean(Route53DiscoveryConfiguration)
+        !embeddedServer.applicationContext.containsBean(EurekaConfiguration.EurekaDiscoveryConfiguration)
+
+        !embeddedServer.applicationContext.containsBean(AWSServiceDiscoveryClientResolver)
+
+        cleanup:
+        embeddedServer.stop()
     }
 }

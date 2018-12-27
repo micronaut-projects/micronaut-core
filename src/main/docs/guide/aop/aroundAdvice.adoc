@@ -1,4 +1,4 @@
-The most common type of advice you may want to apply is "Around" advice, which essentially allows you decorate a methods behaviour.
+The most common type of advice you may want to apply is "Around" advice, which essentially allows you to decorate a methods behaviour.
 
 == Writing Around Advice
 
@@ -43,7 +43,7 @@ With the interceptor and annotation implemented you can then simply apply the an
 include::{testsjava}/aop/around/NotNullExample.java[tags=example, indent=0]
 ----
 
-Whenever the type `NotNullExample` is injected into any class a compile time generated proxy will instead by injected that decorates the appropriate method calls with the `@NotNull` advice defined earlier. You can verify that the advice works by writing a test. The following test uses a JUnit `ExpectedException` rule to verify the appropriate exception is thrown when an argument is `null`:
+Whenever the type `NotNullExample` is injected into any class, a compile time generated proxy will instead be injected that decorates the appropriate method calls with the `@NotNull` advice defined earlier. You can verify that the advice works by writing a test. The following test uses a JUnit `ExpectedException` rule to verify the appropriate exception is thrown when an argument is `null`:
 
 .Around Advice Test
 [source,java]
@@ -51,7 +51,7 @@ Whenever the type `NotNullExample` is injected into any class a compile time gen
 include::{testsjava}/aop/around/AroundTest.java[tags=test, indent=0]
 ----
 
-NOTE: Since Micronaut is compile time, generally the advice should be packaged in a dependent JAR file that is on the classpath when the above test is compiled and should not be in the same codebase since you don't want the test compiling before the advice itself is compiled.
+NOTE: Since Micronaut injection is done at compile time, generally the advice should be packaged in a dependent JAR file that is on the classpath when the above test is compiled and should not be in the same codebase since you don't want the test to be compiled before the advice itself is compiled.
 
 == Customizing Proxy Generation
 
@@ -62,3 +62,50 @@ This behaviour is more efficient as only one instance of the bean is required, h
 * `proxyTarget` (defaults to `false`) - If set to `true` instead of a subclass that calls `super`, the proxy will delegate to the original bean instance
 * `hotswap` (defaults to `false`) - Same as `proxyTarget=true`, but in addition the proxy will implement link:{api}/io/micronaut/aop/HotSwappableInterceptedProxy.html[HotSwappableInterceptedProxy] which wraps each method call in a `ReentrantReadWriteLock` and allows swapping the target instance at runtime.
 * `lazy` (defaults to `false`) - By default Micronaut will eagerly intialize the proxy target when the proxy is created. If set to `true` the proxy target will instead be resolved lazily for each method call.
+
+== AOP Advice on @Factory Beans
+
+The semantics of AOP advice when applied to <<factories,Bean Factories>> differs to regular beans, with the following rules applying:
+
+1. AOP advice applied at the class level of a ann:context.annotation.Factory[] bean will apply the advice to the factory itself and not to any beans defined with the ann:context.annotation.Bean[] annotation.
+2. AOP advice applied on a method annotated with ann:context.annotation.Bean[] will apply the AOP advice to the bean that the factory produces.
+
+Consider the following two examples:
+
+.AOP Advice at the type level of a `@Factory`
+[source,java]
+----
+@Cacheable("my-cache")
+@Factory
+class MyFactory {
+
+    @Bean
+    MyBean myBean() {
+        return new MyBean();
+    }
+}
+----
+
+The above example will cache creation of `MyBean` bean, according to the semantics defined by the ann:cache.annotation.Cacheable[] cache configuration.
+
+Now consider this example:
+
+.AOP Advice at the method level of a `@Factory`
+[source,java]
+----
+@Factory
+class MyFactory {
+
+    @Bean
+    @Cacheable("my-cache")
+    MyBean myBean() {
+        return new MyBean();
+    }
+}
+----
+
+The above example will cache all of the public methods of the `MyBean` bean, but not the bean creation.
+
+The rationale for this behaviour is that you may at times wish to apply advice to a factory and at other times apply advice to the bean produced by the factory.
+
+Note that there is currently no way to apply advice at the method level to a ann:context.annotation.Factory[] bean and all advice for factories must be applied at the type level. You can control which methods have advice applied by defining methods as non-public (non-public methods do not have advice applied).

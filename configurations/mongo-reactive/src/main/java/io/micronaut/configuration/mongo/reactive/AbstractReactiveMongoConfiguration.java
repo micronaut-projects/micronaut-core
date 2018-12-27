@@ -16,6 +16,7 @@
 
 package io.micronaut.configuration.mongo.reactive;
 
+import static org.bson.codecs.configuration.CodecRegistries.fromCodecs;
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
@@ -29,12 +30,15 @@ import com.mongodb.connection.SslSettings;
 import com.mongodb.connection.netty.NettyStreamFactoryFactory;
 import com.mongodb.reactivestreams.client.MongoClients;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.ApplicationConfiguration;
+import org.bson.codecs.Codec;
+import org.bson.codecs.configuration.CodecRegistry;
 import org.bson.codecs.pojo.PojoCodecProvider;
 
 import javax.validation.constraints.NotBlank;
-import java.util.Optional;
+import java.util.*;
 
 /**
  * Abstract Mongo configuration type.
@@ -47,6 +51,10 @@ public abstract class AbstractReactiveMongoConfiguration {
     private String uri;
 
     private final ApplicationConfiguration applicationConfiguration;
+    private List<Codec<?>> codecList = Collections.emptyList();
+    private List<CodecRegistry> codecRegistries = Collections.emptyList();
+    private Collection<String> packageNames;
+    private boolean automaticClassModels = true;
 
     /**
      * Constructor.
@@ -54,6 +62,56 @@ public abstract class AbstractReactiveMongoConfiguration {
      */
     protected AbstractReactiveMongoConfiguration(ApplicationConfiguration applicationConfiguration) {
         this.applicationConfiguration = applicationConfiguration;
+    }
+
+    /**
+     * Additional codecs to register.
+     *
+     * @param codecList The list of codecs
+     */
+    public void codecs(List<Codec<?>> codecList) {
+        if (codecList != null) {
+            this.codecList = codecList;
+        }
+    }
+
+    /**
+     * Additional codecs to register.
+     *
+     * @param codecRegistries The list of codecs
+     */
+    public void codecRegistries(List<CodecRegistry> codecRegistries) {
+        if (codecRegistries != null) {
+            this.codecRegistries = codecRegistries;
+        }
+    }
+
+    /**
+     * Additional codecs to register.
+     *
+     * @param packageNames The package names
+     */
+    public void packages(Collection<String> packageNames) {
+        if (packageNames != null) {
+            this.packageNames = packageNames;
+        }
+    }
+
+
+    /**
+     * The configured codecs.
+     * @return The codecs
+     */
+    public List<Codec<?>> getCodecs() {
+        return codecList;
+    }
+
+    /**
+     * The configured codec registries.
+     * @return The registries
+     */
+    public List<CodecRegistry> getCodecRegistries() {
+        return codecRegistries;
     }
 
     /**
@@ -85,6 +143,23 @@ public abstract class AbstractReactiveMongoConfiguration {
             getSslSettings().applyConnectionString(cs);
             getSocketSettings().applyConnectionString(cs);
         }
+    }
+
+    /**
+     * The package names to allow for POJOs.
+     *
+     * @param packageNames The package names
+     */
+    public void setPackageNames(Collection<String> packageNames) {
+        this.packageNames = packageNames;
+    }
+
+    /**
+     * Whether to allow automatic class models (defaults to true).
+     * @param automaticClassModels True if automatic class models should be allowed
+     */
+    public void setAutomaticClassModels(boolean automaticClassModels) {
+        this.automaticClassModels = automaticClassModels;
     }
 
     /**
@@ -145,10 +220,30 @@ public abstract class AbstractReactiveMongoConfiguration {
         clientSettings.applyToSocketSettings(builder -> builder.applySettings(socketSettings.build()));
         clientSettings.applyToSslSettings(builder -> builder.applySettings(sslSettings.build()));
 
-        clientSettings.codecRegistry(
-            fromRegistries(MongoClients.getDefaultCodecRegistry(),
-                fromProviders(PojoCodecProvider.builder().automatic(true).build()))
+        List<CodecRegistry> codecRegistries = new ArrayList<>();
+        codecRegistries.add(MongoClients.getDefaultCodecRegistry());
 
+        if (this.codecRegistries != null) {
+            codecRegistries.addAll(this.codecRegistries);
+        }
+        if (codecList != null) {
+            codecRegistries.add(fromCodecs(codecList));
+        }
+
+        final PojoCodecProvider.Builder builder = PojoCodecProvider.builder();
+
+        if (CollectionUtils.isNotEmpty(packageNames)) {
+            builder.register(packageNames.toArray(new String[0]));
+        }
+
+        codecRegistries.add(
+                fromProviders(
+                        builder.automatic(automaticClassModels).build()
+                )
+        );
+
+        clientSettings.codecRegistry(
+            fromRegistries(codecRegistries)
         );
         return clientSettings.build();
     }

@@ -16,6 +16,7 @@
 package io.micronaut.docs.server.intro
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 
 
 // tag::imports[]
@@ -27,11 +28,23 @@ import spock.lang.*
  * @author graemerocher
  * @since 1.0
  */
-// tag::class[]
+//tag::class-init[]
 class HelloClientSpec extends Specification {
-    @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer) // <1>
+//end::class-init[]
 
+    @Shared @AutoCleanup EmbeddedServer embeddedServer =
+            ApplicationContext.run(EmbeddedServer, [
+                    'spec.name': 'HelloControllerSpec',
+                    'spec.lang': 'java',
+            ], Environment.TEST)
+    /*
+//tag::embeddedServer[]
+    @Shared @AutoCleanup EmbeddedServer embeddedServer =
+        ApplicationContext.run(EmbeddedServer) // <1>
+//end::embeddedServer[]
+     */
+
+//tag::class-end[]
     @Shared HelloClient client = embeddedServer
                                         .applicationContext
                                         .getBean(HelloClient) // <2>
@@ -43,4 +56,4 @@ class HelloClientSpec extends Specification {
     }
 
 }
-// end::class[]
+// end::class-end[]

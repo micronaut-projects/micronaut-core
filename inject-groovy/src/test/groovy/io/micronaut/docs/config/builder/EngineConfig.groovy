@@ -36,5 +36,12 @@ class EngineConfig {
 
     @ConfigurationBuilder(prefixes = "with", configurationPrefix = "crank-shaft") // <3>
     CrankShaft.Builder crankShaft = CrankShaft.builder()
+
+    SparkPlug.Builder sparkPlug = SparkPlug.builder()
+
+    @ConfigurationBuilder(prefixes = "with", configurationPrefix = "spark-plug")
+    void setSparkPlug(SparkPlug.Builder sparkPlug) {
+        this.sparkPlug = sparkPlug
+    }
 }
 // end::class[]

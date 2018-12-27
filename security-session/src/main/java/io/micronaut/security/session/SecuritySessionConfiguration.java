@@ -54,4 +54,10 @@ public interface SecuritySessionConfiguration extends Toggleable {
      * @return String to be parsed into a URI which represents where the user is redirected to after trying to access a secured route for which the does not have sufficient roles.
      */
     String getForbiddenTargetUrl();
+
+    /**
+     *
+     * @return If true the deprecated {@link SessionSecurityFilterOrderProvider} is loaded, instead of the new {@link io.micronaut.security.handlers.RedirectRejectionHandler}
+     */
+    boolean isLegacyRejectionHandler();
 }

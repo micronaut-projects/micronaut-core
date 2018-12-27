@@ -21,6 +21,8 @@ import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.views.ViewsConfiguration;
@@ -32,6 +34,7 @@ import org.thymeleaf.context.IContext;
 import org.thymeleaf.exceptions.TemplateEngineException;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
 import java.util.HashMap;
@@ -48,7 +51,7 @@ import java.util.Map;
  * @since 1.0
  */
 @Produces(MediaType.TEXT_HTML)
-@Requires(property = ThymeleafViewsRendererConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
+@Requires(property = ThymeleafViewsRendererConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 @Requires(classes = TemplateEngine.class)
 @Singleton
 public class ThymeleafViewsRenderer implements ViewsRenderer {
@@ -73,7 +76,9 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
     }
 
     @Override
-    public Writable render(String viewName, @Nullable Object data) {
+    @Nonnull
+    public Writable render(@Nonnull String viewName, @Nullable Object data) {
+        ArgumentUtils.requireNonNull("viewName", viewName);
         return (writer) -> {
             final IContext context = new Context(Locale.US, variables(data));
             try {
@@ -85,7 +90,7 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
     }
 
     @Override
-    public boolean exists(String viewName) {
+    public boolean exists(@Nonnull String viewName) {
         String location = viewLocation(viewName);
         return resourceLoader.getResourceAsStream(location).isPresent();
     }
@@ -100,10 +105,7 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
                                                                    ThymeleafViewsRendererConfiguration thConfiguration) {
         ClassLoaderTemplateResolver templateResolver = new ClassLoaderTemplateResolver();
 
-        String sb = viewsConfiguration.getFolder() +
-                FILE_SEPARATOR;
-        templateResolver.setPrefix(sb);
-
+        templateResolver.setPrefix(normalizeFolder(viewsConfiguration.getFolder()));
         templateResolver.setCharacterEncoding(thConfiguration.getCharacterEncoding());
         templateResolver.setTemplateMode(thConfiguration.getTemplateMode());
         templateResolver.setSuffix(thConfiguration.getSuffix());
@@ -127,18 +129,8 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
     }
 
     private String viewLocation(final String name) {
-        final StringBuilder sb = new StringBuilder();
-        String prefix = templateResolver.getPrefix();
-        if (prefix != null) {
-            sb.append(prefix);
-            if (!prefix.endsWith(FILE_SEPARATOR)) {
-                sb.append(FILE_SEPARATOR);
-            }
-        }
-        sb.append(name.replace("/", FILE_SEPARATOR));
-        if (templateResolver.getSuffix() != null) {
-            sb.append(templateResolver.getSuffix());
-        }
-        return sb.toString();
+        return templateResolver.getPrefix() +
+                normalizeFile(name, templateResolver.getSuffix()) +
+                templateResolver.getSuffix();
     }
 }

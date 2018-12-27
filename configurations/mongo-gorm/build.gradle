@@ -16,5 +16,5 @@ dependencies {
 
     testCompile project(":http-server")
     testCompile project(":http-client")
-    testCompile "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.0.1"
+    testCompile "de.flapdoodle.embed:de.flapdoodle.embed.mongo:2.1.1"
 }

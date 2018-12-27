@@ -7,9 +7,11 @@ dependencies {
     }
 
     shadowCompile dependencyVersion("validation")
+    shadowCompile dependencyVersion("jcache")
     shadowCompile dependencyVersion("jackson")
     shadowCompile dependencyVersion("rxjava2")
 
+    compileOnly dependencyVersion("jcache")
     compile dependencyVersion("validation")
     compile dependencyVersion("jackson")
     compile dependencyVersion("rxjava2")
@@ -23,12 +25,16 @@ dependencies {
         dependencyModuleVersion('jackson.datatype', 'jackson-datatype-jsr310')
     ])
 
+    compileOnly dependencyVersion("methvin.directory-watcher")
+    compileOnly dependencyVersion("jna")
     compileOnly 'org.glassfish:javax.el:3.0.1-b09'
     compileOnly dependencyVersion("reactor")
     compileOnly dependencyVersion("rxjava1.interop")
     compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
     compileOnly project(":inject-java")
 
+    testCompile 'org.jsr107.ri:cache-ri-impl:1.1.0'
+    testCompile dependencyVersion("jcache")
     testCompile dependencyVersion("rxjava1.interop")
     testCompile dependencyVersion("reactor")
     testCompile project(":inject-java")

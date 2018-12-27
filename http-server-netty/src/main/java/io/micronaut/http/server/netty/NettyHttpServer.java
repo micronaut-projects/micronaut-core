@@ -266,7 +266,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
                         pipeline.addLast(new FlowControlHandler());
                         pipeline.addLast(HTTP_KEEP_ALIVE_HANDLER, new HttpServerKeepAliveHandler());
-                        pipeline.addLast(HTTP_COMPRESSOR, new SmartHttpContentCompressor());
+                        pipeline.addLast(HTTP_COMPRESSOR, new SmartHttpContentCompressor(serverConfiguration.getCompressionThreshold()));
                         pipeline.addLast(HTTP_STREAMS_CODEC, new HttpStreamsServerHandler());
                         pipeline.addLast(HTTP_CHUNKED_HANDLER, new ChunkedWriteHandler());
                         pipeline.addLast(HttpRequestDecoder.ID, new HttpRequestDecoder(

@@ -279,7 +279,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
     private JsonNode node(JsonNode node) {
         if (node instanceof ObjectNode) {
             return ((ObjectNode) node).putObject(currentFieldName);
-        } else if (node instanceof ArrayNode) {
+        } else if (node instanceof ArrayNode && !(streamArray && nodeStack.size() == 1)) {
             return ((ArrayNode) node).addObject();
         } else {
             return JsonNodeFactory.instance.objectNode();

@@ -28,6 +28,22 @@ class JavaLambdaFunctionSpec extends Specification {
         embeddedServer.stop()
     }
 
+    void "test string supplier with produces"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange('/java/supplier/xml', String)
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body() == '<hello></hello>'
+        response.contentType.get() == MediaType.TEXT_XML_TYPE
+
+        cleanup:
+        embeddedServer.stop()
+    }
 
     void "test func primitive"() {
         given:
@@ -74,6 +90,22 @@ class JavaLambdaFunctionSpec extends Specification {
         then:
         response.code() == HttpStatus.OK.code
         response.body().name == "Fred Flinstone"
+
+        cleanup:
+        embeddedServer.stop()
+    }
+
+    void "test func xml"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
+        RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange(HttpRequest.POST('/java/function/xml', '<hello></hello>').contentType(MediaType.TEXT_XML_TYPE), String)
+
+        then:
+        response.code() == HttpStatus.OK.code
+        response.body() == "<hello></hello>"
 
         cleanup:
         embeddedServer.stop()

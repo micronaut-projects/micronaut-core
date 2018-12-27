@@ -16,6 +16,8 @@
 
 package io.micronaut.http.server.types.files;
 
+import io.micronaut.http.MediaType;
+
 import java.io.File;
 
 /**
@@ -24,6 +26,7 @@ import java.io.File;
  * @author James Kleeh
  * @since 1.0
  */
+@Deprecated
 public class SystemFileCustomizableResponseType implements FileCustomizableResponseType {
 
     protected final File file;
@@ -48,8 +51,14 @@ public class SystemFileCustomizableResponseType implements FileCustomizableRespo
     }
 
     @Override
+    @Deprecated
     public String getName() {
         return file.getName();
+    }
+
+    @Override
+    public MediaType getMediaType() {
+        return MediaType.forFilename(getName());
     }
 
     @Override

@@ -19,10 +19,8 @@ package io.micronaut.http.server.netty.multipart;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.PartData;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufInputStream;
-import io.netty.buffer.ByteBufUtil;
-import io.netty.handler.codec.http.multipart.FileUpload;
+import io.micronaut.http.server.netty.HttpDataReference;
+import io.netty.buffer.*;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,16 +36,16 @@ import java.util.Optional;
 @Internal
 public class NettyPartData implements PartData {
 
-    private final FileUpload fileUpload;
-    private final Long chunk;
+    private final HttpDataReference httpData;
+    private final HttpDataReference.Component component;
 
     /**
-     * @param fileUpload The file upload
-     * @param chunk      The chunk
+     * @param httpData   The data reference
+     * @param component  The component reference
      */
-    public NettyPartData(FileUpload fileUpload, Long chunk) {
-        this.fileUpload = fileUpload;
-        this.chunk = chunk;
+    public NettyPartData(HttpDataReference httpData, HttpDataReference.Component component) {
+        this.httpData = httpData;
+        this.component = component;
     }
 
     /**
@@ -95,7 +93,7 @@ public class NettyPartData implements PartData {
      */
     @Override
     public Optional<MediaType> getContentType() {
-        return Optional.of(MediaType.of(fileUpload.getContentType()));
+        return httpData.getContentType();
     }
 
     /**
@@ -103,6 +101,6 @@ public class NettyPartData implements PartData {
      * @throws IOException If an error occurs retrieving the buffer
      */
     public ByteBuf getByteBuf() throws IOException {
-        return fileUpload.getChunk(chunk.intValue());
+        return component.getByteBuf();
     }
 }
