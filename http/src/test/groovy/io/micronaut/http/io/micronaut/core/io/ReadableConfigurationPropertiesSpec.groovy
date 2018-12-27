@@ -16,6 +16,7 @@ class ReadableConfigurationPropertiesSpec extends Specification {
         expect:
         myConfig.logbackFile != null
         myConfig.logbackFile.exists()
+        myConfig.logbackFile.asInputStream().text.contains('<configuration>')
 
         cleanup:
         ctx.close()
