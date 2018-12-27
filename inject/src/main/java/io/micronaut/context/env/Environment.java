@@ -140,7 +140,7 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
     String AZURE = "azure";
 
     /**
-     * Cloud provider Digital Ocean
+     * Cloud provider Digital Ocean.
      */
     String DIGITAL_OCEAN = "digitalocean";
     /**
