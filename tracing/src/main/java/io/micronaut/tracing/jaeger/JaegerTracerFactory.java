@@ -40,6 +40,7 @@ import java.io.IOException;
  * @since 1.0
  */
 @Factory
+@Requires(classes = JaegerTracer.Builder.class)
 @Requires(beans = JaegerConfiguration.class)
 public class JaegerTracerFactory implements Closeable {
 
@@ -84,6 +85,7 @@ public class JaegerTracerFactory implements Closeable {
      */
     @Singleton
     @Primary
+    @Requires(classes = JaegerTracer.Builder.class)
     Configuration jaegerConfiguration() {
         return this.configuration.getConfiguration();
     }
@@ -96,6 +98,7 @@ public class JaegerTracerFactory implements Closeable {
      */
     @Singleton
     @Primary
+    @Requires(classes = JaegerTracer.Builder.class)
     JaegerTracer.Builder jaegerTracerBuilder(Configuration configuration) {
         JaegerTracer.Builder tracerBuilder = resolveBuilder(configuration);
         if (this.configuration.isExpandExceptionLogs()) {
@@ -121,6 +124,7 @@ public class JaegerTracerFactory implements Closeable {
      */
     @Singleton
     @Primary
+    @Requires(classes = JaegerTracer.Builder.class)
     Tracer jaegerTracer(JaegerTracer.Builder tracerBuilder) {
         Tracer tracer = tracerBuilder.build();
         if (!GlobalTracer.isRegistered()) {

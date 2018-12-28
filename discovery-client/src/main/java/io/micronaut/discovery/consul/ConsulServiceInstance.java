@@ -138,7 +138,7 @@ public class ConsulServiceInstance implements ServiceInstance {
         for (String tag : tags) {
             int i = tag.indexOf('=');
             if (i > -1) {
-                map.put(tag.substring(0, i), tag.substring(i + 1, tag.length()));
+                map.put(tag.substring(0, i), tag.substring(i + 1));
             }
         }
         return ConvertibleValues.of(map);
