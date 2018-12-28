@@ -1050,7 +1050,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
             // visit the property metadata
             metadataBuilder.visitProperty(
-                    paramTypeRef != null ? paramTypeRef.getClassName() : Boolean.class.getName(),
+                    paramTypeRef != null ? paramTypeRef.getClassName() : boolean.class.getName(),
                     String.join(".", propertyPath),
                     null,
                     null

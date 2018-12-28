@@ -295,14 +295,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             beanDefinitionWriters = new LinkedHashMap<>();
             this.isFactoryType = annotationUtils.hasStereotype(concreteClass, Factory.class);
             this.isConfigurationPropertiesType = isConfigurationProperties(concreteClass);
-            if (isConfigurationPropertiesType) {
-
-                // TODO: populate documentation
-                this.configurationMetadata = metadataBuilder.visitProperties(
-                        concreteClass,
-                        null
-                );
-            }
             this.isAopProxyType = annotationUtils.hasStereotype(concreteClass, AROUND_TYPE) && !modelUtils.isAbstract(concreteClass);
             this.aopSettings = isAopProxyType ? annotationUtils.getAnnotationMetadata(concreteClass).getValues(AROUND_TYPE, Boolean.class) : OptionalValues.empty();
             this.isExecutableType = isAopProxyType || annotationUtils.hasStereotype(concreteClass, Executable.class);
@@ -325,7 +317,14 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         @Override
         public Object visitType(TypeElement classElement, Object o) {
             AnnotationMetadata typeAnnotationMetadata = annotationUtils.getAnnotationMetadata(classElement);
+            if (isConfigurationPropertiesType) {
 
+                // TODO: populate documentation
+                this.configurationMetadata = metadataBuilder.visitProperties(
+                        concreteClass,
+                        null
+                );
+            }
 
             if (annotationUtils.hasStereotype(classElement, INTRODUCTION_TYPE)) {
                 AopProxyWriter aopProxyWriter = createIntroductionAdviceWriter(classElement);
@@ -1429,13 +1428,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     if (paramCount < 2) {
                         VariableElement paramType = paramCount == 1 ? params.get(0) : null;
                         Object expectedType = paramType != null ? modelUtils.resolveTypeReference(paramType.asType()) : null;
-
-                        metadataBuilder.visitProperty(
-                                expectedType != null ? expectedType.toString() : "boolean",
-                                configurationPrefix + '.' + NameUtils.decapitalize(methodName.substring(prefix.length())),
-                                null,
-                                null
-                        );
 
                         writer.visitConfigBuilderMethod(
                                 prefix,
