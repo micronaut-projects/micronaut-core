@@ -1,0 +1,51 @@
+Since 1.1.x, Micronaut supports API versioning via a dedicated ann:core.version.annotation.Version[] annotation.
+
+The following example demonstrates how to version an API:
+
+.Versioning an API
+[source,java]
+----
+include::router/src/test/groovy/io/micronaut/web/router/version/VersionedController.java[tags=imports, indent=0]
+
+include::router/src/test/groovy/io/micronaut/web/router/version/VersionedController.java[tags=clazz, indent=0]
+}
+----
+
+<1> The `helloV1` method is declared as version `1`
+<2> The `helloV2` method is declared as version `2`
+
+You should then enabling versioning by setting `micronaut.router.versioning.enabled` to `true` in `application.yml`:
+
+.Enabling Versioning
+[source,yaml]
+----
+micronaut:
+    router:
+        versioning:
+            enabled: true
+----
+
+By default Micronaut has 2 out-of-the-box strategies for resolving the version that are based on an HTTP header named `X-API-VERSION` or a request parameter named `api-version`, however this is configurable. A full configuration example can be seen below:
+
+.Configuring Versioning
+[source,yaml]
+----
+micronaut:
+    router:
+        versioning:
+            parameter:
+                enabled: false # <1>
+                names: 'v,api-version' # <2>
+            header:
+                enabled: true # <3>
+                names: # <4>
+                    - 'X-API-VERSION'
+                    - 'Accept-Version'
+----
+
+<1> Enables or disables parameter based versioning
+<2> Specify the parameter names as a comma separated list
+<3> Enables or disables header based versioning
+<4> Specify the header names as a YAML list
+
+If this is not enough you can also implement the api:web.router.version.strategy.VersionExtractingStrategy[] interface which receives the api:http.HttpRequest[] and can implement any strategy you choose.
