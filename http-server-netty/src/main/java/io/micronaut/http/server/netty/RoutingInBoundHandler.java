@@ -404,13 +404,39 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 LOG.debug("No matching route found for URI {} and method {}", request.getUri(), httpMethod);
             }
 
-            // if there is no route present try to locate a route that matches a different HTTP method
-            Set<io.micronaut.http.HttpMethod> existingRoutes = router
-                .findAny(request.getUri().toString())
-                .map(UriRouteMatch::getHttpMethod)
-                .collect(Collectors.toSet());
+            // if there is no route present try to locate a route that matches a different content type
+            Set<MediaType> existingRouteConsumes = router
+                    .find(httpMethod, requestPath)
+                    .map(UriRouteMatch::getRoute)
+                    .flatMap(r -> r.getConsumes().stream())
+                    .collect(Collectors.toSet());
 
-            if (!existingRoutes.isEmpty()) {
+            if (!existingRouteConsumes.isEmpty()) {
+                MediaType contentType = request.getContentType().orElse(null);
+                if (contentType != null) {
+                    if (!existingRouteConsumes.contains(contentType)) {
+                        if (LOG.isDebugEnabled()) {
+                            LOG.debug("Content type not allowed for URI {}, method {}, and content type {}", request.getUri(), httpMethod, contentType);
+                        }
+
+                        handleStatusError(
+                                ctx,
+                                request,
+                                nettyHttpRequest,
+                                HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
+                                "Content Type [" + contentType + "] not allowed. Allowed types: " + existingRouteConsumes);
+                        return;
+                    }
+                }
+            }
+
+            // if there is no route present try to locate a route that matches a different HTTP method
+            Set<io.micronaut.http.HttpMethod> existingRouteMethods = router
+                    .findAny(request.getUri().toString())
+                    .map(UriRouteMatch::getHttpMethod)
+                    .collect(Collectors.toSet());
+
+            if (!existingRouteMethods.isEmpty()) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Method not allowed for URI {} and method {}", request.getUri(), httpMethod);
                 }
@@ -419,24 +445,25 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         ctx,
                         request,
                         nettyHttpRequest,
-                        HttpResponse.notAllowed(existingRoutes),
-                        "Method [" + httpMethod + "] not allowed. Allowed methods: " + existingRoutes);
+                        HttpResponse.notAllowed(existingRouteMethods),
+                        "Method [" + httpMethod + "] not allowed. Allowed methods: " + existingRouteMethods);
                 return;
-            } else {
-                Optional<? extends FileCustomizableResponseType> optionalFile = matchFile(requestPath);
+            }
 
-                if (optionalFile.isPresent()) {
-                    route = new BasicObjectRouteMatch(optionalFile.get());
+            Optional<? extends FileCustomizableResponseType> optionalFile = matchFile(requestPath);
+
+            if (optionalFile.isPresent()) {
+                route = new BasicObjectRouteMatch(optionalFile.get());
+            } else {
+                Optional<RouteMatch<Object>> statusRoute = router.route(HttpStatus.NOT_FOUND);
+                if (statusRoute.isPresent()) {
+                    route = statusRoute.get();
                 } else {
-                    Optional<RouteMatch<Object>> statusRoute = router.route(HttpStatus.NOT_FOUND);
-                    if (statusRoute.isPresent()) {
-                        route = statusRoute.get();
-                    } else {
-                        emitDefaultNotFoundResponse(ctx, request);
-                        return;
-                    }
+                    emitDefaultNotFoundResponse(ctx, request);
+                    return;
                 }
             }
+
         } else {
             route = routeMatch.get();
         }
