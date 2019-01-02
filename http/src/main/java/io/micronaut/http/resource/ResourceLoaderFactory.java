@@ -19,6 +19,7 @@ package io.micronaut.http.resource;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.env.Environment;
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.io.Readable;
 import io.micronaut.core.io.ResourceLoader;
@@ -104,12 +105,20 @@ public class ResourceLoaderFactory {
     @Singleton
     protected @Nonnull TypeConverter<CharSequence, Readable> readableTypeConverter(ResourceResolver resourceResolver) {
         return (object, targetType, context) -> {
-            final Optional<URL> resource = resourceResolver.getResource(object.toString());
-            if (resource.isPresent()) {
-                return Optional.of(Readable.of(resource.get()));
+            String pathStr = object.toString();
+            Optional<ResourceLoader> supportingLoader = resourceResolver.getSupportingLoader(pathStr);
+            if (!supportingLoader.isPresent()) {
+                context.reject(pathStr, new ConfigurationException(
+                        "No supported resource loader for path [" + pathStr + "]. Prefix the path with a supported prefix such as 'classpath:' or 'file:'"
+                ));
             } else {
-                context.reject(object, new FileNotFoundException("No resource exists for value: " + object));
-                return Optional.empty();
+                final Optional<URL> resource = resourceResolver.getResource(pathStr);
+                if (resource.isPresent()) {
+                    return Optional.of(Readable.of(resource.get()));
+                } else {
+                    context.reject(object, new ConfigurationException("No resource exists for value: " + object));
+                    return Optional.empty();
+                }
             }
 
         };
