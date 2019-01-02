@@ -150,32 +150,4 @@ class DefaultVersionedUrlFilterSpec extends Specification {
         matches.size() == 2
     }
 
-    @Controller("/versioned")
-    static class VersionedController {
-
-        @Version("1")
-        @Get("/hello")
-        String helloV1() {
-            return "helloV1"
-        }
-
-        @Version("2")
-        @Get("/hello")
-        String helloV2() {
-            return "helloV2";
-        }
-
-        @Version("2")
-        @Get("/hello")
-        String duplicatedHelloV2() {
-            return "duplicatedHelloV2";
-        }
-
-        @Get("/hello")
-        String hello() {
-            return "hello"
-        }
-
-    }
-
 }

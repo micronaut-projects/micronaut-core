@@ -2,7 +2,11 @@ Micronaut {version} includes the following changes:
 
 === File Watch and Server Restart
 
-A new <<automaticRestart,Automatic Restart>> feature is included that allows the server to restart if a change occurs to a file. This feature can be used both in production and at development time to achieve automatic application restarts when changing source code.
+A new <<automaticRestart,Automatic Restart>> feature is included that allows the server to restart if a change occurs to a file. This feature can be used both in production and at development time to achieve automatic application restarts when changing source code (when combined with a third party tool such as Gradle or Kubernetes in production).
+
+=== API Versioning Support
+
+API versioning is now supported. See the <<apiVersioning, API Versioning>> documentation for more information on how to use this feature.
 
 === Refactoring of File Responses
 
