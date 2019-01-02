@@ -21,7 +21,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import io.micronaut.core.naming.conventions.StringConvention;
 
 import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
 /**
  * Allows configuration how map property values are injected.
@@ -31,6 +33,7 @@ import java.lang.annotation.Retention;
  */
 @Documented
 @Retention(RUNTIME)
+@Target(ElementType.PARAMETER)
 public @interface MapFormat {
 
     /**
