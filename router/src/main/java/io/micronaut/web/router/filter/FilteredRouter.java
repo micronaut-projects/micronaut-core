@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.web.router.version;
+package io.micronaut.web.router.filter;
 
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -32,9 +32,16 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
- * Decorated {@link Router} with filtering capabilities.
+ * Allows decorating an existing {@link Router} with filtering capabilities.
  *
+ * <p>Filters themselves should be supplied via the {@link RouteMatchesFilter} interface.</p>
+ *
+ * <p>A filtered router can be enabled by implementing a {@link io.micronaut.context.event.BeanCreatedEventListener} for
+ * the existing {@link Router} and decorating appropriately. See for example {@link io.micronaut.web.router.version.VersionedRouterDecoratorConfiguration}</p>
+ *
+ * @see RouteMatchesFilter
  * @author Bogdan Oros
+ * @author graemerocher
  * @since 1.1.0
  */
 public class FilteredRouter implements Router {
@@ -48,8 +55,8 @@ public class FilteredRouter implements Router {
      * @param router      A {@link Router} to delegate to
      * @param routeFilter A {@link RouteMatchesFilter} to filter non matching routes
      */
-    FilteredRouter(Router router,
-                   RouteMatchesFilter routeFilter) {
+    public FilteredRouter(Router router,
+                          RouteMatchesFilter routeFilter) {
         this.router = router;
         this.routeFilter = routeFilter;
     }
@@ -142,6 +149,6 @@ public class FilteredRouter implements Router {
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request) {
         Stream<UriRouteMatch<T, R>> matches = router.find(request);
-        return routeFilter.filter(matches.collect(Collectors.toList()), request).stream();
+        return routeFilter.filter(request, matches.collect(Collectors.toList())).stream();
     }
 }
