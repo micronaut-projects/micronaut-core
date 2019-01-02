@@ -32,7 +32,7 @@ public class SimpleHttpResponseFactory implements HttpResponseFactory {
 
     @Override
     public <T> MutableHttpResponse<T> ok(T body) {
-        return new SimpleHttpResponse<>().body(body);
+        return new SimpleHttpResponse<T>().body(body);
     }
 
     @Override
