@@ -111,6 +111,7 @@ public class ResourceLoaderFactory {
                 context.reject(pathStr, new ConfigurationException(
                         "No supported resource loader for path [" + pathStr + "]. Prefix the path with a supported prefix such as 'classpath:' or 'file:'"
                 ));
+                return Optional.empty();
             } else {
                 final Optional<URL> resource = resourceResolver.getResource(pathStr);
                 if (resource.isPresent()) {
