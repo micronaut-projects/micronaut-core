@@ -218,4 +218,17 @@ public interface Router {
     default <T, R> Stream<UriRouteMatch<T, R>> find(HttpMethod httpMethod, URI uri) {
         return find(httpMethod, uri.toString());
     }
+
+    /**
+     * Finds all of the possible routes for the given HTTP request.
+     *
+     * @param request The HTTP request
+     * @param <T>     The target type
+     * @param <R>     The URI route match
+     * @return A {@link Stream} of possible {@link Route} instances.
+     */
+    default <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request) {
+        return find(request.getMethod(), request.getPath());
+    }
+
 }
