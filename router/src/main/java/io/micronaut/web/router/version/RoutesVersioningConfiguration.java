@@ -153,13 +153,14 @@ public class RoutesVersioningConfiguration implements Toggleable {
     public static class HeaderBasedVersioningConfiguration extends AbstractVersioningConfiguration {
 
         public static final String PREFIX = RoutesVersioningConfiguration.PREFIX + ".header";
+        public static final String DEFAULT_HEADER_NAME = "X-API-VERSION";
 
         /**
          * Constructor for header based versioning configuration.
          * Specifies the default name of the request header.
          */
         public HeaderBasedVersioningConfiguration() {
-            super(Collections.singletonList("X-API-VERSION"));
+            super(Collections.singletonList(DEFAULT_HEADER_NAME));
         }
 
     }
@@ -171,13 +172,14 @@ public class RoutesVersioningConfiguration implements Toggleable {
     public static class ParameterBasedVersioningConfiguration extends AbstractVersioningConfiguration {
 
         public static final String PREFIX = RoutesVersioningConfiguration.PREFIX + ".parameter";
+        public static final String DEFAULT_PARAMETER_NAME = "api-version";
 
         /**
          * Constructor for request parameter based versioning configuration.
          * Specifies the default name of the request parameter.
          */
         public ParameterBasedVersioningConfiguration() {
-            super(Collections.singletonList("api-version"));
+            super(Collections.singletonList(DEFAULT_PARAMETER_NAME));
         }
 
     }

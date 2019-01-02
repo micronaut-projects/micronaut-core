@@ -79,6 +79,7 @@ httpServer:
   datavalidation: Data Validation
   staticResources: Serving Static Resources
   errorHandling: Error Handling
+  apiVersioning: API Versioning
   formData: Handling Form Data
   serverIO: Writing Response Data
   uploads: File Uploads
