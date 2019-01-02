@@ -20,6 +20,8 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.web.router.Router;
+import io.micronaut.web.router.filter.FilteredRouter;
+import io.micronaut.web.router.filter.RouteMatchesFilter;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;

@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.web.router.DefaultRouter
 import io.micronaut.web.router.Router
+import io.micronaut.web.router.filter.FilteredRouter
 import io.micronaut.web.router.version.strategy.HeaderVersionExtractingStrategy
 import io.micronaut.web.router.version.strategy.ParameterVersionExtractingStrategy
 import io.micronaut.web.router.version.strategy.VersionExtractingStrategy

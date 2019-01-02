@@ -21,6 +21,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.UriRouteMatch;
+import io.micronaut.web.router.filter.RouteMatchesFilter;
 import io.micronaut.web.router.version.strategy.VersionExtractingStrategy;
 
 import javax.inject.Inject;
@@ -55,14 +56,14 @@ public class VersioningRouteMatchesFilter implements RouteMatchesFilter {
     /**
      * Filters route matches by specified version.
      *
-     * @param matches The list of {@link UriRouteMatch}
-     * @param request The HTTP request
      * @param <T>     The target type
      * @param <R>     The return type
+     * @param request The HTTP request
+     * @param matches The list of {@link UriRouteMatch}
      * @return A filtered list of route matches
      */
     @Override
-    public <T, R> List<UriRouteMatch<T, R>> filter(List<UriRouteMatch<T, R>> matches, HttpRequest<?> request) {
+    public <T, R> List<UriRouteMatch<T, R>> filter(HttpRequest<?> request, List<UriRouteMatch<T, R>> matches) {
 
         ArgumentUtils.requireNonNull("matches", matches);
         ArgumentUtils.requireNonNull("request", request);

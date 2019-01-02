@@ -22,9 +22,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * Annotation to specify an abstract version.
+ * Annotation used to express the version of a component or method.
  *
  * @author Bogdan Oros
+ * @author graemerocher
  * @since 1.1.0
  */
 @Target(ElementType.METHOD)
@@ -32,7 +33,8 @@ import java.lang.annotation.Target;
 public @interface Version {
 
     /**
-     * Version value to compare with.
+     * The version of component or method.
+     *
      * @return version value
      */
     String value();

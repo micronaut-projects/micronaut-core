@@ -120,7 +120,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
         def handler = new VersioningRouteMatchesFilter(strategies)
         def request = HttpRequest.GET("/versioned/hello")
         then:
-        routes == handler.filter(routes, request)
+        routes == handler.filter(request, routes)
     }
 
     def "should return initial versions due to header provided"() {
@@ -128,14 +128,14 @@ class DefaultVersionedUrlFilterSpec extends Specification {
         def handler = new VersioningRouteMatchesFilter(strategies)
         def request = HttpRequest.GET("/versioned/hello")
         then:
-        routes == handler.filter(routes, request)
+        routes == handler.filter(request, routes)
     }
 
     def "should return exact route for header version"() {
         when:
         def handler = new VersioningRouteMatchesFilter(strategies)
         def request = HttpRequest.GET("/versioned/hello").header("API-VERSION", "1")
-        def matches = handler.filter(routes, request)
+        def matches = handler.filter(request, routes)
         then:
         matches.size() == 1
         matches.get(0).getExecutableMethod().methodName == "helloV1"
@@ -145,7 +145,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
         when:
         def handler = new VersioningRouteMatchesFilter(strategies)
         def request = HttpRequest.GET("/versioned/hello").header("API-VERSION", "2")
-        def matches = handler.filter(routes, request)
+        def matches = handler.filter(request, routes)
         then:
         matches.size() == 2
     }

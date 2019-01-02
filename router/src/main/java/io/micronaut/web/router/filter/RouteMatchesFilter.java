@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.web.router.version;
+package io.micronaut.web.router.filter;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.UriRouteMatch;
@@ -32,12 +32,12 @@ public interface RouteMatchesFilter {
     /**
      * A method responsible for filtering route matches based on request.
      *
-     * @param matches The list of {@link UriRouteMatch}
-     * @param request The HTTP request
      * @param <T>     The target type
      * @param <R>     The return type
+     * @param request The HTTP request
+     * @param matches The list of {@link UriRouteMatch}
      * @return A filtered list of route matches
      */
-    <T, R> List<UriRouteMatch<T, R>> filter(List<UriRouteMatch<T, R>> matches, HttpRequest<?> request);
+    <T, R> List<UriRouteMatch<T, R>> filter(HttpRequest<?> request, List<UriRouteMatch<T, R>> matches);
 
 }
