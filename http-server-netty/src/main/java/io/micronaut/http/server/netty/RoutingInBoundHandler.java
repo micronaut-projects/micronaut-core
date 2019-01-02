@@ -467,21 +467,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         } else {
             route = routeMatch.get();
         }
-        // Check that the route is an accepted content type
-        MediaType contentType = request.getContentType().orElse(null);
-        if (!route.accept(contentType)) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Matched route is not a supported media type: {}", contentType);
-            }
 
-            handleStatusError(
-                    ctx,
-                    request,
-                    nettyHttpRequest,
-                    HttpResponse.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE),
-                    "Unsupported Media Type: " + contentType);
-            return;
-        }
         if (LOG.isDebugEnabled()) {
             if (route instanceof MethodBasedRouteMatch) {
                 LOG.debug("Matched route {} - {} to controller {}", httpMethod, requestPath, route.getDeclaringType());
