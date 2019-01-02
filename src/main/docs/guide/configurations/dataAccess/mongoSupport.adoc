@@ -37,6 +37,8 @@ To use the blocking driver, add a dependency to your application to the mongo-ja
 compile "org.mongodb:mongo-java-driver"
 ----
 
+IMPORTANT: `"io.micronaut.configuration:micronaut-mongo-reactive"` dependency must be included as well
+
 Then the blocking http://mongodb.github.io/mongo-java-driver/3.7/javadoc/com/mongodb/MongoClient.html[MongoClient] will be available for injection.
 
 ==== Configuring the MongoDB Driver
