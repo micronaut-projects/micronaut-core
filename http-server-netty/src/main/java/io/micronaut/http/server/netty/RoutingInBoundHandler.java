@@ -411,7 +411,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     .flatMap(r -> r.getConsumes().stream())
                     .collect(Collectors.toSet());
 
-            if (!existingRouteConsumes.isEmpty()) {
+            if (!existingRouteConsumes.isEmpty() && !existingRouteConsumes.contains(MediaType.ALL_TYPE)) {
                 MediaType contentType = request.getContentType().orElse(null);
                 if (contentType != null) {
                     if (!existingRouteConsumes.contains(contentType)) {
