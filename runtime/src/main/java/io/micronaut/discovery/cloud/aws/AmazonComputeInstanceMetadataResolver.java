@@ -35,7 +35,14 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
+<<<<<<< HEAD
 import java.util.*;
+=======
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+>>>>>>> 1.0.x
 import java.util.regex.Pattern;
 
 import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.readMetadataUrl;
@@ -134,7 +141,18 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
                 LOG.error("error getting public host name from:" + ec2InstanceMetadataURL + EC2MetadataKeys.publicHostname.getName(), e);
             }
 
-            ec2InstanceMetadata.setMetadata(objectMapper.convertValue(ec2InstanceMetadata, Map.class));
+            Map<?, ?> metadata = objectMapper.convertValue(ec2InstanceMetadata, Map.class);
+            if (metadata != null) {
+                Map<String, String> finalMetadata = new HashMap<>(metadata.size());
+                for (Map.Entry<?, ?> entry : metadata.entrySet()) {
+                    Object key = entry.getKey();
+                    Object value = entry.getValue();
+                    if (value instanceof String) {
+                        finalMetadata.put(key.toString(), value.toString());
+                    }
+                }
+                ec2InstanceMetadata.setMetadata(finalMetadata);
+            }
             if (LOG.isDebugEnabled()) {
                 LOG.debug("EC2 Metadata found:" + ec2InstanceMetadata.getMetadata().toString());
             }

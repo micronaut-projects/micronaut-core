@@ -23,15 +23,7 @@ import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.ValueResolver;
 
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.NoSuchElementException;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
 
@@ -116,13 +108,15 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
     }
 
     /**
-     * Return this {@link ConvertibleValues} as a map for the given key type and value type.
+     * Return this {@link ConvertibleValues} as a map for the given key type and value type. If any entry cannot be
+     * converted to the target key/value type then the entry is simply excluded, hence the size of the map returned
+     * may not match the size of this {@link ConvertibleValues}.
      *
      * @param keyType   The key type
      * @param valueType The value type
      * @param <KT>      The key type
      * @param <VT>      The value type
-     * @return The values
+     * @return The values with the key converted to the given key type and the value to the given value type.
      */
     default <KT, VT> Map<KT, VT> asMap(Class<KT> keyType, Class<VT> valueType) {
         Map<KT, VT> newMap = new LinkedHashMap<>();
@@ -137,6 +131,25 @@ public interface ConvertibleValues<V> extends ValueResolver<CharSequence>, Itera
         return newMap;
     }
 
+    /**
+     * Return this {@link ConvertibleValues} as a {@link Properties} object returning only keys and values that
+     * can be represented as a string.
+     *
+     * @return The values with the key converted to the given key type and the value to the given value type.
+     * @since 1.0.3
+     */
+    default Properties asProperties() {
+        Properties props = new Properties();
+
+        for (Map.Entry<String, V> entry : this) {
+            String key = entry.getKey();
+            V value = entry.getValue();
+            if (value instanceof CharSequence || value instanceof Number) {
+                props.setProperty(key, value.toString());
+            }
+        }
+        return props;
+    }
     /**
      * Returns a submap for all the keys with the given prefix.
      *
