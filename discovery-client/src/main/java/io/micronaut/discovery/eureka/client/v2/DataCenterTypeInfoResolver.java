@@ -53,7 +53,7 @@ class DataCenterTypeInfoResolver extends ClassNameIdResolver {
 
     @Override
     public String idFromValue(Object value) {
-        if (value.getClass().equals(AmazonInfo.class)) {
+        if (value.getClass().getSimpleName().equals(AmazonInfo.class.getSimpleName())) {
             return AmazonInfo.class.getName();
         }
         return MY_DATA_CENTER_INFO_TYPE_MARKER;

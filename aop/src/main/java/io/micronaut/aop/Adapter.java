@@ -73,6 +73,7 @@ public @interface Adapter {
     class InternalAttributes {
         public static final String ADAPTED_BEAN = "adaptedBean";
         public static final String ADAPTED_METHOD = "adaptedMethod";
+        public static final String ADAPTED_ARGUMENT_TYPES = "adaptedArgumentTypes";
         public static final String ADAPTED_QUALIFIER = "adaptedQualifier";
     }
 }

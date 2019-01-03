@@ -88,7 +88,10 @@ class AmazonEC2InstanceResolverSpec extends Specification {
         NetworkInterface networkInterface = computeInstanceMetadata.get().getInterfaces().get(0)
 
         Optional<ComputeInstanceMetadata> computeInstanceMetadata1 = resolver.resolve(environment)
-
+        computeInstanceMetadata.get().interfaces.size() == 1
+        computeInstanceMetadata.get().metadata
+        !computeInstanceMetadata.get().metadata.containsKey("interfaces")
+        computeInstanceMetadata.get().metadata.values().every()  { it instanceof String }
         computeInstanceMetadata1.isPresent()
         computeInstanceMetadata1.get().isCached()
 

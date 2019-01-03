@@ -36,6 +36,8 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import javax.inject.Singleton;
+import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -183,7 +185,11 @@ public class EurekaAutoRegistration extends DiscoveryServiceAutoRegistration {
             }
 
             ConvertibleValues<String> instanceMetadata = instance.getMetadata();
-            instanceInfo.getMetadata().putAll(instanceMetadata.asMap(String.class, String.class));
+            Properties properties = instanceMetadata.asProperties();
+            Map<String, String> targetMetadata = instanceInfo.getMetadata();
+            for (Map.Entry<Object, Object> entry : properties.entrySet()) {
+                targetMetadata.put(entry.getKey().toString(), entry.getValue().toString());
+            }
             customizeInstanceInfo(instanceInfo);
             validateApplicationName(instanceInfo.getApp());
 

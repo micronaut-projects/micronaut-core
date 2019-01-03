@@ -16,6 +16,7 @@
 
 package io.micronaut.http.netty.websocket;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.MediaType;
 import io.micronaut.websocket.WebSocketBroadcaster;
 import io.micronaut.websocket.WebSocketSession;
@@ -35,6 +36,7 @@ import java.util.function.Predicate;
  * @since 1.0
  */
 @Singleton
+@Requires(beans = WebSocketSessionRepository.class)
 public class NettyServerWebSocketBroadcaster implements WebSocketBroadcaster {
 
     private final WebSocketMessageEncoder webSocketMessageEncoder;
