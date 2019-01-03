@@ -131,6 +131,7 @@ cloud:
     title: Cloud Configuration
     distributedConfiguration: Distributed Configuration
     distributedConfigurationConsul: Consul Support
+    distributedConfigurationSpringCloud: Spring Cloud Config Support
     distributedConfigurationAwsParameterStore: AWS Parameter Store Support
   serviceDiscovery:
     title: Service Discovery
