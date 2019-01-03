@@ -8,6 +8,12 @@ A new <<automaticRestart,Automatic Restart>> feature is included that allows the
 
 API versioning is now supported. See the <<apiVersioning, API Versioning>> documentation for more information on how to use this feature.
 
+=== Support for Spring Cloud Config Server
+
+If you are already using https://spring.io/projects/spring-cloud-config[Spring Config Server] then Micronaut now features native integration for distributed configuration.
+
+See the <<distributedConfigurationSpringCloud, Documentation on Distributed Configuration with Spring Cloud Config>> for more information.
+
 === Refactoring of File Responses
 
 In an effort to make a more consistent and understandable API, some methods and classes related to sending file responses have been deprecated. api:http.server.types.files.SystemFile[] is the replacement for api:http.server.types.files.AttachedFile[] and the constructors of api:http.server.types.files.StreamedFile[] have been deprecated in favor of new constructors that better convey the intended functionality.

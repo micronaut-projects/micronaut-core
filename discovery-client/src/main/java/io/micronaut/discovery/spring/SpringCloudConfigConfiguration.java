@@ -22,6 +22,7 @@ import io.micronaut.discovery.spring.condition.RequiresSpringCloudConfig;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
+import javax.annotation.Nonnull;
 import javax.inject.Inject;
 import java.util.Optional;
 
@@ -29,14 +30,15 @@ import java.util.Optional;
  * A {@link HttpClientConfiguration} for Spring Cloud Config.
  *
  *  @author Thiago Locatelli
+ *  @author graemerocher
  *  @since 1.0
  */
 @RequiresSpringCloudConfig
-@ConfigurationProperties(SpringCloudConfiguration.PREFIX)
-public class SpringCloudConfiguration extends HttpClientConfiguration {
+@ConfigurationProperties(SpringCloudConfigConfiguration.PREFIX)
+public class SpringCloudConfigConfiguration extends HttpClientConfiguration {
 
-    public static final String PREFIX = Constants.PREFIX + ".config";
-    public static final String SPRING_CLOUD_CONFIG_ENDPOINT = "${" + SpringCloudConfiguration.PREFIX + ".uri}";
+    public static final String PREFIX = SpringCloudConstants.PREFIX + ".config";
+    public static final String SPRING_CLOUD_CONFIG_ENDPOINT = "${" + SpringCloudConfigConfiguration.PREFIX + ".uri}";
 
     private String uri = "http://locahost:8888";
 
@@ -46,7 +48,7 @@ public class SpringCloudConfiguration extends HttpClientConfiguration {
     /**
      * Default constructor.
      */
-    public SpringCloudConfiguration() {
+    public SpringCloudConfigConfiguration() {
         this.springCloudConnectionPoolConfiguration = new SpringCloudConnectionPoolConfiguration();
     }
 
@@ -55,27 +57,27 @@ public class SpringCloudConfiguration extends HttpClientConfiguration {
      * @param applicationConfiguration The application configuration
      */
     @Inject
-    public SpringCloudConfiguration(SpringCloudConnectionPoolConfiguration springCloudConnectionPoolConfiguration, ApplicationConfiguration applicationConfiguration) {
+    public SpringCloudConfigConfiguration(SpringCloudConnectionPoolConfiguration springCloudConnectionPoolConfiguration, ApplicationConfiguration applicationConfiguration) {
         super(applicationConfiguration);
         this.springCloudConnectionPoolConfiguration = springCloudConnectionPoolConfiguration;
     }
 
     @Override
-    public ConnectionPoolConfiguration getConnectionPoolConfiguration() {
+    public @Nonnull ConnectionPoolConfiguration getConnectionPoolConfiguration() {
         return springCloudConnectionPoolConfiguration;
     }
 
     /**
      * @return The configuration discovery configuration
      */
-    public SpringConfigDiscoveryConfiguration getConfiguration() {
+    public @Nonnull SpringConfigDiscoveryConfiguration getConfiguration() {
         return springConfigDiscoveryConfiguration;
     }
 
     /**
      * @return The spring cloud config server uri
      */
-    public Optional<String> getUri() {
+    public @Nonnull Optional<String> getUri() {
         return uri != null ? Optional.of(uri) : Optional.empty();
     }
 
@@ -104,7 +106,7 @@ public class SpringCloudConfiguration extends HttpClientConfiguration {
         /**
          * The full prefix for this configuration.
          */
-        public static final String PREFIX = SpringCloudConfiguration.PREFIX + "." + ConfigDiscoveryConfiguration.PREFIX;
+        public static final String PREFIX = SpringCloudConfigConfiguration.PREFIX + "." + ConfigDiscoveryConfiguration.PREFIX;
 
     }
 }

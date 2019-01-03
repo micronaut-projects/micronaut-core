@@ -17,7 +17,7 @@ package io.micronaut.discovery.spring;
  * @author Thiago Locatelli
  * @since 1.0
  */
-public class Constants {
+public class SpringCloudConstants {
 
     public static final String PREFIX = "spring.cloud";
 }

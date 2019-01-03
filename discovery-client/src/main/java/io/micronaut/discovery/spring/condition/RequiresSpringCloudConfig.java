@@ -17,7 +17,8 @@
 package io.micronaut.discovery.spring.condition;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.discovery.spring.SpringCloudConfiguration;
+import io.micronaut.core.util.StringUtils;
+import io.micronaut.discovery.spring.SpringCloudConfigConfiguration;
 
 import java.lang.annotation.*;
 
@@ -29,8 +30,8 @@ import java.lang.annotation.*;
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.PACKAGE, ElementType.TYPE})
-@Requires(property = SpringCloudConfiguration.PREFIX)
-@Requires(property = SpringCloudConfiguration.PREFIX + ".enabled", value = "true", defaultValue = "true")
+@Target({ElementType.PACKAGE, ElementType.TYPE, ElementType.ANNOTATION_TYPE})
+@Requires(property = SpringCloudConfigConfiguration.PREFIX)
+@Requires(property = SpringCloudConfigConfiguration.PREFIX + ".enabled", value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 public @interface RequiresSpringCloudConfig {
 }

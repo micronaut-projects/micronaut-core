@@ -16,20 +16,22 @@
 
 package io.micronaut.discovery.spring.config.client;
 
-import io.micronaut.discovery.spring.SpringCloudConfiguration;
+import io.micronaut.discovery.spring.SpringCloudConfigConfiguration;
 import io.micronaut.discovery.spring.config.client.response.ConfigServerResponse;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.retry.annotation.Retryable;
 import org.reactivestreams.Publisher;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
  * API operations for Spring Cloud Config Client.
  *
  * @author Thiago Locatelli
- * @since 1.0
+ * @author graemerocher
+ * @since 1.1.0
  */
 public interface SpringCloudConfigOperations {
 
@@ -43,11 +45,11 @@ public interface SpringCloudConfigOperations {
     @Get("/{applicationName}/{profiles}")
     @Produces(single = true)
     @Retryable(
-            attempts = "${" + SpringCloudConfiguration.SpringConfigDiscoveryConfiguration.PREFIX + ".retryCount:3}",
-            delay = "${" + SpringCloudConfiguration.SpringConfigDiscoveryConfiguration.PREFIX + ".retryDelay:1s}"
+            attempts = "${" + SpringCloudConfigConfiguration.SpringConfigDiscoveryConfiguration.PREFIX + ".retry-count:3}",
+            delay = "${" + SpringCloudConfigConfiguration.SpringConfigDiscoveryConfiguration.PREFIX + ".retry-delay:1s}"
     )
-    Publisher<ConfigServerResponse> readValues(
-            String applicationName,
+    @Nonnull Publisher<ConfigServerResponse> readValues(
+            @Nonnull String applicationName,
             @Nullable String profiles);
 
 }
