@@ -24,22 +24,22 @@ import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRoute;
 import io.micronaut.web.router.UriRouteMatch;
+import io.micronaut.web.router.version.VersionAwareRouterListener;
 
 import java.net.URI;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
  * Allows decorating an existing {@link Router} with filtering capabilities.
  *
- * <p>Filters themselves should be supplied via the {@link RouteMatchesFilter} interface.</p>
+ * <p>Filters themselves should be supplied via the {@link RouteMatchFilter} interface.</p>
  *
  * <p>A filtered router can be enabled by implementing a {@link io.micronaut.context.event.BeanCreatedEventListener} for
- * the existing {@link Router} and decorating appropriately. See for example {@link io.micronaut.web.router.version.VersionedRouterDecoratorConfiguration}</p>
+ * the existing {@link Router} and decorating appropriately. See for example {@link VersionAwareRouterListener}</p>
  *
- * @see RouteMatchesFilter
+ * @see RouteMatchFilter
  * @author Bogdan Oros
  * @author graemerocher
  * @since 1.1.0
@@ -47,16 +47,16 @@ import java.util.stream.Stream;
 public class FilteredRouter implements Router {
 
     private final Router router;
-    private final RouteMatchesFilter routeFilter;
+    private final RouteMatchFilter routeFilter;
 
     /**
-     * Creates a decorated router for an existing router and {@link RouteMatchesFilter}.
+     * Creates a decorated router for an existing router and {@link RouteMatchFilter}.
      *
      * @param router      A {@link Router} to delegate to
-     * @param routeFilter A {@link RouteMatchesFilter} to filter non matching routes
+     * @param routeFilter A {@link RouteMatchFilter} to filter non matching routes
      */
     public FilteredRouter(Router router,
-                          RouteMatchesFilter routeFilter) {
+                          RouteMatchFilter routeFilter) {
         this.router = router;
         this.routeFilter = routeFilter;
     }
@@ -149,6 +149,6 @@ public class FilteredRouter implements Router {
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request) {
         Stream<UriRouteMatch<T, R>> matches = router.find(request);
-        return routeFilter.filter(request, matches.collect(Collectors.toList())).stream();
+        return matches.filter(routeFilter.filter(request));
     }
 }

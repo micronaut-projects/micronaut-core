@@ -16,32 +16,31 @@
 package io.micronaut.web.router.version
 
 import io.micronaut.context.DefaultApplicationContext
-import io.micronaut.core.version.annotation.Version
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Get
 import io.micronaut.web.router.DefaultRouteBuilder
 import io.micronaut.web.router.DefaultRouter
 import io.micronaut.web.router.UriRouteMatch
-import io.micronaut.web.router.version.strategy.HeaderVersionExtractingStrategy
-import io.micronaut.web.router.version.strategy.ParameterVersionExtractingStrategy
+import io.micronaut.web.router.version.resolution.HeaderVersionResolver
+import io.micronaut.web.router.version.resolution.HeaderVersionResolverConfiguration
+import io.micronaut.web.router.version.resolution.ParameterVersionResolver
+import io.micronaut.web.router.version.resolution.ParameterVersionResolverConfiguration
 import spock.lang.Specification
 
 import java.util.stream.Collectors
 
 class DefaultVersionedUrlFilterSpec extends Specification {
 
-    List<UriRouteMatch<Object, Object>> routes;
+    List<UriRouteMatch<Object, Object>> routes
 
-    def strategies = [new HeaderVersionExtractingStrategy(
-            new RoutesVersioningConfiguration.HeaderBasedVersioningConfiguration().with {
+    def strategies = [new HeaderVersionResolver(
+            new HeaderVersionResolverConfiguration().with {
                 names = ["API-VERSION"]
                 it
             })]
 
     def setup() {
-        def context = new DefaultApplicationContext("test").start();
+        def context = new DefaultApplicationContext("test").start()
         def controller = new VersionedController()
         context.registerSingleton(controller)
 
@@ -58,15 +57,15 @@ class DefaultVersionedUrlFilterSpec extends Specification {
 
     def "should extract header version from request"() {
         when:
-        def strategy = new HeaderVersionExtractingStrategy(
-                new RoutesVersioningConfiguration.HeaderBasedVersioningConfiguration().with {
+        def strategy = new HeaderVersionResolver(
+                new HeaderVersionResolverConfiguration().with {
                     names = [specifiedHeader]
                     it
                 }
         )
         def request = HttpRequest.GET("/test").header(exactHeader, "1")
         then:
-        result == strategy.extract(request)
+        result == strategy.resolve(request)
         where:
         specifiedHeader | exactHeader   || result
         "API-VERSION"   | "API-VERSION" || Optional.of("1")
@@ -75,8 +74,8 @@ class DefaultVersionedUrlFilterSpec extends Specification {
 
     def "should extract parameter version from request"() {
         when:
-        def strategy = new ParameterVersionExtractingStrategy(
-                new RoutesVersioningConfiguration.ParameterBasedVersioningConfiguration().with {
+        def strategy = new ParameterVersionResolver(
+                new ParameterVersionResolverConfiguration().with {
                     names = [specifiedParameter]
                     it
                 }
@@ -86,7 +85,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
             it
         }
         then:
-        result == strategy.extract(request)
+        result == strategy.resolve(request)
         where:
         specifiedParameter | exactParameter || result
         "version"          | "version"      || Optional.of("1")
@@ -95,8 +94,8 @@ class DefaultVersionedUrlFilterSpec extends Specification {
 
     def "should extract parameter from multiple provided"() {
         when:
-        def strategy = new ParameterVersionExtractingStrategy(
-                new RoutesVersioningConfiguration.ParameterBasedVersioningConfiguration().with {
+        def strategy = new ParameterVersionResolver(
+                new ParameterVersionResolverConfiguration().with {
                     names = specifiedParameters
                     it
                 }
@@ -106,7 +105,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
             it
         }
         then:
-        result == strategy.extract(request)
+        result == strategy.resolve(request)
         where:
         specifiedParameters      | exactParameter || result
         ["x-version", "version"] | "version"      || Optional.of("1")
@@ -117,25 +116,28 @@ class DefaultVersionedUrlFilterSpec extends Specification {
     def "should return initial routes ignoring version"() {
         when:
         def strategies = []
-        def handler = new VersioningRouteMatchesFilter(strategies)
+        def handler = new RouteVersionFilter(strategies)
         def request = HttpRequest.GET("/versioned/hello")
+
         then:
-        routes == handler.filter(request, routes)
+        routes.stream().filter(handler.filter(request)).collect(Collectors.toList()) == routes
     }
 
     def "should return initial versions due to header provided"() {
         when:
-        def handler = new VersioningRouteMatchesFilter(strategies)
+        def handler = new RouteVersionFilter(strategies)
         def request = HttpRequest.GET("/versioned/hello")
+
         then:
-        routes == handler.filter(request, routes)
+        routes.stream().filter(handler.filter(request)).collect(Collectors.toList()) == routes
     }
 
     def "should return exact route for header version"() {
         when:
-        def handler = new VersioningRouteMatchesFilter(strategies)
+        def handler = new RouteVersionFilter(strategies)
         def request = HttpRequest.GET("/versioned/hello").header("API-VERSION", "1")
-        def matches = handler.filter(request, routes)
+        def matches = routes.stream().filter(handler.filter(request)).collect(Collectors.toList())
+
         then:
         matches.size() == 1
         matches.get(0).getExecutableMethod().methodName == "helloV1"
@@ -143,9 +145,10 @@ class DefaultVersionedUrlFilterSpec extends Specification {
 
     def "should return duplicating routes for header version"() {
         when:
-        def handler = new VersioningRouteMatchesFilter(strategies)
+        def handler = new RouteVersionFilter(strategies)
         def request = HttpRequest.GET("/versioned/hello").header("API-VERSION", "2")
-        def matches = handler.filter(request, routes)
+        def matches = routes.stream().filter(handler.filter(request)).collect(Collectors.toList())
+
         then:
         matches.size() == 2
     }

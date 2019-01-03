@@ -21,35 +21,34 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.UriRouteMatch;
-import io.micronaut.web.router.filter.RouteMatchesFilter;
-import io.micronaut.web.router.version.strategy.VersionExtractingStrategy;
+import io.micronaut.web.router.filter.RouteMatchFilter;
+import io.micronaut.web.router.version.resolution.RequestVersionResolver;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.function.Predicate;
 
 /**
- * Implementation of {@link RouteMatchesFilter} responsible for filtering route matches on {@link Version}.
+ * Implementation of {@link RouteMatchFilter} responsible for filtering route matches on {@link Version}.
  *
  * @author Bogdan Oros
  * @since 1.1.0
  */
 @Singleton
 @Requires(beans = RoutesVersioningConfiguration.class)
-public class VersioningRouteMatchesFilter implements RouteMatchesFilter {
+public class RouteVersionFilter implements RouteMatchFilter {
 
-    private final List<VersionExtractingStrategy> resolvingStrategies;
+    private final List<RequestVersionResolver> resolvingStrategies;
 
     /**
-     * Creates a {@link VersioningRouteMatchesFilter} with a collection of {@link VersionExtractingStrategy}.
+     * Creates a {@link RouteVersionFilter} with a collection of {@link RequestVersionResolver}.
      *
-     * @param resolvingStrategies A list of {@link VersionExtractingStrategy} beans to extract version from HTTP request
+     * @param resolvingStrategies A list of {@link RequestVersionResolver} beans to extract version from HTTP request
      */
     @Inject
-    public VersioningRouteMatchesFilter(List<VersionExtractingStrategy> resolvingStrategies) {
+    public RouteVersionFilter(List<RequestVersionResolver> resolvingStrategies) {
         this.resolvingStrategies = resolvingStrategies;
     }
 
@@ -59,25 +58,20 @@ public class VersioningRouteMatchesFilter implements RouteMatchesFilter {
      * @param <T>     The target type
      * @param <R>     The return type
      * @param request The HTTP request
-     * @param matches The list of {@link UriRouteMatch}
      * @return A filtered list of route matches
      */
     @Override
-    public <T, R> List<UriRouteMatch<T, R>> filter(HttpRequest<?> request, List<UriRouteMatch<T, R>> matches) {
+    public <T, R> Predicate<UriRouteMatch<T, R>> filter(HttpRequest<?> request) {
 
-        ArgumentUtils.requireNonNull("matches", matches);
         ArgumentUtils.requireNonNull("request", request);
 
-        return resolvingStrategies.stream()
-                .map(strategy -> strategy.extract(request))
-                .findFirst()
-                .filter(Optional::isPresent)
-                .flatMap(Function.identity())
-                .map(version -> matches.stream()
-                        .filter(routeMatch -> isVersionMatched(routeMatch, version))
-                        .collect(Collectors.toList()))
-                .filter(filteredRoutes -> !filteredRoutes.isEmpty())
-                .orElse(matches);
+        if (resolvingStrategies == null || resolvingStrategies.isEmpty()) {
+            return (match) -> true;
+        }
+
+        return (match) -> resolvingStrategies.stream()
+                .map(strategy -> strategy.resolve(request))
+                .anyMatch((opt) -> opt.map(s -> isVersionMatched(match, s)).orElse(true));
     }
 
     private <T, R> boolean isVersionMatched(UriRouteMatch<T, R> routeMatch, String version) {
