@@ -134,7 +134,18 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
                 LOG.error("error getting public host name from:" + ec2InstanceMetadataURL + EC2MetadataKeys.publicHostname.getName(), e);
             }
 
-            ec2InstanceMetadata.setMetadata(objectMapper.convertValue(ec2InstanceMetadata, Map.class));
+            Map<?, ?> metadata = objectMapper.convertValue(ec2InstanceMetadata, Map.class);
+            if (metadata != null) {
+                Map<String, String> finalMetadata = new HashMap<>(metadata.size());
+                for (Map.Entry<?, ?> entry : metadata.entrySet()) {
+                    Object key = entry.getKey();
+                    Object value = entry.getValue();
+                    if (value instanceof String) {
+                        finalMetadata.put(key.toString(), value.toString());
+                    }
+                }
+                ec2InstanceMetadata.setMetadata(finalMetadata);
+            }
             if (LOG.isDebugEnabled()) {
                 LOG.debug("EC2 Metadata found:" + ec2InstanceMetadata.getMetadata().toString());
             }
