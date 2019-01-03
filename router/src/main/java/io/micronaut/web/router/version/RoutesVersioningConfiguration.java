@@ -21,9 +21,6 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 
-import java.util.Collections;
-import java.util.List;
-
 import static io.micronaut.web.router.version.RoutesVersioningConfiguration.PREFIX;
 
 /**
@@ -52,44 +49,6 @@ public class RoutesVersioningConfiguration implements Toggleable {
     private boolean enabled = DEFAULT_ENABLED;
 
     /**
-     * Request header based versioning configuration.
-     */
-    private HeaderBasedVersioningConfiguration header = new HeaderBasedVersioningConfiguration();
-
-    /**
-     * Request parameter based versioning configuration.
-     */
-    private ParameterBasedVersioningConfiguration parameter = new ParameterBasedVersioningConfiguration();
-
-    /**
-     * @return The header based versioning configuration.
-     */
-    public HeaderBasedVersioningConfiguration getHeader() {
-        return header;
-    }
-
-    /**
-     * @param header The header based versioning configuration.
-     */
-    public void setHeader(HeaderBasedVersioningConfiguration header) {
-        this.header = header;
-    }
-
-    /**
-     * @return The request parameter based versioning configuration.
-     */
-    public ParameterBasedVersioningConfiguration getParameter() {
-        return parameter;
-    }
-
-    /**
-     * @param parameter The request parameter based versioning configuration.
-     */
-    public void setParameter(ParameterBasedVersioningConfiguration parameter) {
-        this.parameter = parameter;
-    }
-
-    /**
      * @param enabled Enables the version based route matches filtering.
      */
     public void setEnabled(boolean enabled) {
@@ -102,86 +61,6 @@ public class RoutesVersioningConfiguration implements Toggleable {
     @Override
     public boolean isEnabled() {
         return enabled;
-    }
-
-    /**
-     * Abstract specific configuration for different versioning configurations.
-     */
-    private abstract static class AbstractVersioningConfiguration implements Toggleable {
-
-        private boolean enabled;
-        private List<String> names;
-
-        AbstractVersioningConfiguration(List<String> names) {
-            this.names = names;
-        }
-
-        /**
-         * @return property names to extract specified version from.
-         */
-        public List<String> getNames() {
-            return names;
-        }
-
-        /**
-         * @param names property names to extract specified version from.
-         */
-        public void setNames(List<String> names) {
-            this.names = names;
-        }
-
-        /**
-         * @return {@code true} if specific version based matches filtering is enabled.
-         */
-        @Override
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-        /**
-         * @param enabled Enables the specific version based route matches filtering.
-         */
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
-        }
-    }
-
-    /**
-     * The request header based versioning configuration.
-     */
-    @ConfigurationProperties("header")
-    public static class HeaderBasedVersioningConfiguration extends AbstractVersioningConfiguration {
-
-        public static final String PREFIX = RoutesVersioningConfiguration.PREFIX + ".header";
-        public static final String DEFAULT_HEADER_NAME = "X-API-VERSION";
-
-        /**
-         * Constructor for header based versioning configuration.
-         * Specifies the default name of the request header.
-         */
-        public HeaderBasedVersioningConfiguration() {
-            super(Collections.singletonList(DEFAULT_HEADER_NAME));
-        }
-
-    }
-
-    /**
-     * The request parameter based versioning configuration.
-     */
-    @ConfigurationProperties("parameter")
-    public static class ParameterBasedVersioningConfiguration extends AbstractVersioningConfiguration {
-
-        public static final String PREFIX = RoutesVersioningConfiguration.PREFIX + ".parameter";
-        public static final String DEFAULT_PARAMETER_NAME = "api-version";
-
-        /**
-         * Constructor for request parameter based versioning configuration.
-         * Specifies the default name of the request parameter.
-         */
-        public ParameterBasedVersioningConfiguration() {
-            super(Collections.singletonList(DEFAULT_PARAMETER_NAME));
-        }
-
     }
 
 }

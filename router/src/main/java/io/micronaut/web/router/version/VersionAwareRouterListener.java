@@ -21,7 +21,7 @@ import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.filter.FilteredRouter;
-import io.micronaut.web.router.filter.RouteMatchesFilter;
+import io.micronaut.web.router.filter.RouteMatchFilter;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -34,18 +34,18 @@ import javax.inject.Singleton;
  */
 @Singleton
 @Requires(beans = RoutesVersioningConfiguration.class)
-public class VersionedRouterDecoratorConfiguration implements BeanCreatedEventListener<Router> {
+public class VersionAwareRouterListener implements BeanCreatedEventListener<Router> {
 
-    private final RouteMatchesFilter versionedUrlFilter;
+    private final RouteVersionFilter routeVersionFilter;
 
     /**
      * Creates a configuration to decorate existing {@link Router} beans with a {@link FilteredRouter}.
      *
-     * @param filter A {@link RouteMatchesFilter} to delegate routes filtering
+     * @param filter A {@link RouteMatchFilter} to delegate routes filtering
      */
     @Inject
-    public VersionedRouterDecoratorConfiguration(RouteMatchesFilter filter) {
-        this.versionedUrlFilter = filter;
+    public VersionAwareRouterListener(RouteVersionFilter filter) {
+        this.routeVersionFilter = filter;
     }
 
     /**
@@ -56,8 +56,6 @@ public class VersionedRouterDecoratorConfiguration implements BeanCreatedEventLi
      */
     @Override
     public Router onCreated(BeanCreatedEvent<Router> event) {
-        return new FilteredRouter(
-                event.getBean(), versionedUrlFilter
-        );
+        return new FilteredRouter(event.getBean(), routeVersionFilter);
     }
 }

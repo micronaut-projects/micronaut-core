@@ -20,9 +20,10 @@ import io.micronaut.context.env.PropertySource
 import io.micronaut.web.router.DefaultRouter
 import io.micronaut.web.router.Router
 import io.micronaut.web.router.filter.FilteredRouter
-import io.micronaut.web.router.version.strategy.HeaderVersionExtractingStrategy
-import io.micronaut.web.router.version.strategy.ParameterVersionExtractingStrategy
-import io.micronaut.web.router.version.strategy.VersionExtractingStrategy
+import io.micronaut.web.router.version.resolution.HeaderVersionResolver
+import io.micronaut.web.router.version.resolution.HeaderVersionResolverConfiguration
+import io.micronaut.web.router.version.resolution.ParameterVersionResolver
+import io.micronaut.web.router.version.resolution.RequestVersionResolver
 import spock.lang.Specification
 
 class VersionResolvingStrategiesConfigSpec extends Specification {
@@ -37,7 +38,7 @@ class VersionResolvingStrategiesConfigSpec extends Specification {
                 )
         )
         then:
-        !context.containsBean(VersionExtractingStrategy)
+        !context.containsBean(RequestVersionResolver)
     }
 
     def "contains 'Header resolver' in context"() {
@@ -49,8 +50,8 @@ class VersionResolvingStrategiesConfigSpec extends Specification {
                 props
         ))
         then:
-        context.containsBean(HeaderVersionExtractingStrategy)
-        !context.containsBean(ParameterVersionExtractingStrategy)
+        context.containsBean(HeaderVersionResolver)
+        !context.containsBean(ParameterVersionResolver)
     }
 
     def "contains 'Parameter resolver' in context"() {
@@ -62,8 +63,8 @@ class VersionResolvingStrategiesConfigSpec extends Specification {
                 props
         ))
         then:
-        context.containsBean(ParameterVersionExtractingStrategy)
-        !context.containsBean(HeaderVersionExtractingStrategy)
+        context.containsBean(ParameterVersionResolver)
+        !context.containsBean(HeaderVersionResolver)
     }
 
     def "'Router' is not decorated with 'VersionedRouter'"() {
@@ -94,7 +95,7 @@ class VersionResolvingStrategiesConfigSpec extends Specification {
                  "micronaut.router.versioning.header.enabled": "true",
                  "micronaut.router.versioning.header.names"   : ["X-API", "X-VERSION"]]
         ))
-        def bean = context.getBean(RoutesVersioningConfiguration.HeaderBasedVersioningConfiguration)
+        def bean = context.getBean(HeaderVersionResolverConfiguration)
         then:
         bean.getNames().contains("X-API")
         bean.getNames().contains("X-VERSION")

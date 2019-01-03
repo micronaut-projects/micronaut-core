@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-package io.micronaut.web.router.version.strategy;
+package io.micronaut.web.router.version.resolution;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.version.RoutesVersioningConfiguration;
 
@@ -27,33 +26,30 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-import static io.micronaut.web.router.version.RoutesVersioningConfiguration.HeaderBasedVersioningConfiguration.PREFIX;
-
 /**
- * A {@link VersionExtractingStrategy} responsible for extracting version from {@link io.micronaut.http.HttpHeaders}.
+ * A {@link RequestVersionResolver} responsible for extracting version from {@link io.micronaut.http.HttpHeaders}.
  *
  * @author Bogdan Oros
  * @since 1.1.0
  */
 @Singleton
-@Requires(beans = RoutesVersioningConfiguration.class)
-@Requires(property = PREFIX + ".enabled", value = StringUtils.TRUE)
-public class HeaderVersionExtractingStrategy implements VersionExtractingStrategy {
+@Requires(beans = {RoutesVersioningConfiguration.class, HeaderVersionResolverConfiguration.class})
+public class HeaderVersionResolver implements RequestVersionResolver {
 
     private final List<String> headerNames;
 
     /**
-     * Creates a {@link VersionExtractingStrategy} to extract version from request header.
+     * Creates a {@link RequestVersionResolver} to extract version from request header.
      *
      * @param configuration A configuration to pick correct request header names.
      */
     @Inject
-    public HeaderVersionExtractingStrategy(RoutesVersioningConfiguration.HeaderBasedVersioningConfiguration configuration) {
+    public HeaderVersionResolver(HeaderVersionResolverConfiguration configuration) {
         this.headerNames = configuration.getNames();
     }
 
     @Override
-    public Optional<String> extract(HttpRequest<?> request) {
+    public Optional<String> resolve(HttpRequest<?> request) {
         return headerNames.stream()
                 .map(name -> request.getHeaders().get(name))
                 .filter(Objects::nonNull)

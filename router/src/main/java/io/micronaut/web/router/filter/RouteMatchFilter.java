@@ -20,6 +20,8 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.UriRouteMatch;
 
 import java.util.List;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
  * A filter responsible for filtering route matches.
@@ -27,17 +29,15 @@ import java.util.List;
  * @author Bogdan Oros
  * @since 1.1.0
  */
-public interface RouteMatchesFilter {
+public interface RouteMatchFilter {
 
     /**
      * A method responsible for filtering route matches based on request.
      *
      * @param <T>     The target type
-     * @param <R>     The return type
      * @param request The HTTP request
-     * @param matches The list of {@link UriRouteMatch}
      * @return A filtered list of route matches
      */
-    <T, R> List<UriRouteMatch<T, R>> filter(HttpRequest<?> request, List<UriRouteMatch<T, R>> matches);
+    <T, R> Predicate<UriRouteMatch<T, R>> filter(HttpRequest<?> request);
 
 }

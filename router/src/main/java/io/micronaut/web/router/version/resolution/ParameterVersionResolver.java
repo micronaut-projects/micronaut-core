@@ -14,10 +14,9 @@
  * limitations under the License.
  */
 
-package io.micronaut.web.router.version.strategy;
+package io.micronaut.web.router.version.resolution;
 
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.version.RoutesVersioningConfiguration;
 
@@ -27,34 +26,30 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
-import static io.micronaut.web.router.version.RoutesVersioningConfiguration.ParameterBasedVersioningConfiguration.PREFIX;
-
 /**
- * A {@link VersionExtractingStrategy} responsible for extracting version from {@link io.micronaut.http.HttpParameters}.
+ * A {@link RequestVersionResolver} responsible for extracting version from {@link io.micronaut.http.HttpParameters}.
  *
  * @author Bogdan Oros
  * @since 1.1.0
  */
 @Singleton
-@Requires(beans = RoutesVersioningConfiguration.class)
-@Requires(property = PREFIX + ".enabled", value = StringUtils.TRUE)
-public class ParameterVersionExtractingStrategy implements VersionExtractingStrategy {
+@Requires(beans = {RoutesVersioningConfiguration.class, ParameterVersionResolverConfiguration.class})
+public class ParameterVersionResolver implements RequestVersionResolver {
 
     private final List<String> parameterNames;
 
-
     /**
-     * Creates a {@link VersionExtractingStrategy} to extract version from request parameter.
+     * Creates a {@link RequestVersionResolver} to extract version from request parameter.
      *
      * @param configuration A configuration to pick correct request parameter names.
      */
     @Inject
-    public ParameterVersionExtractingStrategy(RoutesVersioningConfiguration.ParameterBasedVersioningConfiguration configuration) {
+    public ParameterVersionResolver(ParameterVersionResolverConfiguration configuration) {
         this.parameterNames = configuration.getNames();
     }
 
     @Override
-    public Optional<String> extract(HttpRequest<?> request) {
+    public Optional<String> resolve(HttpRequest<?> request) {
         return parameterNames.stream()
                 .map(name -> request.getParameters().get(name))
                 .filter(Objects::nonNull)
