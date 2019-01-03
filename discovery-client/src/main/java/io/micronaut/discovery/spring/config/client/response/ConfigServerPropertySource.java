@@ -18,19 +18,24 @@ package io.micronaut.discovery.spring.config.client.response;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Internal;
 
+import javax.annotation.Nonnull;
+import javax.annotation.concurrent.Immutable;
+import java.util.Collections;
 import java.util.Map;
 
 /**
- * A for Spring Cloud client.
+ * Represents a PropertySource returned from Spring Cloud Config server.
  *
  *  @author Thiago Locatelli
- *  @since 1.0
+ *  @since 1.1.0
  */
+@Immutable
 public class ConfigServerPropertySource {
 
-    private String name;
-    private Map<String, Object> source;
+    private final String name;
+    private final Map<String, Object> source;
 
     /**
      * Default constructor.
@@ -39,10 +44,11 @@ public class ConfigServerPropertySource {
      * @param source    The map containing the configuration entries
      */
     @JsonCreator
-    public ConfigServerPropertySource(@JsonProperty("name") String name,
+    @Internal
+    protected ConfigServerPropertySource(@JsonProperty("name") String name,
                                       @JsonProperty("source") Map<String, Object> source) {
         this.name = name;
-        this.source = source;
+        this.source = source == null ? Collections.emptyMap() : Collections.unmodifiableMap(source);
     }
 
     /**
@@ -50,7 +56,7 @@ public class ConfigServerPropertySource {
      *
      * @return the name of the property source
      */
-    public String getName() {
+    public @Nonnull String getName() {
         return name;
     }
 
@@ -59,7 +65,7 @@ public class ConfigServerPropertySource {
      *
      * @return the map containing the configuration entries
      */
-    public Map<String, Object> getSource() {
+    public @Nonnull Map<String, Object> getSource() {
         return source;
     }
 

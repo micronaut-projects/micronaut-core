@@ -16,12 +16,18 @@
 
 package io.micronaut.discovery.spring.config.client;
 
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.discovery.spring.SpringCloudConfigConfiguration;
+import io.micronaut.http.client.annotation.Client;
+
 /**
  * A non-blocking HTTP client for Spring Cloud Config Client.
  *
  * @author Thiago Locatelli
  * @since 1.0
  */
+@Client(value = SpringCloudConfigConfiguration.SPRING_CLOUD_CONFIG_ENDPOINT, configuration = SpringCloudConfigConfiguration.class)
+@Requires(beans = SpringCloudConfigConfiguration.class)
 public interface SpringCloudConfigClient extends SpringCloudConfigOperations {
 
     String CLIENT_DESCRIPTION = "spring-cloud-config-client";
