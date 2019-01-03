@@ -202,6 +202,10 @@ configurations:
     postgresSupport: Configuring Postgres
     redisSupport: Configuring Redis
     cassandraSupport: Configuring Cassandra
+  databaseMigration:
+    title: Database Migration
+    flyway: Flyway Database Migration
+    liquibase: Liquibase Database Migration
   otherConfigurations:
     title: Other Configurations
     rabbitmq: RabbitMQ
@@ -275,10 +279,15 @@ security:
     refresh: Refresh Controller
   retrievingAuthenticatedUser: Retrieve the authenticated user
   securityEvents: Security Events
-
 multitenancy:
   title: Multi-Tenancy
   multitenancyGorm: Multi-Tenancy GORM
+micronauttest:
+  title: Micronaut Test
+graphql:
+  title: Micronaut GraphQL
+grpc:
+  title: GRPC
 cli:
   title: Micronaut CLI
   createProject: Creating a Project
