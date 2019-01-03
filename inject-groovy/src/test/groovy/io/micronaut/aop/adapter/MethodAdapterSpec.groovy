@@ -10,7 +10,7 @@ class MethodAdapterSpec extends AbstractBeanDefinitionSpec {
 
     void  "test method adapter produces additional bean"() {
         when:"An adapter method is parsed"
-        BeanDefinition definition = buildBeanDefinition('test.MethodAdapterTest$ApplicationEventListener$onStartup$Intercepted','''\
+        BeanDefinition definition = buildBeanDefinition('test.MethodAdapterTest$ApplicationEventListener$onStartup1$Intercepted','''\
 package test;
 
 import io.micronaut.aop.*;
@@ -39,7 +39,7 @@ class MethodAdapterTest {
 
     void  "test method adapter honours type restraints - correct path"() {
         when:"An adapter method is parsed"
-        BeanDefinition definition = buildBeanDefinition('test.MethodAdapterTest2$Foo$myMethod$Intercepted','''\
+        BeanDefinition definition = buildBeanDefinition('test.MethodAdapterTest2$Foo$myMethod1$Intercepted','''\
 package test;
 
 import io.micronaut.aop.*;
