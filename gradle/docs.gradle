@@ -212,70 +212,10 @@ task processConfigProps() {
 task docs(dependsOn: [assemble, javadoc, publishGuide, processConfigProps, publishConfigurationReference]) {
     group = DOCUMENTATION_GROUP
 }
-
-task replaceTableOfContentsLinksWithExternalRepositoriesLinks {
-    group = DOCUMENTATION_GROUP
-    ext {
-        links = [
-                [entry: 'grpc', label: 'GRPC', version: 'snapshot', githubslug: 'micronaut-grpc'],
-                [entry: 'flyway', label: 'Flyway Database Migration', version: 'latest',githubslug: 'micronaut-configuration-flyway'],
-                [entry: 'liquibase', label: 'Liquibase Database Migration', version: 'latest',githubslug: 'micronaut-configuration-liquibase'],
-                [entry: 'graphql', label: 'Micronaut GraphQL', version: 'snapshot', githubslug: 'micronaut-graphql'],
-                [entry: 'micronauttest', label: 'Micronaut Test', version: 'latest', githubslug: 'micronaut-test'],
-        ]
-    }
-    doLast() {
-        def tocItemLink = { String href, String entry ->
-            "id=\"toc-item-${entry}\"><a href=\"${href}\">"
-        }
-        File file = new File("${project.buildDir}/docs/guide/index.html")
-        if (file.exists()) {
-            String text = file.text
-            links.each { Map<String, String> link ->
-                String url = "https://micronaut-projects.github.io/${link.githubslug}/${link.version}/guide/index.html"
-                String target = tocItemLink("#${link.entry}", link.entry)
-                String replacement = tocItemLink(url, link.entry)
-                println target
-                println text.contains(target)
-                text = text.replace(target, replacement)
-            }
-            file.text = text
-        }
-    }
-}
-
-task addLinkToExternalRepositoryDocumentation {
-    group = DOCUMENTATION_GROUP
-    mustRunAfter replaceTableOfContentsLinksWithExternalRepositoriesLinks
-    doLast() {
-        File file = new File("${project.buildDir}/docs/guide/index.html")
-        if (file.exists()) {
-            String text = file.text
-        replaceTableOfContentsLinksWithExternalRepositoriesLinks.ext.links.each { Map<String, String> link ->
-
-                String url = "https://micronaut-projects.github.io/${link.githubslug}/${link.version}/guide/index.html"
-
-                for ( String headerLevel : ['h1', 'h2', 'h3']) {
-                    String target = " ${link.label}</${headerLevel}>"
-                    if (text.contains(target)) {
-                        String replacement = " ${link.label}</${headerLevel}><p>Read <a href='${url}'>${link.label} Documentation</a>.</p>"
-                        text = text.replace(target, replacement)
-                        break
-                    }
-                }
-            }
-            file.text = text
-        }
-    }
-}
-
 javadoc.mustRunAfter assemble
 processConfigProps.mustRunAfter javadoc
 processConfigProps.mustRunAfter assemble
 publishGuide.mustRunAfter processConfigProps
 publishConfigurationReference.mustRunAfter publishGuide
-zipDocs.mustRunAfter replaceTableOfContentsLinksWithExternalRepositoriesLinks
-docs.finalizedBy replaceTableOfContentsLinksWithExternalRepositoriesLinks
-docs.finalizedBy addLinkToExternalRepositoryDocumentation
 docs.finalizedBy zipDocs
 
