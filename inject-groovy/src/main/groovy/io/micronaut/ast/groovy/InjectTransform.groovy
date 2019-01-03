@@ -554,6 +554,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                 if (methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) {
 
+                    if (Modifier.isFinal(returnType.modifiers)) {
+                        addError(
+                                "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: $methodNode",
+                                methodNode
+                        )
+                        return
+                    }
+
                     Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
                     OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean)
                     Map<CharSequence, Object> finalSettings = [:]

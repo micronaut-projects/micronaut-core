@@ -4,6 +4,34 @@ import io.micronaut.inject.AbstractTypeElementSpec
 
 class FinalModifierSpec extends AbstractTypeElementSpec {
 
+    void "test final modifier on factory with AOP advice doesn't compile"() {
+        when:
+        buildBeanDefinition('test.MyBeanFactory', '''
+package test;
+
+import io.micronaut.aop.simple.*;
+import io.micronaut.context.annotation.*;
+
+@Factory
+class MyBeanFactory {
+    @Mutating("someVal")
+    @javax.inject.Singleton
+    MyBean myBean() {
+        return new MyBean();
+    }
+
+}
+
+final class MyBean {
+
+
+}
+''')
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains 'error: Cannot apply AOP advice to final class. Class must be made non-final to support proxying: test.MyBean'
+    }
+
 
     void "test final modifier on class with AOP advice doesn't compile"() {
         when:

@@ -683,6 +683,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         .getAnnotationNamesByStereotype(AROUND_TYPE)
                         .toArray();
                 TypeElement returnTypeElement = (TypeElement) ((DeclaredType) beanMethod.getReturnType()).asElement();
+
+                if (modelUtils.isFinal(returnTypeElement)) {
+                    error(returnTypeElement, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + returnTypeElement);
+                    return;
+                }
+
                 ExecutableElement constructor = JavaModelUtils.isClass(returnTypeElement) ? modelUtils.concreteConstructorFor(returnTypeElement) : null;
                 ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(constructor) : null;
 
