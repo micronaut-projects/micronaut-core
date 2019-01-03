@@ -26,6 +26,7 @@ import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.aop.writer.AopProxyWriter;
 import io.micronaut.context.annotation.*;
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
@@ -75,6 +76,7 @@ import javax.lang.model.util.ElementScanner8;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
@@ -286,6 +288,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private final OptionalValues<Boolean> aopSettings;
         private ConfigurationMetadata configurationMetadata;
         private ExecutableElementParamInfo constructorParamterInfo;
+        private AtomicInteger adaptedMethodIndex = new AtomicInteger(0);
 
         /**
          * @param concreteClass The {@link TypeElement}
@@ -940,7 +943,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         PackageElement packageElement = elementUtils.getPackageOf(concreteClass);
                         String packageName = packageElement.getQualifiedName().toString();
                         String declaringClassSimpleName = concreteClass.getSimpleName().toString();
-                        String beanClassName = declaringClassSimpleName + '$' + typeElement.getSimpleName().toString() + '$' + method.getSimpleName().toString();
+                        String beanClassName = generateAdaptedMethodClassName(method, typeElement, declaringClassSimpleName);
 
                         AopProxyWriter aopProxyWriter = new AopProxyWriter(
                                 packageName,
@@ -976,10 +979,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 List<? extends VariableElement> targetParameters = targetMethod.getParameters();
                                 List<? extends VariableElement> sourceParameters = method.getParameters();
 
-                                if (targetParameters.size() == sourceParameters.size()) {
+                                int paramLen = targetParameters.size();
+                                if (paramLen == sourceParameters.size()) {
 
                                     Map<String, Object> genericTypes = new HashMap<>();
-                                    for (int i = 0; i < targetParameters.size(); i++) {
+                                    for (int i = 0; i < paramLen; i++) {
 
                                         VariableElement targetElement = targetParameters.get(i);
                                         VariableElement sourceElement = sourceParameters.get(i);
@@ -1042,7 +1046,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                         );
                                     }
 
-                                    Map<String, Object> boundTypes = genericUtils.resolveBoundTypes(type);
+                                    Map<String, Object> boundTypes = genericTypes;
                                     ExecutableElementParamInfo params = populateParameterData(targetMethod);
                                     Object owningType = modelUtils.resolveTypeReference(targetMethod.getEnclosingElement());
                                     if (owningType == null) {
@@ -1057,11 +1061,26 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                     Map<String, AnnotationMetadata> methodQualifier = params.getParameterMetadata();
                                     Map<String, Map<String, Object>> methodGenericTypes = params.getGenericTypes();
 
+                                    AnnotationClassValue[] adaptedArgumentTypes = new AnnotationClassValue[paramLen];
+                                    for (int i = 0; i < adaptedArgumentTypes.length; i++) {
+                                        VariableElement ve = sourceParameters.get(i);
+                                        Object r = modelUtils.resolveTypeReference(ve.asType());
+                                        if (r instanceof Class) {
+                                            adaptedArgumentTypes[i] = new AnnotationClassValue((Class) r);
+                                        } else {
+                                            adaptedArgumentTypes[i] = new AnnotationClassValue(r.toString());
+                                        }
+
+                                    }
+
                                     Map members = CollectionUtils.mapOf(
                                             Adapter.InternalAttributes.ADAPTED_BEAN, modelUtils.resolveTypeName(concreteClass.asType()),
-                                            Adapter.InternalAttributes.ADAPTED_METHOD, method.getSimpleName().toString());
+                                            Adapter.InternalAttributes.ADAPTED_METHOD, method.getSimpleName().toString(),
+                                            Adapter.InternalAttributes.ADAPTED_ARGUMENT_TYPES, adaptedArgumentTypes
+                                    );
 
-                                    String qualifier = annotationUtils.getAnnotationMetadata(concreteClass).getValue(Named.class, String.class).orElse(null);
+                                    String qualifier = annotationUtils.getAnnotationMetadata(concreteClass)
+                                                                      .getValue(Named.class, String.class).orElse(null);
 
                                     if (StringUtils.isNotEmpty(qualifier)) {
                                         members.put(Adapter.InternalAttributes.ADAPTED_QUALIFIER, qualifier);
@@ -1094,6 +1113,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     }
                 }
             }
+        }
+
+        private String generateAdaptedMethodClassName(ExecutableElement method, TypeElement typeElement, String declaringClassSimpleName) {
+            String rootName = declaringClassSimpleName + '$' + typeElement.getSimpleName().toString() + '$' + method.getSimpleName().toString();
+            return rootName + adaptedMethodIndex.incrementAndGet();
         }
 
         private AopProxyWriter resolveAopProxyWriter(BeanDefinitionVisitor beanWriter,
