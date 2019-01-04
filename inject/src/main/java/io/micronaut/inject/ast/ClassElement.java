@@ -18,11 +18,10 @@ package io.micronaut.inject.ast;
 
 import io.micronaut.core.naming.NameUtils;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.function.Predicate;
 
 /**
  * Stores data about an element that references a class.
@@ -81,6 +80,25 @@ public interface ClassElement extends TypedElement {
      * @return The bean properties for this class element
      */
     default List<PropertyElement> getBeanProperties() {
+        return Collections.emptyList();
+    }
+
+    /**
+     * Return all the fields of this class element.
+     *
+     * @return The fields
+     */
+    default List<FieldElement> getFields() {
+        return getFields((modifiers) -> true);
+    }
+
+    /**
+     * Return fields contained with the given modifiers include / exclude rules.
+     *
+     * @param modifierFilter Can be used to filter fields by modifier
+     * @return The fields
+     */
+    default List<FieldElement> getFields(@Nonnull Predicate<Set<ElementModifier>> modifierFilter) {
         return Collections.emptyList();
     }
 

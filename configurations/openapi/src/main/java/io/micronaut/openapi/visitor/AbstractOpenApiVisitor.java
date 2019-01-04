@@ -649,24 +649,31 @@ abstract class AbstractOpenApiVisitor  {
 
         if (classElement != null) {
             List<PropertyElement> beanProperties = classElement.getBeanProperties();
-            for (PropertyElement beanProperty : beanProperties) {
-                if (beanProperty.isAnnotationPresent(JsonIgnore.class) || beanProperty.isAnnotationPresent(Hidden.class)) {
-                    continue;
-                }
+            processPropertyElements(mediaType, openAPI, context, type, schema, beanProperties);
 
-                if (beanProperty.getDeclaringType().equals(type)) {
+            final List<FieldElement> publicFields = classElement.getFields(mods -> mods.contains(ElementModifier.PUBLIC) && mods.size() == 1);
 
-                    Schema propertySchema = resolveSchema(openAPI, null, beanProperty.getType(), context, mediaType);
+            processPropertyElements(mediaType, openAPI, context, type, schema, publicFields);
+        }
+    }
 
-                    processSchemaProperty(
-                            context,
-                            beanProperty,
-                            beanProperty.getType(),
-                            schema,
-                            propertySchema
-                    );
-                }
+    private void processPropertyElements(String mediaType, OpenAPI openAPI, VisitorContext context, Element type, Schema schema, List<? extends TypedElement> publicFields) {
+        for (TypedElement publicField : publicFields) {
+            if (publicField.isAnnotationPresent(JsonIgnore.class) || publicField.isAnnotationPresent(Hidden.class)) {
+                continue;
+            }
 
+            if (publicField instanceof MemberElement && ((MemberElement) publicField).getDeclaringType().equals(type)) {
+
+                Schema propertySchema = resolveSchema(openAPI, null, publicField.getType(), context, mediaType);
+
+                processSchemaProperty(
+                        context,
+                        publicField,
+                        publicField.getType(),
+                        schema,
+                        propertySchema
+                );
             }
         }
     }

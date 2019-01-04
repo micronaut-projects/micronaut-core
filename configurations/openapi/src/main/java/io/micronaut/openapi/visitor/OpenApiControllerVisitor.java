@@ -162,7 +162,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 }
 
                 ClassElement returnType = element.getReturnType();
-                if (isResponseType(returnType)) {
+                if (returnType != null && isResponseType(returnType)) {
                     returnType = returnType.getFirstTypeArgument().orElse(returnType);
                 }
                 if (returnType != null) {
