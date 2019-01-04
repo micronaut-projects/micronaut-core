@@ -24,7 +24,6 @@ import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRoute;
 import io.micronaut.web.router.UriRouteMatch;
-import io.micronaut.web.router.version.VersionAwareRouterListener;
 
 import java.net.URI;
 import java.util.List;
@@ -37,7 +36,7 @@ import java.util.stream.Stream;
  * <p>Filters themselves should be supplied via the {@link RouteMatchFilter} interface.</p>
  *
  * <p>A filtered router can be enabled by implementing a {@link io.micronaut.context.event.BeanCreatedEventListener} for
- * the existing {@link Router} and decorating appropriately. See for example {@link VersionAwareRouterListener}</p>
+ * the existing {@link Router} and decorating appropriately. See for example {@link io.micronaut.web.router.version.VersionAwareRouterListener}</p>
  *
  * @see RouteMatchFilter
  * @author Bogdan Oros
