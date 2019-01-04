@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.beans.BeanMap;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -55,6 +56,7 @@ import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.Paths;
 import io.swagger.v3.oas.models.media.ArraySchema;
 import io.swagger.v3.oas.models.media.ComposedSchema;
+import io.swagger.v3.oas.models.media.ObjectSchema;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.reactivestreams.Publisher;
@@ -62,6 +64,7 @@ import org.reactivestreams.Publisher;
 import javax.annotation.Nullable;
 import javax.validation.constraints.*;
 import java.io.IOException;
+import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.Future;
@@ -493,7 +496,7 @@ abstract class AbstractOpenApiVisitor  {
         Schema schema;
         Map<String, Schema> schemas = resolveSchemas(openAPI);
         if (schemaValue != null) {
-            String schemaName = schemaValue.get("name", String.class).orElse(computeDefaultSchemaName(type));
+            String schemaName = schemaValue.get("name", String.class).orElse(computeDefaultSchemaName(definingElement, type));
             schema = schemas.get(schemaName);
             if (schema == null) {
                 JsonNode schemaJson = toJson(schemaValue.getValues(), context);
@@ -529,7 +532,7 @@ abstract class AbstractOpenApiVisitor  {
                         if (type instanceof EnumElement) {
                             schema.setType("string");
                             schema.setEnum(((EnumElement) type).values());
-                        } else {
+                        } else if (schema instanceof ObjectSchema || schema instanceof ComposedSchema) {
                             populateSchemaProperties(mediaType, openAPI, context, type, schema);
                         }
                         schema.setName(schemaName);
@@ -540,44 +543,55 @@ abstract class AbstractOpenApiVisitor  {
                 }
             }
         } else {
-            String schemaName = computeDefaultSchemaName(type);
-            schema = schemas.get(schemaName);
-            if (schema == null) {
+            final boolean isBasicType = ClassUtils.isJavaBasicType(type.getName());
+            final PrimitiveType primitiveType;
+            if (isBasicType) {
+                primitiveType = ClassUtils.forName(type.getName(), getClass().getClassLoader()).map(PrimitiveType::fromType).orElse(null);
+            } else {
+                primitiveType = null;
+            }
+            if (primitiveType != null) {
+                return primitiveType.createProperty();
+            } else {
+                String schemaName = computeDefaultSchemaName(definingElement, type);
+                schema = schemas.get(schemaName);
+                if (schema == null) {
 
-                if (type instanceof EnumElement) {
-                    schema = new Schema();
-                    schema.setName(schemaName);
-                    schemas.put(schemaName, schema);
-
-                    schema.setType("string");
-                    schema.setEnum(((EnumElement) type).values());
-                } else {
-                    if (type instanceof TypedElement) {
-                        ClassElement classElement = ((TypedElement) type).getType();
-                        Optional<ClassElement> superType = classElement != null ? classElement.getSuperType() : Optional.empty();
-                        if (!superType.isPresent()) {
-                            schema = new Schema();
-                        } else {
-                            schema = new ComposedSchema();
-                            while (superType.isPresent()) {
-                                final ClassElement superElement = superType.get();
-
-                                final Schema parentSchema = getSchemaDefinition(mediaType, openAPI, context, superElement, null);
-                                if (parentSchema != null) {
-                                    ((ComposedSchema) schema).allOf(Collections.singletonList(parentSchema));
-                                }
-
-                                superType = superElement.getSuperType();
-                            }
-                        }
-                    } else {
+                    if (type instanceof EnumElement) {
                         schema = new Schema();
-                    }
-                    schema.setType("object");
-                    schema.setName(schemaName);
-                    schemas.put(schemaName, schema);
+                        schema.setName(schemaName);
+                        schemas.put(schemaName, schema);
 
-                    populateSchemaProperties(mediaType, openAPI, context, type, schema);
+                        schema.setType("string");
+                        schema.setEnum(((EnumElement) type).values());
+                    } else {
+                        if (type instanceof TypedElement) {
+                            ClassElement classElement = ((TypedElement) type).getType();
+                            Optional<ClassElement> superType = classElement != null ? classElement.getSuperType() : Optional.empty();
+                            if (!superType.isPresent()) {
+                                schema = new Schema();
+                            } else {
+                                schema = new ComposedSchema();
+                                while (superType.isPresent()) {
+                                    final ClassElement superElement = superType.get();
+
+                                    final Schema parentSchema = getSchemaDefinition(mediaType, openAPI, context, superElement, null);
+                                    if (parentSchema != null) {
+                                        ((ComposedSchema) schema).allOf(Collections.singletonList(parentSchema));
+                                    }
+
+                                    superType = superElement.getSuperType();
+                                }
+                            }
+                        } else {
+                            schema = new Schema();
+                        }
+                        schema.setType("object");
+                        schema.setName(schemaName);
+                        schemas.put(schemaName, schema);
+
+                        populateSchemaProperties(mediaType, openAPI, context, type, schema);
+                    }
                 }
             }
         }
@@ -603,7 +617,11 @@ abstract class AbstractOpenApiVisitor  {
                                     }).collect(Collectors.toList());
     }
 
-    private String computeDefaultSchemaName(Element type) {
+    private String computeDefaultSchemaName(Element definingElement, Element type) {
+        final String metaAnnName = definingElement != null ? definingElement.getAnnotationNameByStereotype(io.swagger.v3.oas.annotations.media.Schema.class).orElse(null) : null;
+        if (metaAnnName != null && !io.swagger.v3.oas.annotations.media.Schema.class.getName().equals(metaAnnName)) {
+            return NameUtils.getSimpleName(metaAnnName);
+        }
         if (type instanceof TypedElement) {
             ClassElement classElement = ((TypedElement) type).getType();
             if (classElement != null) {
