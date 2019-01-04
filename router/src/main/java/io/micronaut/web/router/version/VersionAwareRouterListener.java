@@ -21,7 +21,6 @@ import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.filter.FilteredRouter;
-import io.micronaut.web.router.filter.RouteMatchFilter;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -41,7 +40,7 @@ public class VersionAwareRouterListener implements BeanCreatedEventListener<Rout
     /**
      * Creates a configuration to decorate existing {@link Router} beans with a {@link FilteredRouter}.
      *
-     * @param filter A {@link RouteMatchFilter} to delegate routes filtering
+     * @param filter A {@link io.micronaut.web.router.filter.RouteMatchFilter} to delegate routes filtering
      */
     @Inject
     public VersionAwareRouterListener(RouteVersionFilter filter) {
