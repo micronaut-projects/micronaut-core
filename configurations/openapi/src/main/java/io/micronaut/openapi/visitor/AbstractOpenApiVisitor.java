@@ -24,6 +24,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.beans.BeanMap;
+import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -64,7 +65,6 @@ import org.reactivestreams.Publisher;
 import javax.annotation.Nullable;
 import javax.validation.constraints.*;
 import java.io.IOException;
-import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.Future;
@@ -383,12 +383,7 @@ abstract class AbstractOpenApiVisitor  {
     protected Schema bindSchemaForElement(VisitorContext context, Element element, ClassElement elementType, Schema schemaToBind) {
         AnnotationValue<io.swagger.v3.oas.annotations.media.Schema> schemaAnn = element.getAnnotation(io.swagger.v3.oas.annotations.media.Schema.class);
         if (schemaAnn != null) {
-            JsonNode schemaJson = toJson(schemaAnn.getValues(), context);
-            try {
-                schemaToBind = jsonMapper.readerForUpdating(schemaToBind).readValue(schemaJson);
-            } catch (IOException e) {
-                context.warn("Error reading Swagger Schema for element [" + element + "]: " + e.getMessage(), element);
-            }
+            schemaToBind = bindSchemaAnnotationValue(context, element, schemaToBind, schemaAnn);
         }
 
         Schema finalSchemaToBind = schemaToBind;
@@ -445,7 +440,43 @@ abstract class AbstractOpenApiVisitor  {
         if (element.isAnnotationPresent(Deprecated.class)) {
             schemaToBind.setDeprecated(true);
         }
-        schemaToBind.setNullable(element.isAnnotationPresent(Nullable.class));
+
+        final String defaultValue = element.getValue(Bindable.class, "defaultValue", String.class).orElse(null);
+        if (defaultValue != null && schemaToBind.getDefault() == null) {
+            schemaToBind.setDefault(defaultValue);
+        }
+        if (element.isAnnotationPresent(Nullable.class)) {
+            schemaToBind.setNullable(true);
+        }
+        return schemaToBind;
+    }
+
+    /**
+     * Binds the schema for the given element.
+     *
+     * @param context The context
+     * @param element The element
+     * @param schemaToBind The schema to bind
+     * @param schemaAnn The schema annotation
+     * @return The bound schema
+     */
+    protected Schema bindSchemaAnnotationValue(VisitorContext context, Element element, Schema schemaToBind, AnnotationValue<io.swagger.v3.oas.annotations.media.Schema> schemaAnn) {
+        JsonNode schemaJson = toJson(schemaAnn.getValues(), context);
+        try {
+            schemaToBind = jsonMapper.readerForUpdating(schemaToBind).readValue(schemaJson);
+            final String defaultValue = schemaAnn.get("defaultValue", String.class).orElse(null);
+            if (StringUtils.isNotEmpty(defaultValue)) {
+                schemaToBind.setDefault(defaultValue);
+            }
+            final String[] allowableValues = schemaAnn.get("allowableValues", String[].class).orElse(null);
+            if (ArrayUtils.isNotEmpty(allowableValues)) {
+                for (String allowableValue : allowableValues) {
+                    schemaToBind.addEnumItemObject(allowableValue);
+                }
+            }
+        } catch (IOException e) {
+            context.warn("Error reading Swagger Schema for element [" + element + "]: " + e.getMessage(), element);
+        }
         return schemaToBind;
     }
 
