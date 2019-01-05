@@ -252,6 +252,14 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                         normalizeEnumValues(paramValues, Collections.singletonMap(
                                 "in", ParameterIn.class
                         ));
+                        if (parameter.isAnnotationPresent(Header.class)) {
+                            paramValues.put("in", ParameterIn.HEADER.toString());
+                        } else if (parameter.isAnnotationPresent(CookieValue.class)) {
+                            paramValues.put("in", ParameterIn.COOKIE.toString());
+                        } else if (parameter.isAnnotationPresent(QueryValue.class)) {
+                            paramValues.put("in", ParameterIn.QUERY.toString());
+                        }
+
 
                         JsonNode jsonNode = jsonMapper.valueToTree(paramValues);
 
@@ -287,6 +295,16 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                                 context.warn("Error reading Swagger Parameter for element [" + parameter + "]: " + e.getMessage(), parameter);
                             }
                         }
+
+                        if (newParameter != null) {
+                            final Schema parameterSchema = newParameter.getSchema();
+                            if (paramAnn.contains("schema") && parameterSchema != null) {
+                                final AnnotationValue schemaAnn = paramAnn.get("schema", AnnotationValue.class).orElse(null);
+                                if (schemaAnn != null) {
+                                    bindSchemaAnnotationValue(context, parameter, parameterSchema, schemaAnn);
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -296,9 +314,11 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                         newParameter.setName(parameterName);
                     }
 
-                    newParameter.setRequired(!parameter.isAnnotationPresent(Nullable.class));
+                    if (newParameter.getRequired() == null) {
+                        newParameter.setRequired(!parameter.isAnnotationPresent(Nullable.class));
+                    }
                     // calc newParameter.setExplode();
-                    if (javadocDescription != null) {
+                    if (javadocDescription != null && StringUtils.isEmpty(newParameter.getDescription())) {
 
                         CharSequence desc = javadocDescription.getParameters().get(parameterName);
                         if (desc != null) {
@@ -332,16 +352,19 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                             continue;
                         }
                         Schema propertySchema = resolveSchema(openAPI, parameter, parameter.getType(), context, consumesMediaType);
+                        if (propertySchema != null) {
 
-                        processSchemaProperty(context, parameter, parameter.getType(), schema, propertySchema);
+                            processSchemaProperty(context, parameter, parameter.getType(), schema, propertySchema);
 
-                        propertySchema.setNullable(parameter.isAnnotationPresent(Nullable.class));
-                        if (javadocDescription != null && StringUtils.isEmpty(propertySchema.getDescription())) {
-                            CharSequence doc = javadocDescription.getParameters().get(parameter.getName());
-                            if (doc != null) {
-                                propertySchema.setDescription(doc.toString());
+                            propertySchema.setNullable(parameter.isAnnotationPresent(Nullable.class));
+                            if (javadocDescription != null && StringUtils.isEmpty(propertySchema.getDescription())) {
+                                CharSequence doc = javadocDescription.getParameters().get(parameter.getName());
+                                if (doc != null) {
+                                    propertySchema.setDescription(doc.toString());
+                                }
                             }
                         }
+
                     }
                     mt.setSchema(schema);
                     content.addMediaType(consumesMediaType, mt);
