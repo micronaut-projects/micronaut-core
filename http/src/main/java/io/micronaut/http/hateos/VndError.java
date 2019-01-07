@@ -42,7 +42,6 @@ public class VndError extends io.micronaut.http.hateoas.VndError {
      */
     @Internal
     VndError() {
-        //TODO AGB is this correct?
-        this("");
+        this(null);
     }
 }

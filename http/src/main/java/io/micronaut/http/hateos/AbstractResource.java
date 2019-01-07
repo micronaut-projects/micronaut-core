@@ -16,27 +16,16 @@
 
 package io.micronaut.http.hateos;
 
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.value.ConvertibleValues;
-import io.micronaut.core.util.StringUtils;
-import io.micronaut.core.value.OptionalMultiValues;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
-
-import javax.annotation.Nullable;
-import java.net.URI;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 
 /**
  * Deprecated. Please use io.micronaut.http.hateoas.AbstractResource
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @param <Impl> The implementation class.
+ * @deprecated Use {@link io.micronaut.http.hateoas.AbstractResource} instead
  */
 @Produces(MediaType.APPLICATION_HAL_JSON)
 @Deprecated

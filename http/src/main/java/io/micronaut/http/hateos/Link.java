@@ -20,15 +20,75 @@ import io.micronaut.http.MediaType;
 
 import javax.annotation.Nullable;
 import java.net.URI;
-import java.util.Optional;
 
 /**
  * Deprecated. Please use io.micronaut.http.hateoas.Link
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Use {@link io.micronaut.http.hateoas.Link} instead
  */
 @Deprecated
 public interface Link extends io.micronaut.http.hateoas.Link {
+
+    /**
+     * Create a link from the given URI.
+     *
+     * @param uri The URI
+     * @return The link
+     */
+    static Link of(URI uri) {
+        return new DefaultLink(uri).build();
+    }
+
+    /**
+     * Create a link from the given URI.
+     *
+     * @param uri The URI
+     * @return The link
+     */
+    static io.micronaut.http.hateoas.Link of(String uri) {
+        return of(URI.create(uri));
+    }
+
+    /**
+     * Create a link from the given URI.
+     *
+     * @param uri The URI
+     * @return The link
+     */
+    static Builder build(URI uri) {
+        return new DefaultLink(uri);
+    }
+
+    /**
+     * @deprecated Use {@link io.micronaut.http.hateoas.Link.Builder} instead.
+     */
+    @Deprecated
+    interface Builder extends io.micronaut.http.hateoas.Link.Builder {
+        @Override
+        Builder templated(boolean templated);
+
+        @Override
+        Builder profile(@Nullable URI profile);
+
+        @Override
+        Builder deprecation(@Nullable URI deprecation);
+
+        @Override
+        Builder title(@Nullable String title);
+
+        @Override
+        Builder name(@Nullable String name);
+
+        @Override
+        Builder hreflang(@Nullable String hreflang);
+
+        @Override
+        Builder type(@Nullable MediaType mediaType);
+
+        @Override
+        Link build();
+    }
 
 }
