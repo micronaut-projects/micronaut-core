@@ -26,6 +26,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.util.StringUtils;
 import io.reactivex.Flowable;
+import io.reactivex.Single;
 import io.reactivex.functions.Action;
 
 import javax.inject.Singleton;
@@ -74,14 +75,36 @@ public class TimedInterceptor implements MethodInterceptor<Object, Object> {
         final String metricName = metadata.getValue(Timed.class, String.class).orElse(DEFAULT_METRIC_NAME);
         if (StringUtils.isNotEmpty(metricName)) {
             if (Publishers.isConvertibleToPublisher(javaReturnType)) {
+
                 // handle publisher
                 final Object result = context.proceed();
-                Flowable<?> flowable = Publishers.convertPublisher(result, Flowable.class);
-                AtomicReference<Timer.Sample> sample = new AtomicReference<>();
-                AtomicReference<String> exceptionClass = new AtomicReference<>("none");
-                flowable = flowable.doOnRequest(n -> sample.set(Timer.start(meterRegistry)))
-                               .doOnError(throwable -> exceptionClass.set(throwable.getClass().getSimpleName()))
-                               .doOnComplete((Action) () -> {
+                if (result == null) {
+                    return result;
+                } else {
+                    AtomicReference<Timer.Sample> sample = new AtomicReference<>();
+                    AtomicReference<String> exceptionClass = new AtomicReference<>("none");
+                    if (Publishers.isSingle(result.getClass())) {
+                        Single<?> single = Publishers.convertPublisher(result, Single.class);
+                        single = single.doOnSubscribe(d -> sample.set(Timer.start(meterRegistry)))
+                                       .doOnError(throwable -> stopTimed(
+                                               metricName,
+                                               sample.get(),
+                                               throwable.getClass().getSimpleName(),
+                                               metadata
+                                       ))
+                                       .doOnSuccess(o -> stopTimed(
+                                               metricName,
+                                               sample.get(),
+                                               "none",
+                                               metadata
+                                       ));
+
+                        return Publishers.convertPublisher(single, javaReturnType);
+                    } else {
+                        Flowable<?> flowable = Publishers.convertPublisher(result, Flowable.class);
+                        flowable = flowable.doOnRequest(n -> sample.set(Timer.start(meterRegistry)))
+                                .doOnError(throwable -> exceptionClass.set(throwable.getClass().getSimpleName()))
+                                .doOnComplete((Action) () -> {
                                     final Timer.Sample s = sample.get();
                                     if (s != null) {
                                         stopTimed(
@@ -92,7 +115,11 @@ public class TimedInterceptor implements MethodInterceptor<Object, Object> {
                                         );
                                     }
                                 });
-                return Publishers.convertPublisher(flowable, javaReturnType);
+                        return Publishers.convertPublisher(flowable, javaReturnType);
+                    }
+                }
+
+
             } else {
                 // blocking case
                 Timer.Sample sample = Timer.start(meterRegistry);
@@ -106,7 +133,7 @@ public class TimedInterceptor implements MethodInterceptor<Object, Object> {
                         return cs.whenComplete((BiConsumer<Object, Throwable>) (o, throwable) -> stopTimed(
                                 metricName,
                                 sample,
-                                throwable != null ? throwable.getClass().getSimpleName() : null,
+                                throwable != null ? throwable.getClass().getSimpleName() : "none",
                                 metadata));
                     } else {
                         return result;
@@ -131,13 +158,14 @@ public class TimedInterceptor implements MethodInterceptor<Object, Object> {
             final String[] tags = metadata.getValue(Timed.class, "extraTags", String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
             final double[] percentiles = metadata.getValue(Timed.class, "percentiles", double[].class).orElse(null);
             final boolean histogram = metadata.getValue(Timed.class, "histogram", boolean.class).orElse(false);
-            sample.stop(Timer.builder(metricName)
+            final Timer timer = Timer.builder(metricName)
                     .description(description)
                     .tags(tags)
                     .tags(EXCEPTION_TAG, exceptionClass)
                     .publishPercentileHistogram(histogram)
                     .publishPercentiles(percentiles)
-                    .register(meterRegistry));
+                    .register(meterRegistry);
+            sample.stop(timer);
         } catch (Exception e) {
             // ignoring on purpose
         }
