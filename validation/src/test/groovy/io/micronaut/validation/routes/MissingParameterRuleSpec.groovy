@@ -182,4 +182,40 @@ class Book {
         then:
         noExceptionThrown()
     }
+
+    void "test map name to different header"() {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get("/{name}")
+    String abc(@Header("pet-name") String name, @QueryValue("name") String pathName) {
+        return "abc";
+    }
+}
+
+class Book {
+    
+    private String abc;
+    
+    public String getAbc() {
+        return this.abc;
+    }
+    
+    public void setAbc(String abc) {
+        this.abc = abc;
+    }
+}
+
+""")
+
+        then:
+        noExceptionThrown()
+    }
 }
