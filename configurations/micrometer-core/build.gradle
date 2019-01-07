@@ -6,7 +6,7 @@ dependencies {
     compileOnly project(":inject-java")
     compileOnly project(":management")
     compileOnly project(":jdbc")
-
+    compileOnly dependencyVersion("jcache")
 
     testCompile project(":management")
     testCompile project(":http-client")
