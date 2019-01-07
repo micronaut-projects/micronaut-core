@@ -15,8 +15,9 @@
  */
 
 /**
+ * hateoas.
+ *
  * @author Graeme Rocher
  * @since 1.0
- * @deprecated Use the classes in {@link io.micronaut.http.hateoas} instead
  */
-package io.micronaut.http.hateos;
+package io.micronaut.http.hateoas;
