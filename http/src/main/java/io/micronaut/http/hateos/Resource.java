@@ -16,37 +16,13 @@
 
 package io.micronaut.http.hateos;
 
-import io.micronaut.core.value.OptionalMultiValues;
-
 /**
- * Represents a REST resource in a HATEOS architecture.
+ * Deprecated. Please use io.micronaut.http.hateoas.Resource
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface Resource {
+@Deprecated
+public interface Resource extends io.micronaut.http.hateoas.Resource {
 
-    /**
-     * The links attribute.
-     */
-    String LINKS = "_links";
-
-    /**
-     * The embedded attribute.
-     */
-    String EMBEDDED = "_embedded";
-
-    /**
-     * @return The links for this resource
-     */
-    default OptionalMultiValues<Link> getLinks() {
-        return OptionalMultiValues.empty();
-    }
-
-    /**
-     * @return The embedded resources
-     */
-    default OptionalMultiValues<Resource> getEmbedded() {
-        return OptionalMultiValues.empty();
-    }
 }

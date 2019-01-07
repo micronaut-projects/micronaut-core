@@ -22,113 +22,20 @@ import java.net.URI;
 import java.util.Optional;
 
 /**
- * Default implementation of {@link Link}.
+ * Deprecated. Please use io.micronaut.http.hateoas.DefaultLink
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-class DefaultLink implements Link, Link.Builder {
-
-    final URI href;
-    private boolean templated;
-    private URI profile;
-    private URI deprecation;
-    private String title;
-    private String hreflang;
-    private MediaType type;
-    private String name;
+@Deprecated
+class DefaultLink extends io.micronaut.http.hateoas.DefaultLink {
 
     /**
      * @param uri The URI
      */
+    //TODO AGB don't know how to solve this
+    //protected class (not visible from another package)
     DefaultLink(URI uri) {
         this.href = uri;
-    }
-
-    @Override
-    public URI getHref() {
-        return href;
-    }
-
-    @Override
-    public Builder templated(boolean templated) {
-        this.templated = templated;
-        return this;
-    }
-
-    @Override
-    public Builder profile(URI profile) {
-        this.profile = profile;
-        return this;
-    }
-
-    @Override
-    public Builder deprecation(URI deprecation) {
-        this.deprecation = deprecation;
-        return this;
-    }
-
-    @Override
-    public Builder title(String title) {
-        this.title = title;
-        return this;
-    }
-
-    @Override
-    public Builder name(String name) {
-        this.name = name;
-        return this;
-    }
-
-    @Override
-    public Builder hreflang(String hreflang) {
-        this.hreflang = hreflang;
-        return this;
-    }
-
-    @Override
-    public Builder type(MediaType mediaType) {
-        this.type = mediaType;
-        return this;
-    }
-
-    @Override
-    public boolean isTemplated() {
-        return templated;
-    }
-
-    @Override
-    public Optional<MediaType> getType() {
-        return type == null ? Optional.empty() : Optional.of(type);
-    }
-
-    @Override
-    public Optional<URI> getDeprecation() {
-        return deprecation == null ? Optional.empty() : Optional.of(deprecation);
-    }
-
-    @Override
-    public Optional<URI> getProfile() {
-        return profile == null ? Optional.empty() : Optional.of(profile);
-    }
-
-    @Override
-    public Optional<String> getName() {
-        return name == null ? Optional.empty() : Optional.of(name);
-    }
-
-    @Override
-    public Optional<String> getTitle() {
-        return title == null ? Optional.empty() : Optional.of(title);
-    }
-
-    @Override
-    public Optional<String> getHreflang() {
-        return hreflang == null ? Optional.empty() : Optional.of(hreflang);
-    }
-
-    @Override
-    public Link build() {
-        return this;
     }
 }

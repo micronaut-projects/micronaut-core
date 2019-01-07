@@ -14,38 +14,39 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.hateos;
+package io.micronaut.http.hateoas;
 
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Produces;
-
-import javax.annotation.Nullable;
-import java.util.Optional;
+import io.micronaut.core.value.OptionalMultiValues;
 
 /**
- * Deprecated. Please use io.micronaut.http.hateoas.JsonError
+ * Represents a REST resource in a hateoas architecture.
  *
  * @author Graeme Rocher
- * @since 1.0
+ * @since 1.1
  */
-@Produces(MediaType.APPLICATION_JSON)
-@Deprecated
-public class JsonError extends io.micronaut.http.hateoas.JsonError {
+public interface Resource {
 
     /**
-     * @param message The message
+     * The links attribute.
      */
-    public JsonError(String message) {
-        super(message);
+    String LINKS = "_links";
+
+    /**
+     * The embedded attribute.
+     */
+    String EMBEDDED = "_embedded";
+
+    /**
+     * @return The links for this resource
+     */
+    default OptionalMultiValues<Link> getLinks() {
+        return OptionalMultiValues.empty();
     }
 
     /**
-     * Used by Jackson.
+     * @return The embedded resources
      */
-    @Internal
-    //TODO AGB don't know how to solve this visibility problem
-    JsonError() {
+    default OptionalMultiValues<Resource> getEmbedded() {
+        return OptionalMultiValues.empty();
     }
-
 }

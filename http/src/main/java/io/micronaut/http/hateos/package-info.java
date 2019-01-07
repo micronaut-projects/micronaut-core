@@ -15,7 +15,7 @@
  */
 
 /**
- * Hateos.
+ * hateos.
  *
  * @author Graeme Rocher
  * @since 1.0
