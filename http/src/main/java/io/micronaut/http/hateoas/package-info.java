@@ -14,35 +14,10 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.hateos;
-
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Produces;
-
 /**
- * Deprecated. Please use io.micronaut.http.hateoas.VndError
+ * hateoas.
  *
- * @author graemerocher
+ * @author Graeme Rocher
  * @since 1.0
  */
-@Produces(MediaType.APPLICATION_VND_ERROR)
-@Deprecated
-public class VndError extends io.micronaut.http.hateoas.VndError {
-
-    /**
-     * @param message The message
-     */
-    public VndError(String message) {
-        super(message);
-    }
-
-    /**
-     * Used by Jackson.
-     */
-    @Internal
-    VndError() {
-        //TODO AGB is this correct?
-        this("");
-    }
-}
+package io.micronaut.http.hateoas;

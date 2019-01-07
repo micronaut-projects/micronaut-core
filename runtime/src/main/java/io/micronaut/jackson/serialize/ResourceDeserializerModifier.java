@@ -21,7 +21,7 @@ import com.fasterxml.jackson.databind.DeserializationConfig;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.introspect.BeanPropertyDefinition;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.hateos.Resource;
+import io.micronaut.http.hateoas.Resource;
 
 import java.util.List;
 
