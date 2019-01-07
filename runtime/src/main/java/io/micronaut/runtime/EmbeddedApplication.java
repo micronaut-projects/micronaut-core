@@ -64,4 +64,14 @@ public interface EmbeddedApplication<T extends EmbeddedApplication> extends Appl
     default boolean isServer() {
         return false;
     }
+
+    /**
+     * Most servers shutdown cleanly, however some integrations make require a forced exist. If
+     * true is returned Micronaut will explicitly invoke System.exit(..).
+     *
+     * @return Whether exiting the server should be forced.
+     */
+    default boolean isForceExit() {
+        return false;
+    }
 }
