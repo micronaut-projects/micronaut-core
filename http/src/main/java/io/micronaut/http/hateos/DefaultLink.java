@@ -19,7 +19,6 @@ package io.micronaut.http.hateos;
 import io.micronaut.http.MediaType;
 
 import java.net.URI;
-import java.util.Optional;
 
 /**
  * Deprecated. Please use io.micronaut.http.hateoas.DefaultLink
@@ -28,14 +27,53 @@ import java.util.Optional;
  * @since 1.0
  */
 @Deprecated
-class DefaultLink extends io.micronaut.http.hateoas.DefaultLink {
+class DefaultLink extends io.micronaut.http.hateoas.DefaultLink implements Link.Builder {
 
     /**
      * @param uri The URI
+     * @deprecated Use {@link io.micronaut.http.hateoas.DefaultLink} instead
      */
-    //TODO AGB don't know how to solve this
-    //protected class (not visible from another package)
-    DefaultLink(URI uri) {
-        this.href = uri;
+    protected DefaultLink(URI uri) {
+        super(uri);
+    }
+
+    @Override
+    public Link.Builder templated(boolean templated) {
+        return (Link.Builder) super.templated(templated);
+    }
+
+    @Override
+    public Link.Builder profile(URI profile) {
+        return (Link.Builder) super.profile(profile);
+    }
+
+    @Override
+    public Link.Builder deprecation(URI deprecation) {
+        return (Link.Builder) super.deprecation(deprecation);
+    }
+
+    @Override
+    public Link.Builder title(String title) {
+        return (Link.Builder) super.title(title);
+    }
+
+    @Override
+    public Link.Builder name(String name) {
+        return (Link.Builder) super.name(name);
+    }
+
+    @Override
+    public Link.Builder hreflang(String hreflang) {
+        return (Link.Builder) super.hreflang(hreflang);
+    }
+
+    @Override
+    public Link.Builder type(MediaType mediaType) {
+        return (Link.Builder) super.type(mediaType);
+    }
+
+    @Override
+    public Link build() {
+        return (Link) super.build();
     }
 }

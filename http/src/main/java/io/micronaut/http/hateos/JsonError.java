@@ -20,9 +20,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 
-import javax.annotation.Nullable;
-import java.util.Optional;
-
 /**
  * Deprecated. Please use io.micronaut.http.hateoas.JsonError
  *
@@ -44,8 +41,8 @@ public class JsonError extends io.micronaut.http.hateoas.JsonError {
      * Used by Jackson.
      */
     @Internal
-    //TODO AGB don't know how to solve this visibility problem
     JsonError() {
+        this(null);
     }
 
 }

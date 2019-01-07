@@ -39,14 +39,14 @@ public interface Resource {
     /**
      * @return The links for this resource
      */
-    default OptionalMultiValues<Link> getLinks() {
+    default OptionalMultiValues<? extends Link> getLinks() {
         return OptionalMultiValues.empty();
     }
 
     /**
      * @return The embedded resources
      */
-    default OptionalMultiValues<Resource> getEmbedded() {
+    default OptionalMultiValues<? extends Resource> getEmbedded() {
         return OptionalMultiValues.empty();
     }
 }

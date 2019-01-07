@@ -27,7 +27,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.1
  */
-class DefaultLink implements Link, Link.Builder {
+public class DefaultLink implements Link, Link.Builder {
 
     final URI href;
     private boolean templated;
@@ -41,7 +41,7 @@ class DefaultLink implements Link, Link.Builder {
     /**
      * @param uri The URI
      */
-    DefaultLink(URI uri) {
+    protected DefaultLink(URI uri) {
         this.href = uri;
     }
 

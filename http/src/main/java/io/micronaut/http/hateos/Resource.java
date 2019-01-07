@@ -16,13 +16,27 @@
 
 package io.micronaut.http.hateos;
 
+import io.micronaut.core.value.OptionalMultiValues;
+import io.micronaut.http.hateoas.Link;
+
 /**
  * Deprecated. Please use io.micronaut.http.hateoas.Resource
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Use {@link io.micronaut.http.hateoas.Resource} instead
  */
 @Deprecated
 public interface Resource extends io.micronaut.http.hateoas.Resource {
+    @SuppressWarnings("unchecked")
+    @Override
+    default OptionalMultiValues<Link> getLinks() {
+        return OptionalMultiValues.EMPTY_VALUES;
+    }
 
+    @SuppressWarnings("unchecked")
+    @Override
+    default OptionalMultiValues<Resource> getEmbedded() {
+        return OptionalMultiValues.EMPTY_VALUES;
+    }
 }
