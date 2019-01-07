@@ -120,6 +120,9 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                             if (LOG.isInfoEnabled()) {
                                 LOG.info("Embedded Application shutting down");
                             }
+                            if (embeddedApplication.isForceExit()) {
+                                System.exit(0);
+                            }
                         } catch (InterruptedException e) {
                             // ignore
                         }
