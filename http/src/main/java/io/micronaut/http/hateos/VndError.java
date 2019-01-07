@@ -21,13 +21,14 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 
 /**
- * A type that can be used to represent JSON errors that returns a content type of Vnd.Error.
+ * Deprecated. Please use io.micronaut.http.hateoas.VndError
  *
  * @author graemerocher
  * @since 1.0
  */
 @Produces(MediaType.APPLICATION_VND_ERROR)
-public class VndError extends JsonError {
+@Deprecated
+public class VndError extends io.micronaut.http.hateoas.VndError {
 
     /**
      * @param message The message
@@ -41,5 +42,6 @@ public class VndError extends JsonError {
      */
     @Internal
     VndError() {
+        this(null);
     }
 }

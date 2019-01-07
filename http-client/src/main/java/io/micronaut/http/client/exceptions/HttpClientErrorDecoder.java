@@ -18,8 +18,8 @@ package io.micronaut.http.client.exceptions;
 
 import io.micronaut.core.naming.Described;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.hateos.JsonError;
-import io.micronaut.http.hateos.VndError;
+import io.micronaut.http.hateoas.JsonError;
+import io.micronaut.http.hateoas.VndError;
 
 import java.util.Optional;
 
