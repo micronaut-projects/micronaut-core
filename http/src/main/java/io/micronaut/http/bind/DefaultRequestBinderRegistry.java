@@ -30,15 +30,9 @@ import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
+import io.micronaut.http.bind.binders.*;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
-import io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder;
-import io.micronaut.http.bind.binders.CookieAnnotationBinder;
-import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
-import io.micronaut.http.bind.binders.HeaderAnnotationBinder;
-import io.micronaut.http.bind.binders.ParameterAnnotationBinder;
-import io.micronaut.http.bind.binders.RequestArgumentBinder;
-import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -204,6 +198,9 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
         ParameterAnnotationBinder<Object> parameterAnnotationBinder = new ParameterAnnotationBinder<>(conversionService);
         byAnnotation.put(parameterAnnotationBinder.getAnnotationType(), parameterAnnotationBinder);
+
+        PathVariableAnnotationBinder<Object> pathVariableAnnotationBinder = new PathVariableAnnotationBinder<>(conversionService);
+        byAnnotation.put(pathVariableAnnotationBinder.getAnnotationType(), pathVariableAnnotationBinder);
     }
 
     /**
