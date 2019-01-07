@@ -33,7 +33,7 @@ import java.util.concurrent.atomic.AtomicLong
  * @since 1.0
  */
 
-class hateoasCrudSpec extends Specification {
+class HateoasCrudSpec extends Specification {
 
     @Shared
     @AutoCleanup
