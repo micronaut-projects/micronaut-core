@@ -262,11 +262,18 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 } else if (annotationMetadata.isAnnotationPresent(QueryValue.class)) {
                     String parameterName = annotationMetadata.getValue(QueryValue.class, String.class).orElse(null);
                     conversionService.convert(definedValue, ConversionContext.of(String.class).with(annotationMetadata)).ifPresent(o -> {
-                        if (!StringUtils.isEmpty(parameterName)) {
+                        if (!StringUtils.isEmpty(o)) {
                             paramMap.put(parameterName, o);
                             queryParams.put(parameterName, o);
                         } else {
                             queryParams.put(argumentName, o);
+                        }
+                    });
+                } else if (annotationMetadata.isAnnotationPresent(PathVariable.class)) {
+                    String parameterName = annotationMetadata.getValue(PathVariable.class, String.class).orElse(null);
+                    conversionService.convert(definedValue, ConversionContext.of(String.class).with(annotationMetadata)).ifPresent(o -> {
+                        if (!StringUtils.isEmpty(o)) {
+                            paramMap.put(parameterName, o);
                         }
                     });
                 } else if (!uriVariables.contains(argumentName)) {

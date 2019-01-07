@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,8 +16,6 @@
 
 package io.micronaut.http.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.core.bind.annotation.Bindable;
 
@@ -26,24 +24,32 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
 
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
 /**
- * An annotation that can be applied to method argument to indicate that the method argument is bound from an HTTP
- * cookie.
+ * Used to bind a parameter exclusively from a path variable.
  *
- * @author Graeme Rocher
- * @since 1.0
+ * @author graemerocher
+ * @since 1.0.3
  */
 @Documented
 @Retention(RUNTIME)
 @Target({ElementType.PARAMETER, ElementType.ANNOTATION_TYPE})
 @Bindable
-public @interface CookieValue {
-
+public @interface PathVariable {
     /**
-     * @return The name of the cookie, otherwise it is inferred from the parameter name
+     * @return The name of the parameter
      */
     @AliasFor(annotation = Bindable.class, member = "value")
+    @AliasFor(member = "name")
     String value() default "";
+
+    /**
+     * @return The name of the parameter
+     */
+    @AliasFor(annotation = Bindable.class, member = "value")
+    @AliasFor(member = "value")
+    String name() default "";
 
     /**
      * @see Bindable#defaultValue()
