@@ -34,6 +34,46 @@ import java.lang.annotation.Retention
  */
 class AnnotationMetadataWriterSpec extends AbstractBeanDefinitionSpec {
 
+    void "test annotation metadata with primitive arrays"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata('test.Test','''\
+package test;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import io.micronaut.inject.annotation.*;
+
+@MyAnn(doubleArray=[1.1d])
+class Test {
+}
+
+
+@Documented
+@Retention(RUNTIME)
+@Target([ElementType.TYPE])
+@interface MyAnn {
+    double[] doubleArray() default [];
+    int[] intArray() default [];
+    short[] shortArray() default [];
+    boolean[] booleanArray() default [];
+}
+
+''')
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.getValue("test.MyAnn","doubleArray", Double[].class).get() == [1.1d] as Double[]
+        metadata.getValue("test.MyAnn","doubleArray", double[].class).get() == [1.1d] as double[]
+    }
+
     void "test read annotation with annotation value"() {
         given:
         AnnotationMetadata toWrite = buildTypeAnnotationMetadata("test.Test",'''\

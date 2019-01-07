@@ -242,9 +242,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
             } catch (Throwable e) {
                 AstMessageUtils.error(source, beanClassNode, "Error generating bean definition class for dependency injection of class [${beanTypeName}]: $e.message")
-                if (e.message == null) {
-                    e.printStackTrace(System.err)
-                }
+                e.printStackTrace(System.err)
             }
         }
         if (!beanDefinitionWriters.isEmpty()) {
