@@ -90,8 +90,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 return AnnotationMetadata.EMPTY_METADATA;
             }
             return metadata;
-        } catch(RuntimeException e) {
-            if("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
+        } catch (RuntimeException e) {
+            if ("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
                 // workaround for a bug in the Eclipse APT implementation. See bug 541466 on their Bugzilla.
                 return AnnotationMetadata.EMPTY_METADATA;
             } else {

@@ -21,7 +21,6 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 import io.micronaut.context.exceptions.*;
-import io.micronaut.context.processor.AnnotationProcessor;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;

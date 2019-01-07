@@ -106,5 +106,4 @@ public interface VisitorContext extends MutableConvertibleValues<Object> {
         return Optional.empty();
     }
 
-
 }
