@@ -262,7 +262,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 } else if (annotationMetadata.isAnnotationPresent(QueryValue.class)) {
                     String parameterName = annotationMetadata.getValue(QueryValue.class, String.class).orElse(null);
                     conversionService.convert(definedValue, ConversionContext.of(String.class).with(annotationMetadata)).ifPresent(o -> {
-                        if (!StringUtils.isEmpty(o)) {
+                        if (!StringUtils.isEmpty(parameterName)) {
                             paramMap.put(parameterName, o);
                             queryParams.put(parameterName, o);
                         } else {
