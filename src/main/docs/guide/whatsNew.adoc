@@ -48,3 +48,6 @@ class CacheFactory {
 
 New configurations have been added to support https://micronaut-projects.github.io/micronaut-configuration-flyway/latest/guide/index.html[Flyway] and https://micronaut-projects.github.io/micronaut-configuration-liquibase/latest/guide/index.html[Liquibase] database migrations.
 
+=== Dependency Upgrades
+
+- Micrometer `1.0.6` -> `1.1.1`
