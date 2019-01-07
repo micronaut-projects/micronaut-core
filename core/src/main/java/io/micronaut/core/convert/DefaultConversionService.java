@@ -170,6 +170,28 @@ public class DefaultConversionService implements ConversionService<DefaultConver
     @SuppressWarnings({"OptionalIsPresent", "unchecked"})
     protected void registerDefaultConverters() {
 
+        // wrapper to primitive array converters
+        addConverter(Double[].class, double[].class, (object, targetType, context) -> {
+            double[] doubles = new double[object.length];
+            for (int i = 0; i < object.length; i++) {
+                Double aDouble = object[i];
+                if (aDouble != null) {
+                    doubles[i] = aDouble;
+                }
+            }
+            return Optional.of(doubles);
+        });
+        addConverter(Integer[].class, int[].class, (object, targetType, context) -> {
+            int[] integers = new int[object.length];
+            for (int i = 0; i < object.length; i++) {
+                Integer o = object[i];
+                if (o != null) {
+                    integers[i] = o;
+                }
+            }
+            return Optional.of(integers);
+        });
+
         // Object -> List
         addConverter(Object.class, List.class, (object, targetType, context) -> {
             Optional<Argument<?>> firstTypeVariable = context.getFirstTypeVariable();
