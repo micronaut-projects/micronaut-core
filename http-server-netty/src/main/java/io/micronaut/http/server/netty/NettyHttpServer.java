@@ -311,24 +311,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     public synchronized EmbeddedServer stop() {
         if (isRunning() && workerGroup != null) {
             if (running.compareAndSet(true, false)) {
-                try {
-                    workerGroup.shutdownGracefully()
-                            .addListener(this::logShutdownErrorIfNecessary);
-                    parentGroup.shutdownGracefully()
-                            .addListener(this::logShutdownErrorIfNecessary);
-                    webSocketSessions.close();
-                    applicationContext.publishEvent(new ServerShutdownEvent(this));
-                    if (serviceInstance != null) {
-                        applicationContext.publishEvent(new ServiceShutdownEvent(serviceInstance));
-                    }
-                    if (applicationContext.isRunning()) {
-                        applicationContext.stop();
-                    }
-                } catch (Throwable e) {
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("Error stopping Micronaut server: " + e.getMessage(), e);
-                    }
-                }
+                stopInternal();
             }
         }
         return this;
@@ -405,9 +388,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     @SuppressWarnings("MagicNumber")
     private void bindServerToHost(ServerBootstrap serverBootstrap, @Nullable String host, AtomicInteger attempts) {
         boolean isRandomPort = specifiedPort == -1;
-        if (!SocketUtils.isTcpPortAvailable(serverPort) && !isRandomPort) {
-            throw new ServerStartupException("Unable to start Micronaut server on port: " + serverPort, new BindException("Address already in use"));
-        }
         Optional<String> applicationName = serverConfiguration.getApplicationConfiguration().getName();
         if (applicationName.isPresent()) {
             if (LOG.isDebugEnabled()) {
@@ -433,8 +413,9 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             });
 
         } catch (Throwable e) {
+            final boolean isBindError = e instanceof BindException;
             if (LOG.isErrorEnabled()) {
-                if (e instanceof BindException) {
+                if (isBindError) {
                     LOG.error("Unable to start server. Port already {} in use.", serverPort);
                 } else {
                     LOG.error("Error starting Micronaut server: " + e.getMessage(), e);
@@ -446,7 +427,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
                 serverPort = SocketUtils.findAvailableTcpPort();
                 bindServerToHost(serverBootstrap, host, attempts);
             } else {
-                stop();
+                stopInternal();
+                throw new ServerStartupException("Unable to start Micronaut server on port: " + serverPort, e);
             }
         }
     }
@@ -456,6 +438,27 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             if (LOG.isWarnEnabled()) {
                 Throwable e = future.cause();
                 LOG.warn("Error stopping Micronaut server: " + e.getMessage(), e);
+            }
+        }
+    }
+
+    private void stopInternal() {
+        try {
+            workerGroup.shutdownGracefully()
+                    .addListener(this::logShutdownErrorIfNecessary);
+            parentGroup.shutdownGracefully()
+                    .addListener(this::logShutdownErrorIfNecessary);
+            webSocketSessions.close();
+            applicationContext.publishEvent(new ServerShutdownEvent(this));
+            if (serviceInstance != null) {
+                applicationContext.publishEvent(new ServiceShutdownEvent(serviceInstance));
+            }
+            if (applicationContext.isRunning()) {
+                applicationContext.stop();
+            }
+        } catch (Throwable e) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Error stopping Micronaut server: " + e.getMessage(), e);
             }
         }
     }
