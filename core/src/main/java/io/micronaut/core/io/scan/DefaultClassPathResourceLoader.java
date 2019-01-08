@@ -16,10 +16,9 @@
 
 package io.micronaut.core.io.scan;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,9 +28,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.*;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Stream;
 
 /**
@@ -47,7 +44,8 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
 
     private final ClassLoader classLoader;
     private final String basePath;
-    private final Cache<String, Boolean> isDirectoryCache = Caffeine.newBuilder().maximumSize(50).build();
+    private final Map<String, Boolean> isDirectoryCache = new ConcurrentLinkedHashMap.Builder<String, Boolean>()
+            .maximumWeightedCapacity(50).build();
 
     /**
      * Default constructor.
@@ -153,7 +151,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
 
     @SuppressWarnings("ConstantConditions")
     private boolean isDirectory(String path) {
-        return isDirectoryCache.get(path, s -> {
+        return isDirectoryCache.computeIfAbsent(path, s -> {
             URL url = classLoader.getResource(prefixPath(path));
             if (url != null) {
                 try {

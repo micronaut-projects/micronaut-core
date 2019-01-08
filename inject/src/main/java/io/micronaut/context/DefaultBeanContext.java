@@ -16,8 +16,6 @@
 
 package io.micronaut.context;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.context.annotation.*;
 import io.micronaut.context.event.*;
 import io.micronaut.context.exceptions.*;
@@ -46,9 +44,11 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StreamUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.qualifiers.Qualifiers;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -98,9 +98,9 @@ public class DefaultBeanContext implements BeanContext {
     private final Map<String, BeanConfiguration> beanConfigurations = new ConcurrentHashMap<>(4);
     private final Map<BeanKey, Boolean> containsBeanCache = new ConcurrentHashMap<>(30);
 
-    private final Cache<BeanKey, Collection<Object>> initializedObjectsByType = Caffeine.newBuilder().maximumSize(30).build();
-    private final Cache<BeanKey, Optional<BeanDefinition>> beanConcreteCandidateCache = Caffeine.newBuilder().maximumSize(30).build();
-    private final Cache<Class, Collection<BeanDefinition>> beanCandidateCache = Caffeine.newBuilder().maximumSize(30).build();
+    private final Map<BeanKey, Collection<Object>> initializedObjectsByType = new ConcurrentLinkedHashMap.Builder<BeanKey, Collection<Object>>().maximumWeightedCapacity(30).build();
+    private final Map<BeanKey, Optional<BeanDefinition>> beanConcreteCandidateCache = new ConcurrentLinkedHashMap.Builder<BeanKey, Optional<BeanDefinition>>().maximumWeightedCapacity(30).build();
+    private final Map<Class, Collection<BeanDefinition>> beanCandidateCache = new ConcurrentLinkedHashMap.Builder<Class, Collection<BeanDefinition>>().maximumWeightedCapacity(30).build();
 
     private final ClassLoader classLoader;
     private final Set<Class> thisInterfaces = ReflectionUtils.getAllInterfaces(getClass());
@@ -415,7 +415,7 @@ public class DefaultBeanContext implements BeanContext {
         }
         BeanKey<T> beanKey = new BeanKey<>(type, qualifier);
         synchronized (singletonObjects) {
-            initializedObjectsByType.invalidateAll();
+            initializedObjectsByType.clear();
 
             BeanDefinition<T> beanDefinition = inject ? findBeanCandidatesForInstance(singleton).stream().findFirst().orElse(null) : null;
             if (beanDefinition != null && beanDefinition.getBeanType().isInstance(singleton)) {
@@ -797,7 +797,7 @@ public class DefaultBeanContext implements BeanContext {
         Qualifier<T> proxyQualifier = qualifier != null ? Qualifiers.byQualifiers(qualifier, PROXY_TARGET_QUALIFIER) : PROXY_TARGET_QUALIFIER;
         BeanKey key = new BeanKey(beanType, proxyQualifier);
 
-        return (Optional) beanConcreteCandidateCache.get(key, beanKey -> {
+        return (Optional) beanConcreteCandidateCache.computeIfAbsent(key, beanKey -> {
             BeanRegistration<T> beanRegistration = singletonObjects.get(beanKey);
             if (beanRegistration != null) {
                 if (LOG.isDebugEnabled()) {
@@ -963,8 +963,8 @@ public class DefaultBeanContext implements BeanContext {
      * Invalidates the bean caches.
      */
     protected void invalidateCaches() {
-        beanCandidateCache.invalidateAll();
-        initializedObjectsByType.invalidateAll();
+        beanCandidateCache.clear();
+        initializedObjectsByType.clear();
     }
 
     /**
@@ -1215,7 +1215,7 @@ public class DefaultBeanContext implements BeanContext {
             LOG.debug("Finding candidate beans for instance: {}", instance);
         }
         Collection<BeanDefinitionReference> beanDefinitionsClasses = this.beanDefinitionsClasses;
-        return beanCandidateCache.get(instance.getClass(), aClass -> {
+        return beanCandidateCache.computeIfAbsent(instance.getClass(), aClass -> {
             // first traverse component definition classes and load candidates
 
             if (!beanDefinitionsClasses.isEmpty()) {
@@ -1790,7 +1790,7 @@ public class DefaultBeanContext implements BeanContext {
             Qualifier<T> qualifier,
             boolean throwNonUnique,
             boolean includeProvided) {
-        return (Optional) beanConcreteCandidateCache.get(new BeanKey(beanType, qualifier), beanKey ->
+        return (Optional) beanConcreteCandidateCache.computeIfAbsent(new BeanKey(beanType, qualifier), beanKey ->
                 (Optional) findConcreteCandidateNoCache(beanType, qualifier, throwNonUnique, includeProvided, true)
         );
     }
@@ -2046,7 +2046,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @SuppressWarnings("unchecked")
     private <T> Collection<BeanDefinition<T>> findBeanCandidatesInternal(Class<T> beanType) {
-        return (Collection) beanCandidateCache.get(beanType, aClass -> (Collection) findBeanCandidates(beanType, null));
+        return (Collection) beanCandidateCache.computeIfAbsent(beanType, aClass -> (Collection) findBeanCandidates(beanType, null));
     }
 
     @SuppressWarnings("unchecked")
@@ -2064,7 +2064,7 @@ public class DefaultBeanContext implements BeanContext {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Looking up existing beans for key: {}", key);
         }
-        @SuppressWarnings("unchecked") Collection<T> existing = (Collection<T>) initializedObjectsByType.getIfPresent(key);
+        @SuppressWarnings("unchecked") Collection<T> existing = (Collection<T>) initializedObjectsByType.get(key);
         if (existing != null) {
             logResolvedExisting(beanType, qualifier, hasQualifier, existing);
             return existing;
@@ -2075,7 +2075,7 @@ public class DefaultBeanContext implements BeanContext {
         }
 
         synchronized (singletonObjects) {
-            existing = (Collection<T>) initializedObjectsByType.getIfPresent(key);
+            existing = (Collection<T>) initializedObjectsByType.get(key);
             if (existing != null) {
                 logResolvedExisting(beanType, qualifier, hasQualifier, existing);
                 return existing;

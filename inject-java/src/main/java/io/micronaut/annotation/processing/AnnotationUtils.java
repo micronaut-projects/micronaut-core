@@ -16,15 +16,13 @@
 
 package io.micronaut.annotation.processing;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
-import io.micronaut.inject.visitor.VisitorContext;
+import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
@@ -36,6 +34,7 @@ import javax.lang.model.util.Types;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Utility methods for annotations.
@@ -47,7 +46,7 @@ import java.util.List;
 public class AnnotationUtils {
 
     private static final int CACHE_SIZE = 100;
-    private static final Cache<Element, AnnotationMetadata> annotationMetadataCache = Caffeine.newBuilder().maximumSize(CACHE_SIZE).build();
+    private static final Map<Element, AnnotationMetadata> annotationMetadataCache = new ConcurrentLinkedHashMap.Builder<Element, AnnotationMetadata>().maximumWeightedCapacity(CACHE_SIZE).build();
 
     private final Elements elementUtils;
     private final Messager messager;
@@ -151,7 +150,7 @@ public class AnnotationUtils {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata getAnnotationMetadata(Element element) {
-        AnnotationMetadata metadata = annotationMetadataCache.getIfPresent(element);
+        AnnotationMetadata metadata = annotationMetadataCache.get(element);
         if (metadata == null) {
             metadata = newAnnotationBuilder().build(element);
             annotationMetadataCache.put(element, metadata);
@@ -225,7 +224,7 @@ public class AnnotationUtils {
      */
     @Internal
     static void invalidateCache() {
-        annotationMetadataCache.invalidateAll();
+        annotationMetadataCache.clear();
     }
 
 }
