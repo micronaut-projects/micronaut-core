@@ -36,6 +36,7 @@ class MavenBuildTokens extends BuildTokens {
     static {
         scopeConversions.put("compile", "compile")
         scopeConversions.put("runtime", "runtime")
+        scopeConversions.put("runtimeOnly", "provided")
         scopeConversions.put("compileOnly", "provided")
         scopeConversions.put("testRuntime", "test")
         scopeConversions.put("testCompile", "test")
