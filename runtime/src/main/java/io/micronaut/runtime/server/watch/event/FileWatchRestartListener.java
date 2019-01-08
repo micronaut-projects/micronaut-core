@@ -22,6 +22,8 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
 import io.micronaut.scheduling.io.watch.event.FileChangedEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
 
@@ -38,6 +40,8 @@ import javax.inject.Singleton;
 @Requires(property = FileWatchConfiguration.RESTART, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 public class FileWatchRestartListener implements ApplicationEventListener<FileChangedEvent> {
 
+    private static final Logger LOG = LoggerFactory.getLogger(FileWatchRestartListener.class);
+
     private final EmbeddedServer embeddedServer;
 
     /**
@@ -51,6 +55,10 @@ public class FileWatchRestartListener implements ApplicationEventListener<FileCh
     @Override
     public void onApplicationEvent(FileChangedEvent event) {
         embeddedServer.stop();
+        if (LOG.isInfoEnabled()) {
+            LOG.info("Shutting down server following file change.");
+        }
+        System.exit(0);
     }
 
     @Override
