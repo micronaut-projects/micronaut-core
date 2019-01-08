@@ -106,7 +106,7 @@ final class LinkedDeque<E extends Linked<E>> extends AbstractCollection<E> imple
     }
 
     /** Unlinks the non-null first element. */
-    E unlinkFirst() {
+    private E unlinkFirst() {
         final E f = first;
         final E next = f.getNext();
         f.setNext(null);
@@ -121,7 +121,7 @@ final class LinkedDeque<E extends Linked<E>> extends AbstractCollection<E> imple
     }
 
     /** Unlinks the non-null last element. */
-    E unlinkLast() {
+    private E unlinkLast() {
         final E l = last;
         final E prev = l.getPrevious();
         l.setPrevious(null);
@@ -135,7 +135,7 @@ final class LinkedDeque<E extends Linked<E>> extends AbstractCollection<E> imple
     }
 
     /** Unlinks the non-null element. */
-    void unlink(E e) {
+    private void unlink(E e) {
         final E prev = e.getPrevious();
         final E next = e.getNext();
 
@@ -157,12 +157,6 @@ final class LinkedDeque<E extends Linked<E>> extends AbstractCollection<E> imple
     @Override
     public boolean isEmpty() {
         return (first == null);
-    }
-
-    void checkNotEmpty() {
-        if (isEmpty()) {
-            throw new NoSuchElementException();
-        }
     }
 
     /**
@@ -188,7 +182,8 @@ final class LinkedDeque<E extends Linked<E>> extends AbstractCollection<E> imple
             e.setNext(null);
             e = next;
         }
-        first = last = null;
+        first = null;
+        last = null;
     }
 
     @Override
@@ -197,10 +192,30 @@ final class LinkedDeque<E extends Linked<E>> extends AbstractCollection<E> imple
     }
 
     // A fast-path containment check
+
+    /**
+     * check whether the linked is contained within this linked deque.
+     *
+     * @param e The linked
+     * @return True if it is
+     */
     boolean contains(Linked<?> e) {
         return (e.getPrevious() != null)
                 || (e.getNext() != null)
                 || (e == first);
+    }
+
+    /**
+     * Remvove from this linked deque.
+     * @param e The entry
+     * @return True if it was removed.
+     */
+    boolean remove(E e) {
+        if (contains(e)) {
+            unlink(e);
+            return true;
+        }
+        return false;
     }
 
     /**
@@ -289,7 +304,6 @@ final class LinkedDeque<E extends Linked<E>> extends AbstractCollection<E> imple
         return offerLast(e);
     }
 
-
     @Override
     public void addFirst(E e) {
         if (!offerFirst(e)) {
@@ -328,15 +342,6 @@ final class LinkedDeque<E extends Linked<E>> extends AbstractCollection<E> imple
     @SuppressWarnings("unchecked")
     public boolean remove(Object o) {
         return (o instanceof Linked<?>) && remove((E) o);
-    }
-
-    // A fast-path removal
-    boolean remove(E e) {
-        if (contains(e)) {
-            unlink(e);
-            return true;
-        }
-        return false;
     }
 
     @Override
@@ -398,7 +403,16 @@ final class LinkedDeque<E extends Linked<E>> extends AbstractCollection<E> imple
         };
     }
 
-    abstract class AbstractLinkedIterator implements Iterator<E> {
+    private void checkNotEmpty() {
+        if (isEmpty()) {
+            throw new NoSuchElementException();
+        }
+    }
+
+    /**
+     * Abstract linked iterator impl.
+     */
+    private abstract class AbstractLinkedIterator implements Iterator<E> {
         E cursor;
 
         /**
@@ -440,25 +454,39 @@ final class LinkedDeque<E extends Linked<E>> extends AbstractCollection<E> imple
 
 /**
  * An element that is linked on the {@link Deque}.
+ *
+ * @param <T> The linked type
  */
 interface Linked<T extends Linked<T>> {
 
     /**
      * Retrieves the previous element or <tt>null</tt> if either the element is
      * unlinked or the first element on the deque.
+     *
+     * @return The previous
      */
     T getPrevious();
 
-    /** Sets the previous element or <tt>null</tt> if there is no link. */
+    /**
+     * Sets the previous element or <tt>null</tt> if there is no link.
+     *
+     * @param prev The previous
+     **/
     void setPrevious(T prev);
 
     /**
      * Retrieves the next element or <tt>null</tt> if either the element is
      * unlinked or the last element on the deque.
+     *
+     * @return The next
      */
     T getNext();
 
-    /** Sets the next element or <tt>null</tt> if there is no link. */
+    /**
+     * Sets the next element or <tt>null</tt> if there is no link.
+     *
+     * @param next Sets the next
+     **/
     void setNext(T next);
 }
 

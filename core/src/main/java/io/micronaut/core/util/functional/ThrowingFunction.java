@@ -23,6 +23,7 @@ public interface ThrowingFunction<T, R, E extends Throwable> {
      *
      * @param t the function argument
      * @return the function result
+     * @throws E The exception to throw when something goes wrong
      */
     R apply(T t) throws E;
 
