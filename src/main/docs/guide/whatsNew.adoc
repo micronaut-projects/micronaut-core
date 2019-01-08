@@ -1,8 +1,8 @@
 Micronaut {version} includes the following changes:
 
-* https://github.com/micronaut-projects/micronaut-core/issues?q=is%3Aissue+milestone%3A1.0.2+is%3Aclosed+label%3A%22type%3A+bug%22[Issues Resolved]
-* https://github.com/micronaut-projects/micronaut-core/issues?utf8=✓&q=is%3Aissue+milestone%3A1.0.2+is%3Aclosed+label%3A%22type%3A+improvement%22+[Improvements]
-* https://github.com/micronaut-projects/micronaut-core/issues?utf8=✓&q=is%3Aissue+milestone%3A1.0.2+is%3Aclosed+label%3A%22type%3A+enhancement%22+[Enhancements]
+* https://github.com/micronaut-projects/micronaut-core/issues?q=is%3Aissue+milestone%3A1.0.3+is%3Aclosed+label%3A%22type%3A+bug%22[Issues Resolved]
+* https://github.com/micronaut-projects/micronaut-core/issues?utf8=✓&q=is%3Aissue+milestone%3A1.0.3+is%3Aclosed+label%3A%22type%3A+improvement%22+[Improvements]
+//* https://github.com/micronaut-projects/micronaut-core/issues?utf8=✓&q=is%3Aissue+milestone%3A1.0.3+is%3Aclosed+label%3A%22type%3A+enhancement%22+[Enhancements]
 
 === Liquibase and Flyway
 
