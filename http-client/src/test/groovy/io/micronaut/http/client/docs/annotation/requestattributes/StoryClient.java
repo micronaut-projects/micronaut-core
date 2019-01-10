@@ -16,17 +16,18 @@
 
 package io.micronaut.http.client.docs.annotation.attributes;
 
-import io.micronaut.http.annotation.Attribute;
+import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.client.annotation.Client;
 import io.reactivex.Single;
 
 // tag::class[]
 @Client("/story")
-@Attribute(name = "client-name", value = "storyClient")
+@RequestAttribute(name = "client-name", value = "storyClient")
 public interface StoryClient {
 
     @Get("/{storyId}")
-    Single<Story> getById(@Attribute String storyId);
+    Single<Story> getById(@RequestAttribute(name = "x-story-id") String story, @QueryValue("storyId") String myStoryId);
 }
 // end::class[]

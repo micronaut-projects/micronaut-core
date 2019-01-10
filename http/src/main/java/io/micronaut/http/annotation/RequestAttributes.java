@@ -11,8 +11,8 @@ import java.lang.annotation.Target;
  * Example usage:
  * <pre><code>
  * {@literal @}Attributes({
- *     {@literal @}Attribute(name="api-key",value="my-key-value"),
- *     {@literal @}Attribute(name="api-name",value="my-api-name")
+ *     {@literal @}RequestAttribute(name="api-key",value="my-key-value"),
+ *     {@literal @}RequestAttribute(name="api-name",value="my-api-name")
  * })
  * </pre></code>
  *
@@ -25,15 +25,15 @@ import java.lang.annotation.Target;
 public @interface Attributes {
 
     /**
-     * This allows you to have multiple @Attribute's set at the class level with Java and Groovy.
+     * This allows you to have multiple @RequestAttribute's set at the class level with Java and Groovy.
      * Example usage:
      * <pre><code>
      * {@literal @}Attributes({
-     *     {@literal @}Attribute(name="api-key",value="my-key-value"),
-     *     {@literal @}Attribute(name="api-name",value="my-api-name")
+     *     {@literal @}RequestAttribute(name="api-key",value="my-key-value"),
+     *     {@literal @}RequestAttribute(name="api-name",value="my-api-name")
      * })
      * </pre></code>
      * @return The attributes
      */
-    Attribute[] value() default {};
+    RequestAttribute[] value() default {};
 }

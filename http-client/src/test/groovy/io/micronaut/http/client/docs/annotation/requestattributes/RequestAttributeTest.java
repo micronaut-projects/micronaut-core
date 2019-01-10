@@ -23,7 +23,7 @@ import org.junit.Test;
 
 import java.util.Map;
 
-public class AttributeTest {
+public class RequestAttributeTest {
 
     @Test
     public void testSenderAttributes() throws Exception {
@@ -32,13 +32,13 @@ public class AttributeTest {
             StoryClient client = embeddedServer.getApplicationContext().getBean(StoryClient.class);
             StoryClientFilter filter = embeddedServer.getApplicationContext().getBean(StoryClientFilter.class);
 
-            Story story = client.getById("jan2019").blockingGet();
+            Story story = client.getById("jan2019", "setpember").blockingGet();
 
             Assert.assertNotNull(story);
 
             Map<String, Object> attributes = filter.getLatestRequestAttributes();
             Assert.assertNotNull(attributes);
-            Assert.assertEquals("jan2019", attributes.get("story-id"));
+            Assert.assertEquals("jan2019", attributes.get("x-story-id"));
             Assert.assertEquals("storyClient", attributes.get("client-name"));
         }
     }
