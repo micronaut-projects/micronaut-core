@@ -62,6 +62,14 @@ class ClientVersioningSpec extends Specification {
         response == '1'
     }
 
+    def "should ignore empty version string"() {
+        when:
+        def client = server.applicationContext.getBean(VersionedClient)
+        def response = client.withoutVersion()
+        then:
+        response == null
+    }
+
     @Version("0")
     @Client("/")
     static interface VersionedClient {
@@ -76,6 +84,10 @@ class ClientVersioningSpec extends Specification {
 
         @Get("override")
         String overrideWithClass();
+
+        @Version("")
+        @Get("empty")
+        String withoutVersion();
 
     }
 
@@ -111,6 +123,11 @@ class ClientVersioningSpec extends Specification {
 
         @Get("notconfigured")
         String notConfigured(HttpRequest<?> request) {
+            return request.parameters.get("version")
+        }
+
+        @Get("empty")
+        String empty(HttpRequest<?> request) {
             return request.parameters.get("version")
         }
 
