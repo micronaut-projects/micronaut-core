@@ -26,7 +26,9 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.client.annotation.Client;
+import io.micronaut.http.client.interceptor.configuration.ClientVersioningConfiguration;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -210,6 +212,19 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     headers.put(headerName, headerValue);
                 }
             }
+
+            context.findAnnotation(Version.class)
+                    .flatMap(versionAnnotation -> versionAnnotation.getValue(String.class))
+                    .ifPresent(version -> {
+
+                        ClientVersioningConfiguration configuration = getVersioningConfiguration(clientAnnotation);
+
+                        configuration.getHeaders()
+                                .forEach(header -> headers.put(header, version));
+
+                        configuration.getParameters()
+                                .forEach(parameter -> queryParams.put(parameter, version));
+                    });
 
             List<NettyCookie> cookies = new ArrayList<>();
             List<Argument> bodyArguments = new ArrayList<>();
@@ -489,7 +504,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 } else {
                     try {
                         return blockingHttpClient.retrieve(
-                            request, returnType.asArgument(), errorType
+                                request, returnType.asArgument(), errorType
                         );
                     } catch (RuntimeException t) {
                         if (t instanceof HttpClientResponseException && ((HttpClientResponseException) t).getStatus() == HttpStatus.NOT_FOUND) {
@@ -506,6 +521,17 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
         // try other introduction advice
         return context.proceed();
+    }
+
+    private ClientVersioningConfiguration getVersioningConfiguration(AnnotationValue<Client> clientAnnotation) {
+        String clientId = getClientId(clientAnnotation);
+
+        return beanContext.findBean(ClientVersioningConfiguration.class, Qualifiers.byName(clientId))
+                .orElseGet(() -> beanContext.findBean(ClientVersioningConfiguration.class, Qualifiers.byName(ClientVersioningConfiguration.DEFAULT))
+                        .orElseThrow(() -> new ConfigurationException("Attempt to apply a '@Version' to the request, but " +
+                                "versioning configuration found neither for '" + clientId + "' nor '" + ClientVersioningConfiguration.DEFAULT + "' provided.")
+                        ));
+
     }
 
     private boolean isJsonParsedMediaType(MediaType[] acceptTypes) {
@@ -546,10 +572,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      * @return client registration
      */
     private HttpClient getClient(MethodInvocationContext<Object, Object> context, AnnotationValue<Client> clientAnn) {
-        String clientId = clientAnn.getValue(String.class).orElse(null);
-        if (clientId == null) {
-            throw new HttpClientException("Either the id or value of the @Client annotation must be specified");
-        }
+        String clientId = getClientId(clientAnn);
         String path = clientAnn.get("path", String.class).orElse(null);
         String clientKey = computeClientKey(clientId, path);
         if (clientKey == null) {
@@ -561,7 +584,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             if (null != clientBean) {
                 return clientBean;
             }
-            
+
             LoadBalancer loadBalancer = loadBalancerResolver.resolve(clientId)
                 .orElseThrow(() ->
                     new HttpClientException("Invalid service reference [" + clientId + "] specified to @Client")
@@ -643,6 +666,14 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
             return client;
         });
+    }
+
+    private String getClientId(AnnotationValue<Client> clientAnn) {
+        String clientId = clientAnn.getValue(String.class).orElse(null);
+        if (clientId == null) {
+            throw new HttpClientException("Either the id or value of the @Client annotation must be specified");
+        }
+        return clientId;
     }
 
     private String computeClientKey(String clientId, String path) {
