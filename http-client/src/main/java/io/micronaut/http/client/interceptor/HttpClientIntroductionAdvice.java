@@ -215,6 +215,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             context.findAnnotation(Version.class)
                     .flatMap(versionAnnotation -> versionAnnotation.getValue(String.class))
+                    .filter(StringUtils::isNotEmpty)
                     .ifPresent(version -> {
 
                         ClientVersioningConfiguration configuration = getVersioningConfiguration(clientAnnotation);
