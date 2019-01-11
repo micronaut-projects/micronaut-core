@@ -30,7 +30,7 @@ import java.lang.annotation.Target;
  *     {@literal @}RequestAttribute(name="api-key",value="my-key-value"),
  *     {@literal @}RequestAttribute(name="api-name",value="my-api-name")
  * })
- * </pre></code>
+ * </code></pre>
  *
  * @author Ahmed Lafta
  * @since 1.0
@@ -48,7 +48,7 @@ public @interface RequestAttributes {
      *     {@literal @}RequestAttribute(name="api-key",value="my-key-value"),
      *     {@literal @}RequestAttribute(name="api-name",value="my-api-name")
      * })
-     * </pre></code>
+     * </code></pre>
      * @return The attributes
      */
     RequestAttribute[] value() default {};

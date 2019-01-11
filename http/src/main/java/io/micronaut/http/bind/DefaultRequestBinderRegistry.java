@@ -19,12 +19,10 @@ package io.micronaut.http.bind;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.http.HttpAttributes;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpParameters;
@@ -104,7 +102,6 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
         byType.put(Argument.of(HttpHeaders.class).typeHashCode(), (RequestArgumentBinder<HttpHeaders>) (argument, source) -> () -> Optional.of(source.getHeaders()));
         byType.put(Argument.of(HttpRequest.class).typeHashCode(), (RequestArgumentBinder<HttpRequest>) (argument, source) -> () -> Optional.of(source));
         byType.put(Argument.of(HttpParameters.class).typeHashCode(), (RequestArgumentBinder<HttpParameters>) (argument, source) -> () -> Optional.of(source.getParameters()));
-        byType.put(Argument.of(MutableConvertibleValues.class).typeHashCode(), (RequestArgumentBinder<MutableConvertibleValues>) (argument, source) -> () -> Optional.of(source.getAttributes()));
         byType.put(Argument.of(Cookies.class).typeHashCode(), (RequestArgumentBinder<Cookies>) (argument, source) -> () -> Optional.of(source.getCookies()));
         byType.put(Argument.of(Cookie.class).typeHashCode(), (RequestArgumentBinder<Cookie>) (context, source) -> {
             Cookies cookies = source.getCookies();
