@@ -23,7 +23,7 @@ import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Type;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.interceptor.HttpClientIntroductionAdvice;
-import io.micronaut.http.hateos.JsonError;
+import io.micronaut.http.hateoas.JsonError;
 import io.micronaut.retry.annotation.Recoverable;
 
 import javax.inject.Scope;

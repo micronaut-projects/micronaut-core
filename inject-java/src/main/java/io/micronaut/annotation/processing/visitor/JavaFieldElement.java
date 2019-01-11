@@ -36,6 +36,7 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
 
     private final JavaVisitorContext visitorContext;
     private final VariableElement variableElement;
+    private ClassElement declaringElement;
 
     /**
      * @param variableElement    The {@link VariableElement}
@@ -48,6 +49,20 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
         this.visitorContext = visitorContext;
     }
 
+    /**
+     * @param declaringElement  The declaring element
+     * @param variableElement    The {@link VariableElement}
+     * @param annotationMetadata The annotation metadata
+     * @param visitorContext     The visitor context
+     */
+    JavaFieldElement(ClassElement declaringElement,
+                     VariableElement variableElement,
+                     AnnotationMetadata annotationMetadata,
+                     JavaVisitorContext visitorContext) {
+        this(variableElement, annotationMetadata, visitorContext);
+        this.declaringElement = declaringElement;
+    }
+
     @Nullable
     @Override
     public ClassElement getType() {
@@ -57,14 +72,19 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
 
     @Override
     public ClassElement getDeclaringType() {
-        final Element enclosingElement = variableElement.getEnclosingElement();
-        if (!(enclosingElement instanceof TypeElement)) {
-            throw new IllegalStateException("Enclosing element should be a type element");
+        if (declaringElement == null) {
+
+            final Element enclosingElement = variableElement.getEnclosingElement();
+            if (!(enclosingElement instanceof TypeElement)) {
+                throw new IllegalStateException("Enclosing element should be a type element");
+            }
+            declaringElement = new JavaClassElement(
+                    (TypeElement) enclosingElement,
+                    visitorContext.getAnnotationUtils().getAnnotationMetadata(enclosingElement),
+                    visitorContext
+            );
         }
-        return new JavaClassElement(
-                (TypeElement) enclosingElement,
-                visitorContext.getAnnotationUtils().getAnnotationMetadata(enclosingElement),
-                visitorContext
-        );
+
+        return declaringElement;
     }
 }

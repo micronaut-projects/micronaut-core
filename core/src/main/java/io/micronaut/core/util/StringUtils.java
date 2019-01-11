@@ -53,9 +53,7 @@ public final class StringUtils {
      */
     public static final char SPACE = 0x20;
 
-
     private static final Pattern DIGIT_PATTERN = Pattern.compile("\\d+");
-
 
     /**
      * Return whether the given string is empty.

@@ -17,36 +17,26 @@
 package io.micronaut.http.hateos;
 
 import io.micronaut.core.value.OptionalMultiValues;
+import io.micronaut.http.hateoas.Link;
 
 /**
- * Represents a REST resource in a HATEOS architecture.
+ * Deprecated. Please use io.micronaut.http.hateoas.Resource
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Use {@link io.micronaut.http.hateoas.Resource} instead
  */
-public interface Resource {
-
-    /**
-     * The links attribute.
-     */
-    String LINKS = "_links";
-
-    /**
-     * The embedded attribute.
-     */
-    String EMBEDDED = "_embedded";
-
-    /**
-     * @return The links for this resource
-     */
+@Deprecated
+public interface Resource extends io.micronaut.http.hateoas.Resource {
+    @SuppressWarnings("unchecked")
+    @Override
     default OptionalMultiValues<Link> getLinks() {
-        return OptionalMultiValues.empty();
+        return OptionalMultiValues.EMPTY_VALUES;
     }
 
-    /**
-     * @return The embedded resources
-     */
+    @SuppressWarnings("unchecked")
+    @Override
     default OptionalMultiValues<Resource> getEmbedded() {
-        return OptionalMultiValues.empty();
+        return OptionalMultiValues.EMPTY_VALUES;
     }
 }

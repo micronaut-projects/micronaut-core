@@ -14,11 +14,12 @@
  * limitations under the License.
  */
 
-package io.micronaut.inject.annotation;
+package io.micronaut.inject.annotation.internal;
 
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.inject.annotation.NamedAnnotationMapper;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.VisitorContext;
 

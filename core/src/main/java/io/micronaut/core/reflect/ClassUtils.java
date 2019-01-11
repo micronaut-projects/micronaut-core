@@ -17,6 +17,7 @@
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 
 import javax.annotation.Nullable;
@@ -168,7 +169,21 @@ public class ClassUtils {
         if (type == null) {
             return false;
         }
-        return isJavaLangType(type) || BASIC_TYPE_MAP.containsKey(type.getName());
+        final String name = type.getName();
+        return isJavaBasicType(name);
+    }
+
+    /**
+     * Expanded version of {@link #isJavaLangType(Class)} that includes common Java types like {@link URI}.
+     *
+     * @param name The name of the type
+     * @return True if is a Java basic type
+     */
+    public static boolean isJavaBasicType(@Nullable String name) {
+        if (StringUtils.isEmpty(name)) {
+            return false;
+        }
+        return isJavaLangType(name) || BASIC_TYPE_MAP.containsKey(name);
     }
 
     /**

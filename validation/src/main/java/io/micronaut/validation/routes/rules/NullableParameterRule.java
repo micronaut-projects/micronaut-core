@@ -16,13 +16,13 @@
 
 package io.micronaut.validation.routes.rules;
 
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.validation.routes.RouteValidationResult;
 
-import javax.annotation.Nullable;
 import java.util.*;
 
 /**
@@ -30,6 +30,7 @@ import java.util.*;
  * template variables.
  *
  * @author James Kleeh
+ * @author graemerocher
  * @since 1.0
  */
 public class NullableParameterRule implements RouteValidationRule {
@@ -47,7 +48,7 @@ public class NullableParameterRule implements RouteValidationRule {
                         .findFirst()
                         .ifPresent(p -> {
                             ClassElement type = p.getType();
-                            if (!p.hasAnnotation(Nullable.class) && type != null && !type.isAssignable(Optional.class)) {
+                            if (!isNullable(p) && type != null && !type.isAssignable(Optional.class)) {
                                 errorMessages.add(String.format("The uri variable [%s] is optional, but the corresponding method argument [%s] is not defined as an Optional or annotated with the javax.annotation.Nullable annotation.", variable.getName(), p.toString()));
                             }
                         });
@@ -55,6 +56,11 @@ public class NullableParameterRule implements RouteValidationRule {
         }
 
         return new RouteValidationResult(errorMessages.toArray(new String[0]));
+    }
+
+    private boolean isNullable(ParameterElement p) {
+        // Handles javax.annotation.Nullable or org.jetbrains.annotations.Nullable or Spring's version
+        return p.getAnnotationNames().stream().anyMatch(n -> NameUtils.getSimpleName(n).equals("Nullable"));
     }
 
 }

@@ -10,7 +10,11 @@ Micronaut's startup time is fast and automatic restart leads to a clean slate wi
 
 === Configuring File Watch
 
-The following demonstrates how to configure Micronaut to automatically stop the application if a change occurs to an external file:
+The following demonstrates how to configure Micronaut to automatically stop the application if a change occurs to an external file.
+
+TIP: You can create a new application with the `file-watch` feature already configured using the CLI with the command `mn create-app myapp --features file-watch`
+
+First configure your `application.yml` file to enable file watch:
 
 .Configuring File Watch
 [source,yaml]

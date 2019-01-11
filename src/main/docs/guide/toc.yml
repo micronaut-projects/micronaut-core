@@ -79,6 +79,7 @@ httpServer:
   datavalidation: Data Validation
   staticResources: Serving Static Resources
   errorHandling: Error Handling
+  apiVersioning: API Versioning
   formData: Handling Form Data
   serverIO: Writing Response Data
   uploads: File Uploads
@@ -130,6 +131,7 @@ cloud:
     title: Cloud Configuration
     distributedConfiguration: Distributed Configuration
     distributedConfigurationConsul: Consul Support
+    distributedConfigurationSpringCloud: Spring Cloud Config Support
     distributedConfigurationAwsParameterStore: AWS Parameter Store Support
   serviceDiscovery:
     title: Service Discovery

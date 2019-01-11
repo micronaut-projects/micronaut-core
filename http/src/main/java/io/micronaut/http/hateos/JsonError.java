@@ -20,27 +20,21 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 
-import javax.annotation.Nullable;
-import java.util.Optional;
-
 /**
- * A class that can be used to represent JSON errors that complies to Vnd.Error without the content type requirements.
+ * Deprecated. Please use io.micronaut.http.hateoas.JsonError
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Produces(MediaType.APPLICATION_JSON)
-public class JsonError extends AbstractResource<JsonError> {
-
-    private String message;
-    private String logref;
-    private String path;
+@Deprecated
+public class JsonError extends io.micronaut.http.hateoas.JsonError {
 
     /**
      * @param message The message
      */
     public JsonError(String message) {
-        this.message = message;
+        super(message);
     }
 
     /**
@@ -48,68 +42,7 @@ public class JsonError extends AbstractResource<JsonError> {
      */
     @Internal
     JsonError() {
+        this(null);
     }
 
-    /**
-     * @param message The message
-     */
-    public void setMessage(String message) {
-        this.message = message;
-    }
-
-    /**
-     * @return The message
-     */
-    public String getMessage() {
-        return message;
-    }
-
-    /**
-     * @return The logref
-     */
-    public Optional<String> getLogref() {
-        return logref == null ? Optional.empty() : Optional.of(logref);
-    }
-
-    /**
-     * @return The path
-     */
-    public Optional<String> getPath() {
-        return path == null ? Optional.empty() : Optional.of(path);
-    }
-
-    /**
-     * Sets the path.
-     *
-     * @param path The path
-     * @return This error object
-     */
-    public JsonError path(@Nullable String path) {
-        this.path = path;
-        return this;
-    }
-
-    /**
-     * Sets the logref.
-     *
-     * @param logref The logref
-     * @return This error object
-     */
-    public JsonError logref(@Nullable String logref) {
-        this.logref = logref;
-        return this;
-    }
-
-    @Override
-    public String toString() {
-        StringBuilder builder = new StringBuilder();
-        if (logref != null) {
-            builder.append('[').append(logref).append("] ");
-        }
-        if (path != null) {
-            builder.append(' ').append(path).append(" - ");
-        }
-        builder.append(message);
-        return builder.toString();
-    }
 }
