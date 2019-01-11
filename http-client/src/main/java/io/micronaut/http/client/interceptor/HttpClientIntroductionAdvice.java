@@ -21,29 +21,26 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
-import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.format.Format;
-import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.core.version.annotation.Version;
-import io.micronaut.http.client.annotation.Client;
-import io.micronaut.http.client.interceptor.configuration.ClientVersioningConfiguration;
-import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.format.Format;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -53,10 +50,13 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.client.*;
+import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.interceptor.configuration.ClientVersioningConfiguration;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.client.sse.SseClient;
+import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.cookies.NettyCookie;
@@ -107,6 +107,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private final int HEADERS_INITIAL_CAPACITY = 3;
     private final BeanContext beanContext;
     private final Map<String, HttpClient> clients = new ConcurrentHashMap<>();
+    private final Map<String, ClientVersioningConfiguration> versioningConfigurations = new ConcurrentHashMap<>();
     private final List<ReactiveClientResultTransformer> transformers;
     private final LoadBalancerResolver loadBalancerResolver;
     private final JsonMediaTypeCodec jsonMediaTypeCodec;
@@ -525,13 +526,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     }
 
     private ClientVersioningConfiguration getVersioningConfiguration(AnnotationValue<Client> clientAnnotation) {
-        String clientId = getClientId(clientAnnotation);
-
-        return beanContext.findBean(ClientVersioningConfiguration.class, Qualifiers.byName(clientId))
-                .orElseGet(() -> beanContext.findBean(ClientVersioningConfiguration.class, Qualifiers.byName(ClientVersioningConfiguration.DEFAULT))
-                        .orElseThrow(() -> new ConfigurationException("Attempt to apply a '@Version' to the request, but " +
-                                "versioning configuration found neither for '" + clientId + "' nor '" + ClientVersioningConfiguration.DEFAULT + "' provided.")
-                        ));
+        return versioningConfigurations.computeIfAbsent(getClientId(clientAnnotation), clientId ->
+                beanContext.findBean(ClientVersioningConfiguration.class, Qualifiers.byName(clientId))
+                        .orElseGet(() -> beanContext.findBean(ClientVersioningConfiguration.class, Qualifiers.byName(ClientVersioningConfiguration.DEFAULT))
+                                .orElseThrow(() -> new ConfigurationException("Attempt to apply a '@Version' to the request, but " +
+                                        "versioning configuration found neither for '" + clientId + "' nor '" + ClientVersioningConfiguration.DEFAULT + "' provided.")
+                                )));
 
     }
 
