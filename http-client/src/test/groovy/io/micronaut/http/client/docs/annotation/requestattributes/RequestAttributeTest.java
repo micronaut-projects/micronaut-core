@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.client.docs.annotation.attributes;
+package io.micronaut.http.client.docs.annotation.requestattributes;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -32,13 +32,13 @@ public class RequestAttributeTest {
             StoryClient client = embeddedServer.getApplicationContext().getBean(StoryClient.class);
             StoryClientFilter filter = embeddedServer.getApplicationContext().getBean(StoryClientFilter.class);
 
-            Story story = client.getById("jan2019", "setpember").blockingGet();
+            Story story = client.getById("jan2019").blockingGet();
 
             Assert.assertNotNull(story);
 
             Map<String, Object> attributes = filter.getLatestRequestAttributes();
             Assert.assertNotNull(attributes);
-            Assert.assertEquals("jan2019", attributes.get("x-story-id"));
+            Assert.assertEquals("jan2019", attributes.get("story-id"));
             Assert.assertEquals("storyClient", attributes.get("client-name"));
         }
     }

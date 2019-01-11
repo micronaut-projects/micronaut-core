@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.client.docs.annotation.attributes;
+package io.micronaut.http.client.docs.annotation.requestattributes;
 
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Controller;

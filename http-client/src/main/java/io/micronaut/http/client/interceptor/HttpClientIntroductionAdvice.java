@@ -214,8 +214,8 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
             Map<String, Object> attributes = new LinkedHashMap<>(ATTRIBUTES_INITIAL_CAPACITY);
 
-            List<AnnotationValue<Attribute>> attributeAnnotations = context.getAnnotationValuesByType(Attribute.class);
-            for (AnnotationValue<Attribute> attributeAnnotation : attributeAnnotations) {
+            List<AnnotationValue<RequestAttribute>> attributeAnnotations = context.getAnnotationValuesByType(RequestAttribute.class);
+            for (AnnotationValue<RequestAttribute> attributeAnnotation : attributeAnnotations) {
                 String attributeName = attributeAnnotation.get("name", String.class).orElse(null);
                 Object attributeValue = attributeAnnotation.getValue(Object.class).orElse(null);
                 if (StringUtils.isNotEmpty(attributeName) && attributeValue != null) {
@@ -281,7 +281,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             queryParams.put(argumentName, o);
                         }
                     });
-                } else if (annotationMetadata.isAnnotationPresent(Attribute.class)) {
+                } else if (annotationMetadata.isAnnotationPresent(RequestAttribute.class)) {
                     String attributeName = annotationMetadata.getValue(Annotation.class, String.class).orElse(null);
                     if (StringUtils.isEmpty(attributeName)) {
                         attributeName = NameUtils.hyphenate(argumentName);

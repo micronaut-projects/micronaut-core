@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,26 +29,26 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
  * <p>An annotation that can be applied to method arguments to indicate that the method argument is bound to an HTTP request attribute
- *   This can also be used in conjuction with &#064;Attributes to list attributes on a client class tht will always be applied
+ *   This can also be used in conjuction with &#064;RequestAttributes to list attributes on a client class that will always be applied
  *   <i>Note: Request attributes are intended for internal data sharing only, and are not attached to the outbound request.</i></p>
  * <p></p>
  * <p>The following example demonstrates usage at the type level to declare default values to pass in the request when using the {@code Client} annotation;</p>
  * <p></p>
  *
  * <pre class="code">
- * &#064;Attribute(name="X-Username",value='Freddy'),
- * &#064;Attribute(name="X-MyParam",value='${foo.bar}')
+ * &#064;RequestAttribute(name="X-Username",value='Freddy'),
+ * &#064;RequestAttribute(name="X-MyParam",value='${foo.bar}')
  * &#064;Client('/users')
  * interface UserClient {
  *
  * }
  * </pre>
  *
- * <p>When declared as a binding annotation the <code>&#064;Attribute</code> annotation is declared on each parameter to be bound:</p>
+ * <p>When declared as a binding annotation the <code>&#064;RequestAttribute</code> annotation is declared on each parameter to be bound:</p>
  *
  * <pre class="code">
  * &#064;Get('/user')
- * User get(&#064;Attribute('X-Username') String username, &#064;Attribute('X-MyParam') String myparam) {
+ * User get(&#064;RequestAttribute('X-Username') String username, &#064;RequestAttribute('X-MyParam') String myparam) {
  *    return new User(username, myparam);
  * }
  * </pre>
@@ -58,10 +58,10 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  */
 @Documented
 @Retention(RUNTIME)
-@Target({ElementType.PARAMETER, ElementType.TYPE, ElementType.METHOD}) // this can be either type or param
-@Repeatable(value = Attributes.class)
+@Target({ElementType.PARAMETER, ElementType.TYPE, ElementType.METHOD, ElementType.ANNOTATION_TYPE}) // this can be either type or param
+@Repeatable(value = RequestAttributes.class)
 @Bindable
-public @interface Attribute {
+public @interface RequestAttribute {
 
     /**
      * If used as a bound parameter, this is the attribute name. If used on a class level this is value and not the attribute name.
@@ -71,8 +71,8 @@ public @interface Attribute {
     String value() default "";
 
     /**
-     * If used on a class level with @Attributes this is the attribute name and value is the value.
-     * @return name of header when using with @Attributes
+     * If used on a class level with @RequestAttributes this is the attribute name and value is the value.
+     * @return name of header when using with @RequestAttributes
      */
     @AliasFor(annotation = Bindable.class, member = "value")
     String name() default "";

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.client.docs.annotation.attributes;
+package io.micronaut.http.client.docs.annotation.requestattributes;
 
 // tag::class[]
 public class Story {

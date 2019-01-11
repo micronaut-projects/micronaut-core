@@ -33,6 +33,7 @@ import java.lang.annotation.Annotation;
  * @see CookieAnnotationBinder
  * @see ParameterAnnotationBinder
  * @see HeaderAnnotationBinder
+ * @see RequestAttributeAnnotationBinder
  * @since 1.0
  */
 public interface AnnotatedRequestArgumentBinder<A extends Annotation, T> extends RequestArgumentBinder<T>, AnnotatedArgumentBinder<A, T, HttpRequest<?>> {

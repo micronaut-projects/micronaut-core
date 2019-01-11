@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-package io.micronaut.http.client.docs.annotation.attributes;
+package io.micronaut.http.client.docs.annotation.requestattributes;
 
 import io.micronaut.http.annotation.RequestAttribute;
 import io.micronaut.http.annotation.Get;
-import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.client.annotation.Client;
 import io.reactivex.Single;
 
@@ -28,6 +27,6 @@ import io.reactivex.Single;
 public interface StoryClient {
 
     @Get("/{storyId}")
-    Single<Story> getById(@RequestAttribute(name = "x-story-id") String story, @QueryValue("storyId") String myStoryId);
+    Single<Story> getById(@RequestAttribute String storyId);
 }
 // end::class[]

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2017-2019 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package io.micronaut.http.annotation;
 
 import java.lang.annotation.Documented;
@@ -10,7 +26,7 @@ import java.lang.annotation.Target;
  * This lets you declare several attributes for a client class and have them always included.
  * Example usage:
  * <pre><code>
- * {@literal @}Attributes({
+ * {@literal @}RequestAttributes({
  *     {@literal @}RequestAttribute(name="api-key",value="my-key-value"),
  *     {@literal @}RequestAttribute(name="api-name",value="my-api-name")
  * })
@@ -22,13 +38,13 @@ import java.lang.annotation.Target;
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE})
-public @interface Attributes {
+public @interface RequestAttributes {
 
     /**
      * This allows you to have multiple @RequestAttribute's set at the class level with Java and Groovy.
      * Example usage:
      * <pre><code>
-     * {@literal @}Attributes({
+     * {@literal @}RequestAttributes({
      *     {@literal @}RequestAttribute(name="api-key",value="my-key-value"),
      *     {@literal @}RequestAttribute(name="api-name",value="my-api-name")
      * })
