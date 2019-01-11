@@ -50,7 +50,6 @@ public class RequestAttributeAnnotationBinder<T> extends AbstractAnnotatedArgume
 
     @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> argument, HttpRequest<?> source) {
-        System.out.println("AHMED");
         MutableConvertibleValues<Object> parameters = source.getAttributes();
         AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
         String parameterName = annotationMetadata.getValue(RequestAttribute.class, String.class).orElse(argument.getArgument().getName());

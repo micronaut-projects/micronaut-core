@@ -57,9 +57,6 @@ class RequestAttributeSpec extends Specification {
 
         @Override
         Story get(@RequestAttribute("story-id") Object storyId) {
-            println('STORY!!')
-            println(storyId)
-            println('ahmed')
             return new Story(storyId: storyId, title: 'The Hungry Caterpillar')
         }
     }
