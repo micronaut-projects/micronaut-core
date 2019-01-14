@@ -19,6 +19,7 @@ package io.micronaut.http.server.netty.converters;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
@@ -62,7 +63,7 @@ public class FileUploadToObjectConverter implements TypeConverter<FileUpload, Ob
 
             String contentType = object.getContentType();
             ByteBuf byteBuf = object.getByteBuf();
-            if (String) {
+            if (StringUtils.isNotEmpty(contentType)) {
                 MediaType mediaType = new MediaType(contentType);
                 Optional<MediaTypeCodec> registered = decoderRegistryProvider.get().findCodec(mediaType);
                 if (registered.isPresent()) {
