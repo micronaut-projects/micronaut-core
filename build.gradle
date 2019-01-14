@@ -104,6 +104,12 @@ ext {
                     group  : 'com.google.code.findbugs',
                     name   : 'jsr305'
             ],
+            'kafka.configuration': [
+                    version:kafkaConfigurationVersion,
+                    group:'io.micronaut.configuration',
+                    name:'kafka',
+                    modules:['kafka-streams']
+            ],
             kafka                      : [
                     version: kafkaVersion,
                     group  : 'org.apache.kafka',
