@@ -51,6 +51,10 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
             throw new NoAvailableServiceException(getServiceID());
         }
         int i = index.getAndAccumulate(len, (cur, n) -> cur >= n - 1 ? 0 : cur + 1);
-        return availableServices.get(i);
+        try {
+            return availableServices.get(i);
+        } catch (IndexOutOfBoundsException e) {
+            throw new NoAvailableServiceException(getServiceID());
+        }
     }
 }
