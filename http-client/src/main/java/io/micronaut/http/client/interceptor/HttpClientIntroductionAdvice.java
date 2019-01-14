@@ -103,6 +103,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private static final MediaType[] DEFAULT_ACCEPT_TYPES = {MediaType.APPLICATION_JSON_TYPE};
 
     private final int HEADERS_INITIAL_CAPACITY = 3;
+    private final int ATTRIBUTES_INITIAL_CAPACITY = 1;
     private final BeanContext beanContext;
     private final Map<String, HttpClient> clients = new ConcurrentHashMap<>();
     private final List<ReactiveClientResultTransformer> transformers;
@@ -211,6 +212,17 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
 
+            Map<String, Object> attributes = new LinkedHashMap<>(ATTRIBUTES_INITIAL_CAPACITY);
+
+            List<AnnotationValue<RequestAttribute>> attributeAnnotations = context.getAnnotationValuesByType(RequestAttribute.class);
+            for (AnnotationValue<RequestAttribute> attributeAnnotation : attributeAnnotations) {
+                String attributeName = attributeAnnotation.get("name", String.class).orElse(null);
+                Object attributeValue = attributeAnnotation.getValue(Object.class).orElse(null);
+                if (StringUtils.isNotEmpty(attributeName) && attributeValue != null) {
+                    attributes.put(attributeName, attributeValue);
+                }
+            }
+
             List<NettyCookie> cookies = new ArrayList<>();
             List<Argument> bodyArguments = new ArrayList<>();
             ConversionService<?> conversionService = ConversionService.SHARED;
@@ -269,6 +281,14 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             queryParams.put(argumentName, o);
                         }
                     });
+                } else if (annotationMetadata.isAnnotationPresent(RequestAttribute.class)) {
+                    String attributeName = annotationMetadata.getValue(Annotation.class, String.class).orElse(null);
+                    if (StringUtils.isEmpty(attributeName)) {
+                        attributeName = NameUtils.hyphenate(argumentName);
+                    }
+                    String finalAttributeName = attributeName;
+                    conversionService.convert(definedValue, Object.class)
+                        .ifPresent(o -> attributes.put(finalAttributeName, o));
                 } else if (annotationMetadata.isAnnotationPresent(PathVariable.class)) {
                     String parameterName = annotationMetadata.getValue(PathVariable.class, String.class).orElse(null);
                     conversionService.convert(definedValue, ConversionContext.of(String.class).with(annotationMetadata)).ifPresent(o -> {
@@ -339,6 +359,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
 
             cookies.forEach(request::cookie);
+
+            if (!attributes.isEmpty()) {
+                for (Map.Entry<String, Object> entry : attributes.entrySet()) {
+                    request.setAttribute(entry.getKey(), entry.getValue());
+                }
+            }
 
             MediaType[] acceptTypes = context.getValue(Consumes.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
 
