@@ -164,27 +164,6 @@ messaging:
   title: Message-Driven Microservices
   kafka:
     title: Kafka Support
-    kafkaCli: Using the Micronaut CLI
-    kafkaQuickStart: Kafka Quick Start
-    kafkaClient:
-      title: Kafka Producers Using @KafkaClient
-      kafkaClientMethods: Defining @KafkaClient Methods
-      kafkaClientConfiguration: Configuring @KafkaClient beans
-      kafkaClientBatch: Sending Records in Batch
-      kafkaClientScope: Injecting Kafka Producer Beans
-      kafkaEmbedded: Embedding Kafka
-    kafkaListener:
-      title: Kafka Consumers Using @KafkaListener
-      kafkaListenerMethods: Defining @KafkaListener Methods
-      kafkaListenerConfiguration: Configuring @KafkaListener beans
-      kafkaOffsets: Commiting Kafka Offsets
-      kafkaListenerBatch: Kafka Batch Processing
-      kafkaSendTo: Forwarding Messages with @SendTo
-      kafkaExceptions: Handling Consumer Exceptions
-    kafkaApplications:
-      title: Running Kafka Applications
-      kafkaHealth: Kafka Health Checks
-    kafkaStream: Building Kafka Stream Applications
 commandLineApps:
   title: Standalone Command Line Applications
   picocli:
