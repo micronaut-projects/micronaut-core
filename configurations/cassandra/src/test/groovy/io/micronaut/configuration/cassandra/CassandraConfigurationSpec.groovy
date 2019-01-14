@@ -19,8 +19,12 @@ import com.datastax.driver.core.Cluster
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.MapPropertySource
+import io.micronaut.context.event.BeanCreatedEvent
+import io.micronaut.context.event.BeanCreatedEventListener
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
+
+import javax.inject.Singleton
 
 class CassandraConfigurationSpec extends Specification {
 
@@ -53,11 +57,13 @@ class CassandraConfigurationSpec extends Specification {
         // end::single[]
 
         expect:
+        !applicationContext.getBean(ClusterBuilderListener).invoked
         applicationContext.containsBean(CassandraConfiguration)
         applicationContext.containsBean(Cluster)
 
         when:
         Cluster cluster = applicationContext.getBean(Cluster)
+        applicationContext.getBean(ClusterBuilderListener).invoked
         List<InetSocketAddress> inetSocketAddresses = cluster.manager.contactPoints
 
         then:
@@ -101,5 +107,17 @@ class CassandraConfigurationSpec extends Specification {
 
         cleanup:
         applicationContext.close()
+    }
+
+    @Singleton
+    static class ClusterBuilderListener implements BeanCreatedEventListener<Cluster.Builder> {
+
+        boolean invoked = false
+        @Override
+        Cluster.Builder onCreated(BeanCreatedEvent<Cluster.Builder> event) {
+            def builder = event.getBean()
+            invoked = builder != null
+            return builder
+        }
     }
 }
