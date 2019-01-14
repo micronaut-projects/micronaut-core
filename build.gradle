@@ -13,6 +13,11 @@ buildscript {
         classpath "gradle.plugin.org.aim42:htmlSanityCheck:$htmlSanityCheckVersion"
         classpath "org.codehaus.groovy.modules.http-builder:http-builder:0.7.1"
         classpath 'javax.xml.bind:jaxb-api:2.2.8'
+        classpath "io.micronaut.docs:micronaut-docs-asciidoc-extensions:$micronautDocsVersion"
+        classpath "io.micronaut.docs:micronaut-docs-gradle-plugins:$micronautDocsVersion", {
+            exclude module:'shadow'
+            exclude module:'plugin-shadow'
+        }
     }
 }
 
@@ -437,7 +442,7 @@ subprojects { Project subproject ->
 
 
         if (isDocumented) {
-            compileOnly project(":build-projects:asciidoc-config-props")
+            compileOnly "io.micronaut.docs:micronaut-docs-asciidoc-config-props:$micronautDocsVersion"
         }
         compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
         testCompile "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"

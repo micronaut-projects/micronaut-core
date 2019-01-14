@@ -74,5 +74,3 @@ include "configurations:rabbitmq"
 include "configurations:redis-lettuce"
 include "configurations:security-ldap"
 
-// build projects
-include "build-projects:asciidoc-config-props"
