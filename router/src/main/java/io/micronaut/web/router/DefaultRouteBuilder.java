@@ -48,7 +48,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 /**
  * A DefaultRouteBuilder implementation for building roots.
@@ -429,7 +428,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                     this.producesMediaTypes = Arrays.asList(produces)
             );
 
+
             this.conditions.add(req -> {
+                if (!permitsRequestBody()) {
+                    return true;
+                }
                 List<MediaType> consumes = this.acceptedMediaTypes;
                 if (consumes != null && !consumes.isEmpty()) {
                     if (consumes.contains(MediaType.ALL_TYPE)) {
@@ -501,6 +504,14 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public MethodExecutionHandle getTargetMethod() {
             return this.targetMethod;
+        }
+
+        /**
+         * Whether the route permits a request body.
+         * @return True if the route permits a request body
+         */
+        protected boolean permitsRequestBody() {
+            return true;
         }
     }
 
@@ -736,7 +747,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         final HttpMethod httpMethod;
         final UriMatchTemplate uriMatchTemplate;
-        final List<DefaultUriRoute> nestedRoutes = new ArrayList<>();
+        final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
 
         /**
          * @param httpMethod The HTTP method
@@ -788,7 +799,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 .append('#')
                 .append(targetMethod)
                 .append(" (")
-                .append(acceptedMediaTypes.stream().collect(Collectors.joining(",")))
+                .append(String.join(",", acceptedMediaTypes))
                 .append(" )")
                 .toString();
         }
@@ -850,6 +861,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public int compareTo(UriRoute o) {
             return uriMatchTemplate.compareTo(o.getUriMatchTemplate());
+        }
+
+        @Override
+        protected boolean permitsRequestBody() {
+            return HttpMethod.permitsRequestBody(httpMethod);
         }
     }
 
