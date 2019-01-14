@@ -31,15 +31,26 @@ import io.micronaut.context.annotation.Factory;
 public class ClusterFactory {
 
     /**
+     * Creates the {@link Cluster.Builder} bean for the given configuration.
+     *
+     * @param cassandraConfiguration The cassandra configuration bean
+     * @return A {@link Cluster.Builder} bean
+     */
+
+    @EachBean(CassandraConfiguration.class)
+    Cluster.Builder cassandraBuilder(CassandraConfiguration cassandraConfiguration) {
+        return cassandraConfiguration.getBuilder();
+    }
+
+    /**
      * Creates the {@link Cluster} bean for the given configuration.
      *
-     * @param cassandraConfiguration The {@link CassandraConfiguration} object
+     * @param builder The {@link Cluster.Builder}
      * @return A {@link Cluster} bean
      */
-    @EachBean(CassandraConfiguration.class)
+    @EachBean(Cluster.Builder.class)
     @Bean(preDestroy = "close")
-    public Cluster cassandraCluster(CassandraConfiguration cassandraConfiguration) {
-
-        return cassandraConfiguration.builder.build();
+    public Cluster cassandraCluster(Cluster.Builder builder) {
+        return builder.build();
     }
 }
