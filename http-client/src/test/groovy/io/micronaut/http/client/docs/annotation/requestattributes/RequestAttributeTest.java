@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -40,6 +40,7 @@ public class RequestAttributeTest {
             Assert.assertNotNull(attributes);
             Assert.assertEquals("jan2019", attributes.get("story-id"));
             Assert.assertEquals("storyClient", attributes.get("client-name"));
+            Assert.assertEquals("1", attributes.get("version"));
         }
     }
 }
