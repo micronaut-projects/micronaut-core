@@ -24,6 +24,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
@@ -178,7 +179,19 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     protected void registerDefaultConverters(ConversionService<?> conversionService) {
         conversionService.addConverter(
             CharSequence.class,
-            MediaType.class, (object, targetType, context) -> Optional.of(new MediaType(object.toString())));
+            MediaType.class, (object, targetType, context) -> {
+                    if (StringUtils.isEmpty(object)) {
+                        return Optional.empty();
+                    } else {
+                        final String str = object.toString();
+                        try {
+                            return Optional.of(new MediaType(str));
+                        } catch (IllegalArgumentException e) {
+                            context.reject(e);
+                            return Optional.empty();
+                        }
+                    }
+                });
 
     }
 

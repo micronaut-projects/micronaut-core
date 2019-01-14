@@ -1,4 +1,4 @@
-apply plugin: 'com.github.johnrengelman.plugin-shadow'
+apply plugin: 'com.github.johnrengelman.shadow'
 
 dependencies {
     shadowCompile dependencyVersion("micrometer")
