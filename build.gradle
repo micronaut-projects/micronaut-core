@@ -110,6 +110,18 @@ ext {
                     name:'micronaut-kafka',
                     modules:['micronaut-kafka-streams']
             ],
+            'micronaut.groovy': [
+                    version:micronautGroovyVersion,
+                    group:'io.micronaut',
+                    name:'micronaut-runtime-groovy',
+                    modules:['micronaut-function-groovy']
+            ],
+            'micronaut.gorm': [
+                    version:micronautGroovyVersion,
+                    group:'io.micronaut.configuration',
+                    name:'micronaut-gorm-common',
+                    modules:['micronaut-multitenancy-gorm', 'micronaut-neo4j-gorm', 'micronaut-mongo-gorm', 'micronaut-hibernate-gorm']
+            ],
             'micronaut.netflix': [
                     version:micronautNetflixVersion,
                     group:'io.micronaut.configuration',
