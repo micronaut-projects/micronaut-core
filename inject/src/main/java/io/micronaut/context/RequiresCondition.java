@@ -125,6 +125,10 @@ public class RequiresCondition implements Condition {
             return;
         }
 
+        if (!matchesAbsenceOfClasses(context, requirements)) {
+            return;
+        }
+
         if (!matchesEnvironment(context, requirements)) {
             return;
         }
@@ -392,6 +396,22 @@ public class RequiresCondition implements Condition {
 
     private boolean matchesPresenceOfClasses(ConditionContext context, AnnotationValue<Requires> convertibleValues) {
         return matchesPresenceOfClasses(context, convertibleValues, "classes");
+    }
+
+    private boolean matchesAbsenceOfClasses(ConditionContext context, AnnotationValue<Requires> requirements) {
+        if (requirements.contains("missing")) {
+            Optional<AnnotationClassValue[]> classNames = requirements.get("missing", AnnotationClassValue[].class);
+            if (classNames.isPresent()) {
+                AnnotationClassValue[] classValues = classNames.get();
+                for (AnnotationClassValue classValue : classValues) {
+                    if (classValue.getType().isPresent()) {
+                        context.fail("Class [" + classValue.getName() + "] is not absent");
+                        return false;
+                    }
+                }
+            }
+        }
+        return true;
     }
 
     private boolean matchesPresenceOfClasses(ConditionContext context, AnnotationValue<Requires> requirements, String attr) {
