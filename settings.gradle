@@ -31,13 +31,15 @@ include "security-jwt"
 include "security-session"
 include "session"
 include "spring"
-include "test-suite"
-include "test-suite-kotlin"
-include "test-utils"
 include "tracing"
 include "validation"
 include "views"
 include "websocket"
+
+// test suites
+include "test-suite"
+include "test-suite-kotlin"
+include "test-utils"
 
 // configurations
 include "configurations:aws-common"
