@@ -3,7 +3,7 @@ dependencies {
     compile project(":inject")
     compile "com.zaxxer:HikariCP:2.7.9"
 
-    compileOnly project(":configurations:micrometer-core")
+    compileOnly dependencyVersion("micronaut.micrometer")
     compileOnly project(":inject-java")
 
     testCompile dependencyVersion("h2")
@@ -12,6 +12,6 @@ dependencies {
     testCompile project(":http-server-netty")
     testCompile project(":http-client")
     testCompile project(":management")
-    testCompile project(":configurations:micrometer-core")
+    testCompile dependencyVersion("micronaut.micrometer")
     testCompile dependencyModuleVersion("spring", "spring-jdbc")
 }
