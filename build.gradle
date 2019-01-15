@@ -140,6 +140,13 @@ ext {
                     name   : 'micrometer-core',
                     modules :['micrometer-registry-atlas', 'micrometer-registry-graphite', 'micrometer-registry-prometheus', 'micrometer-registry-statsd']
             ],
+            'micronaut.micrometer': [
+                    version:micronautMicrometerVersion,
+                    group:'io.micronaut.configuration',
+                    name:'micronaut-micrometer-core',
+                    modules:['micronaut-micrometer-registry-atlas', 'micronaut-micrometer-registry-graphite',
+                             'micronaut-micrometer-registry-prometheus', 'micronaut-micrometer-registry-statsd'  ]
+            ],
             'mongo' : [
                     version: mongoVersion,
                     group: 'org.mongodb',
