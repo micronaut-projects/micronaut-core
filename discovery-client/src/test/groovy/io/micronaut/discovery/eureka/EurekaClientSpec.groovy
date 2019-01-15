@@ -27,6 +27,7 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.runtime.server.EmbeddedServer
 import org.testcontainers.containers.GenericContainer
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy
+import spock.lang.Retry
 import spock.lang.Specification
 import spock.lang.Stepwise
 import spock.lang.Shared
@@ -100,10 +101,11 @@ class EurekaClientSpec extends Specification {
 
     }
 
+    @Retry
     void "test register and de-register instance"() {
 
         given:
-        PollingConditions conditions = new PollingConditions(timeout: 10)
+        PollingConditions conditions = new PollingConditions(timeout: 25, delay: 1)
 
         when:
         def instanceId = "myapp-1"
