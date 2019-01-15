@@ -16,6 +16,7 @@
 
 package io.micronaut.scheduling.io.watch;
 
+import com.sun.jna.Library;
 import io.methvin.watchservice.MacOSXListeningWatchService;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.util.StringUtils;
@@ -23,20 +24,21 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.nio.file.FileSystems;
 import java.nio.file.WatchService;
 
 /**
- * A factory that creates the default watch service.
+ * A factory that creates the {@link WatchService}. For Mac OS X this class will try to instantiate
+ * {@link MacOSXListeningWatchService} otherwise fall back to the default with a warning.
  *
  * @author graemerocher
  * @since 1.1.0
  */
 @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 @Requires(property = FileWatchConfiguration.PATHS)
-@Requires(missing = MacOSXListeningWatchService.class)
+@Requires(classes = {MacOSXListeningWatchService.class, Library.class})
 @Factory
-public class WatchServiceFactory {
+public class MacOsWatchServiceFactory {
+
     protected static final Logger LOG = LoggerFactory.getLogger(WatchServiceFactory.class);
 
     /**
@@ -47,17 +49,18 @@ public class WatchServiceFactory {
      */
     @Bean(preDestroy = "close")
     @Prototype
-    @Requires(missing = MacOSXListeningWatchService.class)
+    @Requires(classes = {MacOSXListeningWatchService.class, Library.class})
     @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
     @Requires(property = FileWatchConfiguration.PATHS)
     @Primary
-    protected WatchService watchService() throws IOException {
-        String name = System.getProperty("os.name").toLowerCase();
-        boolean isMacOS = "Mac OS X".equalsIgnoreCase(name) || "Darwin".equalsIgnoreCase(name);
-        if (isMacOS) {
-            LOG.warn("Using default File WatchService on OS X is slow. Consider adding 'io.methvin:directory-watcher' and 'net.java.dev.jna:jna' dependencies to use native file watch");
+    protected WatchService macWatchService() throws IOException {
+        try {
+            return new MacOSXListeningWatchService();
+        } catch (Exception e) {
+            if (LOG.isWarnEnabled()) {
+                LOG.warn("Unable to create Mac OS X specific watch service. Falling back to default polling strategy: " + e.getMessage(), e);
+            }
+            return new WatchServiceFactory().watchService();
         }
-        return FileSystems.getDefault().newWatchService();
     }
-
 }
