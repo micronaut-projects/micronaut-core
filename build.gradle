@@ -104,11 +104,17 @@ ext {
                     group:'com.google.code.findbugs',
                     name:'jsr305'
             ],
-            'kafka.configuration': [
-                    version:kafkaConfigurationVersion,
+            'micronaut.kafka': [
+                    version:micronautKafkaVersion,
                     group:'io.micronaut.configuration',
-                    name:'kafka',
-                    modules:['kafka-streams']
+                    name:'micronaut-kafka',
+                    modules:['micronaut-kafka-streams']
+            ],
+            'micronaut.netflix': [
+                    version:micronautNetflixVersion,
+                    group:'io.micronaut.configuration',
+                    name:'micronaut-netflix-archaius',
+                    modules:['micronaut-netflix-hystrix', 'micronaut-netflix-ribbon']
             ],
             kafka: [
                     version:kafkaVersion,
