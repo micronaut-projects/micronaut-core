@@ -10,14 +10,14 @@ dependencies {
     compile project(":configurations:hibernate-validator")
     compileOnly project(":inject-java")
     compileOnly project(":management")
-    compileOnly project(":configurations:micrometer-core")
     compile dependencyModuleVersion("hibernate", "hibernate-jcache")
     runtime 'javax.xml.bind:jaxb-api:2.3.1'
+    compileOnly dependencyVersion("micronaut.micrometer")
 
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
     testRuntime project(":configurations:jdbc-tomcat")
     testRuntime dependencyVersion("h2")
-    testCompile project(":configurations:micrometer-core")
+    testCompile dependencyVersion("micronaut.micrometer")
     testCompile dependencyModuleVersion("hibernate", "hibernate-jcache")
 }
