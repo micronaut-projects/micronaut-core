@@ -62,7 +62,7 @@ package example;
 
 import io.micronaut.configuration.picocli.PicocliRunner;
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.http.annotation.*;
+import io.micronaut.http.client.annotation.*;
 import io.micronaut.http.client.*;
 import io.reactivex.*;
 
