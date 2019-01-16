@@ -51,7 +51,7 @@ public class WatchServiceFactory {
     @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
     @Requires(property = FileWatchConfiguration.PATHS)
     @Primary
-    protected WatchService watchService() throws IOException {
+    public WatchService watchService() throws IOException {
         String name = System.getProperty("os.name").toLowerCase();
         boolean isMacOS = "Mac OS X".equalsIgnoreCase(name) || "Darwin".equalsIgnoreCase(name);
         if (isMacOS) {
