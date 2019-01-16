@@ -153,4 +153,29 @@ class DefaultVersionedUrlFilterSpec extends Specification {
         matches.size() == 2
     }
 
+    def "should return only matched versions after using all version resolvers"() {
+        when:
+        def strategies = [
+                new ParameterVersionResolver(
+                    new ParameterVersionResolverConfiguration().with {
+                        names = ["version"]
+                        it
+                    }
+                ),
+                new HeaderVersionResolver(
+                    new HeaderVersionResolverConfiguration().with {
+                        names = ["API-VERSION"]
+                        it
+                    })
+        ]
+        def handler = new RouteVersionFilter(strategies)
+        def request = HttpRequest.GET("/versioned/hello").header("API-VERSION", "2")
+        def matches = routes.stream().filter(handler.filter(request)).collect(Collectors.toList())
+        then:
+        matches.size() == 2
+
+
+
+    }
+
 }
