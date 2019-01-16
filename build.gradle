@@ -147,6 +147,12 @@ ext {
                     modules:['micronaut-micrometer-registry-atlas', 'micronaut-micrometer-registry-graphite',
                              'micronaut-micrometer-registry-prometheus', 'micronaut-micrometer-registry-statsd'  ]
             ],
+            'micronaut.sql': [
+                    version:micronautSqlVersion,
+                    group:'io.micronaut.configuration',
+                    name:'micronaut-hibernate-jpa',
+                    modules:['micronaut-jdbc-tomcat', 'micronaut-jdbc-hikari', 'micronaut-jdbc-dbcp', 'micronaut-postgres-reactive']
+            ],
             'mongo' : [
                     version: mongoVersion,
                     group: 'org.mongodb',
