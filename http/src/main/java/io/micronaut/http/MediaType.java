@@ -297,8 +297,12 @@ public class MediaType implements CharSequence {
     private BigDecimal qualityNumberField;
 
     static {
-        ConversionService.SHARED.addConverter(CharSequence.class, MediaType.class, (Function<CharSequence, MediaType>) charSequence ->
-            new MediaType(charSequence.toString())
+        ConversionService.SHARED.addConverter(CharSequence.class, MediaType.class, (Function<CharSequence, MediaType>) charSequence -> {
+                    if (StringUtils.isNotEmpty(charSequence)) {
+                        return new MediaType(charSequence.toString());
+                    }
+                    return null;
+                }
         );
         textTypePatterns.add(Pattern.compile("^text/.*$"));
         textTypePatterns.add(Pattern.compile("^.*\\+json$"));
@@ -367,7 +371,7 @@ public class MediaType implements CharSequence {
         int i = withoutArgs.indexOf('/');
         if (i > -1) {
             this.type = withoutArgs.substring(0, i);
-            this.subtype = withoutArgs.substring(i + 1, withoutArgs.length());
+            this.subtype = withoutArgs.substring(i + 1);
         } else {
             throw new IllegalArgumentException("Invalid mime type: " + name);
         }
@@ -484,6 +488,9 @@ public class MediaType implements CharSequence {
      * @return Whether the content type is text based
      */
     public static boolean isTextBased(String contentType) {
+        if (StringUtils.isEmpty(contentType)) {
+            return false;
+        }
         MediaType mediaType = new MediaType(contentType);
         return mediaType.isTextBased();
     }
@@ -494,7 +501,7 @@ public class MediaType implements CharSequence {
             return name;
         } else {
             return name + ";" + parameters.entrySet().stream().map(Object::toString)
-                .collect(Collectors.joining(";"));
+                    .collect(Collectors.joining(";"));
         }
     }
 

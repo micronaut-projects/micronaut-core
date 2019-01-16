@@ -16,7 +16,6 @@
 
 package io.micronaut.scheduling.io.watch;
 
-import com.sun.jna.Library;
 import io.methvin.watchservice.MacOSXListeningWatchService;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.util.StringUtils;
@@ -28,17 +27,17 @@ import java.nio.file.FileSystems;
 import java.nio.file.WatchService;
 
 /**
- * A factory that creates the {@link WatchService}. For Mac OS X this class will try to instantiate
- * {@link MacOSXListeningWatchService} otherwise fall back to the default with a warning.
+ * A factory that creates the default watch service.
  *
  * @author graemerocher
  * @since 1.1.0
  */
 @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 @Requires(property = FileWatchConfiguration.PATHS)
+@Requires(missing = MacOSXListeningWatchService.class)
 @Factory
 public class WatchServiceFactory {
-    private static final Logger LOG = LoggerFactory.getLogger(WatchServiceFactory.class);
+    protected static final Logger LOG = LoggerFactory.getLogger(WatchServiceFactory.class);
 
     /**
      * The default {@link WatchService}.
@@ -52,7 +51,7 @@ public class WatchServiceFactory {
     @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
     @Requires(property = FileWatchConfiguration.PATHS)
     @Primary
-    WatchService watchService() throws IOException {
+    protected WatchService watchService() throws IOException {
         String name = System.getProperty("os.name").toLowerCase();
         boolean isMacOS = "Mac OS X".equalsIgnoreCase(name) || "Darwin".equalsIgnoreCase(name);
         if (isMacOS) {
@@ -61,26 +60,4 @@ public class WatchServiceFactory {
         return FileSystems.getDefault().newWatchService();
     }
 
-    /**
-     * The default {@link WatchService}.
-     *
-     * @return The watch service to use.
-     * @throws IOException if an error occurs creating the watch service
-     */
-    @Bean(preDestroy = "close")
-    @Prototype
-    @Requires(classes = {MacOSXListeningWatchService.class, Library.class})
-    @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
-    @Requires(property = FileWatchConfiguration.PATHS)
-    @Primary
-    WatchService macWatchService() throws IOException {
-        try {
-            return new MacOSXListeningWatchService();
-        } catch (Exception e) {
-            if (LOG.isWarnEnabled()) {
-                LOG.warn("Unable to create Mac OS X specific watch service. Falling back to default polling strategy: " + e.getMessage(), e);
-            }
-            return watchService();
-        }
-    }
 }

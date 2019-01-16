@@ -6,7 +6,7 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.http.hateos.JsonError
+import io.micronaut.http.hateoas.JsonError
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Single
 import spock.lang.AutoCleanup

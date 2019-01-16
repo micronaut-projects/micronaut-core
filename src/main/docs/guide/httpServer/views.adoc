@@ -6,7 +6,7 @@ To use the view rendering features described in this section, add the following 
 
 dependency:micronaut-views[]
 
-Views and templates can then be placed in the `src/main/resource/views` directory of your project.
+Views and templates can then be placed in the `src/main/resources/views` directory of your project.
 
 If you wish to use a different folder instead of `views`, set the property `micronaut.views.folder`.
 

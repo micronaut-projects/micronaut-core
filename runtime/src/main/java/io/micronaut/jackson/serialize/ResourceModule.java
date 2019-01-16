@@ -20,7 +20,7 @@ import com.fasterxml.jackson.databind.module.SimpleModule;
 import javax.inject.Singleton;
 
 /**
- * Modifies deserialization for {@link io.micronaut.http.hateos.Resource}.
+ * Modifies deserialization for {@link io.micronaut.http.hateoas.Resource}.
  *
  * @author graemerocher
  * @since 1.0
@@ -29,7 +29,7 @@ import javax.inject.Singleton;
 public class ResourceModule extends SimpleModule {
 
     /**
-     * Construct a new resource module with default deserializer for {@link io.micronaut.http.hateos.Resource}.
+     * Construct a new resource module with default deserializer for {@link io.micronaut.http.hateoas.Resource}.
      */
     public ResourceModule() {
         setDeserializerModifier(new ResourceDeserializerModifier());

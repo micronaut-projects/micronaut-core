@@ -75,10 +75,10 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
      * @param errorStatus            The error status
      */
     FullNettyClientHttpResponse(
-        FullHttpResponse fullHttpResponse,
-        MediaTypeCodecRegistry mediaTypeCodecRegistry,
-        ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory,
-        Argument<B> bodyType, boolean errorStatus) {
+            FullHttpResponse fullHttpResponse,
+            MediaTypeCodecRegistry mediaTypeCodecRegistry,
+            ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory,
+            Argument<B> bodyType, boolean errorStatus) {
 
         this.status = HttpStatus.valueOf(fullHttpResponse.status().code());
         this.headers = new NettyHttpHeaders(fullHttpResponse.headers(), ConversionService.SHARED);
@@ -86,7 +86,7 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
         this.nettyHttpResponse = fullHttpResponse;
         this.mediaTypeCodecRegistry = mediaTypeCodecRegistry;
         this.byteBufferFactory = byteBufferFactory;
-        Class<B> rawBodyType = bodyType != null ? bodyType.getType() : null;
+        Class<?> rawBodyType = bodyType != null ? bodyType.getType() : null;
         if (rawBodyType != null && !HttpStatus.class.isAssignableFrom(rawBodyType)) {
             if (HttpResponse.class.isAssignableFrom(bodyType.getType())) {
                 Optional<Argument<?>> responseBodyType = bodyType.getFirstTypeVariable();
@@ -165,25 +165,35 @@ public class FullNettyClientHttpResponse<B> implements HttpResponse<B>, Completa
         }
 
         Optional<T> result = convertedBodies.computeIfAbsent(type, argument -> {
-                Optional<B> existing = getBody();
-                if (existing.isPresent()) {
-                    return getBody().flatMap(b -> {
-                        if (b instanceof ByteBuffer) {
-                            ByteBuf bytebuf = (ByteBuf) ((ByteBuffer) b).asNativeBuffer();
-                            return convertByteBuf(bytebuf, argument);
-                        }
-                        Optional<T> converted = ConversionService.SHARED.convert(b, ConversionContext.of(type));
-                        if (!converted.isPresent()) {
-                            ByteBuf content = nettyHttpResponse.content();
-                            return convertByteBuf(content, type);
-                        }
+                    Optional<B> existing = getBody();
+                    final boolean isOptional = argument.getType() == Optional.class;
+                    final Argument finalArgument = isOptional ? argument.getFirstTypeVariable().orElse(argument) : argument;
+                    Optional<T> converted;
+                    if (existing.isPresent()) {
+                        converted = getBody().flatMap(b -> {
+
+                            if (b instanceof ByteBuffer) {
+                                ByteBuf bytebuf = (ByteBuf) ((ByteBuffer) b).asNativeBuffer();
+                                return convertByteBuf(bytebuf, finalArgument);
+                            } else {
+                                final Optional opt = ConversionService.SHARED.convert(b, ConversionContext.of(finalArgument));
+                                if (!opt.isPresent()) {
+                                    ByteBuf content = nettyHttpResponse.content();
+                                    return convertByteBuf(content, finalArgument);
+                                }
+                                return opt;
+                            }
+                        });
+                    } else {
+                        ByteBuf content = nettyHttpResponse.content();
+                        converted = convertByteBuf(content, finalArgument);
+                    }
+                    if (isOptional) {
+                        return Optional.of(converted);
+                    } else {
                         return converted;
-                    });
-                } else {
-                    ByteBuf content = nettyHttpResponse.content();
-                    return convertByteBuf(content, type);
+                    }
                 }
-            }
 
         );
         if (LOG.isTraceEnabled() && !result.isPresent()) {

@@ -1,6 +1,7 @@
 Micronaut supports reactive and non-blocking client to connect to Postgres using https://github.com/reactiverse/reactive-pg-client[reactive-pg-client], allowing  to handle many database connections with a single thread.
 
 == Configuring the Reactive Postgres Client
+
 [TIP]
 .Using the CLI
 ====
@@ -18,39 +19,4 @@ To configure the Reactive Postgres client you should first add `postgres-reactiv
 compile "io.micronaut.configuration:micronaut-postgres-reactive"
 ----
 
-You should then configure the URI or https://reactiverse.io/reactive-pg-client/apidocs/index.html[`PoolOptions`] of the Postgres server you wish to communicate with in `application.yml`:
-
-[source,yaml]
-.application.yml
-----
-postgres:
-	reactive:
-	    client:
-            port: 5432
-            host: the-host
-            database: the-db
-            user: test
-            password: test
-            maxSize: 5
-----
-
-TIP: You can also connect to Postgres using `uri` instead of the other properties.
-
-Once you have the above configuration in place then you can inject the `io.reactiverse.reactivex.pgclient.PgPool` bean. The following is the simplest way to connect:
-
-[source,groovy]
-----
-include::{testsuite}/configuration/postgres/reactive/PostgresReactiveSpec.groovy[tags=query,indent=0]
-----
-
-<1> `client` is an instance of the `io.reactiverse.reactivex.pgclient.PgPool` bean.
-
-For more information on running queries on Postgres using the reactive client please read the "Running queries" section in the documentation of https://reactiverse.io/reactive-pg-client/guide/groovy/index.html[reactive-pg-client].
-
-== Postgres Health Checks
-
-When the `postgres-reactive` module is activated a api:configuration.postgres.reactive.health.PgPoolHealthIndicator[] is activated resulting in the `/health` endpoint and api:health.CurrentHealthStatus[] interface resolving the health of the Postgres connection.
-
-The only configuration option supported is to enable or disable the indicator by the `endpoints.health.postgres.reactive.enabled` key.
-
-See the section on the <<healthEndpoint, Health Endpoint>> for more information.
+For more information see the https://micronaut-projects.github.io/micronaut-sql/latest/guide/#pgclient[Configuring Reactive Postgres] section of the https://github.com/micronaut-projects/micronaut-sql[Micronaut SQL libraries] project.

@@ -22,7 +22,7 @@ import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
 import com.fasterxml.jackson.databind.util.NameTransformer;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.hateos.Resource;
+import io.micronaut.http.hateoas.Resource;
 
 import javax.inject.Singleton;
 import java.util.Iterator;

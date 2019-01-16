@@ -71,7 +71,10 @@ public class RouteVersionFilter implements RouteMatchFilter {
 
         return (match) -> resolvingStrategies.stream()
                 .map(strategy -> strategy.resolve(request))
-                .anyMatch((opt) -> opt.map(s -> isVersionMatched(match, s)).orElse(true));
+                .filter(Optional::isPresent)
+                .findFirst()
+                .flatMap(opt -> opt.map(v -> isVersionMatched(match, v)))
+                .orElse(true);
     }
 
     private <T, R> boolean isVersionMatched(UriRouteMatch<T, R> routeMatch, String version) {

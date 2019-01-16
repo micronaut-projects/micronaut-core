@@ -64,10 +64,12 @@ class BlockingCrudSpec extends Specification {
 
         when:
         Book book = client.get(99)
+        Optional<Book> opt = client.getOptional(99)
         List<Book> books = client.list()
 
         then:
         book == null
+        !opt.isPresent()
         books.size() == 0
 
         when:
@@ -80,11 +82,14 @@ class BlockingCrudSpec extends Specification {
 
         when:
         book = client.get(book.id)
+        opt = client.getOptional(book.id)
 
         then:
         book != null
         book.title == "The Stand"
         book.id == 1
+        opt.isPresent()
+        opt.get().title == book.title
 
         when:'the full response is resolved'
         HttpResponse<Book> bookAndResponse = client.getResponse(book.id)
@@ -173,6 +178,11 @@ class BlockingCrudSpec extends Specification {
         }
 
         @Override
+        Optional<Book> getOptional(Long id) {
+            return Optional.ofNullable(get(id))
+        }
+
+        @Override
         HttpResponse<Book> getResponse(Long id) {
             def book = books.get(id)
             if(book) {
@@ -212,6 +222,9 @@ class BlockingCrudSpec extends Specification {
 
         @Get("/{id}")
         Book get(Long id)
+
+        @Get("/optional/{id}")
+        Optional<Book> getOptional(Long id)
 
         @Get("/res/{id}")
         HttpResponse<Book> getResponse(Long id)
