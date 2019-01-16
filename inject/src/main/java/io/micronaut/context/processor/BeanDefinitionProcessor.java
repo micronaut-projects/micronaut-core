@@ -17,14 +17,13 @@
 package io.micronaut.context.processor;
 
 import io.micronaut.context.BeanContext;
-import io.micronaut.inject.BeanDefinition;
 
 import java.lang.annotation.Annotation;
 
 /**
  * A bean definition processor is a processor that is called once for each bean annotated with the given annotation type.
  *
- * <p>The {@link #process(BeanDefinition, Object)} method will receive each {@link BeanDefinition} and the {@link BeanContext} as arguments.</p>
+ * <p>The {@link #process(io.micronaut.inject.BeanDefinition, Object)} method will receive each {@link io.micronaut.inject.BeanDefinition} and the {@link BeanContext} as arguments.</p>
  *
  * <p>If the processor needs to be executed as startup it should be define as a {@link io.micronaut.context.annotation.Context} scoped bean.</p>
  *

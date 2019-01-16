@@ -46,7 +46,7 @@ import java.util.function.Supplier;
  * @author Graeme Rocher
  * @since 1.0
  */
-@Requires(classes = Flux.class)
+@Requires(classes = {Flux.class, Schedulers.Factory.class})
 @Context
 @Internal
 class ReactorInstrumentation {

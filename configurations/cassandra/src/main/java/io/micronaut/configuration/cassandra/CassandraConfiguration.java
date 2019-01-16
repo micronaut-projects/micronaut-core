@@ -32,6 +32,16 @@ import io.micronaut.context.annotation.EachProperty;
 @EachProperty(value = "cassandra", primary = "default")
 public class CassandraConfiguration {
 
+    @SuppressWarnings("WeakerAccess")
     @ConfigurationBuilder(allowZeroArgs = true, prefixes = { "with", "add" })
     Cluster.Builder builder = Cluster.builder();
+
+    /**
+     * The configuration builder.
+     *
+     * @return The builder
+     */
+    public Cluster.Builder getBuilder() {
+        return builder;
+    }
 }

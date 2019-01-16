@@ -19,10 +19,14 @@ package io.micronaut.annotation.processing.visitor;
 import io.micronaut.annotation.processing.PublicMethodVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ElementModifier;
+import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.processing.JavaModelUtils;
 
+import javax.annotation.Nonnull;
 import javax.lang.model.element.*;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
@@ -31,6 +35,8 @@ import javax.lang.model.type.TypeVariable;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import java.util.*;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * A class element returning data from a {@link TypeElement}.
@@ -47,7 +53,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     /**
      * @param classElement       The {@link TypeElement}
      * @param annotationMetadata The annotation metadata
-     * @param visitorContext The visitor context
+     * @param visitorContext     The visitor context
      */
     JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
         super(classElement, annotationMetadata);
@@ -59,8 +65,8 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     /**
      * @param classElement       The {@link TypeElement}
      * @param annotationMetadata The annotation metadata
-     * @param visitorContext The visitor context
-     * @param typeArguments The type arguments
+     * @param visitorContext     The visitor context
+     * @param typeArguments      The type arguments
      */
     JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext, List<? extends TypeMirror> typeArguments) {
         super(classElement, annotationMetadata);
@@ -244,6 +250,27 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
             return Collections.emptyList();
         }
 
+    }
+
+    @Override
+    public List<FieldElement> getFields(@Nonnull Predicate<Set<ElementModifier>> modifierFilter) {
+        List<FieldElement> fields = new ArrayList<>();
+        classElement.asType().accept(new PublicMethodVisitor<Object, Object>(visitorContext.getTypes()) {
+            @Override
+            protected boolean isAcceptable(javax.lang.model.element.Element element) {
+                final Set<ElementModifier> mods = element.getModifiers().stream().map(m -> ElementModifier.valueOf(m.name())).collect(Collectors.toSet());
+                return element.getKind() == ElementKind.FIELD && element instanceof VariableElement && modifierFilter.test(mods);
+            }
+
+            @Override
+            protected void accept(DeclaredType type, Element element, Object o) {
+                final AnnotationMetadata fieldMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(element);
+                fields.add(new JavaFieldElement(JavaClassElement.this, (VariableElement) element, fieldMetadata, visitorContext));
+            }
+
+        }, null);
+
+        return Collections.unmodifiableList(fields);
     }
 
     @Override

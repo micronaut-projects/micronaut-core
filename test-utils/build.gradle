@@ -4,5 +4,6 @@ ext {
 }
 
 dependencies {
+    compile "org.codehaus.groovy:groovy:$groovyVersion"
     testCompile "org.yaml:snakeyaml:$snakeYamlVersion"
 }

@@ -59,4 +59,5 @@ public interface EmbeddedServer extends EmbeddedApplication<EmbeddedServer> {
     default boolean isServer() {
         return true;
     }
+
 }

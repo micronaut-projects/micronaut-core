@@ -26,7 +26,7 @@ import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.hateos.JsonError;
+import io.micronaut.http.hateoas.JsonError;
 
 import java.io.File;
 import java.io.IOException;
@@ -69,7 +69,7 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
     );
 
     private static final List<String> KNOWN_BEANS = Arrays.asList(
-            JsonError.class.getName(), "io.micronaut.http.hateos.DefaultLink"
+            JsonError.class.getName(), "io.micronaut.http.hateoas.DefaultLink"
     );
 
     private final Set<String> classes = new ConcurrentSkipListSet<>();

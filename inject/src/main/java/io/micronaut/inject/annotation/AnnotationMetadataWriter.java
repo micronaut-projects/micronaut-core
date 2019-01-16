@@ -30,10 +30,8 @@ import org.objectweb.asm.commons.GeneratorAdapter;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.lang.reflect.Array;
+import java.util.*;
 
 /**
  * Responsible for writing class files that are instances of {@link AnnotationMetadata}.
@@ -130,8 +128,8 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     /**
      * Constructs a new writer for the given class name and metadata.
      *
-     * @param className          The class name for which the metadata relates
-     * @param annotationMetadata The annotation metadata
+     * @param className               The class name for which the metadata relates
+     * @param annotationMetadata      The annotation metadata
      * @param writeAnnotationDefaults Whether annotations defaults should be written
      */
     public AnnotationMetadataWriter(String className, AnnotationMetadata annotationMetadata, boolean writeAnnotationDefaults) {
@@ -408,13 +406,13 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             Type t = Type.getType(declaringClass);
             methodVisitor.getStatic(t, value.toString(), t);
         } else if (value.getClass().isArray()) {
-            Object[] array = (Object[]) value;
-            int len = array.length;
-            pushNewArray(methodVisitor, ((Object[]) value).getClass().getComponentType(), len);
-            for (int i = 0; i < array.length; i++) {
-                int index = i;
+            final Class<?> componentType = ReflectionUtils.getWrapperType(value.getClass().getComponentType());
+            int len = Array.getLength(value);
+            pushNewArray(methodVisitor, componentType, len);
+            for (int i = 0; i < len; i++) {
+                final Object v = Array.get(value, i);
                 pushStoreInArray(methodVisitor, i, len, () ->
-                        pushValue(declaringType, declaringClassWriter, methodVisitor, array[index], loadTypeMethods)
+                        pushValue(declaringType, declaringClassWriter, methodVisitor, v, loadTypeMethods)
                 );
             }
         } else if (value instanceof List) {

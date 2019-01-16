@@ -44,7 +44,14 @@ class CacheFactory {
 
 ----
 
-=== Liquibase and Flyway
+=== Dependency Upgrades
 
-New configurations have been added to support https://micronaut-projects.github.io/micronaut-configuration-flyway/latest/guide/index.html[Flyway] and https://micronaut-projects.github.io/micronaut-configuration-liquibase/latest/guide/index.html[Liquibase] database migrations.
+* Kafka `2.0.0` -> `2.0.1`
 
+=== Micrometer 1.1 and @Timed Support
+
+Micrometer has been upgraded to 1.1 and support for https://micrometer.io/docs/concepts#_the_code_timed_code_annotation[@Timed] AOP advice added.
+
+=== Dependency Upgrades
+
+- Micrometer `1.0.6` -> `1.1.1`

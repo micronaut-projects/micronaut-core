@@ -15,7 +15,6 @@ dependencies {
     testCompile project(":http-server-netty")
     testCompile project(":http-client")
     testCompile project(":configurations:hibernate-validator")
-    testCompile project(":configurations:postgres-reactive")
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
     testCompile project(":tracing")
@@ -25,7 +24,6 @@ dependencies {
     testCompile dependencyModuleVersion("groovy", "groovy-json")
     // tag::testcontainers-dependencies[]
     testCompile "org.testcontainers:spock:1.10.1"
-    testCompile "org.testcontainers:postgresql:1.10.1"
     // end::testcontainers-dependencies[]
 
     testRuntime dependencyVersion("tomcatJdbc")

@@ -227,11 +227,56 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                 if (nodeStack.isEmpty()) {
                     throw new JsonParseException(currentNonBlockingJsonParser, "Unexpected float literal");
                 }
-                JsonNode floatNode = nodeStack.peekFirst();
-                if (floatNode instanceof ObjectNode) {
-                    ((ObjectNode) floatNode).put(currentFieldName, currentNonBlockingJsonParser.getFloatValue());
-                } else {
-                    ((ArrayNode) floatNode).add(currentNonBlockingJsonParser.getFloatValue());
+
+                final JsonParser.NumberType numberType = currentNonBlockingJsonParser.getNumberType();
+                JsonNode decimalNode = nodeStack.peekFirst();
+                switch (numberType) {
+
+                    case FLOAT:
+                        if (decimalNode instanceof ObjectNode) {
+                            ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getFloatValue());
+                        } else {
+                            ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getFloatValue());
+                        }
+                        break;
+                    case DOUBLE:
+                        if (decimalNode instanceof ObjectNode) {
+                            ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getDoubleValue());
+                        } else {
+                            ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getDoubleValue());
+                        }
+                    break;
+                    case BIG_DECIMAL:
+                        if (decimalNode instanceof ObjectNode) {
+                            ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getDecimalValue());
+                        } else {
+                            ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getDecimalValue());
+                        }
+                    break;
+                    case BIG_INTEGER:
+                        if (decimalNode instanceof ObjectNode) {
+                            ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getBigIntegerValue());
+                        } else {
+                            ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getBigIntegerValue());
+                        }
+                    break;
+                    case LONG:
+                        if (decimalNode instanceof ObjectNode) {
+                            ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getLongValue());
+                        } else {
+                            ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getLongValue());
+                        }
+                    break;
+                    case INT:
+                        if (decimalNode instanceof ObjectNode) {
+                            ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getIntValue());
+                        } else {
+                            ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getIntValue());
+                        }
+                    break;
+                    default:
+                        // shouldn't get here
+                        throw new IllegalStateException("Unsupported number type: " + numberType);
                 }
                 break;
             case VALUE_NULL:

@@ -51,12 +51,15 @@ public class MacOsWatchThread extends DefaultWatchThread {
      * @param configuration  the configuration
      * @param watchService   the watch service
      */
-    public MacOsWatchThread(ApplicationEventPublisher eventPublisher, FileWatchConfiguration configuration, WatchService watchService) {
+    public MacOsWatchThread(
+            ApplicationEventPublisher eventPublisher,
+            FileWatchConfiguration configuration,
+            WatchService watchService) {
         super(eventPublisher, configuration, watchService);
     }
 
     @Override
-    protected @Nonnull WatchKey registerPath(Path dir) throws IOException {
+    protected @Nonnull WatchKey registerPath(@Nonnull Path dir) throws IOException {
         WatchablePath watchPath = new WatchablePath(dir);
         return watchPath.register(
                 getWatchService(),
