@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.scheduling.io.watch;
+package io.micronaut.scheduling.io.watch.osx;
 
 import com.sun.jna.Library;
 import io.methvin.watchservice.MacOSXListeningWatchService;
@@ -24,6 +24,8 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.scheduling.io.watch.DefaultWatchThread;
+import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
 
 import javax.annotation.Nonnull;
 import java.io.IOException;

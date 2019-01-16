@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 
-package io.micronaut.scheduling.io.watch;
+package io.micronaut.scheduling.io.watch.osx;
 
 import com.sun.jna.Library;
 import io.methvin.watchservice.MacOSXListeningWatchService;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.scheduling.io.watch.FileWatchConfiguration;
+import io.micronaut.scheduling.io.watch.WatchServiceFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
