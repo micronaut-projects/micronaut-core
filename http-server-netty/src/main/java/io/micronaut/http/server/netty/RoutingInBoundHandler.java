@@ -1120,6 +1120,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     return response;
                 }
 
+                Optional<MediaTypeCodec> overrideCodec = requestReference.get().getAttribute(HttpAttributes.MEDIA_TYPE_CODEC, MediaTypeCodec.class);
+                if (overrideCodec.isPresent()) {
+                    MediaTypeCodec codec = overrideCodec.get();
+                    return encodeBodyWithCodec(response, body, codec, responseMediaType, context, requestReference);
+                }
+
                 if (specifiedMediaType.isPresent())  {
 
                     Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(responseMediaType, body.getClass());
