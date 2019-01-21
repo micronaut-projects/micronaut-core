@@ -50,6 +50,5 @@ include "configurations:neo4j-bolt"
 include "configurations:openapi"
 include "configurations:picocli"
 include "configurations:rabbitmq"
-include "configurations:redis-lettuce"
 include "configurations:security-ldap"
 
