@@ -170,6 +170,11 @@ ext {
                     group:'io.micronaut.configuration',
                     name:'micronaut-mongo-reactive'
             ],
+            'micronaut.redis': [
+                    version:micronautRedisVersion,
+                    group:'io.micronaut.configuration',
+                    name:'micronaut-redis-lettuce'
+            ],
             'mongo' : [
                     version: mongoVersion,
                     group  : 'org.mongodb',
