@@ -16,11 +16,11 @@
 
 package io.micronaut.http.client.interceptor.configuration;
 
+import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 
-import javax.inject.Singleton;
 import java.util.Collections;
 
 
@@ -30,7 +30,7 @@ import java.util.Collections;
  * @author graemerocher
  * @since 1.1.0
  */
-@Singleton
+@ConfigurationProperties(DefaultClientVersioningConfiguration.PREFIX)
 @Primary
 @Requires(missingProperty = DefaultClientVersioningConfiguration.PREFIX)
 @Internal
@@ -47,9 +47,6 @@ public class DefaultClientVersioningConfiguration extends ClientVersioningConfig
         super(ClientVersioningConfiguration.DEFAULT);
         setHeaders(Collections.singletonList(
             DEFAULT_HEADER_NAME
-        ));
-        setParameters(Collections.singletonList(
-            DEFAULT_PARAMETER_NAME
         ));
     }
 }

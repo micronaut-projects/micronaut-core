@@ -49,3 +49,53 @@ micronaut:
 <4> Specify the header names as a YAML list
 
 If this is not enough you can also implement the api:web.router.version.strategy.VersionExtractingStrategy[] interface which receives the api:http.HttpRequest[] and can implement any strategy you choose.
+
+=== Versioning Client Requests
+
+Micronaut's <<clientAnnotation, Declarative HTTP client>> also supports automatic versioning of outgoing requests via the ann:core.version.annotation.Version[] annotation.
+
+By default if you annotate a client interface with ann:core.version.annotation.Version[] the value supplied to the annotation will be included using the `X-API-VERSION` header.
+
+For example:
+
+snippet::io.micronaut.docs.client.versioning.HelloClient[tags="imports,clazz"]
+
+<1> The ann:core.version.annotation.Version[] can be used as the type level to specify the version to use for all methods
+<2> When defined at the method level it is used only for that method
+
+The default behaviour for how the version is sent for each call can be configured with api:http.client.interceptor.configuration.DefaultClientVersioningConfiguration[]:
+
+include::{includedir}configurationProperties/io.micronaut.http.client.interceptor.configuration.DefaultClientVersioningConfiguration.adoc[]
+
+
+For example to use `Accept-Version` as the header name:
+
+.Configuring Client Versioning
+[source,yaml]
+----
+micronaut:
+    http:
+        client:
+            versioning:
+                default:
+                    headers:
+                        - 'Accept-Version'
+                        - 'X-API-VERSION'
+----
+
+The `default` key is used to refer to the default configuration. You can specify client specific configuration by using the value passed to `@Client` (typically the service ID). For example:
+
+.Configuring Versioning
+[source,yaml]
+----
+micronaut:
+    http:
+        client:
+            versioning:
+                greeting-service:
+                    headers:
+                        - 'Accept-Version'
+                        - 'X-API-VERSION'
+----
+
+The above uses a key called `greeting-service` which can be used to configure a client annotated with `@Client('greeting-service')`.
