@@ -58,32 +58,4 @@ $ mn create-app my-app --features redis-lettuce
 ----
 ====
 
-If you wish to use Redis to cache results then you need to have the Lettuce configuration dependency on your classpath. Lettuce is a non-blocking, reactive Redis client implementation and Micronaut provides an implementation that allows cached results to be read reactively.
-
-To enable Lettuce, add the `redis-lettuce` dependency to your application:
-
-.Lettuce Configuration build.gradle
-[source,groovy]
-----
-dependencies {
-    ...
-    compile "io.micronaut.configuration:micronaut-redis-lettuce"
-    ...
-}
-----
-
-Then within your application configuration configure the Redis URL and Redis caches:
-
-//TODO: Move YAML snippet to test
-.Cache Configuration Example
-[source,yaml]
-----
-redis:
-    uri: redis://localhost
-    caches:
-        my-cache:
-            # expire one hour after write
-            expire-after-write: 1h
-----
-
-include::{includedir}configurationProperties/io.micronaut.configuration.lettuce.cache.RedisCacheConfiguration.adoc[]
+If you wish to use Redis to cache results the https://micronaut-projects.github.io/micronaut-redis/snapshot/guide/#cache[Micronaut Redis] module provides a api:cache.CacheManager[] implementation that allows using Redis as a backing cache.
