@@ -49,7 +49,7 @@ public class SecretEncryption extends AbstractEncryptionConfiguration {
         if (secretEncryptionConfiguration.getSecret() == null) {
             throw new ConfigurationException("Secret encryption Configuration 'secret' is required");
         }
-        if (supports(secretEncryptionConfiguration.getJweAlgorithm(), secretEncryptionConfiguration.getEncryptionMethod())) {
+        if (!supports(secretEncryptionConfiguration.getJweAlgorithm(), secretEncryptionConfiguration.getEncryptionMethod())) {
             StringBuilder sb = new StringBuilder();
             sb.append("Encryption Method: ");
             sb.append(secretEncryptionConfiguration.getEncryptionMethod().toString());
