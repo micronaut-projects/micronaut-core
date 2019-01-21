@@ -16,14 +16,11 @@
 
 package io.micronaut.http.client.interceptor.configuration;
 
-import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.http.client.DefaultHttpClientConfiguration;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import static io.micronaut.http.client.interceptor.configuration.ClientVersioningConfiguration.DEFAULT;
 
 /**
  * A base configuration class for configuring {@link io.micronaut.http.client.annotation.Client} versioning.
@@ -31,7 +28,6 @@ import static io.micronaut.http.client.interceptor.configuration.ClientVersionin
  * @author Bogdan Oros
  * @since 1.1.0
  */
-@EachProperty(value = ClientVersioningConfiguration.PREFIX, primary = DEFAULT)
 public class ClientVersioningConfiguration {
 
     /**

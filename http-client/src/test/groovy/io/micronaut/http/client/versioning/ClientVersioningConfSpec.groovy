@@ -2,6 +2,7 @@ package io.micronaut.http.client.versioning
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.client.interceptor.configuration.ClientVersioningConfiguration
+import io.micronaut.http.client.interceptor.configuration.DefaultClientVersioningConfiguration
 import io.micronaut.inject.qualifiers.Qualifiers
 import spock.lang.Specification
 
@@ -12,6 +13,8 @@ class ClientVersioningConfSpec extends Specification {
         def context = ApplicationContext.run("test")
         then:
         context.getBeansOfType(ClientVersioningConfiguration, Qualifiers.byName("simple")).isEmpty()
+        context.getBean(ClientVersioningConfiguration).headers == [DefaultClientVersioningConfiguration.DEFAULT_HEADER_NAME]
+        context.getBean(ClientVersioningConfiguration).parameters == [DefaultClientVersioningConfiguration.DEFAULT_PARAMETER_NAME]
     }
 
     def "should contain versioning configuration in context"() {
