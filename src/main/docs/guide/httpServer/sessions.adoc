@@ -153,39 +153,4 @@ The following table summarizes the events:
 
 == Redis Sessions
 
-Storing api:session.Session[] instances is Redis requires special considerations.
-
-You can configure how sessions are stored in Redis using api:configuration.lettuce.session.RedisHttpSessionConfiguration[].
-
-The following represents an example configuration in `application.yml`.
-
-.Configuring Redis Sessions
-[source,yaml]
-----
-micronaut:
-    session:
-        http:
-            redis:
-                enabled: true
-                # The Redis namespace to write sessions to
-                namespace: 'myapp:sessions'
-                # Write session changes in the background
-                write-mode: BACKGROUND
-                # Disable programatic activation of keyspace events
-                enable-keyspace-events: false
-----
-
-NOTE: The api:configuration.lettuce.session.RedisSessionStore[] implementation uses https://redis.io/topics/notifications[keyspace events] to cleanup active sessions and fire api:session.event.SessionExpiredEvent[] and requires they are active.
-
-By default sessions values are serialized using Java serialization and stored in Redis hashes. You can configure serialization to instead use Jackson to serialize to JSON if desired:
-
-.Using Jackson Serialization
-[source,yaml]
-----
-micronaut:
-    session:
-        http:
-            redis:
-                enabled: true
-                valueSerializer: io.micronaut.jackson.serialize.JacksonObjectSerializer
-----
+If you wish to store api:session.Session[] instances in Redis you can do so with the https://micronaut-projects.github.io/micronaut-redis/latest/guide/#sessions[Micronaut Redis] module which includes instructions on how to do so.

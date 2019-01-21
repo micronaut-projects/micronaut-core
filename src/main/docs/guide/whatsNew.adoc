@@ -22,6 +22,10 @@ In an effort to make a more consistent and understandable API, some methods and 
 
 Support for rendering <<freemarker,Freemaker Views>> has been added.
 
+=== Constraint Bean Support
+
+For those using the `hibernate-validator` configuration, constraints will now be attempted to be retrieved from the bean context. This means you can now use dependency injection in your custom constraints.
+
 === Support for JCache Caching
 
 Support has been added for the JCache specification. If you define a `javax.cache.CacheManager` bean it will be used for caching. For example:

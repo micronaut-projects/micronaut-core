@@ -30,9 +30,10 @@ import javax.inject.Singleton
 class ValidatedBeanSpec extends Specification {
 
     void "test validated bean invalid bean"() {
-
         given:
-        System.setProperty("a.name", "test")
+        System.setProperty("a.url", "test")
+        System.setProperty("a.number", "10")
+        System.setProperty("a.nobean", "abc")
         ApplicationContext applicationContext = new DefaultApplicationContext("test ")
                                                             .start()
 
@@ -49,13 +50,69 @@ List of constraint violations:[
 \turl - must be a valid URL
 ]
 '''
+    }
 
+    void "test validated bean invalid bean custom validator"() {
+
+        given:
+        System.setProperty("a.url", "http://www.google.com")
+        System.setProperty("a.number", "3")
+        System.setProperty("a.nobean", "abc")
+        ApplicationContext applicationContext = new DefaultApplicationContext("test ")
+                .start()
+
+        when:
+        A a = applicationContext.getBean(A)
+
+        then:
+        def e = thrown(BeanInstantiationException)
+        e.message.normalize() == '''\
+Error instantiating bean of type  [io.micronaut.configuration.hibernate.validator.ValidatedBeanSpec$A]
+
+Message: Validation failed for bean definition [io.micronaut.configuration.hibernate.validator.ValidatedBeanSpec$A]
+List of constraint violations:[
+\tnumber - Must be a big number
+]
+'''
+    }
+
+    void "test validated bean invalid bean custom validator that isnt a bean"() {
+
+        given:
+        System.setProperty("a.url", "http://www.google.com")
+        System.setProperty("a.number", "10")
+        System.setProperty("a.nobean", "")
+        ApplicationContext applicationContext = new DefaultApplicationContext("test ")
+                .start()
+
+        when:
+        A a = applicationContext.getBean(A)
+
+        then:
+        def e = thrown(BeanInstantiationException)
+        e.message.normalize() == '''\
+Error instantiating bean of type  [io.micronaut.configuration.hibernate.validator.ValidatedBeanSpec$A]
+
+Message: Validation failed for bean definition [io.micronaut.configuration.hibernate.validator.ValidatedBeanSpec$A]
+List of constraint violations:[
+\tnoBean - The class isn't a bean
+]
+'''
     }
 
     @Singleton
     static class A {
         @URL
-        @Value('a.name')
+        @Value('${a.url}')
         String url
+
+        @BigNumber
+        @Value('${a.number}')
+        Integer number
+
+        @NoBean
+        @Value('${a.nobean}')
+        String noBean
     }
+
 }
