@@ -53,3 +53,5 @@ The validation of POJOs is shown in the following test:
 ----
 include::{testsvalidation}/datavalidation/pogo/EmailControllerSpec.groovy[tag=pojovalidated,indent=0]
 ----
+
+NOTE: Bean injection is supported in custom constraints with the hibernate validator configuration.
