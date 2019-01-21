@@ -14,7 +14,7 @@ class ClientVersioningConfSpec extends Specification {
         then:
         context.getBeansOfType(ClientVersioningConfiguration, Qualifiers.byName("simple")).isEmpty()
         context.getBean(ClientVersioningConfiguration).headers == [DefaultClientVersioningConfiguration.DEFAULT_HEADER_NAME]
-        context.getBean(ClientVersioningConfiguration).parameters == [DefaultClientVersioningConfiguration.DEFAULT_PARAMETER_NAME]
+        context.getBean(ClientVersioningConfiguration).parameters == []
     }
 
     def "should contain versioning configuration in context"() {
