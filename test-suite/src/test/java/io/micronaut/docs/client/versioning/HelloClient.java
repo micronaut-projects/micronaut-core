@@ -13,10 +13,10 @@ import io.reactivex.Single;
 public interface HelloClient {
 
     @Get("/greeting/{name}")
-    String sayHello();
+    String sayHello(String name);
 
     @Version("2")
     @Get("/greeting/{name}")
-    Single<String> sayHelloTwo(); // <2>
+    Single<String> sayHelloTwo(String name); // <2>
 }
 // end::clazz[]
