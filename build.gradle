@@ -153,6 +153,11 @@ ext {
                     name:'micronaut-hibernate-jpa',
                     modules:['micronaut-jdbc-tomcat', 'micronaut-jdbc-hikari', 'micronaut-jdbc-dbcp', 'micronaut-postgres-reactive']
             ],
+            'micronaut.mongo': [
+                    version:micronautMongoVersion,
+                    group:'io.micronaut.configuration',
+                    name:'micronaut-mongo-reactive'
+            ],
             'mongo' : [
                     version: mongoVersion,
                     group: 'org.mongodb',
