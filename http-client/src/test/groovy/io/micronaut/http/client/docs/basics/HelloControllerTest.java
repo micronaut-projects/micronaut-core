@@ -21,6 +21,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.client.RxHttpClient;
+import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.runtime.server.EmbeddedServer;
 
 import static io.micronaut.http.HttpRequest.*;
@@ -29,6 +30,7 @@ import static org.junit.Assert.*;
 import io.reactivex.Flowable;
 import org.junit.Test;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 
@@ -44,7 +46,12 @@ public class HelloControllerTest {
         RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.getURL());
 
         // tag::simple[]
-        String result = client.toBlocking().retrieve("/hello/John");
+        String uri = UriBuilder.of("/hello/{name}")
+                               .expand(Collections.singletonMap("name", "John"))
+                               .toString();
+        assertEquals("/hello/John", uri);
+
+        String result = client.toBlocking().retrieve(uri);
 
         assertEquals(
                 "Hello John",
