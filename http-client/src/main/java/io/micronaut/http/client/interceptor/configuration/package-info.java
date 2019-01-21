@@ -14,29 +14,10 @@
  * limitations under the License.
  */
 
-package io.micronaut.core.version.annotation;
-
-import java.lang.annotation.ElementType;
-import java.lang.annotation.Retention;
-import java.lang.annotation.RetentionPolicy;
-import java.lang.annotation.Target;
-
 /**
- * Annotation used to express the version of a component or method.
+ * {@link io.micronaut.http.client.annotation.Client} versioning configuration.
  *
  * @author Bogdan Oros
- * @author graemerocher
  * @since 1.1.0
  */
-@Target({ElementType.TYPE, ElementType.METHOD})
-@Retention(RetentionPolicy.RUNTIME)
-public @interface Version {
-
-    /**
-     * The version of component or method.
-     *
-     * @return version value
-     */
-    String value();
-
-}
+package io.micronaut.http.client.interceptor.configuration;
