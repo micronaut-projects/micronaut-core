@@ -25,13 +25,13 @@ To create a client, simply create an interface annotated with `@Client`. For exa
 .src/main/java/hello/world/HelloClient.java
 [source,groovy]
 ----
-include::{testsuite}/server/intro/HelloClient.java[tags=imports, indent=0]
+include::{testsuitejava}/server/intro/HelloClient.java[tags=imports, indent=0]
 
-include::{testsuite}/server/intro/HelloClient.java[tags=class, indent=0]
+include::{testsuitejava}/server/intro/HelloClient.java[tags=class, indent=0]
 ----
 
 <1> The `@Client` annotation is used with value that is a relative path to the current server
-<2> The same link:{api}/io/micronaut/http/annotation/Get.html[@Get] annotation used on the server is used to define the client mapping
+<2> The same ann:http.annotation.Get[] annotation used on the server is used to define the client mapping
 <3> A RxJava rx:Single[] is returned with the value read from the server
 
 To test the `HelloClient` simply retrieve it from the api:context.ApplicationContext[] associated with the server:
