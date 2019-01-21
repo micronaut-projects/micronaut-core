@@ -24,6 +24,6 @@ import io.micronaut.http.filter.FilterOrderProvider;
  * @author James Kleeh
  * @since 1.0
  */
-interface ViewsFilterOrderProvider extends FilterOrderProvider {
+public interface ViewsFilterOrderProvider extends FilterOrderProvider {
 
 }
