@@ -97,33 +97,33 @@ public class TextStreamCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T> T decode(Argument<T> type, InputStream inputStream) throws CodecException {
+    public <T> T decode(Argument<T> type, InputStream inputStream, Object... decorators) throws CodecException {
         throw new UnsupportedOperationException("This codec currently only supports encoding");
     }
 
     @Override
-    public <T> T decode(Class<T> type, InputStream inputStream) throws CodecException {
+    public <T> T decode(Class<T> type, InputStream inputStream, Object... decorators) throws CodecException {
         throw new UnsupportedOperationException("This codec currently only supports encoding");
     }
 
     @Override
-    public <T> void encode(T object, OutputStream outputStream) throws CodecException {
+    public <T> void encode(T object, OutputStream outputStream, Object... decorators) throws CodecException {
         try {
-            outputStream.write(encode(object));
+            outputStream.write(encode(object, decorators));
         } catch (IOException e) {
             throw new CodecException("I/O error occurred encoding object to output stream: " + e.getMessage(), e);
         }
     }
 
     @Override
-    public <T> byte[] encode(T object) throws CodecException {
-        ByteBuffer buffer = encode(object, byteBufferFactory);
+    public <T> byte[] encode(T object, Object... decorators) throws CodecException {
+        ByteBuffer buffer = encode(object, byteBufferFactory, decorators);
         return buffer.toByteArray();
     }
 
     @SuppressWarnings("MagicNumber")
     @Override
-    public <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException {
+    public <T> ByteBuffer encode(T object, ByteBufferFactory allocator, Object... decorators) throws CodecException {
         Event<Object> event;
         if (object instanceof Event) {
             event = (Event<Object>) object;
@@ -137,7 +137,7 @@ public class TextStreamCodec implements MediaTypeCodec {
         } else {
             MediaTypeCodec jsonCodec = resolveMediaTypeCodecRegistry().findCodec(MediaType.APPLICATION_JSON_TYPE)
                 .orElseThrow(() -> new CodecException("No possible JSON encoders found!"));
-            body = jsonCodec.encode(data, allocator);
+            body = jsonCodec.encode(data, allocator, decorators);
         }
         ByteBuffer eventData = allocator.buffer(body.readableBytes() + 10);
         writeAttribute(eventData, COMMENT_PREFIX, event.getComment());

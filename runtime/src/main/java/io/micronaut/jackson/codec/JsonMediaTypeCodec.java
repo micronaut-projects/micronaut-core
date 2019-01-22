@@ -20,6 +20,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.ObjectWriter;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -28,6 +29,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
+import io.micronaut.jackson.serialize.JsonViewValueWrapper;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import javax.annotation.Nullable;
@@ -92,7 +94,7 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
 
     @SuppressWarnings("Duplicates")
     @Override
-    public <T> T decode(Argument<T> type, InputStream inputStream) throws CodecException {
+    public <T> T decode(Argument<T> type, InputStream inputStream, Object... decorators) throws CodecException {
         try {
             if (type.hasTypeVariables()) {
                 JavaType javaType = constructJavaType(type);
@@ -111,10 +113,11 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
      * @param type The type
      * @param node The Json Node
      * @param <T> The generic type
+     * @param decorators Decorator objects that can affect encoding behavior
      * @return The decoded object
      * @throws CodecException When object cannot be decoded
      */
-    public <T> T decode(Argument<T> type, JsonNode node) throws CodecException {
+    public <T> T decode(Argument<T> type, JsonNode node, Object... decorators) throws CodecException {
         try {
             return objectMapper.treeToValue(node, type.getType());
         } catch (IOException e) {
@@ -123,7 +126,7 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T> T decode(Argument<T> type, ByteBuffer<?> buffer) throws CodecException {
+    public <T> T decode(Argument<T> type, ByteBuffer<?> buffer, Object... decorators) throws CodecException {
         try {
             if (CharSequence.class.isAssignableFrom(type.getType())) {
                 return (T) buffer.toString(applicationConfiguration.getDefaultCharset());
@@ -140,7 +143,7 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
 
     @SuppressWarnings("Duplicates")
     @Override
-    public <T> T decode(Argument<T> type, String data) throws CodecException {
+    public <T> T decode(Argument<T> type, String data, Object... decorators) throws CodecException {
         try {
             if (type.hasTypeVariables()) {
                 JavaType javaType = constructJavaType(type);
@@ -154,21 +157,21 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T> void encode(T object, OutputStream outputStream) throws CodecException {
+    public <T> void encode(T object, OutputStream outputStream, Object... decorators) throws CodecException {
         try {
-            objectMapper.writeValue(outputStream, object);
+            getWriter(decorators).writeValue(outputStream, object);
         } catch (IOException e) {
             throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage());
         }
     }
 
     @Override
-    public <T> byte[] encode(T object) throws CodecException {
+    public <T> byte[] encode(T object, Object... decorators) throws CodecException {
         try {
             if (object instanceof byte[]) {
                 return (byte[]) object;
             } else {
-                return objectMapper.writeValueAsBytes(object);
+                return getWriter(decorators).writeValueAsBytes(object);
             }
         } catch (JsonProcessingException e) {
             throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage());
@@ -176,8 +179,8 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException {
-        byte[] bytes = encode(object);
+    public <T> ByteBuffer encode(T object, ByteBufferFactory allocator, Object... decorators) throws CodecException {
+        byte[] bytes = encode(object, decorators);
         return allocator.copiedBuffer(bytes);
     }
 
@@ -201,5 +204,12 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
             }
         }
         return javaTypes.toArray(new JavaType[javaTypes.size()]);
+    }
+
+    private ObjectWriter getWriter(Object... decorators) {
+        if (decorators.length > 0 && decorators[0] instanceof JsonViewValueWrapper) {
+            return objectMapper.writerWithView(((JsonViewValueWrapper)decorators[0]).getViewClass());
+        }
+        return objectMapper.writer();
     }
 }

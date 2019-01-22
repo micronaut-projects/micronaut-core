@@ -1120,24 +1120,26 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                     return response;
                 }
 
+                Object decorator = requestReference.get().getAttribute(HttpAttributes.MEDIA_TYPE_CODEC_DECORATOR).orElse(null);
+
                 if (specifiedMediaType.isPresent())  {
 
                     Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(responseMediaType, body.getClass());
                     if (registeredCodec.isPresent()) {
                         MediaTypeCodec codec = registeredCodec.get();
-                        return encodeBodyWithCodec(response, body, codec, responseMediaType, context, requestReference);
+                        return encodeBodyWithCodec(response, body, codec, decorator, responseMediaType, context, requestReference);
                     }
                 }
 
                 Optional<MediaTypeCodec> registeredCodec = mediaTypeCodecRegistry.findCodec(defaultResponseMediaType, body.getClass());
                 if (registeredCodec.isPresent()) {
                     MediaTypeCodec codec = registeredCodec.get();
-                    return encodeBodyWithCodec(response, body, codec, responseMediaType, context, requestReference);
+                    return encodeBodyWithCodec(response, body, codec, decorator, responseMediaType, context, requestReference);
                 }
 
                 MediaTypeCodec defaultCodec = new TextPlainCodec(serverConfiguration.getDefaultCharset());
 
-                return encodeBodyWithCodec(response, body, defaultCodec, responseMediaType,  context, requestReference);
+                return encodeBodyWithCodec(response, body, defaultCodec, decorator, responseMediaType,  context, requestReference);
             } else {
                 return response;
             }
@@ -1193,12 +1195,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     private MutableHttpResponse<?> encodeBodyWithCodec(MutableHttpResponse<?> response,
                                                        Object body,
                                                        MediaTypeCodec codec,
+                                                       Object codecDecorator,
                                                        MediaType mediaType,
                                                        ChannelHandlerContext context,
                                                        AtomicReference<HttpRequest<?>> requestReference) {
         ByteBuf byteBuf;
         try {
-            byteBuf = encodeBodyAsByteBuf(body, codec, context, requestReference);
+            byteBuf = encodeBodyAsByteBuf(body, codec, codecDecorator, context, requestReference);
             int len = byteBuf.readableBytes();
             MutableHttpHeaders headers = response.getHeaders();
             if (!headers.contains(HttpHeaders.CONTENT_TYPE)) {
@@ -1221,7 +1224,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
         return res;
     }
 
-    private ByteBuf encodeBodyAsByteBuf(Object body, MediaTypeCodec codec, ChannelHandlerContext context, AtomicReference<HttpRequest<?>> requestReference) {
+    private ByteBuf encodeBodyAsByteBuf(Object body, MediaTypeCodec codec, Object codecDecorator, ChannelHandlerContext context, AtomicReference<HttpRequest<?>> requestReference) {
         ByteBuf byteBuf;
         if (body instanceof ByteBuf) {
             byteBuf = (ByteBuf) body;
@@ -1252,7 +1255,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Encoding emitted response object [{}] using codec: {}", body, codec);
             }
-            byteBuf = (ByteBuf) codec.encode(body, new NettyByteBufferFactory(context.alloc())).asNativeBuffer();
+            byteBuf = (ByteBuf) codec.encode(body, new NettyByteBufferFactory(context.alloc()), codecDecorator).asNativeBuffer();
         }
         return byteBuf;
     }

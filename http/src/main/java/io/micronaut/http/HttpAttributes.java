@@ -52,7 +52,12 @@ public enum HttpAttributes implements CharSequence {
     /**
      * Attribute used to store the service ID a client request is being sent to. Used for tracing purposes.
      */
-    SERVICE_ID(Constants.PREFIX + ".serviceId");
+    SERVICE_ID(Constants.PREFIX + ".serviceId"),
+
+    /**
+     * Attribute used to store a decorator to affect encoding or decoding via a MediaTypeCodec.
+     */
+    MEDIA_TYPE_CODEC_DECORATOR(Constants.PREFIX + ".mediaTypeCodec.decorator");
 
     private final String name;
 

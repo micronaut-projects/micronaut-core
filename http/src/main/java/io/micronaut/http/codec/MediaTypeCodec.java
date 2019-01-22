@@ -46,10 +46,11 @@ public interface MediaTypeCodec {
      * @param type        The type
      * @param inputStream The input stream
      * @param <T>         The generic type
+     * @param decorators Decorator objects that can affect decoding behavior
      * @return The decoded result
      * @throws CodecException When the result cannot be decoded
      */
-    <T> T decode(Argument<T> type, InputStream inputStream) throws CodecException;
+    <T> T decode(Argument<T> type, InputStream inputStream, Object... decorators) throws CodecException;
 
     /**
      * Encode the given type from the given {@link InputStream}.
@@ -57,9 +58,10 @@ public interface MediaTypeCodec {
      * @param object       The object to encode
      * @param outputStream The input stream
      * @param <T>          The generic type
+     * @param decorators Decorator objects that can affect encoding behavior
      * @throws CodecException When the result cannot be decoded
      */
-    <T> void encode(T object, OutputStream outputStream) throws CodecException;
+    <T> void encode(T object, OutputStream outputStream, Object... decorators) throws CodecException;
 
     /**
      * Encode the given type returning the object as a byte[].
@@ -67,9 +69,10 @@ public interface MediaTypeCodec {
      * @param object The object to encode
      * @param <T>    The generic type
      * @return The decoded result
+     * @param decorators Decorator objects that can affect encoding behavior
      * @throws CodecException When the result cannot be decoded
      */
-    <T> byte[] encode(T object) throws CodecException;
+    <T> byte[] encode(T object, Object... decorators) throws CodecException;
 
     /**
      * Encode the given type returning the object as a {@link ByteBuffer}.
@@ -77,10 +80,11 @@ public interface MediaTypeCodec {
      * @param object    The object to encode
      * @param allocator The allocator
      * @param <T>       The generic type
+     * @param decorators Decorator objects that can affect encoding behavior
      * @return The decoded result
      * @throws CodecException When the result cannot be decoded
      */
-    <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException;
+    <T> ByteBuffer encode(T object, ByteBufferFactory allocator, Object... decorators) throws CodecException;
 
     /**
      * Decode the given type from the given {@link InputStream}.
@@ -88,11 +92,12 @@ public interface MediaTypeCodec {
      * @param type        The type
      * @param inputStream The input stream
      * @param <T>         The generic type
+     * @param decorators Decorator objects that can affect decoding behavior
      * @return The decoded result
      * @throws CodecException When the result cannot be decoded
      */
-    default <T> T decode(Class<T> type, InputStream inputStream) throws CodecException {
-        return decode(Argument.of(type), inputStream);
+    default <T> T decode(Class<T> type, InputStream inputStream, Object... decorators) throws CodecException {
+        return decode(Argument.of(type), inputStream, decorators);
     }
 
     /**
@@ -101,11 +106,12 @@ public interface MediaTypeCodec {
      * @param type  The type
      * @param bytes The bytes
      * @param <T>   The decoded type
+     * @param decorators Decorator objects that can affect decoding behavior
      * @return The decoded result
      * @throws CodecException When the result cannot be decoded
      */
-    default <T> T decode(Class<T> type, byte[] bytes) throws CodecException {
-        return decode(type, new ByteArrayInputStream(bytes));
+    default <T> T decode(Class<T> type, byte[] bytes, Object... decorators) throws CodecException {
+        return decode(type, new ByteArrayInputStream(bytes), decorators);
     }
 
     /**
@@ -114,11 +120,12 @@ public interface MediaTypeCodec {
      * @param type  The type
      * @param bytes The bytes
      * @param <T>   The decoded type
+     * @param decorators Decorator objects that can affect decoding behavior
      * @return The decoded result
      * @throws CodecException When the result cannot be decoded
      */
-    default <T> T decode(Argument<T> type, byte[] bytes) throws CodecException {
-        return decode(type, new ByteArrayInputStream(bytes));
+    default <T> T decode(Argument<T> type, byte[] bytes, Object... decorators) throws CodecException {
+        return decode(type, new ByteArrayInputStream(bytes), decorators);
     }
 
     /**
@@ -128,11 +135,12 @@ public interface MediaTypeCodec {
      * @param type   The type
      * @param buffer the buffer
      * @param <T>    The decoded type
+     * @param decorators Decorator objects that can affect decoding behavior
      * @return The decoded result
      * @throws CodecException When the result cannot be decoded
      */
-    default <T> T decode(Class<T> type, ByteBuffer<?> buffer) throws CodecException {
-        return decode(type, buffer.toInputStream());
+    default <T> T decode(Class<T> type, ByteBuffer<?> buffer, Object... decorators) throws CodecException {
+        return decode(type, buffer.toInputStream(), decorators);
     }
 
     /**
@@ -142,11 +150,12 @@ public interface MediaTypeCodec {
      * @param type   The type
      * @param buffer the buffer
      * @param <T>    The decoded type
+     * @param decorators Decorator objects that can affect decoding behavior
      * @return The decoded result
      * @throws CodecException When the result cannot be decoded
      */
-    default <T> T decode(Argument<T> type, ByteBuffer<?> buffer) throws CodecException {
-        return decode(type, buffer.toInputStream());
+    default <T> T decode(Argument<T> type, ByteBuffer<?> buffer, Object... decorators) throws CodecException {
+        return decode(type, buffer.toInputStream(), decorators);
     }
 
     /**
@@ -155,11 +164,12 @@ public interface MediaTypeCodec {
      * @param type The type
      * @param data The data as a string
      * @param <T>  The decoded type
+     * @param decorators Decorator objects that can affect decoding behavior
      * @return The decoded result
      * @throws CodecException When the result cannot be decoded
      */
-    default <T> T decode(Class<T> type, String data) throws CodecException {
-        return decode(type, new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8)));
+    default <T> T decode(Class<T> type, String data, Object... decorators) throws CodecException {
+        return decode(type, new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8)), decorators);
     }
 
     /**
@@ -168,11 +178,12 @@ public interface MediaTypeCodec {
      * @param type The type
      * @param data The data as a string
      * @param <T>  The decoded type
+     * @param decorators Decorator objects that can affect decoding behavior
      * @return The decoded result
      * @throws CodecException When the result cannot be decoded
      */
-    default <T> T decode(Argument<T> type, String data) throws CodecException {
-        return decode(type, new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8)));
+    default <T> T decode(Argument<T> type, String data, Object... decorators) throws CodecException {
+        return decode(type, new ByteArrayInputStream(data.getBytes(StandardCharsets.UTF_8)), decorators);
     }
 
     /**

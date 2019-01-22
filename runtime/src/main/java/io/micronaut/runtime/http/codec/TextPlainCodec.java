@@ -87,7 +87,7 @@ public class TextPlainCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T> T decode(Argument<T> type, ByteBuffer<?> buffer) throws CodecException {
+    public <T> T decode(Argument<T> type, ByteBuffer<?> buffer, Object... decorators) throws CodecException {
         String text = buffer.toString(defaultCharset);
         return ConversionService.SHARED
             .convert(text, type)
@@ -95,7 +95,7 @@ public class TextPlainCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T> T decode(Argument<T> type, InputStream inputStream) throws CodecException {
+    public <T> T decode(Argument<T> type, InputStream inputStream, Object... decorators) throws CodecException {
         if (CharSequence.class.isAssignableFrom(type.getType())) {
             try {
                 return (T) IOUtils.readText(new BufferedReader(new InputStreamReader(inputStream, defaultCharset)));
@@ -107,8 +107,8 @@ public class TextPlainCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T> void encode(T object, OutputStream outputStream) throws CodecException {
-        byte[] bytes = encode(object);
+    public <T> void encode(T object, OutputStream outputStream, Object... decorators) throws CodecException {
+        byte[] bytes = encode(object, decorators);
         try {
             outputStream.write(bytes);
         } catch (IOException e) {
@@ -117,13 +117,13 @@ public class TextPlainCodec implements MediaTypeCodec {
     }
 
     @Override
-    public <T> byte[] encode(T object) throws CodecException {
+    public <T> byte[] encode(T object, Object... decorators) throws CodecException {
         return object.toString().getBytes(defaultCharset);
     }
 
     @Override
-    public <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException {
-        byte[] bytes = encode(object);
+    public <T> ByteBuffer encode(T object, ByteBufferFactory allocator, Object... decorators) throws CodecException {
+        byte[] bytes = encode(object, decorators);
         int len = bytes.length;
 
         return allocator.buffer(len, len).write(bytes);
