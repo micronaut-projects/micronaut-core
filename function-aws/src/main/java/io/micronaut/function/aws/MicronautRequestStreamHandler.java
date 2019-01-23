@@ -21,8 +21,11 @@ import static io.micronaut.function.aws.MicronautRequestHandler.registerContextB
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler;
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.ApplicationContextBuilder;
+import io.micronaut.context.env.Environment;
 import io.micronaut.function.executor.StreamFunctionExecutor;
 
+import javax.annotation.Nonnull;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -48,4 +51,5 @@ public class MicronautRequestStreamHandler extends StreamFunctionExecutor<Contex
         }
         return applicationContext;
     }
+
 }
