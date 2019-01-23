@@ -45,6 +45,7 @@ class UnresolvedProvider<T> implements Provider<T> {
 
     /**
      * @param beanType The bean type
+     * @param qualifier The qualifier to use
      * @param context  The bean context
      */
     UnresolvedProvider(Class<T> beanType, @Nullable Qualifier<T> qualifier, BeanContext context) {
