@@ -16,15 +16,19 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.ReadTimeoutException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.http.annotation.Get
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+
+import javax.inject.Inject
 
 /**
  * @author Graeme Rocher
@@ -56,13 +60,45 @@ class ReadTimeoutSpec extends Specification {
         e.message == 'Read Timeout'
     }
 
+    void "test read timeout setting with connection pool"() {
+        given:
+        ApplicationContext clientContext = ApplicationContext.run(
+                'micronaut.http.client.read-timeout':'1s',
+                'micronaut.http.client.pool.enabled':true
+        )
+        RxHttpClient client = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+        when:
+        client.retrieve(HttpRequest.GET('/timeout/client'), String).blockingFirst()
+
+        then:
+        def e = thrown(ReadTimeoutException)
+        e.message == 'Read Timeout'
+
+        cleanup:
+        clientContext.close()
+    }
+
     @Controller("/timeout")
     static class GetController {
+
+        @Inject
+        TestClient testClient
 
         @Get(value = "/", produces = MediaType.TEXT_PLAIN)
         String index() {
             sleep 5000
             return "success"
         }
+
+        @Get(value = "/client", produces = MediaType.TEXT_PLAIN)
+        String test() {
+            return testClient.get()
+        }
+    }
+
+    @Client("/timeout")
+    static interface TestClient {
+        @Get
+        String get()
     }
 }
