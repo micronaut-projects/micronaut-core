@@ -21,4 +21,13 @@ class NamedFactoryBeanInjectionSpec extends Specification {
         cleanup:
         ctx.close()
     }
+
+    void "test inject named factory beans from provider"() {
+        given:
+        final ApplicationContext context = ApplicationContext.run()
+        final ApplicationHelper helper = context.getBean(ApplicationHelper.class)
+        Template template = helper.getTemplate()
+        expect:
+        template != null
+    }
 }
