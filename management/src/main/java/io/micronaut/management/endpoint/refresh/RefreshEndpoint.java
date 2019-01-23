@@ -68,7 +68,7 @@ public class RefreshEndpoint {
                 eventPublisher.publishEvent(new RefreshEvent(changes));
             }
             Set<String> keys = changes.keySet();
-            return keys.toArray(new String[keys.size()]);
+            return keys.toArray(new String[0]);
         }
     }
 }

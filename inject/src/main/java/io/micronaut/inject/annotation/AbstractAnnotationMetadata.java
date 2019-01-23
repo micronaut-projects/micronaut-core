@@ -184,7 +184,7 @@ abstract class AbstractAnnotationMetadata implements AnnotationMetadata {
                     }
                 });
             }
-            return annotations.toArray(new Annotation[annotations.size()]);
+            return annotations.toArray(new Annotation[0]);
         }
 
         return AnnotationUtil.ZERO_ANNOTATIONS;
