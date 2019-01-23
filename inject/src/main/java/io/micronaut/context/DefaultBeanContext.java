@@ -38,7 +38,6 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.ClassLoadingReporter;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -985,7 +984,7 @@ public class DefaultBeanContext implements BeanContext {
 
         Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(beanType, qualifier, true, false);
         if (concreteCandidate.isPresent()) {
-            return new UnresolvedProvider<>(beanType, qualifier,this);
+            return new UnresolvedProvider<>(beanType, qualifier, this);
         } else {
             throw new NoSuchBeanException(beanType);
         }
@@ -2441,8 +2440,9 @@ public class DefaultBeanContext implements BeanContext {
         /**
          * @param beanType  The bean type
          * @param qualifier The qualifier
+         * @param typeArguments The type arguments
          */
-        BeanKey(Class<T> beanType, Qualifier<T> qualifier, Class... typeArguments) {
+        BeanKey(Class<T> beanType, Qualifier<T> qualifier, @Nullable Class... typeArguments) {
             this.beanType = beanType;
             this.qualifier = qualifier;
             this.typeArguments = ArrayUtils.isEmpty(typeArguments) ? null : typeArguments;
@@ -2473,8 +2473,12 @@ public class DefaultBeanContext implements BeanContext {
 
         @Override
         public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
             BeanKey<?> beanKey = (BeanKey<?>) o;
             return beanType.equals(beanKey.beanType) &&
                     Objects.equals(qualifier, beanKey.qualifier) &&
