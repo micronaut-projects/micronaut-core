@@ -248,6 +248,12 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                     AnnotationValue<io.swagger.v3.oas.annotations.Parameter> paramAnn = parameter.findAnnotation(io.swagger.v3.oas.annotations.Parameter.class).orElse(null);
 
                     if (paramAnn != null) {
+
+                        if (paramAnn.get("hidden", Boolean.class, false)) {
+                            // ignore hidden parameters
+                            continue;
+                        }
+
                         Map<CharSequence, Object> paramValues = toValueMap(paramAnn.getValues(), context);
                         normalizeEnumValues(paramValues, Collections.singletonMap(
                                 "in", ParameterIn.class
