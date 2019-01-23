@@ -56,6 +56,7 @@ import io.swagger.v3.oas.models.servers.Server;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.security.Principal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -188,6 +189,10 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                     continue;
                 }
 
+                if (isIgnoredParameterType(parameterType)) {
+                    continue;
+                }
+
                 if (parameter.isAnnotationPresent(Body.class)) {
 
                     if (permitsRequestBody && swaggerOperation.getRequestBody() == null) {
@@ -248,6 +253,12 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                     AnnotationValue<io.swagger.v3.oas.annotations.Parameter> paramAnn = parameter.findAnnotation(io.swagger.v3.oas.annotations.Parameter.class).orElse(null);
 
                     if (paramAnn != null) {
+
+                        if (paramAnn.get("hidden", Boolean.class, false)) {
+                            // ignore hidden parameters
+                            continue;
+                        }
+
                         Map<CharSequence, Object> paramValues = toValueMap(paramAnn.getValues(), context);
                         normalizeEnumValues(paramValues, Collections.singletonMap(
                                 "in", ParameterIn.class
@@ -348,9 +359,15 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                     io.swagger.v3.oas.models.media.MediaType mt = new io.swagger.v3.oas.models.media.MediaType();
                     ObjectSchema schema = new ObjectSchema();
                     for (ParameterElement parameter : bodyParameters) {
-                        if (parameter.isAnnotationPresent(JsonIgnore.class) || parameter.isAnnotationPresent(Hidden.class)) {
+                        if (parameter.isAnnotationPresent(JsonIgnore.class) ||
+                                parameter.isAnnotationPresent(Hidden.class) ||
+                                parameter.getValue(io.swagger.v3.oas.annotations.Parameter.class, "hidden", Boolean.class).orElse(false) ||
+                                isIgnoredParameterType(parameter.getType())) {
                             continue;
                         }
+
+
+
                         Schema propertySchema = resolveSchema(openAPI, parameter, parameter.getType(), context, consumesMediaType);
                         if (propertySchema != null) {
 
@@ -375,6 +392,12 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 }
             }
         });
+    }
+
+    private boolean isIgnoredParameterType(ClassElement parameterType) {
+        return parameterType == null ||
+                parameterType.isAssignable(Principal.class) ||
+            parameterType.isAssignable("io.micronaut.security.authentication.Authentication");
     }
 
     private boolean isResponseType(ClassElement returnType) {

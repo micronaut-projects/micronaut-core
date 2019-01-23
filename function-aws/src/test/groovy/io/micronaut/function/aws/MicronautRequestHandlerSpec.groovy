@@ -16,6 +16,7 @@
 package io.micronaut.function.aws
 
 import com.amazonaws.services.lambda.runtime.Context
+import io.micronaut.context.env.Environment
 import spock.lang.Specification
 
 import javax.inject.Inject
@@ -28,8 +29,12 @@ import javax.inject.Singleton
 class MicronautRequestHandlerSpec extends Specification {
 
     void "test micronaut request handler"() {
+        given:
+        System.setProperty(Environment.ENVIRONMENTS_PROPERTY, "foo")
         expect:
         new RoundHandler().handleRequest(1.6f, Mock(Context)) == 2
+        cleanup:
+        System.setProperty(Environment.ENVIRONMENTS_PROPERTY, "")
     }
 
     @Singleton
@@ -42,9 +47,12 @@ class MicronautRequestHandlerSpec extends Specification {
     static class RoundHandler extends MicronautRequestHandler<Float, Integer> {
 
         @Inject MathService mathService
+        @Inject Environment env
 
         @Override
         Integer execute(Float input) {
+            assert env.activeNames.contains(Environment.FUNCTION)
+            assert env.activeNames.contains("foo")
             return mathService.round(input)
         }
     }

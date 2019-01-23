@@ -24,6 +24,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.inject.ExecutableMethod;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Optional;
 
@@ -77,7 +78,7 @@ class AbstractExecutor<C> {
     protected ApplicationContext buildApplicationContext(@Nullable C context) {
         if (applicationContext == null) {
 
-            final ApplicationContextBuilder contextBuilder = ApplicationContext.build(Environment.FUNCTION);
+            final ApplicationContextBuilder contextBuilder = newApplicationContextBuilder();
             final Package pkg = getClass().getPackage();
             if (pkg != null) {
                 final String name = pkg.getName();
@@ -94,6 +95,15 @@ class AbstractExecutor<C> {
             }));
         }
         return applicationContext;
+    }
+
+    /**
+     * Builds a new builder.
+     *
+     * @return The {@link ApplicationContextBuilder}
+     */
+    protected @Nonnull ApplicationContextBuilder newApplicationContextBuilder() {
+        return ApplicationContext.build(Environment.FUNCTION);
     }
 
     /**

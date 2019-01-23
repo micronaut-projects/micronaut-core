@@ -16,11 +16,7 @@
 
 package io.micronaut.function.aws;
 
-import com.amazonaws.services.lambda.runtime.ClientContext;
-import com.amazonaws.services.lambda.runtime.CognitoIdentity;
-import com.amazonaws.services.lambda.runtime.Context;
-import com.amazonaws.services.lambda.runtime.LambdaLogger;
-import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.amazonaws.services.lambda.runtime.*;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.function.executor.AbstractFunctionExecutor;
 
