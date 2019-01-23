@@ -47,6 +47,7 @@ class DefaultConversionServiceSpec extends Specification {
         "10"                   | Integer     | 10
         "${5 + 5}"             | Integer     | 10
         "yes"                  | Boolean     | true
+        "true"                 | Boolean     | true
         "Y"                    | Boolean     | true
         "yes"                  | boolean     | true
         "on"                   | boolean     | true
@@ -78,6 +79,5 @@ class DefaultConversionServiceSpec extends Specification {
         "1"          | Optional   | [T: Argument.of(Long, 'T')]    | Optional.of(1L)
 
     }
-
 
 }

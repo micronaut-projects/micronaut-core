@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.env
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.value.MapPropertyResolver
 import io.micronaut.core.value.PropertyResolver
@@ -287,5 +288,15 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
         expect:
         resolver.getProperty("z", Boolean).isPresent()
+    }
+
+    void "test retrieving a property as string then boolean"() {
+        given:
+        def applicationContext = ApplicationContext.run(['micronaut.security.enabled': true])
+
+        expect:
+        applicationContext.getProperty('micronaut.security.enabled', String).get() == "true"
+        applicationContext.getProperty('micronaut.security.enabled', Boolean).get() == true
+
     }
 }
