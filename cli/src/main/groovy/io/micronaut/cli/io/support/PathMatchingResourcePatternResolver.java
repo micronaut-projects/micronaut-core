@@ -267,7 +267,7 @@ public class PathMatchingResourcePatternResolver {
             URL url = resourceUrls.nextElement();
             result.add(convertClassLoaderURL(url));
         }
-        return result.toArray(new Resource[result.size()]);
+        return result.toArray(new Resource[0]);
     }
 
     /**
@@ -307,7 +307,7 @@ public class PathMatchingResourcePatternResolver {
                 result.addAll(doFindPathMatchingFileResources(rootDirResource, subPattern));
             }
         }
-        return result.toArray(new Resource[result.size()]);
+        return result.toArray(new Resource[0]);
     }
 
     /**
