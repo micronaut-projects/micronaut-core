@@ -213,7 +213,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
 
                 AnnotationUtils.invalidateCache();
-                return true;
             }
         }
         AnnotationUtils.invalidateCache();
