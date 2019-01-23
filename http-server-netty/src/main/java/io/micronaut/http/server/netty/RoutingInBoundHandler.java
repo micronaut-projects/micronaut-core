@@ -210,7 +210,6 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         NettyHttpRequest nettyHttpRequest = NettyHttpRequest.remove(ctx);
-        RouteMatch<?> errorRoute = null;
         if (nettyHttpRequest == null) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Micronaut Server Error - No request state present. Cause: " + cause.getMessage(), cause);
@@ -219,6 +218,11 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             return;
         }
 
+        exceptionCaughtInternal(ctx, cause, nettyHttpRequest);
+    }
+
+    private void exceptionCaughtInternal(ChannelHandlerContext ctx, Throwable cause, NettyHttpRequest nettyHttpRequest) {
+        RouteMatch<?> errorRoute = null;
         // find the origination of of the route
         RouteMatch<?> originalRoute = nettyHttpRequest.getMatchedRoute();
         Class declaringType = null;
@@ -269,7 +273,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 final MethodBasedRouteMatch<?, ?> methodBasedRoute = (MethodBasedRouteMatch) errorRoute;
                 Flowable resultFlowable = Flowable.defer(() -> {
                       Object result = methodBasedRoute.execute();
-                      io.micronaut.http.MutableHttpResponse<?> response = errorResultToResponse(result);
+                      MutableHttpResponse<?> response = errorResultToResponse(result);
                       response.setAttribute(HttpAttributes.ROUTE_MATCH, methodBasedRoute);
                       return Flowable.just(response);
                 });
@@ -315,7 +319,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 try {
                     Flowable resultFlowable = Flowable.defer(() -> {
                         Object result = handler.handle(nettyHttpRequest, cause);
-                        io.micronaut.http.MutableHttpResponse<?> response = errorResultToResponse(result);
+                        MutableHttpResponse<?> response = errorResultToResponse(result);
                         return Flowable.just(response);
                     });
 
@@ -1151,7 +1155,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
 
             @Override
             protected void doOnError(Throwable t) {
-                super.doOnError(t);
+                exceptionCaughtInternal(context, t, (NettyHttpRequest) requestReference.get());
             }
         });
     }

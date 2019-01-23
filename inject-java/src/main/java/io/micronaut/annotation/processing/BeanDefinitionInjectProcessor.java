@@ -213,7 +213,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 }
 
                 AnnotationUtils.invalidateCache();
-                return true;
             }
         }
         AnnotationUtils.invalidateCache();
@@ -1773,7 +1772,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             params.addParameter(argName, modelUtils.resolveTypeReference(parameterType));
                             params.addGenericTypes(argName, Collections.singletonMap(typeVariable.toString(), modelUtils.resolveTypeReference(parameterType)));
                         } else {
-                            error(element, "Unprocessable generic type %s for param %s of element %s", typeVariable, paramElement, element);
+                            error(element, "Unprocessable generic type [%s] for param [%s] of element %s", typeVariable, paramElement, element);
                         }
 
                         break;
@@ -1804,6 +1803,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             }
                             Object argType = modelUtils.classOfPrimitiveFor(typeName);
                             params.addParameter(argName, argType);
+                        } else {
+                            error(element, "Unprocessable element type [%s] for param [%s] of element %s", kind, paramElement, element);
                         }
                 }
             });

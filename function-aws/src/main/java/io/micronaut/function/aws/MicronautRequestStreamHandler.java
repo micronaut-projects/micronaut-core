@@ -16,8 +16,6 @@
 
 package io.micronaut.function.aws;
 
-import static io.micronaut.function.aws.MicronautRequestHandler.registerContextBeans;
-
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestStreamHandler;
 import io.micronaut.context.ApplicationContext;
@@ -26,6 +24,8 @@ import io.micronaut.function.executor.StreamFunctionExecutor;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+
+import static io.micronaut.function.aws.MicronautRequestHandler.registerContextBeans;
 
 /**
  * <p>An implementation of the {@link RequestStreamHandler} for Micronaut</p>.
@@ -48,4 +48,5 @@ public class MicronautRequestStreamHandler extends StreamFunctionExecutor<Contex
         }
         return applicationContext;
     }
+
 }

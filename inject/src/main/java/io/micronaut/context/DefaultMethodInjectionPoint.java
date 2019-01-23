@@ -169,6 +169,8 @@ class DefaultMethodInjectionPoint implements MethodInjectionPoint, EnvironmentCo
     private AnnotationMetadata initAnnotationMetadata(@Nullable AnnotationMetadata annotationMetadata) {
         if (annotationMetadata instanceof DefaultAnnotationMetadata) {
             return new MethodAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
+        } else if (annotationMetadata != null) {
+            return annotationMetadata;
         }
         return AnnotationMetadata.EMPTY_METADATA;
     }

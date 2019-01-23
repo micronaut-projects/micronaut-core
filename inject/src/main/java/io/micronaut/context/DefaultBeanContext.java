@@ -984,8 +984,7 @@ public class DefaultBeanContext implements BeanContext {
 
         Optional<BeanDefinition<T>> concreteCandidate = findConcreteCandidate(beanType, qualifier, true, false);
         if (concreteCandidate.isPresent()) {
-            BeanDefinition<T> definition = concreteCandidate.get();
-            return new UnresolvedProvider<>(definition.getBeanType(), this);
+            return new UnresolvedProvider<>(beanType, qualifier, this);
         } else {
             throw new NoSuchBeanException(beanType);
         }
@@ -1286,7 +1285,7 @@ public class DefaultBeanContext implements BeanContext {
                                  Qualifier<T> qualifier,
                                  boolean isSingleton,
                                  Map<String, Object> argumentValues) {
-        BeanRegistration<T> beanRegistration = isSingleton && !beanDefinition.isIterable() ? singletonObjects.get(new BeanKey(beanDefinition.getBeanType(), qualifier)) : null;
+        BeanRegistration<T> beanRegistration = isSingleton && !beanDefinition.isIterable() ? singletonObjects.get(new BeanKey(beanDefinition, qualifier)) : null;
         T bean;
         if (beanRegistration != null) {
             return beanRegistration.bean;
@@ -1367,7 +1366,7 @@ public class DefaultBeanContext implements BeanContext {
 
         if (!BeanCreatedEventListener.class.isInstance(bean)) {
             if (CollectionUtils.isNotEmpty(beanCreationEventListeners)) {
-                BeanKey beanKey = new BeanKey(beanDefinition.getBeanType(), qualifier);
+                BeanKey beanKey = new BeanKey(beanDefinition, qualifier);
                 for (BeanRegistration<BeanCreatedEventListener> registration : beanCreationEventListeners) {
                     BeanDefinition<BeanCreatedEventListener> definition = registration.getBeanDefinition();
                     List<Argument<?>> typeArguments = definition.getTypeArguments(BeanCreatedEventListener.class);
@@ -1944,7 +1943,8 @@ public class DefaultBeanContext implements BeanContext {
                 qualifier = (Qualifier<T>) optional.map(name -> Qualifiers.byAnnotation(beanDefinition, name)).orElse(null);
             }
         }
-        BeanKey key = new BeanKey<>(beanType, qualifier);
+
+        BeanKey key = new BeanKey<>(beanDefinition, qualifier);
         if (LOG.isDebugEnabled()) {
             if (qualifier != null) {
                 LOG.debug("Registering singleton bean {} for type [{} {}] using bean key {}", createdBean, qualifier, beanType.getName(), key);
@@ -1954,7 +1954,7 @@ public class DefaultBeanContext implements BeanContext {
         }
         BeanRegistration<T> registration = new BeanRegistration<>(key, beanDefinition, createdBean);
 
-        if (singleCandidate) {
+        if (singleCandidate || key.typeArguments != null) {
             singletonObjects.put(key, registration);
         }
 
@@ -2424,19 +2424,30 @@ public class DefaultBeanContext implements BeanContext {
     static final class BeanKey<T> implements BeanIdentifier {
         private final Class beanType;
         private final Qualifier qualifier;
+        private final Class[] typeArguments;
         private final int hashCode;
+
+        /**
+         * A bean key for the given bean definition.
+         * @param definition The definition
+         * @param qualifier The qualifier
+         */
+        BeanKey(BeanDefinition<T> definition, Qualifier<T> qualifier) {
+            this(definition.getBeanType(), qualifier, definition.getTypeParameters());
+        }
 
         /**
          * @param beanType  The bean type
          * @param qualifier The qualifier
+         * @param typeArguments The type arguments
          */
-        BeanKey(Class<T> beanType, Qualifier<T> qualifier) {
+        BeanKey(Class<T> beanType, Qualifier<T> qualifier, @Nullable Class... typeArguments) {
             this.beanType = beanType;
             this.qualifier = qualifier;
-            int result = beanType.hashCode();
-            result = 31 * result + (qualifier != null ? qualifier.hashCode() : 0);
+            this.typeArguments = ArrayUtils.isEmpty(typeArguments) ? null : typeArguments;
+            int result = Objects.hash(beanType, qualifier);
+            result = 31 * result + Arrays.hashCode(this.typeArguments);
             this.hashCode = result;
-
         }
 
         @Override
@@ -2467,13 +2478,10 @@ public class DefaultBeanContext implements BeanContext {
             if (o == null || getClass() != o.getClass()) {
                 return false;
             }
-
-            BeanKey that = (BeanKey) o;
-
-            if (!beanType.equals(that.beanType)) {
-                return false;
-            }
-            return qualifier != null ? qualifier.equals(that.qualifier) : that.qualifier == null;
+            BeanKey<?> beanKey = (BeanKey<?>) o;
+            return beanType.equals(beanKey.beanType) &&
+                    Objects.equals(qualifier, beanKey.qualifier) &&
+                    Arrays.equals(typeArguments, beanKey.typeArguments);
         }
 
         @Override
@@ -2514,10 +2522,14 @@ public class DefaultBeanContext implements BeanContext {
         @Nonnull
         @Override
         public List<Argument<?>> getTypeArguments(Class<?> type) {
-            return typeArguments.computeIfAbsent(type, aClass -> {
-                Class[] classes = aClass.isInterface() ? GenericTypeUtils.resolveInterfaceTypeArguments(singletonClass, aClass) : GenericTypeUtils.resolveSuperTypeGenericArguments(singletonClass, aClass);
-                return Arrays.stream(classes).map((Function<Class, Argument<?>>) Argument::of).collect(Collectors.toList());
-            });
+            List<Argument<?>> result = typeArguments.get(type);
+            if (result == null) {
+                Class[] classes = type.isInterface() ? GenericTypeUtils.resolveInterfaceTypeArguments(singletonClass, type) : GenericTypeUtils.resolveSuperTypeGenericArguments(singletonClass, type);
+                result = Arrays.stream(classes).map((Function<Class, Argument<?>>) Argument::of).collect(Collectors.toList());
+                typeArguments.put(type, result);
+            }
+
+            return result;
         }
 
         @Override

@@ -129,8 +129,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         Set<String> environments = new LinkedHashSet<>(3);
         List<String> specifiedNames = Arrays.asList(names);
 
-        if (!specifiedNames.contains(Environment.FUNCTION) && shouldDeduceEnvironments()) {
-            EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage();
+        if (shouldDeduceEnvironments()) {
+            EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage(specifiedNames);
             environments.addAll(environmentsAndPackage.enviroments);
             String aPackage = environmentsAndPackage.aPackage;
             if (aPackage != null) {
@@ -521,13 +521,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
     }
 
-    private EnvironmentsAndPackage getEnvironmentsAndPackage() {
+    private EnvironmentsAndPackage getEnvironmentsAndPackage(List<String> specifiedNames) {
         EnvironmentsAndPackage environmentsAndPackage = this.environmentsAndPackage;
+        final boolean extendedDeduction = !specifiedNames.contains(Environment.FUNCTION);
         if (environmentsAndPackage == null) {
             synchronized (EnvironmentsAndPackage.class) { // double check
                 environmentsAndPackage = this.environmentsAndPackage;
                 if (environmentsAndPackage == null) {
-                    environmentsAndPackage = deduceEnvironments();
+                    environmentsAndPackage = deduceEnvironments(extendedDeduction, extendedDeduction);
                     this.environmentsAndPackage = environmentsAndPackage;
                 }
             }
@@ -535,39 +536,45 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return environmentsAndPackage;
     }
 
-    private static EnvironmentsAndPackage deduceEnvironments() {
+    private static EnvironmentsAndPackage deduceEnvironments(
+            boolean deduceComputePlatform,
+            boolean inspectTrace) {
 
 
         EnvironmentsAndPackage environmentsAndPackage = new EnvironmentsAndPackage();
-        StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
-        ListIterator<StackTraceElement> stackTraceIterator = Arrays.asList(stackTrace).listIterator();
         Set<String> environments = environmentsAndPackage.enviroments;
 
-        while (stackTraceIterator.hasNext()) {
-            StackTraceElement stackTraceElement = stackTraceIterator.next();
-            String className = stackTraceElement.getClassName();
+        if (inspectTrace) {
+            StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+            ListIterator<StackTraceElement> stackTraceIterator = Arrays.asList(stackTrace).listIterator();
 
-            if (className.startsWith("io.micronaut")) {
-                if (stackTraceIterator.hasNext()) {
-                    StackTraceElement next = stackTrace[stackTraceIterator.nextIndex()];
-                    if (!next.getClassName().startsWith("io.micronaut")) {
-                        environmentsAndPackage.aPackage = NameUtils.getPackageName(next.getClassName());
+            while (stackTraceIterator.hasNext()) {
+                StackTraceElement stackTraceElement = stackTraceIterator.next();
+                String className = stackTraceElement.getClassName();
+
+                if (className.startsWith("io.micronaut")) {
+                    if (stackTraceIterator.hasNext()) {
+                        StackTraceElement next = stackTrace[stackTraceIterator.nextIndex()];
+                        if (!next.getClassName().startsWith("io.micronaut")) {
+                            environmentsAndPackage.aPackage = NameUtils.getPackageName(next.getClassName());
+                        }
                     }
                 }
-            }
 
-            if (stackTraceElement.getMethodName().contains("$spock_")) {
-                environmentsAndPackage.aPackage = NameUtils.getPackageName(className);
-            }
+                if (stackTraceElement.getMethodName().contains("$spock_")) {
+                    environmentsAndPackage.aPackage = NameUtils.getPackageName(className);
+                }
 
-            if (Stream.of("org.spockframework", "org.junit").anyMatch(className::startsWith)) {
-                environments.add(TEST);
-            }
+                if (Stream.of("org.spockframework", "org.junit").anyMatch(className::startsWith)) {
+                    environments.add(TEST);
+                }
 
-            if (className.startsWith("com.android")) {
-                environments.add(ANDROID);
+                if (className.startsWith("com.android")) {
+                    environments.add(ANDROID);
+                }
             }
         }
+
 
         if (!environments.contains(ANDROID)) {
             // deduce k8s
@@ -587,38 +594,40 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 environments.add(Environment.CLOUD);
             }
 
-            ComputePlatform computePlatform = determineCloudProvider();
-            if (computePlatform != null) {
-                switch (computePlatform) {
-                    case GOOGLE_COMPUTE:
-                        //instantiate bean for GC metadata discovery
-                        environments.add(GOOGLE_COMPUTE);
-                        environments.add(Environment.CLOUD);
-                        break;
-                    case AMAZON_EC2:
-                        //instantiate bean for ec2 metadata discovery
-                        environments.add(AMAZON_EC2);
-                        environments.add(Environment.CLOUD);
-                        break;
-                    case AZURE:
-                        // not yet implemented
-                        environments.add(AZURE);
-                        environments.add(Environment.CLOUD);
-                        break;
-                    case IBM:
-                        // not yet implemented
-                        environments.add(IBM);
-                        environments.add(Environment.CLOUD);
-                        break;
-                    case DIGITAL_OCEAN:
-                        environments.add(DIGITAL_OCEAN);
-                        environments.add(Environment.CLOUD);
-                        break;
-                    case OTHER:
-                        // do nothing here
-                        break;
-                    default:
-                        // no-op
+            if (deduceComputePlatform) {
+                ComputePlatform computePlatform = determineCloudProvider();
+                if (computePlatform != null) {
+                    switch (computePlatform) {
+                        case GOOGLE_COMPUTE:
+                            //instantiate bean for GC metadata discovery
+                            environments.add(GOOGLE_COMPUTE);
+                            environments.add(Environment.CLOUD);
+                            break;
+                        case AMAZON_EC2:
+                            //instantiate bean for ec2 metadata discovery
+                            environments.add(AMAZON_EC2);
+                            environments.add(Environment.CLOUD);
+                            break;
+                        case AZURE:
+                            // not yet implemented
+                            environments.add(AZURE);
+                            environments.add(Environment.CLOUD);
+                            break;
+                        case IBM:
+                            // not yet implemented
+                            environments.add(IBM);
+                            environments.add(Environment.CLOUD);
+                            break;
+                        case DIGITAL_OCEAN:
+                            environments.add(DIGITAL_OCEAN);
+                            environments.add(Environment.CLOUD);
+                            break;
+                        case OTHER:
+                            // do nothing here
+                            break;
+                        default:
+                            // no-op
+                    }
                 }
             }
         }
