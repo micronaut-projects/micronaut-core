@@ -20,10 +20,12 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.naming.Named;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
 import java.util.Collection;
@@ -191,6 +193,30 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
             return Collections.emptyList();
         }
         return getTypeArguments(type.getName());
+    }
+
+    /**
+     * Returns the type parameters as a class array for the given type.
+     * @param type The type
+     * @return The type parameters
+     */
+    default @Nonnull Class[] getTypeParameters(@Nullable Class<?> type) {
+        if (type == null) {
+            return ReflectionUtils.EMPTY_CLASS_ARRAY;
+        } else {
+            final List<Argument<?>> typeArguments = getTypeArguments(type);
+            return typeArguments.stream().map(Argument::getType).toArray(Class[]::new);
+        }
+    }
+
+    /**
+     *
+     * Returns the type parameters as a class array for the bean type.
+     *
+     * @return The type parameters for the bean type as a class array.
+     */
+    default @Nonnull Class[] getTypeParameters() {
+        return getTypeParameters(getBeanType());
     }
 
     /**

@@ -89,7 +89,7 @@ public class GenericTypeUtils {
      */
     public static Class[] resolveSuperTypeGenericArguments(Class<?> type, Class<?> superType) {
         Type superclass = type.getGenericSuperclass();
-        while (superclass != null) {
+        while (superclass != null && superclass != Object.class) {
             if (superclass instanceof ParameterizedType) {
                 ParameterizedType pt = (ParameterizedType) superclass;
                 if (pt.getRawType() == superType) {
