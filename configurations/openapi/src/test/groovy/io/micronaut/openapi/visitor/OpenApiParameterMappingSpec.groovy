@@ -106,4 +106,126 @@ class MyBean {}
         pathItem.get.parameters[0].schema.enum == ['NA', 'true', 'false']
         pathItem.get.parameters[0].schema.example == 'NA'
     }
+
+    void "test that @Parameter elements can be hidden on interface"() {
+
+        given:"An API definition"
+        when:
+        buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.reactivex.*;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.*;
+import java.util.List;
+import io.swagger.v3.oas.annotations.*;
+import io.swagger.v3.oas.annotations.parameters.*;
+import io.swagger.v3.oas.annotations.responses.*;
+import io.swagger.v3.oas.annotations.security.*;
+import io.swagger.v3.oas.annotations.media.*;
+import io.swagger.v3.oas.annotations.enums.*;
+import com.fasterxml.jackson.annotation.*;
+/**
+ * @author graemerocher
+ * @since 1.0
+ */
+
+@Controller("/networks")
+interface NetworkOperations {
+
+    @Get
+    public HttpResponse<Greeting> getNetworks(
+            @Parameter(hidden=true) java.security.Principal auth,
+            @QueryValue(value = "fooBar", defaultValue = "NA") String fooBar
+    );
 }
+
+class Greeting {
+    public String message;
+}
+@javax.inject.Singleton
+class MyBean {}
+''')
+        then:"the state is correct"
+        AbstractOpenApiVisitor.testReference != null
+
+        when:"The OpenAPI is retrieved"
+        OpenAPI openAPI = AbstractOpenApiVisitor.testReference
+        Schema greetingSchema = openAPI.components.schemas['Greeting']
+
+        then:"the components are valid"
+        greetingSchema.type == 'object'
+        greetingSchema.properties.size() == 1
+        greetingSchema.properties['message'].type == 'string'
+
+        when:"the /pets path is retrieved"
+        PathItem pathItem = openAPI.paths.get("/networks")
+
+        then:"it is included in the OpenAPI doc"
+        pathItem.get.operationId == 'getNetworks'
+        pathItem.get.parameters.size() == 1
+        pathItem.get.parameters[0].name =='fooBar'
+    }
+
+    void "test that @Parameter elements can be hidden on type"() {
+
+        given:"An API definition"
+        when:
+        buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.reactivex.*;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.*;
+import java.util.List;
+import io.swagger.v3.oas.annotations.*;
+import io.swagger.v3.oas.annotations.parameters.*;
+import io.swagger.v3.oas.annotations.responses.*;
+import io.swagger.v3.oas.annotations.security.*;
+import io.swagger.v3.oas.annotations.media.*;
+import io.swagger.v3.oas.annotations.enums.*;
+import com.fasterxml.jackson.annotation.*;
+/**
+ * @author graemerocher
+ * @since 1.0
+ */
+
+@Controller("/networks")
+interface NetworkOperations {
+
+    @Post
+    public HttpResponse<Greeting> getNetworks(
+            @Parameter(hidden=true) Greeting auth,
+            @QueryValue(value = "fooBar", defaultValue = "NA") String fooBar
+    );
+}
+
+class Greeting {
+    public String message;
+}
+@javax.inject.Singleton
+class MyBean {}
+''')
+        then:"the state is correct"
+        AbstractOpenApiVisitor.testReference != null
+
+        when:"The OpenAPI is retrieved"
+        OpenAPI openAPI = AbstractOpenApiVisitor.testReference
+        Schema greetingSchema = openAPI.components.schemas['Greeting']
+
+        then:"the components are valid"
+        greetingSchema.type == 'object'
+        greetingSchema.properties.size() == 1
+        greetingSchema.properties['message'].type == 'string'
+
+        when:"the /pets path is retrieved"
+        PathItem pathItem = openAPI.paths.get("/networks")
+
+        then:"it is included in the OpenAPI doc"
+        pathItem.post.operationId == 'getNetworks'
+        pathItem.post.parameters.size() == 1
+        pathItem.post.parameters[0].name =='fooBar'
+    }
+}
+
+
