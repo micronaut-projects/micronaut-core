@@ -200,6 +200,6 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
                 javaTypes.add(typeFactory.constructType(argument.getType()));
             }
         }
-        return javaTypes.toArray(new JavaType[javaTypes.size()]);
+        return javaTypes.toArray(new JavaType[0]);
     }
 }

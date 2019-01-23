@@ -41,7 +41,7 @@ public interface ReturnType<T> extends TypeVariableResolver, AnnotationSource {
      */
     default Argument<T> asArgument() {
         Collection<Argument<?>> values = getTypeVariables().values();
-        return Argument.of(getType(), values.toArray(new Argument[values.size()]));
+        return Argument.of(getType(), values.toArray(new Argument[0]));
     }
 
     /**

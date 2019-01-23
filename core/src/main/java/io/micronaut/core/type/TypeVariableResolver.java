@@ -39,7 +39,7 @@ public interface TypeVariableResolver {
     @SuppressWarnings("ToArrayCallWithZeroLengthArrayArgument")
     default Argument[] getTypeParameters() {
         Collection<Argument<?>> values = getTypeVariables().values();
-        return values.toArray(new Argument[values.size()]);
+        return values.toArray(new Argument[0]);
     }
 
     /**

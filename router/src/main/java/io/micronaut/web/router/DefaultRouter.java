@@ -260,7 +260,7 @@ public class DefaultRouter implements Router {
     private UriRoute[] finalizeRoutes(List<UriRoute> routes) {
         Collections.sort(routes);
         Collections.reverse(routes);
-        return routes.toArray(new UriRoute[routes.size()]);
+        return routes.toArray(new UriRoute[0]);
     }
 
     private <T> Optional<RouteMatch<T>> findRouteMatch(Map<ErrorRoute, RouteMatch<T>> matchedRoutes, Throwable error) {

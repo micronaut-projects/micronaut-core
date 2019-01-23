@@ -268,6 +268,6 @@ class CommandLineParser implements CommandLine.Builder<CommandLineParser> {
         if (state == inQuote || state == inDoubleQuote) {
             throw new ParseException("unbalanced quotes in " + toProcess);
         }
-        return result.toArray(new String[result.size()]);
+        return result.toArray(new String[0]);
     }
 }

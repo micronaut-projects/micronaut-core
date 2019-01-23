@@ -95,7 +95,7 @@ public class CandidateListCompletionHandler implements CompletionHandler {
         }
 
         // convert to an array for speed
-        String[] strings = candidates.toArray(new String[candidates.size()]);
+        String[] strings = candidates.toArray(new String[0]);
 
         String first = strings[0];
         StringBuilder candidate = new StringBuilder();
