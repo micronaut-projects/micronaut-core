@@ -47,6 +47,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
@@ -841,6 +842,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     protected final Object getBeanForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) {
         MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
         Argument argument = injectionPoint.getArguments()[argIndex];
+        if (argument instanceof DefaultArgument) {
+            argument = new EnvironmentAwareArgument((DefaultArgument) argument);
+            instrumentAnnotationMetadata(context, argument);
+        }
         return getBeanForMethodArgument(resolutionContext, context, injectionPoint, argument);
     }
 
@@ -1135,6 +1140,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @UsedByGeneratedCode
     protected final Object getBeanForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) {
         FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
+        instrumentAnnotationMetadata(context, injectionPoint);
         return getBeanForField(resolutionContext, context, injectionPoint);
     }
 
@@ -1764,6 +1770,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         }
     }
 
+    private void instrumentAnnotationMetadata(BeanContext context, Object object) {
+        if (object instanceof EnvironmentConfigurable && context instanceof ApplicationContext) {
+            ((EnvironmentConfigurable) object).configure(((ApplicationContext) context).getEnvironment());
+        }
+    }
 
     /**
      * Internal environment aware annotation metadata delegate.
