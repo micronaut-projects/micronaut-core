@@ -31,6 +31,7 @@ import javax.annotation.Nullable;
  *
  * @author James Kleeh
  * @since 1.0.4
+ * @param <T> The argument type
  */
 @Internal
 class EnvironmentAwareArgument<T> extends DefaultArgument<T> implements EnvironmentConfigurable {
@@ -38,6 +39,10 @@ class EnvironmentAwareArgument<T> extends DefaultArgument<T> implements Environm
     private final AnnotationMetadata annotationMetadata;
     private Environment environment;
 
+    /**
+     * Default constructor.
+     * @param argument The wrapped argument
+     */
     EnvironmentAwareArgument(DefaultArgument<T> argument) {
         super(argument.getType(), argument.getName(), argument.getAnnotationMetadata(), argument.getTypeVariables(), argument.getTypeParameters());
         this.annotationMetadata = initAnnotationMetadata(argument.getAnnotationMetadata());
