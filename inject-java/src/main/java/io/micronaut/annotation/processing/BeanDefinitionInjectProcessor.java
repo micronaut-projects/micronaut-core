@@ -1804,6 +1804,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             }
                             Object argType = modelUtils.classOfPrimitiveFor(typeName);
                             params.addParameter(argName, argType);
+                        } else {
+                            error(element, "Unprocessable element type %s for param %s of element %s", kind, paramElement, element);
                         }
                 }
             });
