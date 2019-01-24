@@ -57,7 +57,6 @@ public class JacksonConfiguration {
     private Map<JsonGenerator.Feature, Boolean> generator = Collections.emptyMap();
     private JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_EMPTY;
     private PropertyNamingStrategy propertyNamingStrategy = null;
-    private Boolean jsonViewEnabled = false;
 
     /**
      * @return The default serialization inclusion settings
@@ -134,13 +133,6 @@ public class JacksonConfiguration {
      */
     public PropertyNamingStrategy getPropertyNamingStrategy() {
         return propertyNamingStrategy;
-    }
-
-    /**
-     * @return True if JsonView annotation support is enabled.
-     */
-    public Boolean getJsonViewEnabled() {
-        return jsonViewEnabled;
     }
 
     /**
@@ -243,13 +235,5 @@ public class JacksonConfiguration {
      */
     public void setPropertyNamingStrategy(PropertyNamingStrategy propertyNamingStrategy) {
         this.propertyNamingStrategy = propertyNamingStrategy;
-    }
-
-    /**
-     * Enables or disables support for the JsonView annotation.
-     * @param jsonViewEnabled The boolean value
-     */
-    public void setJsonViewEnabled(Boolean jsonViewEnabled) {
-        this.jsonViewEnabled = jsonViewEnabled;
     }
 }
