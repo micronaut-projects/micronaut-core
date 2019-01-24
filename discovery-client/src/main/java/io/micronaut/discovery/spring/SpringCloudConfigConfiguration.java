@@ -16,6 +16,7 @@
 
 package io.micronaut.discovery.spring;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.discovery.config.ConfigDiscoveryConfiguration;
 import io.micronaut.discovery.spring.condition.RequiresSpringCloudConfig;
@@ -35,6 +36,7 @@ import java.util.Optional;
  */
 @RequiresSpringCloudConfig
 @ConfigurationProperties(SpringCloudConfigConfiguration.PREFIX)
+@BootstrapContextCompatible
 public class SpringCloudConfigConfiguration extends HttpClientConfiguration {
 
     public static final String PREFIX = SpringCloudConstants.PREFIX + ".config";
@@ -94,6 +96,7 @@ public class SpringCloudConfigConfiguration extends HttpClientConfiguration {
      * The default connection pool configuration.
      */
     @ConfigurationProperties(ConnectionPoolConfiguration.PREFIX)
+    @BootstrapContextCompatible
     public static class SpringCloudConnectionPoolConfiguration extends ConnectionPoolConfiguration {
     }
 
@@ -101,6 +104,7 @@ public class SpringCloudConfigConfiguration extends HttpClientConfiguration {
      * Configuration class for Consul client config.
      */
     @ConfigurationProperties(ConfigDiscoveryConfiguration.PREFIX)
+    @BootstrapContextCompatible
     public static class SpringConfigDiscoveryConfiguration extends ConfigDiscoveryConfiguration {
 
         /**

@@ -16,6 +16,7 @@
 
 package io.micronaut.discovery.spring.config.client;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.discovery.spring.SpringCloudConfigConfiguration;
 import io.micronaut.http.client.annotation.Client;
@@ -28,6 +29,7 @@ import io.micronaut.http.client.annotation.Client;
  */
 @Client(value = SpringCloudConfigConfiguration.SPRING_CLOUD_CONFIG_ENDPOINT, configuration = SpringCloudConfigConfiguration.class)
 @Requires(beans = SpringCloudConfigConfiguration.class)
+@BootstrapContextCompatible
 public interface SpringCloudConfigClient extends SpringCloudConfigOperations {
 
     String CLIENT_DESCRIPTION = "spring-cloud-config-client";

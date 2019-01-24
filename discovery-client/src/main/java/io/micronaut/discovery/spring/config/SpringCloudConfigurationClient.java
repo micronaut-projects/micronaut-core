@@ -16,6 +16,7 @@
 
 package io.micronaut.discovery.spring.config;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.env.Environment;
@@ -56,6 +57,7 @@ import java.util.concurrent.ExecutorService;
 @RequiresSpringCloudConfig
 @Requires(beans = SpringCloudConfigClient.class)
 @Requires(property = ConfigurationClient.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
+@BootstrapContextCompatible
 public class SpringCloudConfigurationClient implements ConfigurationClient {
 
     private static final Logger LOG = LoggerFactory.getLogger(SpringCloudConfigurationClient.class);
