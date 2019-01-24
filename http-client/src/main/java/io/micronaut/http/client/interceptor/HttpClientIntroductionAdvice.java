@@ -60,6 +60,7 @@ import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.sse.Event;
+import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.jackson.ObjectMapperFactory;
@@ -667,30 +668,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     private String appendQuery(String uri, Map<String, String> queryParams) {
         if (!queryParams.isEmpty()) {
-            try {
-                URI oldUri = new URI(uri);
-
-                StringBuilder sb = new StringBuilder(oldUri.getQuery() == null ? "" : oldUri.getQuery());
-                if (sb.length() > 0) {
-                    sb.append('&');
-                }
-
-                Iterator<Map.Entry<String, String>> iterator = queryParams.entrySet().iterator();
-                while (iterator.hasNext()) {
-                    Map.Entry<String, String> entry = iterator.next();
-                    sb.append(entry.getKey());
-                    sb.append('=');
-                    sb.append(entry.getValue());
-                    if (iterator.hasNext()) {
-                        sb.append('&');
-                    }
-                }
-
-                return new URI(oldUri.getScheme(), oldUri.getAuthority(), oldUri.getPath(),
-                        sb.toString(), oldUri.getFragment()).toString();
-            } catch (URISyntaxException e) {
-                //no-op
+            final UriBuilder builder = UriBuilder.of(uri);
+            for (Map.Entry<String, String> entry : queryParams.entrySet()) {
+                builder.queryParam(entry.getKey(), entry.getValue());
             }
+            return builder.toString();
         }
         return uri;
     }
