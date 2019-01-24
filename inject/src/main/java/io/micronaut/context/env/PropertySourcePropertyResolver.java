@@ -192,8 +192,9 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         } else {
             Class<T> requiredType = conversionContext.getArgument().getType();
             boolean cacheableType = requiredType == Boolean.class || requiredType == String.class;
-            if (cacheableType && resolvedValueCache.containsKey(name)) {
-                return (Optional<T>) resolvedValueCache.get(name);
+            String cacheName = name + '|' + requiredType.getSimpleName();
+            if (cacheableType && resolvedValueCache.containsKey(cacheName)) {
+                return (Optional<T>) resolvedValueCache.get(cacheName);
             } else {
                 Map<String, Object> entries = resolveEntriesForKey(name, false);
                 if (entries != null) {
@@ -245,12 +246,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                         }
 
                         if (cacheableType) {
-                            resolvedValueCache.put(name, converted);
+                            resolvedValueCache.put(cacheName, converted);
                         }
                         return converted;
                     } else if (cacheableType) {
                         Optional<?> e = Optional.empty();
-                        resolvedValueCache.put(name, e);
+                        resolvedValueCache.put(cacheName, e);
                         return (Optional<T>) e;
                     } else if (Properties.class.isAssignableFrom(requiredType)) {
                         Properties properties = resolveSubProperties(name, entries, conversionContext);
