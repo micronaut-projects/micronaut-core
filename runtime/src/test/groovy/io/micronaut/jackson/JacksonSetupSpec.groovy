@@ -40,7 +40,6 @@ class JacksonSetupSpec extends Specification {
         applicationContext.containsBean(JacksonConfiguration)
         applicationContext.getBean(ObjectMapper.class).valueToTree([foo: 'bar']).get('foo').textValue() == 'bar'
         !applicationContext.getBean(JacksonConfiguration).propertyNamingStrategy
-        !applicationContext.getBean(JacksonConfiguration).jsonViewEnabled
 
         cleanup:
         applicationContext?.close()
@@ -54,7 +53,7 @@ class JacksonSetupSpec extends Specification {
         applicationContext.environment.addPropertySource(MapPropertySource.of(
                 'jackson.dateFormat': 'yyMMdd',
                 'jackson.serialization.indentOutput': true,
-                'jackson.jsonViewEnabled': true
+                'jackson.json-view.enabled': true
         ))
         applicationContext.start()
 
@@ -65,7 +64,6 @@ class JacksonSetupSpec extends Specification {
         applicationContext.containsBean(JacksonConfiguration)
         applicationContext.getBean(JacksonConfiguration).dateFormat == 'yyMMdd'
         applicationContext.getBean(JacksonConfiguration).serializationSettings.get(SerializationFeature.INDENT_OUTPUT)
-        applicationContext.getBean(JacksonConfiguration).jsonViewEnabled
 
         cleanup:
         applicationContext?.close()
