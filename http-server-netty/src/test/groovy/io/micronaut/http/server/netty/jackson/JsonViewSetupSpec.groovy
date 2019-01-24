@@ -31,7 +31,6 @@ class JsonViewSetupSpec extends Specification {
 
         expect:
         applicationContext.containsBean(JacksonConfiguration)
-        !applicationContext.getBean(JacksonConfiguration).jsonViewEnabled
         !applicationContext.containsBean(JsonViewMediaTypeCodecFactory)
         !applicationContext.containsBean(JsonViewServerFilter)
 
@@ -45,13 +44,12 @@ class JsonViewSetupSpec extends Specification {
         given:
         ApplicationContext applicationContext = new DefaultApplicationContext("test")
         applicationContext.environment.addPropertySource(MapPropertySource.of(
-                'jackson.jsonViewEnabled': true
+                'jackson.json-view.enabled': true
         ))
         applicationContext.start()
 
         expect:
         applicationContext.containsBean(JacksonConfiguration)
-        applicationContext.getBean(JacksonConfiguration).jsonViewEnabled
         applicationContext.containsBean(JsonViewMediaTypeCodecFactory)
         applicationContext.containsBean(JsonViewServerFilter)
 

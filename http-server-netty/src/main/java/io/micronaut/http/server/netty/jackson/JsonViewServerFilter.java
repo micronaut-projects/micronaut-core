@@ -27,43 +27,66 @@ import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
 import io.micronaut.jackson.JacksonConfiguration;
+import io.micronaut.scheduling.TaskExecutors;
+import io.reactivex.Flowable;
+import io.reactivex.schedulers.Schedulers;
 import org.reactivestreams.Publisher;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+import javax.inject.Named;
 import java.util.Optional;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Jackson @JsonView filter.
+ *
+ * @since 1.1
+ * @author mmindenhall
+ * @author graemerocher
  */
 @Requires(beans = JacksonConfiguration.class)
-@Requires(property = "jackson.json-view-enabled")
+@Requires(property = JsonViewServerFilter.PROPERTY_JSON_VIEW_ENABLED)
 @Filter("/**")
 public class JsonViewServerFilter implements HttpServerFilter {
-    private static final Logger LOG = LoggerFactory.getLogger(JsonViewServerFilter.class);
-
-    private JsonViewMediaTypeCodecFactory codecFactory;
 
     /**
-     * @param codecFactory The factory to produce @JsonView enabled codecs
+     * Property used to specify whether JSON view is enabled.
      */
-    public JsonViewServerFilter(JsonViewMediaTypeCodecFactory codecFactory) {
-        this.codecFactory = codecFactory;
+    public static final String PROPERTY_JSON_VIEW_ENABLED = "jackson.json-view.enabled";
+
+    private final JsonViewCodecResolver codecFactory;
+    private final ExecutorService executorService;
+
+    /**
+     * @param jsonViewCodecResolver The JSON view codec resolver.
+     * @param executorService The I/O executor service
+     */
+    public JsonViewServerFilter(
+            JsonViewCodecResolver jsonViewCodecResolver,
+            @Named(TaskExecutors.IO) ExecutorService executorService) {
+        this.codecFactory = jsonViewCodecResolver;
+        this.executorService = executorService;
     }
 
     @Override
     public Publisher<MutableHttpResponse<?>> doFilter(HttpRequest<?> request, ServerFilterChain chain) {
-        Optional<AnnotationMetadata> routeMatch = request.getAttribute(HttpAttributes.ROUTE_MATCH, AnnotationMetadata.class);
-        if (routeMatch.isPresent()) {
-            AnnotationMetadata metadata = routeMatch.get();
-
-            Optional<Class> viewClass = metadata.classValue(JsonView.class);
-            if (viewClass.isPresent()) {
-                MediaTypeCodec codec = codecFactory.createJsonViewCodec(viewClass.get());
-                request.setAttribute(HttpAttributes.MEDIA_TYPE_CODEC, codec);
-            }
+        Optional<Class> viewClass = request.getAttribute(HttpAttributes.ROUTE_MATCH, AnnotationMetadata.class)                                                          .flatMap(ann -> ann.classValue(JsonView.class));
+        final Publisher<MutableHttpResponse<?>> responsePublisher = chain.proceed(request);
+        if (viewClass.isPresent()) {
+            return Flowable.fromPublisher(responsePublisher).switchMap(response -> {
+                final Optional<?> body = response.getBody();
+                if (body.isPresent()) {
+                    MediaTypeCodec codec = codecFactory.resolveJsonViewCodec(viewClass.get());
+                    return Flowable.fromCallable(() -> {
+                        final byte[] encoded = codec.encode(body.get());
+                        ((MutableHttpResponse) response).body(encoded);
+                        return response;
+                    }).subscribeOn(Schedulers.from(executorService));
+                } else {
+                    return Flowable.just(response);
+                }
+            });
+        } else {
+            return responsePublisher;
         }
-
-        return chain.proceed(request);
     }
 }

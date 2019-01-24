@@ -8,6 +8,10 @@ A new <<automaticRestart,Automatic Restart>> feature is included that allows the
 
 API versioning is now supported. See the <<apiVersioning, API Versioning>> documentation for more information on how to use this feature.
 
+=== Jackson `@JsonView` Support
+
+Support for using `@JsonView` on controller methods has been added can be optionally enabled by setting `jackson.json-view.enabled` to `true` in `application.yml`.
+
 === Support for Spring Cloud Config Server
 
 If you are already using https://spring.io/projects/spring-cloud-config[Spring Config Server] then Micronaut now features native integration for distributed configuration.
