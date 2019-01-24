@@ -102,6 +102,12 @@ jackson:
         failOnUnknownProperties: false
 ----
 
+=== Support for `@JsonView`
+
+You can use the `@JsonView` annotation to controller methods if you set `jackson.json-view.enabled` to `true` in `application.yml`.
+
+Jackson's `@JsonView` annotation allows you to control which properties are exposes on a per response basis. See https://www.baeldung.com/jackson-json-view-annotation[Jackson JSON Views] for more information.
+
 === Beans
 
 In addition to configuration, beans can be registered to customize Jackson. All beans that extend any of the following classes will be registered with the object mapper.
