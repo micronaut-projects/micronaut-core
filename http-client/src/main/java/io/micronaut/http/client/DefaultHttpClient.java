@@ -1686,6 +1686,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 } else {
                     headers.set(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED);
                 }
+            } else {
+                headers.set(HttpHeaderNames.CONTENT_LENGTH, 0);
             }
         }
     }

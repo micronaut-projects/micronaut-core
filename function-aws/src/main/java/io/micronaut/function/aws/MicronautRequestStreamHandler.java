@@ -49,4 +49,8 @@ public class MicronautRequestStreamHandler extends StreamFunctionExecutor<Contex
         return applicationContext;
     }
 
+    @Override
+    protected void closeApplicationContext() {
+        // Avoid closing the application context when running the function in lambda to keep it warm
+    }
 }
