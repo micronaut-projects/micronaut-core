@@ -33,7 +33,7 @@ import io.micronaut.security.token.config.TokenConfigurationProperties;
 @ConfigurationProperties(BasicAuthTokenReaderConfigurationProperties.PREFIX)
 public class BasicAuthTokenReaderConfigurationProperties implements BasicAuthTokenReaderConfiguration {
 
-    public static final String PREFIX = TokenConfigurationProperties.PREFIX + ".basicAuth";
+    public static final String PREFIX = TokenConfigurationProperties.PREFIX + ".basic-auth";
 
     /**
      * The default enable value.
