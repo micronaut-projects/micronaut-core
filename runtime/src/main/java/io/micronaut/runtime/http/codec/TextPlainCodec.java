@@ -16,6 +16,7 @@
 
 package io.micronaut.runtime.http.codec;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.convert.ConversionService;
@@ -48,6 +49,7 @@ import java.util.*;
  * @since 1.0
  */
 @Singleton
+@BootstrapContextCompatible
 public class TextPlainCodec implements MediaTypeCodec {
 
     public static final String CONFIGURATION_QUALIFIER = "text";

@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -41,13 +42,7 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.annotation.Version;
-import io.micronaut.http.HttpAttributes;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.*;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.client.*;
 import io.micronaut.http.client.annotation.Client;
@@ -61,6 +56,7 @@ import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.sse.Event;
+import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.jackson.ObjectMapperFactory;
@@ -79,8 +75,6 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.Closeable;
 import java.lang.annotation.Annotation;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -95,6 +89,7 @@ import java.util.function.Function;
  */
 @Singleton
 @Internal
+@BootstrapContextCompatible
 public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, Object>, Closeable, AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
@@ -723,30 +718,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     private String appendQuery(String uri, Map<String, String> queryParams) {
         if (!queryParams.isEmpty()) {
-            try {
-                URI oldUri = new URI(uri);
-
-                StringBuilder sb = new StringBuilder(oldUri.getQuery() == null ? "" : oldUri.getQuery());
-                if (sb.length() > 0) {
-                    sb.append('&');
-                }
-
-                Iterator<Map.Entry<String, String>> iterator = queryParams.entrySet().iterator();
-                while (iterator.hasNext()) {
-                    Map.Entry<String, String> entry = iterator.next();
-                    sb.append(entry.getKey());
-                    sb.append('=');
-                    sb.append(entry.getValue());
-                    if (iterator.hasNext()) {
-                        sb.append('&');
-                    }
-                }
-
-                return new URI(oldUri.getScheme(), oldUri.getAuthority(), oldUri.getPath(),
-                        sb.toString(), oldUri.getFragment()).toString();
-            } catch (URISyntaxException e) {
-                //no-op
+            final UriBuilder builder = UriBuilder.of(uri);
+            for (Map.Entry<String, String> entry : queryParams.entrySet()) {
+                builder.queryParam(entry.getKey(), entry.getValue());
             }
+            return builder.toString();
         }
         return uri;
     }

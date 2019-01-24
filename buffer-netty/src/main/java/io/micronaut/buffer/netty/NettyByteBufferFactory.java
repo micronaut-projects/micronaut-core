@@ -16,6 +16,7 @@
 
 package io.micronaut.buffer.netty;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -35,6 +36,7 @@ import java.util.function.Function;
  */
 @Internal
 @Singleton
+@BootstrapContextCompatible
 public class NettyByteBufferFactory implements ByteBufferFactory<ByteBufAllocator, ByteBuf> {
 
     /**

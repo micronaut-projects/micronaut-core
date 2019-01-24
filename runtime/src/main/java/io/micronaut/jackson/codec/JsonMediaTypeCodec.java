@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.io.buffer.ByteBufferFactory;
@@ -45,6 +46,7 @@ import java.util.*;
  * @since 1.0
  */
 @Singleton
+@BootstrapContextCompatible
 public class JsonMediaTypeCodec implements MediaTypeCodec {
 
     public static final String CONFIGURATION_QUALIFIER = "json";
