@@ -16,6 +16,7 @@
 
 package io.micronaut.reactive.rxjava2.converters;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
@@ -37,6 +38,7 @@ import java.util.function.Function;
  */
 @Singleton
 @Requires(classes = Flowable.class)
+@BootstrapContextCompatible
 public class RxJavaConverterRegistrar implements TypeConverterRegistrar {
 
     @SuppressWarnings("unchecked")
