@@ -21,6 +21,7 @@ import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagement
 import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagementAsyncClient;
 import com.amazonaws.services.simplesystemsmanagement.model.*;
 import io.micronaut.configuration.aws.AWSClientConfiguration;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.EnvironmentPropertySource;
@@ -58,6 +59,7 @@ import java.util.concurrent.Future;
 @Requires(classes = {AWSSimpleSystemsManagementAsyncClient.class, AWSClientConfiguration.class})
 @Requires(env = Environment.AMAZON_EC2)
 @Requires(beans = AWSParameterStoreConfiguration.class)
+@BootstrapContextCompatible
 public class AWSParameterStoreConfigClient implements ConfigurationClient {
 
     private static final Logger LOG = LoggerFactory.getLogger(AWSParameterStoreConfiguration.class);

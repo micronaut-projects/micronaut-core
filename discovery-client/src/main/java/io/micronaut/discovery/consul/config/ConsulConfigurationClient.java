@@ -16,6 +16,7 @@
 
 package io.micronaut.discovery.consul.config;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.EnvironmentPropertySource;
@@ -66,6 +67,7 @@ import java.util.concurrent.ExecutorService;
 @RequiresConsul
 @Requires(beans = ConsulClient.class)
 @Requires(property = ConfigurationClient.ENABLED, value = "true", defaultValue = "false")
+@BootstrapContextCompatible
 public class ConsulConfigurationClient implements ConfigurationClient {
 
     private final ConsulClient consulClient;

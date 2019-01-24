@@ -16,6 +16,7 @@
 
 package io.micronaut.runtime.converters.time;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.convert.ConversionContext;
@@ -46,6 +47,7 @@ import java.util.regex.Pattern;
 @Singleton
 // Android doesn't support java.time
 @Requires(notEnv = Environment.ANDROID)
+@BootstrapContextCompatible
 public class TimeConverterRegistrar implements TypeConverterRegistrar {
 
     private static final Pattern DURATION_MATCHER = Pattern.compile("^(-?\\d+)([unsmhd])(s?)$");

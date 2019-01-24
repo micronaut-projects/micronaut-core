@@ -16,6 +16,7 @@
 
 package io.micronaut.http.ssl;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
 
@@ -28,6 +29,7 @@ import io.micronaut.context.annotation.Primary;
  */
 @ConfigurationProperties(SslConfiguration.PREFIX)
 @Primary
+@BootstrapContextCompatible
 public class DefaultSslConfiguration extends SslConfiguration {
 
     /**
@@ -69,6 +71,7 @@ public class DefaultSslConfiguration extends SslConfiguration {
     @SuppressWarnings("WeakerAccess")
     @Primary
     @ConfigurationProperties(KeyConfiguration.PREFIX)
+    @BootstrapContextCompatible
     public static class DefaultKeyConfiguration extends KeyConfiguration {
     }
 
@@ -78,6 +81,7 @@ public class DefaultSslConfiguration extends SslConfiguration {
     @SuppressWarnings("WeakerAccess")
     @Primary
     @ConfigurationProperties(KeyStoreConfiguration.PREFIX)
+    @BootstrapContextCompatible
     public static class DefaultKeyStoreConfiguration extends KeyStoreConfiguration {
 
     }
@@ -88,6 +92,7 @@ public class DefaultSslConfiguration extends SslConfiguration {
     @SuppressWarnings("WeakerAccess")
     @Primary
     @ConfigurationProperties(TrustStoreConfiguration.PREFIX)
+    @BootstrapContextCompatible
     public static class DefaultTrustStoreConfiguration extends TrustStoreConfiguration {
     }
 }
