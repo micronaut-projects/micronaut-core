@@ -16,6 +16,7 @@
 
 package io.micronaut.runtime;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.naming.NameUtils;
@@ -35,6 +36,7 @@ import java.util.Optional;
  */
 @ConfigurationProperties(ApplicationConfiguration.PREFIX)
 @Primary
+@BootstrapContextCompatible
 public class ApplicationConfiguration {
 
     /**
@@ -111,6 +113,7 @@ public class ApplicationConfiguration {
      * Configuration for instance settings.
      */
     @ConfigurationProperties(InstanceConfiguration.PREFIX)
+    @BootstrapContextCompatible
     public static class InstanceConfiguration {
         /**
          * Prefix for Micronaut instance settings.

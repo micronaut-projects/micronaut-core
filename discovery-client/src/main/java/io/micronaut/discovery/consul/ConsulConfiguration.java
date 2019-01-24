@@ -16,6 +16,7 @@
 
 package io.micronaut.discovery.consul;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.discovery.DiscoveryConfiguration;
@@ -42,6 +43,7 @@ import java.util.Optional;
  */
 @RequiresConsul
 @ConfigurationProperties(ConsulConfiguration.PREFIX)
+@BootstrapContextCompatible
 public class ConsulConfiguration extends DiscoveryClientConfiguration {
 
     /**
@@ -169,6 +171,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
      * Configuration class for Consul client config.
      */
     @ConfigurationProperties(ConfigDiscoveryConfiguration.PREFIX)
+    @BootstrapContextCompatible
     public static class ConsulConfigDiscoveryConfiguration extends ConfigDiscoveryConfiguration {
 
         /**
@@ -199,6 +202,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
      * Configuration class for Consul client discovery.
      */
     @ConfigurationProperties(DiscoveryConfiguration.PREFIX)
+    @BootstrapContextCompatible
     public static class ConsulDiscoveryConfiguration extends DiscoveryConfiguration {
 
         private Map<String, String> tags = Collections.emptyMap();
@@ -288,6 +292,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
      * The default connection pool configuration.
      */
     @ConfigurationProperties(ConnectionPoolConfiguration.PREFIX)
+    @BootstrapContextCompatible
     public static class ConsulConnectionPoolConfiguration extends ConnectionPoolConfiguration {
     }
 
@@ -295,6 +300,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
      * Configuration class for Consul client registration.
      */
     @ConfigurationProperties(RegistrationConfiguration.PREFIX)
+    @BootstrapContextCompatible
     public static class ConsulRegistrationConfiguration extends RegistrationConfiguration {
 
         /**

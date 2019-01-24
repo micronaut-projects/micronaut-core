@@ -17,6 +17,7 @@
 package io.micronaut.runtime.http.codec;
 
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.http.codec.MediaTypeCodec;
@@ -32,6 +33,7 @@ import java.util.List;
  * @since 1.0
  */
 @Factory
+@BootstrapContextCompatible
 public class MediaTypeCodecRegistryFactory {
 
     /**
@@ -41,6 +43,7 @@ public class MediaTypeCodecRegistryFactory {
     @Singleton
     @Primary
     @Bean
+    @BootstrapContextCompatible
     MediaTypeCodecRegistry mediaTypeCodecRegistry(List<MediaTypeCodec> codecs) {
         return MediaTypeCodecRegistry.of(codecs);
     }

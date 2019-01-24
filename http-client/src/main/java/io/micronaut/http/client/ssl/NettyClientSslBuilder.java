@@ -16,6 +16,7 @@
 
 package io.micronaut.http.client.ssl;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.ssl.*;
@@ -41,6 +42,7 @@ import java.util.Optional;
  */
 @Singleton
 @Internal
+@BootstrapContextCompatible
 public class NettyClientSslBuilder extends SslBuilder<SslContext> {
 
     /**

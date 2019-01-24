@@ -16,6 +16,7 @@
 
 package io.micronaut.discovery.config;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
@@ -36,6 +37,7 @@ import java.util.stream.Collectors;
  */
 @Singleton
 @Primary
+@BootstrapContextCompatible
 public class DefaultCompositeConfigurationClient implements ConfigurationClient {
 
     private final ConfigurationClient[] configurationClients;
