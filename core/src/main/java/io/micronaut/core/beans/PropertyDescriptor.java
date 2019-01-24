@@ -65,9 +65,8 @@ public class PropertyDescriptor implements Named {
     public Class<?> getBeanClass() {
         if (getter != null) {
             return getter.getDeclaringClass();
-        } else {
-            return setter.getDeclaringClass();
         }
+        return setter.getDeclaringClass();
     }
 
     /**
@@ -76,9 +75,8 @@ public class PropertyDescriptor implements Named {
     public Class<?> getType() {
         if (getter != null) {
             return getter.getReturnType();
-        } else {
-            return setter.getParameterTypes()[0];
         }
+        return setter.getParameterTypes()[0];
     }
 
     /**

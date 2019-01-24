@@ -659,7 +659,8 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
             if (prior == null) {
                 afterWrite(new AddTask(node, weight));
                 return null;
-            } else if (onlyIfAbsent) {
+            }
+            if (onlyIfAbsent) {
                 afterRead(prior);
                 return prior.getValue();
             }
@@ -749,7 +750,8 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
             if (prior == null) {
                 afterWrite(new AddTask(node, weight));
                 return weightedValue.value;
-            } else if (onlyIfAbsent) {
+            }
+            if (onlyIfAbsent) {
                 afterRead(prior);
                 return prior.getValue();
             }
@@ -877,9 +879,8 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
         if (ks == null) {
             keySet = new KeySet();
             return keySet;
-        } else {
-            return ks;
         }
+        return ks;
     }
 
     /**
@@ -997,9 +998,8 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
         if (vs == null) {
             values = new Values();
             return values;
-        } else {
-            return vs;
         }
+        return vs;
     }
 
     @Override
@@ -1008,9 +1008,8 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
         if (es == null) {
             entrySet = new EntrySet();
             return entrySet;
-        } else {
-            return es;
         }
+        return es;
     }
 
     /**

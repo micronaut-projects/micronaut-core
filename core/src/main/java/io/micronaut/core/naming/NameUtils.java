@@ -149,9 +149,8 @@ public class NameUtils {
         if (matcher.find()) {
             int position = matcher.start();
             return className.substring(0, position);
-        } else {
-            return "";
         }
+        return "";
     }
 
     /**
@@ -186,9 +185,8 @@ public class NameUtils {
         if (matcher.find()) {
             int position = matcher.start();
             return className.substring(position + 1);
-        } else {
-            return className;
         }
+        return className;
     }
 
     /**
@@ -239,13 +237,9 @@ public class NameUtils {
         int prefixLength = 0;
         if (methodName.startsWith("get")) {
             prefixLength = PREFIX_LENTGH;
-        } else if (methodName.startsWith("is")) {
-            prefixLength = IS_LENTGH;
-        } else {
-            return false;
         }
-        if (len > prefixLength) {
-            return Character.isUpperCase(methodName.charAt(prefixLength));
+        if (methodName.startsWith("is")) {
+            prefixLength = IS_LENTGH;
         }
         return false;
     }
@@ -261,7 +255,8 @@ public class NameUtils {
             int prefixLength = 0;
             if (getterName.startsWith("get")) {
                 prefixLength = PREFIX_LENTGH;
-            } else if (getterName.startsWith("is")) {
+            }
+            if (getterName.startsWith("is")) {
                 prefixLength = IS_LENTGH;
             }
             return decapitalize(getterName.substring(prefixLength));
@@ -387,9 +382,8 @@ public class NameUtils {
         int index = lastSeparator > extensionPos ? -1 : extensionPos;
         if (index == -1) {
             return "";
-        } else {
-            return filename.substring(index + 1);
         }
+        return filename.substring(index + 1);
     }
 
     /**
@@ -434,9 +428,8 @@ public class NameUtils {
         int index = lastSeparator > extensionPos ? path.length() : extensionPos;
         if (index == -1) {
             return "";
-        } else {
-            return path.substring(lastSeparator + 1, index);
         }
+        return path.substring(lastSeparator + 1, index);
     }
 
 }

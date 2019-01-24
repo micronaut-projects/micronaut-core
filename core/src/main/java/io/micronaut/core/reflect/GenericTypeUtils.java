@@ -186,7 +186,8 @@ public class GenericTypeUtils {
         ParameterizedType pt;
         if (actualTypeArgument instanceof Class) {
             return Optional.of((Class) actualTypeArgument);
-        } else if (actualTypeArgument instanceof ParameterizedType) {
+        }
+        if (actualTypeArgument instanceof ParameterizedType) {
             pt = (ParameterizedType) actualTypeArgument;
             Type rawType = pt.getRawType();
             if (rawType instanceof Class) {

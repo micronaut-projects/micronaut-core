@@ -74,33 +74,32 @@ class UrlReadable implements Readable {
                 } catch (URISyntaxException ex) {
                     return new File(url.getFile()).exists();
                 }
-            } else {
-                URLConnection con = url.openConnection();
-                con.setUseCaches(true);
-                final boolean isHttp = con instanceof HttpURLConnection;
-                if (isHttp) {
-                    final HttpURLConnection httpURLConnection = (HttpURLConnection) con;
-                    httpURLConnection.setRequestMethod("HEAD");
-                    int code = httpURLConnection.getResponseCode();
-                    if (code == HttpURLConnection.HTTP_OK) {
-                        return true;
-                    } else if (code == HttpURLConnection.HTTP_NOT_FOUND) {
-                        return false;
-                    }
-                }
-                if (con.getContentLengthLong() >= 0) {
+            }
+            URLConnection con = url.openConnection();
+            con.setUseCaches(true);
+            final boolean isHttp = con instanceof HttpURLConnection;
+            if (isHttp) {
+                final HttpURLConnection httpURLConnection = (HttpURLConnection) con;
+                httpURLConnection.setRequestMethod("HEAD");
+                int code = httpURLConnection.getResponseCode();
+                if (code == HttpURLConnection.HTTP_OK) {
                     return true;
                 }
-                if (isHttp) {
-                    // No HTTP OK status, and no content-length header: give up
-                    ((HttpURLConnection) con).disconnect();
+                if (code == HttpURLConnection.HTTP_NOT_FOUND) {
                     return false;
-                } else {
-                    // Fall back to stream existence: can we open the stream?
-                    asInputStream().close();
-                    return true;
                 }
             }
+            if (con.getContentLengthLong() >= 0) {
+                return true;
+            }
+            if (isHttp) {
+                // No HTTP OK status, and no content-length header: give up
+                ((HttpURLConnection) con).disconnect();
+                return false;
+            }
+            // Fall back to stream existence: can we open the stream?
+            asInputStream().close();
+            return true;
         } catch (IOException ex) {
             return false;
         }

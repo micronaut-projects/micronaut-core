@@ -115,9 +115,8 @@ public class ResourceResolver {
         Optional<ResourceLoader> resourceLoader = getSupportingLoader(path);
         if (resourceLoader.isPresent()) {
             return resourceLoader.get().getResourceAsStream(path);
-        } else {
-            return Optional.empty();
         }
+        return Optional.empty();
     }
 
     /**
@@ -131,9 +130,8 @@ public class ResourceResolver {
         Optional<ResourceLoader> resourceLoader = getSupportingLoader(path);
         if (resourceLoader.isPresent()) {
             return resourceLoader.get().getResource(path);
-        } else {
-            return Optional.empty();
         }
+        return Optional.empty();
     }
 
     /**
@@ -147,8 +145,7 @@ public class ResourceResolver {
         Optional<ResourceLoader> resourceLoader = getSupportingLoader(path);
         if (resourceLoader.isPresent()) {
             return resourceLoader.get().getResources(path);
-        } else {
-            return Stream.empty();
         }
+        return Stream.empty();
     }
 }

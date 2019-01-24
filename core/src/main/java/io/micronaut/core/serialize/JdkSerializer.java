@@ -105,9 +105,8 @@ public class JdkSerializer implements ObjectSerializer {
                 Optional<Class> aClass = ClassUtils.forName(desc.getName(), requiredType.getClassLoader());
                 if (aClass.isPresent()) {
                     return aClass.get();
-                } else {
-                    return super.resolveClass(desc);
                 }
+                return super.resolveClass(desc);
             }
         };
     }

@@ -193,15 +193,14 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
         if (demand <= 0) {
             illegalDemand();
             return false;
-        } else {
-            if (upstreamDemand < Long.MAX_VALUE) {
-                upstreamDemand += demand;
-                if (upstreamDemand < 0) {
-                    upstreamDemand = Long.MAX_VALUE;
-                }
-            }
-            return true;
         }
+        if (upstreamDemand < Long.MAX_VALUE) {
+            upstreamDemand += demand;
+            if (upstreamDemand < 0) {
+                upstreamDemand = Long.MAX_VALUE;
+            }
+        }
+        return true;
     }
 
     private void flushBuffer() {
