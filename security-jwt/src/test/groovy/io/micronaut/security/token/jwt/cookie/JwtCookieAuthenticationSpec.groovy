@@ -32,7 +32,7 @@ import io.micronaut.security.token.jwt.bearer.BearerTokenReader
 import io.micronaut.security.token.jwt.encryption.EncryptionConfiguration
 import io.micronaut.security.token.jwt.signature.SignatureConfiguration
 import spock.lang.AutoCleanup
-import spock.lang.IgnoreIf
+import spock.lang.Requires
 import spock.lang.Shared
 
 class JwtCookieAuthenticationSpec extends GebSpec {
@@ -134,7 +134,7 @@ class JwtCookieAuthenticationSpec extends GebSpec {
         rsp.body().contains('sherlock')
     }
 
-    @IgnoreIf({ !sys['geb.env']})
+    @Requires({sys['geb.env']})
     def "verify jwt cookie authentication works"() {
         given:
         browser.baseUrl = "http://localhost:${embeddedServer.port}"
