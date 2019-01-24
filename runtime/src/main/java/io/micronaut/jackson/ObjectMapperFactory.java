@@ -25,10 +25,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Type;
+import io.micronaut.context.annotation.*;
 import io.micronaut.core.reflect.GenericTypeUtils;
 
 import javax.annotation.Nullable;
@@ -46,6 +43,7 @@ import java.util.TimeZone;
  * @since 1.0
  */
 @Factory
+@BootstrapContextCompatible
 public class ObjectMapperFactory {
 
     /**
@@ -79,6 +77,7 @@ public class ObjectMapperFactory {
     @Bean
     @Singleton
     @Primary
+    @BootstrapContextCompatible
     public ObjectMapper objectMapper(@Nullable JacksonConfiguration jacksonConfiguration,
                                      @Nullable JsonFactory jsonFactory) {
 

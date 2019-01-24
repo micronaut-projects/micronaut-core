@@ -16,6 +16,7 @@
 
 package io.micronaut.discovery.client.config;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.env.BootstrapPropertySourceLocator;
@@ -46,6 +47,7 @@ import java.util.concurrent.TimeoutException;
  */
 @Singleton
 @Requires(property = ConfigurationClient.ENABLED, value = "true", defaultValue = "false")
+@BootstrapContextCompatible
 public class DistributedPropertySourceLocator implements BootstrapPropertySourceLocator {
     private static final Logger LOG = LoggerFactory.getLogger(DistributedPropertySourceLocator.class);
     private final ConfigurationClient configurationClient;

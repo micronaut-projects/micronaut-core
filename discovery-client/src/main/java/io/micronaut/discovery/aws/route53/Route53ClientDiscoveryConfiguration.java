@@ -16,6 +16,7 @@
 
 package io.micronaut.discovery.aws.route53;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
@@ -37,6 +38,7 @@ import javax.annotation.Nullable;
 @Requires(env = Environment.AMAZON_EC2)
 @Requires(property = Route53AutoNamingClient.ENABLED, value = "true", defaultValue = "false")
 @ConfigurationProperties(Route53ClientDiscoveryConfiguration.PREFIX)
+@BootstrapContextCompatible
 public class Route53ClientDiscoveryConfiguration extends DiscoveryClientConfiguration {
 
     public static final String SERVICE_ID = "route53";

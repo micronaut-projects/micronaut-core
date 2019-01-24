@@ -17,6 +17,7 @@
 package io.micronaut.http.client;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -45,6 +46,7 @@ import java.util.*;
  * @since 1.0
  */
 @Singleton
+@BootstrapContextCompatible
 public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
 
     private final Map<String, ServiceInstanceList> serviceInstanceLists;

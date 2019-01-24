@@ -16,6 +16,7 @@
 
 package io.micronaut.context;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.env.BootstrapPropertySourceLocator;
@@ -47,6 +48,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Creates a default implementation of the {@link ApplicationContext} interface.
@@ -446,7 +448,9 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             // we cache the resolved beans in a local field to avoid the I/O cost of resolving them twice
             // once for the bootstrap context and again for the main context
             resolvedBeanReferences = refs;
-            return refs;
+            return refs.stream()
+                        .filter(ref -> ref.isAnnotationPresent(BootstrapContextCompatible.class))
+                        .collect(Collectors.toList());
         }
 
         @Override
@@ -549,12 +553,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
                     bootstrapPropertySourceLocator = bootstrapContext.getBean(BootstrapPropertySourceLocator.class);
                 } else {
                     bootstrapPropertySourceLocator = BootstrapPropertySourceLocator.EMPTY_LOCATOR;
-                }
-                // share resolved singleton objects between the Bootstrap and the main context
-                // for performance reasons no need to support hierarchy of contexts in Microservice
-                // environment
-                if (!DefaultApplicationContext.this.isRunning()) {
-                    DefaultApplicationContext.this.singletonObjects.putAll(bootstrapContext.singletonObjects);
                 }
             }
             return this.bootstrapPropertySourceLocator;

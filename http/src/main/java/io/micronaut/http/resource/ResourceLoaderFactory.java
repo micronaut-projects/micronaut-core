@@ -17,6 +17,7 @@
 package io.micronaut.http.resource;
 
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
@@ -35,6 +36,7 @@ import javax.inject.Singleton;
  * @since 1.0
  */
 @Factory
+@BootstrapContextCompatible
 public class ResourceLoaderFactory {
 
     /**
@@ -42,6 +44,7 @@ public class ResourceLoaderFactory {
      */
     @Singleton
     @Bean
+    @BootstrapContextCompatible
     ClassPathResourceLoader getClassPathResourceLoader() {
         return new DefaultClassPathResourceLoader(ResourceLoaderFactory.class.getClassLoader());
     }
@@ -50,6 +53,7 @@ public class ResourceLoaderFactory {
      * @return The file system resource loader
      */
     @Singleton
+    @BootstrapContextCompatible
     FileSystemResourceLoader fileSystemResourceLoader() {
         return new DefaultFileSystemResourceLoader();
     }
@@ -59,6 +63,7 @@ public class ResourceLoaderFactory {
      * @return The resource resolver
      */
     @Singleton
+    @BootstrapContextCompatible
     ResourceResolver resourceResolver(ResourceLoader[] resourceLoaders) {
         return new ResourceResolver(resourceLoaders);
     }

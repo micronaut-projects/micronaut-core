@@ -16,6 +16,7 @@
 
 package io.micronaut.http.ssl;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import javax.annotation.Nullable;
@@ -28,6 +29,7 @@ import javax.inject.Inject;
  * @since 1.0
  */
 @ConfigurationProperties(ClientSslConfiguration.PREFIX)
+@BootstrapContextCompatible
 public class ClientSslConfiguration extends SslConfiguration {
 
     /**
