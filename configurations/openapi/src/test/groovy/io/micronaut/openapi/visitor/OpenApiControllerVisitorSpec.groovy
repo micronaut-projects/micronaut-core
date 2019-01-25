@@ -522,4 +522,46 @@ class MyBean {}
 
 
     }
+
+
+    void "test URI template with query parameters is handled correctly"() {
+        given:
+        buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.swagger.v3.oas.annotations.*;
+import io.swagger.v3.oas.annotations.media.*;
+import io.swagger.v3.oas.annotations.enums.*;
+import io.micronaut.http.annotation.*;
+import java.util.List;
+import javax.validation.constraints.*;
+import javax.annotation.*;
+
+@Controller("/")
+class MyController {
+
+    @Get("/hello{?foo,bar}")
+    public String query(@Nullable String foo, @Nullable String bar) { 
+        return null;                               
+     }
+}
+
+@javax.inject.Singleton
+class MyBean {}
+''')
+        when:
+        Operation operation = AbstractOpenApiVisitor.testReference?.paths?.get("/hello")?.get
+
+        then:
+        operation != null
+        operation.operationId == 'query'
+        operation.parameters.size() == 2
+        operation.parameters[0].name == 'foo'
+        !operation.parameters[0].required
+        operation.parameters[0].in == 'query'
+        operation.parameters[1].name == 'bar'
+        !operation.parameters[1].required
+        operation.parameters[1].in == 'query'
+
+    }
 }

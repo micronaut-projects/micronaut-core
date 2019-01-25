@@ -54,6 +54,43 @@ class UriTemplateSpec extends Specification {
     }
 
     @Unroll
+    void "Test nest template #template toPathString() with path #nested"() {
+        given:
+        UriMatchTemplate uriTemplate = new UriMatchTemplate(template)
+
+        expect:
+        uriTemplate.nest(nested).toPathString() == result
+
+        where:
+        template       | nested                         | result
+        '/city'        | '/'                            | '/city'
+        '/city'        | ''                             | '/city'
+        '/city'        | 'country/{name}'               | '/city/country/{name}'
+//        '/foo'         | '/find?{x,empty}'              | '/foo/find' TODO: Not yet implemented. Probably should work
+        '/foo'         | '/find{?x,empty}'              | '/foo/find'
+        '/foo'         | '{/list*,path:4}'              | '/foo{/list*,path:4}'
+        '/person'      | '/{fred}'                      | '/person/{fred}'
+        '/books'       | '{/id}'                        | '/books{/id}'
+        '/books/'      | '{/id}'                        | '/books{/id}'
+        ""             | '/authors{/authorId}'          | '/authors{/authorId}'
+        '/'            | '/regex/{color:^blue|orange$}' | '/regex/{color:^blue|orange$}'
+        '/poetry'      | '/{?max}'                      | '/poetry'
+        '/poetry'      | '{?max}'                       | '/poetry'
+        '/'            | '/hello/{name}'                | '/hello/{name}'
+        ''             | '/hello/{name}'                | '/hello/{name}'
+        '/test/'       | '/hello/{name}'                | '/test/hello/{name}'
+        '{var}'        | '{var2}'                       | '{var}/{var2}'
+        '/book{/id}'   | '/author{/authorId}'           | '/book{/id}/author{/authorId}'
+        '{var}/'       | '{var2}'                       | '{var}/{var2}'
+        '{var}'        | '/{var2}'                      | '{var}/{var2}'
+        '{var}{?q}'    | '/{var2}'                      | '{var}/{var2}'
+        '{var}{#hash}' | '{var2}'                       | '{var}/{var2}'
+        '/foo'         | '/find{?year*}'                | '/foo/find'
+
+
+    }
+
+    @Unroll
     void "Test nest template #template toString() with path #nested"() {
         given:
         UriTemplate uriTemplate = new UriTemplate(template)
