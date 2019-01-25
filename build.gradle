@@ -163,6 +163,11 @@ ext {
                     group:'io.micronaut.configuration',
                     name:'micronaut-redis-lettuce'
             ],
+            'micronaut.neo4j': [
+                    version:micronautNeo4jVersion,
+                    group:'io.micronaut.configuration',
+                    name:'micronaut-neo4j-bolt'
+            ],
             'mongo' : [
                     version: mongoVersion,
                     group: 'org.mongodb',
@@ -179,7 +184,7 @@ ext {
                 name:'neo4j-harness'
             ],
             'neo4j.bolt': [
-                version: '1.6.2',
+                version: neo4jDriverVersion,
                 group:'org.neo4j.driver',
                 name:'neo4j-java-driver'
             ],
