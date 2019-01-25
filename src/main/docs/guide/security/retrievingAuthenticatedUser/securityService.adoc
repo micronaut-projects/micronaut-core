@@ -1,0 +1,1 @@
+If you need to access the currently authenticated user outside of a controller, you can inject api:security.utils.SecurityService[] bean, which provides a set of convenient methods related to authentication and authorization.
