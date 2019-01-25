@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package io.micronaut.configuration.rabbitmq;
+package io.micronaut.configuration.rabbitmq.connect;
 
 import com.rabbitmq.client.ConnectionFactory;
 import io.micronaut.context.annotation.ConfigurationProperties;
