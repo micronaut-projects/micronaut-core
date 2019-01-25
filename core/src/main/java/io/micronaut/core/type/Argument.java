@@ -171,14 +171,13 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
     static Class[] toClassArray(Argument... arguments) {
         if (ArrayUtils.isEmpty(arguments)) {
             return ReflectionUtils.EMPTY_CLASS_ARRAY;
-        } else {
-            Class[] types = new Class[arguments.length];
-            for (int i = 0; i < arguments.length; i++) {
-                Argument argument = arguments[i];
-                types[i] = argument.getType();
-            }
-            return types;
         }
+        Class[] types = new Class[arguments.length];
+        for (int i = 0; i < arguments.length; i++) {
+            Argument argument = arguments[i];
+            types[i] = argument.getType();
+        }
+        return types;
     }
 
     /**
@@ -289,20 +288,19 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
     static <T> Argument<T> of(Class<T> type, @Nullable Class<?>... typeParameters) {
         if (typeParameters == null) {
             return of(type);
-        } else {
-
-            TypeVariable<Class<T>>[] parameters = type.getTypeParameters();
-            int len = typeParameters.length;
-            if (parameters.length != len) {
-                throw new IllegalArgumentException("Type parameter length does not match. Required: " + parameters.length + ", Specified: " + len);
-            }
-            Argument[] typeArguments = new Argument[len];
-            for (int i = 0; i < parameters.length; i++) {
-                TypeVariable<Class<T>> parameter = parameters[i];
-                typeArguments[i] = Argument.of(typeParameters[i], parameter.getName());
-            }
-            return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), AnnotationMetadata.EMPTY_METADATA, typeArguments);
         }
+
+        TypeVariable<Class<T>>[] parameters = type.getTypeParameters();
+        int len = typeParameters.length;
+        if (parameters.length != len) {
+            throw new IllegalArgumentException("Type parameter length does not match. Required: " + parameters.length + ", Specified: " + len);
+        }
+        Argument[] typeArguments = new Argument[len];
+        for (int i = 0; i < parameters.length; i++) {
+            TypeVariable<Class<T>> parameter = parameters[i];
+            typeArguments[i] = Argument.of(typeParameters[i], parameter.getName());
+        }
+        return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), AnnotationMetadata.EMPTY_METADATA, typeArguments);
     }
 
     /**

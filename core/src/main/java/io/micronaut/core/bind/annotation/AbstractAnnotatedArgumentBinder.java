@@ -122,8 +122,7 @@ public abstract class AbstractAnnotatedArgumentBinder<A extends Annotation, T, S
         Optional<T> result = conversionService.convert(value, context);
         if (result.isPresent() && context.getArgument().getType() == Optional.class) {
             return () -> (Optional<T>) result.get();
-        } else {
-            return () -> result;
         }
+        return () -> result;
     }
 }

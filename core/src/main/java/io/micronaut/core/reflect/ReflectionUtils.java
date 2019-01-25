@@ -118,9 +118,8 @@ public class ReflectionUtils {
     public static Class getWrapperType(Class primitiveType) {
         if (primitiveType.isPrimitive()) {
             return PRIMITIVES_TO_WRAPPERS.get(primitiveType);
-        } else {
-            return primitiveType;
         }
+        return primitiveType;
     }
 
     /**
@@ -133,9 +132,8 @@ public class ReflectionUtils {
         Class<?> wrapper = WRAPPER_TO_PRIMITIVE.get(wrapperType);
         if (wrapper != null) {
             return wrapper;
-        } else {
-            return wrapperType;
         }
+        return wrapperType;
     }
 
     /**

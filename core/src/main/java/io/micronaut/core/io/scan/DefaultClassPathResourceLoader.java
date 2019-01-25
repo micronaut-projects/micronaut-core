@@ -76,9 +76,8 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
     public Optional<InputStream> getResourceAsStream(String path) {
         if (!isDirectory(path)) {
             return Optional.ofNullable(classLoader.getResourceAsStream(prefixPath(path)));
-        } else {
-            return Optional.empty();
         }
+        return Optional.empty();
     }
 
     /**
@@ -205,12 +204,10 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         if (basePath != null) {
             if (path.startsWith("/")) {
                 return basePath + path.substring(1);
-            } else {
-                return basePath + path;
             }
-        } else {
-            return path;
+            return basePath + path;
         }
+        return path;
     }
 
 }

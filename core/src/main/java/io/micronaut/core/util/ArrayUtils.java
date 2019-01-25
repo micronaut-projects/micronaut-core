@@ -102,9 +102,8 @@ public class ArrayUtils {
     public static String toString(String delimiter, @Nullable Object[] array) {
         if (isEmpty(array)) {
             return "";
-        } else {
-            List<Object> list = Arrays.asList(array);
-            return CollectionUtils.toString(delimiter, list);
         }
+        List<Object> list = Arrays.asList(array);
+        return CollectionUtils.toString(delimiter, list);
     }
 }

@@ -141,7 +141,8 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             public boolean hasNext() {
                 if (loaded.hasNext()) {
                     return true;
-                } else if (unloadedServices.hasNext()) {
+                }
+                if (unloadedServices.hasNext()) {
                     return true;
                 }
                 return false;
@@ -155,7 +156,8 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
 
                 if (loaded.hasNext()) {
                     return loaded.next();
-                } else if (unloadedServices.hasNext()) {
+                }
+                if (unloadedServices.hasNext()) {
                     ServiceDefinition<S> nextService = unloadedServices.next();
                     loadedServices.put(nextService.getName(), nextService);
                     return nextService;
