@@ -237,9 +237,13 @@ public class NameUtils {
         int prefixLength = 0;
         if (methodName.startsWith("get")) {
             prefixLength = PREFIX_LENTGH;
-        }
-        if (methodName.startsWith("is")) {
+        } else if (methodName.startsWith("is")) {
             prefixLength = IS_LENTGH;
+        } else {
+            return false;
+        }
+        if (len > prefixLength) {
+            return Character.isUpperCase(methodName.charAt(prefixLength));
         }
         return false;
     }
