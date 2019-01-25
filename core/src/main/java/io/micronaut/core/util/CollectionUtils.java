@@ -86,20 +86,22 @@ public class CollectionUtils {
         }
         if (iterableType.equals(Set.class)) {
             return Optional.of(new HashSet<>(collection));
-        } else if (iterableType.equals(Queue.class)) {
+        }
+        if (iterableType.equals(Queue.class)) {
             return Optional.of(new LinkedList<>(collection));
-        } else if (iterableType.equals(List.class)) {
+        }
+        if (iterableType.equals(List.class)) {
             return Optional.of(new ArrayList<>(collection));
-        } else if (!iterableType.isInterface()) {
+        }
+        if (!iterableType.isInterface()) {
             try {
                 Constructor<? extends Iterable<T>> constructor = iterableType.getConstructor(Collection.class);
                 return Optional.of(constructor.newInstance(collection));
             } catch (Throwable e) {
                 return Optional.empty();
             }
-        } else {
-            return Optional.empty();
         }
+        return Optional.empty();
     }
 
     /**
@@ -212,22 +214,19 @@ public class CollectionUtils {
     public static <T> List<T> iterableToList(Iterable<T> iterable) {
         if (iterable == null) {
             return Collections.emptyList();
-        } else {
-            if (iterable instanceof List) {
-                return (List<T>) iterable;
-            } else {
-                Iterator<T> i = iterable.iterator();
-                if (i.hasNext()) {
-                    List<T> list = new ArrayList<>();
-                    while (i.hasNext()) {
-                        list.add(i.next());
-                    }
-                    return list;
-                } else {
-                    return Collections.emptyList();
-                }
-            }
         }
+        if (iterable instanceof List) {
+            return (List<T>) iterable;
+        }
+        Iterator<T> i = iterable.iterator();
+        if (i.hasNext()) {
+            List<T> list = new ArrayList<>();
+            while (i.hasNext()) {
+                list.add(i.next());
+            }
+            return list;
+        }
+        return Collections.emptyList();
     }
 
     /**
@@ -240,22 +239,19 @@ public class CollectionUtils {
     public static <T> Set<T> iterableToSet(Iterable<T> iterable) {
         if (iterable == null) {
             return Collections.emptySet();
-        } else {
-            if (iterable instanceof Set) {
-                return (Set<T>) iterable;
-            } else {
-                Iterator<T> i = iterable.iterator();
-                if (i.hasNext()) {
-                    Set<T> list = new HashSet<>();
-                    while (i.hasNext()) {
-                        list.add(i.next());
-                    }
-                    return list;
-                } else {
-                    return Collections.emptySet();
-                }
-            }
         }
+        if (iterable instanceof Set) {
+            return (Set<T>) iterable;
+        }
+        Iterator<T> i = iterable.iterator();
+        if (i.hasNext()) {
+            Set<T> list = new HashSet<>();
+            while (i.hasNext()) {
+                list.add(i.next());
+            }
+            return list;
+        }
+        return Collections.emptySet();
     }
 
     /**

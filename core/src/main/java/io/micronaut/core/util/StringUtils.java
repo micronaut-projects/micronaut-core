@@ -130,7 +130,7 @@ public final class StringUtils {
             throw new IllegalArgumentException("Number of arguments should be an even number representing the keys and values");
         }
 
-        Map<String, Object> answer = new HashMap<>(len / 2);
+        Map<String, Object> answer = new HashMap<>((int) (len / 2 / 0.75));
         int i = 0;
         while (i < values.length - 1) {
             String key = values[i++].toString().intern();

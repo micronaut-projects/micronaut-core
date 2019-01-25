@@ -92,10 +92,9 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
     public Stream<Class> scan(String annotation, String pkg) {
         if (pkg == null) {
             return Stream.empty();
-        } else {
-            List<Class> classes = doScan(annotation, pkg);
-            return classes.stream();
         }
+        List<Class> classes = doScan(annotation, pkg);
+        return classes.stream();
     }
 
     /**

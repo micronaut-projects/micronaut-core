@@ -119,12 +119,10 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             if (typeConverter != null) {
                 converterCache.put(pair, typeConverter);
                 return true;
-            } else {
-                return false;
             }
-        } else {
-            return true;
+            return false;
         }
+        return true;
     }
 
     @Override
@@ -511,21 +509,20 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                 AnnotationClassValue[] array = new AnnotationClassValue[1];
                 array[0] = (AnnotationClassValue) object;
                 return Optional.of(array);
-            } else {
-
-                String str = object.toString();
-                String[] strings = str.split(",");
-                Class<?> componentType = ReflectionUtils.getWrapperType(targetType.getComponentType());
-                Object newArray = Array.newInstance(componentType, strings.length);
-                for (int i = 0; i < strings.length; i++) {
-                    String string = strings[i];
-                    Optional<?> converted = convert(string, componentType);
-                    if (converted.isPresent()) {
-                        Array.set(newArray, i, converted.get());
-                    }
-                }
-                return Optional.of((Object[]) newArray);
             }
+
+            String str = object.toString();
+            String[] strings = str.split(",");
+            Class<?> componentType = ReflectionUtils.getWrapperType(targetType.getComponentType());
+            Object newArray = Array.newInstance(componentType, strings.length);
+            for (int i = 0; i < strings.length; i++) {
+                String string = strings[i];
+                Optional<?> converted = convert(string, componentType);
+                if (converted.isPresent()) {
+                    Array.set(newArray, i, converted.get());
+                }
+            }
+            return Optional.of((Object[]) newArray);
         });
 
         // String -> Int Array
@@ -580,25 +577,32 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             Class targetNumberType = ReflectionUtils.getWrapperType(targetType);
             if (targetNumberType.isInstance(object)) {
                 return Optional.of(object);
-            } else if (targetNumberType == Integer.class) {
+            }
+            if (targetNumberType == Integer.class) {
                 return Optional.of(object.intValue());
-            } else if (targetNumberType == Long.class) {
+            }
+            if (targetNumberType == Long.class) {
                 return Optional.of(object.longValue());
-            } else if (targetNumberType == Short.class) {
+            }
+            if (targetNumberType == Short.class) {
                 return Optional.of(object.shortValue());
-            } else if (targetNumberType == Byte.class) {
+            }
+            if (targetNumberType == Byte.class) {
                 return Optional.of(object.byteValue());
-            } else if (targetNumberType == Float.class) {
+            }
+            if (targetNumberType == Float.class) {
                 return Optional.of(object.floatValue());
-            } else if (targetNumberType == Double.class) {
+            }
+            if (targetNumberType == Double.class) {
                 return Optional.of(object.doubleValue());
-            } else if (targetNumberType == BigInteger.class) {
+            } 
+            if (targetNumberType == BigInteger.class) {
                 if (object instanceof BigDecimal) {
                     return Optional.of(((BigDecimal) object).toBigInteger());
-                } else {
-                    return Optional.of(BigInteger.valueOf(object.longValue()));
                 }
-            } else if (targetNumberType == BigDecimal.class) {
+                return Optional.of(BigInteger.valueOf(object.longValue()));
+            }
+            if (targetNumberType == BigDecimal.class) {
                 return Optional.of(new BigDecimal(object.toString()));
             }
             return Optional.empty();
@@ -632,9 +636,8 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             Optional converted = convert(object, targetComponentType, newContext);
             if (converted.isPresent()) {
                 return Optional.of(converted);
-            } else {
-                return Optional.of(Optional.empty());
             }
+            return Optional.of(Optional.empty());
         });
 
         addConverter(Object.class, OptionalInt.class, (object, targetType, context) -> {
@@ -655,9 +658,8 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             if (ConvertibleValues.class.isAssignableFrom(targetType)) {
                 if (object instanceof ConvertibleValues) {
                     return Optional.of(object);
-                } else {
-                    return Optional.empty();
                 }
+                return Optional.empty();
             }
             Optional<Argument<?>> typeVariable = context.getFirstTypeVariable();
             Argument<?> componentType = typeVariable.orElse(Argument.OBJECT_ARGUMENT);
@@ -676,17 +678,16 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                     }
                 }
                 return CollectionUtils.convertCollection((Class) targetType, list);
-            } else {
-                targetComponentType = Object.class;
-                List list = new ArrayList();
-                for (Object o : object) {
-                    Optional<?> converted = convert(o, targetComponentType, newContext);
-                    if (converted.isPresent()) {
-                        list.add(converted.get());
-                    }
-                }
-                return CollectionUtils.convertCollection((Class) targetType, list);
             }
+            targetComponentType = Object.class;
+            List list = new ArrayList();
+            for (Object o : object) {
+                Optional<?> converted = convert(o, targetComponentType, newContext);
+                if (converted.isPresent()) {
+                    list.add(converted.get());
+                }
+            }
+            return CollectionUtils.convertCollection((Class) targetType, list);
         });
 
         // Object[] -> String

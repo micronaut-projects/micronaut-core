@@ -41,8 +41,8 @@ import java.util.*;
 public class ClassUtils {
 
     public static final int EMPTY_OBJECT_ARRAY_HASH_CODE = Arrays.hashCode(ArrayUtils.EMPTY_OBJECT_ARRAY);
-    public static final Map<String, Class> COMMON_CLASS_MAP = new HashMap<>(25);
-    public static final Map<String, Class> BASIC_TYPE_MAP = new HashMap<>(10);
+    public static final Map<String, Class> COMMON_CLASS_MAP = new HashMap<>(34);
+    public static final Map<String, Class> BASIC_TYPE_MAP = new HashMap<>(18);
     public static final String CLASS_EXTENSION = ".class";
     
     static final List<ClassLoadingReporter> CLASS_LOADING_REPORTERS;
