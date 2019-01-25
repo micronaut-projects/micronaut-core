@@ -392,6 +392,17 @@ public class DefaultConversionService implements ConversionService<DefaultConver
             }
         });
 
+        // String -> Byte
+        addConverter(CharSequence.class, Byte.class, (CharSequence object, Class<Byte> targetType, ConversionContext context) -> {
+            try {
+                Byte converted = Byte.valueOf(object.toString());
+                return Optional.of(converted);
+            } catch (NumberFormatException e) {
+                context.reject(object, e);
+                return Optional.empty();
+            }
+        });
+
         // String -> BigDecimal
         addConverter(CharSequence.class, BigDecimal.class, (CharSequence object, Class<BigDecimal> targetType, ConversionContext context) -> {
             try {
