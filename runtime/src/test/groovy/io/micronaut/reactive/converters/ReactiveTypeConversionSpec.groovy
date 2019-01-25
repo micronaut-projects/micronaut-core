@@ -15,9 +15,11 @@
  */
 package io.micronaut.reactive.converters
 
+import io.reactivex.Completable
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.ConversionService
+import io.reactivex.Maybe
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import rx.Observable
@@ -32,7 +34,7 @@ import spock.lang.Unroll
 class ReactiveTypeConversionSpec extends Specification {
 
     @Unroll
-    void 'test converting reactive type #from to #target'() {
+    void 'test converting reactive type #from.getClass().getSimpleName() to #target'() {
         given:
         ApplicationContext applicationContext = ApplicationContext.run()
 
@@ -52,6 +54,12 @@ class ReactiveTypeConversionSpec extends Specification {
         Observable.just(1)              | Flowable
         Observable.just(1)              | Mono
         Observable.just(1)              | Flux
+        Completable.complete()          | io.reactivex.Observable
+        Completable.complete()          | Flowable
+        Completable.complete()          | Mono
+        Completable.complete()          | Flux
+        Completable.complete()          | io.reactivex.Single
+        Completable.complete()          | Maybe
         Flux.just(1)                    | Single
         Mono.just(1)                    | Single
         Flux.just(1)                    | Observable
