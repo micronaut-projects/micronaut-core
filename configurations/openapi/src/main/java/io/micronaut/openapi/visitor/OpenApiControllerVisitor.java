@@ -181,6 +181,8 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 swaggerOperation.setParameters(swaggerParameters);
             }
 
+
+
             for (ParameterElement parameter : element.getParameters()) {
 
                 ClassElement parameterType = parameter.getType();
@@ -227,7 +229,8 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 if (!parameter.hasStereotype(Bindable.class) && pathVariables.containsKey(parameterName)) {
                     UriMatchVariable var = pathVariables.get(parameterName);
                     newParameter = new Parameter();
-                    newParameter.setIn(ParameterIn.PATH.toString());
+
+                    newParameter.setIn(var.isQuery() ? ParameterIn.QUERY.toString() : ParameterIn.PATH.toString());
                     final boolean exploded = var.isExploded();
                     if (exploded) {
                         newParameter.setExplode(exploded);

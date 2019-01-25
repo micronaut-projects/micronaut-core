@@ -61,6 +61,13 @@ public class UriMatchVariable {
     }
 
     /**
+     * @return true if the variable part of a query.
+     */
+    public boolean isQuery() {
+        return operator == '?' || operator == '#' || operator == '&';
+    }
+
+    /**
      * An optional variable is one that will allow the route to match
      * if it is not present.
      *

@@ -121,10 +121,11 @@ abstract class AbstractOpenApiVisitor  {
         }
 
 
-        PathItem pathItem = paths.get(matchTemplate.toString());
+        final String pathString = matchTemplate.toPathString();
+        PathItem pathItem = paths.get(pathString);
         if (pathItem == null) {
             pathItem = new PathItem();
-            paths.put(matchTemplate.toString(), pathItem);
+            paths.put(pathString, pathItem);
         }
         return pathItem;
     }
