@@ -59,7 +59,7 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
     /**
      *
      * @param objectMapper To read and write JSON
-     * @param configuration The configuration for computing Google Metadata
+     * @param configuration Digital Ocean Metadata configuration
      */
     @Inject
     public DigitalOceanMetadataResolver(ObjectMapper objectMapper, DigitalOceanMetadataConfiguration configuration) {
@@ -112,7 +112,7 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
             }
         } catch (MalformedURLException mue) {
             if (LOG.isErrorEnabled()) {
-                LOG.error("Google compute metadataUrl value is invalid!: " + configuration.getUrl(), mue);
+                LOG.error("Digital Ocean metadataUrl value is invalid!: " + configuration.getUrl(), mue);
             }
         } catch (IOException ioe) {
             if (LOG.isErrorEnabled()) {
