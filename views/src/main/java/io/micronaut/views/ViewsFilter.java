@@ -25,6 +25,7 @@ import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.views.model.ViewsModelDecorator;
 import io.micronaut.web.router.qualifier.ProducesMediaTypeQualifier;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
@@ -32,6 +33,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -48,21 +52,25 @@ public class ViewsFilter implements HttpServerFilter {
 
     protected final Integer order;
     protected final BeanLocator beanLocator;
+    private final Collection<ViewsModelDecorator> modelDecorators;
 
     /**
      * Constructor.
      *
      * @param beanLocator The bean locator
      * @param viewsFilterOrderProvider The order provider
+     * @param modelDecorators Collection of views model decorator beans
      */
     public ViewsFilter(BeanLocator beanLocator,
-                       @Nullable ViewsFilterOrderProvider viewsFilterOrderProvider) {
+                       @Nullable ViewsFilterOrderProvider viewsFilterOrderProvider,
+                       Collection<ViewsModelDecorator> modelDecorators) {
         this.beanLocator = beanLocator;
         if (viewsFilterOrderProvider != null) {
             this.order = viewsFilterOrderProvider.getOrder();
         } else {
             this.order = 0;
         }
+        this.modelDecorators = modelDecorators;
     }
 
     @Override
@@ -96,7 +104,7 @@ public class ViewsFilter implements HttpServerFilter {
 
                             String view = optionalView.get();
                             if (viewsRenderer.exists(view)) {
-                                Object model = resolveModel(body);
+                                Object model = populateModel(body, request, viewsRenderer);
                                 Writable writable = viewsRenderer.render(view, model);
                                 response.contentType(type);
                                 ((MutableHttpResponse<Object>) response).body(writable);
@@ -116,6 +124,25 @@ public class ViewsFilter implements HttpServerFilter {
     }
 
     /**
+     * Resolves the model for the given response body and enhances the model with instances of {@link ViewsModelDecorator}.
+     * @param responseBody Response Body
+     * @param request {@link HttpRequest} being processed
+     * @param viewsRenderer The Views rendered being used to render the view
+     * @return A model with the controllers response and enhanced with the decorators.
+     */
+    protected Map<String, Object> populateModel(Object responseBody, HttpRequest request, ViewsRenderer viewsRenderer) {
+        Map<String, Object> model = new HashMap<>(viewsRenderer.modelOf(resolveModel(responseBody)));
+        for (ViewsModelDecorator modelDecorator : modelDecorators) {
+            Map<String, Object> extraModel = modelDecorator.modelForRequest(request);
+            for (String extraKey : extraModel.keySet()) {
+                model.putIfAbsent(extraKey, extraModel.get(extraKey));
+            }
+        }
+        return model;
+
+    }
+
+    /**
      * Resolves the model for the given response body. Subclasses can override to customize.
      *
      * @param responseBody Response body
@@ -128,6 +155,8 @@ public class ViewsFilter implements HttpServerFilter {
         }
         return responseBody;
     }
+
+
 
     /**
      * Resolves the view for the given method and response body. Subclasses can override to customize.

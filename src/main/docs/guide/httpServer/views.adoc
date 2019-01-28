@@ -50,6 +50,9 @@ include::{testsviews}/ViewsController.groovy[tags=clazz]
 include::{testsviews}/ViewsController.groovy[tags=modelAndView]
 ----
 
+You can also provide implementations of api:views.model.ViewsModelDecorator[] to decorate the model with
+extra properties.
+
 The following sections show different template engines integrations.
 
 To create your own implementation create a class which implements api:views.ViewRenderer[] and annotate it with api:http.annotation.Produces[@Produces] to the media types the view rendering supports producing.
