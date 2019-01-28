@@ -18,7 +18,6 @@ package io.micronaut.security.authentication;
 
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
@@ -45,8 +44,7 @@ public class AuthenticationArgumentBinder implements TypedRequestArgumentBinder<
     @Override
     public BindingResult<Authentication> bind(ArgumentConversionContext<Authentication> context, HttpRequest<?> source) {
         if (source.getAttributes().contains(OncePerRequestHttpServerFilter.getKey(SecurityFilter.class))) {
-            MutableConvertibleValues<Object> attrs = source.getAttributes();
-            Optional<Authentication> existing = attrs.get(SecurityFilter.AUTHENTICATION, Authentication.class);
+            final Optional<Authentication> existing = source.getUserPrincipal(Authentication.class);
             if (existing.isPresent()) {
                 return () -> existing;
             }
