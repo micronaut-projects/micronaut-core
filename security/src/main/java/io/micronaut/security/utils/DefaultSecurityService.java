@@ -18,7 +18,6 @@ package io.micronaut.security.utils;
 
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.security.authentication.Authentication;
-import io.micronaut.security.filters.SecurityFilter;
 
 import javax.inject.Singleton;
 import java.security.Principal;
@@ -51,7 +50,7 @@ public class DefaultSecurityService implements SecurityService {
      */
     @Override
     public Optional<Authentication> getAuthentication() {
-        return ServerRequestContext.currentRequest().flatMap(request -> request.getAttribute(SecurityFilter.AUTHENTICATION, Authentication.class));
+        return ServerRequestContext.currentRequest().flatMap(request -> request.getUserPrincipal(Authentication.class));
     }
 
 
