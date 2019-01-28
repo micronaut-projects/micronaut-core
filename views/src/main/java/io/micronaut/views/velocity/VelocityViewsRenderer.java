@@ -22,6 +22,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.views.ViewUtils;
 import io.micronaut.views.ViewsConfiguration;
 import io.micronaut.views.ViewsRenderer;
 import io.micronaut.views.exceptions.ViewRenderingException;
@@ -67,7 +68,7 @@ public class VelocityViewsRenderer implements ViewsRenderer {
         this.viewsConfiguration = viewsConfiguration;
         this.velocityConfiguration = velocityConfiguration;
         this.velocityEngine = initializeVelocityEngine();
-        this.folder = normalizeFolder(viewsConfiguration.getFolder());
+        this.folder = viewsConfiguration.getFolder();
     }
 
     @Override
@@ -104,7 +105,7 @@ public class VelocityViewsRenderer implements ViewsRenderer {
 
     private String viewName(final String name) {
         return folder +
-                normalizeFile(name, extension()) +
+                ViewUtils.normalizeFile(name, extension()) +
                 "." +
                 extension();
     }

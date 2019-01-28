@@ -25,6 +25,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.views.ViewUtils;
 import io.micronaut.views.ViewsConfiguration;
 import io.micronaut.views.ViewsRenderer;
 import io.micronaut.views.exceptions.ViewRenderingException;
@@ -32,10 +33,13 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.context.IContext;
 import org.thymeleaf.exceptions.TemplateEngineException;
+import org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
+import org.thymeleaf.templateresolver.ITemplateResolver;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Locale;
@@ -56,10 +60,8 @@ import java.util.Map;
 @Singleton
 public class ThymeleafViewsRenderer implements ViewsRenderer {
 
-    protected final ClassLoaderTemplateResolver templateResolver;
-
+    protected final AbstractConfigurableTemplateResolver templateResolver;
     protected final TemplateEngine engine;
-
     protected ResourceLoader resourceLoader;
 
     /**
@@ -67,12 +69,27 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
      * @param thConfiguration    Thymeleaf template renderer configuration
      * @param resourceLoader     The resource loader
      */
+    @Deprecated
     public ThymeleafViewsRenderer(ViewsConfiguration viewsConfiguration,
                                   ThymeleafViewsRendererConfiguration thConfiguration,
                                   ClassPathResourceLoader resourceLoader) {
         this.templateResolver = initializeTemplateResolver(viewsConfiguration, thConfiguration);
         this.resourceLoader = resourceLoader;
         this.engine = initializeTemplateEngine();
+    }
+
+    /**
+     * @param templateResolver   The template resolver
+     * @param templateEngine     The template engine
+     * @param resourceLoader     The resource loader
+     */
+    @Inject
+    public ThymeleafViewsRenderer(AbstractConfigurableTemplateResolver templateResolver,
+                                  TemplateEngine templateEngine,
+                                  ClassPathResourceLoader resourceLoader) {
+        this.templateResolver = templateResolver;
+        this.resourceLoader = resourceLoader;
+        this.engine = templateEngine;
     }
 
     @Override
@@ -130,7 +147,7 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
 
     private String viewLocation(final String name) {
         return templateResolver.getPrefix() +
-                normalizeFile(name, templateResolver.getSuffix()) +
+                ViewUtils.normalizeFile(name, templateResolver.getSuffix()) +
                 templateResolver.getSuffix();
     }
 }

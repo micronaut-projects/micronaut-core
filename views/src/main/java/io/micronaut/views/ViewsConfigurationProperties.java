@@ -19,6 +19,9 @@ package io.micronaut.views;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.StringUtils;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
 /**
  * Implementation of {@link ViewsConfiguration}. Views configuration properties.
  *
@@ -64,7 +67,7 @@ public class ViewsConfigurationProperties implements ViewsConfiguration {
      */
     @Override
     public String getFolder() {
-        return this.folder;
+        return ViewUtils.normalizeFolder(folder);
     }
 
     /**
@@ -97,4 +100,5 @@ public class ViewsConfigurationProperties implements ViewsConfiguration {
             this.folder = folder;
         }
     }
+
 }

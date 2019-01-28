@@ -18,6 +18,7 @@ package io.micronaut.views;
 
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.io.Writable;
+import io.micronaut.core.util.StringUtils;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -79,19 +80,13 @@ public interface ViewsRenderer {
      * separators that starts and ends with a "\".
      *
      * @param path The path to normalizeFile
+     * @deprecated Use {@link ViewUtils#normalizeFolder(String)} instead
      * @return The normalized path
      */
     @Nonnull
+    @Deprecated
     default String normalizeFolder(@Nullable String path) {
-        if (path == null) {
-            path = "";
-        } else {
-            path = normalizeFile(path, null);
-        }
-        if (!path.endsWith("/")) {
-            path = path + "/";
-        }
-        return path;
+        return ViewUtils.normalizeFolder(path);
     }
 
     /**
@@ -103,21 +98,12 @@ public interface ViewsRenderer {
      *
      * @param path The path to normalizeFile
      * @param extension The file extension
+     * @deprecated Use {@link ViewUtils#normalizeFile(String, String)} instead
      * @return The normalized path
      */
     @Nonnull
+    @Deprecated
     default String normalizeFile(@Nonnull String path, String extension) {
-        path = path.replace("\\", "/");
-        if (path.startsWith("/")) {
-            path = path.substring(1);
-        }
-        if (extension != null && !extension.startsWith(".")) {
-            extension = "." + extension;
-            if (path.endsWith(extension)) {
-                int idx = path.indexOf(extension);
-                path = path.substring(0, idx);
-            }
-        }
-        return path;
+        return ViewUtils.normalizeFile(path, extension);
     }
 }
