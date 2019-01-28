@@ -7,4 +7,5 @@ Micronaut {version} includes the following changes:
 === Dependency Upgrades
 
 * Kafka `2.0.0` -> `2.0.1`
-
+* Reactive Streams `1.0.1` -> `1.0.2`
+* Jackson `2.9.7` -> `2.9.8`
