@@ -16,6 +16,8 @@
 
 package io.micronaut.http.cookie;
 
+import io.micronaut.http.HttpRequest;
+
 import java.io.Serializable;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAmount;
@@ -146,5 +148,25 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
             return instance.create(name, value);
         }
         throw new UnsupportedOperationException("No CookeFactory implementation found. Server implementation does not support cookies.");
+    }
+
+    /**
+     * Construct a new Cookie for the given {@link CookieConfiguration} and value.
+     *
+     * @param request The Http Request
+     * @param configuration  The Cookie configuration
+     * @param value The cookie value
+     * @return The Cookie
+     */
+    static Cookie of(HttpRequest request, CookieConfiguration configuration, String value) {
+        Cookie cookie = of(configuration.getCookieName(), value);
+        configuration.getCookiePath().ifPresent(cookie::path);
+        configuration.getCookieDomain().ifPresent(cookie::domain);
+        configuration.getCookieMaxAge().ifPresent(cookie::maxAge);
+        configuration.isCookieHttpOnly().ifPresent(cookie::httpOnly);
+        if (request.isSecure()) {
+            configuration.isCookieSecure().ifPresent(cookie::secure);
+        }
+        return cookie;
     }
 }

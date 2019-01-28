@@ -17,25 +17,14 @@
 package io.micronaut.security.token.jwt.cookie;
 
 import io.micronaut.core.util.Toggleable;
+import io.micronaut.http.cookie.CookieConfiguration;
 
 /**
  *
  * @author Sergio del Amo
  * @since 1.0
  */
-public interface JwtCookieConfiguration extends Toggleable {
-
-    /**
-     * cookieName getter.
-     * @return a String with the Cookie Name
-     */
-    String getCookieName();
-
-    /**
-     * cookiePath getter.
-     * @return a String with the Cookie path
-     */
-    String getCookiePath();
+public interface JwtCookieConfiguration extends CookieConfiguration, Toggleable {
 
     /**
      *

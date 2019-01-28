@@ -50,8 +50,15 @@ public class CookieTenantWriter implements TenantWriter {
      */
     @Override
     public void writeTenant(MutableHttpRequest<?> request, Serializable tenant) {
+
         if (tenant instanceof String) {
-            request.cookie((Cookie.of(cookieTenantWriterConfiguration.getCookiename(), (String) tenant)));
+            Cookie cookie = Cookie.of(request, cookieTenantWriterConfiguration, (String) tenant);
+            if (cookieTenantWriterConfiguration.getCookieMaxAge().isPresent()) {
+                cookie.maxAge(cookieTenantWriterConfiguration.getCookieMaxAge().get());
+            } else {
+                cookie.maxAge(Integer.MAX_VALUE);
+            }
+            request.cookie(cookie);
         }
     }
 }

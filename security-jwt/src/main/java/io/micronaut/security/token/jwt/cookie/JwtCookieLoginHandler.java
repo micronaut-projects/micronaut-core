@@ -60,10 +60,11 @@ public class JwtCookieLoginHandler implements LoginHandler {
     public HttpResponse loginSuccess(UserDetails userDetails, HttpRequest<?> request) {
         Optional<AccessRefreshToken> accessRefreshTokenOptional = accessRefreshTokenGenerator.generate(userDetails);
         if (accessRefreshTokenOptional.isPresent()) {
-            Cookie cookie = Cookie.of(jwtCookieConfiguration.getCookieName(), accessRefreshTokenOptional.get().getAccessToken());
-            cookie.path(jwtCookieConfiguration.getCookiePath());
-            cookie.maxAge(jwtGeneratorConfiguration.getAccessTokenExpiration());
-            cookie.httpOnly(true).secure(request.isSecure());
+
+            Cookie cookie = Cookie.of(request, jwtCookieConfiguration, accessRefreshTokenOptional.get().getAccessToken());
+            if (!jwtCookieConfiguration.getCookieMaxAge().isPresent()) {
+                cookie.maxAge(jwtGeneratorConfiguration.getAccessTokenExpiration());
+            }
             try {
                 URI location = new URI(jwtCookieConfiguration.getLoginSuccessTargetUrl());
                 return HttpResponse.seeOther(location).cookie(cookie);
