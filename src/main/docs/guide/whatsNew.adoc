@@ -17,6 +17,9 @@ Micronaut is now modular with parts of Micronaut being shifted into subprojects.
 * https://micronaut-projects.github.io/micronaut-test/latest/guide/index.html[Micronaut Test]
 * https://micronaut-projects.github.io/micronaut-netflix/latest/guide/index.html[Micronaut Netflix]
 
+=== GraalVM 1.0 RC11 Support
+
+The GraalVM support has been updated to accomodate the latest changes in https://github.com/oracle/graal/releases/tag/vm-1.0.0-rc11[GraalVM 1.0.0 RC11].
 
 === Dependency Upgrades
 
