@@ -1,3 +1,5 @@
+== When The Context Starts
+
 If you wish for a particular method to be invoked when a bean is constructed then you can use the `javax.annotation.PostConstruct` annotation:
 
 [source,groovy]
@@ -10,3 +12,30 @@ include::{testsdir}/lifecycle/V8Engine.groovy[tags=class, indent=0]
 <1> The `PostConstruct` annotation is imported
 <2> A field is defined that requires initialization
 <3> A method is annotated with `@PostConstruct` and will be invoked once the object is constructed and fully injected.
+
+== When The Context Closes
+
+If you wish for a particular method to be invoked when the context is closed then you can use the `javax.annotation.PreDestroy` annotation:
+
+[source,groovy]
+----
+include::{testsdir}/lifecycle/PreDestroyBean.groovy[tags=class, indent=0]
+----
+
+<1> The `PreDestroy` annotation is imported
+<2> A method is annotated with `@PreDestroy` and will be invoked when the context is closed.
+
+For factory beans, the `preDestroy` value in the api:context.annotation.Bean[] annotation can be used to tell Micronaut which method to invoke.
+
+[source,groovy]
+----
+include::{testsdir}/lifecycle/ConnectionFactory.groovy[tags=class, indent=0]
+
+include::{testsdir}/lifecycle/Connection.groovy[tags=class, indent=0]
+----
+
+<1> The `preDestroy` value is set on the annotation
+<2> The annotation value matches the method name
+
+
+NOTE: Just simply implementing the Closeable or AutoCloseable interfaces is not enough to get a bean to close with the context. One of the above methods must be used.

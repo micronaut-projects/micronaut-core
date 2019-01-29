@@ -30,12 +30,12 @@ class VehicleSpec extends Specification {
         Vehicle vehicle = new DefaultBeanContext()
                 .start()
                 .getBean(Vehicle)
-        println( vehicle.start() )
+
+        println vehicle.start()
         // end::start[]
 
         then:
         vehicle.engine instanceof V8Engine
         ((V8Engine)vehicle.engine).initialized
-        vehicle.start() == "Starting V8"
     }
 }
