@@ -16,6 +16,7 @@
 
 package io.micronaut.security.filters;
 
+import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
@@ -53,7 +54,7 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
     /**
      * The attribute used to store the authentication object in the request.
      */
-    public static final CharSequence AUTHENTICATION = "micronaut.AUTHENTICATION";
+    public static final CharSequence AUTHENTICATION = HttpAttributes.PRINCIPAL;
 
     /**
      * The attribute used to store a valid token in the request.

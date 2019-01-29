@@ -57,7 +57,11 @@ public class Publishers {
             Optional<Class> aClass = ClassUtils.forName(name, classLoader);
             aClass.ifPresent(Publishers.REACTIVE_TYPES::add);
         }
-        for (String name : Arrays.asList("io.reactivex.Single", "reactor.core.publisher.Mono", "io.reactivex.Maybe")) {
+        for (String name : Arrays.asList(
+                "io.reactivex.Single",
+                "reactor.core.publisher.Mono",
+                "io.reactivex.Maybe",
+                "io.reactivex.Completable")) {
             Optional<Class> aClass = ClassUtils.forName(name, classLoader);
             aClass.ifPresent(aClass1 -> {
                 Publishers.SINGLE_TYPES.add(aClass1);

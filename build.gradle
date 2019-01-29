@@ -116,6 +116,16 @@ ext {
                     name:'micronaut-runtime-groovy',
                     modules:['micronaut-function-groovy']
             ],
+            'micronaut.aws': [
+                    version:micronautAwsVersion,
+                    group:'io.micronaut.configuration',
+                    name:'micronaut-aws-common'
+            ],
+            'micronaut.function.aws': [
+                    version:micronautAwsVersion,
+                    group:'io.micronaut',
+                    name:'micronaut-function-aws'
+            ],
             'micronaut.gorm': [
                     version:micronautGroovyVersion,
                     group:'io.micronaut.configuration',

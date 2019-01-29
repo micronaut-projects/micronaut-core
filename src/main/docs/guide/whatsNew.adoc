@@ -52,14 +52,13 @@ class CacheFactory {
 
 ----
 
-=== Dependency Upgrades
-
-* Kafka `2.0.0` -> `2.0.1`
-
 === Micrometer 1.1 and @Timed Support
 
 Micrometer has been upgraded to 1.1 and support for https://micrometer.io/docs/concepts#_the_code_timed_code_annotation[@Timed] AOP advice added.
 
 === Dependency Upgrades
 
+- Kafka `2.0.1` -> `2.1.0`
 - Micrometer `1.0.6` -> `1.1.1`
+- Reactive Streams `1.0.1` -> `1.0.2`
+- Jackson `2.9.7` -> `2.9.8`

@@ -50,11 +50,9 @@ public class PrincipalTenantResolver implements TenantResolver {
      * @throws TenantNotFoundException if tenant not found
      */
     protected Serializable resolveTenantIdentifierAtRequest(HttpRequest<Object> request) throws TenantNotFoundException {
-        return request.getAttribute(SecurityFilter.AUTHENTICATION).map(objAuthentication -> {
-           if (objAuthentication instanceof Principal) {
-               return ((Principal) objAuthentication).getName();
-           }
-           throw new TenantNotFoundException("Tenant could not be resolved because authentication object is not java.security.Principal");
-        }).orElseThrow(() -> new TenantNotFoundException("Tenant could not be resolved because " + SecurityFilter.AUTHENTICATION + " attribute was not found"));
+        return request.getUserPrincipal().map(Principal::getName)
+                      .orElseThrow(() ->
+                              new TenantNotFoundException("Tenant could not be resolved because " + SecurityFilter.AUTHENTICATION + " attribute was not found")
+                      );
     }
 }
