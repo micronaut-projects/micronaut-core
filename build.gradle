@@ -110,6 +110,11 @@ ext {
                     name:'micronaut-kafka',
                     modules:['micronaut-kafka-streams']
             ],
+            'micronaut.rabbitmq': [
+                    version:micronautRabbitMQVersion,
+                    group:'io.micronaut.configuration',
+                    name:'micronaut-rabbitmq'
+            ],
             'micronaut.groovy': [
                     version:micronautGroovyVersion,
                     group:'io.micronaut',
