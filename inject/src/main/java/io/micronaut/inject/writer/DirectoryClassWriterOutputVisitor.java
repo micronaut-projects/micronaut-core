@@ -19,9 +19,9 @@ package io.micronaut.inject.writer;
 import io.micronaut.core.annotation.Internal;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import java.util.Optional;
 
 /**
@@ -49,7 +49,7 @@ public class DirectoryClassWriterOutputVisitor extends AbstractClassWriterOutput
         if (!parentDir.exists() && !parentDir.mkdirs()) {
             throw new IOException("Cannot create parent directory: " + targetFile.getParentFile());
         }
-        return new FileOutputStream(targetFile);
+        return Files.newOutputStream(targetFile.toPath());
     }
 
     @Override

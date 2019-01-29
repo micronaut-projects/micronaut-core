@@ -30,7 +30,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -188,7 +187,7 @@ public class SpringIOUtils {
         for (Resource resource : resources) {
             final InputStream input = resource.getInputStream();
             final File target = new File(targetDir, resource.getURL().toString().substring(baseUrl.toString().length()));
-            copy(new BufferedInputStream(input), new BufferedOutputStream(new FileOutputStream(target)));
+            copy(new BufferedInputStream(input), new BufferedOutputStream(Files.newOutputStream(target.toPath())));
         }
     }
 
@@ -204,7 +203,7 @@ public class SpringIOUtils {
         assert in != null : "No input File specified";
         assert out != null : "No output File specified";
         return copy(new BufferedInputStream(Files.newInputStream(in.toPath())),
-            new BufferedOutputStream(new FileOutputStream(out)));
+            new BufferedOutputStream(Files.newOutputStream(out.toPath())));
     }
 
     /**
@@ -219,7 +218,7 @@ public class SpringIOUtils {
         assert in != null : "No input File specified";
         assert out != null : "No output File specified";
         return copy(new BufferedInputStream(in.getInputStream()),
-            new BufferedOutputStream(new FileOutputStream(out)));
+            new BufferedOutputStream(Files.newOutputStream(out.toPath())));
     }
 
     /**
@@ -233,7 +232,7 @@ public class SpringIOUtils {
         assert in != null : "No input byte array specified";
         assert out != null : "No output File specified";
         ByteArrayInputStream inStream = new ByteArrayInputStream(in);
-        OutputStream outStream = new BufferedOutputStream(new FileOutputStream(out));
+        OutputStream outStream = new BufferedOutputStream(Files.newOutputStream(out.toPath()));
         copy(inStream, outStream);
     }
 
