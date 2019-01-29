@@ -38,8 +38,9 @@ public class AWSParameterStoreConfiguration extends AWSClientConfiguration imple
      * Constant for whether AWS parameter store is enabled or not.
      */
     public static final String ENABLED = "aws.client.system-manager.parameterstore.enabled";
+
     /**
-     * The perfix for configuration.
+     * The prefix for configuration.
      */
     public static final String CONFIGURATION_PREFIX = "system-manager.parameterstore";
 
