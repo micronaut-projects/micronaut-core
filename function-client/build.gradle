@@ -1,13 +1,13 @@
 dependencies {
     compile project(":function")
     compile project(":http-client")
-    compile project(":configurations:aws-common")
+    compile dependencyVersion("micronaut.aws")
     compileOnly project(":inject-java")
-    compileOnly project(":function-aws")
+    compileOnly dependencyVersion("micronaut.function.aws")
     compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-lambda', version: '1.11.285'
 
     testCompile project(":http-server-netty")
-    testCompile project(":function-aws")
+    testCompile dependencyVersion("micronaut.function.aws")
     testCompile project(":function-web")
     testCompile dependencyModuleVersion("micronaut.groovy","micronaut-function-groovy"), {
         exclude module:'micronaut-function'
