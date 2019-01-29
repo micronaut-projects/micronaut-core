@@ -54,18 +54,14 @@ public class SecurityViewsModelDecorator implements ViewsModelDecorator {
         this.securityService = securityService;
     }
 
-    @Nonnull
     @Override
-    public Map<String, Object> modelForRequest(HttpRequest request) {
+    public void decorateModel(@Nonnull Map<String, Object> model, @Nonnull HttpRequest request) {
         Optional<Authentication> authentication = securityService.getAuthentication();
-        if (!authentication.isPresent()) {
-            return new HashMap<>();
+        if (authentication.isPresent()) {
+            Map<String, Object> securityModel = new HashMap<>();
+            securityModel.put(securityViewsModelDecoratorConfiguration.getPrincipalNameKey(), authentication.get().getName());
+            securityModel.put(securityViewsModelDecoratorConfiguration.getAttributesKey(), authentication.get());
+            model.putIfAbsent(securityViewsModelDecoratorConfiguration.getSecurityKey(), securityModel);
         }
-        Map<String, Object> model = new HashMap<>();
-        Map<String, Object> securityModel = new HashMap<>();
-        securityModel.put(securityViewsModelDecoratorConfiguration.getPrincipalNameKey(), authentication.get().getName());
-        securityModel.put(securityViewsModelDecoratorConfiguration.getAttributesKey(), authentication.get());
-        model.put(securityViewsModelDecoratorConfiguration.getSecurityKey(), securityModel);
-        return model;
     }
 }

@@ -30,10 +30,8 @@ import java.util.Map;
 public interface ViewsModelDecorator {
 
     /**
-     *
+     * @param model Model being processed
      * @param request The request being processed
-     * @return An extra map which is appended to the model being rendered.
      */
-    @Nonnull
-    Map<String, Object> modelForRequest(HttpRequest request);
+    void decorateModel(@Nonnull Map<String, Object> model, @Nonnull HttpRequest request);
 }

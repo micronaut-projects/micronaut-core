@@ -133,10 +133,7 @@ public class ViewsFilter implements HttpServerFilter {
     protected Map<String, Object> populateModel(Object responseBody, HttpRequest request, ViewsRenderer viewsRenderer) {
         Map<String, Object> model = new HashMap<>(viewsRenderer.modelOf(resolveModel(responseBody)));
         for (ViewsModelDecorator modelDecorator : modelDecorators) {
-            Map<String, Object> extraModel = modelDecorator.modelForRequest(request);
-            for (String extraKey : extraModel.keySet()) {
-                model.putIfAbsent(extraKey, extraModel.get(extraKey));
-            }
+            modelDecorator.decorateModel(model, request);
         }
         return model;
 
