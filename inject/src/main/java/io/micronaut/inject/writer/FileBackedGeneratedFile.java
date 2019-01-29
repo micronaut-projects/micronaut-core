@@ -19,7 +19,6 @@ package io.micronaut.inject.writer;
 import io.micronaut.core.annotation.Internal;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -61,7 +60,7 @@ class FileBackedGeneratedFile implements GeneratedFile {
     @Override
     public InputStream openInputStream() throws IOException {
         file.getParentFile().mkdirs();
-        return new FileInputStream(file);
+        return Files.newInputStream(file.toPath());
     }
 
     @Override

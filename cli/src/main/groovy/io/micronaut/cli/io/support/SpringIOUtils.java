@@ -30,7 +30,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -40,6 +39,7 @@ import java.io.StringWriter;
 import java.io.Writer;
 import java.lang.reflect.Array;
 import java.net.URL;
+import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
@@ -118,7 +118,7 @@ public class SpringIOUtils {
     }
 
     private static byte[] compute(File f, String algorithm) throws IOException {
-        InputStream is = new FileInputStream(f);
+        InputStream is = Files.newInputStream(f.toPath());
 
         try {
             MessageDigest md = getMessageDigest(algorithm);
@@ -203,7 +203,7 @@ public class SpringIOUtils {
     public static int copy(File in, File out) throws IOException {
         assert in != null : "No input File specified";
         assert out != null : "No output File specified";
-        return copy(new BufferedInputStream(new FileInputStream(in)),
+        return copy(new BufferedInputStream(Files.newInputStream(in.toPath())),
             new BufferedOutputStream(new FileOutputStream(out)));
     }
 
@@ -247,7 +247,7 @@ public class SpringIOUtils {
     public static byte[] copyToByteArray(File in) throws IOException {
         assert in != null : "No input File specified";
 
-        return copyToByteArray(new BufferedInputStream(new FileInputStream(in)));
+        return copyToByteArray(new BufferedInputStream(Files.newInputStream(in.toPath())));
     }
 
     //---------------------------------------------------------------------
