@@ -1,8 +1,22 @@
 Micronaut {version} includes the following changes:
 
-* https://github.com/micronaut-projects/micronaut-core/issues?q=is%3Aissue+milestone%3A1.0.3+is%3Aclosed+label%3A%22type%3A+bug%22[Issues Resolved]
-* https://github.com/micronaut-projects/micronaut-core/issues?utf8=✓&q=is%3Aissue+milestone%3A1.0.3+is%3Aclosed+label%3A%22type%3A+improvement%22+[Improvements]
-//* https://github.com/micronaut-projects/micronaut-core/issues?utf8=✓&q=is%3Aissue+milestone%3A1.0.3+is%3Aclosed+label%3A%22type%3A+enhancement%22+[Enhancements]
+* https://github.com/micronaut-projects/micronaut-core/issues?q=is%3Aissue+milestone%3A1.0.4+is%3Aclosed+label%3A%22type%3A+bug%22[Issues Resolved]
+* https://github.com/micronaut-projects/micronaut-core/issues?utf8=✓&q=is%3Aissue+milestone%3A1.0.4+is%3Aclosed+label%3A%22type%3A+improvement%22+[Improvements]
+//* https://github.com/micronaut-projects/micronaut-core/issues?utf8=✓&q=is%3Aissue+milestone%3A1.0.4+is%3Aclosed+label%3A%22type%3A+enhancement%22+[Enhancements]
+
+=== Modularization
+
+Micronaut is now modular with parts of Micronaut being shifted into subprojects. See the following links for new subprojects that now have indepent release cycles outside of Micronaut core:
+
+* https://micronaut-projects.github.io/micronaut-kafka/latest/guide/index.html[Micronaut Kafka]
+* https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/index.html[Micronaut Micrometer]
+* https://micronaut-projects.github.io/micronaut-groovy/latest/guide/index.html[Micronaut Groovy]
+* https://micronaut-projects.github.io/micronaut-sql/latest/guide/index.html[Micronaut SQL]
+* https://micronaut-projects.github.io/micronaut-mongodb/latest/guide/index.html[Micronaut MongoDB]
+* https://micronaut-projects.github.io/micronaut-redis/latest/guide/index.html[Micronaut Redis]
+* https://micronaut-projects.github.io/micronaut-test/latest/guide/index.html[Micronaut Test]
+* https://micronaut-projects.github.io/micronaut-netflix/latest/guide/index.html[Micronaut Netflix]
+
 
 === Dependency Upgrades
 
