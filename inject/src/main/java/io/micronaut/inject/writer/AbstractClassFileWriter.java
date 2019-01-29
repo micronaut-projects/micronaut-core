@@ -28,9 +28,9 @@ import org.objectweb.asm.commons.Method;
 
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Files;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
@@ -519,7 +519,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             File targetFile = new File(targetDir, fileName);
             targetFile.getParentFile().mkdirs();
 
-            try (FileOutputStream outputStream = new FileOutputStream(targetFile)) {
+            try (OutputStream outputStream = Files.newOutputStream(targetFile.toPath())) {
                 writeClassToDisk(outputStream, classWriter);
             }
         }

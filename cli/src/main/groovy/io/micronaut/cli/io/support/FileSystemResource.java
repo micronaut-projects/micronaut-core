@@ -17,7 +17,6 @@
 package io.micronaut.cli.io.support;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -193,7 +192,7 @@ public class FileSystemResource implements Resource {
      * @see java.io.FileOutputStream
      */
     public OutputStream getOutputStream() throws IOException {
-        return new FileOutputStream(file);
+        return Files.newOutputStream(file.toPath());
     }
 
     /**
