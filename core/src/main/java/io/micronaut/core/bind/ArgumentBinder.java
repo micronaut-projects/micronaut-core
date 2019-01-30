@@ -88,9 +88,8 @@ public interface ArgumentBinder<T, S> {
         /**
          * @return The {@link ConversionError} instances that occurred
          */
-        @SuppressWarnings("unchecked")
         default List<ConversionError> getConversionErrors() {
-            return Collections.EMPTY_LIST;
+            return Collections.emptyList();
         }
 
         /**
