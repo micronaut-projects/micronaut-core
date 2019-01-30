@@ -54,25 +54,25 @@ public class ViewsFilter implements HttpServerFilter {
 
     protected final Integer order;
     protected final BeanLocator beanLocator;
-    private final Collection<ViewModelProcessor> modelDecorators;
+    private final Collection<ViewModelProcessor> viewModelProcessors;
 
     /**
      * Constructor.
      *
      * @param beanLocator The bean locator
      * @param viewsFilterOrderProvider The order provider
-     * @param modelDecorators Collection of views model decorator beans
+     * @param viewModelProcessors Collection of views model decorator beans
      */
     public ViewsFilter(BeanLocator beanLocator,
                        @Nullable ViewsFilterOrderProvider viewsFilterOrderProvider,
-                       Collection<ViewModelProcessor> modelDecorators) {
+                       Collection<ViewModelProcessor> viewModelProcessors) {
         this.beanLocator = beanLocator;
         if (viewsFilterOrderProvider != null) {
             this.order = viewsFilterOrderProvider.getOrder();
         } else {
             this.order = 0;
         }
-        this.modelDecorators = modelDecorators;
+        this.viewModelProcessors = viewModelProcessors;
     }
 
     /**
@@ -91,7 +91,7 @@ public class ViewsFilter implements HttpServerFilter {
         } else {
             this.order = 0;
         }
-        this.modelDecorators = new ArrayList<>();
+        this.viewModelProcessors = new ArrayList<>();
     }
 
     @Override
@@ -123,16 +123,9 @@ public class ViewsFilter implements HttpServerFilter {
                         if (optionalViewsRenderer.isPresent()) {
                             ViewsRenderer viewsRenderer = optionalViewsRenderer.get();
                             Map<String, Object> model = populateModel(request, viewsRenderer, body);
-                            ModelAndView<Map<String, Object>> modelAndView = new ModelAndView<>(
+                            ModelAndView<Map<String, Object>> modelAndView = processModelAndView(request,
                                     optionalView.get(),
-                                    model
-                            );
-                            if (CollectionUtils.isNotEmpty(modelDecorators)) {
-                                for (ViewModelProcessor modelDecorator : modelDecorators) {
-                                    modelDecorator.process(request, modelAndView);
-                                }
-                            }
-
+                                    model);
                             model = modelAndView.getModel().orElse(model);
                             String view = modelAndView.getView().orElse(optionalView.get());
                             if (viewsRenderer.exists(view)) {
@@ -153,6 +146,26 @@ public class ViewsFilter implements HttpServerFilter {
 
                 return Flowable.just(response);
             });
+    }
+
+    /**
+     *
+     * @param request The HTTP Request being processed
+     * @param view The resolved View.
+     * @param model The Model returned
+     * @return A {@link ModelAndView} after being processed by the available {@link ViewModelProcessor}s.
+     */
+    protected ModelAndView<Map<String, Object>> processModelAndView(HttpRequest request, String view, Map<String, Object> model) {
+        ModelAndView<Map<String, Object>> modelAndView = new ModelAndView<>(
+                view,
+                model
+        );
+        if (CollectionUtils.isNotEmpty(viewModelProcessors)) {
+            for (ViewModelProcessor modelDecorator : viewModelProcessors) {
+                modelDecorator.process(request, modelAndView);
+            }
+        }
+        return modelAndView;
     }
 
     /**
