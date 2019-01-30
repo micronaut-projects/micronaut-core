@@ -15,9 +15,9 @@ public class UriTemplateTest {
         UriMatchTemplate template = UriMatchTemplate.of("/hello/{name}");
 
         assertTrue(template.match("/hello/John").isPresent()); // <1>
-        assertEquals(template.expand(  // <2>
+        assertEquals("/hello/John", template.expand(  // <2>
                 Collections.singletonMap("name", "John")
-        ), "/hello/John");
+        ));
         // end::match[]
     }
 }
