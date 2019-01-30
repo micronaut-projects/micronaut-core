@@ -33,7 +33,7 @@ class GradleBuildTokens extends BuildTokens {
             compile: 'compile',
             runtime: 'runtime',
             testCompile: 'testCompile',
-            provided: 'runtimeOnly'
+            provided: 'developmentOnly'
     ]
 
     Map getTokens(Profile profile, List<Feature> features) {
