@@ -46,7 +46,7 @@ ext {
 
     dependencyVersions = [
             groovy                     : [
-                    version: groovyVersion,
+                    version: groovyVersion + ':indy',
                     group  : 'org.codehaus.groovy',
                     name   : 'groovy',
                     modules: ['groovy-test', 'groovy-ant', 'groovy-json', 'groovy-jmx', 'groovy-templates']
@@ -465,7 +465,8 @@ subprojects { Project subproject ->
         targetCompatibility = '1.8'
         compileJava.options.compilerArgs.add '-parameters'
         compileTestJava.options.compilerArgs.add '-parameters'
-
+        compileGroovy.groovyOptions.optimizationOptions.indy = true
+        compileTestGroovy.groovyOptions.optimizationOptions.indy = true
         if (
         !subproject.name.startsWith('test-') &&
                 !subproject.toString().contains('build-projects')
@@ -540,8 +541,8 @@ subprojects { Project subproject ->
     def isDocumented = subproject.name != 'inject' && subproject.name != 'core' && subproject.name != 'aop' && !subproject.name.contains('asciidoc-config-props')
 
     dependencies {
-        documentation "org.codehaus.groovy:groovy-templates:$groovyVersion"
-        documentation "org.codehaus.groovy:groovy-dateutil:$groovyVersion"
+        documentation "org.codehaus.groovy:groovy-templates:$groovyVersion:indy"
+        documentation "org.codehaus.groovy:groovy-dateutil:$groovyVersion:indy"
         if (subproject.name != "bom") {
             compile dependencyVersion("slf4j")
         }
@@ -560,7 +561,7 @@ subprojects { Project subproject ->
         testCompile "org.objenesis:objenesis:1.4"
 
         testRuntime "ch.qos.logback:logback-classic:1.2.3"
-        testCompile "org.codehaus.groovy:groovy-test:$groovyVersion"
+        testCompile "org.codehaus.groovy:groovy-test:$groovyVersion:indy"
         compileOnly "org.ow2.asm:asm:$asmVersion"
         compileOnly "org.ow2.asm:asm-commons:$asmVersion"
 
