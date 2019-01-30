@@ -16,13 +16,14 @@
 package io.micronaut.inject.configproperties;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import org.hibernate.validator.constraints.NotBlank;
 
 import javax.validation.constraints.NotNull;
+import javax.validation.constraints.NotBlank;
 import java.net.URL;
 
 @ConfigurationProperties("foo.bar")
 public class ValidatedConfig {
+
     @NotNull
     URL url;
 

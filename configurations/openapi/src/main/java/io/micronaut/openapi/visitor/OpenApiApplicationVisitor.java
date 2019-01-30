@@ -58,7 +58,7 @@ public class OpenApiApplicationVisitor extends AbstractOpenApiVisitor implements
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
-        context.info("Generating OpenAPI Documentation");
+        context.info("Generating OpenAPI Documentation", element);
         Optional<OpenAPI> attr = context.get(ATTR_OPENAPI, OpenAPI.class);
         OpenAPI openAPI = readOpenAPI(element, context);
         if (attr.isPresent()) {
@@ -160,7 +160,7 @@ public class OpenApiApplicationVisitor extends AbstractOpenApiVisitor implements
                 String property = System.getProperty(MICRONAUT_OPENAPI_TARGET_FILE);
                 if (StringUtils.isNotEmpty(property)) {
                     File f = new File(property);
-                    visitorContext.info("Writing OpenAPI YAML to destination: " + f);
+                    visitorContext.info("Writing OpenAPI YAML to destination: " + f, classElement);
                     try {
                         f.getParentFile().mkdirs();
                         yamlMapper.writeValue(f, openAPI);
@@ -183,7 +183,7 @@ public class OpenApiApplicationVisitor extends AbstractOpenApiVisitor implements
                     if (generatedFile.isPresent()) {
                         GeneratedFile f = generatedFile.get();
                         try {
-                            visitorContext.info("Writing OpenAPI YAML to destination: " + f.toURI());
+                            visitorContext.info("Writing OpenAPI YAML to destination: " + f.toURI(), classElement);
                             Writer writer = f.openWriter();
                             yamlMapper.writeValue(writer, openAPI);
                         } catch (Exception e) {
