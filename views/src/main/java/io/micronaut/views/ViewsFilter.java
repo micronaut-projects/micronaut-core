@@ -20,11 +20,13 @@ import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.io.Writable;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.*;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
+import io.micronaut.views.model.ViewModelProcessor;
 import io.micronaut.web.router.qualifier.ProducesMediaTypeQualifier;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
@@ -32,6 +34,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -48,13 +54,35 @@ public class ViewsFilter implements HttpServerFilter {
 
     protected final Integer order;
     protected final BeanLocator beanLocator;
+    private final Collection<ViewModelProcessor> viewModelProcessors;
 
     /**
      * Constructor.
      *
      * @param beanLocator The bean locator
      * @param viewsFilterOrderProvider The order provider
+     * @param viewModelProcessors Collection of views model decorator beans
      */
+    public ViewsFilter(BeanLocator beanLocator,
+                       @Nullable ViewsFilterOrderProvider viewsFilterOrderProvider,
+                       Collection<ViewModelProcessor> viewModelProcessors) {
+        this.beanLocator = beanLocator;
+        if (viewsFilterOrderProvider != null) {
+            this.order = viewsFilterOrderProvider.getOrder();
+        } else {
+            this.order = 0;
+        }
+        this.viewModelProcessors = viewModelProcessors;
+    }
+
+    /**
+     * Constructor.
+     * @deprecated Use {@link ViewsFilter#ViewsFilter(BeanLocator, ViewsFilterOrderProvider, Collection)} instead.
+     *
+     * @param beanLocator The bean locator
+     * @param viewsFilterOrderProvider The order provider
+     */
+    @Deprecated
     public ViewsFilter(BeanLocator beanLocator,
                        @Nullable ViewsFilterOrderProvider viewsFilterOrderProvider) {
         this.beanLocator = beanLocator;
@@ -63,6 +91,7 @@ public class ViewsFilter implements HttpServerFilter {
         } else {
             this.order = 0;
         }
+        this.viewModelProcessors = new ArrayList<>();
     }
 
     @Override
@@ -93,10 +122,14 @@ public class ViewsFilter implements HttpServerFilter {
 
                         if (optionalViewsRenderer.isPresent()) {
                             ViewsRenderer viewsRenderer = optionalViewsRenderer.get();
-
-                            String view = optionalView.get();
+                            Map<String, Object> model = populateModel(request, viewsRenderer, body);
+                            ModelAndView<Map<String, Object>> modelAndView = processModelAndView(request,
+                                    optionalView.get(),
+                                    model);
+                            model = modelAndView.getModel().orElse(model);
+                            String view = modelAndView.getView().orElse(optionalView.get());
                             if (viewsRenderer.exists(view)) {
-                                Object model = resolveModel(body);
+
                                 Writable writable = viewsRenderer.render(view, model);
                                 response.contentType(type);
                                 ((MutableHttpResponse<Object>) response).body(writable);
@@ -116,6 +149,37 @@ public class ViewsFilter implements HttpServerFilter {
     }
 
     /**
+     *
+     * @param request The HTTP Request being processed
+     * @param view The resolved View.
+     * @param model The Model returned
+     * @return A {@link ModelAndView} after being processed by the available {@link ViewModelProcessor}s.
+     */
+    protected ModelAndView<Map<String, Object>> processModelAndView(HttpRequest request, String view, Map<String, Object> model) {
+        ModelAndView<Map<String, Object>> modelAndView = new ModelAndView<>(
+                view,
+                model
+        );
+        if (CollectionUtils.isNotEmpty(viewModelProcessors)) {
+            for (ViewModelProcessor modelDecorator : viewModelProcessors) {
+                modelDecorator.process(request, modelAndView);
+            }
+        }
+        return modelAndView;
+    }
+
+    /**
+     * Resolves the model for the given response body and enhances the model with instances of {@link ViewModelProcessor}.
+     * @param request {@link HttpRequest} being processed
+     * @param viewsRenderer The Views rendered being used to render the view
+     * @param responseBody Response Body
+     * @return A model with the controllers response and enhanced with the decorators.
+     */
+    protected Map<String, Object> populateModel(HttpRequest request, ViewsRenderer viewsRenderer, Object responseBody) {
+        return new HashMap<>(viewsRenderer.modelOf(resolveModel(responseBody)));
+    }
+
+    /**
      * Resolves the model for the given response body. Subclasses can override to customize.
      *
      * @param responseBody Response body
@@ -128,6 +192,8 @@ public class ViewsFilter implements HttpServerFilter {
         }
         return responseBody;
     }
+
+
 
     /**
      * Resolves the view for the given method and response body. Subclasses can override to customize.
