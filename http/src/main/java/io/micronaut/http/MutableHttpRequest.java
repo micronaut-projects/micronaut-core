@@ -67,7 +67,7 @@ public interface MutableHttpRequest<B> extends HttpRequest<B>, MutableHttpMessag
      */
     default MutableHttpRequest<B> accept(MediaType... mediaTypes) {
         if (ArrayUtils.isNotEmpty(mediaTypes)) {
-            String acceptString = Arrays.stream(mediaTypes).collect(Collectors.joining(","));
+            String acceptString = String.join(",", mediaTypes);
             header(HttpHeaders.ACCEPT, acceptString);
         }
         return this;

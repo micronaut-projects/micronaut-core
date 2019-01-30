@@ -107,7 +107,6 @@ public class MicronautBeanProcessor implements BeanFactoryPostProcessor, Disposa
         micronautContext.start();
 
         micronautBeanQualifierTypes
-                .stream()
                 .forEach(micronautBeanQualifierType -> {
             Qualifier<Object> micronautBeanQualifier;
             if (micronautBeanQualifierType.isAnnotation()) {
@@ -116,7 +115,6 @@ public class MicronautBeanProcessor implements BeanFactoryPostProcessor, Disposa
                 micronautBeanQualifier = Qualifiers.byType(micronautBeanQualifierType);
             }
             micronautContext.getBeanDefinitions(micronautBeanQualifier)
-                    .stream()
                     .forEach(definition -> {
                         final BeanDefinitionBuilder beanDefinitionBuilder = BeanDefinitionBuilder
                                 .rootBeanDefinition(MicronautSpringBeanFactory.class.getName());
