@@ -2091,7 +2091,7 @@ public class DefaultBeanContext implements BeanContext {
                             if (LOG.isTraceEnabled()) {
 
                                 if (registeredQualifier != null) {
-                                    LOG.trace("Found existing bean for type {} {}: {} ", beanType.getName(), instance);
+                                    LOG.trace("Found existing bean for type {}: {} ", beanType.getName(), instance);
                                 } else {
                                     LOG.trace("Found existing bean for type {}: {} ", beanType.getName(), instance);
                                 }
