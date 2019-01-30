@@ -20,6 +20,7 @@ public interface ThrowingSupplier<T, E extends Throwable> {
     /**
      * Gets a result.
      *
+     * @throws E the type of exception that can be thrown
      * @return a result
      */
     T get() throws E;

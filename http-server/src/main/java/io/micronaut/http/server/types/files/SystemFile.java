@@ -35,11 +35,18 @@ public class SystemFile implements FileCustomizableResponseType {
     private final MediaType mediaType;
     private String attachmentName;
 
+    /**
+     * @param file The file to respond with
+     */
     public SystemFile(File file) {
         this.file = file;
         this.mediaType = MediaType.forFilename(file.getName());
     }
 
+    /**
+     * @param file The file to respond with
+     * @param mediaType The content type of the response
+     */
     public SystemFile(File file, MediaType mediaType) {
         this.file = file;
         this.mediaType = mediaType;

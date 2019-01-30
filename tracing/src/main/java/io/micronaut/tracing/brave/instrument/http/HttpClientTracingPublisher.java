@@ -22,7 +22,6 @@ import brave.Tracing;
 import brave.http.HttpClientHandler;
 import brave.http.HttpTracing;
 import brave.propagation.TraceContext;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.*;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.tracing.instrument.http.AbstractOpenTracingFilter;

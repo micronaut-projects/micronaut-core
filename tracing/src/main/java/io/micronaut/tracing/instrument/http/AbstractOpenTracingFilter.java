@@ -16,7 +16,6 @@
 
 package io.micronaut.tracing.instrument.http;
 
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.*;
 import io.micronaut.http.filter.HttpFilter;
 import io.opentracing.Span;

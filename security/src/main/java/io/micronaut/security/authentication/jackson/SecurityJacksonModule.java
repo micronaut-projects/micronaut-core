@@ -40,6 +40,9 @@ public class SecurityJacksonModule extends SimpleModule {
         super("micronaut.security");
     }
 
+    /**
+     * Customizes the module.
+     */
     @PostConstruct
     protected void customize() {
         SimpleAbstractTypeResolver resolver = new SimpleAbstractTypeResolver();
