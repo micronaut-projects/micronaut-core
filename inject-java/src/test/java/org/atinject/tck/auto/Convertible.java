@@ -194,7 +194,7 @@ public class Convertible implements Car {
         }
 
         public void testProviderReturnedValues() {
-            assertTrue(engine != null);
+            assertNotNull(engine);
         }
 
         // injecting different kinds of members
