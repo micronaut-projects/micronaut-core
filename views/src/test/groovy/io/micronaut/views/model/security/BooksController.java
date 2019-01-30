@@ -10,7 +10,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-@Requires(property = "spec.name", value = "SecurityViewsModelDecoratorSpec")
+@Requires(property = "spec.name", value = "SecurityViewModelProcessorSpec")
 //tag::class[]
 @Controller("/")
 public class BooksController {

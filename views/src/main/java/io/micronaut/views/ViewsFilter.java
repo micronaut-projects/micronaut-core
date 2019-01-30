@@ -20,12 +20,13 @@ import io.micronaut.context.BeanLocator;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.io.Writable;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.*;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
-import io.micronaut.views.model.ViewsModelDecorator;
+import io.micronaut.views.model.ViewModelProcessor;
 import io.micronaut.web.router.qualifier.ProducesMediaTypeQualifier;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
@@ -52,7 +53,7 @@ public class ViewsFilter implements HttpServerFilter {
 
     protected final Integer order;
     protected final BeanLocator beanLocator;
-    private final Collection<ViewsModelDecorator> modelDecorators;
+    private final Collection<ViewModelProcessor> modelDecorators;
 
     /**
      * Constructor.
@@ -63,7 +64,7 @@ public class ViewsFilter implements HttpServerFilter {
      */
     public ViewsFilter(BeanLocator beanLocator,
                        @Nullable ViewsFilterOrderProvider viewsFilterOrderProvider,
-                       Collection<ViewsModelDecorator> modelDecorators) {
+                       Collection<ViewModelProcessor> modelDecorators) {
         this.beanLocator = beanLocator;
         if (viewsFilterOrderProvider != null) {
             this.order = viewsFilterOrderProvider.getOrder();
@@ -101,10 +102,21 @@ public class ViewsFilter implements HttpServerFilter {
 
                         if (optionalViewsRenderer.isPresent()) {
                             ViewsRenderer viewsRenderer = optionalViewsRenderer.get();
+                            Map<String, Object> model = populateModel(request, viewsRenderer, body);
+                            ModelAndView<Map<String, Object>> modelAndView = new ModelAndView<>(
+                                    optionalView.get(),
+                                    model
+                            );
+                            if (CollectionUtils.isNotEmpty(modelDecorators)) {
+                                for (ViewModelProcessor modelDecorator : modelDecorators) {
+                                    modelDecorator.process(request, modelAndView);
+                                }
+                            }
 
-                            String view = optionalView.get();
+                            model = modelAndView.getModel().orElse(model);
+                            String view = modelAndView.getView().orElse(optionalView.get());
                             if (viewsRenderer.exists(view)) {
-                                Object model = populateModel(body, request, viewsRenderer);
+
                                 Writable writable = viewsRenderer.render(view, model);
                                 response.contentType(type);
                                 ((MutableHttpResponse<Object>) response).body(writable);
@@ -124,19 +136,14 @@ public class ViewsFilter implements HttpServerFilter {
     }
 
     /**
-     * Resolves the model for the given response body and enhances the model with instances of {@link ViewsModelDecorator}.
-     * @param responseBody Response Body
+     * Resolves the model for the given response body and enhances the model with instances of {@link ViewModelProcessor}.
      * @param request {@link HttpRequest} being processed
      * @param viewsRenderer The Views rendered being used to render the view
+     * @param responseBody Response Body
      * @return A model with the controllers response and enhanced with the decorators.
      */
-    protected Map<String, Object> populateModel(Object responseBody, HttpRequest request, ViewsRenderer viewsRenderer) {
-        Map<String, Object> model = new HashMap<>(viewsRenderer.modelOf(resolveModel(responseBody)));
-        for (ViewsModelDecorator modelDecorator : modelDecorators) {
-            modelDecorator.decorateModel(model, request);
-        }
-        return model;
-
+    protected Map<String, Object> populateModel(HttpRequest request, ViewsRenderer viewsRenderer, Object responseBody) {
+        return new HashMap<>(viewsRenderer.modelOf(resolveModel(responseBody)));
     }
 
     /**

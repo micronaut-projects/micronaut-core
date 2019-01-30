@@ -24,12 +24,13 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @author graemerocher
  * @since 1.0
+ * @param <T> The model type
  */
-public class ModelAndView {
+public class ModelAndView<T> {
 
     private String view;
 
-    private Object model;
+    private T model;
 
     /**
      * Empty constructor.
@@ -43,7 +44,7 @@ public class ModelAndView {
      * @param view  view name to be rendered
      * @param model Model to be rendered against the view
      */
-    public ModelAndView(String view, Object model) {
+    public ModelAndView(String view, T model) {
         this.view = view;
         this.model = model;
     }
@@ -67,7 +68,7 @@ public class ModelAndView {
     /**
      * @return model to render
      */
-    public Optional<Object> getModel() {
+    public Optional<T> getModel() {
         return Optional.ofNullable(model);
     }
 
@@ -76,7 +77,7 @@ public class ModelAndView {
      *
      * @param model model to be rendered
      */
-    public void setModel(Object model) {
+    public void setModel(T model) {
         this.model = model;
     }
 }

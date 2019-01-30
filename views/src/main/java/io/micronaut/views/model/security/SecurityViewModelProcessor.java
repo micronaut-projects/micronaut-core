@@ -22,7 +22,9 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.filters.SecurityFilter;
 import io.micronaut.security.utils.SecurityService;
-import io.micronaut.views.model.ViewsModelDecorator;
+import io.micronaut.views.ModelAndView;
+import io.micronaut.views.model.ViewModelProcessor;
+
 import javax.annotation.Nonnull;
 import javax.inject.Singleton;
 import java.util.HashMap;
@@ -35,33 +37,39 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 1.1.0
  */
-@Requires(property = SecurityViewsModelDecoratorConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
-@Requires(beans = {SecurityFilter.class, SecurityService.class, SecurityViewsModelDecoratorConfiguration.class})
+@Requires(property = SecurityViewModelProcessorConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
+@Requires(beans = {SecurityFilter.class, SecurityService.class, SecurityViewModelProcessorConfiguration.class})
 @Singleton
-public class SecurityViewsModelDecorator implements ViewsModelDecorator {
+public class SecurityViewModelProcessor implements ViewModelProcessor {
 
     private final SecurityService securityService;
-    private final SecurityViewsModelDecoratorConfiguration securityViewsModelDecoratorConfiguration;
+    private final SecurityViewModelProcessorConfiguration securityViewModelProcessorConfiguration;
 
     /**
      *
-     * @param securityViewsModelDecoratorConfiguration The Security Views Model Decorator configuration
+     * @param securityViewModelProcessorConfiguration The Security Views Model Decorator configuration
      * @param securityService Utility to access Security information
      */
-    public SecurityViewsModelDecorator(SecurityViewsModelDecoratorConfiguration securityViewsModelDecoratorConfiguration,
-                                       SecurityService securityService) {
-        this.securityViewsModelDecoratorConfiguration = securityViewsModelDecoratorConfiguration;
+    public SecurityViewModelProcessor(SecurityViewModelProcessorConfiguration securityViewModelProcessorConfiguration,
+                                      SecurityService securityService) {
+        this.securityViewModelProcessorConfiguration = securityViewModelProcessorConfiguration;
         this.securityService = securityService;
     }
 
     @Override
-    public void decorateModel(@Nonnull Map<String, Object> model, @Nonnull HttpRequest request) {
+    public void process(@Nonnull HttpRequest<?> request, @Nonnull ModelAndView<Map<String, Object>> modelAndView) {
         Optional<Authentication> authentication = securityService.getAuthentication();
         if (authentication.isPresent()) {
             Map<String, Object> securityModel = new HashMap<>();
-            securityModel.put(securityViewsModelDecoratorConfiguration.getPrincipalNameKey(), authentication.get().getName());
-            securityModel.put(securityViewsModelDecoratorConfiguration.getAttributesKey(), authentication.get());
-            model.putIfAbsent(securityViewsModelDecoratorConfiguration.getSecurityKey(), securityModel);
+            securityModel.put(securityViewModelProcessorConfiguration.getPrincipalNameKey(), authentication.get().getName());
+            securityModel.put(securityViewModelProcessorConfiguration.getAttributesKey(), authentication.get());
+
+            Map<String, Object> viewModel = modelAndView.getModel().orElseGet(() -> {
+                final HashMap<String, Object> newModel = new HashMap<>(1);
+                modelAndView.setModel(newModel);
+                return newModel;
+            });
+            viewModel.putIfAbsent(securityViewModelProcessorConfiguration.getSecurityKey(), securityModel);
         }
     }
 }

@@ -8,7 +8,7 @@ import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.Specification
 
-class SecurityViewsModelDecoratorSpec extends Specification {
+class SecurityViewModelProcessorSpec extends Specification {
 
     def "if micronaut.security.views-model-decorator.enabled=true SecurityViewsModelDecorator bean exists"() {
         given:
@@ -18,7 +18,7 @@ class SecurityViewsModelDecoratorSpec extends Specification {
         ])
 
         expect:
-        !applicationContext.containsBean(SecurityViewsModelDecorator)
+        !applicationContext.containsBean(SecurityViewModelProcessor)
 
         cleanup:
         applicationContext.close()
@@ -31,7 +31,7 @@ class SecurityViewsModelDecoratorSpec extends Specification {
         ])
 
         expect:
-        applicationContext.containsBean(SecurityViewsModelDecorator)
+        applicationContext.containsBean(SecurityViewModelProcessor)
 
         cleanup:
         applicationContext.close()
@@ -40,7 +40,7 @@ class SecurityViewsModelDecoratorSpec extends Specification {
     def "a custom security property name can be injected to the model"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'spec.name': 'SecurityViewsModelDecoratorSpec',
+                'spec.name': 'SecurityViewModelProcessorSpec',
                 'micronaut.security.enabled': true,
                 'micronaut.security.views-model-decorator.security-key': 'securitycustom',
                 'micronaut.views.handlebars.enabled': false,
@@ -57,7 +57,7 @@ class SecurityViewsModelDecoratorSpec extends Specification {
         embeddedServer.applicationContext.containsBean(MockAuthenticationProvider)
 
         and:
-        embeddedServer.applicationContext.containsBean(SecurityViewsModelDecorator)
+        embeddedServer.applicationContext.containsBean(SecurityViewModelProcessor)
 
         when:
         HttpRequest request = HttpRequest.GET("/").basicAuth('john', 'secret')
@@ -88,7 +88,7 @@ class SecurityViewsModelDecoratorSpec extends Specification {
     def "security property is injected to the model"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'spec.name': 'SecurityViewsModelDecoratorSpec',
+                'spec.name': 'SecurityViewModelProcessorSpec',
                 'micronaut.security.enabled': true,
                 'micronaut.views.handlebars.enabled': false,
                 'micronaut.views.thymeleaf.enabled': false,
@@ -104,7 +104,7 @@ class SecurityViewsModelDecoratorSpec extends Specification {
         embeddedServer.applicationContext.containsBean(MockAuthenticationProvider)
 
         and:
-        embeddedServer.applicationContext.containsBean(SecurityViewsModelDecorator)
+        embeddedServer.applicationContext.containsBean(SecurityViewModelProcessor)
 
         when:
         HttpRequest request = HttpRequest.GET("/").basicAuth('john', 'secret')

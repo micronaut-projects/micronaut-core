@@ -9,7 +9,7 @@ import io.reactivex.Flowable
 import org.reactivestreams.Publisher
 import javax.inject.Singleton
 
-@Requires(property = 'spec.name', value = 'SecurityViewsModelDecoratorSpec')
+@Requires(property = 'spec.name', value = 'SecurityViewModelProcessorSpec')
 @Singleton
 class MockAuthenticationProvider implements AuthenticationProvider {
     @Override

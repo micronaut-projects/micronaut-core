@@ -24,14 +24,14 @@ import io.micronaut.security.config.SecurityConfigurationProperties;
 import javax.annotation.Nonnull;
 
 /**
- * {@link ConfigurationProperties} implementation of {@link SecurityViewsModelDecoratorConfiguration}.
+ * {@link ConfigurationProperties} implementation of {@link SecurityViewModelProcessorConfiguration}.
  *
  * @author Sergio del Amo
  * @since 1.1.0
  */
 @Requires(classes = Authentication.class)
-@ConfigurationProperties(SecurityViewsModelDecoratorConfigurationProperties.PREFIX)
-public class SecurityViewsModelDecoratorConfigurationProperties implements SecurityViewsModelDecoratorConfiguration {
+@ConfigurationProperties(SecurityViewModelProcessorConfigurationProperties.PREFIX)
+public class SecurityViewModelProcessorConfigurationProperties implements SecurityViewModelProcessorConfiguration {
 
     public static final String PREFIX = SecurityConfigurationProperties.PREFIX + ".views-model-decorator";
 
@@ -76,7 +76,7 @@ public class SecurityViewsModelDecoratorConfigurationProperties implements Secur
     }
 
     /**
-     * Enable {@link io.micronaut.views.model.security.SecurityViewsModelDecorator}. Default value ({@value #DEFAULT_ENABLED}).
+     * Enable {@link SecurityViewModelProcessor}. Default value ({@value #DEFAULT_ENABLED}).
      * @param enabled enabled flag
      */
     public void setEnabled(boolean enabled) {

@@ -14,37 +14,30 @@
  * limitations under the License.
  */
 
-package io.micronaut.views.model.security;
+package io.micronaut.views.model;
 
-import io.micronaut.core.util.Toggleable;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.views.ModelAndView;
+
 import javax.annotation.Nonnull;
+import java.util.Map;
 
 /**
- * Configuration for {@link SecurityViewsModelDecorator}.
+ * Implementers of {@link ViewModelProcessor} process the {@link ModelAndView} and modify it prior to rendering by
+ * either adding or removing entries.
  *
  * @author Sergio del Amo
- * @since 1.1.0
+ * @since 1.0
  */
-public interface SecurityViewsModelDecoratorConfiguration extends Toggleable {
+public interface ViewModelProcessor {
 
     /**
+     * Invoked prior to the view rendering.
      *
-     * @return the key name which will be used in the model map.
+     * @param request The request being processed
+     * @param modelAndView The model and view
      */
-    @Nonnull
-    String getSecurityKey();
-
-    /**
-     *
-     * @return the key for the principal name property which is used in the nested security map.
-     */
-    @Nonnull
-    String getPrincipalNameKey();
-
-    /**
-     *
-     * @return the key for the attributes property which is used in the nested security map.
-     */
-    @Nonnull
-    String getAttributesKey();
+    void process(
+            @Nonnull HttpRequest<?> request,
+            @Nonnull ModelAndView<Map<String, Object>> modelAndView);
 }
