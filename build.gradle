@@ -167,6 +167,12 @@ ext {
                     name   : 'micrometer-core',
                     modules: ['micrometer-registry-atlas', 'micrometer-registry-graphite', 'micrometer-registry-prometheus', 'micrometer-registry-statsd']
             ],
+            'junit5'               : [
+                    version: junit5Version,
+                    group  : 'org.junit.jupiter',
+                    name   : 'junit-jupiter-api',
+                    modules: ['junit-jupiter-engine', 'junit-jupiter-params']
+            ],
             'micronaut.micrometer': [
                     version:micronautMicrometerVersion,
                     group:'io.micronaut.configuration',
