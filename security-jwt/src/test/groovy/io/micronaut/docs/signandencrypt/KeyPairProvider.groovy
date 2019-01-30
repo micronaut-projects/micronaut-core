@@ -23,6 +23,8 @@ import org.bouncycastle.openssl.PEMKeyPair
 import org.bouncycastle.openssl.PEMParser
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
 
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.security.KeyPair
 import java.security.Security
 
@@ -41,7 +43,7 @@ class KeyPairProvider {
         // Parse the EC key pair
         PEMParser pemParser
         try {
-            pemParser = new PEMParser(new InputStreamReader(new FileInputStream(pemPath)))
+            pemParser = new PEMParser(new InputStreamReader(Files.newInputStream(Paths.get(pemPath))))
             PEMKeyPair pemKeyPair = (PEMKeyPair) pemParser.readObject()
 
             // Convert to Java (JCA) format

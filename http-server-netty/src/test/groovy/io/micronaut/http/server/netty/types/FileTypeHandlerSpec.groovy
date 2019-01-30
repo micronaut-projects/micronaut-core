@@ -36,6 +36,7 @@ import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType
 
 import javax.inject.Inject
 import javax.inject.Named
+import java.nio.file.Files
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -319,12 +320,12 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
         @Get('/download')
         StreamedFile download() {
-            new StreamedFile(new FileInputStream(tempFile), "abc.html").attach("fileTypeHandlerSpec.html")
+            new StreamedFile(Files.newInputStream(tempFile.toPath()), "abc.html").attach("fileTypeHandlerSpec.html")
         }
 
         @Get('/custom-content-type')
         HttpResponse<StreamedFile> customContentType() {
-            HttpResponse.ok(new StreamedFile(new FileInputStream(tempFile), "abc.html").attach("temp.html"))
+            HttpResponse.ok(new StreamedFile(Files.newInputStream(tempFile.toPath()), "abc.html").attach("temp.html"))
                     .contentType(MediaType.TEXT_PLAIN_TYPE)
         }
 
