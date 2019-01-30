@@ -27,6 +27,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.reflect.ClassLoadingReporter;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -403,12 +404,30 @@ public class RequiresCondition implements Condition {
             Optional<AnnotationClassValue[]> classNames = requirements.get("missing", AnnotationClassValue[].class);
             if (classNames.isPresent()) {
                 AnnotationClassValue[] classValues = classNames.get();
-                for (AnnotationClassValue classValue : classValues) {
-                    if (classValue.getType().isPresent()) {
-                        context.fail("Class [" + classValue.getName() + "] is not absent");
-                        return false;
+                if (ArrayUtils.isNotEmpty(classValues)) {
+                    for (AnnotationClassValue classValue : classValues) {
+                        if (classValue.getType().isPresent()) {
+                            context.fail("Class [" + classValue.getName() + "] is not absent");
+                            return false;
+                        }
                     }
+                } else {
+                    return matchAbsenceOfClassNames(context, requirements);
                 }
+            } else {
+                return matchAbsenceOfClassNames(context, requirements);
+            }
+        }
+        return true;
+    }
+
+    private boolean matchAbsenceOfClassNames(ConditionContext context, AnnotationValue<Requires> requirements) {
+        final String[] classNameArray = requirements.get("missing", String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
+        final ClassLoader classLoader = context.getBeanContext().getClassLoader();
+        for (String name : classNameArray) {
+            if (ClassUtils.isPresent(name, classLoader)) {
+                context.fail("Class [" + name + "] is not absent");
+                return false;
             }
         }
         return true;

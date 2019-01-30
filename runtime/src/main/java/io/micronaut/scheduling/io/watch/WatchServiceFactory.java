@@ -16,7 +16,6 @@
 
 package io.micronaut.scheduling.io.watch;
 
-import io.methvin.watchservice.MacOSXListeningWatchService;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.util.StringUtils;
 import org.slf4j.Logger;
@@ -34,7 +33,7 @@ import java.nio.file.WatchService;
  */
 @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 @Requires(property = FileWatchConfiguration.PATHS)
-@Requires(missing = MacOSXListeningWatchService.class)
+@Requires(missingClasses = "io.methvin.watchservice.MacOSXListeningWatchService")
 @Factory
 public class WatchServiceFactory {
     protected static final Logger LOG = LoggerFactory.getLogger(WatchServiceFactory.class);
@@ -47,7 +46,7 @@ public class WatchServiceFactory {
      */
     @Bean(preDestroy = "close")
     @Prototype
-    @Requires(missing = MacOSXListeningWatchService.class)
+    @Requires(missingClasses = "io.methvin.watchservice.MacOSXListeningWatchService")
     @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
     @Requires(property = FileWatchConfiguration.PATHS)
     @Primary
