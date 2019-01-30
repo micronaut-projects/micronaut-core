@@ -53,8 +53,8 @@ public class TokenAuthenticationFetcher implements AuthenticationFetcher {
     public static final Integer ORDER = 0;
 
     protected final Collection<TokenValidator> tokenValidators;
-    private final TokenResolver tokenResolver;
     protected final ApplicationEventPublisher eventPublisher;
+    private final TokenResolver tokenResolver;
 
     /**
      * @param tokenValidators The list of {@link TokenValidator} which attempt to validate the request
@@ -84,7 +84,6 @@ public class TokenAuthenticationFetcher implements AuthenticationFetcher {
                                       ApplicationEventPublisher eventPublisher) {
         this(tokenValidators, new DefaultTokenResolver(tokenReaders), eventPublisher);
     }
-
 
     @Override
     public Publisher<Authentication> fetchAuthentication(HttpRequest<?> request) {

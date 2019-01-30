@@ -402,6 +402,13 @@ public class UriTemplate implements Comparable<UriTemplate> {
         return new UriTemplateParser(templateString);
     }
 
+    /**
+     * Returns the template as a string filtering the segments
+     * with the provided filter.
+     *
+     * @param filter The filter to test segments
+     * @return The template as a string
+     */
     protected String toString(Predicate<PathSegment> filter) {
         StringBuilder builder = new StringBuilder();
         UriTemplateParser.VariablePathSegment previousVariable = null;

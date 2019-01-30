@@ -19,7 +19,6 @@ package io.micronaut.core.io.file;
 import io.micronaut.core.io.ResourceLoader;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;

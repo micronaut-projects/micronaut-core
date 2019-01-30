@@ -38,7 +38,7 @@ public enum ComputePlatform {
     AZURE,
 
     /**
-     * Digital Ocean
+     * Digital Ocean.
      */
     DIGITAL_OCEAN,
 
@@ -55,5 +55,5 @@ public enum ComputePlatform {
     /**
      * Other.
      */
-    OTHER;
+    OTHER
 }
