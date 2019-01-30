@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>User Books</title>
+</head>
+<body>
+    #if( $security )
+      <h1>User: ${security['name']}</h1>
+    #end
+
+    #foreach($book in $books)
+      $book
+    #end
+
+    #if( $securitycustom )
+    <h1>Custom: ${securitycustom['name']}</span></h1>
+    #end
+
+</body>
+</html>
