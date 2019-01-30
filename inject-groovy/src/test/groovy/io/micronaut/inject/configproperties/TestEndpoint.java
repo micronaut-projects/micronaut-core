@@ -2,7 +2,6 @@ package io.micronaut.inject.configproperties;
 
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.ConfigurationReader;
-import io.micronaut.context.annotation.Requires;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Documented;

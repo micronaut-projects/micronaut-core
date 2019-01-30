@@ -5,7 +5,6 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Header;
 import io.micronaut.http.client.docs.annotation.Pet;
-import io.reactivex.Single;
 
 @Controller("/pets")
 public class PetController {

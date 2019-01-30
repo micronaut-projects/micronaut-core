@@ -2,10 +2,7 @@ package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.reactivex.Flowable;
-
-import java.util.Collections;
 
 public class TestMetadata extends DefaultAnnotationMetadata {
     public TestMetadata() {

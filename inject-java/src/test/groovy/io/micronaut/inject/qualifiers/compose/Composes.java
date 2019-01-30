@@ -2,7 +2,6 @@ package io.micronaut.inject.qualifiers.compose;
 
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Requires;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Retention;
