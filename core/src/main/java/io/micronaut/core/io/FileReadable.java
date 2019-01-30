@@ -22,6 +22,7 @@ import io.micronaut.core.util.ArgumentUtils;
 import javax.annotation.Nonnull;
 import java.io.*;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 
 /**
  * Implementation of {@link Readable} for files.
@@ -46,17 +47,17 @@ class FileReadable implements Readable {
     @Nonnull
     @Override
     public InputStream asInputStream() throws IOException {
-        return new FileInputStream(file);
+        return Files.newInputStream(file.toPath());
     }
 
     @Override
     public Reader asReader() throws IOException {
-        return new FileReader(file);
+        return Files.newBufferedReader(file.toPath());
     }
 
     @Override
     public Reader asReader(Charset charset) throws IOException {
-        return new FileReader(file);
+        return Files.newBufferedReader(file.toPath(), charset);
     }
 
     @Override

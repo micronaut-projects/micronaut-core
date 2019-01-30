@@ -37,6 +37,7 @@ import java.nio.file.Files;
  */
 @Internal
 class FileBackedGeneratedFile implements GeneratedFile {
+
     private final File file;
 
     /**
@@ -71,7 +72,7 @@ class FileBackedGeneratedFile implements GeneratedFile {
     @Override
     public Reader openReader() throws IOException {
         file.getParentFile().mkdirs();
-        return new FileReader(file);
+        return Files.newBufferedReader(file.toPath());
     }
 
     @Override
@@ -85,6 +86,6 @@ class FileBackedGeneratedFile implements GeneratedFile {
     @Override
     public Writer openWriter() throws IOException {
         file.getParentFile().mkdirs();
-        return new FileWriter(file);
+        return Files.newBufferedWriter(file.toPath());
     }
 }
