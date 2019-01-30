@@ -1,4 +1,4 @@
-api:views.model.security.SecurityViewsModelDecorator[] is enabled by default and injects the current username in the view. The following properties allow you to customize the injection:
+api:views.model.security.SecurityViewModelProcessor[] is enabled by default and injects the current username in the view. The following properties allow you to customize the injection:
 
 include::{includedir}configurationProperties/io.micronaut.views.model.security.SecurityViewModelProcessorConfigurationProperties.adoc[]
 
