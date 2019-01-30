@@ -117,9 +117,8 @@ public class SpringIOUtils {
     }
 
     private static byte[] compute(File f, String algorithm) throws IOException {
-        InputStream is = Files.newInputStream(f.toPath());
 
-        try {
+        try (InputStream is = Files.newInputStream(f.toPath())) {
             MessageDigest md = getMessageDigest(algorithm);
             md.reset();
 
@@ -129,8 +128,6 @@ public class SpringIOUtils {
                 md.update(buf, 0, len);
             }
             return md.digest();
-        } finally {
-            is.close();
         }
     }
 
