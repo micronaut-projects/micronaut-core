@@ -14,6 +14,6 @@ import javax.inject.Singleton
 class MockAuthenticationProvider implements AuthenticationProvider {
     @Override
     Publisher<AuthenticationResponse> authenticate(AuthenticationRequest authenticationRequest) {
-        return Flowable.just(new UserDetails(authenticationRequest.identity as String, []))
+        return Flowable.just(new UserDetails(authenticationRequest.identity as String, ['email': 'john@email.com']))
     }
 }
