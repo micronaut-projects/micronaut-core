@@ -5,7 +5,7 @@
 </head>
 <body>
     #if( $security )
-      <h1>User: ${security['name']} email: ${security['attributes']['email']}</h1>
+      <h1>User: ${security['name']}</h1>
     #end
 
     #foreach($book in $books)
