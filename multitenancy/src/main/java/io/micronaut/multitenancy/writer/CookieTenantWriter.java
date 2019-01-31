@@ -52,7 +52,11 @@ public class CookieTenantWriter implements TenantWriter {
     public void writeTenant(MutableHttpRequest<?> request, Serializable tenant) {
 
         if (tenant instanceof String) {
-            Cookie cookie = Cookie.of(request, cookieTenantWriterConfiguration, (String) tenant);
+            Cookie cookie = Cookie.of(
+                    cookieTenantWriterConfiguration.getCookiename(),
+                    (String) tenant
+            );
+            cookie.configure(cookieTenantWriterConfiguration, request.isSecure());
             if (cookieTenantWriterConfiguration.getCookieMaxAge().isPresent()) {
                 cookie.maxAge(cookieTenantWriterConfiguration.getCookieMaxAge().get());
             } else {

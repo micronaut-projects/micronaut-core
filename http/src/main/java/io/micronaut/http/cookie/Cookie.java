@@ -16,8 +16,9 @@
 
 package io.micronaut.http.cookie;
 
-import io.micronaut.http.HttpRequest;
-
+import io.micronaut.core.util.ArgumentUtils;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.io.Serializable;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAmount;
@@ -33,12 +34,12 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
     /**
      * @return The name of the cookie
      */
-    String getName();
+    @Nonnull String getName();
 
     /**
      * @return The value of the cookie
      */
-    String getValue();
+    @Nonnull String getValue();
 
     /**
      * Gets the domain name of this Cookie.
@@ -47,14 +48,14 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      *
      * @return the domain name of this Cookie
      */
-    String getDomain();
+    @Nullable String getDomain();
 
     /**
      * The path of the cookie. The cookie is visible to all paths below the request path on the server.
      *
      * @return The cookie path
      */
-    String getPath();
+    @Nullable String getPath();
 
     /**
      * Checks to see if this {@link Cookie} can only be accessed via HTTP.
@@ -83,7 +84,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @param maxAge The max age
      * @return This cookie
      */
-    Cookie maxAge(long maxAge);
+    @Nonnull Cookie maxAge(long maxAge);
 
     /**
      * Sets the value.
@@ -91,7 +92,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @param value The value of the cookie
      * @return This cookie
      */
-    Cookie value(String value);
+    @Nonnull Cookie value(@Nonnull String value);
 
     /**
      * Sets the domain of the cookie.
@@ -99,7 +100,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @param domain The domain of the cookie
      * @return This cookie
      */
-    Cookie domain(String domain);
+    @Nonnull Cookie domain(@Nullable String domain);
 
     /**
      * Sets the path of the cookie.
@@ -107,7 +108,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @param path The path of the cookie
      * @return This cookie
      */
-    Cookie path(String path);
+    @Nonnull Cookie path(@Nullable String path);
 
     /**
      * Sets whether the cookie is secure.
@@ -115,7 +116,7 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @param secure Is the cookie secure
      * @return This cookie
      */
-    Cookie secure(boolean secure);
+    @Nonnull Cookie secure(boolean secure);
 
     /**
      * Sets whether the cookie is HTTP-Only.
@@ -123,7 +124,37 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @param httpOnly Is the cookie HTTP-Only
      * @return This cookie
      */
-    Cookie httpOnly(boolean httpOnly);
+    @Nonnull Cookie httpOnly(boolean httpOnly);
+
+    /**
+     * Configure the Cookie with the given configuration.
+     * @param configuration The configuration
+     * @return The cookie
+     */
+    default @Nonnull Cookie configure(@Nonnull CookieConfiguration configuration) {
+        ArgumentUtils.requireNonNull("configuration", configuration);
+        return configure(configuration, true);
+    }
+
+    /**
+     * Configure the Cookie with the given configuration.
+     * @param configuration The configuration
+     * @param isSecure Is the request secure
+     * @return The cookie
+     */
+    default @Nonnull Cookie configure(
+            @Nonnull CookieConfiguration configuration,
+            boolean isSecure) {
+        ArgumentUtils.requireNonNull("configuration", configuration);
+        configuration.getCookiePath().ifPresent(this::path);
+        configuration.getCookieDomain().ifPresent(this::domain);
+        configuration.getCookieMaxAge().ifPresent(this::maxAge);
+        configuration.isCookieHttpOnly().ifPresent(this::httpOnly);
+        if (isSecure) {
+            configuration.isCookieSecure().ifPresent(this::secure);
+        }
+        return this;
+    }
 
     /**
      * Sets the max age of the cookie in seconds.
@@ -131,7 +162,8 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @param maxAge The max age
      * @return This cookie
      */
-    default Cookie maxAge(TemporalAmount maxAge) {
+    default @Nonnull Cookie maxAge(@Nonnull TemporalAmount maxAge) {
+        ArgumentUtils.requireNonNull("maxAge", maxAge);
         return maxAge(maxAge.get(ChronoUnit.SECONDS));
     }
 
@@ -142,31 +174,11 @@ public interface Cookie extends Comparable<Cookie>, Serializable {
      * @param value The value
      * @return The Cookie
      */
-    static Cookie of(String name, String value) {
+    static @Nonnull Cookie of(@Nonnull String name, @Nonnull String value) {
         CookieFactory instance = CookieFactory.INSTANCE;
         if (instance != null) {
             return instance.create(name, value);
         }
         throw new UnsupportedOperationException("No CookeFactory implementation found. Server implementation does not support cookies.");
-    }
-
-    /**
-     * Construct a new Cookie for the given {@link CookieConfiguration} and value.
-     *
-     * @param request The Http Request
-     * @param configuration  The Cookie configuration
-     * @param value The cookie value
-     * @return The Cookie
-     */
-    static Cookie of(HttpRequest request, CookieConfiguration configuration, String value) {
-        Cookie cookie = of(configuration.getCookieName(), value);
-        configuration.getCookiePath().ifPresent(cookie::path);
-        configuration.getCookieDomain().ifPresent(cookie::domain);
-        configuration.getCookieMaxAge().ifPresent(cookie::maxAge);
-        configuration.isCookieHttpOnly().ifPresent(cookie::httpOnly);
-        if (request.isSecure()) {
-            configuration.isCookieSecure().ifPresent(cookie::secure);
-        }
-        return cookie;
     }
 }
