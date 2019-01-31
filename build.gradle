@@ -126,10 +126,16 @@ ext {
                     group:'io.micronaut.configuration',
                     name:'micronaut-aws-common'
             ],
-            'micronaut.function.aws': [
+            'micronaut.function-aws': [
                     version:micronautAwsVersion,
                     group:'io.micronaut',
                     name:'micronaut-function-aws'
+            ],
+            'micronaut.function.aws': [
+                    version:micronautAwsVersion,
+                    group:'io.micronaut.aws',
+                    name:'micronaut-function-aws-api-proxy',
+                    modules: ['micronaut-function-aws-custom-runtime']
             ],
             'micronaut.gorm': [
                     version:micronautGroovyVersion,
