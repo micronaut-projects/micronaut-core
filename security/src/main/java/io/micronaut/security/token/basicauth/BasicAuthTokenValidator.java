@@ -20,9 +20,9 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.authentication.AuthenticationResponse;
-import io.micronaut.security.authentication.AuthenticationUserDetailsAdapter;
 import io.micronaut.security.authentication.Authenticator;
-import io.micronaut.security.authentication.UserDetails;
+import io.micronaut.security.authentication.DefaultToAuthenticationUserDetailsAdapter;
+import io.micronaut.security.authentication.UserDetailsAuthenticationResponseToAuthenticationAdapter;
 import io.micronaut.security.authentication.UsernamePasswordCredentials;
 import io.micronaut.security.token.validator.TokenValidator;
 import io.reactivex.Flowable;
@@ -54,11 +54,26 @@ public class BasicAuthTokenValidator implements TokenValidator {
 
     protected final Authenticator authenticator;
 
+    private final UserDetailsAuthenticationResponseToAuthenticationAdapter userDetailsAdapter;
+
     /**
+     * @param authenticator The Authenticator
+     * @param userDetailsAdapter User Details ot Authentication adapter
+     */
+    public BasicAuthTokenValidator(Authenticator authenticator,
+                                   UserDetailsAuthenticationResponseToAuthenticationAdapter userDetailsAdapter) {
+        this.authenticator = authenticator;
+        this.userDetailsAdapter = userDetailsAdapter;
+    }
+
+    /**
+     * @deprecated Use {@link #BasicAuthTokenValidator(Authenticator, UserDetailsAuthenticationResponseToAuthenticationAdapter)} instead.
+
      * @param authenticator The Authenticator
      */
     public BasicAuthTokenValidator(Authenticator authenticator) {
         this.authenticator = authenticator;
+        this.userDetailsAdapter = new DefaultToAuthenticationUserDetailsAdapter(null);
     }
 
     @Override
@@ -69,8 +84,7 @@ public class BasicAuthTokenValidator implements TokenValidator {
 
             return authenticationResponse.switchMap(response -> {
                 if (response.isAuthenticated()) {
-                    UserDetails userDetails = (UserDetails) response;
-                    return Flowable.just(new AuthenticationUserDetailsAdapter(userDetails));
+                    return Flowable.just(userDetailsAdapter.adapt(response));
                 } else {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Could not authenticate {}", creds.get().getUsername());

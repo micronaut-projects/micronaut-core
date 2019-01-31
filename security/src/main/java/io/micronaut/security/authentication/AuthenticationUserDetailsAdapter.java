@@ -27,7 +27,12 @@ import java.util.Map;
  */
 public class AuthenticationUserDetailsAdapter implements Authentication {
 
+    private static final String DEFAULT_USERNAME = "username";
+    private static final String DEFAULT_ROLESNAME = "roles";
+
     private UserDetails userDetails;
+    private String username = DEFAULT_USERNAME;
+    private String rolesNames = DEFAULT_ROLESNAME;
 
     /**
      *
@@ -40,13 +45,53 @@ public class AuthenticationUserDetailsAdapter implements Authentication {
     @Override
     public Map<String, Object> getAttributes() {
         Map<String, Object> attributes = new HashMap<>();
-        attributes.put("roles", userDetails.getRoles());
-        attributes.put("username", userDetails.getUsername());
+        attributes.put(getRolesNames(), userDetails.getRoles());
+        attributes.put(getUsername(), userDetails.getUsername());
         return attributes;
     }
 
     @Override
     public String getName() {
         return userDetails.getUsername();
+    }
+
+    /**
+     *
+     * @param rolesName The key user for roles
+     */
+    public void setRolesNames(String rolesName) {
+        this.rolesNames = rolesName;
+    }
+
+    /**
+     *
+     * @return The key use for username
+     */
+    public String getUsername() {
+        return username;
+    }
+
+    /**
+     *
+     * @param username The key use for username
+     */
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    /**
+     *
+     * @return The key use for rolesNames T
+     */
+    public String getRolesNames() {
+        return rolesNames;
+    }
+
+    /**
+     *
+     * @return the original userDetails used to construct the object
+     */
+    public UserDetails getUserDetails() {
+        return userDetails;
     }
 }

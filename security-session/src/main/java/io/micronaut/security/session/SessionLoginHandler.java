@@ -16,12 +16,14 @@
 
 package io.micronaut.security.session;
 
+import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.security.authentication.AuthenticationFailed;
-import io.micronaut.security.authentication.AuthenticationUserDetailsAdapter;
+import io.micronaut.security.authentication.DefaultToAuthenticationUserDetailsAdapter;
 import io.micronaut.security.authentication.UserDetails;
+import io.micronaut.security.authentication.UserDetailsAuthenticationResponseToAuthenticationAdapter;
 import io.micronaut.security.handlers.LoginHandler;
 import io.micronaut.security.filters.SecurityFilter;
 import io.micronaut.session.Session;
@@ -43,6 +45,7 @@ public class SessionLoginHandler implements LoginHandler {
 
     protected final SessionStore<Session> sessionStore;
     protected final SecuritySessionConfiguration securitySessionConfiguration;
+    private final UserDetailsAuthenticationResponseToAuthenticationAdapter userDetailsAdapter;
 
     /**
      * Constructor.
@@ -50,15 +53,30 @@ public class SessionLoginHandler implements LoginHandler {
      * @param sessionStore The session store
      */
     public SessionLoginHandler(SecuritySessionConfiguration securitySessionConfiguration,
+                               SessionStore<Session> sessionStore,
+                               UserDetailsAuthenticationResponseToAuthenticationAdapter userDetailsAdapter) {
+        this.securitySessionConfiguration = securitySessionConfiguration;
+        this.sessionStore = sessionStore;
+        this.userDetailsAdapter = userDetailsAdapter;
+    }
+
+    /**
+     * Constructor.
+     * @deprecated Use {@link #SessionLoginHandler(SecuritySessionConfiguration, SessionStore, UserDetailsAuthenticationResponseToAuthenticationAdapter)} instead.
+     * @param securitySessionConfiguration Security Session Configuration
+     * @param sessionStore The session store
+     */
+    public SessionLoginHandler(SecuritySessionConfiguration securitySessionConfiguration,
                                SessionStore<Session> sessionStore) {
         this.securitySessionConfiguration = securitySessionConfiguration;
         this.sessionStore = sessionStore;
+        this.userDetailsAdapter = new DefaultToAuthenticationUserDetailsAdapter(null);
     }
 
     @Override
     public HttpResponse loginSuccess(UserDetails userDetails, HttpRequest<?> request) {
         Session session = findSession(request);
-        session.put(SecurityFilter.AUTHENTICATION, new AuthenticationUserDetailsAdapter(userDetails));
+        session.put(SecurityFilter.AUTHENTICATION, userDetailsAdapter.adapt(userDetails));
         try {
             URI location = new URI(securitySessionConfiguration.getLoginSuccessTargetUrl());
             return HttpResponse.seeOther(location);
