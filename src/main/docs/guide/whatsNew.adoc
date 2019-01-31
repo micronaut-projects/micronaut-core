@@ -52,6 +52,10 @@ class CacheFactory {
 
 ----
 
+=== AWS API Gateway Proxy Support
+
+Support for AWS API Gateway Proxy has been added allowing AWS Lambda's to be defined as regular controllers. See the documentation on https://micronaut-projects.github.io/micronaut-aws/latest/guide/#apiProxy[AWS API Gateway Proxy Support] for more information and links to examples.
+
 === Micrometer 1.1 and @Timed Support
 
 Micrometer has been upgraded to 1.1 and support for https://micrometer.io/docs/concepts#_the_code_timed_code_annotation[@Timed] AOP advice added.
