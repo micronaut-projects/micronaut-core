@@ -150,6 +150,14 @@ public @interface Requires {
     Class[] missing() default {};
 
     /**
+     * Expresses the given class names should be missing from the classpath for the bean configuration to load.
+     *
+     * @return The names of the classes that should be missing
+     */
+    @AliasFor(member = "missing")
+    String[] missingClasses() default {};
+
+    /**
      * Expresses the given beans that should be missing from the classpath for the bean or configuration to load.
      *
      * @return The classes

@@ -263,6 +263,46 @@ public class MediaType implements CharSequence {
     public static final MediaType APPLICATION_GRAPHQL_TYPE = new MediaType(APPLICATION_GRAPHQL);
 
     /**
+     * Png Image: image/png.
+     */
+    public static final String IMAGE_PNG = "image/png";
+
+    /**
+     * Png Image: image/png.
+     */
+    public static final MediaType IMAGE_PNG_TYPE = new MediaType(IMAGE_PNG);
+
+    /**
+     * Jpeg Image: image/jpeg.
+     */
+    public static final String IMAGE_JPEG = "image/jpeg";
+
+    /**
+     * Jpeg Image: image/jpeg.
+     */
+    public static final MediaType IMAGE_JPEG_TYPE = new MediaType(IMAGE_JPEG);
+
+    /**
+     * Gif Image: image/gif.
+     */
+    public static final String IMAGE_GIF = "image/gif";
+
+    /**
+     * Gif Image: image/gif.
+     */
+    public static final MediaType IMAGE_GIF_TYPE = new MediaType(IMAGE_GIF);
+
+    /**
+     * Webp Image: image/webp.
+     */
+    public static final String IMAGE_WEBP = "image/webp";
+
+    /**
+     * Webp Image: image/webp.
+     */
+    public static final MediaType IMAGE_WEBP_TYPE = new MediaType(IMAGE_WEBP);
+
+    /**
      * Parameter {@code "charset"}.
      */
     public static final String CHARSET_PARAMETER = "charset";

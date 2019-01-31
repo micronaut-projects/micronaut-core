@@ -25,6 +25,11 @@ package io.micronaut.http;
 public enum HttpAttributes implements CharSequence {
 
     /**
+     * Attribute used to store the {@link java.security.Principal}.
+     */
+    PRINCIPAL("micronaut.AUTHENTICATION"),
+
+    /**
      * Attribute used to store any exception that may have occurred during request processing.
      */
     ERROR(Constants.PREFIX + ".error"),

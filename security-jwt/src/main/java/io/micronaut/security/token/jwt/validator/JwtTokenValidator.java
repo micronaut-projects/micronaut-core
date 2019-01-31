@@ -157,8 +157,10 @@ public class JwtTokenValidator implements TokenValidator {
     }
 
     /**
+     * Verifies the provided claims with the provided validators.
      *
-     * @param jwtClaimsSet JWT Claims.
+     * @param jwtClaimsSet JWT Claims
+     * @param claimsValidators The claims validators
      * @return Whether the JWT claims pass every validation.
      */
     protected boolean verifyClaims(JWTClaimsSet jwtClaimsSet, Collection<? extends JwtClaimsValidator> claimsValidators) {
@@ -246,8 +248,9 @@ public class JwtTokenValidator implements TokenValidator {
         return Optional.empty();
 
     }
+
     /**
-     * Validates JWT signature and Claims
+     * Validates JWT signature and Claims.
      *
      * @param token A JWT token
      * @param claimsValidators a Collection of claims Validators.

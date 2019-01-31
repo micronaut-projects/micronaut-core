@@ -33,7 +33,7 @@ class GradleBuildTokens extends BuildTokens {
             compile: 'compile',
             runtime: 'runtime',
             testCompile: 'testCompile',
-            provided: 'runtimeOnly'
+            provided: 'developmentOnly'
     ]
 
     Map getTokens(Profile profile, List<Feature> features) {
@@ -74,7 +74,7 @@ class GradleBuildTokens extends BuildTokens {
             if (nameAndVersion.length == 2) {
                 "    id \"${nameAndVersion[0]}\" version \"${nameAndVersion[1]}\""
             } else {
-                "apply plugin:\"$name\""
+                "    id \"${name}\""
             }
         }
 
@@ -91,7 +91,7 @@ class GradleBuildTokens extends BuildTokens {
                 if (nameAndVersion.length == 2) {
                     "    id \"${nameAndVersion[0]}\" version \"${nameAndVersion[1]}\""
                 } else {
-                    "apply plugin:\"$name\""
+                    "    id \"${name}\""
                 }
             }
         }

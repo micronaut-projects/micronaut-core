@@ -190,20 +190,9 @@ public class DefaultBeanContext implements BeanContext {
                 LOG.debug("Stopping BeanContext");
             }
             publishEvent(new ShutdownEvent(this));
+
             // need to sort registered singletons so that beans with that require other beans appear first
-            ArrayList<BeanRegistration> objects = new ArrayList<>(singletonObjects.values());
-            objects.sort((o1, o2) -> {
-                        BeanDefinition bd1 = o1.beanDefinition;
-                        BeanDefinition bd2 = o2.beanDefinition;
-
-                        Collection requiredComponents1 = bd1.getRequiredComponents();
-                        Collection requiredComponents2 = bd2.getRequiredComponents();
-                        Integer requiredComponentCount1 = requiredComponents1.size();
-                        Integer requiredComponentCount2 = requiredComponents2.size();
-                        return requiredComponentCount1.compareTo(requiredComponentCount2);
-                    }
-            );
-
+            List<BeanRegistration> objects = topologicalSort(singletonObjects.values());
 
             Set<Integer> processed = new HashSet<>();
             for (BeanRegistration beanRegistration : objects) {
@@ -2266,6 +2255,51 @@ public class DefaultBeanContext implements BeanContext {
             return stream.count() > 0;
         }
         return false;
+    }
+
+    private List<BeanRegistration> topologicalSort(Collection<BeanRegistration> beans) {
+        List<BeanRegistration> sorted = new ArrayList<>();
+        List<BeanRegistration> unsorted = new ArrayList<>(beans);
+
+        //loop until all items have been sorted
+        while (!unsorted.isEmpty()) {
+            boolean acyclic = false;
+
+            Iterator<BeanRegistration> i = unsorted.iterator();
+            while (i.hasNext()) {
+                BeanRegistration bean = i.next();
+                boolean found = false;
+
+                //determine if any components are in the unsorted list
+                Collection<Class> components = bean.getBeanDefinition().getRequiredComponents();
+                for (Class<?> clazz: components) {
+                    if (unsorted.stream()
+                            .map(BeanRegistration::getBeanDefinition)
+                            .map(BeanDefinition::getBeanType)
+                            .anyMatch(bt -> clazz.isAssignableFrom(bt))) {
+                        found = true;
+                        break;
+                    }
+                }
+
+                //none of the required components are in the unsorted list
+                //so it can be added to the sorted list
+                if (!found) {
+                    acyclic = true;
+                    i.remove();
+                    sorted.add(0, bean);
+                }
+            }
+
+            //rather than throw an exception here because there is a cyclical dependency
+            //just add the first item to the list and keep trying. It may be possible to
+            //see a cycle here because qualifiers are not taken into account.
+            if (!acyclic) {
+                sorted.add(0, unsorted.remove(0));
+            }
+        }
+
+        return sorted;
     }
 
     /**

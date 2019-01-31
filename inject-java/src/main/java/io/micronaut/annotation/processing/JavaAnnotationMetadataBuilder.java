@@ -16,7 +16,6 @@
 
 package io.micronaut.annotation.processing;
 
-import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.util.StringUtils;

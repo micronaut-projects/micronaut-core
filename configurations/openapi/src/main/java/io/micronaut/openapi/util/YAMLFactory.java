@@ -24,6 +24,7 @@ import org.yaml.snakeyaml.DumperOptions;
 import java.io.*;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 
 /**
  * Copied from {@link com.fasterxml.jackson.dataformat.yaml.YAMLFactory} to support snakeyaml >= 1.20.
@@ -262,7 +263,7 @@ class YAMLFactory extends JsonFactory {
     @Override
     public YAMLParser createParser(File f) throws IOException {
         IOContext ctxt = _createContext(f, true);
-        return _createParser(_decorate(new FileInputStream(f), ctxt), ctxt);
+        return _createParser(_decorate(Files.newInputStream(f.toPath()), ctxt), ctxt);
     }
 
     @Override

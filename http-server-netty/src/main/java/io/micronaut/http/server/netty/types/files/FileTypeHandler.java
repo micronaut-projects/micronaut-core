@@ -16,7 +16,6 @@
 
 package io.micronaut.http.server.netty.types.files;
 
-import io.micronaut.core.naming.NameUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -27,7 +26,6 @@ import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
-import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.http.server.types.files.StreamedFile;
 import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType;
@@ -40,7 +38,6 @@ import java.time.LocalDateTime;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
-import java.util.Optional;
 
 /**
  * Responsible for writing files out to the response in Netty.
@@ -115,7 +112,7 @@ public class FileTypeHandler implements NettyCustomizableResponseTypeHandler<Obj
     /**
      * @param filename The filename
      * @deprecated The media type now comes from the file types.
-     * @see FileCustomizableResponseType#getMediaType()
+     * @see io.micronaut.http.server.types.files.FileCustomizableResponseType#getMediaType()
      * @return The {@link MediaType}
      */
     @Deprecated

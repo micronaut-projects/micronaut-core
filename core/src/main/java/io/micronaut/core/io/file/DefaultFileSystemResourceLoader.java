@@ -19,11 +19,11 @@ package io.micronaut.core.io.file;
 import io.micronaut.core.io.ResourceLoader;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.file.Files;
 import java.util.Optional;
 import java.util.stream.Stream;
 
@@ -62,8 +62,8 @@ public class DefaultFileSystemResourceLoader implements FileSystemResourceLoader
     public Optional<InputStream> getResourceAsStream(String path) {
         File file = getFile(normalize(path));
         try {
-            return Optional.of(new FileInputStream(file));
-        } catch (FileNotFoundException e) {
+            return Optional.of(Files.newInputStream(file.toPath()));
+        } catch (IOException e) {
             return Optional.empty();
         }
     }

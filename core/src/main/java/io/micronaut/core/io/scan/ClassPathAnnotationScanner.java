@@ -22,7 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.JarURLConnection;
@@ -199,7 +198,7 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
         if (fileName.endsWith(".class")) {
             // ignore generated classes
             if (fileName.indexOf('$') == -1) {
-                try (FileInputStream inputStream = new FileInputStream(file)) {
+                try (InputStream inputStream = Files.newInputStream(file.toPath())) {
                     scanInputStream(annotation, inputStream, classes);
                 } catch (IOException e) {
                     if (LOG.isDebugEnabled()) {

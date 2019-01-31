@@ -1,5 +1,6 @@
 buildscript {
     repositories {
+        mavenLocal()
         maven { url "https://repo.grails.org/grails/core" }
     }
     dependencies {
@@ -110,11 +111,32 @@ ext {
                     name:'micronaut-kafka',
                     modules:['micronaut-kafka-streams']
             ],
+            'micronaut.rabbitmq': [
+                    version:micronautRabbitMQVersion,
+                    group:'io.micronaut.configuration',
+                    name:'micronaut-rabbitmq'
+            ],
             'micronaut.groovy': [
                     version:micronautGroovyVersion,
                     group:'io.micronaut',
                     name:'micronaut-runtime-groovy',
                     modules:['micronaut-function-groovy']
+            ],
+            'micronaut.aws': [
+                    version:micronautAwsVersion,
+                    group:'io.micronaut.configuration',
+                    name:'micronaut-aws-common'
+            ],
+            'micronaut.function-aws': [
+                    version:micronautAwsVersion,
+                    group:'io.micronaut',
+                    name:'micronaut-function-aws'
+            ],
+            'micronaut.function.aws': [
+                    version:micronautAwsVersion,
+                    group:'io.micronaut.aws',
+                    name:'micronaut-function-aws-api-proxy',
+                    modules: ['micronaut-function-aws-custom-runtime']
             ],
             'micronaut.gorm': [
                     version:micronautGroovyVersion,
@@ -151,6 +173,12 @@ ext {
                     group  : 'io.micrometer',
                     name   : 'micrometer-core',
                     modules: ['micrometer-registry-atlas', 'micrometer-registry-graphite', 'micrometer-registry-prometheus', 'micrometer-registry-statsd']
+            ],
+            'junit5'               : [
+                    version: junit5Version,
+                    group  : 'org.junit.jupiter',
+                    name   : 'junit-jupiter-api',
+                    modules: ['junit-jupiter-engine', 'junit-jupiter-params']
             ],
             'micronaut.micrometer': [
                     version:micronautMicrometerVersion,

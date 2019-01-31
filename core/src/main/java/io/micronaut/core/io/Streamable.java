@@ -18,11 +18,11 @@ package io.micronaut.core.io;
 
 import javax.annotation.Nullable;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 
 /**
  * Interface for types that can be written to an {@link java.io.OutputStream}.
@@ -48,7 +48,7 @@ public interface Streamable {
      * @throws IOException if an error occurred while outputting data to the writer
      */
     default void writeTo(File file) throws IOException {
-        try (FileOutputStream outputStream = new FileOutputStream(file)) {
+        try (OutputStream outputStream = Files.newOutputStream(file.toPath())) {
             writeTo(outputStream);
         }
     }
