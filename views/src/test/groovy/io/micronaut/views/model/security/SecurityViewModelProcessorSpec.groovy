@@ -117,7 +117,7 @@ class SecurityViewModelProcessorSpec extends Specification {
         String html = response.body()
 
         then:
-        html.contains('User: john')
+        html.contains('User: john email: john@email.com')
 
         and:
         html.contains('Developing Microservices')
