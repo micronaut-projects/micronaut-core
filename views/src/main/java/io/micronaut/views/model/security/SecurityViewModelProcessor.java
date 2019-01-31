@@ -62,7 +62,7 @@ public class SecurityViewModelProcessor implements ViewModelProcessor {
         if (authentication.isPresent()) {
             Map<String, Object> securityModel = new HashMap<>();
             securityModel.put(securityViewModelProcessorConfiguration.getPrincipalNameKey(), authentication.get().getName());
-            securityModel.put(securityViewModelProcessorConfiguration.getAttributesKey(), authentication.get().getAttributes());
+            securityModel.put(securityViewModelProcessorConfiguration.getAttributesKey(), authentication.get());
 
             Map<String, Object> viewModel = modelAndView.getModel().orElseGet(() -> {
                 final HashMap<String, Object> newModel = new HashMap<>(1);
