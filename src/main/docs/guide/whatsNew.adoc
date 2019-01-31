@@ -1,5 +1,20 @@
 Micronaut {version} includes the following changes:
 
+
+=== Modularization
+
+Micronaut is now modular with parts of Micronaut being shifted into subprojects. See the following links for new subprojects that now have indepent release cycles outside of Micronaut core:
+
+* https://micronaut-projects.github.io/micronaut-kafka/latest/guide/index.html[Micronaut Kafka]
+* https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/index.html[Micronaut Micrometer]
+* https://micronaut-projects.github.io/micronaut-groovy/latest/guide/index.html[Micronaut Groovy]
+* https://micronaut-projects.github.io/micronaut-sql/latest/guide/index.html[Micronaut SQL]
+* https://micronaut-projects.github.io/micronaut-mongodb/latest/guide/index.html[Micronaut MongoDB]
+* https://micronaut-projects.github.io/micronaut-redis/latest/guide/index.html[Micronaut Redis]
+* https://micronaut-projects.github.io/micronaut-test/latest/guide/index.html[Micronaut Test]
+* https://micronaut-projects.github.io/micronaut-netflix/latest/guide/index.html[Micronaut Netflix]
+* https://micronaut-projects.github.io/micronaut-aws/latest/guide/index.html[Micronaut AWS]
+
 === File Watch and Server Restart
 
 A new <<automaticRestart,Automatic Restart>> feature is included that allows the server to restart if a change occurs to a file. This feature can be used both in production and at development time to achieve automatic application restarts when changing source code (when combined with a third party tool such as Gradle or Kubernetes in production).
@@ -62,6 +77,7 @@ Micrometer has been upgraded to 1.1 and support for https://micrometer.io/docs/c
 
 === Dependency Upgrades
 
+- Gradle `4.10.2` -> `5.1.1`
 - Kafka `2.0.1` -> `2.1.0`
 - Micrometer `1.0.6` -> `1.1.1`
 - Reactive Streams `1.0.1` -> `1.0.2`
