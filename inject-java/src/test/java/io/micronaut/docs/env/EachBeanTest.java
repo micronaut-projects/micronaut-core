@@ -47,7 +47,7 @@ public class EachBeanTest {
 
         // tag::beans[]
         Collection<DataSource> beansOfType = applicationContext.getBeansOfType(DataSource.class);
-        assertEquals(beansOfType.size(), 2); // <1>
+        assertEquals(2, beansOfType.size()); // <1>
 
         DataSource firstConfig = applicationContext.getBean(
                 DataSource.class,

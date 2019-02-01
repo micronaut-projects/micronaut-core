@@ -357,7 +357,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     private void flushBuffer() {
         while (!buffer.isEmpty() && (outstandingDemand > 0 || outstandingDemand == Long.MAX_VALUE)) {
             if (LOG.isTraceEnabled()) {
-                LOG.trace("HandlerPublisher (state: {}) release message from buffer to satisfy demand: ", state, outstandingDemand);
+                LOG.trace("HandlerPublisher (state: {}) release message from buffer to satisfy demand: {}", state, outstandingDemand);
             }
             publishMessage(buffer.remove());
         }

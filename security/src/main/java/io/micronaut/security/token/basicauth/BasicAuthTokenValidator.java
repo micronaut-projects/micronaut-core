@@ -31,7 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
-import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Optional;
 
@@ -100,14 +100,7 @@ public class BasicAuthTokenValidator implements TokenValidator {
         }
 
         String token;
-        try {
-            token = new String(decoded, "UTF-8");
-        } catch (final UnsupportedEncodingException e) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Bad format of the basic auth header");
-            }
-            return Optional.empty();
-        }
+        token = new String(decoded, StandardCharsets.UTF_8);
 
         final int delim = token.indexOf(":");
         if (delim < 0) {

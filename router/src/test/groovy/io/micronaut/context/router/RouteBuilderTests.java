@@ -21,7 +21,6 @@ import io.micronaut.context.annotation.Executable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Controller;
 import org.junit.Test;
 import io.micronaut.web.router.*;
 

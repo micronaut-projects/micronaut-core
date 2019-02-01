@@ -299,7 +299,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
      * @return A set of calculated property names
      */
     private Set<String> calcPropertySourceNames(String prefix, Set<String> activeNames) {
-        return ClientUtil.calcPropertySourceNames(prefix, activeNames);
+        return ClientUtil.calcPropertySourceNames(prefix, activeNames, "_");
     }
 
     /**

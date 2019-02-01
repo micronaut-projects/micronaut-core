@@ -17,8 +17,6 @@
 package io.micronaut.docs.replaces;
 
 import io.micronaut.context.annotation.Replaces;
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.context.env.Environment;
 import io.micronaut.docs.requires.Book;
 
 import javax.inject.Singleton;

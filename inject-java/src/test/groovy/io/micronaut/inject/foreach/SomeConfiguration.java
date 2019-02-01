@@ -20,7 +20,6 @@ import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
 
 import javax.annotation.Nullable;
-import javax.sql.DataSource;
 
 @EachProperty("someconf")
 public class SomeConfiguration {

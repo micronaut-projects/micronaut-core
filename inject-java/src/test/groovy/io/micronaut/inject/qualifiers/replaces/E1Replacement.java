@@ -2,7 +2,6 @@ package io.micronaut.inject.qualifiers.replaces;
 
 import io.micronaut.context.annotation.Replaces;
 
-import javax.inject.Named;
 import javax.inject.Singleton;
 
 @Singleton

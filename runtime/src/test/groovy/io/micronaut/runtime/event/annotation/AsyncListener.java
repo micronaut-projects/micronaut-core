@@ -5,7 +5,6 @@ import io.micronaut.scheduling.annotation.Async;
 
 import javax.inject.Singleton;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 
 @Singleton
 public class AsyncListener {

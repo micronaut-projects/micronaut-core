@@ -58,8 +58,8 @@ public class IssuesControllerTest {
         String body = client.toBlocking().retrieve("/issues/12"); // <2>
         assertNotNull(body);
         assertEquals( // <3>
-                body,
-                "Issue # 12!"
+                "Issue # 12!",
+                body
         );
     }
     // end::test[]

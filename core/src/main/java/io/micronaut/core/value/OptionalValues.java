@@ -36,7 +36,7 @@ public interface OptionalValues<V> extends Iterable<CharSequence> {
     /**
      * Constant for empty values.
      */
-    OptionalValues EMPTY_VALUES = of(Object.class, Collections.EMPTY_MAP);
+    OptionalValues EMPTY_VALUES = of(Object.class, Collections.emptyMap());
 
     /**
      * Retrieve a value if it is present.

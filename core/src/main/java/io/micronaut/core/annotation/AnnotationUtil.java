@@ -92,11 +92,11 @@ public class AnnotationUtil {
      * @param objects The objects
      * @return A unmodifiable, pooled set of strings
      */
-    @SuppressWarnings({"unused", "unchecked"})
+    @SuppressWarnings({"unused"})
     @UsedByGeneratedCode
     public static List<String> internListOf(Object... objects) {
         if (objects == null || objects.length == 0) {
-            return Collections.EMPTY_LIST;
+            return Collections.emptyList();
         }
 
         Integer hash = Arrays.hashCode(objects);
@@ -130,7 +130,7 @@ public class AnnotationUtil {
             if (value == Collections.EMPTY_MAP) {
                 String key = values[0].toString().intern();
                 return INTERN_MAP_POOL.computeIfAbsent(key, s ->
-                        Collections.singletonMap(s, Collections.EMPTY_MAP)
+                        Collections.singletonMap(s, Collections.emptyMap())
                 );
             } else {
                 return StringUtils.internMapOf(values);

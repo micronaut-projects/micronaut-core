@@ -27,6 +27,7 @@ import io.micronaut.context.env.yaml.YamlPropertySourceLoader;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.discovery.client.ClientUtil;
 import io.micronaut.discovery.config.ConfigDiscoveryConfiguration;
 import io.micronaut.discovery.config.ConfigurationClient;
 import io.micronaut.discovery.consul.ConsulConfiguration;
@@ -48,9 +49,7 @@ import javax.inject.Named;
 import javax.inject.Singleton;
 import java.util.Base64;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -205,7 +204,7 @@ public class ConsulConfigurationClient implements ConfigurationClient {
                             case PROPERTIES:
                                 String fullName = key.substring(pathPrefix.length());
                                 if (!fullName.contains("/")) {
-                                    propertySourceNames = calcPropertySourceNames(fullName, activeNames);
+                                    propertySourceNames = ClientUtil.calcPropertySourceNames(fullName, activeNames, ",");
                                     String formatName = format.name().toLowerCase(Locale.ENGLISH);
                                     PropertySourceLoader propertySourceLoader = resolveLoader(formatName);
 
@@ -313,35 +312,10 @@ public class ConsulConfigurationClient implements ConfigurationClient {
         int i = prefix.indexOf('/');
         if (i > -1) {
             prefix = prefix.substring(0, i);
-            propertySourceNames = calcPropertySourceNames(prefix, activeNames);
+            propertySourceNames = ClientUtil.calcPropertySourceNames(prefix, activeNames, ",");
             if (propertySourceNames == null) {
                 return null;
             }
-        }
-        return propertySourceNames;
-    }
-
-    private Set<String> calcPropertySourceNames(String prefix, Set<String> activeNames) {
-        Set<String> propertySourceNames;
-        if (prefix.indexOf(',') > -1) {
-
-            String[] tokens = prefix.split(",");
-            if (tokens.length == 1) {
-                propertySourceNames = Collections.singleton(tokens[0]);
-            } else {
-                String name = tokens[0];
-                Set<String> newSet = new HashSet<>(tokens.length - 1);
-                for (int j = 1; j < tokens.length; j++) {
-                    String envName = tokens[j];
-                    if (!activeNames.contains(envName)) {
-                        return Collections.emptySet();
-                    }
-                    newSet.add(name + '[' + envName + ']');
-                }
-                propertySourceNames = newSet;
-            }
-        } else {
-            propertySourceNames = Collections.singleton(prefix);
         }
         return propertySourceNames;
     }
