@@ -1339,7 +1339,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
 
                     GenericsType[] typeArguments = typeToImplement.getGenericsTypes()
-                    Map<String, ClassNode> typeVariables = new HashMap<>(typeArguments.size())
+                    Map<String, ClassNode> typeVariables = new HashMap<>(typeArguments?.size() ?: 1)
 
                     for (GenericsType typeArgument : typeArguments) {
                         typeVariables.put(typeArgument.name, typeArgument.type)
