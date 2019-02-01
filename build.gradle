@@ -67,7 +67,8 @@ ext {
             'jackson.modules'          : [
                     version: jacksonVersion,
                     group  : 'com.fasterxml.jackson.module',
-                    name   : 'jackson-module-afterburner'
+                    name   : 'jackson-module-afterburner',
+                    modules: ['jackson-module-kotlin', 'jackson-module-parameter-names', 'jackson-module-jaxb-annotations']
             ],
             'jackson.datatype'         : [
                     version: jacksonVersion,
