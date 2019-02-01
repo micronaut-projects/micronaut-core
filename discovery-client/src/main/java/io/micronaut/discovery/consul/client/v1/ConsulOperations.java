@@ -119,6 +119,7 @@ public interface ConsulOperations {
      * @return The current leader address
      */
     @Get(uri = "/status/leader", single = true)
+    @Retryable
     Publisher<String> status();
 
     /**

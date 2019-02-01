@@ -131,9 +131,13 @@ consul:
 
 With this configuration option in place Consul will assume responsibility of invoking the Micronaut applications <<healthEndpoint, Health Endpoint>>.
 
-== Running from Dockerized NAT-ed instances
-Sometimes when running in dockerized services that run on a different IP address than what other clients would connect to, use the following settings below.
-Note you currently have to bind Micronaut to the same port you would be mapping to on the host container.
+== Controlling IP/Host Registration
+
+Occasionally, depending on the deployment environment you may wish to expose the IP address and not the host name, since by default Micronaut will register with Consul with either the value of the `HOST` environment variable or the value configured via `micronaut.server.host`.
+
+You can use the `consul.client.registration.prefer-ip-address` setting to indicate you would prefer to register with the IP address.
+
+Micronaut will by default perform an IP lookup to try and figure out the IP address, however you can use the `consul.client.registration.ip-addr` setting to specify the IP address of the service directly.
 
 .Consul HTTP Check Configuration
 [source,yaml]
@@ -141,13 +145,13 @@ Note you currently have to bind Micronaut to the same port you would be mapping 
 consul:
   client:
     registration:
-        ipAddr: <your base container ip>
-        preferIpAddress: true
+        ip-addr: <your base container ip>
+        prefer-ip-address: true
 ----
 
-This will tell consul to register the IP that other instances can use to access your service and not the NAT ip it is running under (or 127.0.0.1).
+This will tell Consul to register the IP that other instances can use to access your service and not the NAT IP it is running under (or 127.0.0.1).
 
-If you want to use the check: http: true setting, the ipAddr configured will be used for the consul health checks to the micronaut /health endpoint.
+If you use HTTP health checks (see the previous section) then Consul will use the configured IP address to check the Micronaut `/health` endpoint.
 
 .Consul HTTP Check Configuration
 [source,yaml]
@@ -155,8 +159,8 @@ If you want to use the check: http: true setting, the ipAddr configured will be 
 consul:
   client:
     registration:
-        ipAddr: <your base container ip>
-        preferIpAddress: true
+        ip-addr: <your base container ip>
+        prefer-ip-address: true
         check:
             http: true
 ----
