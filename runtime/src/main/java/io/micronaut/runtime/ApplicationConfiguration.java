@@ -128,8 +128,7 @@ public class ApplicationConfiguration {
         private String id;
         private String group;
         private String zone;
-        @SuppressWarnings("unchecked")
-        private Map<String, String> metadata = Collections.EMPTY_MAP;
+        private Map<String, String> metadata = Collections.emptyMap();
 
         /**
          * @return An optional instance identifier

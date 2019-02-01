@@ -665,9 +665,7 @@ public class MediaType implements CharSequence {
 
     @SuppressWarnings("MagicNumber")
     private static Map<String, String> loadMimeTypes() {
-        InputStream is = null;
-        try {
-            is = MediaType.class.getClassLoader().getResourceAsStream(MIME_TYPES_FILE_NAME);
+        try (InputStream is = MediaType.class.getClassLoader().getResourceAsStream(MIME_TYPES_FILE_NAME)) {
             BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.US_ASCII));
             Map<String, String> result = new LinkedHashMap<>(100);
             String line;
@@ -686,13 +684,6 @@ public class MediaType implements CharSequence {
         } catch (IOException ex) {
             if (LOG.isWarnEnabled()) {
                 LOG.warn("Failed to load mime types for file extension detection!");
-            }
-        } finally {
-            if (is != null) {
-                try {
-                    is.close();
-                } catch (IOException ignore) {
-                }
             }
         }
 

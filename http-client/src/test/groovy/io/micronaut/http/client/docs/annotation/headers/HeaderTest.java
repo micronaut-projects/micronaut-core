@@ -25,7 +25,7 @@ public class HeaderTest {
 
             Assert.assertNotNull(pet);
 
-            Assert.assertEquals(pet.getAge(), 11);
+            Assert.assertEquals(11, pet.getAge());
         }
 
     }

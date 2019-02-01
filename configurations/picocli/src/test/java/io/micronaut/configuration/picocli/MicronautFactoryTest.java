@@ -16,14 +16,10 @@
 
 package io.micronaut.configuration.picocli;
 
-import io.micronaut.configuration.picocli.MicronautFactory;
 import io.micronaut.context.ApplicationContext;
-import io.micronaut.context.DefaultApplicationContext;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.util.CollectionUtils;
-import org.junit.Ignore;
-import spock.lang.Specification;
 
 import javax.inject.Singleton;
 import java.util.concurrent.atomic.AtomicInteger;

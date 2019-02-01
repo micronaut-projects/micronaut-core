@@ -14,6 +14,7 @@ package io.micronaut.openapi.util;
 import java.io.*;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
@@ -554,7 +555,7 @@ public class YAMLGenerator extends GeneratorBase {
     @Override
     public final void writeUTF8String(byte[] text, int offset, int len)
             throws IOException {
-        writeString(new String(text, offset, len, "UTF-8"));
+        writeString(new String(text, offset, len, StandardCharsets.UTF_8));
     }
 
     /*

@@ -52,13 +52,12 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
      * @param annotationName The annotation name
      * @param values         The values
      */
-    @SuppressWarnings("unchecked")
     @UsedByGeneratedCode
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values) {
         this.annotationName = annotationName.intern();
         this.convertibleValues = newConvertibleValues(values);
         this.values = values;
-        this.defaultValues = Collections.EMPTY_MAP;
+        this.defaultValues = Collections.emptyMap();
     }
 
     /**
@@ -66,13 +65,12 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
      * @param values         The values
      * @param defaultValues The default values
      */
-    @SuppressWarnings("unchecked")
     @UsedByGeneratedCode
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<String, Object> defaultValues) {
         this.annotationName = annotationName.intern();
         this.convertibleValues = newConvertibleValues(values);
         this.values = values;
-        this.defaultValues = defaultValues != null ? defaultValues : Collections.EMPTY_MAP;
+        this.defaultValues = defaultValues != null ? defaultValues : Collections.emptyMap();
     }
 
     /**
@@ -83,8 +81,8 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
     public AnnotationValue(String annotationName) {
         this.annotationName = annotationName.intern();
         this.convertibleValues = ConvertibleValues.EMPTY;
-        this.values = Collections.EMPTY_MAP;
-        this.defaultValues = Collections.EMPTY_MAP;
+        this.values = Collections.emptyMap();
+        this.defaultValues = Collections.emptyMap();
     }
 
     /**
@@ -97,7 +95,7 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
         Map<String, Object> existing = convertibleValues.asMap();
         this.values = new HashMap<>(existing.size());
         this.values.putAll(existing);
-        this.defaultValues = Collections.EMPTY_MAP;
+        this.defaultValues = Collections.emptyMap();
     }
 
     /**

@@ -58,9 +58,8 @@ class AnnotationMetadataSupport {
      * @param annotation The annotation
      * @return The default values for the annotation
      */
-    @SuppressWarnings("unchecked")
     static Map<String, Object> getDefaultValues(String annotation) {
-        return ANNOTATION_DEFAULTS.computeIfAbsent(annotation, s -> Collections.EMPTY_MAP);
+        return ANNOTATION_DEFAULTS.computeIfAbsent(annotation, s -> Collections.emptyMap());
     }
 
     /**

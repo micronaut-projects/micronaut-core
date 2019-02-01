@@ -32,6 +32,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
@@ -121,7 +122,7 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
                             LOG.debug("Ignoring file [" + url + "] due to URI error: " + e.getMessage(), e);
                         }
                     }
-                } else if (includeJars && Stream.of("jar", "zip", "war").anyMatch(it -> it.equals(protocol))) {
+                } else if (includeJars && Arrays.asList("jar", "zip", "war").contains(protocol)) {
                     URLConnection con = url.openConnection();
                     if (con instanceof JarURLConnection) {
                         JarURLConnection jarCon = (JarURLConnection) con;

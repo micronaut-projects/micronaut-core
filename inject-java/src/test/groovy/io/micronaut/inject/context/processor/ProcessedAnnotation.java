@@ -2,7 +2,6 @@ package io.micronaut.inject.context.processor;
 
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.DefaultScope;
-import io.micronaut.context.annotation.Executable;
 
 import javax.inject.Singleton;
 import java.lang.annotation.Documented;

@@ -34,8 +34,7 @@ public class HealthEntry {
 
     private NodeEntry node;
     private ServiceEntry service;
-    @SuppressWarnings("unchecked")
-    private List<Check> checks = Collections.EMPTY_LIST;
+    private List<Check> checks = Collections.emptyList();
 
     /**
      * @return The node for this health entry

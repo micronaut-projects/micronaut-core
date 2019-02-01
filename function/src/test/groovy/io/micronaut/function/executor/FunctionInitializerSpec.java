@@ -31,7 +31,7 @@ public class FunctionInitializerSpec   {
 
     @Test
     public void testFunctionInitializer() {
-        Assert.assertEquals(new MathFunction().round(1.6f) , 2);
+        Assert.assertEquals(2, new MathFunction().round(1.6f));
     }
 
     @Singleton

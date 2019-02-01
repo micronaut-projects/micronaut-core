@@ -57,8 +57,8 @@ public class EnvironmentTest {
         Environment environment = applicationContext.getEnvironment();
 
         assertEquals(
-                environment.getProperty("micronaut.server.host", String.class).orElse("localhost"),
-                "foo"
+                "foo",
+                environment.getProperty("micronaut.server.host", String.class).orElse("localhost")
         );
         // end::envProps[]
 
