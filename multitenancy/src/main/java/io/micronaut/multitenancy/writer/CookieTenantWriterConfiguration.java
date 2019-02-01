@@ -17,6 +17,7 @@
 package io.micronaut.multitenancy.writer;
 
 import io.micronaut.core.util.Toggleable;
+import io.micronaut.http.cookie.CookieConfiguration;
 
 /**
  * {@link io.micronaut.multitenancy.writer.CookieTenantWriter} Configuration.
@@ -24,7 +25,7 @@ import io.micronaut.core.util.Toggleable;
  * @author Sergio del Amo
  * @since 1.0
  */
-interface CookieTenantWriterConfiguration extends Toggleable {
+interface CookieTenantWriterConfiguration extends CookieConfiguration, Toggleable {
 
     /**
      *
