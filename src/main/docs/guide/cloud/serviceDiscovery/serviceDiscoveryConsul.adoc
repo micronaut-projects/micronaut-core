@@ -4,10 +4,10 @@ https://www.consul.io[Consul] is a popular Service Discovery and Distributed Con
 
 The quickest way to start using Consul is via Docker:
 
-. Starting Consul with Docker
+. Starting Consul with Docker. Currently only v1.2.x is supported.
 [source,bash]
 ----
-docker run -p 8500:8500 consul
+docker run -p 8500:8500 consul:1.2.4
 ----
 
 Alternatively you can https://www.consul.io/docs/install/index.html[install and run a local Consul instance].
@@ -130,3 +130,33 @@ consul:
 ----
 
 With this configuration option in place Consul will assume responsibility of invoking the Micronaut applications <<healthEndpoint, Health Endpoint>>.
+
+== Running from Dockerized NAT-ed instances
+Sometimes when running in dockerized services that run on a different IP address than what other clients would connect to, use the following settings below.
+Note you currently have to bind Micronaut to the same port you would be mapping to on the host container.
+
+.Consul HTTP Check Configuration
+[source,yaml]
+----
+consul:
+  client:
+    registration:
+        ipAddr: <your base container ip>
+        preferIpAddress: true
+----
+
+This will tell consul to register the IP that other instances can use to access your service and not the NAT ip it is running under (or 127.0.0.1).
+
+If you want to use the check: http: true setting, the ipAddr configured will be used for the consul health checks to the micronaut /health endpoint.
+
+.Consul HTTP Check Configuration
+[source,yaml]
+----
+consul:
+  client:
+    registration:
+        ipAddr: <your base container ip>
+        preferIpAddress: true
+        check:
+            http: true
+----
