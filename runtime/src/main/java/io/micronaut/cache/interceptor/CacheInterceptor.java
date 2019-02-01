@@ -39,6 +39,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.TaskExecutors;
 import io.reactivex.BackpressureStrategy;
 import io.reactivex.Flowable;
+import io.reactivex.Single;
 import io.reactivex.functions.Function;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
@@ -399,7 +400,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                             }
                         }
                     } else {
-                        final Flowable<Boolean> cacheInvalidateFlowable = Flowable.create(emitter -> {
+                        final Flowable<Object> cacheInvalidateFlowable = Flowable.create(emitter -> {
                             if (invalidateAll) {
                                 final CompletableFuture<Void> allFutures = buildInvalidateAllFutures(cacheNames);
                                 allFutures.whenCompleteAsync((aBoolean, throwable) -> {
@@ -410,7 +411,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                                             return;
                                         }
                                     }
-                                    emitter.onNext(true);
+                                    emitter.onNext(o);
                                     emitter.onComplete();
                                 }, ioExecutor);
                             } else {
@@ -431,7 +432,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                                             return;
                                         }
                                     }
-                                    emitter.onNext(true);
+                                    emitter.onNext(o);
                                     emitter.onComplete();
                                 }, ioExecutor);
                             }
@@ -441,7 +442,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                 }
             }
             if (!cacheInvalidates.isEmpty()) {
-                return Flowable.concat(cacheInvalidates).toList().map(flowables -> Flowable.just(o)).toFlowable();
+                return Flowable.merge(cacheInvalidates).lastOrError().toFlowable();
             } else {
                 return Flowable.just(o);
             }
@@ -470,14 +471,14 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                             CompletableFuture<Void> putOperationFuture = buildPutFutures(cacheNames, o, key);
                             putOperationFuture.whenComplete((aVoid, throwable) -> {
                                 if (throwable == null) {
-                                    emitter.onNext(true);
+                                    emitter.onNext(o);
                                     emitter.onComplete();
                                 } else {
                                     SyncCache cache = cacheManager.getCache(cacheNames[0]);
                                     if (errorHandler.handlePutError(cache, key, o, asRuntimeException(throwable))) {
                                         emitter.onError(throwable);
                                     } else {
-                                        emitter.onNext(true);
+                                        emitter.onNext(o);
                                         emitter.onComplete();
                                     }
                                 }
@@ -489,7 +490,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
             }
 
             if (!cachePuts.isEmpty()) {
-                return Flowable.concat(cachePuts).toList().map(flowables -> Flowable.just(o)).toFlowable();
+                return Flowable.merge(cachePuts).lastOrError().toFlowable();
             } else {
                 return Flowable.just(o);
             }
