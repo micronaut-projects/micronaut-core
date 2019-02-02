@@ -102,6 +102,11 @@ function postProcessCodeBlocks() {
                 multiLanguageSelectorElement.classList.add("multi-language-selector");
                 languageSelectorFragment.appendChild(multiLanguageSelectorElement);
 
+                if (sampleCollection.every(function(element) {
+                    return element.classList.contains("hidden");
+                })) {
+                    sampleCollection[0].classList.remove("hidden");
+                }
 
                 sampleCollection.forEach(function (sampleEl) {
                     var optionEl = document.createElement("code");
