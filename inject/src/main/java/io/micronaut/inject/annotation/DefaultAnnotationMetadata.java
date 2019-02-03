@@ -409,19 +409,17 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     protected final void addAnnotation(String annotation, Map<CharSequence, Object> values) {
         if (annotation != null) {
             String repeatedName = getRepeatedName(annotation);
-            if (repeatedName != null) {
-                Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
-                if (v instanceof io.micronaut.core.annotation.AnnotationValue[]) {
-                    io.micronaut.core.annotation.AnnotationValue[] avs = (io.micronaut.core.annotation.AnnotationValue[]) v;
-                    for (io.micronaut.core.annotation.AnnotationValue av : avs) {
-                        addRepeatable(annotation, av);
-                    }
-                } else if (v instanceof Iterable) {
-                    Iterable i = (Iterable) v;
-                    for (Object o : i) {
-                        if (o instanceof io.micronaut.core.annotation.AnnotationValue) {
-                            addRepeatable(annotation, ((io.micronaut.core.annotation.AnnotationValue) o));
-                        }
+            Object v = values.get(AnnotationMetadata.VALUE_MEMBER);
+            if (v instanceof io.micronaut.core.annotation.AnnotationValue[]) {
+                io.micronaut.core.annotation.AnnotationValue[] avs = (io.micronaut.core.annotation.AnnotationValue[]) v;
+                for (io.micronaut.core.annotation.AnnotationValue av : avs) {
+                    addRepeatable(annotation, av);
+                }
+            } else if (v instanceof Iterable && repeatedName != null) {
+                Iterable i = (Iterable) v;
+                for (Object o : i) {
+                    if (o instanceof io.micronaut.core.annotation.AnnotationValue) {
+                        addRepeatable(annotation, ((io.micronaut.core.annotation.AnnotationValue) o));
                     }
                 }
             } else {
@@ -842,7 +840,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         if (v != null) {
             if (v.getClass().isArray()) {
                 Object[] array = (Object[]) v;
-                List newValues = new ArrayList(array.length + 1);
+                Set newValues = new LinkedHashSet(array.length + 1);
                 newValues.addAll(Arrays.asList(array));
                 newValues.add(annotationValue);
                 values.put(member, newValues);
@@ -850,7 +848,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
                 ((Collection) v).add(annotationValue);
             }
         } else {
-            ArrayList<Object> newValues = new ArrayList<>(2);
+            Set<Object> newValues = new LinkedHashSet<>(2);
             newValues.add(annotationValue);
             values.put(member, newValues);
         }
