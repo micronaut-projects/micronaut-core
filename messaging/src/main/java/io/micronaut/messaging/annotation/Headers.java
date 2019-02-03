@@ -38,18 +38,10 @@ import java.lang.annotation.Target;
  */
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.TYPE})
+@Target({ElementType.TYPE, ElementType.METHOD})
 public @interface Headers {
 
     /***
-     * This allows you to have multiple @Header's set at the class level with Java and Groovy.
-     * Example usage:
-     * <pre><code>
-     *{@literal @}Headers({
-     *     {@literal @}Header(name="Content-type",value="application/octet-stream"),
-     *     {@literal @}Header(name="Content-length",value="2048")
-     * })
-     * </code></pre>
      * @return The headers
      */
     Header[] value() default {};
