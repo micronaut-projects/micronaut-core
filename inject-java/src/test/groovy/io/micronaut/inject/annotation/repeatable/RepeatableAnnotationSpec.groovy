@@ -163,8 +163,8 @@ class Test {
         !definition.getAnnotationMetadata().hasAnnotation(Requirements.class)
 
         requirements != null
-        requirements.size() == 3
-        requires.size() == 3
+        requirements.size() == 2
+        requires.size() == 2
     }
 
     void "test repeatable annotation resolve inherited from meta annotations - reverse"() {
@@ -193,8 +193,8 @@ class Test {
         !definition.getAnnotationMetadata().hasAnnotation(Requirements.class)
 
         requirements != null
-        requirements.size() == 3
-        requires.size() == 3
+        requirements.size() == 2
+        requires.size() == 2
     }
 
 
