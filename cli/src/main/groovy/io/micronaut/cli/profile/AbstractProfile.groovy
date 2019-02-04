@@ -291,7 +291,7 @@ abstract class AbstractProfile implements Profile {
 
     @Override
     Iterable<Feature> getFeatures() {
-        Set<Feature> calculatedFeatures = []
+        Set<Feature> calculatedFeatures = new LinkedHashSet()
         calculatedFeatures.addAll(features)
         def parents = getExtends()
         for (profile in parents) {
