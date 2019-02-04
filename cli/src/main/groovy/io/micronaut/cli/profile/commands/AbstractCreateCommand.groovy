@@ -328,10 +328,11 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                 def location = f.location
 
                 File skeletonDir
+                File tmpDir
                 if (location instanceof FileSystemResource) {
                     skeletonDir = location.createRelative("skeleton").file
                 } else {
-                    File tmpDir = unzipProfile(ant, location)
+                    tmpDir = unzipProfile(ant, location)
                     skeletonDir = new File(tmpDir, "META-INF/profile/features/$f.name/skeleton")
                 }
 
@@ -344,8 +345,10 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                     copySrcToTarget(ant, new File(skeletonDir, cmd.build + "-build"), ['**/' + APPLICATION_YML], profileInstance.binaryExtensions)
                     ant.chmod(dir: targetDirectory, includes: profileInstance.executablePatterns.join(' '), perm: 'u+x')
                 }
-            }
 
+                deleteDirectory(tmpDir)
+                deleteDirectory(skeletonDir)
+            }
             replaceBuildTokens(cmd.build, profileInstance, features, projectTargetDirectory)
 
             messageOnComplete(cmd.console, cmd, projectTargetDirectory)
@@ -753,11 +756,12 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
 
         def skeletonResource = participatingProfile.profileDir.createRelative("skeleton")
         File skeletonDir
+        File tmpDir
         if (skeletonResource instanceof FileSystemResource) {
             skeletonDir = skeletonResource.file
         } else {
             // establish the JAR file name and extract
-            def tmpDir = unzipProfile(ant, skeletonResource)
+            tmpDir = unzipProfile(ant, skeletonResource)
             skeletonDir = new File(tmpDir, "META-INF/profile/skeleton")
         }
         copySrcToTarget(ant, skeletonDir, excludes, profile.binaryExtensions)
@@ -767,6 +771,9 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         copyBuildFiles(new File(skeletonDir, build + "-build"), build, buildMergeProfileNames.contains(participatingProfile.name))
 
         ant.chmod(dir: targetDirectory, includes: profile.executablePatterns.join(' '), perm: 'u+x')
+
+        deleteDirectory(tmpDir)
+        deleteDirectory(skeletonDir)
     }
 
     @CompileDynamic
@@ -821,6 +828,14 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                     }
                 }
             }
+        }
+    }
+
+    private void deleteDirectory(File directory) {
+        try {
+            directory?.deleteDir()
+        } catch (Throwable t) {
+            // Ignore error deleting temporal directory
         }
     }
 
