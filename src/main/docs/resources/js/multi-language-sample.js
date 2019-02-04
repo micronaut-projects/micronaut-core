@@ -94,43 +94,50 @@ function postProcessCodeBlocks() {
 
         multiLanguageSets.forEach(function (sampleCollection) {
             // Create selector element if not existing
-            if (sampleCollection.length > 1 &&
-                (sampleCollection[0].previousElementSibling == null ||
-                    !sampleCollection[0].previousElementSibling.classList.contains("multi-language-selector"))) {
-                var languageSelectorFragment = document.createDocumentFragment();
-                var multiLanguageSelectorElement = document.createElement("div");
-                multiLanguageSelectorElement.classList.add("multi-language-selector");
-                languageSelectorFragment.appendChild(multiLanguageSelectorElement);
+            if (sampleCollection.length > 1) {
 
+                if (sampleCollection.every(function(element) {
+                    return element.classList.contains("hidden");
+                })) {
+                    sampleCollection[0].classList.remove("hidden");
+                }
 
-                sampleCollection.forEach(function (sampleEl) {
-                    var optionEl = document.createElement("code");
-                    var sampleLanguage = sampleEl.getAttribute("data-lang");
-                    optionEl.setAttribute("data-lang", sampleLanguage);
-                    optionEl.setAttribute("role", "button");
-                    optionEl.classList.add("language-option");
+                if (sampleCollection[0].previousElementSibling == null ||
+                    !sampleCollection[0].previousElementSibling.classList.contains("multi-language-selector")) {
+                    var languageSelectorFragment = document.createDocumentFragment();
+                    var multiLanguageSelectorElement = document.createElement("div");
+                    multiLanguageSelectorElement.classList.add("multi-language-selector");
+                    languageSelectorFragment.appendChild(multiLanguageSelectorElement);
 
-                    optionEl.innerText = capitalizeFirstLetter(sampleLanguage);
+                    sampleCollection.forEach(function (sampleEl) {
+                        var optionEl = document.createElement("code");
+                        var sampleLanguage = sampleEl.getAttribute("data-lang");
+                        optionEl.setAttribute("data-lang", sampleLanguage);
+                        optionEl.setAttribute("role", "button");
+                        optionEl.classList.add("language-option");
 
-                    optionEl.addEventListener("click", function updatePreferredLanguage(evt) {
-                        var optionId = optionEl.getAttribute("data-lang");
-                        if (isBuild(optionId)) {
-                            window.localStorage.setItem(LOCALSTORAGE_KEY_BUILD, optionId);
-                        }
-                        if (isLang(optionId)) {
-                            window.localStorage.setItem(LOCALSTORAGE_KEY_LANG, optionId);
-                        }
-                        // Record how far down the page the clicked element is before switching all samples
-                        var beforeOffset = evt.target.offsetTop;
+                        optionEl.innerText = capitalizeFirstLetter(sampleLanguage);
 
-                        switchSampleLanguage(isLang(optionId) ? optionId : initPreferredLanguage(), isBuild(optionId) ? optionId : initPreferredBuild());
+                        optionEl.addEventListener("click", function updatePreferredLanguage(evt) {
+                            var optionId = optionEl.getAttribute("data-lang");
+                            if (isBuild(optionId)) {
+                                window.localStorage.setItem(LOCALSTORAGE_KEY_BUILD, optionId);
+                            }
+                            if (isLang(optionId)) {
+                                window.localStorage.setItem(LOCALSTORAGE_KEY_LANG, optionId);
+                            }
+                            // Record how far down the page the clicked element is before switching all samples
+                            var beforeOffset = evt.target.offsetTop;
 
-                        // Scroll the window to account for content height differences between different sample languages
-                        window.scrollBy(0, evt.target.offsetTop - beforeOffset);
+                            switchSampleLanguage(isLang(optionId) ? optionId : initPreferredLanguage(), isBuild(optionId) ? optionId : initPreferredBuild());
+
+                            // Scroll the window to account for content height differences between different sample languages
+                            window.scrollBy(0, evt.target.offsetTop - beforeOffset);
+                        });
+                        multiLanguageSelectorElement.appendChild(optionEl);
                     });
-                    multiLanguageSelectorElement.appendChild(optionEl);
-                });
-                sampleCollection[0].parentNode.insertBefore(languageSelectorFragment, sampleCollection[0]);
+                    sampleCollection[0].parentNode.insertBefore(languageSelectorFragment, sampleCollection[0]);
+                }
             }
         });
 
