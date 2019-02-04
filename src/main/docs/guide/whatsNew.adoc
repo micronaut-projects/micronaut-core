@@ -14,10 +14,57 @@ Micronaut is now modular with parts of Micronaut being shifted into subprojects.
 * https://micronaut-projects.github.io/micronaut-test/latest/guide/index.html[Micronaut Test]
 * https://micronaut-projects.github.io/micronaut-netflix/latest/guide/index.html[Micronaut Netflix]
 * https://micronaut-projects.github.io/micronaut-aws/latest/guide/index.html[Micronaut AWS]
+* https://micronaut-projects.github.io/micronaut-grpc/latest/guide/index.html[Micronaut GRPC]
 
 === File Watch and Server Restart
 
 A new <<automaticRestart,Automatic Restart>> feature is included that allows the server to restart if a change occurs to a file. This feature can be used both in production and at development time to achieve automatic application restarts when changing source code (when combined with a third party tool such as Gradle or Kubernetes in production).
+
+[TIP]
+.Using the CLI
+====
+----
+$ mn create-app my-app --features file-watch
+----
+====
+
+
+=== AWS API Gateway Proxy Support
+
+Support for AWS API Gateway Proxy has been added allowing AWS Lambda's to be defined as regular controllers. See the documentation on https://micronaut-projects.github.io/micronaut-aws/latest/guide/#apiProxy[AWS API Gateway Proxy Support] for more information and links to examples.
+
+[TIP]
+.Using the CLI
+====
+----
+$ mn create-app my-app --features aws-api-gateway
+----
+====
+
+=== AWS Lambda Custom Runtime + GraalVM Support
+
+Support for creating AWS API Gateway applications (see above) that are compiled into GraalVM native images and run using an AWS Lambda Custom Runtime has been added. This reduces cold starts on Lambda to 100-200ms.
+
+[TIP]
+.Using the CLI
+====
+----
+$ mn create-app my-app --features aws-api-gateway-graal
+----
+====
+
+=== Micrometer 1.1 and @Timed Support
+
+Micrometer has been upgraded to 1.1 and support for https://micrometer.io/docs/concepts#_the_code_timed_code_annotation[@Timed] AOP advice added.
+
+
+[TIP]
+.Using the CLI
+====
+----
+$ mn create-app my-app --features micrometer
+----
+====
 
 === API Versioning Support
 
@@ -43,7 +90,7 @@ Support for rendering <<freemarker,Freemaker Views>> has been added.
 
 === Constraint Bean Support
 
-For those using the `hibernate-validator` configuration, constraints will now be attempted to be retrieved from the bean context. This means you can now use dependency injection in your custom constraints.
+For those using the `micronaut-hibernate-validator` configuration, constraints will now be attempted to be retrieved from the bean context. This means you can now use dependency injection in your custom constraints.
 
 === Support for JCache Caching
 
@@ -66,14 +113,6 @@ class CacheFactory {
 }
 
 ----
-
-=== AWS API Gateway Proxy Support
-
-Support for AWS API Gateway Proxy has been added allowing AWS Lambda's to be defined as regular controllers. See the documentation on https://micronaut-projects.github.io/micronaut-aws/latest/guide/#apiProxy[AWS API Gateway Proxy Support] for more information and links to examples.
-
-=== Micrometer 1.1 and @Timed Support
-
-Micrometer has been upgraded to 1.1 and support for https://micrometer.io/docs/concepts#_the_code_timed_code_annotation[@Timed] AOP advice added.
 
 === Dependency Upgrades
 
