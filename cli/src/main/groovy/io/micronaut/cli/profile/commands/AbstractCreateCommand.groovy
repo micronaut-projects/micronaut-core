@@ -609,6 +609,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             oneOfFeatureNames.addAll(g.oneOfFeatures*.feature*.name)
         }
 
+        List<Feature> dependentFeatures = []
         for (int i = 0; i < features.size(); i++) {
             Feature feature = features[i]
 
@@ -620,13 +621,20 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                         if (feature.requested) {
                             d.requested = true
                         }
-                        features.add(d)
+                        dependentFeatures.add(d)
                     }
                 }
             }
         }
 
-        features
+        if (dependentFeatures) {
+            Set<Feature> newFeatures = new LinkedHashSet<>()
+            newFeatures.addAll(dependentFeatures)
+            newFeatures.addAll(features)
+            return newFeatures
+        } else {
+            return features
+        }
     }
 
     protected static String getLanguage(Set<Feature> features) {
