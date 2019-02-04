@@ -423,7 +423,7 @@ public class CacheInterceptor implements MethodInterceptor<Object, Object> {
                                         emitter.onNext(o);
                                         emitter.onComplete();
                                     }
-                                });
+                                }, ioExecutor);
                             } else {
                                 CacheKeyGenerator keyGenerator = cacheOperation.getCacheInvalidateKeyGenerator(invalidateOperation);
                                 String[] parameterNames = invalidateOperation.get(MEMBER_PARAMETERS, String[].class, StringUtils.EMPTY_STRING_ARRAY);
