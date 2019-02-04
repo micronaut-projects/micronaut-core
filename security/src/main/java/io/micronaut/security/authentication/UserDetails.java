@@ -17,7 +17,8 @@
 package io.micronaut.security.authentication;
 
 import java.util.Collection;
-import java.util.Objects;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -30,6 +31,9 @@ public class UserDetails implements AuthenticationResponse {
 
     private String username;
     private Collection<String> roles;
+    private Map<String, Object> attributes = new HashMap<>();
+    private String rolesKey = "roles";
+    private String usernameKey = "username";
 
     /**
      *
@@ -39,6 +43,44 @@ public class UserDetails implements AuthenticationResponse {
     public UserDetails(String username, Collection<String> roles) {
         this.username = username;
         this.roles = roles;
+    }
+
+    /**
+     *
+     * @param username e.g. admin
+     * @param roles e.g. ['ROLE_ADMIN', 'ROLE_USER']
+     * @param attributes User's attributes
+     */
+    public UserDetails(String username, Collection<String> roles, Map<String, Object> attributes) {
+        this.username = username;
+        this.roles = roles;
+        this.attributes = attributes;
+    }
+
+    /**
+     * @param usernameKey e.g. key used to place the username in the attributes map
+     * @param username e.g. admin
+     * @param rolesKey e.g. key used to place the roles in the attributes map
+     * @param roles e.g. ['ROLE_ADMIN', 'ROLE_USER']
+     * @param attributes User's attributes
+     */
+    public UserDetails(String usernameKey, String username, String rolesKey, Collection<String> roles, Map<String, Object> attributes) {
+        this.usernameKey = usernameKey;
+        this.username = username;
+        this.rolesKey = rolesKey;
+        this.roles = roles;
+        this.attributes = attributes;
+    }
+
+    /**
+     *
+     * @return User's attributes
+     */
+    public Map<String, Object> getAttributes() {
+        Map<String, Object> result = this.attributes;
+        result.putIfAbsent(this.rolesKey, getRoles());
+        result.putIfAbsent(this.usernameKey, getUsername());
+        return result;
     }
 
     /**
@@ -83,22 +125,46 @@ public class UserDetails implements AuthenticationResponse {
         return Optional.empty();
     }
 
+    public void setAttributes(Map<String, Object> attributes) {
+        this.attributes = attributes;
+    }
+
+    /**
+     * @param rolesKey key used to place the roles in the attributes map
+     */
+    public void setRolesKey(String rolesKey) {
+        this.rolesKey = rolesKey;
+    }
+
+    /**
+     *
+     * @param usernameKey key used to place the username in the attributes map
+     */
+    public void setUsernameKey(String usernameKey) {
+        this.usernameKey = usernameKey;
+    }
+
     @Override
     public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (o == null || getClass() != o.getClass()) {
-            return false;
-        }
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
         UserDetails that = (UserDetails) o;
-        return Objects.equals(username, that.username) &&
-                Objects.equals(roles, that.roles);
+
+        if (username != null ? !username.equals(that.username) : that.username != null) return false;
+        if (roles != null ? !roles.equals(that.roles) : that.roles != null) return false;
+        if (attributes != null ? !attributes.equals(that.attributes) : that.attributes != null) return false;
+        if (rolesKey != null ? !rolesKey.equals(that.rolesKey) : that.rolesKey != null) return false;
+        return usernameKey != null ? usernameKey.equals(that.usernameKey) : that.usernameKey == null;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(username, roles);
+        int result = username != null ? username.hashCode() : 0;
+        result = 31 * result + (roles != null ? roles.hashCode() : 0);
+        result = 31 * result + (attributes != null ? attributes.hashCode() : 0);
+        result = 31 * result + (rolesKey != null ? rolesKey.hashCode() : 0);
+        result = 31 * result + (usernameKey != null ? usernameKey.hashCode() : 0);
+        return result;
     }
-
 }

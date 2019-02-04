@@ -24,12 +24,14 @@ import io.micronaut.security.authentication.AuthenticationUserDetailsAdapter;
 import io.micronaut.security.authentication.Authenticator;
 import io.micronaut.security.authentication.UserDetails;
 import io.micronaut.security.authentication.UsernamePasswordCredentials;
+import io.micronaut.security.token.config.TokenConfiguration;
 import io.micronaut.security.token.validator.TokenValidator;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import javax.inject.Singleton;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -54,11 +56,26 @@ public class BasicAuthTokenValidator implements TokenValidator {
 
     protected final Authenticator authenticator;
 
+    @Nullable
+    private final String rolesKeyName;
+
     /**
+     * @deprecated Use {@link #BasicAuthTokenValidator(Authenticator, TokenConfiguration)}
      * @param authenticator The Authenticator
      */
     public BasicAuthTokenValidator(Authenticator authenticator) {
         this.authenticator = authenticator;
+        this.rolesKeyName = null;
+    }
+
+    /**
+     * @param authenticator The Authenticator
+     * @param tokenConfiguration The Token configuration.
+     */
+    public BasicAuthTokenValidator(Authenticator authenticator,
+                                   TokenConfiguration tokenConfiguration) {
+        this.authenticator = authenticator;
+        this.rolesKeyName = tokenConfiguration.getRolesName();
     }
 
     @Override
@@ -70,7 +87,7 @@ public class BasicAuthTokenValidator implements TokenValidator {
             return authenticationResponse.switchMap(response -> {
                 if (response.isAuthenticated()) {
                     UserDetails userDetails = (UserDetails) response;
-                    return Flowable.just(new AuthenticationUserDetailsAdapter(userDetails));
+                    return Flowable.just(new AuthenticationUserDetailsAdapter(userDetails, rolesKeyName));
                 } else {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Could not authenticate {}", creds.get().getUsername());
