@@ -415,8 +415,8 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                         pushValue(declaringType, declaringClassWriter, methodVisitor, v, loadTypeMethods)
                 );
             }
-        } else if (value instanceof List) {
-            List array = (List) value;
+        } else if (value instanceof Collection) {
+            List array = Arrays.asList(((Collection) value).toArray());
             int len = array.size();
             if (len == 0) {
                 pushNewArray(methodVisitor, Object.class, len);
