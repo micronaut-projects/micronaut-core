@@ -121,7 +121,9 @@ background-image: url(data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgNDYyIDEw
 }
 
 .multi-language-text.hidden,
-.multi-language-selector ~ .multi-language-sample.hidden {
+.multi-language-selector + .multi-language-sample.hidden,
+.multi-language-selector + .multi-language-sample + .multi-language-sample.hidden,
+.multi-language-selector + .multi-language-sample + .multi-language-sample + .multi-language-sample.hidden {
     display: none;
 }
 
