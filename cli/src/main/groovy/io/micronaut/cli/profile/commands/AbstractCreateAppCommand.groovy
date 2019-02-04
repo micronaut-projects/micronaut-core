@@ -51,7 +51,7 @@ abstract class AbstractCreateAppCommand extends AbstractCreateCommand {
     boolean handle(ExecutionContext executionContext) {
         String profileName = evaluateProfileName()
 
-        Set<String> selectedFeatures = new HashSet<>()
+        Set<String> selectedFeatures = new LinkedHashSet<>()
         selectedFeatures.addAll(features)
 
 
