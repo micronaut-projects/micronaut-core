@@ -24,10 +24,12 @@ import io.micronaut.security.authentication.AuthenticationUserDetailsAdapter;
 import io.micronaut.security.authentication.UserDetails;
 import io.micronaut.security.handlers.LoginHandler;
 import io.micronaut.security.filters.SecurityFilter;
+import io.micronaut.security.token.config.TokenConfiguration;
 import io.micronaut.session.Session;
 import io.micronaut.session.SessionStore;
 import io.micronaut.session.http.HttpSessionFilter;
 
+import javax.annotation.Nullable;
 import javax.inject.Singleton;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -44,8 +46,12 @@ public class SessionLoginHandler implements LoginHandler {
     protected final SessionStore<Session> sessionStore;
     protected final SecuritySessionConfiguration securitySessionConfiguration;
 
+    @Nullable
+    private final String rolesKeyName;
+
     /**
      * Constructor.
+     * @deprecated use {@link #SessionLoginHandler(SecuritySessionConfiguration, SessionStore, TokenConfiguration)}
      * @param securitySessionConfiguration Security Session Configuration
      * @param sessionStore The session store
      */
@@ -53,12 +59,26 @@ public class SessionLoginHandler implements LoginHandler {
                                SessionStore<Session> sessionStore) {
         this.securitySessionConfiguration = securitySessionConfiguration;
         this.sessionStore = sessionStore;
+        this.rolesKeyName = null;
+    }
+
+    /**
+     * Constructor.
+     * @param securitySessionConfiguration Security Session Configuration
+     * @param sessionStore The session store
+     */
+    public SessionLoginHandler(SecuritySessionConfiguration securitySessionConfiguration,
+                               SessionStore<Session> sessionStore,
+                               TokenConfiguration tokenConfiguration) {
+        this.securitySessionConfiguration = securitySessionConfiguration;
+        this.sessionStore = sessionStore;
+        this.rolesKeyName = tokenConfiguration.getRolesName();
     }
 
     @Override
     public HttpResponse loginSuccess(UserDetails userDetails, HttpRequest<?> request) {
         Session session = findSession(request);
-        session.put(SecurityFilter.AUTHENTICATION, new AuthenticationUserDetailsAdapter(userDetails));
+        session.put(SecurityFilter.AUTHENTICATION, new AuthenticationUserDetailsAdapter(userDetails, rolesKeyName));
         try {
             URI location = new URI(securitySessionConfiguration.getLoginSuccessTargetUrl());
             return HttpResponse.seeOther(location);

@@ -15,4 +15,11 @@ class UserDetailsEmail extends UserDetails  {
         super(username, roles)
         this.email = email
     }
+
+    @Override
+    Map<String, Object> getAttributes() {
+        Map<String, Object> result = super.getAttributes()
+        result.put("email", email)
+        result
+    }
 }

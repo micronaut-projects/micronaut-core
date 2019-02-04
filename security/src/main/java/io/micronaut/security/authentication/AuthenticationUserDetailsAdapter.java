@@ -16,7 +16,7 @@
 
 package io.micronaut.security.authentication;
 
-import java.util.HashMap;
+import javax.annotation.Nullable;
 import java.util.Map;
 
 /**
@@ -29,20 +29,25 @@ public class AuthenticationUserDetailsAdapter implements Authentication {
 
     private UserDetails userDetails;
 
+    @Nullable
+    private String rolesKey;
+
     /**
      *
      * @param userDetails Authenticated user's representation.
      */
-    public AuthenticationUserDetailsAdapter(UserDetails userDetails) {
+    public AuthenticationUserDetailsAdapter(UserDetails userDetails, @Nullable String rolesKey) {
         this.userDetails = userDetails;
+        this.rolesKey = rolesKey;
     }
 
     @Override
     public Map<String, Object> getAttributes() {
-        Map<String, Object> attributes = new HashMap<>();
-        attributes.put("roles", userDetails.getRoles());
-        attributes.put("username", userDetails.getUsername());
-        return attributes;
+        Map<String, Object> result = userDetails.getAttributes();
+        if (rolesKey != null) {
+            result.putIfAbsent(rolesKey, userDetails.getRoles());
+        }
+        return result;
     }
 
     @Override
