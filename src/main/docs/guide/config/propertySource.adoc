@@ -24,6 +24,11 @@ Micronaut by default contains `PropertySourceLoader` implementations that load p
 
 TIP: To use custom properties from local files, you can either call your application with `-Dmicronaut.config.files=myfile.yml` or set the environment variable `MICRONAUT_CONFIG_FILES=myfile.yml`. The value can be a comma-separated list.
 
+=== Validating Properties on Startup
+
+By default, Micronaut beans are not created on startup, but as they are needed. Any properties associated with the bean are not loaded until this point, so if a property is not defined, you will get the error at this time.
+
+To force the validation of a bean's properties at startup, make the bean with @Context scope. By making them @Context scope the bean will be created, and the corresponding properties loaded, when the application starts.
 
 === Property Value Placeholders
 
