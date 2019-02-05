@@ -7,9 +7,6 @@ publishing {
                 def profiles = new Properties()
                 profiles.load(new StringReader(new File("$projectDir/profiles.properties").text))
 
-                def configurations = new Properties()
-                configurations.load(new StringReader(new File("$projectDir/configurations.properties").text))
-
                 xml.children().last() + {
                     def mkp = delegate
 
@@ -33,18 +30,6 @@ publishing {
                                     def version = profile.value
                                     if (!isBuildSnapshot && version.toString().endsWith("-SNAPSHOT")) {
                                         throw new RuntimeException("Cannot have a snapshot dependency on a profile [$profile.key] for a release!")
-                                    }
-                                    mkp.version(version)
-                                }
-                            }
-
-                            for (configuration in configurations) {
-                                mkp.dependency {
-                                    mkp.groupId 'io.micronaut.configuration'
-                                    mkp.artifactId "micronaut-${configuration.key}"
-                                    def version = configuration.value
-                                    if (!isBuildSnapshot && version.toString().endsWith("-SNAPSHOT")) {
-                                        throw new RuntimeException("Cannot have a snapshot dependency on a configuration [$configuration.key] for a release!")
                                     }
                                     mkp.version(version)
                                 }

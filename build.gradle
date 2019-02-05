@@ -128,6 +128,16 @@ ext {
                     group:'io.micronaut.configuration',
                     name:'micronaut-aws-common'
             ],
+            'micronaut.elasticsearch': [
+                version:micronautElasticsearch,
+                group:'io.micronaut.configuration',
+                name:'micronaut-elasticsearch'
+            ],
+            'micronaut.flyway': [
+                version:micronautFlyway,
+                group:'io.micronaut.configuration',
+                name:'micronaut-flyway'
+            ],
             'micronaut.function-aws': [
                     version:micronautAwsVersion,
                     group:'io.micronaut',
@@ -144,6 +154,11 @@ ext {
                     group:'io.micronaut.configuration',
                     name:'micronaut-gorm-common',
                     modules:['micronaut-multitenancy-gorm', 'micronaut-neo4j-gorm', 'micronaut-mongo-gorm', 'micronaut-hibernate-gorm']
+            ],
+            'micronaut.liquibase': [
+                version:micronautLiquibase,
+                group:'io.micronaut.configuration',
+                name:'micronaut-liquibase'
             ],
             'micronaut.netflix': [
                     version:micronautNetflixVersion,
@@ -366,6 +381,11 @@ ext {
                     group  : 'org.hibernate',
                     name   : 'hibernate-core',
                     modules: ['hibernate-jcache', 'hibernate-ehcache']
+            ],
+            elasticsearch              : [
+                    version: elasticsearchVersion,
+                    group  : 'org.elasticsearch.client',
+                    name   : 'elasticsearch-rest-high-level-client'
             ],
             'methvin.directory-watcher': [
                     version: methvinDirectoryWatcherVersion,
