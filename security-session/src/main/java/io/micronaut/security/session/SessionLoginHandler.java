@@ -16,7 +16,6 @@
 
 package io.micronaut.security.session;
 
-import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.security.authentication.AuthenticationFailed;
@@ -26,12 +25,11 @@ import io.micronaut.security.handlers.LoginHandler;
 import io.micronaut.security.filters.SecurityFilter;
 import io.micronaut.session.Session;
 import io.micronaut.session.SessionStore;
-import io.micronaut.session.http.HttpSessionFilter;
+import io.micronaut.session.http.SessionForRequest;
 
 import javax.inject.Singleton;
 import java.net.URI;
 import java.net.URISyntaxException;
-import java.util.Optional;
 
 /**
  * {@link LoginHandler} implementation for Session-based Authentication.
@@ -57,7 +55,7 @@ public class SessionLoginHandler implements LoginHandler {
 
     @Override
     public HttpResponse loginSuccess(UserDetails userDetails, HttpRequest<?> request) {
-        Session session = findSession(request);
+        Session session = SessionForRequest.find(request).orElse(SessionForRequest.create(sessionStore, request));
         session.put(SecurityFilter.AUTHENTICATION, new AuthenticationUserDetailsAdapter(userDetails));
         try {
             URI location = new URI(securitySessionConfiguration.getLoginSuccessTargetUrl());
@@ -74,19 +72,6 @@ public class SessionLoginHandler implements LoginHandler {
             return HttpResponse.seeOther(location);
         } catch (URISyntaxException e) {
             return HttpResponse.serverError();
-        }
-    }
-
-    private Session findSession(HttpRequest<?> request) {
-        MutableConvertibleValues<Object> attrs = request.getAttributes();
-        Optional<Session> existing = attrs.get(HttpSessionFilter.SESSION_ATTRIBUTE, Session.class);
-        if (existing.isPresent()) {
-            return existing.get();
-        } else {
-            // create a new session store it in the attribute
-            Session newSession = sessionStore.newSession();
-            attrs.put(HttpSessionFilter.SESSION_ATTRIBUTE, newSession);
-            return newSession;
         }
     }
 }
