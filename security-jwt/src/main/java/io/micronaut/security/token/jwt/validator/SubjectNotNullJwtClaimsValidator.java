@@ -23,6 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Singleton;
+import java.util.Map;
 
 /**
  * Validate JWT subject claim is not null.
@@ -41,7 +42,6 @@ public class SubjectNotNullJwtClaimsValidator implements GenericJwtClaimsValidat
      * @param claimsSet JWT Claims
      * @return True if the JWT subject claim is not null
      */
-    @Override
     public boolean validate(JWTClaimsSet claimsSet) {
         final String subject = claimsSet.getSubject();
         boolean hasSubject = subject != null;
@@ -51,5 +51,10 @@ public class SubjectNotNullJwtClaimsValidator implements GenericJwtClaimsValidat
             }
         }
         return hasSubject;
+    }
+
+    @Override
+    public boolean validate(Map<String, Object> claims) {
+        return validate(JWTClaimsSetUtils.jwtClaimsSetFromClaims(claims));
     }
 }

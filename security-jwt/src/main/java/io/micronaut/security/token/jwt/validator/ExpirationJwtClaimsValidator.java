@@ -22,8 +22,10 @@ import io.micronaut.core.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.inject.Singleton;
 import java.util.Date;
+import java.util.Map;
 
 /**
  * Validate JWT is not expired.
@@ -37,8 +39,12 @@ public class ExpirationJwtClaimsValidator implements GenericJwtClaimsValidator {
 
     private static final Logger LOG = LoggerFactory.getLogger(ExpirationJwtClaimsValidator.class);
 
-    @Override
-    public boolean validate(JWTClaimsSet claimsSet) {
+    /**
+     *
+     * @param claimsSet The JWT Claims
+     * @return true if the expiration claim denotes a date after now.
+     */
+    protected boolean validate(@Nonnull JWTClaimsSet claimsSet) {
         final Date expTime = claimsSet.getExpirationTime();
         if (expTime != null) {
             final Date now = new Date();
@@ -50,5 +56,10 @@ public class ExpirationJwtClaimsValidator implements GenericJwtClaimsValidator {
             }
         }
         return true;
+    }
+
+    @Override
+    public boolean validate(Map<String, Object> claims) {
+        return validate(JWTClaimsSetUtils.jwtClaimsSetFromClaims(claims));
     }
 }
