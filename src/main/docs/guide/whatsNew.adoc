@@ -28,6 +28,20 @@ $ mn create-app my-app --features file-watch
 ----
 ====
 
+=== GRPC Support
+
+Support for creating https://grpc.io/[GRPC] + Micronaut applications has been added.
+
+See the https://micronaut-projects.github.io/micronaut-grpc/latest/guide/[Micronaut GRPC] documentation for more information and example applications.
+
+[TIP]
+.Using the CLI
+====
+Use the CLI to quickly create a GRPC application.
+----
+mn create-app helloworld --profile grpc --lang java --build gradle
+----
+====
 
 === AWS API Gateway Proxy Support
 
