@@ -84,6 +84,12 @@ See the <<distributedConfigurationSpringCloud, Documentation on Distributed Conf
 
 In an effort to make a more consistent and understandable API, some methods and classes related to sending file responses have been deprecated. api:http.server.types.files.SystemFile[] is the replacement for api:http.server.types.files.AttachedFile[] and the constructors of api:http.server.types.files.StreamedFile[] have been deprecated in favor of new constructors that better convey the intended functionality.
 
+Note that api:http.server.types.files.SystemFile[] behaves differently from api:http.server.types.files.AttachedFile[] in that responses are by default sent inline instead of attached. In addition, support for sending attached responses has been added to api:http.server.types.files.StreamedFile[]. The following methods can be used to attach a system or streamed file.
+
+* api:http.server.types.files.StreamedFile#attach-java.lang.String-[StreamedFile#attach(String)]
+* api:http.server.types.files.SystemFile#attach--[SystemFile#attach()]
+* api:http.server.types.files.SystemFile#attach-java.lang.String-[SystemFile#attach(String)]
+
 === Support for Freemarker Views
 
 Support for rendering <<freemarker,Freemaker Views>> has been added.
@@ -113,6 +119,20 @@ class CacheFactory {
 }
 
 ----
+
+=== Major Improvements for Multipart File Uploads
+
+Several issues and improvements have been made in regards to file uploads in comparison to the previous version of Micronaut. These fixes have been substantial enough that they have caused the behavior of uploads to change, however these changes should not break any existing use cases. To summarize the issues:
+
+* Routes were not in control of the flow of bytes coming from the client with multipart uploads
+* It was not possible to read and release a chunk of data at a time. The entire upload would be put into memory or disk
+* Mixed (memory/disk with a threshold) uploads are not supported
+
+The following changes have been implemented:
+
+* Routes gain control of the data flow as soon as they are executed. A route cannot be executed until all of its arguments are fulfilled, so data will reside on memory or disk until the route can be executed.
+* After processing a chunk of data it is immediately released. For memory uploads this means the data is immediately freed. For disk uploads the data remains on disk until after processing.
+* Two new configuration options are available to support mixed uploads: `micronaut.server.multipart.mixed` and `micronaut.server.multipart.threshold`. When data needs to be buffered, mixed uploads will initially store data in memory. Once the threshold is reached, the data will be erased from memory and moved entirely onto disk.
 
 === Dependency Upgrades
 
