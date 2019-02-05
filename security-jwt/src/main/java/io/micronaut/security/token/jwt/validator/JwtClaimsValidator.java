@@ -17,8 +17,7 @@
 package io.micronaut.security.token.jwt.validator;
 
 import io.micronaut.security.token.jwt.config.JwtConfigurationProperties;
-
-import java.util.Map;
+import io.micronaut.security.token.jwt.generator.claims.JwtClaims;
 
 /**
  * Provides a contract to create custom JWT claims validations.
@@ -35,5 +34,5 @@ public interface JwtClaimsValidator {
      * @param claims JWT Claims
      * @return whether the JWT claims pass validation.
      */
-    boolean validate(Map<String, Object> claims);
+    boolean validate(JwtClaims claims);
 }
