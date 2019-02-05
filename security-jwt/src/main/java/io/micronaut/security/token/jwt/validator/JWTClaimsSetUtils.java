@@ -16,23 +16,27 @@
 
 package io.micronaut.security.token.jwt.validator;
 
-import io.micronaut.security.token.jwt.config.JwtConfigurationProperties;
+import com.nimbusds.jwt.JWTClaimsSet;
 import io.micronaut.security.token.jwt.generator.claims.JwtClaims;
 
 /**
- * Provides a contract to create custom JWT claims validations.
+ * Utils class to instantiate a JWClaimsSet give a map of claims.
  *
  * @author Sergio del Amo
  * @since 1.1.0
  */
-public interface JwtClaimsValidator {
-
-    String PREFIX = JwtConfigurationProperties.PREFIX + ".claims-validators";
+public class JWTClaimsSetUtils {
 
     /**
      *
-     * @param claims JWT Claims
-     * @return whether the JWT claims pass validation.
+     * @param claims JWT claims
+     * @return A JWTClaimsSet
      */
-    boolean validate(JwtClaims claims);
+    public static JWTClaimsSet jwtClaimsSetFromClaims(JwtClaims claims) {
+        JWTClaimsSet.Builder claimsSetBuilder = new JWTClaimsSet.Builder();
+        for (String k : claims.names()) {
+            claimsSetBuilder.claim(k, claims.get(k));
+        }
+        return claimsSetBuilder.build();
+    }
 }
