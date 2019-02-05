@@ -47,11 +47,11 @@ With this approach you need to have installed only Docker as it downloads the re
 
 To build your native image without using Docker you need to install GraalVM SDK via the https://www.graalvm.org/docs/getting-started/[Getting Started] instructions or using SDKman:
 
-.Installing GraalVM 1.0.0-rc11 with SDKman
+.Installing GraalVM 1.0.0-rc12 with SDKman
 [source,bash]
 ----
-$ sdk install java 1.0.0-rc-11-grl
-$ sdk use java 1.0.0-rc-11-grl
+$ sdk install java 1.0.0-rc12-grl
+$ sdk use java 1.0.0-rc12-grl
 ----
 
 .Creating native image
@@ -97,15 +97,14 @@ native-image --no-server \ # <1>
              --class-path build/libs/hello-world-0.1-all.jar \ # <2>
              -H:ReflectionConfigurationFiles=build/reflect.json \ # <3>
              -H:EnableURLProtocols=http \ # <4>
-             -H:IncludeResources="logback.xml|application.yml|META-INF/services/*.*" \ # <5>
+             -H:IncludeResources="logback.xml|application.yml" \ # <5>
              -H:Name=hello-world \ # <6>
              -H:Class=hello.world.Application \ # <7>
              -H:+ReportUnsupportedElementsAtRuntime \ # <8>
              -H:+AllowVMInspection \
-             -H:-UseServiceLoaderFeature \
-             --allow-incomplete-classpath \
+             --allow-incomplete-classpath \ # <9>
              --rerun-class-initialization-at-runtime='sun.security.jca.JCAUtil$CachedSecureRandomHolder,javax.net.ssl.SSLContext' \
-             --delay-class-initialization-to-runtime=io.netty.handler.codec.http.HttpObjectEncoder,io.netty.handler.codec.http.websocketx.WebSocket00FrameEncoder,io.netty.handler.ssl.util.ThreadLocalInsecureRandom,com.sun.jndi.dns.DnsClient <9>
+             --delay-class-initialization-to-runtime=io.netty.handler.codec.http.HttpObjectEncoder,io.netty.handler.codec.http.websocketx.WebSocket00FrameEncoder,io.netty.handler.ssl.util.ThreadLocalInsecureRandom,com.sun.jndi.dns.DnsClient # <10>
 ----
 <1> Do not start a background server to generate the native image
 <2> The `class-path` argument is used to refer to the Micronaut shaded JAR
@@ -115,7 +114,8 @@ native-image --no-server \ # <1>
 <6> The `-H:Name` argument specifies the name of the native image to be built
 <7> The `-H:Class` argument specifies the Java main class that is the entry point of the application.
 <8> The `-H:+ReportUnsupportedElementsAtRuntime` tells GraalVM to report any `ClassNotFoundException` errors at runtime instead of at build time.
-<9> The `--delay-class-initialization-to-runtime` specifies which classes static initializers should be delayed until runtime. GraalVM by default runs static initializers at build time. That is undesirable in certain cases (particularly with Netty).
+<9> The `--allow-incomplete-classpath` tells GraalVM to report missing classes only at runtime instead of at native image generation time.
+<10> The `--delay-class-initialization-to-runtime` specifies which classes static initializers should be delayed until runtime. GraalVM by default runs static initializers at build time. That is undesirable in certain cases (particularly with Netty).
 
 
 Once the image has been built you can run the application using the native image name:
