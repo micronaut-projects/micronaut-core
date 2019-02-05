@@ -154,3 +154,4 @@ The following changes have been implemented:
 - Micrometer `1.0.6` -> `1.1.1`
 - Reactive Streams `1.0.1` -> `1.0.2`
 - Jackson `2.9.7` -> `2.9.8`
+- Nimbus JOSE+JWT  `6.0.2` -> `6.8`
