@@ -11,7 +11,7 @@ To control either the media type of the file being sent, or to set the file to b
 [source,java]
 ----
 @Get
-public AttachedFile download() {
+public SystemFile download() {
     File file = ...
     return new SystemFile(file).attach("myfile.txt");
     // or new SystemFile(file, MediaType.TEXT_HTML_TYPE)
