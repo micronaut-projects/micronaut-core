@@ -1,6 +1,7 @@
 package io.micronaut.security.handlers
 
 import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpRequest
 
 import javax.inject.Singleton
 
@@ -9,7 +10,7 @@ import javax.inject.Singleton
 class CustomForbiddenRejectionUriProvider implements ForbiddenRejectionUriProvider {
 
     @Override
-    Optional<String> getForbiddenRedirectUri() {
+    Optional<String> getForbiddenRedirectUri(HttpRequest<?> request) {
         Optional.of("/forbidden")
     }
 }
