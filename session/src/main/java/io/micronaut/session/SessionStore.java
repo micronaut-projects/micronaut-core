@@ -60,24 +60,4 @@ public interface SessionStore<S extends Session> {
      * @return A future that completes with the saved session once the operation is complete
      */
     CompletableFuture<S> save(S session);
-
-    /**
-     *
-     * @param request the Http Request
-     * @return A new session stored in the request attributes
-     */
-    default Session createSessionAtRequest(HttpRequest<?> request) {
-        Session session = newSession();
-        request.getAttributes().put(HttpSessionFilter.SESSION_ATTRIBUTE, session);
-        return session;
-    }
-
-    /**
-     *
-     * @param request the Http Request
-     * @return A session if found in the request attributes.
-     */
-    default Optional<Session> findSessionAtRequest(HttpRequest<?> request) {
-        return request.getAttributes().get(HttpSessionFilter.SESSION_ATTRIBUTE, Session.class);
-    }
 }
