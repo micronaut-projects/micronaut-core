@@ -18,6 +18,7 @@ package io.micronaut.security.session;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.security.config.SecurityConfigurationProperties;
 import io.micronaut.security.handlers.ForbiddenRejectionUriProvider;
 import io.micronaut.security.handlers.UnauthorizedRejectionUriProvider;
@@ -183,13 +184,27 @@ public class SecuritySessionConfigurationProperties implements SecuritySessionCo
         this.enabled = enabled;
     }
 
-    @Override
+    /**
+     * @return A uri to redirect to when a user tries to access a secured resource without authentication.
+     */
     public Optional<String> getUnauthorizedRedirectUri() {
         return Optional.ofNullable(unauthorizedTargetUrl);
     }
 
     @Override
+    public Optional<String> getUnauthorizedRedirectUri(HttpRequest<?> request) {
+        return getUnauthorizedRedirectUri();
+    }
+
+    /**
+     * @return A uri to redirect to when an authenticated user tries to access a resource for which he does not have the required authorization level.
+     */
     public Optional<String> getForbiddenRedirectUri() {
         return Optional.ofNullable(forbiddenTargetUrl);
+    }
+
+    @Override
+    public Optional<String> getForbiddenRedirectUri(HttpRequest<?> request) {
+        return getForbiddenRedirectUri();
     }
 }

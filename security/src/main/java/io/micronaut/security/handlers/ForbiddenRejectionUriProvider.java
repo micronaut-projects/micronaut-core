@@ -16,6 +16,8 @@
 
 package io.micronaut.security.handlers;
 
+import io.micronaut.http.HttpRequest;
+
 import java.util.Optional;
 
 /**
@@ -29,8 +31,8 @@ import java.util.Optional;
 public interface ForbiddenRejectionUriProvider {
 
     /**
-     *
+     * @param request {@link HttpRequest} being processed
      * @return A uri to redirect to when an authenticated user tries to access a resource for which he does not have the required authorization level.
      */
-    Optional<String> getForbiddenRedirectUri();
+    Optional<String> getForbiddenRedirectUri(HttpRequest<?> request);
 }
