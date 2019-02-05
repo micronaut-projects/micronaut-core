@@ -53,6 +53,19 @@ $ mn create-app my-app --features aws-api-gateway-graal
 ----
 ====
 
+=== AWS Lambda Alexa Skill Support
+
+Support for creating https://micronaut-projects.github.io/micronaut-aws/latest/guide/#alexa[Alexa Skills with Micronaut] has been added.
+
+[TIP]
+.Using the CLI
+====
+You can create Alexa functions with the CLI. Use the `-lang` parameter to specify `java`, `kotlin` or `groovy`.
+----
+$ mn create-function hello-alexa --provider alexa
+----
+====
+
 === Micrometer 1.1 and @Timed Support
 
 Micrometer has been upgraded to 1.1 and support for https://micrometer.io/docs/concepts#_the_code_timed_code_annotation[@Timed] AOP advice added.
