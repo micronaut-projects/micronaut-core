@@ -1,6 +1,7 @@
 package io.micronaut.security.handlers
 
 import io.micronaut.context.annotation.Requires
+import io.micronaut.http.HttpRequest
 
 import javax.inject.Singleton
 
@@ -9,7 +10,7 @@ import javax.inject.Singleton
 class CustomUnauthorizedRejectionUriProvider implements UnauthorizedRejectionUriProvider {
 
     @Override
-    Optional<String> getUnauthorizedRedirectUri() {
+    Optional<String> getUnauthorizedRedirectUri(HttpRequest<?> request) {
         Optional.of("/login")
     }
 }
