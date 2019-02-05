@@ -57,7 +57,7 @@ public class SessionLoginHandler implements LoginHandler {
 
     @Override
     public HttpResponse loginSuccess(UserDetails userDetails, HttpRequest<?> request) {
-        Session session = findSession(request);
+        Session session = sessionStore.findSessionAtRequest(request).orElse(sessionStore.createSessionAtRequest(request));
         session.put(SecurityFilter.AUTHENTICATION, new AuthenticationUserDetailsAdapter(userDetails));
         try {
             URI location = new URI(securitySessionConfiguration.getLoginSuccessTargetUrl());
@@ -74,19 +74,6 @@ public class SessionLoginHandler implements LoginHandler {
             return HttpResponse.seeOther(location);
         } catch (URISyntaxException e) {
             return HttpResponse.serverError();
-        }
-    }
-
-    private Session findSession(HttpRequest<?> request) {
-        MutableConvertibleValues<Object> attrs = request.getAttributes();
-        Optional<Session> existing = attrs.get(HttpSessionFilter.SESSION_ATTRIBUTE, Session.class);
-        if (existing.isPresent()) {
-            return existing.get();
-        } else {
-            // create a new session store it in the attribute
-            Session newSession = sessionStore.newSession();
-            attrs.put(HttpSessionFilter.SESSION_ATTRIBUTE, newSession);
-            return newSession;
         }
     }
 }
