@@ -177,3 +177,8 @@ The following changes have been implemented:
 - Jackson `2.9.7` -> `2.9.8`
 - Nimbus JOSE+JWT  `6.0.2` -> `6.8`
 - Spring `5.0.10.RELEASE` -> `5.1.4.RELEASE`
+- Reactor `3.2.0.RELEASE` -> `3.2.5.RELEASE`
+- RxJava 2 `2.2.2` -> `2.2.6`
+- Reactive Postgres `0.10.5` -> `0.11.2`
+- GORM `6.1.8.RELEASE` -> `7.1.0.M1`
+- Hibernate `5.3.7.Final` -> `5.4.0.Final`
