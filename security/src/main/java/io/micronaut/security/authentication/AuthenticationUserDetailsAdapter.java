@@ -35,6 +35,7 @@ public class AuthenticationUserDetailsAdapter implements Authentication {
     /**
      *
      * @param userDetails Authenticated user's representation.
+     * @param rolesKey The key name that should used to store the roles
      */
     public AuthenticationUserDetailsAdapter(UserDetails userDetails, @Nullable String rolesKey) {
         this.userDetails = userDetails;

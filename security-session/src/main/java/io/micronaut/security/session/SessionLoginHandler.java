@@ -66,6 +66,7 @@ public class SessionLoginHandler implements LoginHandler {
      * Constructor.
      * @param securitySessionConfiguration Security Session Configuration
      * @param sessionStore The session store
+     * @param tokenConfiguration Token Configuration
      */
     public SessionLoginHandler(SecuritySessionConfiguration securitySessionConfiguration,
                                SessionStore<Session> sessionStore,
