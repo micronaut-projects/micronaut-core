@@ -5,10 +5,10 @@ Micronaut {version} includes the following changes:
 
 Micronaut is now modular with parts of Micronaut being shifted into subprojects. See the following links for new subprojects that now have indepent release cycles outside of Micronaut core:
 
-* https://micronaut-projects.github.io/micronaut-kafka/latest/guide/index.html[Micronaut Kafka]
+* https://micronaut-projects.github.io/micronaut-kafka/1.1.x/guide/index.html[Micronaut Kafka]
 * https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/index.html[Micronaut Micrometer]
-* https://micronaut-projects.github.io/micronaut-groovy/latest/guide/index.html[Micronaut Groovy]
-* https://micronaut-projects.github.io/micronaut-sql/latest/guide/index.html[Micronaut SQL]
+* https://micronaut-projects.github.io/micronaut-groovy/1.1.x/guide/index.html[Micronaut Groovy]
+* https://micronaut-projects.github.io/micronaut-sql/1.1.x/guide/index.html[Micronaut SQL]
 * https://micronaut-projects.github.io/micronaut-mongodb/latest/guide/index.html[Micronaut MongoDB]
 * https://micronaut-projects.github.io/micronaut-redis/latest/guide/index.html[Micronaut Redis]
 * https://micronaut-projects.github.io/micronaut-test/latest/guide/index.html[Micronaut Test]
@@ -182,3 +182,6 @@ The following changes have been implemented:
 - Reactive Postgres `0.10.5` -> `0.11.2`
 - GORM `6.1.8.RELEASE` -> `7.1.0.M1`
 - Hibernate `5.3.7.Final` -> `5.4.0.Final`
+* Hikari `2.7.9` -> `3.3.0`
+* Commons DBCP 2 `2.1.1` -> `2.5.0`
+* Tomcat Pool `9.0.1` -> `9.0.14`
