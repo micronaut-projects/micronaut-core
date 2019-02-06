@@ -189,3 +189,4 @@ The following changes have been implemented:
 - Hikari `2.7.9` -> `3.3.0`
 - Commons DBCP 2 `2.1.1` -> `2.5.0`
 - Tomcat Pool `9.0.1` -> `9.0.14`
+- Neo4j Java Driver `1.6.4` -> `1.7.2`
