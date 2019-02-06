@@ -497,7 +497,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         @Override
         protected void visitConstructorOrMethod(MethodNode methodNode, boolean isConstructor) {
-            if (methodNode.isSynthetic()) return
+            if (methodNode.isSynthetic() || methodNode.name.contains('$')) return
 
             String methodName = methodNode.name
             ClassNode declaringClass = methodNode.declaringClass
