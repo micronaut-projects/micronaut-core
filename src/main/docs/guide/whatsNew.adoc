@@ -6,10 +6,11 @@ Micronaut {version} includes the following changes:
 Micronaut is now modular with parts of Micronaut being shifted into subprojects. See the following links for new subprojects that now have indepent release cycles outside of Micronaut core:
 
 * https://micronaut-projects.github.io/micronaut-kafka/1.1.x/guide/index.html[Micronaut Kafka]
-* https://micronaut-projects.github.io/micronaut-micrometer/latest/guide/index.html[Micronaut Micrometer]
+* https://micronaut-projects.github.io/micronaut-micrometer/1.1.x/guide/index.html[Micronaut Micrometer]
 * https://micronaut-projects.github.io/micronaut-groovy/1.1.x/guide/index.html[Micronaut Groovy]
 * https://micronaut-projects.github.io/micronaut-sql/1.1.x/guide/index.html[Micronaut SQL]
-* https://micronaut-projects.github.io/micronaut-mongodb/latest/guide/index.html[Micronaut MongoDB]
+* https://micronaut-projects.github.io/micronaut-mongodb/1.1.x/guide/index.html[Micronaut MongoDB]
+* https://micronaut-projects.github.io/micronaut-neo4j/1.1.x/guide/index.html[Micronaut Neo4j]
 * https://micronaut-projects.github.io/micronaut-redis/latest/guide/index.html[Micronaut Redis]
 * https://micronaut-projects.github.io/micronaut-test/latest/guide/index.html[Micronaut Test]
 * https://micronaut-projects.github.io/micronaut-netflix/latest/guide/index.html[Micronaut Netflix]
