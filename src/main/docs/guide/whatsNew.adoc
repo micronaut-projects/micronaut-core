@@ -80,6 +80,10 @@ $ mn create-function hello-alexa --provider alexa
 ----
 ====
 
+=== Micronaut Test Templates
+
+The CLI has been updated to generate tests that use https://micronaut-projects.github.io/micronaut-test/latest/guide/index.html[Micronaut Test] for JUnit 5 and Spock.
+
 === Micrometer 1.1 and @Timed Support
 
 Micrometer has been upgraded to 1.1 and support for https://micrometer.io/docs/concepts#_the_code_timed_code_annotation[@Timed] AOP advice added.
@@ -182,6 +186,6 @@ The following changes have been implemented:
 - Reactive Postgres `0.10.5` -> `0.11.2`
 - GORM `6.1.8.RELEASE` -> `7.0.0.M1`
 - Hibernate `5.3.7.Final` -> `5.4.0.Final`
-* Hikari `2.7.9` -> `3.3.0`
-* Commons DBCP 2 `2.1.1` -> `2.5.0`
-* Tomcat Pool `9.0.1` -> `9.0.14`
+- Hikari `2.7.9` -> `3.3.0`
+- Commons DBCP 2 `2.1.1` -> `2.5.0`
+- Tomcat Pool `9.0.1` -> `9.0.14`
