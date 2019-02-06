@@ -188,7 +188,7 @@ The following changes have been implemented:
 - Reactor `3.2.0.RELEASE` -> `3.2.5.RELEASE`
 - RxJava 2 `2.2.2` -> `2.2.6`
 - Reactive Postgres `0.10.5` -> `0.11.2`
-- GORM `6.1.8.RELEASE` -> `7.0.0.M1`
+- GORM `6.1.8.RELEASE` -> `7.0.0.RC1`
 - Hibernate `5.3.7.Final` -> `5.4.0.Final`
 - Hikari `2.7.9` -> `3.3.0`
 - Commons DBCP 2 `2.1.1` -> `2.5.0`
