@@ -125,6 +125,10 @@ public class UserDetails implements AuthenticationResponse {
         return Optional.empty();
     }
 
+    /**
+     * Sets user's attributes.
+     * @param attributes User's attributes.
+     */
     public void setAttributes(Map<String, Object> attributes) {
         this.attributes = attributes;
     }
