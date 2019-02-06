@@ -48,6 +48,5 @@ include "configurations:hibernate-validator"
 include "configurations:jmx"
 include "configurations:openapi"
 include "configurations:picocli"
-include "configurations:rabbitmq"
 include "configurations:security-ldap"
 
