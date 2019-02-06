@@ -190,3 +190,5 @@ The following changes have been implemented:
 - Commons DBCP 2 `2.1.1` -> `2.5.0`
 - Tomcat Pool `9.0.1` -> `9.0.14`
 - Neo4j Java Driver `1.6.4` -> `1.7.2`
+- Mongo Java Driver `3.8.0` -> `3.10.0`
+- Mongo Reactive Driver `1.8.0` -> `1.10.0`

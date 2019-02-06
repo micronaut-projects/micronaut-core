@@ -215,7 +215,7 @@ ext {
                     modules: ['mongodb-driver-async', 'mongo-java-driver']
             ],
             'mongo.reactive'           : [
-                    version: '1.8.0',
+                    version: mongoReactiveVersion,
                     group  : 'org.mongodb',
                     name   : 'mongodb-driver-reactivestreams'
             ],
