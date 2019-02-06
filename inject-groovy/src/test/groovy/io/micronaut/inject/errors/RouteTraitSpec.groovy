@@ -2,11 +2,11 @@ package io.micronaut.inject.errors
 
 import groovy.transform.NotYetImplemented
 import io.micronaut.AbstractBeanDefinitionSpec
+import io.micronaut.http.annotation.Get
 import spock.lang.Issue
 
 class RouteTraitSpec extends AbstractBeanDefinitionSpec {
 
-    @NotYetImplemented
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/1103')
     void "test that routes inherited from traits compile"() {
         given:
@@ -35,5 +35,10 @@ trait ControllerTrait {
 
         expect:
         definition != null
+        definition.executableMethods.size() == 2
+        definition.executableMethods.find { it.methodName == 'indexT'}
+        definition.executableMethods.find { it.methodName == 'indexT'}.arguments.length == 1
+        definition.executableMethods.find { it.methodName == 'indexT'}.isAnnotationPresent(Get)
+        definition.executableMethods.find { it.methodName == 'indexT'}.arguments[0].name == 'x'
     }
 }
