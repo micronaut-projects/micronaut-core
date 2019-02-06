@@ -16,6 +16,8 @@
 
 package io.micronaut.security.handlers;
 
+import io.micronaut.http.HttpRequest;
+
 import java.util.Optional;
 
 /**
@@ -28,8 +30,8 @@ import java.util.Optional;
 public interface UnauthorizedRejectionUriProvider {
 
     /**
-     *
+     * @param request {@link HttpRequest} being processed
      * @return A uri to redirect to when a user tries to access a secured resource without authentication.
      */
-    Optional<String> getUnauthorizedRedirectUri();
+    Optional<String> getUnauthorizedRedirectUri(HttpRequest<?> request);
 }

@@ -14,25 +14,17 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.token.jwt.validator;
+package io.micronaut.cli.profile.commands
 
-import io.micronaut.security.token.jwt.config.JwtConfigurationProperties;
-import io.micronaut.security.token.jwt.generator.claims.JwtClaims;
+import groovy.transform.CompileStatic
 
-/**
- * Provides a contract to create custom JWT claims validations.
- *
- * @author Sergio del Amo
- * @since 1.1.0
- */
-public interface JwtClaimsValidator {
+@CompileStatic
+enum SupportedProvider {
+    aws("aws"),
+    alexa("aws-alexa")
 
-    String PREFIX = JwtConfigurationProperties.PREFIX + ".claims-validators";
-
-    /**
-     *
-     * @param claims JWT Claims
-     * @return whether the JWT claims pass validation.
-     */
-    boolean validate(JwtClaims claims);
+    final String fullName
+    SupportedProvider(String fullName) {
+        this.fullName = fullName
+    }
 }

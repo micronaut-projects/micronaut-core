@@ -42,8 +42,8 @@ class CreateFunctionCommand extends AbstractCreateCommand {
     @Parameters(arity = '0..1', paramLabel = 'NAME', description = 'The name of the function to create.')
     String functionName
 
-    @Option(names = ['-r', '--provider'], paramLabel = 'PROVIDER', description = 'Which cloud provider to use. Possible values: ${DEFAULT-VALUE}.')
-    protected String provider = 'aws'
+    @Option(names = ['-r', '--provider'], paramLabel = 'PROVIDER', description = 'Which cloud provider to use. Possible values: ${COMPLETION-CANDIDATES-VALUE}.')
+    protected SupportedProvider provider = SupportedProvider.aws
 
     @Option(names = ['-l', '--lang'], paramLabel = 'LANG', description = 'Which language to use. Possible values: ${COMPLETION-CANDIDATES}.')
     SupportedLanguage lang = SupportedLanguage.java
@@ -96,7 +96,7 @@ class CreateFunctionCommand extends AbstractCreateCommand {
 
     @Override
     protected String evaluateProfileName() {
-        "function-${provider}"
+        "function-${provider.fullName}"
     }
 
     protected String evaluateLangFeature(String profile) {
@@ -104,7 +104,7 @@ class CreateFunctionCommand extends AbstractCreateCommand {
     }
 
     protected String evaluateTestFeature() {
-        "test-${provider}-${resolveTest()}"
+        "test-${provider.fullName}-${resolveTest()}"
     }
 
     protected SupportedTestFramework resolveTest() {

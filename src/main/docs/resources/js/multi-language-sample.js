@@ -171,7 +171,23 @@ function createCopyToClipboardElement() {
     return copyToClipboardDiv;
 }
 
+function postProcessCodeCallouts() {
+    var calloutClass = "conum";
+    var matches = document.querySelectorAll("b."+calloutClass);
+    if (matches != null) {
+        matches.forEach(function(item) {
+            var number = item.textContent.replace("(", "").replace(")", "");
+            var i = document.createElement('i');
+            i.setAttribute("class","conum");
+            i.setAttribute("data-value", number);
+            item.parentNode.insertBefore(i, item);
+            item.removeAttribute("class");
+        });
+    }
+}
+
 document.addEventListener("DOMContentLoaded", function(event) {
     addCopyToClipboardButtons();
     postProcessCodeBlocks();
+    postProcessCodeCallouts();
 });

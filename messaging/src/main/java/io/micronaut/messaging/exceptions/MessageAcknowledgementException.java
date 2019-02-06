@@ -14,25 +14,28 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.token.jwt.validator;
-
-import io.micronaut.security.token.jwt.config.JwtConfigurationProperties;
-import io.micronaut.security.token.jwt.generator.claims.JwtClaims;
+package io.micronaut.messaging.exceptions;
 
 /**
- * Provides a contract to create custom JWT claims validations.
+ * An exception thrown when a message is being acknowledged or rejected.
  *
- * @author Sergio del Amo
+ * @author James Kleeh
  * @since 1.1.0
  */
-public interface JwtClaimsValidator {
-
-    String PREFIX = JwtConfigurationProperties.PREFIX + ".claims-validators";
+public class MessageAcknowledgementException extends MessageListenerException {
 
     /**
-     *
-     * @param claims JWT Claims
-     * @return whether the JWT claims pass validation.
+     * @param message The message
      */
-    boolean validate(JwtClaims claims);
+    public MessageAcknowledgementException(String message) {
+        super(message);
+    }
+
+    /**
+     * @param message The message
+     * @param cause   The throwable
+     */
+    public MessageAcknowledgementException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }
