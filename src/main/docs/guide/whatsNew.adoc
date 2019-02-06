@@ -15,6 +15,9 @@ Micronaut is now modular with parts of Micronaut being shifted into subprojects.
 * https://micronaut-projects.github.io/micronaut-netflix/latest/guide/index.html[Micronaut Netflix]
 * https://micronaut-projects.github.io/micronaut-aws/latest/guide/index.html[Micronaut AWS]
 * https://micronaut-projects.github.io/micronaut-grpc/latest/guide/index.html[Micronaut GRPC]
+* https://micronaut-projects.github.io/micronaut-flyway/latest/guide/index.html[Micronaut Flyway]
+* https://micronaut-projects.github.io/micronaut-liquibase/latest/guide/index.html[Micronaut Liquibase]
+* https://micronaut-projects.github.io/micronaut-elasticsearch/latest/guide/index.html[Micronaut Elasticsearch]
 
 === File Watch and Server Restart
 
