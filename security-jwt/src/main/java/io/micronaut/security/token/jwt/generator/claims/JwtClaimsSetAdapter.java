@@ -16,47 +16,43 @@
 
 package io.micronaut.security.token.jwt.generator.claims;
 
+import com.nimbusds.jwt.JWTClaimsSet;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Set;
 
 /**
- * @see <a href="https://tools.ietf.org/html/rfc7519#section-4.1">Registered Claims Names</a>
+ * Adapts from {@link JWTClaimsSet} to {@link JwtClaims}.
+ *
+ * @author Sergio del Amo
+ * @since 1.1.0
  */
-public interface JwtClaims {
-    String ISSUER          = "iss";
+public class JwtClaimsSetAdapter implements JwtClaims {
 
-    String SUBJECT         = "sub";
-
-    String EXPIRATION_TIME = "exp";
-
-    String NOT_BEFORE      = "nbf";
-
-    String ISSUED_AT       = "iat";
-
-    String JWT_ID          = "jti";
-
-    String AUDIENCE        = "aud";
+    private final JWTClaimsSet jwtClaimsSet;
 
     /**
-     *
-     * @param claimName the JWT Claim name
-     * @return {@code null} if the claim not exist or the Claim value.
+     * Constructor.
+     * @param jwtClaimsSet a JWT Claims set
      */
+    public JwtClaimsSetAdapter(JWTClaimsSet jwtClaimsSet) {
+        this.jwtClaimsSet = jwtClaimsSet;
+    }
+
     @Nullable
-    Object get(String claimName);
+    @Override
+    public Object get(String claimName) {
+        return jwtClaimsSet.getClaim(claimName);
+    }
 
-    /**
-     *
-     * @return All claim names.
-     */
     @Nonnull
-    Set<String> names();
+    @Override
+    public Set<String> names() {
+        return jwtClaimsSet.getClaims().keySet();
+    }
 
-    /**
-     *
-     * @param claimName the JWT Claim name
-     * @return {@code false} if the claim does not exist.
-     */
-    boolean contains(String claimName);
+    @Override
+    public boolean contains(String claimName) {
+        return jwtClaimsSet.getClaims().containsKey(claimName);
+    }
 }

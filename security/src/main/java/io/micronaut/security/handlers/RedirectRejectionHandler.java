@@ -75,7 +75,7 @@ public class RedirectRejectionHandler implements RejectionHandler {
         return Flowable.create(emitter -> {
             if (shouldHandleRequest(request)) {
                 try {
-                    String uri = getRedirectUri(forbidden).orElse("/");
+                    String uri = getRedirectUri(request, forbidden).orElse("/");
                     emitter.onNext(httpResponseWithUri(uri));
                 } catch (URISyntaxException e) {
                     emitter.onError(e);
@@ -126,12 +126,13 @@ public class RedirectRejectionHandler implements RejectionHandler {
     /**
      * Returns the redirection uri.
      *
+     * @param request {@link HttpRequest} being processed
      * @param forbidden if true indicates that although the user was authenticated he did not had the necessary access privileges.
      * @return the uri to redirect to
      */
-    protected Optional<String> getRedirectUri(boolean forbidden) {
-        Optional<String> uri = forbidden ? forbiddenRejectionUriProvider.getForbiddenRedirectUri() :
-                unauthorizedRejectionUriProvider.getUnauthorizedRedirectUri();
+    protected Optional<String> getRedirectUri(HttpRequest<?> request, boolean forbidden) {
+        Optional<String> uri = forbidden ? forbiddenRejectionUriProvider.getForbiddenRedirectUri(request) :
+                unauthorizedRejectionUriProvider.getUnauthorizedRedirectUri(request);
         if (LOG.isDebugEnabled()) {
             LOG.debug("redirect uri: {}", uri);
         }

@@ -29,6 +29,7 @@ import com.nimbusds.jwt.PlainJWT;
 import com.nimbusds.jwt.SignedJWT;
 import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.token.jwt.encryption.EncryptionConfiguration;
+import io.micronaut.security.token.jwt.generator.claims.JwtClaimsSetAdapter;
 import io.micronaut.security.token.jwt.signature.SignatureConfiguration;
 import io.micronaut.security.token.validator.TokenValidator;
 import io.reactivex.Flowable;
@@ -165,7 +166,7 @@ public class JwtTokenValidator implements TokenValidator {
      */
     protected boolean verifyClaims(JWTClaimsSet jwtClaimsSet, Collection<? extends JwtClaimsValidator> claimsValidators) {
         return claimsValidators.stream()
-                .allMatch(jwtClaimsValidator -> jwtClaimsValidator.validate(jwtClaimsSet));
+                .allMatch(jwtClaimsValidator -> jwtClaimsValidator.validate(new JwtClaimsSetAdapter(jwtClaimsSet)));
     }
 
     /**

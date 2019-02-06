@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
-package io.micronaut.messaging.acknowledgement;
+package io.micronaut.messaging;
+
+import io.micronaut.messaging.exceptions.MessageAcknowledgementException;
 
 /**
  * A contract that allows for responding to messages.
@@ -27,10 +29,10 @@ public interface Acknowledgement {
     /**
      * Acknowledges the message.
      */
-    void ack();
+    void ack() throws MessageAcknowledgementException;
 
     /**
      * Rejects the message.
      */
-    void nack();
+    void nack() throws MessageAcknowledgementException;
 }
