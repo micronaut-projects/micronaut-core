@@ -93,19 +93,25 @@ $ mn create-app my-app --features micrometer
 ----
 ====
 
+=== Kafka 2.1 and Kafka Improvements
+
+Kafka support has been improved with the release of https://micronaut-projects.github.io/micronaut-kafka/1.1.x/guide/[Micronaut Kafka] 1.1 including supports for metrics, distributed tracing and Kafka 2.1.
+
 === API Versioning Support
 
-API versioning is now supported. See the <<apiVersioning, API Versioning>> documentation for more information on how to use this feature.
+API versioning is now supported. See the <<apiVersioning, API Versioning>> documentation for more information on how to use this feature. Thanks for https://github.com/BogdanOros[Bogdan Oros] for contributing this feature.
 
 === Jackson `@JsonView` Support
 
-Support for using `@JsonView` on controller methods has been added can be optionally enabled by setting `jackson.json-view.enabled` to `true` in `application.yml`.
+Support for using `@JsonView` on controller methods has been added can be optionally enabled by setting `jackson.json-view.enabled` to `true` in `application.yml`. Thanks to https://github.com/mmindenhall[Mark Mindenhall] for contributing this feature.
 
 === Support for Spring Cloud Config Server
 
 If you are already using https://spring.io/projects/spring-cloud-config[Spring Config Server] then Micronaut now features native integration for distributed configuration.
 
 See the <<distributedConfigurationSpringCloud, Documentation on Distributed Configuration with Spring Cloud Config>> for more information.
+
+Thanks to https://github.com/thiagolocatelli[Thiago Locatelli] and https://github.com/MichelSchudel[Michel Schudel] for contributing this feature.
 
 === Refactoring of File Responses
 
@@ -119,7 +125,7 @@ Note that api:http.server.types.files.SystemFile[] behaves differently from api:
 
 === Support for Freemarker Views
 
-Support for rendering <<freemarker,Freemaker Views>> has been added.
+Support for rendering <<freemarker,Freemaker Views>> has been added. Thanks to https://github.com/jerolba[Jeronimo López] for contributing this feature.
 
 === Constraint Bean Support
 
