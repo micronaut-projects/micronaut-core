@@ -146,15 +146,27 @@ public class UserDetails implements AuthenticationResponse {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
 
         UserDetails that = (UserDetails) o;
 
-        if (username != null ? !username.equals(that.username) : that.username != null) return false;
-        if (roles != null ? !roles.equals(that.roles) : that.roles != null) return false;
-        if (attributes != null ? !attributes.equals(that.attributes) : that.attributes != null) return false;
-        if (rolesKey != null ? !rolesKey.equals(that.rolesKey) : that.rolesKey != null) return false;
+        if (username != null ? !username.equals(that.username) : that.username != null) {
+            return false;
+        }
+        if (roles != null ? !roles.equals(that.roles) : that.roles != null) {
+            return false;
+        }
+        if (attributes != null ? !attributes.equals(that.attributes) : that.attributes != null) {
+            return false;
+        }
+        if (rolesKey != null ? !rolesKey.equals(that.rolesKey) : that.rolesKey != null) {
+            return false;
+        }
         return usernameKey != null ? usernameKey.equals(that.usernameKey) : that.usernameKey == null;
     }
 
