@@ -188,16 +188,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Override
     protected void initializeContext(List<BeanDefinitionReference> contextScopeBeans, List<BeanDefinitionReference> processedBeans) {
-        Environment environment = getEnvironment();
-        if (environment instanceof RuntimeConfiguredEnvironment) {
-            RuntimeConfiguredEnvironment rce = (RuntimeConfiguredEnvironment) environment;
-            if (!rce.isRuntimeConfigured()) {
-                initializeTypeConverters(this);
-            }
-        } else {
-            initializeTypeConverters(this);
-        }
-
+        initializeTypeConverters(this);
         super.initializeContext(contextScopeBeans, processedBeans);
     }
 
