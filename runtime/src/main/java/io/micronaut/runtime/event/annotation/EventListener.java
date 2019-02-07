@@ -19,6 +19,8 @@ package io.micronaut.runtime.event.annotation;
 // tag::imports[]
 import io.micronaut.aop.Adapter;
 import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.core.annotation.Indexed;
+
 import java.lang.annotation.*;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
@@ -43,6 +45,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 @Target({ElementType.ANNOTATION_TYPE, ElementType.METHOD})
 @Adapter(ApplicationEventListener.class) // <1>
+@Indexed(ApplicationEventListener.class)
 public @interface EventListener {
 }
 // end::clazz[]

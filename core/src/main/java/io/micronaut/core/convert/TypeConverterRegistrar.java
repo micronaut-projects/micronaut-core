@@ -16,12 +16,15 @@
 
 package io.micronaut.core.convert;
 
+import io.micronaut.core.annotation.Indexed;
+
 /**
  * An interface for classes that register type conversions with the {@link ConversionService}.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
+@Indexed(TypeConverterRegistrar.class)
 public interface TypeConverterRegistrar {
 
     /**
