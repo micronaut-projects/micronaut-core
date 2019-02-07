@@ -16,6 +16,8 @@
 
 package io.micronaut.context.event;
 
+import io.micronaut.core.annotation.Indexed;
+
 import java.util.EventListener;
 
 /**
@@ -28,6 +30,7 @@ import java.util.EventListener;
  * @see BeanCreatedEvent
  * @since 1.0
  */
+@Indexed(BeanCreatedEventListener.class)
 public interface BeanCreatedEventListener<T> extends EventListener {
 
     /**

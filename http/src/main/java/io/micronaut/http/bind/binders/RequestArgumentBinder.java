@@ -16,6 +16,7 @@
 
 package io.micronaut.http.bind.binders;
 
+import io.micronaut.core.annotation.Indexed;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.http.HttpRequest;
 
@@ -26,5 +27,6 @@ import io.micronaut.http.HttpRequest;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Indexed(RequestArgumentBinder.class)
 public interface RequestArgumentBinder<T> extends ArgumentBinder<T, HttpRequest<?>> {
 }

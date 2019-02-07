@@ -16,6 +16,8 @@
 
 package io.micronaut.core.convert;
 
+import io.micronaut.core.annotation.Indexed;
+
 import java.util.Optional;
 import java.util.function.Function;
 
@@ -35,6 +37,7 @@ import java.util.function.Function;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Indexed(TypeConverter.class)
 public interface TypeConverter<S, T> {
 
     /**

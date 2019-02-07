@@ -16,6 +16,8 @@
 
 package io.micronaut.context.event;
 
+import io.micronaut.core.annotation.Indexed;
+
 import java.util.EventListener;
 
 /**
@@ -25,6 +27,7 @@ import java.util.EventListener;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Indexed(ApplicationEventListener.class)
 public interface ApplicationEventListener<E> extends EventListener {
 
     /**
