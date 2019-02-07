@@ -45,6 +45,7 @@ public class JacksonConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_ARRAYSIZETHRESHOLD = 100;
+    public static final String PROPERTY_MODULE_SCAN = "jackson.module-scan";
 
     private boolean moduleScan = true;
     private String dateFormat;

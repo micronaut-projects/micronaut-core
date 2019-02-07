@@ -36,6 +36,7 @@ import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.ClassLoadingReporter;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -143,6 +144,9 @@ public class DefaultBeanContext implements BeanContext {
         this.classLoader = resourceLoader.getClassLoader();
         this.resourceLoader = resourceLoader;
         this.customScopeRegistry = new DefaultCustomScopeRegistry(this, classLoader);
+
+        // startup optimization.. index Jackson modules
+        ClassUtils.forName("com.fasterxml.jackson.databind.Module", classLoader).ifPresent(indexedTypes::add);
     }
 
     @Override
@@ -1184,8 +1188,7 @@ public class DefaultBeanContext implements BeanContext {
         if (indexedTypes.contains(beanType)) {
             beanDefinitionsClasses = beanIndex.get(beanType);
             if (beanDefinitionsClasses == null) {
-                // no index, do full search
-                beanDefinitionsClasses = this.beanDefinitionsClasses;
+                beanDefinitionsClasses = Collections.emptyList();
             }
         } else {
             beanDefinitionsClasses = this.beanDefinitionsClasses;
