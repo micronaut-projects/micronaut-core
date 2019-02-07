@@ -63,7 +63,7 @@ class SimpleBeanInfo implements BeanInfo {
     SimpleBeanInfo(Class<?> beanClass) {
         this.beanClass = beanClass;
         List<PropertyDescriptor> propertyList = introspectProperties(introspectMethods(beanClass));
-        if (propertyList.isEmpty()) {
+        if (CollectionUtils.isEmpty(propertyList)) {
             this.properties = Collections.emptyMap();
         } else {
             HashMap<String, PropertyDescriptor> propertyMap = new HashMap<>(propertyList.size());
