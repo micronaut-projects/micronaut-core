@@ -36,6 +36,7 @@ class BeanMapSpec extends Specification {
         BeanMap beanMap = BeanMap.of(bean)
 
         then:
+        BeanMap.of(new io.micronaut.core.beans.NoProps()).size() == 0
         beanMap.get("bool")
         beanMap.get("URL") == new URL("http://google.com")
         beanMap.get("str") == "blah"
@@ -47,6 +48,7 @@ class BeanMapSpec extends Specification {
         !beanMap.containsKey('class')
     }
 
+    static class NoProps {}
     static class SuperClass {
         String sup
     }
