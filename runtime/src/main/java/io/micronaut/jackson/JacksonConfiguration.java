@@ -46,6 +46,7 @@ public class JacksonConfiguration {
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_ARRAYSIZETHRESHOLD = 100;
 
+    private boolean moduleScan = true;
     private String dateFormat;
     private Locale locale;
     private TimeZone timeZone;
@@ -57,6 +58,23 @@ public class JacksonConfiguration {
     private Map<JsonGenerator.Feature, Boolean> generator = Collections.emptyMap();
     private JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_EMPTY;
     private PropertyNamingStrategy propertyNamingStrategy = null;
+
+    /**
+     * Whether Jackson modules should be scanned for.
+     *
+     * @return True if module scanning is enabled
+     */
+    public boolean isModuleScan() {
+        return moduleScan;
+    }
+
+    /**
+     * Sets whether to scan for modules or not (defaults to true).
+     * @param moduleScan True if module scan should be enabled
+     */
+    public void setModuleScan(boolean moduleScan) {
+        this.moduleScan = moduleScan;
+    }
 
     /**
      * @return The default serialization inclusion settings

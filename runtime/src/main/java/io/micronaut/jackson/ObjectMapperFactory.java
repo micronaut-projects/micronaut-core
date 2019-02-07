@@ -84,7 +84,10 @@ public class ObjectMapperFactory {
 
         ObjectMapper objectMapper = jsonFactory != null ? new ObjectMapper(jsonFactory) : new ObjectMapper();
 
-        objectMapper.findAndRegisterModules();
+        final boolean hasConfiguration = jacksonConfiguration != null;
+        if (hasConfiguration && jacksonConfiguration.isModuleScan()) {
+            objectMapper.findAndRegisterModules();
+        }
         objectMapper.registerModules(jacksonModules);
         SimpleModule module = new SimpleModule(MICRONAUT_MODULE);
         for (JsonSerializer serializer : serializers) {
@@ -131,7 +134,7 @@ public class ObjectMapperFactory {
         objectMapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
         objectMapper.configure(DeserializationFeature.UNWRAP_SINGLE_VALUE_ARRAYS, true);
 
-        if (jacksonConfiguration != null) {
+        if (hasConfiguration) {
 
             JsonInclude.Include include = jacksonConfiguration.getSerializationInclusion();
             if (include != null) {
