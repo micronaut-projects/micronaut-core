@@ -14,28 +14,10 @@
  * limitations under the License.
  */
 
-package io.micronaut.jackson.serialize;
-
-import com.fasterxml.jackson.databind.Module;
-import com.fasterxml.jackson.databind.module.SimpleModule;
-import io.micronaut.core.annotation.Indexed;
-
-import javax.inject.Singleton;
-
 /**
- * Modifies deserialization for {@link io.micronaut.http.hateoas.Resource}.
+ * Contains factories for modules.
  *
  * @author graemerocher
- * @since 1.0
+ * @since 1.1
  */
-@Singleton
-@Indexed(Module.class)
-public class ResourceModule extends SimpleModule {
-
-    /**
-     * Construct a new resource module with default deserializer for {@link io.micronaut.http.hateoas.Resource}.
-     */
-    public ResourceModule() {
-        setDeserializerModifier(new ResourceDeserializerModifier());
-    }
-}
+package io.micronaut.jackson.modules;
