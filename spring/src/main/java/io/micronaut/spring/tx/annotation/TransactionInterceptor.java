@@ -30,8 +30,8 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionSystemException;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import org.springframework.transaction.interceptor.TransactionAttribute;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.inject.Singleton;
 import java.util.Map;
@@ -44,7 +44,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 1.0
  */
 @Singleton
-public class TransactionInterceptor implements MethodInterceptor<Object, Object> {
+public class TransactionInterceptor extends TransactionAspectSupport implements MethodInterceptor<Object, Object> {
 
     private final Map<ExecutableMethod, TransactionAttribute> transactionDefinitionMap = new ConcurrentHashMap<>();
     private final Map<String, PlatformTransactionManager> transactionManagerMap = new ConcurrentHashMap<>();
@@ -73,12 +73,21 @@ public class TransactionInterceptor implements MethodInterceptor<Object, Object>
                 finalTransactionManagerName
             );
 
-            TransactionTemplate template = new TransactionTemplate(
-                transactionManager,
-                transactionDefinition
-            );
-
-            return template.execute(status -> context.proceed());
+            final TransactionInfo transactionInfo = createTransactionIfNecessary(
+                    transactionManager,
+                    transactionDefinition,
+                    context.getDeclaringType().getName() + "." + context.getMethodName());
+            Object retVal;
+            try {
+                retVal = context.proceed();
+            } catch (Throwable ex) {
+                completeTransactionAfterThrowing(transactionInfo, ex);
+                throw ex;
+            } finally {
+                cleanupTransactionInfo(transactionInfo);
+            }
+            commitTransactionAfterReturning(transactionInfo);
+            return retVal;
         } else {
             return context.proceed();
         }
