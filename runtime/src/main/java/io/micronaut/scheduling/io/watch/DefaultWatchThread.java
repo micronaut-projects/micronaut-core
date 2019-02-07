@@ -19,6 +19,7 @@ package io.micronaut.scheduling.io.watch;
 import io.micronaut.context.LifeCycle;
 import io.micronaut.context.annotation.Parallel;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventPublisher;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.io.watch.event.FileChangedEvent;
@@ -47,6 +48,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 @Requires(property = FileWatchConfiguration.PATHS)
+@Requires(notEnv = {Environment.FUNCTION, Environment.ANDROID})
 @Parallel
 public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
 

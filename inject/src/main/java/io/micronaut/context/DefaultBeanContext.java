@@ -31,6 +31,7 @@ import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.io.service.StreamSoftServiceLoader;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
@@ -65,6 +66,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -1194,9 +1196,10 @@ public class DefaultBeanContext implements BeanContext {
             Stream<BeanDefinition<T>> candidateStream = beanDefinitionsClasses
                     .stream()
                     .filter(reference -> {
-                        if (reference.isEnabled(this)) {
+                        if (reference.isPresent()) {
                             Class<?> candidateType = reference.getBeanType();
-                            return candidateType != null && (beanType.isAssignableFrom(candidateType) || beanType == candidateType);
+                            final boolean isCandidate = candidateType != null && (beanType.isAssignableFrom(candidateType) || beanType == candidateType);
+                            return isCandidate && reference.isEnabled(this);
                         }
                         return false;
                     })
@@ -2035,70 +2038,70 @@ public class DefaultBeanContext implements BeanContext {
         List<BeanDefinitionReference> processedBeans = new ArrayList<>(10);
         List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences();
         List<BeanDefinitionReference> allReferences = new ArrayList<>(beanDefinitionReferences.size());
+        Map<BeanConfiguration, List<BeanDefinitionReference>> byConfiguration = new HashMap<>(beanConfigurations.size());
 
         final boolean reportingEnabled = ClassLoadingReporter.isReportingEnabled();
-        for (BeanDefinitionReference ref : beanDefinitionReferences) {
-            Optional<Class> indexedType = ref.getAnnotationMetadata().classValue(Indexed.class);
-            if (indexedType.isPresent()) {
-                final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType.get());
-                indexed.add(ref);
-            } else if (ref.isPresent()) {
-                final Class beanType = ref.getBeanType();
-                if (indexedTypes.contains(beanType)) {
-                    final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(beanType);
-                    indexed.add(ref);
-                } else {
-                    indexedType = indexedTypes.stream().filter(t ->
-                            t == beanType || t.isAssignableFrom(beanType)
-                    ).findFirst();
-                    if (indexedType.isPresent()) {
-                        final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType.get());
-                        indexed.add(ref);
-                    }
-                }
+        for (BeanDefinitionReference beanDefinitionReference : beanDefinitionReferences) {
+            Optional<BeanConfiguration> beanConfiguration = beanConfigurations.values().stream().filter(c -> c.isWithin(beanDefinitionReference)).findFirst();
+            final boolean hasConfiguration = beanConfiguration.isPresent();
+            if (hasConfiguration) {
+                byConfiguration.computeIfAbsent(beanConfiguration.get(), bc -> new ArrayList<>(5))
+                    .add(beanDefinitionReference);
+            } else {
+                indexBeanDefinitionIfNecessary(beanDefinitionReference);
             }
-            allReferences.add(ref);
-            if (ref.isContextScope()) {
-                contextScopeBeans.add(ref);
+            allReferences.add(beanDefinitionReference);
+            if (beanDefinitionReference.isContextScope()) {
+                contextScopeBeans.add(beanDefinitionReference);
             }
-            if (ref.requiresMethodProcessing()) {
-                processedBeans.add(ref);
+            if (beanDefinitionReference.requiresMethodProcessing()) {
+                processedBeans.add(beanDefinitionReference);
             }
         }
 
-        //noinspection unchecked
         this.beanDefinitionsClasses.addAll(allReferences);
-        this.beanDefinitionsClasses.removeIf(beanDefinitionReference -> {
-            Optional<BeanConfiguration> beanConfiguration = beanConfigurations.values().stream().filter(c -> c.isWithin(beanDefinitionReference)).findFirst();
-            if (beanConfiguration.isPresent() && !beanConfiguration.get().isEnabled(this)) {
-                if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                    AbstractBeanContextConditional.LOG.debug(
-                            "Bean [{}] will not be loaded because the configuration [{}] is not enabled",
-                            beanDefinitionReference.getName(),
-                            beanConfiguration);
-                }
-                final Class indexType = beanDefinitionReference.getAnnotationMetadata().classValue(Indexed.class).orElse(null);
-                if (indexType != null) {
-                    final Collection<BeanDefinitionReference> refs = beanIndex.get(indexType);
-                    if (refs != null) {
-                        refs.remove(beanDefinitionReference);
+        for (Map.Entry<BeanConfiguration, List<BeanDefinitionReference>> entry : byConfiguration.entrySet()) {
+            if (!entry.getKey().isEnabled(this)) {
+                final List<BeanDefinitionReference> references = entry.getValue();
+                this.beanDefinitionsClasses.removeAll(references);
+                contextScopeBeans.removeAll(references);
+                processedBeans.removeAll(references);
+                if (reportingEnabled) {
+                    for (BeanDefinitionReference reference : references) {
+                        ClassLoadingReporter.reportMissing(reference.getBeanDefinitionName());
+                        ClassLoadingReporter.reportMissing(reference.getName());
                     }
                 }
-                contextScopeBeans.remove(beanDefinitionReference);
-                processedBeans.remove(beanDefinitionReference);
-                if (reportingEnabled) {
-                    ClassLoadingReporter.reportMissing(beanDefinitionReference.getBeanDefinitionName());
-                    ClassLoadingReporter.reportMissing(beanDefinitionReference.getName());
+            } else {
+                for (BeanDefinitionReference beanDefinitionReference : entry.getValue()) {
+                    indexBeanDefinitionIfNecessary(beanDefinitionReference);
                 }
-                return true;
             }
-
-            return false;
-        });
-
+        }
         initializeEventListeners();
-
         initializeContext(contextScopeBeans, processedBeans);
+    }
+
+    private void indexBeanDefinitionIfNecessary(BeanDefinitionReference beanDefinitionReference) {
+        Optional<Class> indexedType = beanDefinitionReference.getAnnotationMetadata().classValue(Indexed.class);
+        if (indexedType.isPresent()) {
+            final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType.get());
+            indexed.add(beanDefinitionReference);
+        } else if (beanDefinitionReference.isPresent()) {
+            final Class beanType = beanDefinitionReference.getBeanType();
+            if (indexedTypes.contains(beanType)) {
+                final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(beanType);
+                indexed.add(beanDefinitionReference);
+            } else {
+                indexedType = indexedTypes.stream().filter(t ->
+                        t == beanType || t.isAssignableFrom(beanType)
+                ).findFirst();
+                if (indexedType.isPresent()) {
+                    final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType.get());
+                    indexed.add(beanDefinitionReference);
+                }
+            }
+        }
     }
 
     @NotNull
