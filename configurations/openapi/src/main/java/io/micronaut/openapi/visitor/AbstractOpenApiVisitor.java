@@ -794,8 +794,15 @@ abstract class AbstractOpenApiVisitor  {
                 final JsonNode jsonNode = toJson(map, context);
                 try {
                     final Optional<SecurityScheme> securityRequirement = Optional.of(jsonMapper.treeToValue(jsonNode, SecurityScheme.class));
-                    securityRequirement.ifPresent(securityScheme ->
-                            resolveComponents(openAPI).addSecuritySchemes(name, securityScheme)
+                    securityRequirement.ifPresent(securityScheme -> {
+
+                        try {
+                            securityScheme.setIn(Enum.valueOf(SecurityScheme.In.class, map.get("in").toString().toUpperCase(Locale.ENGLISH)));
+                        } catch (Exception e) {
+                            // ignore
+                        }
+                        resolveComponents(openAPI).addSecuritySchemes(name, securityScheme);
+                            }
                     );
                 } catch (JsonProcessingException e) {
                     context.warn("Error reading Swagger SecurityRequirement for element [" + element + "]: " + e.getMessage(), element);
