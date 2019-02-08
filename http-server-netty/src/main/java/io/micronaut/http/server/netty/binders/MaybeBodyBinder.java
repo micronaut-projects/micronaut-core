@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.context.BeanLocator;
@@ -23,9 +24,10 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
+import io.micronaut.http.server.HttpServerConfiguration;
+import io.reactivex.Maybe;
 import io.reactivex.Single;
 import org.reactivestreams.Publisher;
 
@@ -34,17 +36,17 @@ import java.util.Collection;
 import java.util.Optional;
 
 /**
- * Bindings {@link io.micronaut.http.annotation.Body} arguments of type {@link Single}.
+ * Bindings {@link io.micronaut.http.annotation.Body} arguments of type {@link Maybe}.
  *
  * @author Graeme Rocher
  * @since 1.0
  */
 @Singleton
-@Requires(classes = Single.class)
+@Requires(classes = Maybe.class)
 @Internal
-public class SingleBodyBinder extends DefaultBodyAnnotationBinder<Single> implements NonBlockingBodyArgumentBinder<Single> {
+public class MaybeBodyBinder extends DefaultBodyAnnotationBinder<Maybe> implements NonBlockingBodyArgumentBinder<Maybe> {
 
-    public static final Argument<Single> TYPE = Argument.of(Single.class);
+    public static final Argument<Maybe> TYPE = Argument.of(Maybe.class);
 
     private PublisherBodyBinder publisherBodyBinder;
 
@@ -53,28 +55,28 @@ public class SingleBodyBinder extends DefaultBodyAnnotationBinder<Single> implem
      * @param beanLocator             The bean locator
      * @param httpServerConfiguration The Http server configuration
      */
-    public SingleBodyBinder(ConversionService conversionService, BeanLocator beanLocator, HttpServerConfiguration httpServerConfiguration) {
+    public MaybeBodyBinder(ConversionService conversionService, BeanLocator beanLocator, HttpServerConfiguration httpServerConfiguration) {
         super(conversionService);
         this.publisherBodyBinder = new PublisherBodyBinder(conversionService, beanLocator, httpServerConfiguration);
     }
 
     @Override
-    public Argument<Single> argumentType() {
+    public Argument<Maybe> argumentType() {
         return TYPE;
     }
 
     @SuppressWarnings("unchecked")
     @Override
-    public BindingResult<Single> bind(ArgumentConversionContext<Single> context, HttpRequest<?> source) {
+    public BindingResult<Maybe> bind(ArgumentConversionContext<Maybe> context, HttpRequest<?> source) {
         Collection<Argument<?>> typeVariables = context.getArgument().getTypeVariables().values();
 
         BindingResult<Publisher> result = publisherBodyBinder.bind(
-            ConversionContext.of(Argument.of(Publisher.class, (Argument[]) typeVariables.toArray(Argument.ZERO_ARGUMENTS))),
-            source
+                ConversionContext.of(Argument.of(Publisher.class, (Argument[]) typeVariables.toArray(Argument.ZERO_ARGUMENTS))),
+                source
         );
         if (result.isPresentAndSatisfied()) {
-            return () -> Optional.of(Single.fromPublisher(result.get()));
+            return () -> Optional.of(Single.fromPublisher(result.get()).toMaybe());
         }
-        return BindingResult.EMPTY;
+        return () -> Optional.of(Maybe.empty());
     }
 }

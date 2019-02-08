@@ -77,11 +77,11 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         });
     }
 
-    Map<String, Map<CharSequence, Object>> declaredAnnotations;
-    Map<String, Map<CharSequence, Object>> allAnnotations;
-    Map<String, Map<CharSequence, Object>> declaredStereotypes;
-    Map<String, Map<CharSequence, Object>> allStereotypes;
-    Map<String, List<String>> annotationsByStereotype;
+    @Nullable Map<String, Map<CharSequence, Object>> declaredAnnotations;
+    @Nullable Map<String, Map<CharSequence, Object>> allAnnotations;
+    @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes;
+    @Nullable Map<String, Map<CharSequence, Object>> allStereotypes;
+    @Nullable Map<String, List<String>> annotationsByStereotype;
     private Map<Class, List> annotationValuesByType = new ConcurrentHashMap<>(2);
 
     // should not be used in any of the read methods
@@ -390,7 +390,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
             Map<CharSequence, Object> values = allAnnotations.get(annotation);
             if (values != null) {
                 return OptionalValues.of(valueType, values);
-            } else {
+            } else if (allStereotypes != null) {
                 values = allStereotypes.get(annotation);
                 if (values != null) {
                     return OptionalValues.of(valueType, values);
