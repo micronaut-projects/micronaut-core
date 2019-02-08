@@ -132,6 +132,22 @@ class RxHttpPostSpec extends Specification {
         book.title == "The Stand"
     }
 
+    void "test reactive post with unserializable data"() {
+        when:
+        Flowable<User> flowable = client.retrieve(
+                HttpRequest.POST("/reactive/post/user", '{"userName" : "edwin","movies" : [ {"imdbId" : "tt1285016","inCollection": "true"},{"imdbId" : "tt0100502","inCollection" : "false"} ]}')
+                        .accept(MediaType.APPLICATION_JSON_TYPE),
+
+                User
+        )
+        User user = flowable.blockingFirst()
+
+        then:
+        user != null
+        user.movies.size() == 2
+    }
+
+
     @Controller('/reactive/post')
     static class ReactivePostController {
         @Post('/single')
@@ -143,6 +159,14 @@ class RxHttpPostSpec extends Specification {
         Maybe<HttpPostSpec.Book> maybe(@Body Maybe<HttpPostSpec.Book> book) {
             return book
         }
+
+        @Post("/user")
+        Single<HttpResponse<User>> postUser(@Body Single<User> user) {
+            return user.map({ User u->
+                return HttpResponse.ok(u)
+            })
+        }
+
     }
 
 }
