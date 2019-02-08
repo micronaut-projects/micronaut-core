@@ -20,23 +20,29 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
+import spock.lang.AutoCleanup
+import spock.lang.Shared
 import spock.lang.Specification
+import spock.lang.Stepwise
 
+@Stepwise
 class ServerRequestContextReactiveSpec extends Specification {
 
-    def "verifies ServerRequestContext.currentRequest() does not return null for reactive flows"() {
-        given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-                'spec.name': 'ServerRequestContextReactiveSpec',
-                'micronaut.security.enabled': true,
-        ])
+    @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+            'spec.name': 'ServerRequestContextReactiveSpec',
+            'micronaut.security.enabled': true,
+    ])
 
+    @Shared @AutoCleanup RxHttpClient httpClient =
+            embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.URL)
+
+    def "verifies ServerRequestContext.currentRequest() does not return null for reactive flows"() {
         expect:
         embeddedServer.applicationContext.containsBean(MyController)
 
         when:
-        RxHttpClient httpClient = embeddedServer.getApplicationContext().createBean(RxHttpClient.class, embeddedServer.URL)
-        Flowable<Message> messages = httpClient.retrieve(HttpRequest.GET("/mycontroller/simple"), Message)
+
+        Flowable<Message> messages = httpClient.retrieve(HttpRequest.GET("/test/request-context/simple"), Message)
 
         then:
         messages
@@ -49,7 +55,7 @@ class ServerRequestContextReactiveSpec extends Specification {
         message.message == 'Sergio'
 
         when:
-        messages = httpClient.retrieve(HttpRequest.GET("/mycontroller"), Message)
+        messages = httpClient.retrieve(HttpRequest.GET("/test/request-context"), Message)
 
         then:
         messages
@@ -60,8 +66,65 @@ class ServerRequestContextReactiveSpec extends Specification {
         then:
         message
         message.message == 'Sergio'
+    }
 
-        cleanup:
-        embeddedServer.close()
+    def "verify flowable with subscribe on"() {
+        when:
+        def messages = httpClient.retrieve(HttpRequest.GET("/test/request-context/flowable-subscribeon"), Message)
+
+        then:
+        messages
+
+        when:
+        def message = messages.blockingFirst()
+
+        then:
+        message
+        message.message == 'Sergio'
+    }
+
+    def "verify flowable callable"() {
+        when:
+        def messages = httpClient.retrieve(HttpRequest.GET("/test/request-context/flowable-callable"), Message)
+
+        then:
+        messages
+
+        when:
+        def message = messages.blockingFirst()
+
+        then:
+        message
+        message.message == 'Sergio'
+    }
+
+    def "verify flux"() {
+        when:
+        def messages = httpClient.retrieve(HttpRequest.GET("/test/request-context/flux"), Message)
+
+        then:
+        messages
+
+        when:
+        def message = messages.blockingFirst()
+
+        then:
+        message
+        message.message == 'Sergio'
+    }
+
+    def "verify flux subscribe on"() {
+        when:
+        def messages = httpClient.retrieve(HttpRequest.GET("/test/request-context/flux-subscribeon"), Message)
+
+        then:
+        messages
+
+        when:
+        def message = messages.blockingFirst()
+
+        then:
+        message
+        message.message == 'Sergio'
     }
 }
