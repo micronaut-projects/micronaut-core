@@ -15,6 +15,10 @@
  */
 package io.micronaut.http.client.rxjava2
 
+import io.micronaut.http.annotation.Body
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.QueryValue
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
@@ -25,6 +29,8 @@ import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpPostSpec
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import io.reactivex.Maybe
+import io.reactivex.Single
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -98,5 +104,45 @@ class RxHttpPostSpec extends Specification {
         book.title == "The Stand"
     }
 
+    void "test reactive single post retrieve request with JSON"() {
+        when:
+        Flowable<HttpPostSpec.Book> flowable = client.retrieve(
+                HttpRequest.POST("/reactive/post/single", Single.just(new HttpPostSpec.Book(title: "The Stand", pages: 1000)))
+                        .accept(MediaType.APPLICATION_JSON_TYPE),
+
+                HttpPostSpec.Book
+        )
+        HttpPostSpec.Book book = flowable.blockingFirst()
+
+        then:
+        book.title == "The Stand"
+    }
+
+    void "test reactive maybe post retrieve request with JSON"() {
+        when:
+        Flowable<HttpPostSpec.Book> flowable = client.retrieve(
+                HttpRequest.POST("/reactive/post/maybe", Maybe.just(new HttpPostSpec.Book(title: "The Stand", pages: 1000)))
+                        .accept(MediaType.APPLICATION_JSON_TYPE),
+
+                HttpPostSpec.Book
+        )
+        HttpPostSpec.Book book = flowable.blockingFirst()
+
+        then:
+        book.title == "The Stand"
+    }
+
+    @Controller('/reactive/post')
+    static class ReactivePostController {
+        @Post('/single')
+        Single<HttpPostSpec.Book> simple(@Body Single<HttpPostSpec.Book> book) {
+            return book
+        }
+
+        @Post('/maybe')
+        Maybe<HttpPostSpec.Book> maybe(@Body Maybe<HttpPostSpec.Book> book) {
+            return book
+        }
+    }
 
 }
