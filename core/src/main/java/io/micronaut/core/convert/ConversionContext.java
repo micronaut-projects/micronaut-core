@@ -24,10 +24,7 @@ import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 
 /**
  * A conversion context is a context object supplied to a {@link TypeConverter} that allows more accurate conversion.
@@ -109,6 +106,11 @@ public interface ConversionContext extends AnnotationMetadataProvider, TypeVaria
             @Override
             public Iterator<ConversionError> iterator() {
                 return thisContext.iterator();
+            }
+
+            @Override
+            public Optional<ConversionError> getLastError() {
+                return thisContext.getLastError();
             }
         };
     }

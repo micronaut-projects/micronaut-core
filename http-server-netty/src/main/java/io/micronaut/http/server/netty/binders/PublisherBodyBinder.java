@@ -109,14 +109,18 @@ public class PublisherBodyBinder extends DefaultBodyAnnotationBinder<Publisher> 
                         if (converted.isPresent()) {
                             subscriber.onNext(converted.get());
                         } else {
-                            if (LOG.isTraceEnabled()) {
-                                LOG.trace("Cannot convert message for argument [{}] and value: {}", context.getArgument(), message);
-                            }
+
                             try {
                                 Optional<ConversionError> lastError = conversionContext.getLastError();
                                 if (lastError.isPresent()) {
+                                    if (LOG.isDebugEnabled()) {
+                                        LOG.debug("Cannot convert message for argument [" + context.getArgument() + "] and value: " + message, lastError.get());
+                                    }
                                     subscriber.onError(new ConversionErrorException(context.getArgument(), lastError.get()));
                                 } else {
+                                    if (LOG.isDebugEnabled()) {
+                                        LOG.debug("Cannot convert message for argument [{}] and value: {}", context.getArgument(), message);
+                                    }
                                     subscriber.onError(new UnsatisfiedRouteException(context.getArgument()));
                                 }
                             } finally {
