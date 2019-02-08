@@ -23,6 +23,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.scheduling.instrument.InstrumentedExecutorService;
 import io.micronaut.scheduling.instrument.InstrumentedScheduledExecutorService;
+import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
 import io.micronaut.scheduling.instrument.RunnableInstrumenter;
 
 import javax.inject.Singleton;
@@ -41,7 +42,7 @@ import java.util.function.Function;
  */
 @Singleton
 @Internal
-final class ServerRequestContextInstrumentation implements Function<Runnable, Runnable>, RunnableInstrumenter, BeanCreatedEventListener<ThreadFactory> {
+final class ServerRequestContextInstrumentation implements Function<Runnable, Runnable>, RunnableInstrumenter, ReactiveInstrumenter, BeanCreatedEventListener<ThreadFactory> {
 
     @Override
     public Runnable apply(Runnable runnable) {
@@ -69,6 +70,17 @@ final class ServerRequestContextInstrumentation implements Function<Runnable, Ru
         final Optional<HttpRequest<Object>> httpRequest = ServerRequestContext.currentRequest();
         return httpRequest.map(objectHttpRequest -> ServerRequestContext.instrument(objectHttpRequest, runnable))
                 .orElse(runnable);
+    }
+
+    @Override
+    public Optional<RunnableInstrumenter> newInstrumentation() {
+        final Optional<HttpRequest<Object>> httpRequest = ServerRequestContext.currentRequest();
+        return httpRequest.map(request -> new RunnableInstrumenter() {
+            @Override
+            public Runnable instrument(Runnable command) {
+                return ServerRequestContext.instrument(request, command);
+            }
+        });
     }
 
     /**
