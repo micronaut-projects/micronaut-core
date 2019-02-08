@@ -19,6 +19,7 @@ import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.QueryValue
+import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
@@ -143,8 +144,8 @@ class RxHttpPostSpec extends Specification {
         User user = flowable.blockingFirst()
 
         then:
-        user != null
-        user.movies.size() == 2
+        def e = thrown(HttpClientResponseException)
+        e.message.contains('Cannot construct instance of `io.micronaut.http.client.rxjava2.Movie`')
     }
 
 
