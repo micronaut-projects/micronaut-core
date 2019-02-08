@@ -17,7 +17,9 @@ package io.micronaut.openapi.visitor
 
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeType
 import io.swagger.v3.oas.models.OpenAPI
+import io.swagger.v3.oas.models.security.SecurityScheme
 
 class OpenApiApplicationVisitorSpec extends AbstractTypeElementSpec {
 
@@ -182,5 +184,61 @@ class MyBean {}
         openAPI.servers[0].variables.size() == 2
         openAPI.servers[0].variables.var1.description == 'var 1'
         openAPI.servers[0].variables.var1.default == '1'
+    }
+
+    void "test build OpenAPI security schemes"() {
+        given:"An API definition"
+        System.setProperty(AbstractOpenApiVisitor.ATTR_TEST_MODE, "true")
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.reactivex.Maybe;
+import io.reactivex.Single;
+import io.micronaut.http.annotation.*;
+import java.util.List;
+import io.swagger.v3.oas.annotations.*;
+import io.swagger.v3.oas.annotations.info.*;
+import io.swagger.v3.oas.annotations.tags.*;
+import io.swagger.v3.oas.annotations.servers.*;
+import io.swagger.v3.oas.annotations.security.*;
+import io.swagger.v3.oas.annotations.enums.*;
+/**
+ * @author graemerocher
+ * @since 1.0
+ */
+@OpenAPIDefinition()
+@SecurityScheme(name = "myOauth2Security",
+           type = SecuritySchemeType.OAUTH2,
+           in = SecuritySchemeIn.HEADER,
+           flows = @OAuthFlows(
+                   implicit = @OAuthFlow(authorizationUrl = "http://url.com/auth",
+                           scopes = @OAuthScope(name = "write:pets", description = "modify pets in your account"))))
+class Application {
+
+}
+
+
+@javax.inject.Singleton
+class MyBean {}
+''')
+        then:"the state is correct"
+        AbstractOpenApiVisitor.testReference != null
+
+        when:"the /pets path is retrieved"
+        OpenAPI openAPI = AbstractOpenApiVisitor.testReference
+
+        then:"it is included in the OpenAPI doc"
+        openAPI != null
+        openAPI.components.securitySchemes['myOauth2Security']
+        openAPI.components.securitySchemes['myOauth2Security'].type == SecurityScheme.Type.OAUTH2
+        openAPI.components.securitySchemes['myOauth2Security'].flows
+        openAPI.components.securitySchemes['myOauth2Security'].flows.implicit
+        openAPI.components.securitySchemes['myOauth2Security'].flows.implicit.authorizationUrl == 'http://url.com/auth'
+        openAPI.components.securitySchemes['myOauth2Security'].flows.implicit.scopes
+        openAPI.components.securitySchemes['myOauth2Security'].flows.implicit.scopes.size() == 1
+        openAPI.components.securitySchemes['myOauth2Security'].flows.implicit.scopes.get("write:pets")
+        openAPI.components.securitySchemes['myOauth2Security'].flows.implicit.scopes.get("write:pets") == 'modify pets in your account'
+        openAPI.components.securitySchemes['myOauth2Security'].in == SecurityScheme.In.HEADER
     }
 }
