@@ -10,6 +10,8 @@ dependencies {
     testCompile project(":inject-groovy")
     testCompile project(":http-server-netty")
     testCompile project(":test-utils")
+
+    testCompile dependencyVersion("reactor")
 }
 
 //tasks.withType(Test) {

@@ -23,10 +23,12 @@ import io.micronaut.security.annotation.Secured;
 import io.micronaut.security.rules.SecurityRule;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
+import io.reactivex.schedulers.Schedulers;
+import reactor.core.publisher.Flux;
 
 @Requires(property = "spec.name", value = "ServerRequestContextReactiveSpec")
 @Secured(SecurityRule.IS_ANONYMOUS)
-@Controller("/mycontroller")
+@Controller("/test/request-context")
 class MyController {
 
     @Get
@@ -47,4 +49,51 @@ class MyController {
         }
         return Flowable.just(new Message("Anonymous"));
     }
+
+    @Get("/flowable-subscribeon")
+    Flowable<Message> flowableSubscribeOn() {
+        return Flowable.just("foo")
+                .flatMapSingle(name -> {
+                    if (ServerRequestContext.currentRequest().isPresent()) {
+                        return Single.just(new Message("Sergio"));
+                    }
+                    return Single.just(new Message("Anonymous"));
+                }).subscribeOn(Schedulers.io());
+    }
+
+
+    @Get("/flowable-callable")
+    Flowable<Message> flowableCallable() {
+        return Flowable.fromCallable(() -> "foo")
+                .subscribeOn(Schedulers.io())
+                .flatMapSingle(name -> {
+                    if (ServerRequestContext.currentRequest().isPresent()) {
+                        return Single.just(new Message("Sergio"));
+                    }
+                    return Single.just(new Message("Anonymous"));
+                });
+    }
+
+    @Get("/flux")
+    Flux<Message> flux() {
+        return Flux.just("foo")
+                .flatMap(name -> {
+                    if (ServerRequestContext.currentRequest().isPresent()) {
+                        return Flux.just(new Message("Sergio"));
+                    }
+                    return Flux.just(new Message("Anonymous"));
+                });
+    }
+
+    @Get("/flux-subscribeon")
+    Flux<Message> fluxSubscribeOn() {
+        return Flux.just("foo")
+                .flatMap(name -> {
+                    if (ServerRequestContext.currentRequest().isPresent()) {
+                        return Flux.just(new Message("Sergio"));
+                    }
+                    return Flux.just(new Message("Anonymous"));
+                }).subscribeOn(reactor.core.scheduler.Schedulers.elastic());
+    }
+
 }
