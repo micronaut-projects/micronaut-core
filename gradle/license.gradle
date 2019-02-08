@@ -9,7 +9,7 @@ license {
         java   = 'SLASHSTAR_STYLE'
         groovy = 'SLASHSTAR_STYLE'
     }
-    ext.year = '2017-2018'
+    ext.year = '2017-2019'
 
     exclude '**/*.txt'
     exclude '**/*.html'
@@ -18,6 +18,7 @@ license {
     exclude '**/io/micronaut/core/io/scan/AnnotationClassReader.java'
     exclude '**/io/micronaut/core/io/scan/Attribute.java'
     exclude '**/io/micronaut/core/io/scan/Context.java'
+    exclude '**/io/micronaut/core/util/clhm/**'
     exclude '**/io/micronaut/core/util/AntPathMatcher.java'
     exclude '**/io/micronaut/discovery/eureka/client/v2/AmazonInfo.java'
     exclude '**/io/micronaut/discovery/eureka/client/v2/DataCenterInfo.java'
@@ -26,6 +27,7 @@ license {
     exclude '**/io/micronaut/scheduling/cron/CronExpression.java'
     exclude '**/org/atinject/tck/auto/Tck.kt'
     exclude '**/io/micronaut/http/netty/stream/package-info.java'
+    exclude '**/io/micronaut/http/uri/QueryStringDecoder.java'
     exclude '**/build-info.properties'
     exclude '**/git.properties'
     exclude '**/othergit.properties'
