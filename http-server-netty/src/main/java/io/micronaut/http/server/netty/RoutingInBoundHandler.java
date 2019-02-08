@@ -211,6 +211,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         NettyHttpRequest nettyHttpRequest = NettyHttpRequest.remove(ctx);
         if (nettyHttpRequest == null) {
+            if (cause.getCause() instanceof IllegalArgumentException && cause.getCause().getCause() instanceof URISyntaxException ) {
+                ctx.writeAndFlush(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST));
+                return;
+            }
             if (LOG.isErrorEnabled()) {
                 LOG.error("Micronaut Server Error - No request state present. Cause: " + cause.getMessage(), cause);
             }
