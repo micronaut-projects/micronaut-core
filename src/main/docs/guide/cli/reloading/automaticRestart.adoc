@@ -41,6 +41,8 @@ configurations {
     developmentOnly
 }
 dependencies {
+    // Dependency will exist if the project was created using --features file-watch, add otherwise
+    developmentOnly "io.micronaut:micronaut-runtime-osx"
     ...
     developmentOnly "net.java.dev.jna:jna"
     developmentOnly "io.methvin:directory-watcher"
