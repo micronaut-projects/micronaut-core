@@ -21,6 +21,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.Optional;
 
@@ -54,6 +55,7 @@ public class HttpUtil {
      * @param request The request
      * @return An {@link Optional} of {@link Charset}
      */
+    @SuppressWarnings("Duplicates")
     public static Optional<Charset> resolveCharset(HttpMessage<?> request) {
         try {
             Optional<Charset> contentTypeCharset = request
@@ -70,7 +72,24 @@ public class HttpUtil {
                 return request
                     .getHeaders()
                     .findFirst(HttpHeaders.ACCEPT_CHARSET)
-                    .map(Charset::forName);
+                    .map(text -> {
+                        int len = text.length();
+                        if (len == 0 || (len == 1 && text.charAt(0) == '*')) {
+                            return StandardCharsets.UTF_8;
+                        }
+                        if (text.indexOf(';') > -1) {
+                            text = text.split(";")[0];
+                        }
+                        if (text.indexOf(',') > -1) {
+                            text = text.split(",")[0];
+                        }
+                        try {
+                            return Charset.forName(text);
+                        } catch (Exception e) {
+                            // unsupported charset, default to UTF-8
+                            return StandardCharsets.UTF_8;
+                        }
+                    });
             }
         } catch (UnsupportedCharsetException e) {
             return Optional.empty();
