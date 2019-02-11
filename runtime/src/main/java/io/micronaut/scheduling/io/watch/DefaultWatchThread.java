@@ -48,6 +48,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 @Requires(property = FileWatchConfiguration.PATHS)
 @Requires(notEnv = {Environment.FUNCTION, Environment.ANDROID})
+@Requires(beans = WatchService.class)
 @Parallel
 public class DefaultWatchThread implements LifeCycle<DefaultWatchThread> {
 
