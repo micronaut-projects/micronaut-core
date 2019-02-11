@@ -53,7 +53,7 @@ public class WatchServiceFactory {
         String name = System.getProperty("os.name").toLowerCase();
         boolean isMacOS = "Mac OS X".equalsIgnoreCase(name) || "Darwin".equalsIgnoreCase(name);
         if (isMacOS) {
-            LOG.warn("Using default File WatchService on OS X is slow. Consider adding 'io.methvin:directory-watcher' and 'net.java.dev.jna:jna' dependencies to use native file watch");
+            LOG.warn("Using default File WatchService on OS X is slow. Consider adding 'io.micronaut:micronaut-runtime-osx' dependencies to use native file watch");
         }
         return FileSystems.getDefault().newWatchService();
     }
