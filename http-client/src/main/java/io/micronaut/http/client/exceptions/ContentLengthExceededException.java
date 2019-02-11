@@ -26,13 +26,13 @@ public class ContentLengthExceededException extends HttpClientException {
      * @param receivedLength The received length
      */
     public ContentLengthExceededException(long maxLength, long receivedLength) {
-        super("The received length [" + receivedLength + "] exceeds the maximum content length [" + maxLength + "]");
+        super("The received length [" + receivedLength + "] exceeds the maximum allowed content length [" + maxLength + "]");
     }
 
     /**
      * @param maxLength The maximum length
      */
     public ContentLengthExceededException(long maxLength) {
-        super("The received length exceeds the maximum content length [" + maxLength + "]");
+        super("The received length exceeds the maximum allowed content length [" + maxLength + "]");
     }
 }

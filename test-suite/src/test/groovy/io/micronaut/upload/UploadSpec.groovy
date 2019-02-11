@@ -284,7 +284,7 @@ class UploadSpec extends AbstractMicronautSpec {
         def json = new JsonSlurper().parseText(e.response.getBody().get())
 
         then:
-        json.message.contains("exceeds the maximum content length [1024]")
+        json.message.contains("exceeds the maximum allowed content length [1024]")
     }
 
     void "test upload CompletedFileUpload object"() {
