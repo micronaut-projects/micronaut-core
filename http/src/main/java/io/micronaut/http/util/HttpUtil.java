@@ -19,8 +19,8 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMessage;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
-
 import java.nio.charset.Charset;
+import java.nio.charset.IllegalCharsetNameException;
 import java.nio.charset.UnsupportedCharsetException;
 import java.util.Optional;
 
@@ -72,7 +72,7 @@ public class HttpUtil {
                     .findFirst(HttpHeaders.ACCEPT_CHARSET)
                     .map(Charset::forName);
             }
-        } catch (UnsupportedCharsetException e) {
+        } catch (UnsupportedCharsetException| IllegalCharsetNameException e) {
             return Optional.empty();
         }
     }
