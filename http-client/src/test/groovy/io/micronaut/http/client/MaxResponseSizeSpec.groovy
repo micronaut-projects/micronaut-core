@@ -52,7 +52,7 @@ class MaxResponseSizeSpec extends Specification {
 
         then:
         def e = thrown(ContentLengthExceededException)
-        e.message == 'The received length exceeds the maximum content length [1024]'
+        e.message == 'The received length exceeds the maximum allowed content length [1024]'
     }
 
     @Controller("/max")

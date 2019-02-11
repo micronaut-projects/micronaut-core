@@ -78,7 +78,7 @@ public class DefaultHttpContentProcessor extends SingleThreadedBufferingProcesso
         long receivedLength = this.receivedLength.addAndGet(resolveLength(message));
 
         if ((advertisedLength != -1 && receivedLength > advertisedLength) || (receivedLength > requestMaxSize)) {
-            fireExceedsLength(receivedLength, advertisedLength == -1 ? requestMaxSize : advertisedLength);
+            fireExceedsLength(advertisedLength == -1 ? receivedLength : advertisedLength, requestMaxSize);
         } else {
             if (verifyPartDefinedSize(message)) {
                 publishVerifiedContent(message);

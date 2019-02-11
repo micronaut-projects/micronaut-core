@@ -44,6 +44,6 @@ public class ContentLengthExceededException extends HttpException {
      * @param receivedLength   The received length
      */
     public ContentLengthExceededException(long advertisedLength, long receivedLength) {
-        this("The received length [" + receivedLength + "] exceeds the maximum content length [" + advertisedLength + "]");
+        this("The content length [" + receivedLength + "] exceeds the maximum allowed content length [" + advertisedLength + "]");
     }
 }
