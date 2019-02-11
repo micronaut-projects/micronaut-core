@@ -20,6 +20,7 @@ import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
 
+import javax.annotation.Nonnull;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
@@ -402,7 +403,12 @@ public class UriTemplate implements Comparable<UriTemplate> {
         return new UriTemplateParser(templateString);
     }
 
-    protected String toString(Predicate<PathSegment> filter) {
+    /**
+     * Converts the template to a string using the given filter to dictate which segements to include.
+     * @param filter The filter
+     * @return The string
+     */
+    protected @Nonnull String toString(@Nonnull Predicate<PathSegment> filter) {
         StringBuilder builder = new StringBuilder();
         UriTemplateParser.VariablePathSegment previousVariable = null;
         for (PathSegment segment : segments) {
