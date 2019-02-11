@@ -62,6 +62,31 @@ public class ArrayUtils {
     }
 
     /**
+     * Concatenate two byte arrays.
+     *
+     * @param a   The first array
+     * @param b   The second array
+     * @return The concatenated array
+     */
+    public static byte[] concat(byte[] a, byte... b) {
+        int aLen = a.length;
+        int bLen = b.length;
+
+        if (bLen == 0) {
+            return a;
+        }
+        if (aLen == 0) {
+            return b;
+        }
+
+        byte[] c = new byte[aLen + bLen];
+        System.arraycopy(a, 0, c, 0, aLen);
+        System.arraycopy(b, 0, c, aLen, bLen);
+
+        return c;
+    }
+
+    /**
      * Whether the given array is empty.
      *
      * @param array The array

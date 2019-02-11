@@ -23,6 +23,7 @@ import io.micronaut.core.convert.TypeConverter;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.CompositeByteBuf;
+import io.netty.buffer.Unpooled;
 
 import javax.inject.Singleton;
 import java.util.Optional;
@@ -63,6 +64,15 @@ public class ByteBufConverters {
     @Bean
     TypeConverter<ByteBuf, byte[]> byteBufToArrayTypeConverter() {
         return (object, targetType, context) -> Optional.of(ByteBufUtil.getBytes(object));
+    }
+
+    /**
+     * @return A converter that converts bytebufs to byte arrays
+     */
+    @Singleton
+    @Bean
+    TypeConverter<byte[], ByteBuf> byteArrayToByteBuffTypeConverter() {
+        return (object, targetType, context) -> Optional.of(Unpooled.wrappedBuffer(object));
     }
 
     /**
