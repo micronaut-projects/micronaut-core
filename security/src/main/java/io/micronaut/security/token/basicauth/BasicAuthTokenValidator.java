@@ -30,7 +30,7 @@ import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.annotation.Nullable;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -55,22 +55,23 @@ public class BasicAuthTokenValidator implements TokenValidator {
 
     protected final Authenticator authenticator;
 
-    @Nullable
     private final String rolesKeyName;
 
     /**
      * @deprecated Use {@link #BasicAuthTokenValidator(Authenticator, TokenConfiguration)}
      * @param authenticator The Authenticator
      */
+    @Deprecated
     public BasicAuthTokenValidator(Authenticator authenticator) {
         this.authenticator = authenticator;
-        this.rolesKeyName = null;
+        this.rolesKeyName = TokenConfiguration.DEFAULT_ROLES_NAME;
     }
 
     /**
      * @param authenticator The Authenticator
      * @param tokenConfiguration The Token configuration.
      */
+    @Inject
     public BasicAuthTokenValidator(Authenticator authenticator,
                                    TokenConfiguration tokenConfiguration) {
         this.authenticator = authenticator;
