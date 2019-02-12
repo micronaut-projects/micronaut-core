@@ -37,12 +37,14 @@ public class TokenConfigurationProperties implements TokenConfiguration {
 
     /**
      * The default roles name.
+     * @deprecated Use {@link TokenConfiguration#DEFAULT_ROLES_NAME} instead
      */
     @SuppressWarnings("WeakerAccess")
-    public static final String DEFAULT_ROLES_NAME = "roles";
+    @Deprecated
+    public static final String DEFAULT_ROLES_NAME = TokenConfiguration.DEFAULT_ROLES_NAME;
 
     private boolean enabled = DEFAULT_ENABLED;
-    private String rolesName = DEFAULT_ROLES_NAME;
+    private String rolesName = TokenConfiguration.DEFAULT_ROLES_NAME;
 
     @Override
     public boolean isEnabled() {
