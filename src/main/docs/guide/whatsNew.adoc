@@ -49,6 +49,11 @@ mn create-app helloworld --profile grpc --lang java --build gradle
 ----
 ====
 
+=== Cold Start and Performance Improvements
+
+Micronaut 1.1 cold start performance has been improved through a variety of optimizations including compilation time indexing of common bean types. Users should see superior cold start performance for both Microservices and Functions.
+
+
 === AWS API Gateway Proxy Support
 
 Support for AWS API Gateway Proxy has been added allowing AWS Lambda's to be defined as regular controllers. See the documentation on https://micronaut-projects.github.io/micronaut-aws/latest/guide/#apiProxy[AWS API Gateway Proxy Support] for more information and links to examples.
