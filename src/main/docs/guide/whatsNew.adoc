@@ -29,6 +29,8 @@ A new <<automaticRestart,Automatic Restart>> feature is included that allows the
 ====
 ----
 $ mn create-app my-app --features file-watch
+$ cd my-app
+$ ./gradlew run --continuous
 ----
 ====
 
