@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.discovery.consul;
 
 import io.micronaut.context.annotation.BootstrapContextCompatible;
@@ -55,6 +54,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
     private final ConsulConnectionPoolConfiguration consulConnectionPoolConfiguration;
 
     private String aslToken;
+    private boolean healthCheck = true;
     private ConsulRegistrationConfiguration registration = new ConsulRegistrationConfiguration();
     private ConsulDiscoveryConfiguration discovery = new ConsulDiscoveryConfiguration();
     private ConsulConfigDiscoveryConfiguration configuration = new ConsulConfigDiscoveryConfiguration();
@@ -76,6 +76,24 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
         super(applicationConfiguration);
         setPort(CONSULT_DEFAULT_PORT);
         this.consulConnectionPoolConfiguration = consulConnectionPoolConfiguration;
+    }
+
+    /**
+     * @return Whether the Consul server should be considered for health checks.
+     * @see io.micronaut.discovery.consul.health.ConsulHealthIndicator
+     */
+    public boolean isHealthCheck() {
+        return healthCheck;
+    }
+
+    /**
+     * Sets whether the Consul server should be considered for health checks.
+     * @see io.micronaut.discovery.consul.health.ConsulHealthIndicator
+
+     * @param healthCheck True if it should
+     */
+    public void setHealthCheck(boolean healthCheck) {
+        this.healthCheck = healthCheck;
     }
 
     @Override

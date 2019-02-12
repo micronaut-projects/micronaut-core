@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.*;
@@ -22,20 +21,21 @@ import io.micronaut.context.exceptions.*;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.context.scope.CustomScope;
 import io.micronaut.context.scope.CustomScopeRegistry;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.annotation.*;
 import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.TypeConverter;
+import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.io.service.StreamSoftServiceLoader;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.ClassLoadingReporter;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
@@ -49,6 +49,7 @@ import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
+import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,6 +66,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -101,9 +103,17 @@ public class DefaultBeanContext implements BeanContext {
     private final Map<BeanKey, Collection<Object>> initializedObjectsByType = new ConcurrentLinkedHashMap.Builder<BeanKey, Collection<Object>>().maximumWeightedCapacity(30).build();
     private final Map<BeanKey, Optional<BeanDefinition>> beanConcreteCandidateCache = new ConcurrentLinkedHashMap.Builder<BeanKey, Optional<BeanDefinition>>().maximumWeightedCapacity(30).build();
     private final Map<Class, Collection<BeanDefinition>> beanCandidateCache = new ConcurrentLinkedHashMap.Builder<Class, Collection<BeanDefinition>>().maximumWeightedCapacity(30).build();
+    private final Map<Class, Collection<BeanDefinitionReference>> beanIndex = new ConcurrentLinkedHashMap.Builder<Class, Collection<BeanDefinitionReference>>().maximumWeightedCapacity(10).build();
 
     private final ClassLoader classLoader;
     private final Set<Class> thisInterfaces = ReflectionUtils.getAllInterfaces(getClass());
+    private final Set<Class> indexedTypes = CollectionUtils.setOf(
+            TypeConverter.class,
+            TypeConverterRegistrar.class,
+            ApplicationEventListener.class,
+            BeanCreatedEventListener.class,
+            BeanInitializedEventListener.class
+    );
     private final CustomScopeRegistry customScopeRegistry;
     private final ResourceLoader resourceLoader;
     private Collection<BeanRegistration<BeanCreatedEventListener>> beanCreationEventListeners;
@@ -133,6 +143,9 @@ public class DefaultBeanContext implements BeanContext {
         this.classLoader = resourceLoader.getClassLoader();
         this.resourceLoader = resourceLoader;
         this.customScopeRegistry = new DefaultCustomScopeRegistry(this, classLoader);
+
+        // startup optimization.. index Jackson modules
+        ClassUtils.forName("com.fasterxml.jackson.databind.Module", classLoader).ifPresent(indexedTypes::add);
     }
 
     @Override
@@ -190,20 +203,9 @@ public class DefaultBeanContext implements BeanContext {
                 LOG.debug("Stopping BeanContext");
             }
             publishEvent(new ShutdownEvent(this));
+
             // need to sort registered singletons so that beans with that require other beans appear first
-            ArrayList<BeanRegistration> objects = new ArrayList<>(singletonObjects.values());
-            objects.sort((o1, o2) -> {
-                        BeanDefinition bd1 = o1.beanDefinition;
-                        BeanDefinition bd2 = o2.beanDefinition;
-
-                        Collection requiredComponents1 = bd1.getRequiredComponents();
-                        Collection requiredComponents2 = bd2.getRequiredComponents();
-                        Integer requiredComponentCount1 = requiredComponents1.size();
-                        Integer requiredComponentCount2 = requiredComponents2.size();
-                        return requiredComponentCount1.compareTo(requiredComponentCount2);
-                    }
-            );
-
+            List<BeanRegistration> objects = topologicalSort(singletonObjects.values());
 
             Set<Integer> processed = new HashSet<>();
             for (BeanRegistration beanRegistration : objects) {
@@ -415,6 +417,7 @@ public class DefaultBeanContext implements BeanContext {
         }
         BeanKey<T> beanKey = new BeanKey<>(type, qualifier);
         synchronized (singletonObjects) {
+
             initializedObjectsByType.clear();
 
             BeanDefinition<T> beanDefinition = inject ? findBeanCandidatesForInstance(singleton).stream().findFirst().orElse(null) : null;
@@ -423,8 +426,31 @@ public class DefaultBeanContext implements BeanContext {
                 singletonObjects.put(beanKey, new BeanRegistration<>(beanKey, beanDefinition, singleton));
             } else {
                 NoInjectionBeanDefinition<T> dynamicRegistration = new NoInjectionBeanDefinition<>(type);
+                beanDefinition = dynamicRegistration;
                 beanDefinitionsClasses.add(dynamicRegistration);
                 singletonObjects.put(beanKey, new BeanRegistration<>(beanKey, dynamicRegistration, singleton));
+            }
+
+            final Optional<Class> indexedType = indexedTypes.stream().filter(t -> t.isAssignableFrom(type) || t == type).findFirst();
+            if (indexedType.isPresent()) {
+                final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType.get());
+                BeanDefinition<T> finalBeanDefinition = beanDefinition;
+                indexed.add(new AbstractBeanDefinitionReference(type.getName(), type.getName()) {
+                    @Override
+                    protected Class<? extends BeanDefinition<?>> getBeanDefinitionType() {
+                        return (Class<? extends BeanDefinition<?>>) finalBeanDefinition.getClass();
+                    }
+
+                    @Override
+                    public BeanDefinition load() {
+                        return finalBeanDefinition;
+                    }
+
+                    @Override
+                    public Class getBeanType() {
+                        return type;
+                    }
+                });
             }
         }
         return this;
@@ -1000,7 +1026,8 @@ public class DefaultBeanContext implements BeanContext {
         List<BeanDefinitionReference> list = new ArrayList<>(300);
         for (ServiceDefinition<BeanDefinitionReference> definition : definitions) {
             if (definition.isPresent()) {
-                list.add(definition.load());
+                final BeanDefinitionReference ref = definition.load();
+                list.add(ref);
             }
         }
         return list;
@@ -1026,10 +1053,8 @@ public class DefaultBeanContext implements BeanContext {
      * Initialize the event listeners.
      */
     protected void initializeEventListeners() {
-        getBeansOfType(BeanCreatedEventListener.class);
-        this.beanCreationEventListeners = getActiveBeanRegistrations(BeanCreatedEventListener.class);
-        getBeansOfType(BeanInitializedEventListener.class);
-        this.beanInitializedEventListeners = getActiveBeanRegistrations(BeanInitializedEventListener.class);
+        this.beanCreationEventListeners = getBeanRegistrations(BeanCreatedEventListener.class);
+        this.beanInitializedEventListeners = getBeanRegistrations(BeanInitializedEventListener.class);
     }
 
     /**
@@ -1157,15 +1182,26 @@ public class DefaultBeanContext implements BeanContext {
         }
         // first traverse component definition classes and load candidates
 
-        Collection<BeanDefinitionReference> beanDefinitionsClasses = this.beanDefinitionsClasses;
+        Collection<BeanDefinitionReference> beanDefinitionsClasses;
+
+        if (indexedTypes.contains(beanType)) {
+            beanDefinitionsClasses = beanIndex.get(beanType);
+            if (beanDefinitionsClasses == null) {
+                beanDefinitionsClasses = Collections.emptyList();
+            }
+        } else {
+            beanDefinitionsClasses = this.beanDefinitionsClasses;
+        }
+
         if (!beanDefinitionsClasses.isEmpty()) {
 
             Stream<BeanDefinition<T>> candidateStream = beanDefinitionsClasses
                     .stream()
                     .filter(reference -> {
-                        if (reference.isEnabled(this)) {
+                        if (reference.isPresent()) {
                             Class<?> candidateType = reference.getBeanType();
-                            return candidateType != null && (beanType.isAssignableFrom(candidateType) || beanType == candidateType);
+                            final boolean isCandidate = candidateType != null && (beanType.isAssignableFrom(candidateType) || beanType == candidateType);
+                            return isCandidate && reference.isEnabled(this);
                         }
                         return false;
                     })
@@ -2000,13 +2036,22 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     private void readAllBeanDefinitionClasses() {
-        List<BeanDefinitionReference> contextScopeBeans = new ArrayList<>();
-        List<BeanDefinitionReference> processedBeans = new ArrayList<>();
+        List<BeanDefinitionReference> contextScopeBeans = new ArrayList<>(20);
+        List<BeanDefinitionReference> processedBeans = new ArrayList<>(10);
         List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences();
         List<BeanDefinitionReference> allReferences = new ArrayList<>(beanDefinitionReferences.size());
+        Map<BeanConfiguration, List<BeanDefinitionReference>> byConfiguration = new HashMap<>(beanConfigurations.size());
 
         final boolean reportingEnabled = ClassLoadingReporter.isReportingEnabled();
         for (BeanDefinitionReference beanDefinitionReference : beanDefinitionReferences) {
+            Optional<BeanConfiguration> beanConfiguration = beanConfigurations.values().stream().filter(c -> c.isWithin(beanDefinitionReference)).findFirst();
+            final boolean hasConfiguration = beanConfiguration.isPresent();
+            if (hasConfiguration) {
+                byConfiguration.computeIfAbsent(beanConfiguration.get(), bc -> new ArrayList<>(5))
+                    .add(beanDefinitionReference);
+            } else {
+                indexBeanDefinitionIfNecessary(beanDefinitionReference);
+            }
             allReferences.add(beanDefinitionReference);
             if (beanDefinitionReference.isContextScope()) {
                 contextScopeBeans.add(beanDefinitionReference);
@@ -2016,32 +2061,54 @@ public class DefaultBeanContext implements BeanContext {
             }
         }
 
-        //noinspection unchecked
         this.beanDefinitionsClasses.addAll(allReferences);
-        this.beanDefinitionsClasses.removeIf(beanDefinitionReference -> {
-            Optional<BeanConfiguration> beanConfiguration = beanConfigurations.values().stream().filter(c -> c.isWithin(beanDefinitionReference)).findFirst();
-            if (beanConfiguration.isPresent() && !beanConfiguration.get().isEnabled(this)) {
-                if (AbstractBeanContextConditional.LOG.isDebugEnabled()) {
-                    AbstractBeanContextConditional.LOG.debug(
-                            "Bean [{}] will not be loaded because the configuration [{}] is not enabled",
-                            beanDefinitionReference.getName(),
-                            beanConfiguration);
-                }
-                contextScopeBeans.remove(beanDefinitionReference);
-                processedBeans.remove(beanDefinitionReference);
+        for (Map.Entry<BeanConfiguration, List<BeanDefinitionReference>> entry : byConfiguration.entrySet()) {
+            if (!entry.getKey().isEnabled(this)) {
+                final List<BeanDefinitionReference> references = entry.getValue();
+                this.beanDefinitionsClasses.removeAll(references);
+                contextScopeBeans.removeAll(references);
+                processedBeans.removeAll(references);
                 if (reportingEnabled) {
-                    ClassLoadingReporter.reportMissing(beanDefinitionReference.getBeanDefinitionName());
-                    ClassLoadingReporter.reportMissing(beanDefinitionReference.getName());
+                    for (BeanDefinitionReference reference : references) {
+                        ClassLoadingReporter.reportMissing(reference.getBeanDefinitionName());
+                        ClassLoadingReporter.reportMissing(reference.getName());
+                    }
                 }
-                return true;
+            } else {
+                for (BeanDefinitionReference beanDefinitionReference : entry.getValue()) {
+                    indexBeanDefinitionIfNecessary(beanDefinitionReference);
+                }
             }
-
-            return false;
-        });
-
+        }
         initializeEventListeners();
-
         initializeContext(contextScopeBeans, processedBeans);
+    }
+
+    private void indexBeanDefinitionIfNecessary(BeanDefinitionReference beanDefinitionReference) {
+        Optional<Class> indexedType = beanDefinitionReference.getAnnotationMetadata().classValue(Indexed.class);
+        if (indexedType.isPresent()) {
+            final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType.get());
+            indexed.add(beanDefinitionReference);
+        } else if (beanDefinitionReference.isPresent()) {
+            final Class beanType = beanDefinitionReference.getBeanType();
+            if (indexedTypes.contains(beanType)) {
+                final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(beanType);
+                indexed.add(beanDefinitionReference);
+            } else {
+                indexedType = indexedTypes.stream().filter(t ->
+                        t == beanType || t.isAssignableFrom(beanType)
+                ).findFirst();
+                if (indexedType.isPresent()) {
+                    final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType.get());
+                    indexed.add(beanDefinitionReference);
+                }
+            }
+        }
+    }
+
+    @NotNull
+    private Collection<BeanDefinitionReference> resolveTypeIndex(Class<?> indexedType) {
+        return beanIndex.computeIfAbsent(indexedType, aClass -> new ArrayList<>(20));
     }
 
     @SuppressWarnings("unchecked")
@@ -2102,7 +2169,7 @@ public class DefaultBeanContext implements BeanContext {
                             if (LOG.isTraceEnabled()) {
 
                                 if (registeredQualifier != null) {
-                                    LOG.trace("Found existing bean for type {} {}: {} ", beanType.getName(), instance);
+                                    LOG.trace("Found existing bean for type {}: {} ", beanType.getName(), instance);
                                 } else {
                                     LOG.trace("Found existing bean for type {}: {} ", beanType.getName(), instance);
                                 }
@@ -2266,6 +2333,51 @@ public class DefaultBeanContext implements BeanContext {
             return stream.count() > 0;
         }
         return false;
+    }
+
+    private List<BeanRegistration> topologicalSort(Collection<BeanRegistration> beans) {
+        List<BeanRegistration> sorted = new ArrayList<>();
+        List<BeanRegistration> unsorted = new ArrayList<>(beans);
+
+        //loop until all items have been sorted
+        while (!unsorted.isEmpty()) {
+            boolean acyclic = false;
+
+            Iterator<BeanRegistration> i = unsorted.iterator();
+            while (i.hasNext()) {
+                BeanRegistration bean = i.next();
+                boolean found = false;
+
+                //determine if any components are in the unsorted list
+                Collection<Class> components = bean.getBeanDefinition().getRequiredComponents();
+                for (Class<?> clazz: components) {
+                    if (unsorted.stream()
+                            .map(BeanRegistration::getBeanDefinition)
+                            .map(BeanDefinition::getBeanType)
+                            .anyMatch(bt -> clazz.isAssignableFrom(bt))) {
+                        found = true;
+                        break;
+                    }
+                }
+
+                //none of the required components are in the unsorted list
+                //so it can be added to the sorted list
+                if (!found) {
+                    acyclic = true;
+                    i.remove();
+                    sorted.add(0, bean);
+                }
+            }
+
+            //rather than throw an exception here because there is a cyclical dependency
+            //just add the first item to the list and keep trying. It may be possible to
+            //see a cycle here because qualifiers are not taken into account.
+            if (!acyclic) {
+                sorted.add(0, unsorted.remove(0));
+            }
+        }
+
+        return sorted;
     }
 
     /**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.uri;
 
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
 
+import javax.annotation.Nonnull;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
@@ -402,6 +402,13 @@ public class UriTemplate implements Comparable<UriTemplate> {
         return new UriTemplateParser(templateString);
     }
 
+    /**
+     * Returns the template as a string filtering the segments
+     * with the provided filter.
+     *
+     * @param filter The filter to test segments
+     * @return The template as a string
+     */
     protected String toString(Predicate<PathSegment> filter) {
         StringBuilder builder = new StringBuilder();
         UriTemplateParser.VariablePathSegment previousVariable = null;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.server.types.files;
 
 import io.micronaut.http.HttpHeaders;
@@ -35,11 +34,18 @@ public class SystemFile implements FileCustomizableResponseType {
     private final MediaType mediaType;
     private String attachmentName;
 
+    /**
+     * @param file The file to respond with
+     */
     public SystemFile(File file) {
         this.file = file;
         this.mediaType = MediaType.forFilename(file.getName());
     }
 
+    /**
+     * @param file The file to respond with
+     * @param mediaType The content type of the response
+     */
     public SystemFile(File file, MediaType mediaType) {
         this.file = file;
         this.mediaType = mediaType;

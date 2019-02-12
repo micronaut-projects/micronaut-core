@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.function.executor;
 
 import org.junit.Assert;
@@ -31,7 +30,7 @@ public class FunctionInitializerSpec   {
 
     @Test
     public void testFunctionInitializer() {
-        Assert.assertEquals(new MathFunction().round(1.6f) , 2);
+        Assert.assertEquals(2, new MathFunction().round(1.6f));
     }
 
     @Singleton

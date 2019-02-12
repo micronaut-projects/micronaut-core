@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.management.health.indicator;
 
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import io.micronaut.health.HealthStatus;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.validation.constraints.NotNull;
 import java.util.HashMap;
@@ -72,7 +73,7 @@ public interface HealthResult {
      * Helper class to build instances.
      */
     class Builder {
-
+        private static final Logger LOG = LoggerFactory.getLogger(HealthResult.class);
         private final String name;
         private HealthStatus status;
         private Object details;
@@ -112,7 +113,11 @@ public interface HealthResult {
          */
         public Builder exception(@NotNull Throwable ex) {
             Map<String, String> error = new HashMap<>(1);
-            error.put("error", ex.getClass().getName() + ": " + ex.getMessage());
+            final String message = ex.getClass().getName() + ": " + ex.getMessage();
+            error.put("error", message);
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Health indicator [" + name + "] reported exception: " + message, ex);
+            }
             return details(error);
         }
 

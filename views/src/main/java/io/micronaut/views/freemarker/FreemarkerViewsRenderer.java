@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.views.freemarker;
 
 import freemarker.template.Configuration;
@@ -22,9 +21,7 @@ import freemarker.template.Template;
 import freemarker.template.TemplateException;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.cli.exceptions.ParseException;
-import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.Writable;
-import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;

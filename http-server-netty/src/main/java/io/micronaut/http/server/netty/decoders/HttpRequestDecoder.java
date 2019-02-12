@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.server.netty.decoders;
 
 import io.micronaut.core.annotation.Internal;
@@ -26,7 +25,9 @@ import io.micronaut.runtime.server.EmbeddedServer;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToMessageDecoder;
+import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.HttpRequest;
+import io.netty.handler.codec.http.HttpVersion;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -70,6 +71,12 @@ public class HttpRequestDecoder extends MessageToMessageDecoder<HttpRequest> imp
         if (LOG.isDebugEnabled()) {
             LOG.debug("Server {}:{} Received Request: {} {}", embeddedServer.getHost(), embeddedServer.getPort(), msg.method(), msg.uri());
         }
-        out.add(new NettyHttpRequest<>(msg, ctx, conversionService, configuration));
+        try {
+            out.add(new NettyHttpRequest<>(msg, ctx, conversionService, configuration));
+        } catch (IllegalArgumentException e) {
+            new NettyHttpRequest<>(new DefaultHttpRequest(msg.protocolVersion(), msg.method(), "/"), ctx, conversionService, configuration);
+            final Throwable cause = e.getCause();
+            ctx.fireExceptionCaught(cause != null ? cause : e);
+        }
     }
 }

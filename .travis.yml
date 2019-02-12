@@ -33,7 +33,7 @@ cache:
     - $HOME/.gradle/caches/
     - $HOME/.gradle/wrapper/
 after_deploy:
-- "./gradlew sdkMajorRelease"
+- "./gradlew sdkMinorRelease"
 deploy:
   provider: releases
   api_key:

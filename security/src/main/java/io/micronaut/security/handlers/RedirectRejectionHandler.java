@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2019 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 /**
  * @author Sergio del Amo
  * @since 1.0
@@ -75,7 +90,7 @@ public class RedirectRejectionHandler implements RejectionHandler {
         return Flowable.create(emitter -> {
             if (shouldHandleRequest(request)) {
                 try {
-                    String uri = getRedirectUri(forbidden).orElse("/");
+                    String uri = getRedirectUri(request, forbidden).orElse("/");
                     emitter.onNext(httpResponseWithUri(uri));
                 } catch (URISyntaxException e) {
                     emitter.onError(e);
@@ -126,12 +141,13 @@ public class RedirectRejectionHandler implements RejectionHandler {
     /**
      * Returns the redirection uri.
      *
+     * @param request {@link HttpRequest} being processed
      * @param forbidden if true indicates that although the user was authenticated he did not had the necessary access privileges.
      * @return the uri to redirect to
      */
-    protected Optional<String> getRedirectUri(boolean forbidden) {
-        Optional<String> uri = forbidden ? forbiddenRejectionUriProvider.getForbiddenRedirectUri() :
-                unauthorizedRejectionUriProvider.getUnauthorizedRedirectUri();
+    protected Optional<String> getRedirectUri(HttpRequest<?> request, boolean forbidden) {
+        Optional<String> uri = forbidden ? forbiddenRejectionUriProvider.getForbiddenRedirectUri(request) :
+                unauthorizedRejectionUriProvider.getUnauthorizedRedirectUri(request);
         if (LOG.isDebugEnabled()) {
             LOG.debug("redirect uri: {}", uri);
         }

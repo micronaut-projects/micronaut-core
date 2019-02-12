@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.openapi.visitor;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -794,8 +793,15 @@ abstract class AbstractOpenApiVisitor  {
                 final JsonNode jsonNode = toJson(map, context);
                 try {
                     final Optional<SecurityScheme> securityRequirement = Optional.of(jsonMapper.treeToValue(jsonNode, SecurityScheme.class));
-                    securityRequirement.ifPresent(securityScheme ->
-                            resolveComponents(openAPI).addSecuritySchemes(name, securityScheme)
+                    securityRequirement.ifPresent(securityScheme -> {
+
+                        try {
+                            securityScheme.setIn(Enum.valueOf(SecurityScheme.In.class, map.get("in").toString().toUpperCase(Locale.ENGLISH)));
+                        } catch (Exception e) {
+                            // ignore
+                        }
+                        resolveComponents(openAPI).addSecuritySchemes(name, securityScheme);
+                            }
                     );
                 } catch (JsonProcessingException e) {
                     context.warn("Error reading Swagger SecurityRequirement for element [" + element + "]: " + e.getMessage(), element);

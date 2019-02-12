@@ -18,19 +18,19 @@ package io.micronaut.http.client.interceptor.configuration;
 
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Parameter;
-import io.micronaut.http.client.annotation.Client;
 
 import static io.micronaut.http.client.interceptor.configuration.ClientVersioningConfiguration.DEFAULT;
 
 /**
- * Client versioning configuration for named configurations nested under {@code micronaut.http.client.versioning}
+ * Client versioning configuration for named configurations nested under {@code micronaut.http.client.versioning}.
  */
 @EachProperty(value = ClientVersioningConfiguration.PREFIX, primary = DEFAULT)
 public class NamedClientVersioningConfiguration extends ClientVersioningConfiguration {
+
     /**
      * Creates a new configuration for the given client ID.
      *
-     * @param clientName ID of the {@link Client} to apply configuration for.
+     * @param clientName ID of the {@link io.micronaut.http.client.annotation.Client} to apply configuration for.
      */
     NamedClientVersioningConfiguration(@Parameter String clientName) {
         super(clientName);

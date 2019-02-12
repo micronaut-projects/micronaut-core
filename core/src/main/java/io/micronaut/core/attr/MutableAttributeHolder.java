@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.attr;
 
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.util.StringUtils;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.Optional;
 
 /**
@@ -34,6 +35,7 @@ public interface MutableAttributeHolder extends AttributeHolder {
      * @return The mutable attributes
      */
     @Override
+    @Nonnull
     MutableConvertibleValues<Object> getAttributes();
 
     /**
@@ -43,7 +45,7 @@ public interface MutableAttributeHolder extends AttributeHolder {
      * @param value The value of the attribute
      * @return This message
      */
-    default MutableAttributeHolder setAttribute(CharSequence name, Object value) {
+    default @Nonnull MutableAttributeHolder setAttribute(@Nonnull CharSequence name, @Nullable Object value) {
         if (StringUtils.isNotEmpty(name)) {
             if (value == null) {
                 getAttributes().remove(name.toString());
@@ -62,7 +64,7 @@ public interface MutableAttributeHolder extends AttributeHolder {
      * @param <T>  type Generic
      * @return An {@link Optional} value
      */
-    default <T> Optional<T> removeAttribute(CharSequence name, Class<T> type) {
+    default @Nonnull <T> Optional<T> removeAttribute(@Nonnull CharSequence name, @Nonnull Class<T> type) {
         if (StringUtils.isNotEmpty(name)) {
             String key = name.toString();
             Optional<T> value = getAttribute(key, type);

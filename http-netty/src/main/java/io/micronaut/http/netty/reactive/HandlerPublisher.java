@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.netty.reactive;
 
 import static io.micronaut.http.netty.reactive.HandlerPublisher.State.*;
@@ -357,7 +356,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     private void flushBuffer() {
         while (!buffer.isEmpty() && (outstandingDemand > 0 || outstandingDemand == Long.MAX_VALUE)) {
             if (LOG.isTraceEnabled()) {
-                LOG.trace("HandlerPublisher (state: {}) release message from buffer to satisfy demand: ", state, outstandingDemand);
+                LOG.trace("HandlerPublisher (state: {}) release message from buffer to satisfy demand: {}", state, outstandingDemand);
             }
             publishMessage(buffer.remove());
         }

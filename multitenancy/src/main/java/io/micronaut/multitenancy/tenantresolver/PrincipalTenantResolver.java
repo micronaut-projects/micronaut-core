@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.multitenancy.tenantresolver;
 
 import io.micronaut.context.annotation.Requires;
@@ -50,11 +49,9 @@ public class PrincipalTenantResolver implements TenantResolver {
      * @throws TenantNotFoundException if tenant not found
      */
     protected Serializable resolveTenantIdentifierAtRequest(HttpRequest<Object> request) throws TenantNotFoundException {
-        return request.getAttribute(SecurityFilter.AUTHENTICATION).map(objAuthentication -> {
-           if (objAuthentication instanceof Principal) {
-               return ((Principal) objAuthentication).getName();
-           }
-           throw new TenantNotFoundException("Tenant could not be resolved because authentication object is not java.security.Principal");
-        }).orElseThrow(() -> new TenantNotFoundException("Tenant could not be resolved because " + SecurityFilter.AUTHENTICATION + " attribute was not found"));
+        return request.getUserPrincipal().map(Principal::getName)
+                      .orElseThrow(() ->
+                              new TenantNotFoundException("Tenant could not be resolved because " + SecurityFilter.AUTHENTICATION + " attribute was not found")
+                      );
     }
 }

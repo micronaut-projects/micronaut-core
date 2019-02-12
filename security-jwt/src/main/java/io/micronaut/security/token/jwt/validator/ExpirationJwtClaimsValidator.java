@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.token.jwt.validator;
 
 import com.nimbusds.jwt.JWTClaimsSet;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.security.token.jwt.generator.claims.JwtClaims;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.inject.Singleton;
 import java.util.Date;
 
@@ -37,8 +38,12 @@ public class ExpirationJwtClaimsValidator implements GenericJwtClaimsValidator {
 
     private static final Logger LOG = LoggerFactory.getLogger(ExpirationJwtClaimsValidator.class);
 
-    @Override
-    public boolean validate(JWTClaimsSet claimsSet) {
+    /**
+     *
+     * @param claimsSet The JWT Claims
+     * @return true if the expiration claim denotes a date after now.
+     */
+    protected boolean validate(@Nonnull JWTClaimsSet claimsSet) {
         final Date expTime = claimsSet.getExpirationTime();
         if (expTime != null) {
             final Date now = new Date();
@@ -50,5 +55,10 @@ public class ExpirationJwtClaimsValidator implements GenericJwtClaimsValidator {
             }
         }
         return true;
+    }
+
+    @Override
+    public boolean validate(JwtClaims claims) {
+        return validate(JWTClaimsSetUtils.jwtClaimsSetFromClaims(claims));
     }
 }

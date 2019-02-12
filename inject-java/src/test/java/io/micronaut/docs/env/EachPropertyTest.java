@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -46,7 +46,7 @@ public class EachPropertyTest {
 
         // tag::beans[]
         Collection<DataSourceConfiguration> beansOfType = applicationContext.getBeansOfType(DataSourceConfiguration.class);
-        assertEquals(beansOfType.size(), 2); // <1>
+        assertEquals(2, beansOfType.size()); // <1>
 
         DataSourceConfiguration firstConfig = applicationContext.getBean(
                 DataSourceConfiguration.class,
@@ -54,8 +54,8 @@ public class EachPropertyTest {
         );
 
         assertEquals(
-                firstConfig.getUrl(),
-                new URI("jdbc:mysql://localhost/one")
+                new URI("jdbc:mysql://localhost/one"),
+                firstConfig.getUrl()
         );
         // end::beans[]
     }

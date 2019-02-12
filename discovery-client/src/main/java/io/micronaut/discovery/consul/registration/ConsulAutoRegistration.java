@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.discovery.consul.registration;
 
 import io.micronaut.context.annotation.Requires;
@@ -37,6 +36,7 @@ import io.micronaut.health.HealthStatus;
 import io.micronaut.health.HeartbeatConfiguration;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.runtime.ApplicationConfiguration;
+import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.runtime.server.EmbeddedServerInstance;
 import io.reactivex.Single;
 import org.reactivestreams.Publisher;
@@ -220,7 +220,20 @@ public class ConsulAutoRegistration extends DiscoveryServiceAutoRegistration {
                             check = ttlCheck;
                         } else {
 
-                            URL serverURL = ((EmbeddedServerInstance) instance).getEmbeddedServer().getURL();
+                            EmbeddedServer embeddedServer = ((EmbeddedServerInstance) instance).getEmbeddedServer();
+                            URL serverURL = embeddedServer.getURL();
+                            if (registration.isPreferIpAddress() && address != null) {
+
+                                try {
+                                    serverURL = new URL(embeddedServer.getURL().getProtocol(), address, embeddedServer.getPort(), embeddedServer.getURL().getPath());
+                                } catch (MalformedURLException e) {
+                                    if (LOG.isDebugEnabled()) {
+                                        LOG.error("invalid url for health check:" + embeddedServer.getURL().getProtocol() + address + ":" + embeddedServer.getPort() + "/" + embeddedServer.getURL().getPath());
+                                    }
+                                    throw new DiscoveryException("Invalid health path configured: " + registration.getHealthPath());
+                                }
+                            }
+
                             HTTPCheck httpCheck;
                             try {
                                 httpCheck = new HTTPCheck(

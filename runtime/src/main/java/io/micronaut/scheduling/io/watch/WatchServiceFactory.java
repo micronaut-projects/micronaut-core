@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.scheduling.io.watch;
 
-import io.methvin.watchservice.MacOSXListeningWatchService;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.util.StringUtils;
 import org.slf4j.Logger;
@@ -34,7 +32,7 @@ import java.nio.file.WatchService;
  */
 @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 @Requires(property = FileWatchConfiguration.PATHS)
-@Requires(missing = MacOSXListeningWatchService.class)
+@Requires(missingClasses = "io.methvin.watchservice.MacOSXListeningWatchService")
 @Factory
 public class WatchServiceFactory {
     protected static final Logger LOG = LoggerFactory.getLogger(WatchServiceFactory.class);
@@ -47,7 +45,7 @@ public class WatchServiceFactory {
      */
     @Bean(preDestroy = "close")
     @Prototype
-    @Requires(missing = MacOSXListeningWatchService.class)
+    @Requires(missingClasses = "io.methvin.watchservice.MacOSXListeningWatchService")
     @Requires(property = FileWatchConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
     @Requires(property = FileWatchConfiguration.PATHS)
     @Primary
@@ -55,7 +53,7 @@ public class WatchServiceFactory {
         String name = System.getProperty("os.name").toLowerCase();
         boolean isMacOS = "Mac OS X".equalsIgnoreCase(name) || "Darwin".equalsIgnoreCase(name);
         if (isMacOS) {
-            LOG.warn("Using default File WatchService on OS X is slow. Consider adding 'io.methvin:directory-watcher' and 'net.java.dev.jna:jna' dependencies to use native file watch");
+            LOG.warn("Using default File WatchService on OS X is slow. Consider adding 'io.micronaut:micronaut-runtime-osx' dependencies to use native file watch");
         }
         return FileSystems.getDefault().newWatchService();
     }

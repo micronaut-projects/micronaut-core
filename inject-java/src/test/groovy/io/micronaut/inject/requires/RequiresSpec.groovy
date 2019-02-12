@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,7 +18,9 @@ package io.micronaut.inject.requires
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.PropertySource
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanDefinitionReference
@@ -80,6 +82,23 @@ class MyBean {
 
         then:
         beanDefinition.isEnabled(Mock(BeanContext))
+    }
+
+    void "test requires classes with classes not present"() {
+        when:
+        AnnotationMetadata metadata = buildTypeAnnotationMetadata('''
+package test;
+
+import io.micronaut.context.annotation.*;
+
+@Requires(classes=String.class)
+@javax.inject.Singleton
+class MyBean {
+}
+''')
+
+        then:
+        metadata.getAnnotationValuesByType(Requires)
     }
 
     void "test meta requires condition not satisfied"() {

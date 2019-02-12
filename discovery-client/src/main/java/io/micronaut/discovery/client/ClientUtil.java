@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.discovery.client;
 
 import java.util.Collections;
@@ -29,13 +28,14 @@ public class ClientUtil {
      * Calculates property source names. This is used across several clients to make naming consistent.
      * @param prefix fullName or prefix to the environment, or application specific configuration
      * @param activeNames active environments which configurations can be created for
+     * @param separator
      * @return Set of names to be used for each PropertySource
      */
-    public static Set<String> calcPropertySourceNames(String prefix, Set<String> activeNames) {
+    public static Set<String> calcPropertySourceNames(String prefix, Set<String> activeNames, String separator) {
         Set<String> propertySourceNames;
-        if (prefix.indexOf('_') > -1) {
+        if (prefix.contains(separator)) {
 
-            String[] tokens = prefix.split("_");
+            String[] tokens = prefix.split(separator);
             if (tokens.length == 1) {
                 propertySourceNames = Collections.singleton(tokens[0]);
             } else {

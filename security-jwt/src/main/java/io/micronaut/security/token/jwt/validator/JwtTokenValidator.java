@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.token.jwt.validator;
 
 import com.nimbusds.jose.EncryptionMethod;
@@ -29,6 +28,7 @@ import com.nimbusds.jwt.PlainJWT;
 import com.nimbusds.jwt.SignedJWT;
 import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.token.jwt.encryption.EncryptionConfiguration;
+import io.micronaut.security.token.jwt.generator.claims.JwtClaimsSetAdapter;
 import io.micronaut.security.token.jwt.signature.SignatureConfiguration;
 import io.micronaut.security.token.validator.TokenValidator;
 import io.reactivex.Flowable;
@@ -99,7 +99,7 @@ public class JwtTokenValidator implements TokenValidator {
      * @param jwt a JWT Token
      * @return empty if signature configurations exists, Optional.of(jwt) if no signature configuration is available.
      */
-    protected Optional<JWT> validatePlainJWTSignature(JWT jwt) {
+    public Optional<JWT> validatePlainJWTSignature(JWT jwt) {
         if (signatureConfigurations.isEmpty()) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("JWT is not signed and no signature configurations -> verified");
@@ -120,7 +120,7 @@ public class JwtTokenValidator implements TokenValidator {
      * @param signedJWT a Signed JWT Token
      * @return empty if signature validation fails
      */
-    protected  Optional<JWT> validateSignedJWTSignature(SignedJWT signedJWT) {
+    public  Optional<JWT> validateSignedJWTSignature(SignedJWT signedJWT) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("JWT is signed");
         }
@@ -157,13 +157,15 @@ public class JwtTokenValidator implements TokenValidator {
     }
 
     /**
+     * Verifies the provided claims with the provided validators.
      *
-     * @param jwtClaimsSet JWT Claims.
+     * @param jwtClaimsSet JWT Claims
+     * @param claimsValidators The claims validators
      * @return Whether the JWT claims pass every validation.
      */
-    protected boolean verifyClaims(JWTClaimsSet jwtClaimsSet, Collection<? extends JwtClaimsValidator> claimsValidators) {
+    public boolean verifyClaims(JWTClaimsSet jwtClaimsSet, Collection<? extends JwtClaimsValidator> claimsValidators) {
         return claimsValidators.stream()
-                .allMatch(jwtClaimsValidator -> jwtClaimsValidator.validate(jwtClaimsSet));
+                .allMatch(jwtClaimsValidator -> jwtClaimsValidator.validate(new JwtClaimsSetAdapter(jwtClaimsSet)));
     }
 
     /**
@@ -174,7 +176,7 @@ public class JwtTokenValidator implements TokenValidator {
      * @param token the JWT token as String
      * @return empty if signature validation fails
      */
-    protected Optional<JWT> validateEncryptedJWTSignature(EncryptedJWT encryptedJWT, String token) {
+    public Optional<JWT> validateEncryptedJWTSignature(EncryptedJWT encryptedJWT, String token) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("JWT is encrypted");
         }
@@ -246,8 +248,9 @@ public class JwtTokenValidator implements TokenValidator {
         return Optional.empty();
 
     }
+
     /**
-     * Validates JWT signature and Claims
+     * Validates JWT signature and Claims.
      *
      * @param token A JWT token
      * @param claimsValidators a Collection of claims Validators.
@@ -274,7 +277,7 @@ public class JwtTokenValidator implements TokenValidator {
      * @param token a JWT token
      * @return Empty if JWT signature verification failed or JWT if valid signature.
      */
-    protected Optional<JWT> parseJwtIfValidSignature(String token) {
+    public Optional<JWT> parseJwtIfValidSignature(String token) {
         try {
             JWT jwt = JWTParser.parse(token);
 
@@ -304,7 +307,7 @@ public class JwtTokenValidator implements TokenValidator {
      * @return {@link Authentication} based on the JWT.
      * @throws ParseException it may throw a ParseException while retrieving the JWT claims
      */
-    protected Authentication createAuthentication(final JWT jwt) throws ParseException {
+    public Authentication createAuthentication(final JWT jwt) throws ParseException {
         final JWTClaimsSet claimSet = jwt.getJWTClaimsSet();
         return new AuthenticationJWTClaimsSetAdapter(claimSet);
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.AnnotationClassValue;
@@ -58,9 +57,8 @@ class AnnotationMetadataSupport {
      * @param annotation The annotation
      * @return The default values for the annotation
      */
-    @SuppressWarnings("unchecked")
     static Map<String, Object> getDefaultValues(String annotation) {
-        return ANNOTATION_DEFAULTS.computeIfAbsent(annotation, s -> Collections.EMPTY_MAP);
+        return ANNOTATION_DEFAULTS.computeIfAbsent(annotation, s -> Collections.emptyMap());
     }
 
     /**

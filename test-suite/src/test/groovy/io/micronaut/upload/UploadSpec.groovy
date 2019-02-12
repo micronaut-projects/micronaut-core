@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -284,7 +284,7 @@ class UploadSpec extends AbstractMicronautSpec {
         def json = new JsonSlurper().parseText(e.response.getBody().get())
 
         then:
-        json.message.contains("exceeds the maximum content length [1024]")
+        json.message.contains("exceeds the maximum allowed content length [1024]")
     }
 
     void "test upload CompletedFileUpload object"() {

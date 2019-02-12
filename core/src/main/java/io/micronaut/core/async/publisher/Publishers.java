@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.async.publisher;
 
 import io.micronaut.core.annotation.Internal;
@@ -57,7 +56,11 @@ public class Publishers {
             Optional<Class> aClass = ClassUtils.forName(name, classLoader);
             aClass.ifPresent(Publishers.REACTIVE_TYPES::add);
         }
-        for (String name : Arrays.asList("io.reactivex.Single", "reactor.core.publisher.Mono", "io.reactivex.Maybe")) {
+        for (String name : Arrays.asList(
+                "io.reactivex.Single",
+                "reactor.core.publisher.Mono",
+                "io.reactivex.Maybe",
+                "io.reactivex.Completable")) {
             Optional<Class> aClass = ClassUtils.forName(name, classLoader);
             aClass.ifPresent(aClass1 -> {
                 Publishers.SINGLE_TYPES.add(aClass1);

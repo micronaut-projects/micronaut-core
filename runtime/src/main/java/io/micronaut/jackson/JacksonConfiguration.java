@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.jackson;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -45,7 +44,9 @@ public class JacksonConfiguration {
      */
     @SuppressWarnings("WeakerAccess")
     public static final int DEFAULT_ARRAYSIZETHRESHOLD = 100;
+    public static final String PROPERTY_MODULE_SCAN = "jackson.module-scan";
 
+    private boolean moduleScan = true;
     private String dateFormat;
     private Locale locale;
     private TimeZone timeZone;
@@ -57,6 +58,23 @@ public class JacksonConfiguration {
     private Map<JsonGenerator.Feature, Boolean> generator = Collections.emptyMap();
     private JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_EMPTY;
     private PropertyNamingStrategy propertyNamingStrategy = null;
+
+    /**
+     * Whether Jackson modules should be scanned for.
+     *
+     * @return True if module scanning is enabled
+     */
+    public boolean isModuleScan() {
+        return moduleScan;
+    }
+
+    /**
+     * Sets whether to scan for modules or not (defaults to true).
+     * @param moduleScan True if module scan should be enabled
+     */
+    public void setModuleScan(boolean moduleScan) {
+        this.moduleScan = moduleScan;
+    }
 
     /**
      * @return The default serialization inclusion settings

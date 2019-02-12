@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.docs.signandencrypt
 
 import groovy.util.logging.Slf4j
@@ -23,6 +22,8 @@ import org.bouncycastle.openssl.PEMKeyPair
 import org.bouncycastle.openssl.PEMParser
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
 
+import java.nio.file.Files
+import java.nio.file.Paths
 import java.security.KeyPair
 import java.security.Security
 
@@ -41,7 +42,7 @@ class KeyPairProvider {
         // Parse the EC key pair
         PEMParser pemParser
         try {
-            pemParser = new PEMParser(new InputStreamReader(new FileInputStream(pemPath)))
+            pemParser = new PEMParser(new InputStreamReader(Files.newInputStream(Paths.get(pemPath))))
             PEMKeyPair pemKeyPair = (PEMKeyPair) pemParser.readObject()
 
             // Convert to Java (JCA) format

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.token;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
@@ -53,8 +52,8 @@ public class TokenAuthenticationFetcher implements AuthenticationFetcher {
     public static final Integer ORDER = 0;
 
     protected final Collection<TokenValidator> tokenValidators;
-    private final TokenResolver tokenResolver;
     protected final ApplicationEventPublisher eventPublisher;
+    private final TokenResolver tokenResolver;
 
     /**
      * @param tokenValidators The list of {@link TokenValidator} which attempt to validate the request
@@ -84,7 +83,6 @@ public class TokenAuthenticationFetcher implements AuthenticationFetcher {
                                       ApplicationEventPublisher eventPublisher) {
         this(tokenValidators, new DefaultTokenResolver(tokenReaders), eventPublisher);
     }
-
 
     @Override
     public Publisher<Authentication> fetchAuthentication(HttpRequest<?> request) {

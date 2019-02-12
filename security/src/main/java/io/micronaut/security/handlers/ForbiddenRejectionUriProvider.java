@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.handlers;
+
+import io.micronaut.http.HttpRequest;
 
 import java.util.Optional;
 
@@ -29,8 +30,8 @@ import java.util.Optional;
 public interface ForbiddenRejectionUriProvider {
 
     /**
-     *
+     * @param request {@link HttpRequest} being processed
      * @return A uri to redirect to when an authenticated user tries to access a resource for which he does not have the required authorization level.
      */
-    Optional<String> getForbiddenRedirectUri();
+    Optional<String> getForbiddenRedirectUri(HttpRequest<?> request);
 }

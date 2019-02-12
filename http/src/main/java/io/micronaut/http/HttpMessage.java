@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http;
 
 import io.micronaut.core.attr.MutableAttributeHolder;
@@ -21,8 +20,10 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.util.HttpUtil;
 
+import javax.annotation.Nonnull;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
@@ -42,7 +43,7 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
     /**
      * @return The {@link HttpHeaders} object
      */
-    HttpHeaders getHeaders();
+    @Nonnull HttpHeaders getHeaders();
 
     /**
      * <p>A {@link MutableConvertibleValues} of the attributes for this HTTP message.</p>
@@ -52,22 +53,22 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
      * @return The attributes of the message
      */
     @Override
-    MutableConvertibleValues<Object> getAttributes();
+    @Nonnull MutableConvertibleValues<Object> getAttributes();
 
     /**
      * @return The request body
      */
-    Optional<B> getBody();
+    @Nonnull Optional<B> getBody();
 
     /**
      * @return The request character encoding. Defaults to {@link StandardCharsets#UTF_8}
      */
-    default Charset getCharacterEncoding() {
+    default @Nonnull Charset getCharacterEncoding() {
         return HttpUtil.resolveCharset(this).orElse(StandardCharsets.UTF_8);
     }
 
     @Override
-    default HttpMessage<B> setAttribute(CharSequence name, Object value) {
+    default @Nonnull HttpMessage<B> setAttribute(@Nonnull CharSequence name, Object value) {
         return (HttpMessage<B>) MutableAttributeHolder.super.setAttribute(name, value);
     }
 
@@ -78,7 +79,8 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
      * @param <T>  The generic type
      * @return An {@link Optional} of the type or {@link Optional#empty()} if the body cannot be returned as the given type
      */
-    default <T> Optional<T> getBody(Argument<T> type) {
+    default @Nonnull <T> Optional<T> getBody(@Nonnull Argument<T> type) {
+        ArgumentUtils.requireNonNull("type", type);
         return getBody().flatMap(b -> ConversionService.SHARED.convert(b, ConversionContext.of(type)));
     }
 
@@ -89,14 +91,15 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
      * @param <T>  The generic type
      * @return An {@link Optional} of the type or {@link Optional#empty()} if the body cannot be returned as the given type
      */
-    default <T> Optional<T> getBody(Class<T> type) {
+    default @Nonnull <T> Optional<T> getBody(@Nonnull Class<T> type) {
+        ArgumentUtils.requireNonNull("type", type);
         return getBody(Argument.of(type));
     }
 
     /**
      * @return The locale of the message
      */
-    default Optional<Locale> getLocale() {
+    default @Nonnull Optional<Locale> getLocale() {
         return getHeaders().findFirst(HttpHeaders.CONTENT_LANGUAGE)
             .map(Locale::new);
     }
@@ -115,7 +118,7 @@ public interface HttpMessage<B> extends MutableAttributeHolder {
      *
      * @return The content type
      */
-    default Optional<MediaType> getContentType() {
+    default @Nonnull Optional<MediaType> getContentType() {
         return getHeaders()
             .contentType();
     }

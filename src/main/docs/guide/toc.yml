@@ -260,6 +260,7 @@ security:
   retrievingAuthenticatedUser:
     title: Retrieve the authenticated user
     securityService: User outside of a controller
+    accessSecurityInViews: User in a view
   securityEvents: Security Events
 
 multitenancy:

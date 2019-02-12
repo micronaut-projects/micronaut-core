@@ -5,7 +5,10 @@ dependencies {
     compile project(":http-client")
     compile project(":validation")
 
-    compileOnly project(":configurations:aws-common")
+    compileOnly dependencyVersion("micronaut.aws"), {
+        exclude module:'micronaut-http-client'
+        exclude module:'micronaut-inject'
+    }
     // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-route53
     compileOnly group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.297'
 // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-core
@@ -20,7 +23,10 @@ dependencies {
 
     testCompile "org.testcontainers:spock:1.10.1"
 
-    testCompile project(":configurations:aws-common")
+    testCompile dependencyVersion("micronaut.aws"), {
+        exclude module:'micronaut-http-client'
+        exclude module:'micronaut-inject'
+    }
     // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-route53
     testCompile group: 'com.amazonaws', name: 'aws-java-sdk-route53', version: '1.11.297'
 // https://mvnrepository.com/artifact/com.amazonaws/aws-java-sdk-core

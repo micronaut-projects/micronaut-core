@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.token.jwt.validator;
 
 import com.nimbusds.jwt.JWTClaimsSet;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.security.token.jwt.generator.claims.JwtClaims;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import javax.inject.Singleton;
 
 /**
@@ -41,7 +40,6 @@ public class SubjectNotNullJwtClaimsValidator implements GenericJwtClaimsValidat
      * @param claimsSet JWT Claims
      * @return True if the JWT subject claim is not null
      */
-    @Override
     public boolean validate(JWTClaimsSet claimsSet) {
         final String subject = claimsSet.getSubject();
         boolean hasSubject = subject != null;
@@ -51,5 +49,10 @@ public class SubjectNotNullJwtClaimsValidator implements GenericJwtClaimsValidat
             }
         }
         return hasSubject;
+    }
+
+    @Override
+    public boolean validate(JwtClaims claims) {
+        return validate(JWTClaimsSetUtils.jwtClaimsSetFromClaims(claims));
     }
 }

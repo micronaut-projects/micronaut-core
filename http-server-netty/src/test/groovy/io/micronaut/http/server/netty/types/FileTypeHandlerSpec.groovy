@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType
 
 import javax.inject.Inject
 import javax.inject.Named
+import java.nio.file.Files
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -319,12 +320,12 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
         @Get('/download')
         StreamedFile download() {
-            new StreamedFile(new FileInputStream(tempFile), "abc.html").attach("fileTypeHandlerSpec.html")
+            new StreamedFile(Files.newInputStream(tempFile.toPath()), "abc.html").attach("fileTypeHandlerSpec.html")
         }
 
         @Get('/custom-content-type')
         HttpResponse<StreamedFile> customContentType() {
-            HttpResponse.ok(new StreamedFile(new FileInputStream(tempFile), "abc.html").attach("temp.html"))
+            HttpResponse.ok(new StreamedFile(Files.newInputStream(tempFile.toPath()), "abc.html").attach("temp.html"))
                     .contentType(MediaType.TEXT_PLAIN_TYPE)
         }
 

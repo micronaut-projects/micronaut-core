@@ -3,7 +3,7 @@ Micronaut allows the customization of the response that is sent when a request i
 To control this response, it is necessary to register a api:io.micronaut.security.handlers.RejectionHandler[] and ensure your bean replaces the default implementation.
 
 If both beans (api:io.micronaut.security.handlers.UnauthorizedRejectionUriProvider[], api:io.micronaut.security.handlers.ForbiddenRejectionUriProvider[]) exists, then api:io.micronaut.security.handlers.RedirectRejectionHandler[],
-               a generic redirect handler, is registered as a `RedirectHandler`.
+               a generic redirect handler, is registered as a `RejectionHandler`.
 
 You can create your own `RejectionHandler`. You will need to replace the current `RejectionHandler`.
 

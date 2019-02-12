@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.ast.groovy
 
 import groovy.transform.CompileDynamic
@@ -497,7 +496,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         @Override
         protected void visitConstructorOrMethod(MethodNode methodNode, boolean isConstructor) {
-            if (methodNode.isSynthetic()) return
+            if (methodNode.isSynthetic() || methodNode.name.contains('$')) return
 
             String methodName = methodNode.name
             ClassNode declaringClass = methodNode.declaringClass
@@ -1339,7 +1338,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
 
                     GenericsType[] typeArguments = typeToImplement.getGenericsTypes()
-                    Map<String, ClassNode> typeVariables = new HashMap<>(typeArguments.size())
+                    Map<String, ClassNode> typeVariables = new HashMap<>(typeArguments?.size() ?: 1)
 
                     for (GenericsType typeArgument : typeArguments) {
                         typeVariables.put(typeArgument.name, typeArgument.type)

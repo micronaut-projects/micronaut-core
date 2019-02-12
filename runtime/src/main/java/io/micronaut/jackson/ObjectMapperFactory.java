@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.jackson;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -84,7 +83,10 @@ public class ObjectMapperFactory {
 
         ObjectMapper objectMapper = jsonFactory != null ? new ObjectMapper(jsonFactory) : new ObjectMapper();
 
-        objectMapper.findAndRegisterModules();
+        final boolean hasConfiguration = jacksonConfiguration != null;
+        if (hasConfiguration && jacksonConfiguration.isModuleScan()) {
+            objectMapper.findAndRegisterModules();
+        }
         objectMapper.registerModules(jacksonModules);
         SimpleModule module = new SimpleModule(MICRONAUT_MODULE);
         for (JsonSerializer serializer : serializers) {
@@ -131,7 +133,7 @@ public class ObjectMapperFactory {
         objectMapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
         objectMapper.configure(DeserializationFeature.UNWRAP_SINGLE_VALUE_ARRAYS, true);
 
-        if (jacksonConfiguration != null) {
+        if (hasConfiguration) {
 
             JsonInclude.Include include = jacksonConfiguration.getSerializationInclusion();
             if (include != null) {

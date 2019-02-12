@@ -17,7 +17,7 @@ micronaut:
 
 You can then inject a client with `@Client("foo")` and it will use the above configuration to load balance between the two configured servers.
 
-WARN: This client configuration can be used in conjunction with the `@Client` annotation, either by injecting an `HttpClient` directly or use on a client interface. In any case, all other attributes on the annotation *will be ignored* other than the service id.
+WARNING: This client configuration can be used in conjunction with the `@Client` annotation, either by injecting an `HttpClient` directly or use on a client interface. In any case, all other attributes on the annotation *will be ignored* other than the service id. Note, however, that the client can still be customised using `micronaut.http.services.*` settings. Check the link:configurationreference.html#io.micronaut.http.client.ServiceHttpClientConfiguration[ServiceHttpClientConfiguration properties reference] for the whole list of properties that can be customised.
 
 TIP: You can override this configuration in production by specifying an environment variable such as `MICRONAUT_HTTP_SERVICES_FOO_URLS=http://prod1,http://prod2`
 
