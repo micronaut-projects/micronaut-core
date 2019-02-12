@@ -22,19 +22,16 @@ import io.micronaut.security.authentication.UserDetails
 class UserDetailsEmail extends UserDetails  {
     String email
 
-    UserDetailsEmail(String username, Collection<String> roles) {
-        super(username, roles)
-    }
-
     UserDetailsEmail(String username, Collection<String> roles, String email) {
         super(username, roles)
         this.email = email
     }
 
     @Override
-    Map<String, Object> getAttributes() {
-        Map<String, Object> result = super.getAttributes()
-        result.put("email", email)
-        result
+    Map<String, Object> getAttributes(String rolesKey, String usernameKey) {
+        Map<String, Object> attributes = super.getAttributes(rolesKey, usernameKey)
+        attributes.put("email", email)
+        attributes
     }
+
 }

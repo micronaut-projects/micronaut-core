@@ -24,6 +24,8 @@ import io.micronaut.core.util.Toggleable;
  */
 public interface TokenConfiguration extends Toggleable {
 
+    String DEFAULT_ROLES_NAME = "roles";
+
     /**
      * The name in the claims object that stores the granted roles.
      *
