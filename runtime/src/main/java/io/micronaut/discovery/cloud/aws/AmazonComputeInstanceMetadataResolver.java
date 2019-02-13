@@ -17,7 +17,6 @@ package io.micronaut.discovery.cloud.aws;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.type.MapType;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.io.IOUtils;
@@ -95,6 +94,7 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
             String ec2InstanceMetadataURL = configuration.getMetadataUrl();
             JsonNode metadataJson = readMetadataUrl(new URL(ec2InstanceIdentityDocURL), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS, objectMapper, new HashMap<>());
             if (metadataJson != null) {
+                stringValue(metadataJson, EC2MetadataKeys.instanceId.name()).ifPresent(ec2InstanceMetadata::setInstanceId);
                 stringValue(metadataJson, EC2MetadataKeys.accountId.name()).ifPresent(ec2InstanceMetadata::setAccount);
                 stringValue(metadataJson, EC2MetadataKeys.availabilityZone.name()).ifPresent(ec2InstanceMetadata::setAvailabilityZone);
                 stringValue(metadataJson, EC2MetadataKeys.instanceType.name()).ifPresent(ec2InstanceMetadata::setMachineType);
@@ -136,9 +136,8 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
                 LOG.error("error getting public host name from:" + ec2InstanceMetadataURL + EC2MetadataKeys.publicHostname.getName(), e);
             }
 
-            final MapType mapType = objectMapper.getTypeFactory().constructMapType(Map.class, String.class, String.class);
-            Map<String, String> metadata = objectMapper.convertValue(ec2InstanceMetadata, mapType);
-            ec2InstanceMetadata.setMetadata(metadata);
+            Map<?, ?> metadata = objectMapper.convertValue(ec2InstanceMetadata, Map.class);
+            populateMetadata(ec2InstanceMetadata, metadata);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("EC2 Metadata found:" + ec2InstanceMetadata.getMetadata().toString());
             }

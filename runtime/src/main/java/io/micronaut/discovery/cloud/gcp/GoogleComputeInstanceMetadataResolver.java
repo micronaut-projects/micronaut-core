@@ -17,7 +17,6 @@ package io.micronaut.discovery.cloud.gcp;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.type.MapType;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
@@ -177,8 +176,8 @@ public class GoogleComputeInstanceMetadataResolver implements ComputeInstanceMet
                             });
                     instanceMetadata.setInterfaces(interfaces);
                 }
-                final MapType mapType = objectMapper.getTypeFactory().constructMapType(Map.class, String.class, String.class);
-                instanceMetadata.setMetadata(objectMapper.convertValue(instanceMetadata, mapType));
+                final Map<?, ?> metadata = objectMapper.convertValue(instanceMetadata, Map.class);
+                populateMetadata(instanceMetadata, metadata);
                 cachedMetadata = instanceMetadata;
 
                 return Optional.of(instanceMetadata);

@@ -53,9 +53,6 @@ class DigitalOceanMetadataResolverSpec extends Specification {
         ((DigitalOceanNetworkInterface)computeInstanceMetadata.get().interfaces.find { it.ipv6 == "2604:A880:0800:0010:0000:0000:017D:2001"}).cidr == 64
         ((DigitalOceanNetworkInterface)computeInstanceMetadata.get().interfaces.find { it.ipv6 == "2604:A880:0800:0010:0000:0000:017D:2001"}).ipv6Gateway == "2604:A880:0800:0010:0000:0000:0000:0001"
 
-        computeInstanceMetadata.get().metadata['dns']['nameservers'].contains("2001:4860:4860::8844")
-        computeInstanceMetadata.get().metadata['dns']['nameservers'].contains("2001:4860:4860::8888")
-        computeInstanceMetadata.get().metadata['dns']['nameservers'].contains("8.8.8.8")
     }
 
 

@@ -17,7 +17,6 @@ package io.micronaut.discovery.cloud.digitalocean;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.type.MapType;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
@@ -35,6 +34,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.populateMetadata;
 import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.readMetadataUrl;
 import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.*;
 
@@ -104,8 +104,9 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
                 allInterfaces.addAll(publicInterfaces);
                 allInterfaces.addAll(privateInterfaces);
                 instanceMetadata.setInterfaces(allInterfaces);
-                final MapType mapType = objectMapper.getTypeFactory().constructMapType(Map.class, String.class, String.class);
-                instanceMetadata.setMetadata(objectMapper.convertValue(metadataJson, mapType));
+
+                final Map<?, ?> metadata = objectMapper.convertValue(metadataJson, Map.class);
+                populateMetadata(instanceMetadata, metadata);
                 cachedMetadata = instanceMetadata;
 
                 return Optional.of(instanceMetadata);

@@ -36,6 +36,7 @@ class GoogleComputeInstanceResolverSpec extends Specification {
     void "test building google compute metadata"() {
         given:
         Environment environment = Mock(Environment)
+        environment.getActiveNames() >> ['foo']
 
         GoogleComputeInstanceMetadataResolver resolver = buildResolver()
         Optional<ComputeInstanceMetadata> computeInstanceMetadata = resolver.resolve(environment)
@@ -79,7 +80,7 @@ class GoogleComputeInstanceResolverSpec extends Specification {
     void "test metadata caching"() {
         given:
         Environment environment = Mock(Environment)
-
+        environment.getActiveNames() >> ['foo']
         GoogleComputeInstanceMetadataResolver resolver = buildResolver()
         Optional<ComputeInstanceMetadata> computeInstanceMetadata = resolver.resolve(environment)
 
