@@ -25,6 +25,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -78,5 +79,24 @@ public class ComputeInstanceMetadataResolverUtils {
      */
     public static Optional<String> stringValue(JsonNode json, String key) {
         return Optional.ofNullable(json.findValue(key)).map(JsonNode::asText);
+    }
+
+    /**
+     * Populates the instance instance metadata's {@link AbstractComputeInstanceMetadata#setMetadata(Map)} property.
+     * @param instanceMetadata The instance metadata
+     * @param metadata A map of metadata
+     */
+    public static void populateMetadata(AbstractComputeInstanceMetadata instanceMetadata, Map<?, ?> metadata) {
+        if (metadata != null) {
+            Map<String, String> finalMetadata = new HashMap<>(metadata.size());
+            for (Map.Entry<?, ?> entry : metadata.entrySet()) {
+                Object key = entry.getKey();
+                Object value = entry.getValue();
+                if (value instanceof String) {
+                    finalMetadata.put(key.toString(), value.toString());
+                }
+            }
+            instanceMetadata.setMetadata(finalMetadata);
+        }
     }
 }
