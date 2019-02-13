@@ -15,6 +15,8 @@
  */
 package io.micronaut.discovery.cloud;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -147,6 +149,7 @@ public abstract class AbstractComputeInstanceMetadata implements ComputeInstance
     }
 
     @Override
+    @JsonIgnore
     public boolean isCached() {
         return cached;
     }
@@ -266,6 +269,7 @@ public abstract class AbstractComputeInstanceMetadata implements ComputeInstance
     /**
      * @param cached whether this instance is cached
      */
+    @JsonIgnore
     public void setCached(boolean cached) {
         this.cached = cached;
     }
