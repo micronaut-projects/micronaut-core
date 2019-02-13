@@ -15,6 +15,7 @@
  */
 package io.micronaut.discovery.cloud.gcp;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.micronaut.context.env.ComputePlatform;
 import io.micronaut.discovery.cloud.AbstractComputeInstanceMetadata;
 
@@ -30,6 +31,7 @@ public class GoogleComputeInstanceMetadata extends AbstractComputeInstanceMetada
     private final ComputePlatform computePlatform = ComputePlatform.GOOGLE_COMPUTE;
 
     @Override
+    @JsonIgnore
     public ComputePlatform getComputePlatform() {
         return computePlatform;
     }

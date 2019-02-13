@@ -17,6 +17,7 @@ package io.micronaut.discovery.cloud.aws;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.type.MapType;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.io.IOUtils;
@@ -37,8 +38,7 @@ import java.net.URLConnection;
 import java.util.*;
 import java.util.regex.Pattern;
 
-import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.readMetadataUrl;
-
+import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.*;
 /**
  * Resolves {@link ComputeInstanceMetadata} for Amazon EC2.
  *
@@ -95,23 +95,26 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
             String ec2InstanceMetadataURL = configuration.getMetadataUrl();
             JsonNode metadataJson = readMetadataUrl(new URL(ec2InstanceIdentityDocURL), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS, objectMapper, new HashMap<>());
             if (metadataJson != null) {
-                ec2InstanceMetadata.setAccount(metadataJson.findValue(EC2MetadataKeys.accountId.name()).textValue());
-                ec2InstanceMetadata.setAvailabilityZone(metadataJson.findValue(EC2MetadataKeys.availabilityZone.name()).textValue());
-                ec2InstanceMetadata.setInstanceId(metadataJson.findValue(EC2MetadataKeys.instanceId.name()).textValue());
-                ec2InstanceMetadata.setMachineType(metadataJson.findValue(EC2MetadataKeys.instanceType.name()).textValue());
-                ec2InstanceMetadata.setRegion(metadataJson.findValue(EC2MetadataKeys.region.name()).textValue());
-                ec2InstanceMetadata.setPrivateIpV4(metadataJson.findValue("privateIp").textValue());
-                ec2InstanceMetadata.setImageId(metadataJson.findValue("imageId").textValue());
+                stringValue(metadataJson, EC2MetadataKeys.accountId.name()).ifPresent(ec2InstanceMetadata::setAccount);
+                stringValue(metadataJson, EC2MetadataKeys.availabilityZone.name()).ifPresent(ec2InstanceMetadata::setAvailabilityZone);
+                stringValue(metadataJson, EC2MetadataKeys.instanceType.name()).ifPresent(ec2InstanceMetadata::setMachineType);
+                stringValue(metadataJson, EC2MetadataKeys.region.name()).ifPresent(ec2InstanceMetadata::setRegion);
+                stringValue(metadataJson, "privateIp").ifPresent(ec2InstanceMetadata::setPrivateIpV4);
+                stringValue(metadataJson, "imageId").ifPresent(ec2InstanceMetadata::setImageId);
             }
             try {
                 ec2InstanceMetadata.setLocalHostname(readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + EC2MetadataKeys.localHostname.getName()), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS));
             } catch (IOException e) {
-                LOG.error("Error getting local hostname from url:" + ec2InstanceMetadataURL + EC2MetadataKeys.localHostname.name(), e);
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Error getting local hostname from url:" + ec2InstanceMetadataURL + EC2MetadataKeys.localHostname.name(), e);
+                }
             }
             try {
                 ec2InstanceMetadata.setPublicHostname(readEc2MetadataUrl(new URL(ec2InstanceMetadataURL + EC2MetadataKeys.publicHostname.getName()), CONNECTION_TIMEOUT_IN_MILLS, READ_TIMEOUT_IN_MILLS));
             } catch (IOException e) {
-                LOG.error("error getting public host name from:" + ec2InstanceMetadataURL + EC2MetadataKeys.publicHostname.name(), e);
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("error getting public host name from:" + ec2InstanceMetadataURL + EC2MetadataKeys.publicHostname.name(), e);
+                }
             }
             // build up network info
             try {
@@ -133,18 +136,9 @@ public class AmazonComputeInstanceMetadataResolver implements ComputeInstanceMet
                 LOG.error("error getting public host name from:" + ec2InstanceMetadataURL + EC2MetadataKeys.publicHostname.getName(), e);
             }
 
-            Map<?, ?> metadata = objectMapper.convertValue(ec2InstanceMetadata, Map.class);
-            if (metadata != null) {
-                Map<String, String> finalMetadata = new HashMap<>(metadata.size());
-                for (Map.Entry<?, ?> entry : metadata.entrySet()) {
-                    Object key = entry.getKey();
-                    Object value = entry.getValue();
-                    if (value instanceof String) {
-                        finalMetadata.put(key.toString(), value.toString());
-                    }
-                }
-                ec2InstanceMetadata.setMetadata(finalMetadata);
-            }
+            final MapType mapType = objectMapper.getTypeFactory().constructMapType(Map.class, String.class, String.class);
+            Map<String, String> metadata = objectMapper.convertValue(ec2InstanceMetadata, mapType);
+            ec2InstanceMetadata.setMetadata(metadata);
             if (LOG.isDebugEnabled()) {
                 LOG.debug("EC2 Metadata found:" + ec2InstanceMetadata.getMetadata().toString());
             }

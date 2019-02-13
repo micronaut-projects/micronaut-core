@@ -17,6 +17,7 @@ package io.micronaut.discovery.cloud;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpMethod;
 
 import java.io.IOException;
@@ -25,6 +26,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Utility class for {@link ComputeInstanceMetadataResolver}'s.
@@ -32,6 +34,7 @@ import java.util.Map;
  * @author Alvaro Sanchez-Mariscal
  * @since 1.1
  */
+@Internal
 public class ComputeInstanceMetadataResolverUtils {
 
     /**
@@ -65,5 +68,15 @@ public class ComputeInstanceMetadataResolverUtils {
                 return objectMapper.readTree(in);
             }
         }
+    }
+
+    /**
+     * Resolve a value as a string from the metadata json.
+     * @param json The json
+     * @param key The key
+     * @return An optional value
+     */
+    public static Optional<String> stringValue(JsonNode json, String key) {
+        return Optional.ofNullable(json.findValue(key)).map(JsonNode::asText);
     }
 }
