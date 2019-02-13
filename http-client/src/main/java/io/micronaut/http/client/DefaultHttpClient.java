@@ -1047,16 +1047,19 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             if (readTimeout.isPresent()) {
                 // add an additional second, because generally the timeout should occur
                 // from the Netty request handling pipeline
-                Duration duration = readTimeout.get().plus(Duration.ofSeconds(1));
-                finalFlowable = finalFlowable.timeout(
-                        duration.toMillis(),
-                        TimeUnit.MILLISECONDS
-                ).onErrorResumeNext(throwable -> {
-                    if (throwable instanceof TimeoutException) {
-                        return Flowable.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
-                    }
-                    return Flowable.error(throwable);
-                });
+                final Duration rt = readTimeout.get();
+                if (!rt.isNegative()) {
+                    Duration duration = rt.plus(Duration.ofSeconds(1));
+                    finalFlowable = finalFlowable.timeout(
+                            duration.toMillis(),
+                            TimeUnit.MILLISECONDS
+                    ).onErrorResumeNext(throwable -> {
+                        if (throwable instanceof TimeoutException) {
+                            return Flowable.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
+                        }
+                        return Flowable.error(throwable);
+                    });
+                }
             }
             return finalFlowable.subscribeOn(scheduler);
         };
