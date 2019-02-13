@@ -15,7 +15,6 @@
  */
 package io.micronaut.security.authentication;
 
-import javax.annotation.Nullable;
 import java.util.Map;
 
 /**
@@ -26,28 +25,31 @@ import java.util.Map;
  */
 public class AuthenticationUserDetailsAdapter implements Authentication {
 
-    private UserDetails userDetails;
-
-    @Nullable
-    private String rolesKey;
+    private final UserDetails userDetails;
+    private final String rolesKey;
 
     /**
      *
      * @param userDetails Authenticated user's representation.
      * @param rolesKey The key name that should used to store the roles
      */
-    public AuthenticationUserDetailsAdapter(UserDetails userDetails, @Nullable String rolesKey) {
+    public AuthenticationUserDetailsAdapter(UserDetails userDetails, String rolesKey) {
         this.userDetails = userDetails;
         this.rolesKey = rolesKey;
     }
 
+    /**
+     *
+     * @param userDetails Authenticated user's representation.
+     */
+    @Deprecated
+    public AuthenticationUserDetailsAdapter(UserDetails userDetails) {
+        this(userDetails, "roles");
+    }
+
     @Override
     public Map<String, Object> getAttributes() {
-        Map<String, Object> result = userDetails.getAttributes();
-        if (rolesKey != null) {
-            result.putIfAbsent(rolesKey, userDetails.getRoles());
-        }
-        return result;
+        return userDetails.getAttributes(rolesKey, "username");
     }
 
     @Override
