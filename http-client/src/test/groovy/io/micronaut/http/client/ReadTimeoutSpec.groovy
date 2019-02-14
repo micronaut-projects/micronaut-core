@@ -78,6 +78,24 @@ class ReadTimeoutSpec extends Specification {
         clientContext.close()
     }
 
+    void "test disable read timeout"() {
+        given:
+
+        ApplicationContext clientContext = ApplicationContext.run(
+                'micronaut.http.client.read-timeout':'-1s')
+        def server = clientContext.getBean(EmbeddedServer).start()
+        RxHttpClient client = clientContext.createBean(RxHttpClient, server.getURL())
+        when:
+        def result = client.retrieve(HttpRequest.GET('/timeout/client'), String).blockingFirst()
+
+        then:
+        result == 'success'
+
+        cleanup:
+        server.stop()
+        clientContext.close()
+    }
+
     @Controller("/timeout")
     static class GetController {
 

@@ -34,6 +34,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.populateMetadata;
 import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.readMetadataUrl;
 import static io.micronaut.discovery.cloud.digitalocean.DigitalOceanMetadataKeys.*;
 
@@ -104,7 +105,8 @@ public class DigitalOceanMetadataResolver implements ComputeInstanceMetadataReso
                 allInterfaces.addAll(privateInterfaces);
                 instanceMetadata.setInterfaces(allInterfaces);
 
-                instanceMetadata.setMetadata(objectMapper.convertValue(metadataJson, Map.class));
+                final Map<?, ?> metadata = objectMapper.convertValue(metadataJson, Map.class);
+                populateMetadata(instanceMetadata, metadata);
                 cachedMetadata = instanceMetadata;
 
                 return Optional.of(instanceMetadata);
