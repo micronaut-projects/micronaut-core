@@ -24,12 +24,6 @@ Micronaut by default contains `PropertySourceLoader` implementations that load p
 
 TIP: To use custom properties from local files, you can either call your application with `-Dmicronaut.config.files=myfile.yml` or set the environment variable `MICRONAUT_CONFIG_FILES=myfile.yml`. The value can be a comma-separated list.
 
-=== Validating Properties on Startup
-
-By default, Micronaut beans are not created on startup, but as they are needed. Any properties associated with the bean are not loaded until this point, so if a property is not defined, you will get the error at this time.
-
-To force the validation of a bean's properties at startup, make the bean with @Context scope. By making them @Context scope the bean will be created, and the corresponding properties loaded, when the application starts.
-
 === Property Value Placeholders
 
 Micronaut includes a property placeholder syntax which can be used to reference configuration properties both within configuration values and with any Micronaut annotation (see ann:io.micronaut.context.annotation.Value[] and the section on <<valueAnnotation,Configuration Injection>>).
@@ -131,3 +125,9 @@ micronaut:
 |random.uuid2
 |Random UUID without dashes
 |===
+
+=== Fail Fast Property Injection
+
+For beans that inject required properties, the injection and potential failure will not occur until the bean is requested. To verify at startup that the properties exist and can be injected, the bean can be annotated with ann:io.micronaut.context.annotation.Context[]. Context scoped beans will be injected at startup time and thus will fail at startup time if any required properties are missing or could not be converted to the required type.
+
+IMPORTANT: To maintain a fast startup time, it is recommended to use this feature as sparingly as possible.
