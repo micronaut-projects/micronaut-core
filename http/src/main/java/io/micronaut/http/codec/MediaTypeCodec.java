@@ -51,12 +51,12 @@ public interface MediaTypeCodec {
     <T> T decode(Argument<T> type, InputStream inputStream) throws CodecException;
 
     /**
-     * Encode the given type from the given {@link InputStream}.
+     * Encode the given type to the given {@link OutputStream}.
      *
      * @param object       The object to encode
-     * @param outputStream The input stream
+     * @param outputStream The output stream
      * @param <T>          The generic type
-     * @throws CodecException When the result cannot be decoded
+     * @throws CodecException When the result cannot be encoded
      */
     <T> void encode(T object, OutputStream outputStream) throws CodecException;
 
@@ -66,7 +66,7 @@ public interface MediaTypeCodec {
      * @param object The object to encode
      * @param <T>    The generic type
      * @return The decoded result
-     * @throws CodecException When the result cannot be decoded
+     * @throws CodecException When the result cannot be encoded
      */
     <T> byte[] encode(T object) throws CodecException;
 
@@ -77,7 +77,7 @@ public interface MediaTypeCodec {
      * @param allocator The allocator
      * @param <T>       The generic type
      * @return The decoded result
-     * @throws CodecException When the result cannot be decoded
+     * @throws CodecException When the result cannot be encoded
      */
     <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException;
 
