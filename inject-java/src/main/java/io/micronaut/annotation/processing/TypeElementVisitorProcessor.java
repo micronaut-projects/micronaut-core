@@ -116,7 +116,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                 .stream()
                 .filter(JavaModelUtils::isClassOrInterface)
                 .map(modelUtils::classElementFor)
-                .filter(typeElement -> groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType))
+                .filter(typeElement -> typeElement == null || (groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType)))
                 .forEach((typeElement) -> {
                     String className = typeElement.getQualifiedName().toString();
                     List<LoadedVisitor> matchedVisitors = loadedVisitors.values().stream().filter((v) -> v.matches(typeElement)).collect(Collectors.toList());
