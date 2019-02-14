@@ -84,11 +84,14 @@ public class ModelUtils {
      * @param element The element
      * @return The {@link TypeElement}
      */
-    final TypeElement classElementFor(Element element) {
-        while (!(JavaModelUtils.isClass(element) || JavaModelUtils.isInterface(element))) {
+    @Nullable final TypeElement classElementFor(Element element) {
+        while (element != null && !(JavaModelUtils.isClass(element) || JavaModelUtils.isInterface(element))) {
             element = element.getEnclosingElement();
         }
-        return (TypeElement) element;
+        if (element instanceof  TypeElement) {
+            return (TypeElement) element;
+        }
+        return null;
     }
 
     /**
