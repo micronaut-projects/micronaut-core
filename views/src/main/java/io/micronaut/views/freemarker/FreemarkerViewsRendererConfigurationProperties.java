@@ -25,7 +25,6 @@ import io.micronaut.views.ViewsConfigurationProperties;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.Optional;
 
 /**
  * {@link ConfigurationProperties} implementation of {@link FreemarkerViewsRendererConfiguration}.

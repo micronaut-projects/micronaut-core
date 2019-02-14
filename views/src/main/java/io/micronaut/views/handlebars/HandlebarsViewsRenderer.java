@@ -56,7 +56,7 @@ public class HandlebarsViewsRenderer implements ViewsRenderer {
 
 
     /**
-     * @param viewsConfiguration                   Views Configuration.
+     * @param viewsConfiguration                   Views Configuration
      * @param resourceLoader                       Resource Loader
      * @param handlebarsViewsRendererConfiguration Handlebars ViewRenderer Configuration.
      */
@@ -68,9 +68,10 @@ public class HandlebarsViewsRenderer implements ViewsRenderer {
     }
 
     /**
-     * @param viewsConfiguration                   Views Configuration.
+     * @param viewsConfiguration                   Views Configuration
      * @param resourceLoader                       Resource Loader
      * @param handlebarsViewsRendererConfiguration Handlebars ViewRenderer Configuration.
+     * @param handlebars                           Handlebars Engine
      */
     @Inject
     public HandlebarsViewsRenderer(ViewsConfiguration viewsConfiguration,

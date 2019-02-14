@@ -18,8 +18,6 @@ package io.micronaut.views.freemarker;
 import freemarker.template.Version;
 import io.micronaut.core.util.Toggleable;
 
-import java.util.Optional;
-
 /**
  * Configuration for {@link FreemarkerViewsRenderer}.
  * 

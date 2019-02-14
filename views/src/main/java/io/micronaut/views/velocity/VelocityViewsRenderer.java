@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.views.velocity;
 
 import io.micronaut.core.io.Writable;
@@ -109,7 +110,7 @@ public class VelocityViewsRenderer implements ViewsRenderer {
     }
 
     /**
-     * Only used in the deprecated constructor
+     * Only used in the deprecated constructor.
      */
     private VelocityEngine initializeVelocityEngine() {
         final Properties p = new Properties();
