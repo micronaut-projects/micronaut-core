@@ -41,7 +41,7 @@ configurations {
     developmentOnly
 }
 dependencies {
-    // Dependency will exist if the project was created using --features file-watch, add otherwise
+    // Automatically added with the 'file-watch' feature in the CLi
     developmentOnly "io.micronaut:micronaut-runtime-osx"
     ...
     developmentOnly "net.java.dev.jna:jna"
