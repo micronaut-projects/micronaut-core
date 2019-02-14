@@ -31,7 +31,6 @@ import java.time.Duration;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(classes = TemplateEngine.class)
 @ConfigurationProperties(ThymeleafViewsRendererConfigurationProperties.PREFIX)
 public class ThymeleafViewsRendererConfigurationProperties implements ThymeleafViewsRendererConfiguration {
 

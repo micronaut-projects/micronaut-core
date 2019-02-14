@@ -15,9 +15,7 @@
  */
 package io.micronaut.views.handlebars;
 
-import com.github.jknack.handlebars.Handlebars;
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.views.ViewsConfigurationProperties;
 
@@ -27,7 +25,6 @@ import io.micronaut.views.ViewsConfigurationProperties;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(classes = Handlebars.class)
 @ConfigurationProperties(HandlebarsViewsRendererConfigurationProperties.PREFIX)
 public class HandlebarsViewsRendererConfigurationProperties implements HandlebarsViewsRendererConfiguration {
 

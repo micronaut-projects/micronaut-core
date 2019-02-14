@@ -15,10 +15,8 @@
  */
 package io.micronaut.views.velocity;
 
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.util.ArgumentUtils;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.views.ViewUtils;
@@ -33,6 +31,7 @@ import org.apache.velocity.exception.ResourceNotFoundException;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -48,8 +47,6 @@ import java.util.Properties;
  * @since 1.0
  */
 @Produces(MediaType.TEXT_HTML)
-@Requires(property = VelocityViewsRendererConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
-@Requires(classes = VelocityEngine.class)
 @Singleton
 public class VelocityViewsRenderer implements ViewsRenderer {
 
@@ -62,11 +59,27 @@ public class VelocityViewsRenderer implements ViewsRenderer {
      * @param viewsConfiguration    Views Configuration
      * @param velocityConfiguration Velocity Configuration
      */
+    @Deprecated
     VelocityViewsRenderer(ViewsConfiguration viewsConfiguration,
                           VelocityViewsRendererConfiguration velocityConfiguration) {
         this.viewsConfiguration = viewsConfiguration;
         this.velocityConfiguration = velocityConfiguration;
         this.velocityEngine = initializeVelocityEngine();
+        this.folder = viewsConfiguration.getFolder();
+    }
+
+    /**
+     * @param viewsConfiguration    Views Configuration
+     * @param velocityConfiguration Velocity Configuration
+     * @param velocityEngine        Velocity Engine
+     */
+    @Inject
+    VelocityViewsRenderer(ViewsConfiguration viewsConfiguration,
+                          VelocityViewsRendererConfiguration velocityConfiguration,
+                          VelocityEngine velocityEngine) {
+        this.viewsConfiguration = viewsConfiguration;
+        this.velocityConfiguration = velocityConfiguration;
+        this.velocityEngine = velocityEngine;
         this.folder = viewsConfiguration.getFolder();
     }
 
@@ -95,6 +108,9 @@ public class VelocityViewsRenderer implements ViewsRenderer {
         return true;
     }
 
+    /**
+     * Only used in the deprecated constructor
+     */
     private VelocityEngine initializeVelocityEngine() {
         final Properties p = new Properties();
         p.setProperty("resource.loader", "class");

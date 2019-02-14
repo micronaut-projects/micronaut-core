@@ -6,10 +6,10 @@ import io.micronaut.context.annotation.Factory;
 import javax.inject.Singleton;
 
 @Factory
-class HandlebarsFactory {
+public class HandlebarsFactory {
 
     @Singleton
-    Handlebars handlebars() {
+    public Handlebars handlebars() {
         return new Handlebars();
     }
 }

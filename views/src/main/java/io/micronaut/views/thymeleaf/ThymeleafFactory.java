@@ -1,6 +1,5 @@
 package io.micronaut.views.thymeleaf;
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.views.ViewsConfiguration;
 import org.thymeleaf.TemplateEngine;
@@ -11,10 +10,10 @@ import org.thymeleaf.templateresolver.ITemplateResolver;
 import javax.inject.Singleton;
 
 @Factory
-class ThymeleafFactory {
+public class ThymeleafFactory {
 
     @Singleton
-    AbstractConfigurableTemplateResolver templateResolver(ViewsConfiguration viewsConfiguration,
+    public AbstractConfigurableTemplateResolver templateResolver(ViewsConfiguration viewsConfiguration,
                                                           ThymeleafViewsRendererConfiguration rendererConfiguration) {
         ClassLoaderTemplateResolver templateResolver = new ClassLoaderTemplateResolver();
 
@@ -32,7 +31,7 @@ class ThymeleafFactory {
     }
 
     @Singleton
-    TemplateEngine templateEngine(ITemplateResolver templateResolver) {
+    public TemplateEngine templateEngine(ITemplateResolver templateResolver) {
         TemplateEngine engine = new TemplateEngine();
         engine.setTemplateResolver(templateResolver);
         return engine;

@@ -15,12 +15,10 @@
  */
 package io.micronaut.views.thymeleaf;
 
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
@@ -34,7 +32,6 @@ import org.thymeleaf.context.IContext;
 import org.thymeleaf.exceptions.TemplateEngineException;
 import org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
-import org.thymeleaf.templateresolver.ITemplateResolver;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -54,8 +51,6 @@ import java.util.Map;
  * @since 1.0
  */
 @Produces(MediaType.TEXT_HTML)
-@Requires(property = ThymeleafViewsRendererConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
-@Requires(classes = TemplateEngine.class)
 @Singleton
 public class ThymeleafViewsRenderer implements ViewsRenderer {
 

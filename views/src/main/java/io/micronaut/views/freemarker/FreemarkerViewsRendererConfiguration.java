@@ -15,7 +15,10 @@
  */
 package io.micronaut.views.freemarker;
 
+import freemarker.template.Version;
 import io.micronaut.core.util.Toggleable;
+
+import java.util.Optional;
 
 /**
  * Configuration for {@link FreemarkerViewsRenderer}.
@@ -29,4 +32,9 @@ public interface FreemarkerViewsRendererConfiguration extends Toggleable {
      * @return Default extension for templates
      */
     String getDefaultExtension();
+
+    /**
+     * @return An optional Freemarker version number
+     */
+    Version getIncompatibleImprovements();
 }
