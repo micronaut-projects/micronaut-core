@@ -15,9 +15,7 @@
  */
 package io.micronaut.annotation.processing;
 
-import static javax.lang.model.element.ElementKind.ANNOTATION_TYPE;
-import static javax.lang.model.element.ElementKind.CONSTRUCTOR;
-import static javax.lang.model.element.ElementKind.FIELD;
+import static javax.lang.model.element.ElementKind.*;
 import static javax.lang.model.type.TypeKind.ARRAY;
 
 import io.micronaut.aop.Adapter;
@@ -128,7 +126,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         annotations = annotations
                 .stream()
                 .filter(ann -> !ann.getQualifiedName().toString().equals(AnnotationUtil.KOTLIN_METADATA))
-                .filter(ann -> annotationUtils.hasStereotype(ann, ANNOTATION_STEREOTYPES) || AbstractAnnotationMetadataBuilder.isAnnotationMapped(((TypeElement) ann).getQualifiedName().toString()))
+                .filter(ann -> annotationUtils.hasStereotype(ann, ANNOTATION_STEREOTYPES) || AbstractAnnotationMetadataBuilder.isAnnotationMapped(ann.getQualifiedName().toString()))
                 .collect(Collectors.toSet());
 
         if (!annotations.isEmpty()) {
@@ -142,8 +140,12 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     .forEach(element -> {
                         TypeElement typeElement = modelUtils.classElementFor(element);
 
+                        if (element.getKind() == ENUM) {
+                            error(element, "Enum types cannot be defined as beans");
+                            return;
+                        }
                         // skip Groovy code, handled by InjectTransform. Required for GroovyEclipse compiler
-                        if (groovyObjectType != null && typeUtils.isAssignable(typeElement.asType(), groovyObjectType)) {
+                        if (typeElement == null || (groovyObjectType != null && typeUtils.isAssignable(typeElement.asType(), groovyObjectType))) {
                             return;
                         }
 
@@ -535,7 +537,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
 
             TypeElement declaringClassElement = modelUtils.classElementFor(method);
-            if (modelUtils.isObjectClass(declaringClassElement)) {
+            if (declaringClassElement == null || modelUtils.isObjectClass(declaringClassElement)) {
                 return null;
             }
 
@@ -569,63 +571,67 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             TypeElement declaringClass = modelUtils.classElementFor(method);
 
-            AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(method);
-            if (methodAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
-                writer.visitConfigBuilderMethod(
-                        fieldType,
-                        NameUtils.getterNameFor(parameter.getSimpleName().toString()),
-                        methodAnnotationMetadata,
-                        metadataBuilder);
-                try {
-                    visitConfigurationBuilder(method, valueType, writer);
-                } finally {
-                    writer.visitConfigBuilderEnd();
+            if (declaringClass != null) {
+
+                AnnotationMetadata methodAnnotationMetadata = annotationUtils.getAnnotationMetadata(method);
+                if (methodAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
+                    writer.visitConfigBuilderMethod(
+                            fieldType,
+                            NameUtils.getterNameFor(parameter.getSimpleName().toString()),
+                            methodAnnotationMetadata,
+                            metadataBuilder);
+                    try {
+                        visitConfigurationBuilder(method, valueType, writer);
+                    } finally {
+                        writer.visitConfigBuilderEnd();
+                    }
+                } else {
+                    String docComment = elementUtils.getDocComment(method);
+                    String setterName = method.getSimpleName().toString();
+                    PropertyMetadata propertyMetadata = metadataBuilder.visitProperty(
+                            concreteClass,
+                            declaringClass,
+                            getPropertyMetadataTypeReference(valueType),
+                            NameUtils.getPropertyNameForSetter(setterName),
+                            docComment,
+                            null
+                    );
+
+                    AnnotationMetadata annotationMetadata = DefaultAnnotationMetadata.mutateMember(
+                            AnnotationMetadata.EMPTY_METADATA,
+                            PropertySource.class.getName(),
+                            AnnotationMetadata.VALUE_MEMBER,
+                            Collections.singletonList(
+                                    new io.micronaut.core.annotation.AnnotationValue(
+                                            Property.class.getName(),
+                                            Collections.singletonMap(
+                                                    "name",
+                                                    propertyMetadata.getPath()
+                                            )
+                                    )
+                            )
+                    );
+
+                    boolean requiresReflection = modelUtils.isPrivate(method);
+
+                    if (!requiresReflection && modelUtils.isProtected(method)) {
+                        PackageElement declaringPackage = elementUtils.getPackageOf(declaringClass);
+                        PackageElement concretePackage = elementUtils.getPackageOf(this.concreteClass);
+                        requiresReflection = !declaringPackage.getQualifiedName().equals(concretePackage.getQualifiedName());
+                    }
+
+                    writer.visitSetterValue(
+                            modelUtils.resolveTypeReference(declaringClass),
+                            annotationMetadata,
+                            requiresReflection,
+                            fieldType,
+                            setterName,
+                            genericTypes,
+                            annotationUtils.getAnnotationMetadata(method.getParameters().get(0)),
+                            true);
                 }
-            } else {
-                String docComment = elementUtils.getDocComment(method);
-                String setterName = method.getSimpleName().toString();
-                PropertyMetadata propertyMetadata = metadataBuilder.visitProperty(
-                        concreteClass,
-                        declaringClass,
-                        getPropertyMetadataTypeReference(valueType),
-                        NameUtils.getPropertyNameForSetter(setterName),
-                        docComment,
-                        null
-                );
-
-                AnnotationMetadata annotationMetadata = DefaultAnnotationMetadata.mutateMember(
-                        AnnotationMetadata.EMPTY_METADATA,
-                        PropertySource.class.getName(),
-                        AnnotationMetadata.VALUE_MEMBER,
-                        Collections.singletonList(
-                                new io.micronaut.core.annotation.AnnotationValue(
-                                        Property.class.getName(),
-                                        Collections.singletonMap(
-                                                "name",
-                                                propertyMetadata.getPath()
-                                        )
-                                )
-                        )
-                );
-
-                boolean requiresReflection = modelUtils.isPrivate(method);
-
-                if (!requiresReflection && modelUtils.isProtected(method)) {
-                    PackageElement declaringPackage = elementUtils.getPackageOf(declaringClass);
-                    PackageElement concretePackage = elementUtils.getPackageOf(this.concreteClass);
-                    requiresReflection = !declaringPackage.getQualifiedName().equals(concretePackage.getQualifiedName());
-                }
-
-                writer.visitSetterValue(
-                        modelUtils.resolveTypeReference(declaringClass),
-                        annotationMetadata,
-                        requiresReflection,
-                        fieldType,
-                        setterName,
-                        genericTypes,
-                        annotationUtils.getAnnotationMetadata(method.getParameters().get(0)),
-                        true);
             }
+
         }
 
         /**
@@ -639,7 +645,13 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             TypeMirror returnType = beanMethod.getReturnType();
             ExecutableElementParamInfo beanMethodParams = populateParameterData(beanMethod);
 
-            BeanDefinitionWriter beanMethodWriter = createFactoryBeanMethodWriterFor(beanMethod, returnType);
+            TypeElement producedElement = modelUtils.classElementFor(typeUtils.asElement(returnType));
+
+            if (producedElement == null) {
+                return;
+            }
+
+            BeanDefinitionWriter beanMethodWriter = createFactoryBeanMethodWriterFor(beanMethod, returnType, producedElement);
 
             if (returnType instanceof DeclaredType) {
                 DeclaredType dt = (DeclaredType) returnType;
@@ -1179,6 +1191,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             TypeMirror returnType = method.getReturnType();
             TypeElement declaringClass = modelUtils.classElementFor(method);
 
+            if (declaringClass == null) {
+                return;
+            }
+
             boolean isParent = !declaringClass.getQualifiedName().equals(this.concreteClass.getQualifiedName());
             ExecutableElement overridingMethod = modelUtils.overridingOrHidingMethod(method, this.concreteClass).orElse(method);
             TypeElement overridingClass = modelUtils.classElementFor(overridingMethod);
@@ -1277,6 +1293,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                 TypeElement declaringClass = modelUtils.classElementFor(variable);
 
+                if (declaringClass == null) {
+                    return null;
+                }
+
                 boolean isPrivate = modelUtils.isPrivate(variable);
                 boolean requiresReflection = isPrivate
                         || modelUtils.isInheritedAndNotPublic(this.concreteClass, declaringClass, variable);
@@ -1334,6 +1354,10 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 Object fieldType = modelUtils.resolveTypeReference(fieldTypeMirror);
 
                 TypeElement declaringClass = modelUtils.classElementFor(field);
+
+                if (declaringClass == null) {
+                    return null;
+                }
 
                 String fieldName = field.getSimpleName().toString();
                 if (fieldAnnotationMetadata.hasStereotype(ConfigurationBuilder.class)) {
@@ -1711,11 +1735,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
         }
 
-        private BeanDefinitionWriter createFactoryBeanMethodWriterFor(ExecutableElement method, TypeMirror producedType) {
+        private BeanDefinitionWriter createFactoryBeanMethodWriterFor(ExecutableElement method, TypeMirror producedType, TypeElement producedElement) {
             AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(method);
-            Element element = typeUtils.asElement(producedType);
-            TypeElement producedElement = modelUtils.classElementFor(element);
-
             PackageElement producedPackageElement = elementUtils.getPackageOf(producedElement);
             PackageElement definingPackageElement = elementUtils.getPackageOf(concreteClass);
 
