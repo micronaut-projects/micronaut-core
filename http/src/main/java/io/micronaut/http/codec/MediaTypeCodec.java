@@ -66,7 +66,7 @@ public interface MediaTypeCodec {
      * @param object The object to encode
      * @param <T>    The generic type
      * @return The decoded result
-     * @throws CodecException When the result cannot be decoded
+     * @throws CodecException When the result cannot be encoded
      */
     <T> byte[] encode(T object) throws CodecException;
 
@@ -77,7 +77,7 @@ public interface MediaTypeCodec {
      * @param allocator The allocator
      * @param <T>       The generic type
      * @return The decoded result
-     * @throws CodecException When the result cannot be decoded
+     * @throws CodecException When the result cannot be encoded
      */
     <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException;
 
