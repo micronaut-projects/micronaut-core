@@ -128,4 +128,18 @@ class ReplacesSpec extends Specification {
         cleanup:
         ctx.close()
     }
+
+    void "test replacing a bean with AOP bean of the same type"() {
+        given:
+        def ctx = ApplicationContext.run()
+
+        when:
+        F f = ctx.getBean(F)
+
+        then:
+        f.getId() == "replaces"
+
+        cleanup:
+        ctx.close()
+    }
 }
