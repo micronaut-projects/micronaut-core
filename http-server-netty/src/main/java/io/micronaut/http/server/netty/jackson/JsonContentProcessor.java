@@ -77,6 +77,8 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
                 } else {
                     this.jacksonProcessor = new JacksonProcessor(jsonFactory);
                 }
+            } else {
+                this.jacksonProcessor = new JacksonProcessor(jsonFactory);
             }
         } else {
             this.jacksonProcessor = new JacksonProcessor(jsonFactory);
