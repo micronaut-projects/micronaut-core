@@ -1499,6 +1499,11 @@ public class DefaultBeanContext implements BeanContext {
                         // don't replace yourself
                         return false;
                     }
+                    if (replacingCandidate instanceof ProxyBeanDefinition) {
+                        if (((ProxyBeanDefinition<T>) replacingCandidate).getTargetDefinitionType() == definition.getClass()) {
+                            return false;
+                        }
+                    }
 
                     final AnnotationValue<Replaces> replacesAnn = replacingCandidate.getAnnotation(Replaces.class);
                     Optional<Class> beanType = replacesAnn.getValue(Class.class);
