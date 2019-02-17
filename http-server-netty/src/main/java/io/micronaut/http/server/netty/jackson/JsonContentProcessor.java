@@ -64,6 +64,8 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
             return;
         }
 
+        boolean streamArray = false;
+
         if (subscriber instanceof TypedSubscriber) {
             TypedSubscriber typedSubscriber = (TypedSubscriber) subscriber;
             Argument typeArgument = typedSubscriber.getTypeArgument();
@@ -73,15 +75,12 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
                 Optional<Argument<?>> genericArgument = typeArgument.getFirstTypeVariable();
                 if (genericArgument.isPresent() && !Iterable.class.isAssignableFrom(genericArgument.get().getType())) {
                     // if the generic argument is not a iterable type them stream the array into the publisher
-                    this.jacksonProcessor = new JacksonProcessor(jsonFactory, true);
-                } else {
-                    this.jacksonProcessor = new JacksonProcessor(jsonFactory);
+                    streamArray = true;
                 }
             }
-        } else {
-            this.jacksonProcessor = new JacksonProcessor(jsonFactory);
         }
 
+        this.jacksonProcessor = new JacksonProcessor(jsonFactory, streamArray);
         this.jacksonProcessor.subscribe(new CompletionAwareSubscriber<JsonNode>() {
 
             @Override
