@@ -1,0 +1,57 @@
+Micronaut supports CSP (link:https://www.w3.org/TR/CSP2/[Content Security Policy Level 2]) out of the box. By default, CSP is disabled. To enable CSP, modify your configuration. For example with `application.yml`:
+
+.CSP Configuration Example
+[source,yaml]
+----
+micronaut:
+    server:
+        csp:
+            enabled: true
+            reportOnly: false
+            policyDirectives: "default-src 'self'"
+----
+
+In the above example, the policy enforces any resources (images, fonts, scripts, etc.) that are not on the same origin to be blocked from loading. In this case, if an attempt is made to load a script or other resource from a different origin, say, http://badactor.com, the browser would block these from loading, optionally report such violations, which could be very useful in mitigating XSS attacks.
+
+.CSP Reporting Example
+[source,yaml]
+
+----
+micronaut:
+    server:
+        csp:
+            enabled: true
+            reportOnly: false
+            policyDirectives: "default-src https:; report-uri /csp-violation-report-endpoint"
+----
+
+If you would like to dry run the policy, you could just report violations that would have occurred by enabling 'reportOnly' key in your CSP configuration.
+
+Micronaut endpoints allows us to implement a reporting endpoint.
+
+The following example demonstrates a simple CSP reporting endpoint:
+
+[source,groovy]
+.CspReportEndpoint.groovy
+----
+include::{testsuite}/server/endpoints/CspReportEndpoint.groovy[tags=import, indent=0]
+
+include::{testsuite}/server/endpoints/CspReportEndpoint.groovy[tags=classBegin, indent=0]
+
+include::{testsuite}/server/endpoints/CspReportEndpoint.groovy[tags=type, indent=4]
+
+include::{testsuite}/server/endpoints/CspReportEndpoint.groovy[tags=report, indent=4]
+include::{testsuite}/server/endpoints/CspReportEndpoint.groovy[tags=classEnd, indent=0]
+----
+<1> Supported media types are represented by api:http.MediaType[]
+
+
+.CSP Reporting Endpoint Custom Content Type
+[source,yaml]
+----
+micronaut:
+    codec:
+        json:
+            additionalTypes:
+                - application/csp-report
+----

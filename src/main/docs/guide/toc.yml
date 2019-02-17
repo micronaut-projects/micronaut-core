@@ -96,6 +96,7 @@ httpServer:
     title: Configuring the HTTP Server
     threadPools: Configuring Server Thread Pools
     cors: Configuring CORS
+    csp: Configuring CSP
     https: Securing the Server with HTTPS
   views:
     title: Server Side View Rendering
