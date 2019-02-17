@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty.configuration
 
-import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.server.HttpServerConfiguration
 import io.netty.channel.ChannelOption
 import io.micronaut.context.ApplicationContext
@@ -138,5 +137,33 @@ class NettyHttpServerConfigurationSpec extends Specification {
 
         cleanup:
         beanContext.close()
+    }
+
+    void "test csp configuration"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of("test",
+                ['micronaut.server.csp.enabled': true,
+                 'micronaut.server.csp.reportOnly': false,
+                 'micronaut.server.csp.policyDirectives': "default-src https:"]
+
+        ))
+        applicationContext.start()
+
+        expect:
+        applicationContext.containsBean(HttpServerConfiguration.CspConfiguration)
+
+        when:
+        NettyHttpServerConfiguration config = applicationContext.getBean(NettyHttpServerConfiguration)
+        NettyHttpServer server = applicationContext.getBean(NettyHttpServer)
+        server.start()
+
+        then:
+        config.csp.enabled
+        !config.csp.reportOnly
+        config.csp.policyDirectives == 'default-src https:'
+
+        cleanup:
+        applicationContext.close()
     }
 }
