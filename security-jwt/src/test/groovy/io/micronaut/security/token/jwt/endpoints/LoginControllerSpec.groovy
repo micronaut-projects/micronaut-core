@@ -78,6 +78,7 @@ class LoginControllerSpec extends Specification {
         rsp.body().username
         rsp.body().roles == null
         rsp.body().expiresIn
+        rsp.body().tokenType
     }
 
     def "invoking login with GET, returns unauthorized"() {

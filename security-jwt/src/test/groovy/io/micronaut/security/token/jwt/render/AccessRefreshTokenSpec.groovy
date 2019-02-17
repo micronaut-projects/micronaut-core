@@ -27,12 +27,12 @@ class AccessRefreshTokenSpec extends Specification {
             mapper.configure(SORT_PROPERTIES_ALPHABETICALLY, true)
 
         and : "a fully populated token"
-            AccessRefreshToken token = new AccessRefreshToken("1234", "abcd")
+            AccessRefreshToken token = new AccessRefreshToken("1234", "abcd", "Bearer")
 
         when: "we serialize the object to json"
             def rawJsonString = mapper.writeValueAsString(token)
 
         then: "we will get an OAuth 2.0 RFC6749 compliant value"
-            rawJsonString == "{\"access_token\":\"1234\",\"refresh_token\":\"abcd\"}"
+            rawJsonString == "{\"access_token\":\"1234\",\"refresh_token\":\"abcd\",\"token_type\":\"Bearer\"}"
     }
 }
