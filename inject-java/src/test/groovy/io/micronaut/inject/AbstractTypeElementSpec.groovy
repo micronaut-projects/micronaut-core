@@ -22,7 +22,10 @@ import com.sun.tools.javac.util.Context
 import groovy.transform.CompileStatic
 import io.micronaut.annotation.processing.AnnotationUtils
 import io.micronaut.annotation.processing.ModelUtils
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.io.scan.ClassPathResourceLoader
 import io.micronaut.core.naming.NameUtils
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
 import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
@@ -85,6 +88,35 @@ abstract class AbstractTypeElementSpec extends Specification {
 
         ClassLoader classLoader = buildClassLoader(className, cls)
         return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
+    }
+
+    protected ApplicationContext buildContext(String className, String cls) {
+        def files = Parser.generate(className, cls)
+        ClassLoader classLoader = new ClassLoader() {
+            @Override
+            protected Class<?> findClass(String name) throws ClassNotFoundException {
+                String fileName = name.replace('.', '/') + '.class'
+                JavaFileObject generated = files.find { it.name.endsWith(fileName) }
+                if (generated != null) {
+                    def bytes = generated.openInputStream().bytes
+                    return defineClass(name, bytes, 0, bytes.length)
+                }
+                return super.findClass(name)
+            }
+        }
+
+        return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader),"test") {
+            @Override
+            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
+                files.findAll { JavaFileObject jfo ->
+                    jfo.kind == JavaFileObject.Kind.CLASS && jfo.name.endsWith("DefinitionClass.class")
+                }.collect { JavaFileObject jfo ->
+                    def name = jfo.toUri().toString().substring("mem:///CLASS_OUTPUT/".length())
+                    name = name.replace('/', '.') - '.class'
+                    return classLoader.loadClass(name).newInstance()
+                } as List<BeanDefinitionReference>
+            }
+        }.start()
     }
 
     protected BeanDefinitionReference buildBeanDefinitionReference(String className, String cls) {

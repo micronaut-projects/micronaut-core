@@ -828,6 +828,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                 TypeElement destroyMethodDeclaringClass = (TypeElement) typeUtils.asElement(returnType);
                                 beanMethodWriter.visitPreDestroyMethod(
                                         destroyMethodDeclaringClass.getQualifiedName().toString(),
+                                        modelUtils.resolveTypeReference(returnType),
                                         destroyMethodName
                                 );
                             }
