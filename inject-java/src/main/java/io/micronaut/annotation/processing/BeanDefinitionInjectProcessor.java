@@ -827,7 +827,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         .ifPresent(destroyMethodName -> {
                             if (StringUtils.isNotEmpty(destroyMethodName)) {
                                 TypeElement destroyMethodDeclaringClass = (TypeElement) typeUtils.asElement(returnType);
-                                final Optional<ExecutableElement> destroyMethodRef = modelUtils.findNoArgumentMethod(destroyMethodDeclaringClass, destroyMethodName);
+                                final Optional<ExecutableElement> destroyMethodRef = modelUtils.findAccessibleNoArgumentInstanceMethod(destroyMethodDeclaringClass, destroyMethodName);
                                 if (destroyMethodRef.isPresent()) {
                                     beanMethodWriter.visitPreDestroyMethod(
                                             destroyMethodDeclaringClass.getQualifiedName().toString(),
