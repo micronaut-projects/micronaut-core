@@ -13,18 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.server.endpoints
+package io.micronaut.docs.filters
 
 //tag::import[]
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
-import io.micronaut.management.endpoint.annotation.Endpoint
-import io.micronaut.management.endpoint.annotation.Write
+import io.micronaut.http.annotation.Consumes
+import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Post
 //end::import[]
 
 //tag::classBegin[]
-@Endpoint(id = "report", defaultSensitive = false)
-class CspReportEndpoint {
+@Controller("/")
+class CspReportController {
 //end::classBegin[]
 
     //tag::type[]
@@ -32,7 +33,8 @@ class CspReportEndpoint {
     //end::type[]
 
     //tag::report[]
-    @Write(consumes = APPLICATION_CSP_REPORT) //<1>
+    @Consumes(APPLICATION_CSP_REPORT) //<1>
+    @Post("/report")
     HttpStatus report(@Body String violation) {
         // record violation
         return HttpStatus.OK
