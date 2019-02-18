@@ -3,7 +3,45 @@ package io.micronaut.inject.factory.lifecycle
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.AbstractTypeElementSpec
 
+import java.util.concurrent.ExecutorService
+
 class PreDestroyOnBeanAnnotationSpec extends AbstractTypeElementSpec {
+
+    void "test pre destroy with bean method on interface"() {
+        given:
+        ApplicationContext context = buildContext('test.TestFactory$TestBean', '''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@Factory
+class TestFactory {
+
+    @Bean(preDestroy="shutdown")
+    @javax.inject.Singleton
+    java.util.concurrent.ExecutorService myService() {
+        return java.util.concurrent.Executors.newFixedThreadPool(1);
+    }
+}
+
+
+''')
+
+        when:
+        def bean = context.getBean(ExecutorService)
+
+        then:
+        bean != null
+
+        when:
+        context.destroyBean(ExecutorService)
+
+        then:
+        bean.isTerminated()
+        bean != context.getBean(ExecutorService)
+    }
+
     void "test pre destroy with bean method that returns a value"() {
         given:
         ApplicationContext context = buildContext('test.TestFactory$TestBean', '''\
@@ -44,7 +82,6 @@ class Test {
         then:
         bean != context.getBean(beanType)
     }
-
     void "test pre destroy with bean method that returns void"() {
         given:
         ApplicationContext context = buildContext('test.TestFactory2$TestBean', '''\
