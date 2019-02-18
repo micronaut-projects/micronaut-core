@@ -29,6 +29,29 @@ import spock.lang.Specification
 
 class CspFilterSpec extends Specification {
 
+    void "test no CSP configuration"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName
+        ])
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        when:
+        def response = rxClient.exchange(
+                HttpRequest.GET('/csp')
+        ).blockingFirst()
+        def headerNames = response.headers.names()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        !headerNames.contains(CspFilter.CSP_HEADER)
+        !headerNames.contains(CspFilter.CSP_REPORT_ONLY_HEADER)
+
+        cleanup:
+        embeddedServer.close()
+    }
+
     void "test CSP no response header"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
