@@ -111,6 +111,8 @@ public class HttpServerConfiguration {
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
 
+    private CspConfiguration csp = new CspConfiguration();
+
     /**
      * Default constructor.
      */
@@ -184,6 +186,13 @@ public class HttpServerConfiguration {
      */
     public CorsConfiguration getCors() {
         return cors;
+    }
+
+    /**
+     * @return Configuration for CSP
+     */
+    public CspConfiguration getCsp() {
+        return csp;
     }
 
     /**
@@ -326,6 +335,14 @@ public class HttpServerConfiguration {
      */
     public void setCors(CorsConfiguration cors) {
         this.cors = cors;
+    }
+
+    /**
+     * Sets the csp configuration.
+     * @param csp The csp configuration
+     */
+    public void setCsp(CspConfiguration csp) {
+        this.csp = csp;
     }
 
     /**
