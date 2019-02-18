@@ -42,8 +42,8 @@ import org.reactivestreams.Publisher;
 @Filter("/**")
 public class CspFilter implements HttpServerFilter {
 
-    private static final String CSP_HEADER = "Content-Security-Policy";
-    private static final String CSP_REPORT_ONLY_HEADER = "Content-Security-Policy-Report-Only";
+    public static final String CSP_HEADER = "Content-Security-Policy";
+    public static final String CSP_REPORT_ONLY_HEADER = "Content-Security-Policy-Report-Only";
 
     protected final HttpServerConfiguration.CspConfiguration cspConfiguration;
 
