@@ -27,19 +27,19 @@ micronaut:
 
 If you would like to dry run the policy, you could just report violations that would have occurred by enabling 'reportOnly' key in your CSP configuration.
 
-An api:management.endpoint.annotation.Endpoint[endpoint] can be created to process violation report sent from user-agent. The following example demonstrates a simple CSP reporting endpoint:
+The following example demonstrates a simple CSP reporting controller that can be used to process violations from the user-agent.
 
 [source,groovy]
-.CspReportEndpoint.groovy
+.CspReportController.groovy
 ----
-include::{testsuite}/server/endpoints/CspReportEndpoint.groovy[tags=import, indent=0]
+include::{testsviews}/filters/CspReportController.groovy[tags=import, indent=0]
 
-include::{testsuite}/server/endpoints/CspReportEndpoint.groovy[tags=classBegin, indent=0]
+include::{testsviews}/filters/CspReportController.groovy[tags=classBegin, indent=0]
 
-include::{testsuite}/server/endpoints/CspReportEndpoint.groovy[tags=type, indent=4]
+include::{testsviews}/filters/CspReportController.groovy[tags=type, indent=4]
 
-include::{testsuite}/server/endpoints/CspReportEndpoint.groovy[tags=report, indent=4]
-include::{testsuite}/server/endpoints/CspReportEndpoint.groovy[tags=classEnd, indent=0]
+include::{testsviews}/filters/CspReportController.groovy[tags=report, indent=4]
+include::{testsviews}/filters/CspReportController.groovy[tags=classEnd, indent=0]
 ----
 <1> Violation reports are standard JSON structures with a custom type set to 'application/csp-report'.
 
