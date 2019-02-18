@@ -1499,6 +1499,11 @@ public class DefaultBeanContext implements BeanContext {
                         // don't replace yourself
                         return false;
                     }
+                    if (replacingCandidate instanceof ProxyBeanDefinition) {
+                        if (((ProxyBeanDefinition<T>) replacingCandidate).getTargetDefinitionType() == definition.getClass()) {
+                            return false;
+                        }
+                    }
 
                     final AnnotationValue<Replaces> replacesAnn = replacingCandidate.getAnnotation(Replaces.class);
                     Optional<Class> beanType = replacesAnn.getValue(Class.class);
@@ -2040,46 +2045,38 @@ public class DefaultBeanContext implements BeanContext {
         List<BeanDefinitionReference> processedBeans = new ArrayList<>(10);
         List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences();
         List<BeanDefinitionReference> allReferences = new ArrayList<>(beanDefinitionReferences.size());
-        Map<BeanConfiguration, List<BeanDefinitionReference>> byConfiguration = new HashMap<>(beanConfigurations.size());
+
+        Map<BeanConfiguration, Boolean> configurationEnabled = beanConfigurations.values().stream()
+                .collect(Collectors.toMap(Function.identity(), bc -> bc.isEnabled(this)));
 
         final boolean reportingEnabled = ClassLoadingReporter.isReportingEnabled();
+
         for (BeanDefinitionReference beanDefinitionReference : beanDefinitionReferences) {
-            Optional<BeanConfiguration> beanConfiguration = beanConfigurations.values().stream().filter(c -> c.isWithin(beanDefinitionReference)).findFirst();
-            final boolean hasConfiguration = beanConfiguration.isPresent();
-            if (hasConfiguration) {
-                byConfiguration.computeIfAbsent(beanConfiguration.get(), bc -> new ArrayList<>(5))
-                    .add(beanDefinitionReference);
+            boolean disabledByConfiguration = beanConfigurations.values()
+                    .stream()
+                    .filter(c -> c.isWithin(beanDefinitionReference))
+                    .anyMatch(c -> !configurationEnabled.get(c));
+
+            if (disabledByConfiguration) {
+                if (reportingEnabled) {
+                    ClassLoadingReporter.reportMissing(beanDefinitionReference.getBeanDefinitionName());
+                    ClassLoadingReporter.reportMissing(beanDefinitionReference.getName());
+                }
             } else {
-                indexBeanDefinitionIfNecessary(beanDefinitionReference);
-            }
-            allReferences.add(beanDefinitionReference);
-            if (beanDefinitionReference.isContextScope()) {
-                contextScopeBeans.add(beanDefinitionReference);
-            }
-            if (beanDefinitionReference.requiresMethodProcessing()) {
-                processedBeans.add(beanDefinitionReference);
+                allReferences.add(beanDefinitionReference);
+                if (beanDefinitionReference.isContextScope()) {
+                    contextScopeBeans.add(beanDefinitionReference);
+                }
+                if (beanDefinitionReference.requiresMethodProcessing()) {
+                    processedBeans.add(beanDefinitionReference);
+                }
             }
         }
 
         this.beanDefinitionsClasses.addAll(allReferences);
-        for (Map.Entry<BeanConfiguration, List<BeanDefinitionReference>> entry : byConfiguration.entrySet()) {
-            if (!entry.getKey().isEnabled(this)) {
-                final List<BeanDefinitionReference> references = entry.getValue();
-                this.beanDefinitionsClasses.removeAll(references);
-                contextScopeBeans.removeAll(references);
-                processedBeans.removeAll(references);
-                if (reportingEnabled) {
-                    for (BeanDefinitionReference reference : references) {
-                        ClassLoadingReporter.reportMissing(reference.getBeanDefinitionName());
-                        ClassLoadingReporter.reportMissing(reference.getName());
-                    }
-                }
-            } else {
-                for (BeanDefinitionReference beanDefinitionReference : entry.getValue()) {
-                    indexBeanDefinitionIfNecessary(beanDefinitionReference);
-                }
-            }
-        }
+
+        allReferences.forEach(this::indexBeanDefinitionIfNecessary);
+
         initializeEventListeners();
         initializeContext(contextScopeBeans, processedBeans);
     }

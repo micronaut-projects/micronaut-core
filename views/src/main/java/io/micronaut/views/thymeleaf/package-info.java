@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
  * Contains classes specific to Views rendered with Thymeleaf.
  * @see <a href="https://www.thymeleaf.org">Thymeleaf</a>
@@ -21,9 +22,11 @@
  * @since 1.0
  */
 @Configuration
+@Requires(property = ThymeleafViewsRendererConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 @Requires(classes = TemplateEngine.class)
 package io.micronaut.views.thymeleaf;
 
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import org.thymeleaf.TemplateEngine;

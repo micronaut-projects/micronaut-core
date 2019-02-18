@@ -2,7 +2,7 @@ This section will document breaking changes that may happen during milestone or 
 
 ==== 1.1.0
 
-* link:{api}/io/micronaut/session/http/HttpSessionConfiguration.html[HttpSessionConfiguration] default value for `cookiePath` is `/`.
+* link:{api}/io/micronaut/session/http/HttpSessionConfiguration.html[HttpSessionConfiguration] default value for `cookiePath` is `/`. The change was necessary for cookies to function normally.
 
 ==== 1.0.0.RC3
 

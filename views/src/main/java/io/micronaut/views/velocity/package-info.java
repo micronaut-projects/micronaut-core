@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
  * Contains classes specific to Views rendered with Velocity.
  * @see <a href="http://velocity.apache.org">Velocity</a>
@@ -21,9 +22,11 @@
  * @since 1.0
  */
 @Configuration
+@Requires(property = VelocityViewsRendererConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 @Requires(classes = VelocityEngine.class)
 package io.micronaut.views.velocity;
 
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import org.apache.velocity.app.VelocityEngine;

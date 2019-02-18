@@ -50,6 +50,7 @@ class HandlebarsViewsRendererSpec extends Specification {
     RxHttpClient client = embeddedServer.getApplicationContext().createBean(RxHttpClient, embeddedServer.getURL())
 
     def "bean is loaded"() {
+
         when:
         embeddedServer.applicationContext.getBean(ViewsFilter)
 
