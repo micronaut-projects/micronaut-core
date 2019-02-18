@@ -84,7 +84,7 @@ public class ObjectMapperFactory {
         ObjectMapper objectMapper = jsonFactory != null ? new ObjectMapper(jsonFactory) : new ObjectMapper();
 
         final boolean hasConfiguration = jacksonConfiguration != null;
-        if (hasConfiguration && jacksonConfiguration.isModuleScan()) {
+        if (!hasConfiguration || jacksonConfiguration.isModuleScan()) {
             objectMapper.findAndRegisterModules();
         }
         objectMapper.registerModules(jacksonModules);
