@@ -11,7 +11,7 @@ micronaut:
             policyDirectives: "default-src self"
 ----
 
-In the above example, the policy enforces any resources (images, fonts, scripts, etc.) that are not on the same origin to be blocked from loading. In this case, if an attempt is made to load a script or other resource from a different origin, say, \http://evil.com, the browser would block these from loading, optionally report such violations, which could be very useful in mitigating XSS attacks.
+In the above example, the policy directive enforces any resources (images, fonts, scripts, etc.) that are not on the same origin to be blocked from loading. In this case, if an attempt is made to load a script or a resource from a different origin, say from, \http://evil.com, the browser would block these from loading, optionally report such violations, which could be very useful in mitigating XSS attacks.
 
 .CSP Reporting Example
 [source,yaml]
@@ -27,7 +27,7 @@ micronaut:
 
 If you would like to dry run the policy, you could just report violations that would have occurred by enabling 'reportOnly' key in your CSP configuration.
 
-An api:management.endpoint.annotation.Endpoint[endpoint] can be created for reporting violation. The following example demonstrates a simple CSP reporting endpoint:
+An api:management.endpoint.annotation.Endpoint[endpoint] can be created to process violation report sent from user-agent. The following example demonstrates a simple CSP reporting endpoint:
 
 [source,groovy]
 .CspReportEndpoint.groovy
@@ -41,9 +41,9 @@ include::{testsuite}/server/endpoints/CspReportEndpoint.groovy[tags=type, indent
 include::{testsuite}/server/endpoints/CspReportEndpoint.groovy[tags=report, indent=4]
 include::{testsuite}/server/endpoints/CspReportEndpoint.groovy[tags=classEnd, indent=0]
 ----
-<1> The reported violation is a JSON with a custom type set to 'application/csp-report'.
+<1> Violation reports are standard JSON structures with a custom type set to 'application/csp-report'.
 
-To process a CSP report using JSON codec, it has to be registered as an additional type in your application configuration.
+To process a link:https://www.w3.org/TR/CSP2/#violation-reports[violation report] using JSON codec, it has to be registered as an additional type in your application configuration.
 
 .CSP Reporting Endpoint Custom Content Type
 [source,yaml]
@@ -57,7 +57,7 @@ micronaut:
 
 An example violation from Chrome looks like:
 
-.JSON report body
+.JSON report structure
 [source,json]
 ----
 {
