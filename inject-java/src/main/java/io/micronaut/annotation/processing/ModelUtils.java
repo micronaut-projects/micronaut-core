@@ -196,7 +196,8 @@ public class ModelUtils {
     }
 
     /**
-     * Finds a no argument method of the given name
+     * Finds a no argument method of the given name.
+     * 
      * @param classElement The class element
      * @param methodName The method name
      * @return The executable element
