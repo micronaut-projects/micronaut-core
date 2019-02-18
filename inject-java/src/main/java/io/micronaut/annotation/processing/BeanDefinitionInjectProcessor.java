@@ -827,11 +827,17 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         .ifPresent(destroyMethodName -> {
                             if (StringUtils.isNotEmpty(destroyMethodName)) {
                                 TypeElement destroyMethodDeclaringClass = (TypeElement) typeUtils.asElement(returnType);
-                                beanMethodWriter.visitPreDestroyMethod(
-                                        destroyMethodDeclaringClass.getQualifiedName().toString(),
-                                        modelUtils.resolveTypeReference(returnType),
-                                        destroyMethodName
-                                );
+                                final Optional<ExecutableElement> destroyMethodRef = modelUtils.findNoArgumentMethod(destroyMethodDeclaringClass, destroyMethodName);
+                                if (destroyMethodRef.isPresent()) {
+                                    beanMethodWriter.visitPreDestroyMethod(
+                                            destroyMethodDeclaringClass.getQualifiedName().toString(),
+                                            genericUtils.resolveTypeReference(destroyMethodRef.get().getReturnType()),
+                                            destroyMethodName
+                                    );
+                                } else {
+                                    error(beanMethod, "@Bean method defines a preDestroy method that does not exist or is not public: " + destroyMethodName);
+                                }
+
                             }
                         });
             }
