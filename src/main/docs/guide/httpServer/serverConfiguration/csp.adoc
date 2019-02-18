@@ -8,10 +8,10 @@ micronaut:
         csp:
             enabled: true
             reportOnly: false
-            policyDirectives: "default-src 'self'"
+            policyDirectives: "default-src self"
 ----
 
-In the above example, the policy enforces any resources (images, fonts, scripts, etc.) that are not on the same origin to be blocked from loading. In this case, if an attempt is made to load a script or other resource from a different origin, say, http://badactor.com, the browser would block these from loading, optionally report such violations, which could be very useful in mitigating XSS attacks.
+In the above example, the policy enforces any resources (images, fonts, scripts, etc.) that are not on the same origin to be blocked from loading. In this case, if an attempt is made to load a script or other resource from a different origin, say, \http://evil.com, the browser would block these from loading, optionally report such violations, which could be very useful in mitigating XSS attacks.
 
 .CSP Reporting Example
 [source,yaml]
@@ -27,9 +27,7 @@ micronaut:
 
 If you would like to dry run the policy, you could just report violations that would have occurred by enabling 'reportOnly' key in your CSP configuration.
 
-Micronaut endpoints allows us to implement a reporting endpoint.
-
-The following example demonstrates a simple CSP reporting endpoint:
+An api:management.endpoint.annotation.Endpoint[endpoint] can be created for reporting violation. The following example demonstrates a simple CSP reporting endpoint:
 
 [source,groovy]
 .CspReportEndpoint.groovy
@@ -43,8 +41,9 @@ include::{testsuite}/server/endpoints/CspReportEndpoint.groovy[tags=type, indent
 include::{testsuite}/server/endpoints/CspReportEndpoint.groovy[tags=report, indent=4]
 include::{testsuite}/server/endpoints/CspReportEndpoint.groovy[tags=classEnd, indent=0]
 ----
-<1> Supported media types are represented by api:http.MediaType[]
+<1> The reported violation is a JSON with a custom type set to 'application/csp-report'.
 
+To process a CSP report using JSON codec, it has to be registered as an additional type in your application configuration.
 
 .CSP Reporting Endpoint Custom Content Type
 [source,yaml]
@@ -54,4 +53,24 @@ micronaut:
         json:
             additionalTypes:
                 - application/csp-report
+----
+
+An example violation from Chrome looks like:
+
+.JSON report body
+[source,json]
+----
+{
+  "csp-report": {
+    "document-uri": "http://localhost:8080/",
+    "referrer": "",
+    "violated-directive": "img-src",
+    "effective-directive": "img-src",
+    "original-policy": "default-src https:; report-uri /report",
+    "disposition": "enforce",
+    "blocked-uri": "http://localhost:8080/favicon.ico",
+    "status-code": 200,
+    "script-sample": ""
+  }
+}
 ----

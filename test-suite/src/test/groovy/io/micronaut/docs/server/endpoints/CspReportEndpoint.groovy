@@ -17,7 +17,6 @@ package io.micronaut.docs.server.endpoints
 
 //tag::import[]
 import io.micronaut.http.HttpStatus
-import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.management.endpoint.annotation.Endpoint
 import io.micronaut.management.endpoint.annotation.Write
@@ -29,11 +28,11 @@ class CspReportEndpoint {
 //end::classBegin[]
 
     //tag::type[]
-    public static final String APPLICATION_CSP_REPORT = "application/csp-report" //<1>
+    public static final String APPLICATION_CSP_REPORT = "application/csp-report"
     //end::type[]
 
     //tag::report[]
-    @Write(consumes = [MediaType.APPLICATION_JSON, APPLICATION_CSP_REPORT]) //<2>
+    @Write(consumes = APPLICATION_CSP_REPORT) //<1>
     HttpStatus report(@Body String violation) {
         // record violation
         return HttpStatus.OK
