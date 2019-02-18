@@ -12,6 +12,7 @@ Micronaut is now modular with parts of Micronaut being shifted into subprojects.
 * https://micronaut-projects.github.io/micronaut-mongodb/1.1.x/guide/index.html[Micronaut MongoDB]
 * https://micronaut-projects.github.io/micronaut-neo4j/1.1.x/guide/index.html[Micronaut Neo4j]
 * https://micronaut-projects.github.io/micronaut-redis/1.1.x/guide/index.html[Micronaut Redis]
+* https://micronaut-projects.github.io/micronaut-rabbitmq/1.1.x/guide/index.html[Micronaut RabbitMQ]
 * https://micronaut-projects.github.io/micronaut-test/latest/guide/index.html[Micronaut Test]
 * https://micronaut-projects.github.io/micronaut-netflix/latest/guide/index.html[Micronaut Netflix]
 * https://micronaut-projects.github.io/micronaut-aws/latest/guide/index.html[Micronaut AWS]
@@ -48,6 +49,21 @@ Use the CLI to quickly create a GRPC application.
 mn create-app helloworld --profile grpc --lang java --build gradle
 ----
 ====
+
+=== RabbitMQ Support
+
+Support for creating Message-Driven Microservices with https://www.rabbitmq.com[RabbitMQ] has been added.
+
+[TIP]
+.Using the CLI
+====
+Use the CLI to quickly create a RabbitMQ application.
+----
+mn create-app hellorabbit --features rabbitmq
+----
+====
+
+See the https://micronaut-projects.github.io/micronaut-rabbitmq/latest/guide/[Micronaut RabbitMQ] documentation for more information.
 
 === Cold Start and Performance Improvements
 
