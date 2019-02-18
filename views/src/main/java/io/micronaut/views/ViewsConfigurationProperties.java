@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.views;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -63,7 +64,7 @@ public class ViewsConfigurationProperties implements ViewsConfiguration {
      */
     @Override
     public String getFolder() {
-        return this.folder;
+        return ViewUtils.normalizeFolder(folder);
     }
 
     /**
@@ -96,4 +97,5 @@ public class ViewsConfigurationProperties implements ViewsConfiguration {
             this.folder = folder;
         }
     }
+
 }

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
  * Contains classes specific to Views rendered with Handlebars.
  * @see <a href="https://jknack.github.io/handlebars.java/">Handlebars.java</a>
@@ -21,9 +22,11 @@
  * @since 1.0
  */
 @Configuration
+@Requires(property = HandlebarsViewsRendererConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 @Requires(classes = Handlebars.class)
 package io.micronaut.views.handlebars;
 
 import com.github.jknack.handlebars.Handlebars;
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;

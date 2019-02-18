@@ -13,13 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.views.thymeleaf;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.views.ViewsConfigurationProperties;
-import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver;
 
@@ -31,7 +30,6 @@ import java.time.Duration;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(classes = TemplateEngine.class)
 @ConfigurationProperties(ThymeleafViewsRendererConfigurationProperties.PREFIX)
 public class ThymeleafViewsRendererConfigurationProperties implements ThymeleafViewsRendererConfiguration {
 
