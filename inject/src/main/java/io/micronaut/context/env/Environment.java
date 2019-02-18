@@ -182,6 +182,15 @@ public interface Environment extends PropertyResolver, LifeCycle<Environment>, C
      */
     String HOSTNAME = "HOSTNAME";
 
+    /**
+     * Property for whether to deduce environments.
+     */
+    String DEDUCE_ENVIRONMENT_PROPERTY = "micronaut.env.deduction";
+
+    /**
+     * Environment key for whether to deduce environments.
+     */
+    String DEDUCE_ENVIRONMENT_ENV = "MICRONAUT_ENV_DEDUCTION";
 
     /**
      * Should respect the order as provided.
