@@ -26,6 +26,7 @@ import io.micronaut.cache.annotation.InvalidateOperations
 import io.micronaut.cache.annotation.PutOperations
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.qualifiers.Qualifiers
+import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -36,6 +37,7 @@ import java.util.concurrent.CompletableFuture
  * @author Graeme Rocher
  * @since 1.0
  */
+@Retry
 class SyncCacheSpec extends Specification {
 
     void "test cacheable annotations"() {
