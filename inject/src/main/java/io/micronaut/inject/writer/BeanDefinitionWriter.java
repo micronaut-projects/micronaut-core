@@ -712,11 +712,24 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
      */
     public void visitPreDestroyMethod(Object declaringType,
                                       String methodName) {
+        visitPreDestroyMethod(declaringType, Void.TYPE, methodName);
+    }
+
+    /**
+     * Visits a pre-destroy method injection point.
+     *
+     * @param declaringType The declaring type of the method. Either a Class or a string representing the name of the type
+     * @param returnType The return type of the method
+     * @param methodName    The method name
+     */
+    public void visitPreDestroyMethod(Object declaringType,
+                                      Object returnType,
+                                      String methodName) {
         visitPreDestroyMethodDefinition();
         visitMethodInjectionPointInternal(
                 declaringType,
                 false,
-                Void.TYPE,
+                returnType,
                 methodName,
                 Collections.emptyMap(),
                 Collections.emptyMap(),
