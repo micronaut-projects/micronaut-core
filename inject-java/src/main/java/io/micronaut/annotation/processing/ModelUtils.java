@@ -123,6 +123,10 @@ public class ModelUtils {
         String setterName = setterNameFor(name);
         // FIXME refine this to discover one of possible overloaded methods with correct signature (i.e. single arg of field type)
         TypeElement typeElement = classElementFor(field);
+        if (typeElement == null) {
+            return Optional.empty();
+        }
+
         List<? extends Element> elements = typeElement.getEnclosedElements();
         List<ExecutableElement> methods = ElementFilter.methodsIn(elements);
         return methods.stream()
@@ -188,6 +192,19 @@ public class ModelUtils {
         return ctors.stream()
             .filter(ctor -> !ctor.getModifiers().contains(PRIVATE))
             .collect(Collectors.toList());
+    }
+
+    /**
+     * Finds a no argument method of the given name.
+     * 
+     * @param classElement The class element
+     * @param methodName The method name
+     * @return The executable element
+     */
+    Optional<ExecutableElement> findAccessibleNoArgumentInstanceMethod(TypeElement classElement, String methodName) {
+        return ElementFilter.methodsIn(classElement.getEnclosedElements())
+                .stream().filter(m -> m.getSimpleName().toString().equals(methodName) && !isPrivate(m) && !isStatic(m))
+                .findFirst();
     }
 
     /**

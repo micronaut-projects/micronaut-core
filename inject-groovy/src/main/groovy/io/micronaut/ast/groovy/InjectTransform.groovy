@@ -651,6 +651,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 AstGenericUtils.resolveTypeReference(destroyMethod.returnType, genericsSpec),
                                 destroyMethodName
                         )
+                    } else {
+                        addError("@Bean method defines a preDestroy method that does not exist or is not public: $destroyMethodName", methodNode )
                     }
                 }
                 beanDefinitionWriters.put(methodNode, beanMethodWriter)
