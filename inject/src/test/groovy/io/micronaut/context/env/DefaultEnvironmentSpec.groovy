@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.env
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.naming.NameUtils
 import spock.lang.Specification
@@ -325,6 +326,30 @@ class DefaultEnvironmentSpec extends Specification {
         env.activeNames[1] == "system"
         env.activeNames[2] == "property"
         env.activeNames[3] == "explicit"
+    }
+
+    @RestoreSystemProperties
+    void "test disable environment deduction"() {
+        when:
+        System.setProperty(Environment.CLOUD_PLATFORM_PROPERTY, "GOOGLE_COMPUTE")
+        ApplicationContext ctx1 = ApplicationContext.run("test")
+
+        then:
+        ctx1.environment.activeNames.contains(Environment.GOOGLE_COMPUTE)
+
+        when:
+        System.setProperty(Environment.DEDUCE_ENVIRONMENT_PROPERTY, "false")
+        ApplicationContext ctx2 = ApplicationContext.run("test")
+
+        then:
+        !ctx2.environment.activeNames.contains(Environment.GOOGLE_COMPUTE)
+
+        cleanup:
+        System.setProperty(Environment.DEDUCE_ENVIRONMENT_PROPERTY, "")
+        System.setProperty(Environment.CLOUD_PLATFORM_PROPERTY, "")
+
+        ctx1.close()
+        ctx2.close()
     }
 
     private static Environment startEnv(String files) {
