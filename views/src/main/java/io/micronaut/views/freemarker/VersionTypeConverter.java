@@ -13,26 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.views.freemarker;
 
 import freemarker.template.Version;
-import io.micronaut.core.util.Toggleable;
+import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.TypeConverter;
+
+import javax.inject.Singleton;
+import java.util.Optional;
 
 /**
- * Configuration for {@link FreemarkerViewsRenderer}.
- * 
- * @author Jerónimo López
- * @since 1.1
+ * Type converter for a string to a {@link Version}.
+ *
+ * @author James Kleeh
+ * @since 1.1.0
  */
-public interface FreemarkerViewsRendererConfiguration extends Toggleable {
+@Singleton
+public class VersionTypeConverter implements TypeConverter<CharSequence, Version> {
 
-    /**
-     * @return Default extension for templates
-     */
-    String getDefaultExtension();
-
-    /**
-     * @return An optional Freemarker version number
-     */
-    Version getIncompatibleImprovements();
+    @Override
+    public Optional<Version> convert(CharSequence object, Class<Version> targetType, ConversionContext context) {
+        return Optional.of(new Version(object.toString()));
+    }
 }

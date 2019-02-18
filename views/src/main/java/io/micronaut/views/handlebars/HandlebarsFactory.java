@@ -14,16 +14,27 @@
  * limitations under the License.
  */
 
-/**
- * Contains classes specific to Views rendered with FreeMarker.
- * @see <a href="https://freemarker.apache.org/">FreeMarker</a>
- *
- * @author Jerónimo López
- * @since 1.1
- */
-@Configuration
-@Requires(classes = freemarker.template.Configuration.class)
-package io.micronaut.views.freemarker;
+package io.micronaut.views.handlebars;
 
-import io.micronaut.context.annotation.Configuration;
-import io.micronaut.context.annotation.Requires;
+import com.github.jknack.handlebars.Handlebars;
+import io.micronaut.context.annotation.Factory;
+
+import javax.inject.Singleton;
+
+/**
+ * Factory for handlebars beans.
+ *
+ * @author James Kleeh
+ * @since 1.1.0
+ */
+@Factory
+public class HandlebarsFactory {
+
+    /**
+     * @return The handlebars engine
+     */
+    @Singleton
+    public Handlebars handlebars() {
+        return new Handlebars();
+    }
+}

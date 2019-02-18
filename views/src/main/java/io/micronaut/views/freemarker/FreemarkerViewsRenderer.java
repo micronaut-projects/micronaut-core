@@ -13,24 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.views.freemarker;
 
-import freemarker.template.Configuration;
-import freemarker.template.MalformedTemplateNameException;
-import freemarker.template.Template;
-import freemarker.template.TemplateException;
+import freemarker.template.*;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.cli.exceptions.ParseException;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.views.ViewUtils;
 import io.micronaut.views.ViewsConfiguration;
 import io.micronaut.views.ViewsRenderer;
 import io.micronaut.views.exceptions.ViewRenderingException;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.util.Map;
@@ -56,13 +56,32 @@ public class FreemarkerViewsRenderer implements ViewsRenderer {
     /**
      * @param viewsConfiguration      Views Configuration
      * @param freemarkerConfiguration Freemarker Configuration
+     * @deprecated Use {@link #FreemarkerViewsRenderer(ViewsConfiguration, FreemarkerViewsRendererConfigurationProperties, Configuration)} instead
      */
+    @Deprecated
     FreemarkerViewsRenderer(ViewsConfiguration viewsConfiguration,
                             FreemarkerViewsRendererConfigurationProperties freemarkerConfiguration) {
         this.viewsConfiguration = viewsConfiguration;
         this.freemarkerMicronautConfiguration = freemarkerConfiguration;
-        this.freemarkerConfiguration = freemarkerConfiguration.getConfiguration();
         this.extension = freemarkerConfiguration.getDefaultExtension();
+        Configuration configuration = new Configuration(freemarkerConfiguration.getIncompatibleImprovements());
+        configuration.setClassLoaderForTemplateLoading(getClass().getClassLoader(), "/" + viewsConfiguration.getFolder());
+        this.freemarkerConfiguration = configuration;
+    }
+
+    /**
+     * @param viewsConfiguration      Views Configuration Properties
+     * @param freemarkerConfiguration Freemarker Configuration Properties
+     * @param configuration           The Freemarker Configuration
+     */
+    @Inject
+    FreemarkerViewsRenderer(ViewsConfiguration viewsConfiguration,
+                            FreemarkerViewsRendererConfigurationProperties freemarkerConfiguration,
+                            Configuration configuration) {
+        this.viewsConfiguration = viewsConfiguration;
+        this.freemarkerMicronautConfiguration = freemarkerConfiguration;
+        this.extension = freemarkerConfiguration.getDefaultExtension();
+        this.freemarkerConfiguration = configuration;
     }
 
     @Override
@@ -94,7 +113,7 @@ public class FreemarkerViewsRenderer implements ViewsRenderer {
     }
 
     private String viewLocation(String name) {
-        return normalizeFile(name, extension) +
+        return ViewUtils.normalizeFile(name, extension) +
                 EXTENSION_SEPARATOR +
                 extension;
     }
