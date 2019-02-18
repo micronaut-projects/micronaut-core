@@ -526,9 +526,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 ClassNode returnType = methodNode.getReturnType()
                 Map<String, ClassNode> genericsSpec = AstGenericUtils.createGenericsSpec(returnType)
                 if (genericsSpec) {
+                    Map<String, Object> boundTypes = [:]
                     GenericsType[] genericsTypes = returnType.redirect().getGenericsTypes()
                     Map<String, Map<String, Object>> typeArguments = [:]
-                    Map<String, Object> boundTypes = [:]
                     for (gt in genericsTypes) {
                         ClassNode cn = genericsSpec[gt.name]
                         boundTypes.put(gt.name, AstGenericUtils.resolveTypeReference(cn))
@@ -647,7 +647,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     String destroyMethodName = preDestroy.get()
                     MethodNode destroyMethod = producedType.getMethod(destroyMethodName)
                     if (destroyMethod != null) {
-                        beanMethodWriter.visitPreDestroyMethod(destroyMethod.declaringClass.name, destroyMethodName)
+                        beanMethodWriter.visitPreDestroyMethod(
+                                destroyMethod.declaringClass.name,
+                                AstGenericUtils.resolveTypeReference(destroyMethod.returnType, genericsSpec),
+                                destroyMethodName
+                        )
                     }
                 }
                 beanDefinitionWriters.put(methodNode, beanMethodWriter)
