@@ -701,6 +701,8 @@ public class DefaultBeanContext implements BeanContext {
                 bean = beanRegistration.bean;
                 if (bean != null) {
                     singletonObjects.remove(beanKey);
+                    BeanKey<?> concreteKey = new BeanKey<>(bean.getClass(), null);
+                    singletonObjects.remove(concreteKey);
                 }
             }
         }
