@@ -329,6 +329,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         String deduceProperty = System.getProperty(Environment.DEDUCE_ENVIRONMENT_PROPERTY);
         String deduceEnv = System.getenv(Environment.DEDUCE_ENVIRONMENT_ENV);
 
+        System.out.println("deduceProperty: " + deduceProperty);
+        System.out.println("deduceEnv: " + deduceEnv);
+
         return !(StringUtils.isNotEmpty(deduceProperty) && deduceProperty.equals("false") ||
                 (StringUtils.isNotEmpty(deduceEnv) && deduceEnv.equals("false")));
     }
