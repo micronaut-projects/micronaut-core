@@ -36,7 +36,7 @@ import java.util.Map;
  * @author graemerocher
  * @since 1.0
  */
-public class DefaultApplicationContextBuilder implements ApplicationContextBuilder {
+public class DefaultApplicationContextBuilder implements ApplicationContextBuilder, ApplicationContextConfiguration {
     private List<Object> singletons = new ArrayList<>();
     private List<String> environments = new ArrayList<>();
     private List<String> packages = new ArrayList<>();
@@ -101,6 +101,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         return this;
     }
 
+
+    @Override
+    public Boolean getDeduceEnvironments() {
+        return deduceEnvironments;
+    }
+
     @Override
     public ApplicationContextBuilder mainClass(Class mainClass) {
         if (mainClass != null) {
@@ -128,7 +134,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         ClassLoader classLoader = ApplicationContext.class.getClassLoader();
         DefaultApplicationContext applicationContext = new DefaultApplicationContext(
             classPathResourceLoader != null ? classPathResourceLoader : ClassPathResourceLoader.defaultLoader(classLoader),
-            deduceEnvironments,
+            this,
             environments.toArray(new String[0])
         );
 
