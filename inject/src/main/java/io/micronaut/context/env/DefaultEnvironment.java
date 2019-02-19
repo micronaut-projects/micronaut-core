@@ -356,9 +356,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 LOG.info("DeduceEnvironment environment variable: " + deduceEnv);
             }
 
-            if(StringUtils.isNotEmpty(deduceEnv)) {
+            if (StringUtils.isNotEmpty(deduceEnv)) {
                 return Boolean.valueOf(deduceEnv);
-            } else if(StringUtils.isNotEmpty(deduceProperty)) {
+            } else if (StringUtils.isNotEmpty(deduceProperty)) {
                 return Boolean.valueOf(deduceProperty);
             } else {
                 if (LOG.isInfoEnabled()) {

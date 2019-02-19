@@ -76,8 +76,20 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     /**
      * Construct a new ApplicationContext for the given environment name and classloader.
      *
-     * @param environmentNames The environment names
-     * @param resourceLoader   The class loader
+     * @param environmentNames   The environment names
+     * @param resourceLoader     The class loader
+     */
+    public DefaultApplicationContext(ClassPathResourceLoader resourceLoader, String... environmentNames) {
+        this(resourceLoader, null, environmentNames);
+    }
+
+
+    /**
+     * Construct a new ApplicationContext for the given environment name and classloader.
+     *
+     * @param environmentNames   The environment names
+     * @param deduceEnvironments Whether to deduce environments
+     * @param resourceLoader     The class loader
      */
     public DefaultApplicationContext(ClassPathResourceLoader resourceLoader, Boolean deduceEnvironments, String... environmentNames) {
         super(resourceLoader);
