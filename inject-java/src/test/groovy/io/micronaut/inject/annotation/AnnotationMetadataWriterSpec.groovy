@@ -66,6 +66,45 @@ class AnnotationMetadataWriterSpec extends AbstractTypeElementSpec {
     }
 
 
+    void "test annotation metadata with instantiated member"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
+package test;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.core.annotation.*;
+
+@MyAnn(ToInstantiate.class)
+class Test {
+}
+
+class SomeType {}
+
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.TYPE})
+@interface MyAnn {
+    @InstantiatedMember
+    Class value();
+}
+
+''')
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.getValue("test.MyAnn", ToInstantiate).get() instanceof ToInstantiate
+    }
+
     void "test annotation metadata with primitive arrays"() {
         given:
         AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
