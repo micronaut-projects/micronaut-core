@@ -1,6 +1,6 @@
 This section will outline some common requirements that will require custom code to implement and describe what to do in those cases.
 
-### Authentication Data
+== Authentication Data
 
 The authentication object returned from a successful authentication request is by default an instance of UserDetails, which only contains the username and any roles associated with the user. To store additional data in the authentication, extend api:security.authentication.UserDetails[] with your own implementation that has fields for the additional data you wish to store.
 
@@ -22,7 +22,7 @@ public class MyContextAuthenticationMapper implements ContextAuthenticationMappe
 
 <1> The usage of @Replaces will allow your bean to replace the default implementation in the context
 
-### Groups
+== Groups
 
 By default the groups found in LDAP, if enabled, will be returned as is without any processing. No additional groups from any other sources will be added to the list. It is a common requirement to retrieve additional groups from other sources, or to normalize the names of the groups in a specific format.
 
@@ -50,7 +50,7 @@ public class MyLdapGroupProcessor extends DefaultLdapGroupProcessor {
 <2> The link:{api}/io/micronaut/security/ldap/group/LdapGroupProcessor.html#getAdditionalGroups-io.micronaut.security.ldap.context.LdapSearchResult-[getAdditionalGroups] method allows you to add groups from other sources
 <3> The link:{api}/io/micronaut/security/ldap/group/LdapGroupProcessor.html#processGroup-java.lang.String-[processGroup] method allows you to transform the name of the group, or exclude it
 
-### Search Logic
+== Search Logic
 
 To customize how LDAP searches are done, replace the default implementation with your own. See api:security.ldap.context.LdapSearchService[].
 
@@ -64,7 +64,7 @@ public class MyLdapSearchService implements LdapSearchService {
 }
 ----
 
-### Context Building
+== Context Building
 
 To customize how the LDAP context is built, replace the default implementation with your own. See api:security.ldap.context.ContextBuilder[].
 

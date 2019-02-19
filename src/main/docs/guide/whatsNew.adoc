@@ -198,6 +198,17 @@ The following changes have been implemented:
 * After processing a chunk of data it is immediately released. For memory uploads this means the data is immediately freed. For disk uploads the data remains on disk until after processing.
 * Two new configuration options are available to support mixed uploads: `micronaut.server.multipart.mixed` and `micronaut.server.multipart.threshold`. When data needs to be buffered, mixed uploads will initially store data in memory. Once the threshold is reached, the data will be erased from memory and moved entirely onto disk.
 
+=== Option to Disable Environment Detection
+
+Environment detection can be disabled by setting the `micronaut.env.deduction` system property or the `MICRONAUT_ENV_DEDUCTION` environment variable to `false`. Additionally, a new method has been added to api:context.ApplicationContextBuilder[] so that this setting can be made when the application context is instantiated.
+
+[source,groovy]
+----
+  ApplicationContext ctx = ApplicationContext.build().deduceEnvironment(false).start()
+----
+
+See the <<environments, Environment>> documentation for more information.
+
 === Dependency Upgrades
 
 - Groovy `2.5.4` -> `2.5.6`
