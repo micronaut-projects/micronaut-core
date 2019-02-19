@@ -125,13 +125,14 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         Set<String> environments = new LinkedHashSet<>(3);
         List<String> specifiedNames = Arrays.asList(names);
 
-        EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage(specifiedNames);
-        environments.addAll(environmentsAndPackage.enviroments);
-        String aPackage = environmentsAndPackage.aPackage;
-        if (aPackage != null) {
-            packages.add(aPackage);
+        if (shouldDeduceEnvironments()) {
+            EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage(specifiedNames);
+            environments.addAll(environmentsAndPackage.enviroments);
+            String aPackage = environmentsAndPackage.aPackage;
+            if (aPackage != null) {
+                packages.add(aPackage);
+            }
         }
-
         environments.addAll(specifiedNames);
 
         this.classLoader = resourceLoader.getClassLoader();
@@ -140,10 +141,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             LOG.info("Established active environments: {}", environments);
         }
         conversionService.addConverter(
-                CharSequence.class, Class.class, new StringToClassConverter(classLoader)
+            CharSequence.class, Class.class, new StringToClassConverter(classLoader)
         );
         conversionService.addConverter(
-                Object[].class, Class[].class, new StringArrayToClassArrayConverter(conversionService)
+            Object[].class, Class[].class, new StringArrayToClassArrayConverter(conversionService)
         );
         this.resourceLoader = resourceLoader;
         this.annotationScanner = createAnnotationScanner(classLoader);
@@ -325,14 +326,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @return Whether environment names and packages should be deduced
      */
     protected boolean shouldDeduceEnvironments() {
-
         String deduceProperty = System.getProperty(Environment.DEDUCE_ENVIRONMENT_PROPERTY);
         String deduceEnv = System.getenv(Environment.DEDUCE_ENVIRONMENT_ENV);
-
-        if (LOG.isDebugEnabled()) {
-            LOG.info("DeduceProperty: " + deduceProperty);
-            LOG.info("DeduceEnv: " + deduceEnv);
-        }
 
         return !(StringUtils.isNotEmpty(deduceProperty) && deduceProperty.equals("false") ||
                 (StringUtils.isNotEmpty(deduceEnv) && deduceEnv.equals("false")));
@@ -364,7 +359,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         propertySources.addAll(this.propertySources.values());
         propertySources.addAll(readPropertySourceListFromFiles(System.getProperty(Environment.PROPERTY_SOURCES_KEY)));
         propertySources.addAll(readPropertySourceListFromFiles(
-                readPropertySourceListKeyFromEnvironment())
+            readPropertySourceListKeyFromEnvironment())
         );
         OrderUtil.sort(propertySources);
         for (PropertySource propertySource : propertySources) {
@@ -394,10 +389,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         List<PropertySource> propertySources = new ArrayList<>();
         Collection<PropertySourceLoader> propertySourceLoaders = getPropertySourceLoaders();
         Optional<Collection<String>> filePathList = Optional.ofNullable(files)
-                .filter(value -> !value.isEmpty())
-                .map(value -> value.split(FILE_SEPARATOR))
-                .map(Arrays::asList)
-                .map(Collections::unmodifiableList);
+            .filter(value -> !value.isEmpty())
+            .map(value -> value.split(FILE_SEPARATOR))
+            .map(Arrays::asList)
+            .map(Collections::unmodifiableList);
 
         filePathList.ifPresent(list -> {
             if (!list.isEmpty()) {
@@ -649,11 +644,11 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         }
 
         Stream.of(System.getProperty(ENVIRONMENTS_PROPERTY),
-                System.getenv(ENVIRONMENTS_ENV))
-                .filter(StringUtils::isNotEmpty)
-                .flatMap(s -> Arrays.stream(s.split(",")))
-                .map(String::trim)
-                .forEach(environments::add);
+            System.getenv(ENVIRONMENTS_ENV))
+            .filter(StringUtils::isNotEmpty)
+            .flatMap(s -> Arrays.stream(s.split(",")))
+            .map(String::trim)
+            .forEach(environments::add);
 
         return environmentsAndPackage;
     }
@@ -726,7 +721,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
         }
         boolean isWindows = System.getProperty("os.name")
-                .toLowerCase().startsWith("windows");
+            .toLowerCase().startsWith("windows");
 
         if (isWindows ? isEC2Windows() : isEC2Linux()) {
             return ComputePlatform.AMAZON_EC2;
@@ -755,7 +750,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             con.setDoOutput(true);
             int responseCode = con.getResponseCode();
             BufferedReader in = new BufferedReader(
-                    new InputStreamReader(con.getInputStream()));
+                new InputStreamReader(con.getInputStream()));
             String inputLine;
             StringBuffer response = new StringBuffer();
 
@@ -764,7 +759,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             }
             in.close();
             if (con.getHeaderField("Metadata-Flavor") != null &&
-                    con.getHeaderField("Metadata-Flavor").equalsIgnoreCase("Google")) {
+                con.getHeaderField("Metadata-Flavor").equalsIgnoreCase("Google")) {
                 return true;
             }
 
