@@ -47,8 +47,4 @@ dependencies {
     testCompile dependencyVersion("reactor")
     testRuntime dependencyVersion("snakeyaml")
 
-    test {
-        testLogging.showStandardStreams = true
-        testLogging.exceptionFormat = 'full'
-    }
 }
