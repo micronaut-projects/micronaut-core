@@ -141,7 +141,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     protected DefaultEnvironment createEnvironment(@Nullable  ApplicationContextConfiguration configuration, String... environmentNames) {
 
         Boolean deduceEnvironments = null;
-        if(configuration != null) {
+        if (configuration != null) {
             deduceEnvironments = configuration.getDeduceEnvironments();
         }
 

@@ -30,6 +30,7 @@ public class SessionForRequest {
 
     /**
      *
+     * @param sessionStore the session store
      * @param request the Http Request
      * @return A new session stored in the request attributes
      */

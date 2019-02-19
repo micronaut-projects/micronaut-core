@@ -49,6 +49,8 @@ public interface CookieConfiguration {
 
     /**
      * Checks to see if this {@link Cookie} can only be accessed via HTTP.
+     *
+     * @return True if the cookie is HTTP only
      */
     Optional<Boolean> isCookieHttpOnly();
 
