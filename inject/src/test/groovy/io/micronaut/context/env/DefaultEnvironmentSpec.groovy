@@ -331,6 +331,7 @@ class DefaultEnvironmentSpec extends Specification {
         env.activeNames[3] == "explicit"
     }
 
+    // tag::disableEnvDeduction[]
     void "test disable environment deduction via builder"() {
         when:
         ApplicationContext ctx = ApplicationContext.build().deduceEnvironment(false).start()
@@ -341,7 +342,7 @@ class DefaultEnvironmentSpec extends Specification {
         cleanup:
         ctx.close()
     }
-
+    // end::disableEnvDeduction[]
 
     @RestoreSystemProperties
     void "test disable environment deduction via system property"() {
