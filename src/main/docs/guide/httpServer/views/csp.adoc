@@ -25,6 +25,8 @@ micronaut:
             policyDirectives: "default-src https:; report-uri /csp-violation-report-endpoint"
 ----
 
+NOTE: CSP filter path is enabled for '/**' by default. If you prefer policy directives applied to only a subset of your views, configure `views.csp.path`. For example, if the value is set to `/views*`, policy directive will be applied to that path.
+
 If you would like to dry run the policy, you could just report violations that would have occurred by enabling 'reportOnly' key in your CSP configuration.
 
 The following example demonstrates a simple CSP reporting controller that can be used to process violations from the user-agent.

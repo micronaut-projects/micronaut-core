@@ -131,6 +131,7 @@ class CspFilterSpec extends Specification {
                 'spec.name': getClass().simpleName,
                 'micronaut.views.enabled': true,
                 'micronaut.views.csp.enabled': true,
+                'micronaut.views.csp.path': "/csp",
                 'micronaut.views.csp.reportOnly': false,
                 'micronaut.views.csp.policyDirectives': "default-src self:"
         ])
@@ -157,6 +158,7 @@ class CspFilterSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
                 'micronaut.views.csp.enabled': true,
+                'micronaut.views.csp.path': "/csp",
                 'micronaut.views.csp.reportOnly': true,
                 'micronaut.views.csp.policyDirectives': "default-src self:"
         ])
@@ -178,12 +180,44 @@ class CspFilterSpec extends Specification {
         embeddedServer.close()
     }
 
+    void "test CSP response header ignore"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'spec.name': getClass().simpleName,
+                'micronaut.views.csp.enabled': true,
+                'micronaut.views.csp.path': "/csp",
+                'micronaut.views.csp.reportOnly': false,
+                'micronaut.views.csp.policyDirectives': "default-src self:"
+        ])
+        URL server = embeddedServer.getURL()
+        RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
+
+        when:
+        def response = rxClient.exchange(
+                HttpRequest.GET('/csp/ignore')
+        ).blockingFirst()
+        def headerNames = response.headers.names()
+
+        then:
+        response.code() == HttpStatus.OK.code
+        !headerNames.contains(CspFilter.CSP_HEADER)
+        !headerNames.contains(CspFilter.CSP_REPORT_ONLY_HEADER)
+
+        cleanup:
+        embeddedServer.close()
+    }
+
     @Controller('/csp')
     @Requires(property = 'spec.name', value = 'CspFilterSpec')
     static class TestController {
 
         @Get
         HttpResponse index() {
+            HttpResponse.ok()
+        }
+
+        @Get("/ignore")
+        HttpResponse ignore() {
             HttpResponse.ok()
         }
     }
