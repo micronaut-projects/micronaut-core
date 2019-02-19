@@ -28,7 +28,7 @@ public class ClientUtil {
      * Calculates property source names. This is used across several clients to make naming consistent.
      * @param prefix fullName or prefix to the environment, or application specific configuration
      * @param activeNames active environments which configurations can be created for
-     * @param separator
+     * @param separator The separator string
      * @return Set of names to be used for each PropertySource
      */
     public static Set<String> calcPropertySourceNames(String prefix, Set<String> activeNames, String separator) {
