@@ -17,6 +17,7 @@ package io.micronaut.context.annotation;
 
 import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.TrueCondition;
+import io.micronaut.core.annotation.InstantiatedMember;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Documented;
@@ -73,6 +74,7 @@ public @interface Requires {
      *
      * @return The condition classes
      */
+    @InstantiatedMember
     Class<? extends Condition> condition() default TrueCondition.class;
 
     /**

@@ -41,6 +41,7 @@ import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.Statement
 import org.codehaus.groovy.control.SourceUnit
 
+import java.lang.annotation.Annotation
 import java.lang.annotation.Repeatable
 import java.lang.reflect.Array
 
@@ -59,6 +60,11 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
 
     GroovyAnnotationMetadataBuilder(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit
+    }
+
+    @Override
+    protected boolean hasAnnotation(AnnotatedNode element, Class<? extends Annotation> annotation) {
+        return !element.getAnnotations(ClassHelper.makeCached(annotation)).isEmpty()
     }
 
     @Override

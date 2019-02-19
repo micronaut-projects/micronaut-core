@@ -291,7 +291,12 @@ public class RequiresCondition implements Condition {
         if (conditionClass == TrueCondition.class) {
             return true;
         } else if (conditionClass != null) {
-            Optional<? extends Condition> condition = InstantiationUtils.tryInstantiate(conditionClass);
+            // try first via instantiated metadata
+
+            Optional<? extends Condition> condition = requirements.get("condition", conditionClass);
+            if (!condition.isPresent()) {
+                condition = InstantiationUtils.tryInstantiate(conditionClass);
+            }
             if (condition.isPresent()) {
                 boolean conditionResult = condition.get().matches(context);
                 if (!conditionResult) {
