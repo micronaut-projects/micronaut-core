@@ -32,7 +32,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * <p>Note that the member should be a simple POJO with a public no argument constructor.</p>
  *
  * @author graemerocher
- * @since 1.0
+ * @since 1.1
  */
 @Documented
 @Retention(RUNTIME)
