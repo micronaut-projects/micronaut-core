@@ -342,8 +342,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
         if (deduceEnvironments != null) {
 
-            if (LOG.isInfoEnabled()) {
-                LOG.info("DeduceEnvironment builder setting: " + deduceEnvironments);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("DeduceEnvironment builder setting: " + deduceEnvironments);
             }
 
             return deduceEnvironments;
@@ -351,9 +351,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             String deduceProperty = System.getProperty(Environment.DEDUCE_ENVIRONMENT_PROPERTY);
             String deduceEnv = System.getenv(Environment.DEDUCE_ENVIRONMENT_ENV);
 
-            if (LOG.isInfoEnabled()) {
-                LOG.info("DeduceEnvironment system property: " + deduceProperty);
-                LOG.info("DeduceEnvironment environment variable: " + deduceEnv);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("DeduceEnvironment system property: " + deduceProperty);
+                LOG.debug("DeduceEnvironment environment variable: " + deduceEnv);
             }
 
             if (StringUtils.isNotEmpty(deduceEnv)) {
@@ -361,8 +361,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             } else if (StringUtils.isNotEmpty(deduceProperty)) {
                 return Boolean.valueOf(deduceProperty);
             } else {
-                if (LOG.isInfoEnabled()) {
-                    LOG.info("DEDUCE_ENVIRONMENT_DEFAULT: " + DEDUCE_ENVIRONMENT_DEFAULT);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("DEDUCE_ENVIRONMENT_DEFAULT: " + DEDUCE_ENVIRONMENT_DEFAULT);
                 }
                 return DEDUCE_ENVIRONMENT_DEFAULT;
             }
