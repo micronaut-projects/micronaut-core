@@ -33,7 +33,7 @@ dependencies {
 
     compileOnly "javax.persistence:javax.persistence-api:2.2"
     compileOnly dependencyVersion("groovy")
-    compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.2.30"
+    compileOnly "org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.3.20"
     compile "org.ow2.asm:asm:$asmVersion"
     compile "org.ow2.asm:asm-commons:$asmVersion"
     compile "org.ow2.asm:asm-tree:$asmVersion"
