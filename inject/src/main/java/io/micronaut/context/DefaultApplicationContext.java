@@ -70,7 +70,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param environmentNames The environment names
      */
     public DefaultApplicationContext(String... environmentNames) {
-        this(ClassPathResourceLoader.defaultLoader(DefaultBeanContext.class.getClassLoader()), environmentNames);
+        this(ClassPathResourceLoader.defaultLoader(DefaultBeanContext.class.getClassLoader()), null, environmentNames);
     }
 
     /**
@@ -79,11 +79,11 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      * @param environmentNames The environment names
      * @param resourceLoader   The class loader
      */
-    public DefaultApplicationContext(ClassPathResourceLoader resourceLoader, String... environmentNames) {
+    public DefaultApplicationContext(ClassPathResourceLoader resourceLoader, Boolean deduceEnvironments, String... environmentNames) {
         super(resourceLoader);
         this.conversionService = createConversionService();
         this.resourceLoader = resourceLoader;
-        this.environment = createEnvironment(true, environmentNames);
+        this.environment = createEnvironment(deduceEnvironments, environmentNames);
     }
 
     @Override
@@ -409,7 +409,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      */
     private static class BootstrapEnvironment extends DefaultEnvironment {
         BootstrapEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... activeEnvironments) {
-            super(resourceLoader, conversionService, false, activeEnvironments);
+            super(resourceLoader, conversionService, null, activeEnvironments);
         }
 
         @Override
@@ -431,7 +431,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         private final BootstrapEnvironment bootstrapEnvironment;
 
         BootstrapApplicationContext(BootstrapEnvironment bootstrapEnvironment, String... activeEnvironments) {
-            super(resourceLoader, activeEnvironments);
+            super(resourceLoader, null, activeEnvironments);
             this.bootstrapEnvironment = bootstrapEnvironment;
         }
 

@@ -73,6 +73,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final int DEFAULT_CONNECT_TIMEOUT = 500;
     private static final String GOOGLE_COMPUTE_METADATA = "http://metadata.google.internal";
     private static final String DO_SYS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/sys_vendor";
+    private static final Boolean DEDUCE_ENVIRONMENT_DEFAULT = true;
 
     protected final ClassPathResourceLoader resourceLoader;
 
@@ -122,7 +123,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     @SuppressWarnings("MagicNumber")
     public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... names) {
-        this(resourceLoader, conversionService, true, names);
+        this(resourceLoader, conversionService, null, names);
     }
 
     /**
@@ -355,7 +356,16 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                 LOG.info("DeduceEnvironment environment variable: " + deduceEnv);
             }
 
-            return Boolean.valueOf(deduceProperty) || Boolean.valueOf(deduceEnv);
+            if(StringUtils.isNotEmpty(deduceEnv)) {
+                return Boolean.valueOf(deduceEnv);
+            } else if(StringUtils.isNotEmpty(deduceProperty)) {
+                return Boolean.valueOf(deduceProperty);
+            } else {
+                if (LOG.isInfoEnabled()) {
+                    LOG.info("DEDUCE_ENVIRONMENT_DEFAULT: " + DEDUCE_ENVIRONMENT_DEFAULT);
+                }
+                return DEDUCE_ENVIRONMENT_DEFAULT;
+            }
         }
     }
 

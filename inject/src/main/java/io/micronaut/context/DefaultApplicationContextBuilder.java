@@ -45,7 +45,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private ClassPathResourceLoader classPathResourceLoader;
     private Collection<String> configurationIncludes = new HashSet<>();
     private Collection<String> configurationExcludes = new HashSet<>();
-    private Boolean deduceEnvironments = true;
+    private Boolean deduceEnvironments = null;
 
     /**
      * Default constructor.
@@ -128,6 +128,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         ClassLoader classLoader = ApplicationContext.class.getClassLoader();
         DefaultApplicationContext applicationContext = new DefaultApplicationContext(
             classPathResourceLoader != null ? classPathResourceLoader : ClassPathResourceLoader.defaultLoader(classLoader),
+            deduceEnvironments,
             environments.toArray(new String[0])
         );
 
