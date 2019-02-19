@@ -110,11 +110,24 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     /**
      * Creates the default environment for the given environment name.
      *
+     * @deprecated  Use {@link #createEnvironment(Boolean, String...)} instead
      * @param environmentNames The environment name
      * @return The environment instance
      */
+    @Deprecated
     protected DefaultEnvironment createEnvironment(String... environmentNames) {
-        return new RuntimeConfiguredEnvironment(environmentNames);
+        return createEnvironment(null, environmentNames);
+    }
+
+    /**
+     * Creates the default environment for the given environment name.
+     *
+     * @param deduceEnvironments Whether to deduce environments
+     * @param environmentNames The environment name
+     * @return The environment instance
+     */
+    protected DefaultEnvironment createEnvironment(Boolean deduceEnvironments, String... environmentNames) {
+        return new RuntimeConfiguredEnvironment(deduceEnvironments, environmentNames);
     }
 
     /**
@@ -396,7 +409,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      */
     private static class BootstrapEnvironment extends DefaultEnvironment {
         BootstrapEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... activeEnvironments) {
-            super(resourceLoader, conversionService, activeEnvironments);
+            super(resourceLoader, conversionService, false, activeEnvironments);
         }
 
         @Override
@@ -488,8 +501,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         private BootstrapPropertySourceLocator bootstrapPropertySourceLocator;
         private BootstrapEnvironment bootstrapEnvironment;
 
-        RuntimeConfiguredEnvironment(String... environmentNames) {
-            super(DefaultApplicationContext.this.resourceLoader, DefaultApplicationContext.this.conversionService, environmentNames);
+        RuntimeConfiguredEnvironment(Boolean deduceEnvironments, String... environmentNames) {
+            super(DefaultApplicationContext.this.resourceLoader, DefaultApplicationContext.this.conversionService, deduceEnvironments, environmentNames);
             this.isRuntimeConfigured = Boolean.getBoolean(Environment.BOOTSTRAP_CONTEXT_PROPERTY) ||
                     DefaultApplicationContext.this.resourceLoader.getResource(Environment.BOOTSTRAP_NAME + ".yml").isPresent() ||
                     DefaultApplicationContext.this.resourceLoader.getResource(Environment.BOOTSTRAP_NAME + ".properties").isPresent();
