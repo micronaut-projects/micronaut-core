@@ -45,6 +45,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private ClassPathResourceLoader classPathResourceLoader;
     private Collection<String> configurationIncludes = new HashSet<>();
     private Collection<String> configurationExcludes = new HashSet<>();
+    private Boolean deduceEnvironments = true;
 
     /**
      * Default constructor.
@@ -59,6 +60,16 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         }
         return this;
     }
+
+
+    @Override
+    public ApplicationContextBuilder deduceEnvironment(@Nullable Boolean deduceEnvironments) {
+        if (deduceEnvironments != null) {
+            this.deduceEnvironments = deduceEnvironments;
+        }
+        return this;
+    }
+
 
     @Override
     public ApplicationContextBuilder environments(@Nullable String... environments) {

@@ -89,6 +89,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private final Map<String, PropertySourceLoader> loaderByFormatMap = new ConcurrentHashMap<>();
     private final Map<String, Boolean> presenceCache = new ConcurrentHashMap<>();
     private final AtomicBoolean reading = new AtomicBoolean(false);
+    private final Boolean deduceEnvironments;
 
     /**
      * @param classLoader The class loader
@@ -121,18 +122,23 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     @SuppressWarnings("MagicNumber")
     public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... names) {
+        this(resourceLoader, conversionService, true, names);
+    }
+
+    @SuppressWarnings("MagicNumber")
+    public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, Boolean deduceEnvironments, String... names) {
         super(conversionService);
         Set<String> environments = new LinkedHashSet<>(3);
         List<String> specifiedNames = Arrays.asList(names);
 
-        if (shouldDeduceEnvironments()) {
-            EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage(specifiedNames);
-            environments.addAll(environmentsAndPackage.enviroments);
-            String aPackage = environmentsAndPackage.aPackage;
-            if (aPackage != null) {
-                packages.add(aPackage);
-            }
+        this.deduceEnvironments = deduceEnvironments;
+        EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage(specifiedNames);
+        environments.addAll(environmentsAndPackage.enviroments);
+        String aPackage = environmentsAndPackage.aPackage;
+        if (aPackage != null) {
+            packages.add(aPackage);
         }
+
         environments.addAll(specifiedNames);
 
         this.classLoader = resourceLoader.getClassLoader();
@@ -141,10 +147,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             LOG.info("Established active environments: {}", environments);
         }
         conversionService.addConverter(
-            CharSequence.class, Class.class, new StringToClassConverter(classLoader)
+                CharSequence.class, Class.class, new StringToClassConverter(classLoader)
         );
         conversionService.addConverter(
-            Object[].class, Class[].class, new StringArrayToClassArrayConverter(conversionService)
+                Object[].class, Class[].class, new StringArrayToClassArrayConverter(conversionService)
         );
         this.resourceLoader = resourceLoader;
         this.annotationScanner = createAnnotationScanner(classLoader);
@@ -326,14 +332,25 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @return Whether environment names and packages should be deduced
      */
     protected boolean shouldDeduceEnvironments() {
-        String deduceProperty = System.getProperty(Environment.DEDUCE_ENVIRONMENT_PROPERTY);
-        String deduceEnv = System.getenv(Environment.DEDUCE_ENVIRONMENT_ENV);
 
-        System.out.println("deduceProperty: " + deduceProperty);
-        System.out.println("deduceEnv: " + deduceEnv);
+        if(deduceEnvironments != null) {
 
-        return !(StringUtils.isNotEmpty(deduceProperty) && deduceProperty.equals("false") ||
-                (StringUtils.isNotEmpty(deduceEnv) && deduceEnv.equals("false")));
+            if(LOG.isInfoEnabled()) {
+                LOG.info("DeduceEnvironment builder setting: " + deduceEnvironments);
+            }
+
+            return deduceEnvironments;
+        } else {
+            String deduceProperty = System.getProperty(Environment.DEDUCE_ENVIRONMENT_PROPERTY);
+            String deduceEnv = System.getenv(Environment.DEDUCE_ENVIRONMENT_ENV);
+
+            if(LOG.isInfoEnabled()) {
+                LOG.info("DeduceEnvironment system property: " + deduceProperty);
+                LOG.info("DeduceEnvironment environment variable: " + deduceEnv);
+            }
+
+            return Boolean.valueOf(deduceProperty) || Boolean.valueOf(deduceEnv);
+        }
     }
 
 
