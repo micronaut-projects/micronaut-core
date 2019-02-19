@@ -61,7 +61,6 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         return this;
     }
 
-
     @Override
     public ApplicationContextBuilder deduceEnvironment(@Nullable Boolean deduceEnvironments) {
         if (deduceEnvironments != null) {
@@ -69,7 +68,6 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         }
         return this;
     }
-
 
     @Override
     public ApplicationContextBuilder environments(@Nullable String... environments) {
