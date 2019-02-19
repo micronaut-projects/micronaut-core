@@ -87,15 +87,15 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     /**
      * Construct a new ApplicationContext for the given environment name and classloader.
      *
-     * @param environmentNames   The environment names
-     * @param deduceEnvironments Whether to deduce environments
-     * @param resourceLoader     The class loader
+     * @param environmentNames The environment names
+     * @param configuration    The application context configuration
+     * @param resourceLoader   The class loader
      */
-    public DefaultApplicationContext(ClassPathResourceLoader resourceLoader, Boolean deduceEnvironments, String... environmentNames) {
+    public DefaultApplicationContext(ClassPathResourceLoader resourceLoader, @Nullable ApplicationContextConfiguration configuration, String... environmentNames) {
         super(resourceLoader);
         this.conversionService = createConversionService();
         this.resourceLoader = resourceLoader;
-        this.environment = createEnvironment(deduceEnvironments, environmentNames);
+        this.environment = createEnvironment(configuration, environmentNames);
     }
 
     @Override
@@ -122,7 +122,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     /**
      * Creates the default environment for the given environment name.
      *
-     * @deprecated  Use {@link #createEnvironment(Boolean, String...)} instead
+     * @deprecated  Use {@link #createEnvironment(ApplicationContextConfiguration, String...)} instead
      * @param environmentNames The environment name
      * @return The environment instance
      */
@@ -134,11 +134,17 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     /**
      * Creates the default environment for the given environment name.
      *
-     * @param deduceEnvironments Whether to deduce environments
+     * @param configuration The application context configuration
      * @param environmentNames The environment name
      * @return The environment instance
      */
-    protected DefaultEnvironment createEnvironment(Boolean deduceEnvironments, String... environmentNames) {
+    protected DefaultEnvironment createEnvironment(@Nullable  ApplicationContextConfiguration configuration, String... environmentNames) {
+
+        Boolean deduceEnvironments = null;
+        if(configuration != null) {
+            deduceEnvironments = configuration.getDeduceEnvironments();
+        }
+
         return new RuntimeConfiguredEnvironment(deduceEnvironments, environmentNames);
     }
 
