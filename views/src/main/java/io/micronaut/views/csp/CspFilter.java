@@ -23,6 +23,8 @@ import io.micronaut.http.filter.ServerFilterChain;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
+import static io.micronaut.views.csp.CspConfiguration.PATH;
+
 /**
  * <p>
  *      Provides support for <a href="https://www.w3.org/TR/CSP2/">Content Security Policy (CSP) Level 2</a>.
@@ -53,7 +55,7 @@ import org.reactivestreams.Publisher;
  * @author Arul Dhesiaseelan
  * @since 1.1
  */
-@Filter("/**")
+@Filter("${" + PATH + ":/}**")
 public class CspFilter implements HttpServerFilter {
 
     public static final String CSP_HEADER = "Content-Security-Policy";

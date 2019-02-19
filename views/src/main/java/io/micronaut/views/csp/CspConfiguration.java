@@ -33,6 +33,11 @@ public class CspConfiguration implements Toggleable {
      */
     public static final String PREFIX = ViewsConfigurationProperties.PREFIX + ".csp";
 
+    /**
+     * The path for endpoints settings.
+     */
+    public static final String PATH = PREFIX + ".path";
+
     public static final boolean DEFAULT_ENABLED = false;
 
     private boolean enabled = DEFAULT_ENABLED;
