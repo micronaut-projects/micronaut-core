@@ -191,6 +191,21 @@ public class DefaultConversionService implements ConversionService<DefaultConver
 
         // AnnotationClassValue -> Class
         addConverter(AnnotationClassValue.class, Class.class, (object, targetType, context) -> object.getType());
+        addConverter(AnnotationClassValue.class, Object.class, (object, targetType, context) -> {
+            if (targetType.equals(Class.class)) {
+                return object.getType();
+            } else {
+                if (CharSequence.class.isAssignableFrom(targetType)) {
+                    return Optional.of(object.getName());
+                } else {
+                    Optional i = object.getInstance();
+                    if (i.isPresent() && targetType.isInstance(i.get())) {
+                        return i;
+                    }
+                    return Optional.empty();
+                }
+            }
+        });
         addConverter(AnnotationClassValue[].class, Class.class, (object, targetType, context) -> {
             if (object.length > 0) {
                 final AnnotationClassValue o = object[0];

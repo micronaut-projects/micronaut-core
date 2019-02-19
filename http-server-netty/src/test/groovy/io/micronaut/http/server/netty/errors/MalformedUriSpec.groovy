@@ -10,9 +10,13 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
+import spock.lang.Retry
 import spock.lang.Shared
 import spock.lang.Specification
 
+@Retry
+// Retry added because we need to use java.net.URL to test not the Micronaut HTTP client and URL.text from Groovy is unreliable
+// sometimes failing for seemingly unknown reasons
 class MalformedUriSpec extends Specification {
 
     @Shared @AutoCleanup EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer)
