@@ -111,8 +111,6 @@ public class HttpServerConfiguration {
     private final ApplicationConfiguration applicationConfiguration;
     private Charset defaultCharset;
 
-    private CspConfiguration csp = new CspConfiguration();
-
     /**
      * Default constructor.
      */
@@ -186,13 +184,6 @@ public class HttpServerConfiguration {
      */
     public CorsConfiguration getCors() {
         return cors;
-    }
-
-    /**
-     * @return Configuration for CSP
-     */
-    public CspConfiguration getCsp() {
-        return csp;
     }
 
     /**
@@ -335,14 +326,6 @@ public class HttpServerConfiguration {
      */
     public void setCors(CorsConfiguration cors) {
         this.cors = cors;
-    }
-
-    /**
-     * Sets the csp configuration.
-     * @param csp The csp configuration
-     */
-    public void setCsp(CspConfiguration csp) {
-        this.csp = csp;
     }
 
     /**
@@ -552,69 +535,6 @@ public class HttpServerConfiguration {
          */
         public void setConfigurations(Map<String, CorsOriginConfiguration> configurations) {
             this.configurations = configurations;
-        }
-    }
-
-    /**
-     * Configuration for CSP.
-     */
-    @ConfigurationProperties("csp")
-    public static class CspConfiguration implements Toggleable {
-
-        public static final boolean DEFAULT_ENABLED = false;
-
-        private boolean enabled = DEFAULT_ENABLED;
-
-        private String policyDirectives;
-
-        private boolean reportOnly = false;
-
-        /**
-         * @return Whether csp is enabled. Defaults to false.
-         */
-        @Override
-        public boolean isEnabled() {
-            return enabled;
-        }
-
-
-        /**
-         * @return Policy directives
-         */
-        public String getPolicyDirectives() {
-            return policyDirectives;
-        }
-
-        /**
-         * @return Whether reportOnly is set. Defaults to false.
-         */
-        public boolean isReportOnly() {
-            return reportOnly;
-        }
-
-        /**
-         * Sets whether CSP is enabled. Default value ({@value #DEFAULT_ENABLED})
-         * @param enabled True if CSP is enabled
-         */
-        public void setEnabled(boolean enabled) {
-            this.enabled = enabled;
-        }
-
-        /**
-         * Sets the policy directives.
-         * @param policyDirectives CSP policy directives
-         */
-        public void setPolicyDirectives(String policyDirectives) {
-            this.policyDirectives = policyDirectives;
-        }
-
-        /**
-         * Sets whether to include Content-Security-Policy-Report-Only header in the response,
-         * defaults to Content-Security-Policy header. Default value ({@value #DEFAULT_ENABLED})
-         * @param reportOnly set to true for reporting purpose only
-         */
-        public void setReportOnly(boolean reportOnly) {
-            this.reportOnly = reportOnly;
         }
     }
 }
