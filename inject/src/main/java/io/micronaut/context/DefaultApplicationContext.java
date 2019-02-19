@@ -83,7 +83,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         super(resourceLoader);
         this.conversionService = createConversionService();
         this.resourceLoader = resourceLoader;
-        this.environment = createEnvironment(environmentNames);
+        this.environment = createEnvironment(true, environmentNames);
     }
 
     @Override
