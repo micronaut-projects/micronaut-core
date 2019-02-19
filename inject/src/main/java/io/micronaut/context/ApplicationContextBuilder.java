@@ -37,7 +37,7 @@ public interface ApplicationContextBuilder {
     ApplicationContextBuilder singletons(Object... beans);
 
     /**
-     * Boolean flag to toggle environments deduction
+     * Boolean flag to toggle environments deduction.
      *
      * @param deduceEnvironment The boolean
      * @return This builder

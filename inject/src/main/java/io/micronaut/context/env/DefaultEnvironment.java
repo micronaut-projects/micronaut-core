@@ -125,6 +125,12 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         this(resourceLoader, conversionService, true, names);
     }
 
+    /**
+     * @param resourceLoader     The resource loader
+     * @param conversionService  The conversion service
+     * @param deduceEnvironments Option to deduce environments
+     * @param names              The names
+     */
     @SuppressWarnings("MagicNumber")
     public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, Boolean deduceEnvironments, String... names) {
         super(conversionService);
@@ -333,9 +339,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     protected boolean shouldDeduceEnvironments() {
 
-        if(deduceEnvironments != null) {
+        if (deduceEnvironments != null) {
 
-            if(LOG.isInfoEnabled()) {
+            if (LOG.isInfoEnabled()) {
                 LOG.info("DeduceEnvironment builder setting: " + deduceEnvironments);
             }
 
@@ -344,7 +350,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             String deduceProperty = System.getProperty(Environment.DEDUCE_ENVIRONMENT_PROPERTY);
             String deduceEnv = System.getenv(Environment.DEDUCE_ENVIRONMENT_ENV);
 
-            if(LOG.isInfoEnabled()) {
+            if (LOG.isInfoEnabled()) {
                 LOG.info("DeduceEnvironment system property: " + deduceProperty);
                 LOG.info("DeduceEnvironment environment variable: " + deduceEnv);
             }
