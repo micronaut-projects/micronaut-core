@@ -15,8 +15,6 @@
  */
 package io.micronaut.session;
 
-import io.micronaut.http.HttpRequest;
-import io.micronaut.session.http.HttpSessionFilter;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 

@@ -101,7 +101,6 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         return this;
     }
 
-
     @Override
     public Boolean getDeduceEnvironments() {
         return deduceEnvironments;

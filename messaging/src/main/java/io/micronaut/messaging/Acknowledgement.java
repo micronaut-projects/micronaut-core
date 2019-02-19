@@ -27,11 +27,13 @@ public interface Acknowledgement {
 
     /**
      * Acknowledges the message.
+     * @throws MessageAcknowledgementException may throw a MessageAcknowledgementException
      */
     void ack() throws MessageAcknowledgementException;
 
     /**
      * Rejects the message.
+     * @throws MessageAcknowledgementException may throw a MessageAcknowledgementException
      */
     void nack() throws MessageAcknowledgementException;
 }

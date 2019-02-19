@@ -30,5 +30,4 @@ public interface ApplicationContextConfiguration {
      */
     Boolean getDeduceEnvironments();
 
-
 }
