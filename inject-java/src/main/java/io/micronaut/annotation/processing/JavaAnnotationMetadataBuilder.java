@@ -376,6 +376,24 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     /**
      * Checks if a method has an annotation.
      *
+     * @param element The method
+     * @param ann    The annotation to look for
+     * @return Whether if the method has the annotation
+     */
+    @Override
+    public boolean hasAnnotation(Element element, Class<? extends Annotation> ann) {
+        List<? extends AnnotationMirror> annotationMirrors = element.getAnnotationMirrors();
+        for (AnnotationMirror annotationMirror : annotationMirrors) {
+            if (annotationMirror.getAnnotationType().toString().equals(ann.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Checks if a method has an annotation.
+     *
      * @param method The method
      * @param ann    The annotation to look for
      * @return Whether if the method has the annotation

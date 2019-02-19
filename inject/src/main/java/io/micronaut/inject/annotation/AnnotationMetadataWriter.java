@@ -26,6 +26,7 @@ import io.micronaut.inject.writer.ClassGenerationException;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import org.objectweb.asm.*;
 import org.objectweb.asm.commons.GeneratorAdapter;
+import org.objectweb.asm.commons.Method;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -113,6 +114,13 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             ReflectionUtils.getRequiredInternalConstructor(
                     AnnotationClassValue.class,
                     Class.class
+            )
+    );
+
+    private static final org.objectweb.asm.commons.Method CONSTRUCTOR_CLASS_VALUE_WITH_INSTANCE = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredInternalConstructor(
+                    AnnotationClassValue.class,
+                    Object.class
             )
     );
 
@@ -272,8 +280,14 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         GeneratorAdapter constructor = startConstructor(classWriter);
         DefaultAnnotationMetadata annotationMetadata = this.annotationMetadata;
 
-        final HashMap<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
-        instantiateInternal(owningType, classWriter, constructor, annotationMetadata, false, loadTypeMethods);
+        final HashMap<String, GeneratorAdapter> loadTypeMethods = new HashMap<>(5);
+        instantiateInternal(
+                owningType,
+                classWriter,
+                constructor,
+                annotationMetadata,
+                false,
+                loadTypeMethods);
         constructor.visitInsn(RETURN);
         constructor.visitMaxs(1, 1);
         constructor.visitEnd();
@@ -398,7 +412,16 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             methodVisitor.push(value.toString());
         } else if (value instanceof AnnotationClassValue) {
             AnnotationClassValue acv = (AnnotationClassValue) value;
-            invokeLoadClassValueMethod(declaringType, declaringClassWriter, methodVisitor, loadTypeMethods, acv);
+            if (acv.isInstantiated()) {
+                methodVisitor.visitTypeInsn(NEW, TYPE_ANNOTATION_CLASS_VALUE.getInternalName());
+                methodVisitor.visitInsn(DUP);
+                methodVisitor.visitTypeInsn(NEW, getInternalName(acv.getName()));
+                methodVisitor.visitInsn(DUP);
+                methodVisitor.invokeConstructor(getTypeReference(acv.getName()), new Method(CONSTRUCTOR_NAME, getConstructorDescriptor()));
+                methodVisitor.invokeConstructor(TYPE_ANNOTATION_CLASS_VALUE, CONSTRUCTOR_CLASS_VALUE_WITH_INSTANCE);
+            } else {
+                invokeLoadClassValueMethod(declaringType, declaringClassWriter, methodVisitor, loadTypeMethods, acv);
+            }
         } else if (value instanceof Enum) {
             Enum enumObject = (Enum) value;
             Class declaringClass = enumObject.getDeclaringClass();

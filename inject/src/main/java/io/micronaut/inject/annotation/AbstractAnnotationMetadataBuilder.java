@@ -18,10 +18,7 @@ package io.micronaut.inject.annotation;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Aliases;
 import io.micronaut.context.annotation.DefaultScope;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.*;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.util.CollectionUtils;
@@ -31,6 +28,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 
 import javax.annotation.Nullable;
 import javax.inject.Scope;
+import java.lang.annotation.Annotation;
 import java.util.*;
 
 /**
@@ -130,6 +128,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      */
     protected abstract T getTypeForAnnotation(A annotationMirror);
 
+    /**
+     * Checks whether an annotation is present.
+     *
+     * @param element The element
+     * @param annotation The annotation type
+     * @return True if the annotation is present
+     */
+    protected abstract boolean hasAnnotation(T element, Class<? extends Annotation> annotation);
     /**
      * Get the given type of the annotation.
      *
@@ -303,31 +309,41 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     continue;
                 }
 
+                boolean isInstantiatedMember = hasAnnotation(member, InstantiatedMember.class);
                 Optional<?> aliases = getAnnotationValues(member, Aliases.class).get("value");
                 Object annotationValue = entry.getValue();
-
-                if (aliases.isPresent()) {
-                    Object value = aliases.get();
-                    if (value instanceof io.micronaut.core.annotation.AnnotationValue[]) {
-                        io.micronaut.core.annotation.AnnotationValue[] values = (io.micronaut.core.annotation.AnnotationValue[]) value;
-                        for (io.micronaut.core.annotation.AnnotationValue av : values) {
-                            OptionalValues<Object> aliasForValues = OptionalValues.of(Object.class, av.getValues());
-                            processAnnotationAlias(
-                                    metadata,
-                                    isDeclared,
-                                    parentAnnotations,
-                                    annotationValues,
-                                    annotationValue,
-                                    aliasForValues
-                            );
-                        }
+                if (isInstantiatedMember) {
+                    final String memberName = getAnnotationMemberName(member);
+                    final Object rawValue = readAnnotationValue(memberName, annotationValue);
+                    if (rawValue instanceof AnnotationClassValue) {
+                        AnnotationClassValue acv = (AnnotationClassValue) rawValue;
+                        annotationValues.put(memberName, new AnnotationClassValue(acv.getName(), true));
                     }
-                    readAnnotationRawValues(getAnnotationMemberName(member), annotationValue, annotationValues);
                 } else {
-                    OptionalValues<?> aliasForValues = getAnnotationValues(member, AliasFor.class);
-                    processAnnotationAlias(metadata, isDeclared, parentAnnotations, annotationValues, annotationValue, aliasForValues);
-                    readAnnotationRawValues(getAnnotationMemberName(member), annotationValue, annotationValues);
+                    if (aliases.isPresent()) {
+                        Object value = aliases.get();
+                        if (value instanceof io.micronaut.core.annotation.AnnotationValue[]) {
+                            io.micronaut.core.annotation.AnnotationValue[] values = (io.micronaut.core.annotation.AnnotationValue[]) value;
+                            for (io.micronaut.core.annotation.AnnotationValue av : values) {
+                                OptionalValues<Object> aliasForValues = OptionalValues.of(Object.class, av.getValues());
+                                processAnnotationAlias(
+                                        metadata,
+                                        isDeclared,
+                                        parentAnnotations,
+                                        annotationValues,
+                                        annotationValue,
+                                        aliasForValues
+                                );
+                            }
+                        }
+                        readAnnotationRawValues(getAnnotationMemberName(member), annotationValue, annotationValues);
+                    } else {
+                        OptionalValues<?> aliasForValues = getAnnotationValues(member, AliasFor.class);
+                        processAnnotationAlias(metadata, isDeclared, parentAnnotations, annotationValues, annotationValue, aliasForValues);
+                        readAnnotationRawValues(getAnnotationMemberName(member), annotationValue, annotationValues);
+                    }
                 }
+
             }
         }
         List<AnnotationMapper> mappers = ANNOTATION_MAPPERS.get(annotationName);
