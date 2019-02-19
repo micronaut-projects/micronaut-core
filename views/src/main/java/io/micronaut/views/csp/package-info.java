@@ -20,8 +20,8 @@
  * @since 1.1
  */
 @Configuration
-@Requires(property = "micronaut.server.csp.enabled", value = StringUtils.TRUE)
-package io.micronaut.http.server.csp;
+@Requires(property = CspConfiguration.PREFIX + ".enabled", value = StringUtils.TRUE)
+package io.micronaut.views.csp;
 
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;

@@ -4,7 +4,7 @@ Micronaut supports CSP (link:https://www.w3.org/TR/CSP2/[Content Security Policy
 [source,yaml]
 ----
 micronaut:
-    server:
+    views:
         csp:
             enabled: true
             reportOnly: false
@@ -18,7 +18,7 @@ In the above example, the policy directive enforces any resources (images, fonts
 
 ----
 micronaut:
-    server:
+    views:
         csp:
             enabled: true
             reportOnly: false

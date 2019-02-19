@@ -13,22 +13,67 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty.csp
+package io.micronaut.views.csp
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.context.env.PropertySource
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.client.RxHttpClient
-import io.micronaut.http.server.csp.CspFilter
+import io.micronaut.http.server.netty.NettyHttpServer
 import io.micronaut.runtime.server.EmbeddedServer
+import spock.lang.Ignore
 import spock.lang.Specification
 
 class CspFilterSpec extends Specification {
 
+    void "test no configuration"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.start()
+
+        expect: "No beans are created"
+        !applicationContext.containsBean(CspConfiguration)
+
+        cleanup:
+        applicationContext.close()
+    }
+
+    void "test csp configuration"() {
+        given:
+        ApplicationContext applicationContext = new DefaultApplicationContext("test")
+        applicationContext.environment.addPropertySource(PropertySource.of("test",
+                ['micronaut.views.enabled': true,
+                 'micronaut.views.csp.enabled': true,
+                 'micronaut.views.csp.reportOnly': false,
+                 'micronaut.views.csp.policyDirectives': "default-src https:"]
+
+        ))
+        applicationContext.start()
+
+        expect:
+        applicationContext.containsBean(CspConfiguration)
+
+        when:
+        CspConfiguration config = applicationContext.getBean(CspConfiguration)
+        NettyHttpServer server = applicationContext.getBean(NettyHttpServer)
+        server.start()
+
+        then:
+        config.enabled
+        !config.reportOnly
+        config.policyDirectives == 'default-src https:'
+
+        cleanup:
+        applicationContext.close()
+    }
+
+    @Ignore
     void "test no CSP configuration"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
@@ -52,13 +97,15 @@ class CspFilterSpec extends Specification {
         embeddedServer.close()
     }
 
+    @Ignore
     void "test CSP no response header"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
-                'micronaut.server.csp.enabled': false,
-                'micronaut.server.csp.reportOnly': false,
-                'micronaut.server.csp.policyDirectives': "default-src self:"
+                'micronaut.views.enabled': true,
+                'micronaut.views.csp.enabled': false,
+                'micronaut.views.csp.reportOnly': false,
+                'micronaut.views.csp.policyDirectives': "default-src self:"
         ])
         URL server = embeddedServer.getURL()
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
@@ -82,9 +129,10 @@ class CspFilterSpec extends Specification {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
-                'micronaut.server.csp.enabled': true,
-                'micronaut.server.csp.reportOnly': false,
-                'micronaut.server.csp.policyDirectives': "default-src self:"
+                'micronaut.views.enabled': true,
+                'micronaut.views.csp.enabled': true,
+                'micronaut.views.csp.reportOnly': false,
+                'micronaut.views.csp.policyDirectives': "default-src self:"
         ])
         URL server = embeddedServer.getURL()
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)
@@ -108,9 +156,9 @@ class CspFilterSpec extends Specification {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
-                'micronaut.server.csp.enabled': true,
-                'micronaut.server.csp.reportOnly': true,
-                'micronaut.server.csp.policyDirectives': "default-src self:"
+                'micronaut.views.csp.enabled': true,
+                'micronaut.views.csp.reportOnly': true,
+                'micronaut.views.csp.policyDirectives': "default-src self:"
         ])
         URL server = embeddedServer.getURL()
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, server)

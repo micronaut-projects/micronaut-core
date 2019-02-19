@@ -96,7 +96,6 @@ httpServer:
     title: Configuring the HTTP Server
     threadPools: Configuring Server Thread Pools
     cors: Configuring CORS
-    csp: Configuring CSP
     https: Securing the Server with HTTPS
   views:
     title: Server Side View Rendering
@@ -104,6 +103,7 @@ httpServer:
     handlebars: Handlebars.java
     velocity: Apache Velocity
     freemarker: Apache Freemarker
+    csp: Configuring CSP
   openapi: OpenAPI / Swagger Support
 httpClient:
   title: The HTTP Client

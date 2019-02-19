@@ -13,14 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.csp;
+package io.micronaut.views.csp;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.HttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
-import io.micronaut.http.server.HttpServerConfiguration;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
@@ -60,12 +59,12 @@ public class CspFilter implements HttpServerFilter {
     public static final String CSP_HEADER = "Content-Security-Policy";
     public static final String CSP_REPORT_ONLY_HEADER = "Content-Security-Policy-Report-Only";
 
-    protected final HttpServerConfiguration.CspConfiguration cspConfiguration;
+    protected final CspConfiguration cspConfiguration;
 
     /**
-     * @param cspConfiguration The {@link HttpServerConfiguration.CspConfiguration} instance
+     * @param cspConfiguration The {@link CspConfiguration} instance
      */
-    public CspFilter(HttpServerConfiguration.CspConfiguration cspConfiguration) {
+    public CspFilter(CspConfiguration cspConfiguration) {
         this.cspConfiguration = cspConfiguration;
     }
 
