@@ -13,66 +13,63 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.util.CollectionUtils;
 
 import javax.annotation.Nonnull;
-import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Simple reflection based BeanMap implementation.
- * @param <T> type Generic
- * @author Graeme Rocher
- * @since 1.0
- * @deprecated Replaced by {@link BeanIntrospectionMap}
+ * An implementation of {@link BeanMap} that uses a backing {@link BeanIntrospection}.
+ *
+ * @param <T> The bean type
+ * @since 1.1
+ * @author graemerocher
  */
 @Internal
-@Deprecated
-class ReflectionBeanMap<T> implements BeanMap<T> {
-
-    private final BeanInfo<T> beanInfo;
-    private final Map<String, PropertyDescriptor> propertyDescriptors;
-    private final T bean;
+final class BeanIntrospectionMap<T> implements BeanMap<T> {
+    final BeanIntrospection<T> beanIntrospection;
+    final T bean;
 
     /**
-     * Constructor.
-     * @param bean bean
+     * Default constructor.
+     * @param beanIntrospection The introspection
+     * @param bean The bean
      */
-    @SuppressWarnings("unchecked")
-    ReflectionBeanMap(T bean) {
-        Objects.requireNonNull(bean, "Bean cannot be null");
+    BeanIntrospectionMap(BeanIntrospection<T> beanIntrospection, T bean) {
+        this.beanIntrospection = beanIntrospection;
         this.bean = bean;
-        this.beanInfo = (BeanInfo<T>) Introspector.getBeanInfo(bean.getClass());
-        this.propertyDescriptors = beanInfo.getPropertyDescriptors();
     }
 
     @Override
     public @Nonnull Class<T> getBeanType() {
-        return beanInfo.getBeanClass();
+        return beanIntrospection.getBeanType();
     }
 
     @Override
     public int size() {
-        return propertyDescriptors.size();
+        return beanIntrospection.getPropertyNames().length;
     }
 
     @Override
     public boolean isEmpty() {
-        return propertyDescriptors.isEmpty();
+        return size() > 0;
     }
 
     @Override
     public boolean containsKey(Object key) {
-        return propertyDescriptors.containsKey(key);
+        if (key == null) {
+            return false;
+        }
+        return beanIntrospection.getProperty(key.toString()).isPresent();
     }
 
     @Override
@@ -82,29 +79,26 @@ class ReflectionBeanMap<T> implements BeanMap<T> {
 
     @Override
     public Object get(Object key) {
-        PropertyDescriptor propertyDescriptor = propertyDescriptors.get(key);
-        if (propertyDescriptor != null) {
-            Method readMethod = propertyDescriptor.getReadMethod();
-            if (readMethod != null) {
-                return ReflectionUtils.invokeMethod(bean, readMethod);
-            }
+        if (key == null) {
+            return null;
         }
-        return null;
+        return beanIntrospection.getProperty(key.toString()).map(bp -> bp.read(bean)).orElse(null);
     }
 
     @Override
     public Object put(String key, Object value) {
-        PropertyDescriptor propertyDescriptor = propertyDescriptors.get(key);
-        if (propertyDescriptor != null) {
-            Method writeMethod = propertyDescriptor.getWriteMethod();
-            if (writeMethod != null) {
-                Class<?> targetType = writeMethod.getParameterTypes()[0];
-                Optional<?> converted = ConversionService.SHARED.convert(value, targetType);
-                if (converted.isPresent()) {
-                    return ReflectionUtils.invokeMethod(bean, writeMethod, converted.get());
-                }
-            }
+        if (key == null) {
+            return null;
         }
+        beanIntrospection.getProperty(key).ifPresent(bp -> {
+            final Class<Object> propertyType = bp.getType();
+            if (value != null && !propertyType.isInstance(value)) {
+                Optional<?> converted = ConversionService.SHARED.convert(value, propertyType);
+                converted.ifPresent(o -> bp.write(bean, o));
+            } else {
+                bp.write(bean, value);
+            }
+        });
         return null;
     }
 
@@ -127,7 +121,7 @@ class ReflectionBeanMap<T> implements BeanMap<T> {
 
     @Override
     public Set<String> keySet() {
-        return propertyDescriptors.keySet();
+        return CollectionUtils.setOf(beanIntrospection.getPropertyNames());
     }
 
     @Override
