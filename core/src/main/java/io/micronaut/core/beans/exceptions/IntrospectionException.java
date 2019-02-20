@@ -13,30 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.beans;
-
-import java.util.Map;
+package io.micronaut.core.beans.exceptions;
 
 /**
- * An interface that provides basic bean information. Designed as a simpler replacement for {@link java.beans.BeanInfo}.
+ * Thrown when an error occurs introspecting a bean type.
  *
- * @param <T> type Generic
  * @author Graeme Rocher
  * @since 1.0
- * @deprecated Use {@link BeanIntrospection} instead
  */
-@Deprecated
-public interface BeanInfo<T> {
+public class IntrospectionException extends RuntimeException {
 
     /**
-     * @return The bean class
+     * @param message The message
      */
-    Class<T> getBeanClass();
+    public IntrospectionException(String message) {
+        super(message);
+    }
 
     /**
-     * The properties of the bean.
-     *
-     * @return The properties of the bean as a map where the key is the property name
+     * @param message The message
+     * @param cause   The throwable
      */
-    Map<String, PropertyDescriptor> getPropertyDescriptors();
+    public IntrospectionException(String message, Throwable cause) {
+        super(message, cause);
+    }
 }
