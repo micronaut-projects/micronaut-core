@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.PublicMethodVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementModifier;
@@ -40,8 +41,10 @@ import java.util.stream.Collectors;
  * A class element returning data from a {@link TypeElement}.
  *
  * @author James Kleeh
+ * @author graemerocher
  * @since 1.0
  */
+@Internal
 public class JavaClassElement extends AbstractJavaElement implements ClassElement {
 
     private final TypeElement classElement;
@@ -54,7 +57,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
      * @param visitorContext     The visitor context
      */
     JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        super(classElement, annotationMetadata);
+        super(classElement, annotationMetadata, visitorContext);
         this.classElement = classElement;
         this.visitorContext = visitorContext;
         this.typeArguments = Collections.emptyList();
@@ -67,7 +70,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
      * @param typeArguments      The type arguments
      */
     JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext, List<? extends TypeMirror> typeArguments) {
-        super(classElement, annotationMetadata);
+        super(classElement, annotationMetadata, visitorContext);
         this.classElement = classElement;
         this.visitorContext = visitorContext;
         this.typeArguments = typeArguments;
@@ -232,7 +235,8 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                             annotationMetadata,
                             propertyName,
                             value.type,
-                            value.setter == null) {
+                            value.setter == null,
+                            visitorContext) {
                         @Override
                         public Optional<String> getDocumentation() {
                             Elements elements = visitorContext.getElements();

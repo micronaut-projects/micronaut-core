@@ -42,6 +42,7 @@ import java.util.*;
 public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     private static final Map<String, List<AnnotationMapper>> ANNOTATION_MAPPERS = new HashMap<>();
+    private static final Map<Object, AnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>();
 
     static {
         SoftServiceLoader<AnnotationMapper> serviceLoader = SoftServiceLoader.load(AnnotationMapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader());
@@ -79,20 +80,26 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata build(T element) {
-        DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
+        final AnnotationMetadata existing = MUTATED_ANNOTATION_METADATA.get(element);
+        if (existing != null) {
+            return existing;
+        } else {
 
-        try {
-            AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, true);
-            if (metadata.isEmpty()) {
-                return AnnotationMetadata.EMPTY_METADATA;
-            }
-            return metadata;
-        } catch (RuntimeException e) {
-            if ("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
-                // workaround for a bug in the Eclipse APT implementation. See bug 541466 on their Bugzilla.
-                return AnnotationMetadata.EMPTY_METADATA;
-            } else {
-                throw e;
+            DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
+
+            try {
+                AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, true);
+                if (metadata.isEmpty()) {
+                    return AnnotationMetadata.EMPTY_METADATA;
+                }
+                return metadata;
+            } catch (RuntimeException e) {
+                if ("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
+                    // workaround for a bug in the Eclipse APT implementation. See bug 541466 on their Bugzilla.
+                    return AnnotationMetadata.EMPTY_METADATA;
+                } else {
+                    throw e;
+                }
             }
         }
     }
@@ -104,8 +111,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata buildForMethod(T element) {
-        DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
-        return buildInternal(null, element, annotationMetadata, false);
+        final AnnotationMetadata existing = MUTATED_ANNOTATION_METADATA.get(element);
+        if (existing != null) {
+            return existing;
+        } else {
+            DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
+            return buildInternal(null, element, annotationMetadata, false);
+        }
     }
 
     /**
@@ -614,6 +626,27 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         List<String> stereoTypeParents = new ArrayList<>(parents);
         stereoTypeParents.add(annotationTypeName);
         buildStereotypeHierarchy(stereoTypeParents, annotationType, metadata, isDeclared);
+    }
+
+    /**
+     * Used to store metadata mutations at compilation time. Not for public consumption.
+     *
+     * @param element The element
+     * @param metadata The metadata
+     */
+    @Internal
+    public static void addMutatedMetadata(Object element, AnnotationMetadata metadata) {
+        if (element != null && metadata != null) {
+            MUTATED_ANNOTATION_METADATA.put(element, metadata);
+        }
+    }
+
+    /**
+     * Used to clear mutated metadata at the end of a compilation cycle.
+     */
+    @Internal
+    public static void clearMutated() {
+        MUTATED_ANNOTATION_METADATA.clear();
     }
 
     /**

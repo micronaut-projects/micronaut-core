@@ -39,16 +39,23 @@ class JavaPropertyElement extends AbstractJavaElement implements PropertyElement
 
     /**
      * Default constructor.
-     *
-     * @param declaringElement The declaring element
+     *  @param declaringElement The declaring element
      * @param getter The element
      * @param annotationMetadata The annotation metadata
      * @param name The name
      * @param type The type
      * @param readOnly Whether it is read only
+     * @param visitorContext The java visitor context
      */
-    JavaPropertyElement(ClassElement declaringElement, ExecutableElement getter, AnnotationMetadata annotationMetadata, String name, ClassElement type, boolean readOnly) {
-        super(getter, annotationMetadata);
+    JavaPropertyElement(
+            ClassElement declaringElement,
+            ExecutableElement getter,
+            AnnotationMetadata annotationMetadata,
+            String name,
+            ClassElement type,
+            boolean readOnly,
+            JavaVisitorContext visitorContext) {
+        super(getter, annotationMetadata, visitorContext);
         this.name = name;
         this.type = type;
         this.readOnly = readOnly;

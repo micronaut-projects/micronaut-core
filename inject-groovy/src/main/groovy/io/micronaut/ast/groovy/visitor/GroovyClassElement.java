@@ -49,7 +49,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
      * @param annotationMetadata The annotation metadata
      */
     GroovyClassElement(SourceUnit sourceUnit, ClassNode classNode, AnnotationMetadata annotationMetadata) {
-        super(annotationMetadata);
+        super(classNode, annotationMetadata);
         this.classNode = classNode;
         this.sourceUnit = sourceUnit;
     }
@@ -99,6 +99,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                 groovyProps.add(propertyNode.getName());
                 GroovyPropertyElement groovyPropertyElement = new GroovyPropertyElement(
                         this,
+                        propertyNode.getField(),
                         AstAnnotationUtils.getAnnotationMetadata(sourceUnit, propertyNode.getField()),
                         new GroovyClassElement(sourceUnit, propertyNode.getType(),
                                 AnnotationMetadata.EMPTY_METADATA),
@@ -203,6 +204,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                 if (value.getter != null) {
                     GroovyPropertyElement propertyElement = new GroovyPropertyElement(
                             value.declaringType == null ? this : value.declaringType,
+                            value.getter,
                             AstAnnotationUtils.getAnnotationMetadata(sourceUnit, value.getter),
                             value.type,
                             propertyName,
