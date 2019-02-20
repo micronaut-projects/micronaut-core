@@ -27,7 +27,7 @@ class BearerAccessRefreshTokenSpec extends Specification {
             mapper.configure(SORT_PROPERTIES_ALPHABETICALLY, true)
 
         and : "a fully populated bearer token"
-            BearerAccessRefreshToken token = new BearerAccessRefreshToken("testing", ["admin", "superuser"], 3600, "1234", "abcd")
+            BearerAccessRefreshToken token = new BearerAccessRefreshToken("testing", ["admin", "superuser"], 3600, "1234", "abcd", "Bearer")
 
         when: "we serialize the object to json"
             def rawJsonString = mapper.writeValueAsString(token)
