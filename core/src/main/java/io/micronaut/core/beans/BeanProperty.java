@@ -51,7 +51,13 @@ public interface BeanProperty<B, T> extends Named, AnnotationMetadataDelegate {
      * @param value The value to write
      * @throws IllegalArgumentException If either the bean type or value type are not correct
      */
-    void write(@Nonnull B bean, @Nullable T value);
+    default void write(@Nonnull B bean, @Nullable T value) {
+        if (isReadOnly()) {
+            throw new UnsupportedOperationException("Cannot write read-only property");
+        } else {
+            throw new UnsupportedOperationException("Write method unimplemented");
+        }
+    }
 
     /**
      * @return The property type.
