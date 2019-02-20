@@ -118,6 +118,7 @@ import java.lang.reflect.Modifier
  * @since 1.0
  */
 @CompileStatic
+// IMPORTANT NOTE: This transform runs in phase CANONICALIZATION so it runs after TypeElementVisitorTransform
 @GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
 class InjectTransform implements ASTTransformation, CompilationUnitAware {
 

@@ -16,9 +16,11 @@
 package io.micronaut.ast.groovy
 
 import groovy.transform.CompileStatic
+import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
+import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.SourceUnit
@@ -53,5 +55,7 @@ class TypeElementVisitorEnd implements ASTTransformation {
         }
 
         TypeElementVisitorTransform.loadedVisitors = null
+        AstAnnotationUtils.invalidateCache()
+        AbstractAnnotationMetadataBuilder.clearMutated()
     }
 }

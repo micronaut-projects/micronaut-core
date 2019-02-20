@@ -42,10 +42,12 @@ import java.util.Map;
  * @author Dean Wette
  */
 @SuppressWarnings("ConstantName")
+@Internal
 public class AnnotationUtils {
 
     private static final int CACHE_SIZE = 100;
-    private static final Map<Element, AnnotationMetadata> annotationMetadataCache = new ConcurrentLinkedHashMap.Builder<Element, AnnotationMetadata>().maximumWeightedCapacity(CACHE_SIZE).build();
+    private static final Map<Element, AnnotationMetadata> annotationMetadataCache
+            = new ConcurrentLinkedHashMap.Builder<Element, AnnotationMetadata>().maximumWeightedCapacity(CACHE_SIZE).build();
 
     private final Elements elementUtils;
     private final Messager messager;
@@ -226,4 +228,15 @@ public class AnnotationUtils {
         annotationMetadataCache.clear();
     }
 
+    /**
+     * Invalidates any cached metadata.
+     *
+     * @param element The element
+     */
+    @Internal
+    public void invalidateMetadata(Element element) {
+        if (element != null) {
+            annotationMetadataCache.remove(element);
+        }
+    }
 }

@@ -48,10 +48,12 @@ import static org.codehaus.groovy.ast.ClassHelper.makeCached
  * Executes type element visitors.
  *
  * @author James Kleeh
+ * @author Graeme Rocher
  * @since 1.0
  */
 @CompileStatic
-@GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
+// IMPORTANT NOTE: This transform runs in phase SEMANTIC_ANALYSIS so it runs before InjectTransform
+@GroovyASTTransformation(phase = CompilePhase.SEMANTIC_ANALYSIS)
 class TypeElementVisitorTransform implements ASTTransformation {
 
     protected static Map<String, LoadedVisitor> loadedVisitors = null

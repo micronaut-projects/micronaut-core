@@ -16,8 +16,13 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
+import io.micronaut.core.util.ArgumentUtils;
 
+import javax.annotation.Nonnull;
+import java.lang.annotation.Annotation;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 /**
  * Stores data about a compile time element. The underlying object can be a class, field, or method.
@@ -49,6 +54,63 @@ public interface Element extends AnnotationMetadata {
      * @return The native type
      */
     Object getNativeType();
+
+    /**
+     * Annotate this element with the given annotation type. If the annotation is already present then
+     * any values populated by the builder will be merged/overridden with the existing values.
+     *
+     * @param annotationType The annotation type
+     * @param consumer A function that receives the {@link AnnotationValueBuilder}
+     * @param <T> The annotation generic type
+     * @return This element
+     */
+    @Nonnull
+    default <T extends Annotation> Element annotate(@Nonnull String annotationType, @Nonnull Consumer<AnnotationValueBuilder<T>> consumer) {
+        throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support adding annotations at compilation time");
+    }
+
+    /**
+     * Annotate this element with the given annotation type. If the annotation is already present then
+     * any values populated by the builder will be merged/overridden with the existing values.
+     *
+     * @param annotationType The annotation type
+     * @param <T> The annotation generic type
+     * @return This element
+     */
+    @Nonnull
+    default <T extends Annotation> Element annotate(@Nonnull String annotationType) {
+        return annotate(annotationType, (Consumer<AnnotationValueBuilder<T>>) annotationValueBuilder -> {});
+    }
+
+    /**
+     * Annotate this element with the given annotation type. If the annotation is already present then
+     * any values populated by the builder will be merged/overridden with the existing values.
+     *
+     * @param annotationType The annotation type
+     * @param consumer A function that receives the {@link AnnotationValueBuilder}
+     * @param <T> The annotation generic type
+     * @return The {@link AnnotationValueBuilder}
+     */
+    @Nonnull
+    default <T extends Annotation> Element annotate(@Nonnull Class<T> annotationType, @Nonnull Consumer<AnnotationValueBuilder<T>> consumer) {
+        ArgumentUtils.requireNonNull("annotationType", annotationType);
+        ArgumentUtils.requireNonNull("consumer", consumer);
+        return annotate(annotationType.getName(), consumer);
+    }
+
+    /**
+     * Annotate this element with the given annotation type. If the annotation is already present then
+     * any values populated by the builder will be merged/overridden with the existing values.
+     *
+     * @param annotationType The annotation type
+     * @param <T> The annotation generic type
+     * @return The {@link AnnotationValueBuilder}
+     */
+    @Nonnull
+    default <T extends Annotation> Element annotate(@Nonnull Class<T> annotationType) {
+        ArgumentUtils.requireNonNull("annotationType", annotationType);
+        return annotate(annotationType.getName(), annotationValueBuilder -> { });
+    }
 
     /**
      * The simple name of the element. For a class this will be the name without the package.
