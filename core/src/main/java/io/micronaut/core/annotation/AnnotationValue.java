@@ -307,9 +307,10 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
      * Start building a new annotation for the given name.
      *
      * @param annotationName The annotation name
+     * @param <T> The annotation type
      * @return The builder
      */
-    public static AnnotationValueBuilder<?> builder(String annotationName) {
+    public static <T extends Annotation> AnnotationValueBuilder<T> builder(String annotationName) {
         return new AnnotationValueBuilder<>(annotationName);
     }
 

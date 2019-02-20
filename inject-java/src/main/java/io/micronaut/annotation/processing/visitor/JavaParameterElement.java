@@ -42,7 +42,7 @@ class JavaParameterElement extends AbstractJavaElement implements ParameterEleme
      * @param visitorContext The visitor context
      */
     JavaParameterElement(VariableElement element, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        super(element, annotationMetadata);
+        super(element, annotationMetadata, visitorContext);
         this.visitorContext = visitorContext;
     }
 

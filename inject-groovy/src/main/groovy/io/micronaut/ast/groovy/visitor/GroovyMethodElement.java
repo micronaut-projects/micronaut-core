@@ -46,7 +46,7 @@ public class GroovyMethodElement extends AbstractGroovyElement implements Method
      * @param annotationMetadata The annotation metadata
      */
     GroovyMethodElement(SourceUnit sourceUnit, MethodNode methodNode, AnnotationMetadata annotationMetadata) {
-        super(annotationMetadata);
+        super(methodNode, annotationMetadata);
         this.methodNode = methodNode;
         this.sourceUnit = sourceUnit;
     }

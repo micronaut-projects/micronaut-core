@@ -56,8 +56,13 @@ class LoadedVisitor {
             it.name == TypeElementVisitor.class.name
         }
         GenericsType[] generics = definition.getGenericsTypes()
-        classAnnotation = generics[0].type.name
-        elementAnnotation = generics[1].type.name
+        if (generics) {
+            classAnnotation = generics[0].type.name
+            elementAnnotation = generics[1].type.name
+        } else {
+            classAnnotation = ClassHelper.OBJECT
+            elementAnnotation = ClassHelper.OBJECT
+        }
     }
 
     TypeElementVisitor getVisitor() {
@@ -118,7 +123,7 @@ class LoadedVisitor {
         switch (annotatedNode.getClass()) {
             case FieldNode:
             case PropertyNode:
-                visitor.visitField(new GroovyFieldElement(sourceUnit, (Variable) annotatedNode, annotationMetadata), visitorContext)
+                visitor.visitField(new GroovyFieldElement(sourceUnit, (Variable) annotatedNode,  annotatedNode, annotationMetadata), visitorContext)
                 break
             case ConstructorNode:
                 visitor.visitConstructor(new GroovyConstructorElement(sourceUnit, (ConstructorNode) annotatedNode, annotationMetadata), visitorContext)

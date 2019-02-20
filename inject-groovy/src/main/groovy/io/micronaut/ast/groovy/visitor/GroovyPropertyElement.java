@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PropertyElement;
+import org.codehaus.groovy.ast.AnnotatedNode;
 
 import javax.annotation.Nullable;
 
@@ -40,14 +41,22 @@ class GroovyPropertyElement extends AbstractGroovyElement implements PropertyEle
      * Default constructor.
      *
      * @param declaringElement The declaring element
+     * @param annotatedNode    The annotated node
      * @param annotationMetadata the annotation metadata
      * @param type the type
      * @param name the name
      * @param readOnly Whether it is read only
      * @param nativeType the native underlying type
      */
-    GroovyPropertyElement(GroovyClassElement declaringElement, AnnotationMetadata annotationMetadata, ClassElement type, String name, boolean readOnly, Object nativeType) {
-        super(annotationMetadata);
+    GroovyPropertyElement(
+            GroovyClassElement declaringElement,
+            AnnotatedNode annotatedNode,
+            AnnotationMetadata annotationMetadata,
+            ClassElement type,
+            String name,
+            boolean readOnly,
+            Object nativeType) {
+        super(annotatedNode, annotationMetadata);
         this.type = type;
         this.name = name;
         this.readOnly = readOnly;

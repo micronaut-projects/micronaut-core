@@ -19,10 +19,7 @@ import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
-import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.FieldNode;
-import org.codehaus.groovy.ast.PropertyNode;
-import org.codehaus.groovy.ast.Variable;
+import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.control.SourceUnit;
 
 import javax.annotation.Nullable;
@@ -43,10 +40,13 @@ public class GroovyFieldElement extends AbstractGroovyElement implements FieldEl
     /**
      * @param sourceUnit         the source unit
      * @param variable           The {@link Variable}
+     * @param annotatedNode       The annotated ndoe
      * @param annotationMetadata The annotation medatada
      */
-    GroovyFieldElement(SourceUnit sourceUnit, Variable variable, AnnotationMetadata annotationMetadata) {
-        super(annotationMetadata);
+    GroovyFieldElement(
+            SourceUnit sourceUnit,
+            Variable variable, AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata) {
+        super(annotatedNode, annotationMetadata);
         this.variable = variable;
         this.sourceUnit = sourceUnit;
     }

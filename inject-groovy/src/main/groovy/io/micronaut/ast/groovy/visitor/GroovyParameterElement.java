@@ -46,7 +46,7 @@ public class GroovyParameterElement extends AbstractGroovyElement implements Par
      * @param annotationMetadata The annotation metadata
      */
     GroovyParameterElement(SourceUnit sourceUnit, Parameter parameter, AnnotationMetadata annotationMetadata) {
-        super(annotationMetadata);
+        super(parameter, annotationMetadata);
         this.parameter = parameter;
         this.sourceUnit = sourceUnit;
     }

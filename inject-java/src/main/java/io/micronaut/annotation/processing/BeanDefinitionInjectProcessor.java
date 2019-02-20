@@ -217,6 +217,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
         }
         AnnotationUtils.invalidateCache();
+        AbstractAnnotationMetadataBuilder.clearMutated();
         return false;
     }
 
