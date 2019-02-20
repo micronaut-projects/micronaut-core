@@ -202,7 +202,7 @@ public class ModelUtils {
      * @return The executable element
      */
     Optional<ExecutableElement> findAccessibleNoArgumentInstanceMethod(TypeElement classElement, String methodName) {
-        return ElementFilter.methodsIn(classElement.getEnclosedElements())
+        return ElementFilter.methodsIn(elementUtils.getAllMembers(classElement))
                 .stream().filter(m -> m.getSimpleName().toString().equals(methodName) && !isPrivate(m) && !isStatic(m))
                 .findFirst();
     }
