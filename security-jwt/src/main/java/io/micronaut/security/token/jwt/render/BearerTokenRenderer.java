@@ -15,7 +15,9 @@
  */
 package io.micronaut.security.token.jwt.render;
 
+import io.micronaut.http.HttpHeaderValues;
 import io.micronaut.security.authentication.UserDetails;
+
 import javax.inject.Singleton;
 
 /**
@@ -23,16 +25,19 @@ import javax.inject.Singleton;
  * @author Sergio del Amo
  * @since 1.0
  */
+
 @Singleton
 public class BearerTokenRenderer implements TokenRenderer {
 
+    private final String BEARER_TOKEN_TYPE = HttpHeaderValues.AUTHORIZATION_PREFIX_BEARER;
+
     @Override
     public AccessRefreshToken render(Integer expiresIn, String accessToken, String refreshToken) {
-        return new AccessRefreshToken(accessToken, refreshToken);
+        return new AccessRefreshToken(accessToken, refreshToken, BEARER_TOKEN_TYPE, expiresIn);
     }
 
     @Override
     public AccessRefreshToken render(UserDetails userDetails, Integer expiresIn, String accessToken, String refreshToken) {
-        return new BearerAccessRefreshToken(userDetails.getUsername(), userDetails.getRoles(), expiresIn, accessToken, refreshToken);
+        return new BearerAccessRefreshToken(userDetails.getUsername(), userDetails.getRoles(), expiresIn, accessToken, refreshToken, BEARER_TOKEN_TYPE);
     }
 }
