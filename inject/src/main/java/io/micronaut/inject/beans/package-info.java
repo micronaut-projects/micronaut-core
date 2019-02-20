@@ -13,20 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.core.naming;
-
-import javax.annotation.Nonnull;
 
 /**
- * An interface for components that are named.
+ * Contains implementations for compile time bean introspection.
  *
- * @author Graeme Rocher
- * @since 1.0
+ * @author graemerocher
+ * @since 1.1
  */
-public interface Named {
-
-    /**
-     * @return The name of the component
-     */
-    @Nonnull String getName();
-}
+package io.micronaut.inject.beans;

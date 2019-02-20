@@ -37,7 +37,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
     /**
      * @return The properties of the bean.
      */
-    @Nonnull List<BeanProperty<T, ?>> getProperties();
+    @Nonnull List<BeanProperty<T, Object>> getProperties();
 
     /**
      * Get all the bean properties annotated for the given type.
@@ -45,7 +45,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
      * @param annotationType The annotation type
      * @return The properties of the bean.
      */
-    @Nonnull List<BeanProperty<T, ?>> getProperties(Class<? extends Annotation> annotationType);
+    @Nonnull List<BeanProperty<T, Object>> getProperties(Class<? extends Annotation> annotationType);
 
     /**
      * Instantiates an instance of the bean, throwing an exception is instantiation is not possible.
