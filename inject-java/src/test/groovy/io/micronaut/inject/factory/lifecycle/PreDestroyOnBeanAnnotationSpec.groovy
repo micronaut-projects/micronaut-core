@@ -7,6 +7,93 @@ import java.util.concurrent.ExecutorService
 
 class PreDestroyOnBeanAnnotationSpec extends AbstractTypeElementSpec {
 
+    void "test pre destroy with bean method on parent class"() {
+        given:
+        ApplicationContext context = buildContext('test.TestFactory$TestBean', '''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@Factory
+class TestFactory {
+
+    @Bean(preDestroy="close")
+    @javax.inject.Singleton
+    Test testBean() {
+        return new Test();
+    }
+}
+
+class Test extends AbstractTest {}
+class AbstractTest implements AutoCloseable {
+
+    public boolean closed = false;
+    public void close() {
+        closed = true;
+    }
+}
+
+''')
+
+        when:
+        Class<?> beanType = context.classLoader.loadClass('test.Test')
+        def bean = context.getBean(beanType)
+
+        then:
+        bean != null
+
+        when:
+        context.destroyBean(beanType)
+
+        then:
+        bean.closed
+        bean != context.getBean(beanType)
+    }
+
+    void "test pre destroy with bean method on parent interface"() {
+        given:
+        ApplicationContext context = buildContext('test.TestFactory$TestBean', '''\
+package test;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.context.annotation.*;
+
+@Factory
+class TestFactory {
+
+    @Bean(preDestroy="close")
+    @javax.inject.Singleton
+    Test testBean() {
+        return new Test();
+    }
+}
+
+class Test implements AutoCloseable {
+
+    public boolean closed = false;
+    public void close() {
+        closed = true;
+    }
+}
+
+''')
+
+        when:
+        Class<?> beanType = context.classLoader.loadClass('test.Test')
+        def bean = context.getBean(beanType)
+
+        then:
+        bean != null
+
+        when:
+        context.destroyBean(beanType)
+
+        then:
+        bean.closed
+        bean != context.getBean(beanType)
+    }
+
     void "test pre destroy with bean method on interface"() {
         given:
         ApplicationContext context = buildContext('test.TestFactory$TestBean', '''\
