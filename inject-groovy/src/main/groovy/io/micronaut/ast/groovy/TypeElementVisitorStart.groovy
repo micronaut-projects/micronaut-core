@@ -89,18 +89,6 @@ class TypeElementVisitorStart implements ASTTransformation {
             }
 
 
-            def val = System.getProperty(ELEMENT_VISITORS_PROPERTY)
-            if (val) {
-                for (v in val.split(",")) {
-                    def visitor = InstantiationUtils.tryInstantiate(v, source.classLoader).orElse(null)
-                    if (visitor instanceof TypeElementVisitor) {
-                        LoadedVisitor newLoadedVisitor = new LoadedVisitor(source, visitor)
-                        loadedVisitors.put(visitor.getClass().getName(), newLoadedVisitor)
-                    }
-                }
-            }
-
-
             def visitorContext = new GroovyVisitorContext(source)
             for(loadedVisitor in loadedVisitors.values()) {
                 try {
@@ -110,6 +98,17 @@ class TypeElementVisitorStart implements ASTTransformation {
                             source,
                             moduleNode,
                             "Error starting type visitor [$loadedVisitor.visitor]: $e.message")
+                }
+            }
+        }
+
+        def val = System.getProperty(ELEMENT_VISITORS_PROPERTY)
+        if (val) {
+            for (v in val.split(",")) {
+                def visitor = InstantiationUtils.tryInstantiate(v, source.classLoader).orElse(null)
+                if (visitor instanceof TypeElementVisitor) {
+                    LoadedVisitor newLoadedVisitor = new LoadedVisitor(source, visitor)
+                    loadedVisitors.put(visitor.getClass().getName(), newLoadedVisitor)
                 }
             }
         }

@@ -25,6 +25,7 @@ import io.micronaut.core.version.VersionUtils;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
+import javax.annotation.Nonnull;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.element.Element;
@@ -33,10 +34,7 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.ElementScanner8;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static javax.lang.model.element.ElementKind.FIELD;
@@ -45,6 +43,7 @@ import static javax.lang.model.element.ElementKind.FIELD;
  * <p>The annotation processed used to execute type element visitors.</p>
  *
  * @author James Kleeh
+ * @author graemerocher
  * @since 1.0
  */
 @SupportedAnnotationTypes("*")
@@ -60,11 +59,72 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         }
 
 
+        Collection<TypeElementVisitor> typeElementVisitors = findTypeElementVisitors();
+        Collection<LoadedVisitor> loadedVisitors = new ArrayList<>(typeElementVisitors.size());
+        for (TypeElementVisitor visitor : typeElementVisitors) {
+            try {
+                loadedVisitors.add(new LoadedVisitor(
+                        visitor,
+                        javaVisitorContext,
+                        genericUtils,
+                        processingEnv
+                ));
+            } catch (TypeNotPresentException | NoClassDefFoundError e) {
+                // ignored, means annotations referenced are not on the classpath
+            }
+
+        }
+        for (LoadedVisitor loadedVisitor : loadedVisitors) {
+            try {
+                loadedVisitor.getVisitor().start(javaVisitorContext);
+            } catch (Throwable e) {
+                error("Error initializing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage());
+            }
+        }
+
+        TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
+        TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
+
+        roundEnv.getRootElements()
+                .stream()
+                .filter(JavaModelUtils::isClassOrInterface)
+                .map(modelUtils::classElementFor)
+                .filter(typeElement -> typeElement == null || (groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType)))
+                .forEach((typeElement) -> {
+                    String className = typeElement.getQualifiedName().toString();
+                    List<LoadedVisitor> matchedVisitors = loadedVisitors.stream().filter((v) -> v.matches(typeElement)).collect(Collectors.toList());
+                    typeElement.accept(new ElementVisitor(typeElement, matchedVisitors), className);
+                });
+
+        for (LoadedVisitor loadedVisitor : loadedVisitors) {
+            try {
+                loadedVisitor.getVisitor().finish(javaVisitorContext);
+            } catch (Throwable e) {
+                error("Error finalizing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage());
+            }
+        }
+
+        executed = true;
+        return false;
+    }
+
+    /**
+     * Discovers the {@link TypeElementVisitor} instances that are available.
+     *
+     * @return A collection of type element visitors.
+     */
+    protected @Nonnull Collection<TypeElementVisitor> findTypeElementVisitors() {
+        Map<String, TypeElementVisitor> typeElementVisitors = new HashMap<>(10);
         SoftServiceLoader<TypeElementVisitor> serviceLoader = SoftServiceLoader.load(TypeElementVisitor.class, getClass().getClassLoader());
-        Map<String, LoadedVisitor> loadedVisitors = new HashMap<>();
         for (ServiceDefinition<TypeElementVisitor> definition : serviceLoader) {
             if (definition.isPresent()) {
-                TypeElementVisitor visitor = definition.load();
+                TypeElementVisitor visitor;
+                try {
+                    visitor = definition.load();
+                } catch (Throwable e) {
+                    warning("TypeElementVisitor [" + definition.getName() + "] will be ignored due to loading error: " + e.getMessage());
+                    continue;
+                }
                 if (visitor == null) {
                     continue;
                 }
@@ -87,53 +147,11 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
                     }
                 }
 
-                try {
-                    loadedVisitors.put(definition.getName(), new LoadedVisitor(
-                            visitor,
-                            javaVisitorContext,
-                            genericUtils,
-                            processingEnv
-                    ));
-                } catch (TypeNotPresentException | NoClassDefFoundError e) {
-                    // ignored, means annotations referenced are not on the classpath
-                }
+                typeElementVisitors.put(definition.getName(), visitor);
             }
         }
-
-        for (LoadedVisitor loadedVisitor : loadedVisitors.values()) {
-            try {
-                loadedVisitor.getVisitor().start(javaVisitorContext);
-            } catch (Throwable e) {
-                error("Error initializing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage());
-            }
-        }
-
-        TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
-        TypeMirror groovyObjectType = groovyObjectTypeElement != null ? groovyObjectTypeElement.asType() : null;
-
-        roundEnv.getRootElements()
-                .stream()
-                .filter(JavaModelUtils::isClassOrInterface)
-                .map(modelUtils::classElementFor)
-                .filter(typeElement -> typeElement == null || (groovyObjectType == null || !typeUtils.isAssignable(typeElement.asType(), groovyObjectType)))
-                .forEach((typeElement) -> {
-                    String className = typeElement.getQualifiedName().toString();
-                    List<LoadedVisitor> matchedVisitors = loadedVisitors.values().stream().filter((v) -> v.matches(typeElement)).collect(Collectors.toList());
-                    typeElement.accept(new ElementVisitor(typeElement, matchedVisitors), className);
-                });
-
-        for (LoadedVisitor loadedVisitor : loadedVisitors.values()) {
-            try {
-                loadedVisitor.getVisitor().finish(javaVisitorContext);
-            } catch (Throwable e) {
-                error("Error finalizing type visitor [%s]: %s", loadedVisitor.getVisitor(), e.getMessage());
-            }
-        }
-
-        executed = true;
-        return false;
+        return typeElementVisitors.values();
     }
-
 
 
     /**

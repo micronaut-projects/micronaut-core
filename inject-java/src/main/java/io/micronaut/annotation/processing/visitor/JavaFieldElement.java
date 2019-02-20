@@ -16,6 +16,7 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 
@@ -31,6 +32,7 @@ import javax.lang.model.type.TypeMirror;
  * @author James Kleeh
  * @since 1.0
  */
+@Internal
 class JavaFieldElement extends AbstractJavaElement implements FieldElement {
 
     private final JavaVisitorContext visitorContext;
@@ -43,7 +45,7 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
      * @param visitorContext     The visitor context
      */
     JavaFieldElement(VariableElement variableElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        super(variableElement, annotationMetadata);
+        super(variableElement, annotationMetadata, visitorContext);
         this.variableElement = variableElement;
         this.visitorContext = visitorContext;
     }

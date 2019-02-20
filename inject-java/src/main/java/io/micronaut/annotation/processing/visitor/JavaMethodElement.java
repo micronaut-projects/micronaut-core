@@ -16,6 +16,7 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -35,6 +36,7 @@ import java.util.function.Function;
  * @author James Kleeh
  * @since 1.0
  */
+@Internal
 class JavaMethodElement extends AbstractJavaElement implements MethodElement {
 
     private final ExecutableElement executableElement;
@@ -49,7 +51,7 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
             ExecutableElement executableElement,
             AnnotationMetadata annotationMetadata,
             JavaVisitorContext visitorContext) {
-        super(executableElement, annotationMetadata);
+        super(executableElement, annotationMetadata, visitorContext);
         this.executableElement = executableElement;
         this.visitorContext = visitorContext;
     }
