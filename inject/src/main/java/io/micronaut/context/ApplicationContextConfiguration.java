@@ -15,19 +15,29 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.core.annotation.Internal;
+
+import javax.annotation.Nullable;
+import java.util.List;
+
 /**
  * An interface for configuring an application context.
  *
  * @author Zachary Klein
  * @since 1.0
  */
+@Internal
 public interface ApplicationContextConfiguration {
 
     /**
-     * Whether to deduce environments.
-     *
-     * @return Boolean setting
+     * @return True if the environments should be deduced
      */
+    @Nullable
     Boolean getDeduceEnvironments();
+
+    /**
+     * @return The environment names
+     */
+    List<String> getEnvironments();
 
 }

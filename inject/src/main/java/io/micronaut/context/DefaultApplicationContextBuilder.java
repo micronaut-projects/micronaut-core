@@ -63,9 +63,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
 
     @Override
     public ApplicationContextBuilder deduceEnvironment(@Nullable Boolean deduceEnvironments) {
-        if (deduceEnvironments != null) {
-            this.deduceEnvironments = deduceEnvironments;
-        }
+        this.deduceEnvironments = deduceEnvironments;
         return this;
     }
 
@@ -107,6 +105,11 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public List<String> getEnvironments() {
+        return environments;
+    }
+
+    @Override
     public ApplicationContextBuilder mainClass(Class mainClass) {
         if (mainClass != null) {
             ClassLoader classLoader = mainClass.getClassLoader();
@@ -133,8 +136,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         ClassLoader classLoader = ApplicationContext.class.getClassLoader();
         DefaultApplicationContext applicationContext = new DefaultApplicationContext(
             classPathResourceLoader != null ? classPathResourceLoader : ClassPathResourceLoader.defaultLoader(classLoader),
-            this,
-            environments.toArray(new String[0])
+            this
         );
 
         Environment environment = applicationContext.getEnvironment();
