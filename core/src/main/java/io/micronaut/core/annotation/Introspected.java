@@ -56,7 +56,7 @@ public @interface Introspected {
     Class<? extends Annotation>[] ignored() default {};
 
     /**
-     * The annotation types that should be indexed for lookup via {@link io.micronaut.core.beans.BeanIntrospection#getProperties(Class)}.
+     * The annotation types that should be indexed for lookup via {@link io.micronaut.core.beans.BeanIntrospection#getBeanProperties(Class)}.
      *
      * @return The indexed annotation types
      */

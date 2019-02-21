@@ -16,9 +16,11 @@
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -46,6 +48,29 @@ public class ClassUtils {
     
     static final List<ClassLoadingReporter> CLASS_LOADING_REPORTERS;
     static final boolean CLASS_LOADING_REPORTER_ENABLED;
+
+    private static final Map<String, Class> PRIMITIVE_TYPE_MAP = CollectionUtils.mapOf(
+        "int", Integer.TYPE,
+            "boolean", Boolean.TYPE,
+            "long", Long.TYPE,
+            "byte", Byte.TYPE,
+            "double", Double.TYPE,
+            "float", Float.TYPE,
+            "char", Character.TYPE,
+            "short", Short.TYPE,
+            "void", void.class
+    );
+
+    private static final Map<String, Class> PRIMITIVE_ARRAY_MAP = CollectionUtils.mapOf(
+            "int", int[].class,
+            "boolean", boolean[].class,
+            "long", long[].class,
+            "byte", byte[].class,
+            "double", double[].class,
+            "float", float[].class,
+            "char", char[].class,
+            "short", short[].class
+    );
 
     static {
         COMMON_CLASS_MAP.put(boolean.class.getName(), boolean.class);
@@ -108,6 +133,18 @@ public class ClassUtils {
         } else {
             CLASS_LOADING_REPORTER_ENABLED = reporterList.stream().anyMatch(Toggleable::isEnabled);
         }
+    }
+
+    /**
+     * Returns the array type for the given primitive type name.
+     * @param primitiveType The primitive type name
+     * @return The array type
+     */
+    public static @Nonnull Optional<Class> arrayTypeForPrimitive(String primitiveType) {
+        if (primitiveType != null) {
+            return Optional.ofNullable(PRIMITIVE_ARRAY_MAP.get(primitiveType));
+        }
+        return Optional.empty();
     }
 
     /**
@@ -192,28 +229,7 @@ public class ClassUtils {
      * @return An optional type
      */
     public static Optional<Class> getPrimitiveType(String primitiveType) {
-        switch (primitiveType) {
-            case "byte":
-                return Optional.of(Byte.TYPE);
-            case "int":
-                return Optional.of(Integer.TYPE);
-            case "short":
-                return Optional.of(Short.TYPE);
-            case "long":
-                return Optional.of(Long.TYPE);
-            case "float":
-                return Optional.of(Float.TYPE);
-            case "double":
-                return Optional.of(Double.TYPE);
-            case "char":
-                return Optional.of(Character.TYPE);
-            case "boolean":
-                return Optional.of(Boolean.TYPE);
-            case "void":
-                return Optional.of(Void.TYPE);
-            default:
-                return Optional.empty();
-        }
+        return Optional.ofNullable(PRIMITIVE_TYPE_MAP.get(primitiveType));
     }
 
     /**

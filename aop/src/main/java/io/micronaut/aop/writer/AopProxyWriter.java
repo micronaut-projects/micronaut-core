@@ -684,9 +684,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                         null, null
                     );
                     proxyConstructorGenerator.loadThis();
-                    proxyConstructorGenerator.newInstance(TYPE_READ_WRITE_LOCK);
-                    proxyConstructorGenerator.dup();
-                    proxyConstructorGenerator.invokeConstructor(TYPE_READ_WRITE_LOCK, METHOD_DEFAULT_CONSTRUCTOR);
+                    pushNewInstance(proxyConstructorGenerator, TYPE_READ_WRITE_LOCK);
                     proxyConstructorGenerator.putField(proxyType, FIELD_READ_WRITE_LOCK, TYPE_READ_WRITE_LOCK);
 
                     // Add Read Lock field

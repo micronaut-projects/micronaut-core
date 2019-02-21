@@ -13,39 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.inject.ast;
-
-import javax.annotation.Nullable;
 
 /**
- * An element that has an underlying type.
+ * Type visitor implementations for producing {@link io.micronaut.core.beans.BeanIntrospection} instances.
  *
  * @author graemerocher
- * @since 1.0
- * @see PropertyElement
- * @see ClassElement
- * @see FieldElement
+ * @since 1.1
  */
-public interface TypedElement extends Element {
-    /**
-     * @return The type of the element
-     */
-    @Nullable
-    ClassElement getType();
-
-    /**
-     * Whether the type is primitive.
-     * @return True if it is
-     */
-    default boolean isPrimitive() {
-        return false;
-    }
-
-    /**
-     * Is the type an array.
-     * @return True if it is.
-     */
-    default boolean isArray() {
-        return false;
-    }
-}
+package io.micronaut.inject.beans.visitor;

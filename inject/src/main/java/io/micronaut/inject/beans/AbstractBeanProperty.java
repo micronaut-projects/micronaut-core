@@ -21,6 +21,9 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArgumentUtils;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -43,6 +46,8 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
     private final Class<P> type;
     private final String name;
     private final AnnotationMetadata annotationMetadata;
+    private final Argument[] typeArguments;
+    private final Class<B> beanType;
 
     /**
      * Default constructor.
@@ -50,6 +55,7 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
      * @param type The property type
      * @param name The property name
      * @param annotationMetadata The annotation metadata
+     * @param typeArguments optional type arguments
      */
     @Internal
     @UsedByGeneratedCode
@@ -57,11 +63,14 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
             @Nonnull BeanIntrospection<B> introspection,
             @Nonnull Class<P> type,
             @Nonnull String name,
-            @Nullable AnnotationMetadata annotationMetadata) {
+            @Nullable AnnotationMetadata annotationMetadata,
+            @Nullable Argument[] typeArguments) {
         this.introspection = introspection;
         this.type = type;
-        this.name = name;
+        this.beanType = introspection.getBeanType();
+        this.name = name.intern();
         this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
+        this.typeArguments = typeArguments;
     }
 
     @Override public @Nonnull String getName() {
@@ -74,6 +83,15 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
         return type;
     }
 
+    @Override
+    public Argument<P> asArgument() {
+        if (typeArguments != null) {
+            return Argument.of(type, name, typeArguments);
+        } else {
+            return Argument.of(type, name);
+        }
+    }
+
     @Nonnull
     @Override
     public BeanIntrospection<B> getDeclaringBean() {
@@ -84,4 +102,53 @@ public abstract class AbstractBeanProperty<B, P> implements BeanProperty<B, P> {
     public AnnotationMetadata getAnnotationMetadata() {
         return annotationMetadata;
     }
+
+    @Nullable
+    @Override
+    public final P read(@Nonnull B bean) {
+        ArgumentUtils.requireNonNull("bean", bean);
+
+        if (!beanType.isInstance(bean)) {
+            throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + introspection.getBeanType());
+        }
+        if (isWriteOnly()) {
+            throw new UnsupportedOperationException("Cannot read from a write-only property");
+        }
+        return readInternal(bean);
+    }
+
+    @Override
+    public final void write(@Nonnull B bean, @Nullable P value) {
+        ArgumentUtils.requireNonNull("bean", bean);
+
+        if (!beanType.isInstance(bean)) {
+            throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + introspection.getBeanType());
+        }
+        if (isReadOnly()) {
+            throw new UnsupportedOperationException("Cannot write a read-only property");
+        }
+        if (value != null && !ReflectionUtils.getWrapperType(getType()).isInstance(value)) {
+            throw new IllegalArgumentException("Specified value [" + value + "] is not of the correct type: " + getType());
+        }
+
+        writeInternal(bean, value);
+    }
+
+    /**
+     * Writes a property value.
+     * @param bean The bean
+     * @param value The value
+     */
+    @UsedByGeneratedCode
+    @Internal
+    protected abstract void writeInternal(@Nonnull B bean, @Nullable P value);
+
+    /**
+     * Reads the bean property.
+     * @param bean The bean
+     * @return THe value
+     */
+    @UsedByGeneratedCode
+    @Internal
+    protected abstract P readInternal(@Nonnull B bean);
 }

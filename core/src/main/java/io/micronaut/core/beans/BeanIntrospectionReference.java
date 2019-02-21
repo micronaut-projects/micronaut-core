@@ -16,6 +16,7 @@
 
 package io.micronaut.core.beans;
 
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
 
 import javax.annotation.Nonnull;
@@ -28,7 +29,7 @@ import javax.annotation.Nonnull;
  * @since 1.1
  */
 @Internal
-public interface BeanIntrospectionReference<T> {
+public interface BeanIntrospectionReference<T> extends AnnotationMetadataProvider {
 
     /**
      * @return Is the introspection present?
@@ -40,7 +41,7 @@ public interface BeanIntrospectionReference<T> {
      * @return The type
      * @throws io.micronaut.core.beans.exceptions.IntrospectionException if the introspection cannot be loaded
      */
-    @Nonnull Class<T> getType();
+    @Nonnull Class<T> getBeanType();
 
     /**
      * Loads the introspection.

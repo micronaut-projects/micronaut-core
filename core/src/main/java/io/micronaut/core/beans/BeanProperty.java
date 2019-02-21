@@ -18,6 +18,7 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.naming.Named;
+import io.micronaut.core.type.Argument;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -65,10 +66,35 @@ public interface BeanProperty<B, T> extends Named, AnnotationMetadataDelegate {
     @Nonnull Class<T> getType();
 
     /**
+     * Represent the type as an argument, including any generic type information.
+     *
+     * @return The argument
+     */
+    default Argument<T> asArgument() {
+        return Argument.of(getType());
+    }
+
+    /**
      * @return Whether the property is read-only
      */
     default boolean isReadOnly() {
         return false;
+    }
+
+    /**
+     * @return Whether the property is write-only
+     */
+    default boolean isWriteOnly() {
+        return false;
+    }
+
+    /**
+     * Whether the property can be written to and read from.
+     *
+     * @return True if it can.
+     */
+    default boolean isReadWrite() {
+       return !isReadOnly() && !isWriteOnly();
     }
 
     /**

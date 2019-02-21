@@ -29,6 +29,7 @@ import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.PropertyNode;
 import org.codehaus.groovy.control.SourceUnit;
 
+import javax.annotation.Nonnull;
 import java.lang.reflect.Modifier;
 import java.util.*;
 
@@ -70,7 +71,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
     }
 
     @Override
-    public Map<String, ClassElement> getTypeArguments() {
+    public @Nonnull Map<String, ClassElement> getTypeArguments() {
         Map<String, ClassNode> spec = AstGenericUtils.createGenericsSpec(classNode);
         if (!spec.isEmpty()) {
             Map<String, ClassElement> map = new LinkedHashMap<>(spec.size());

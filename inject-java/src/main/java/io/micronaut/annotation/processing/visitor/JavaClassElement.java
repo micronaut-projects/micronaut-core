@@ -298,7 +298,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     }
 
     @Override
-    public Map<String, ClassElement> getTypeArguments() {
+    public @Nonnull Map<String, ClassElement> getTypeArguments() {
         List<? extends TypeParameterElement> typeParameters = classElement.getTypeParameters();
         if (typeParameters.size() == typeArguments.size()) {
             Iterator<? extends TypeParameterElement> tpi = typeParameters.iterator();
