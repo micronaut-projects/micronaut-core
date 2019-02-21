@@ -13,30 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.context;
 
-package io.micronaut.messaging;
+import io.micronaut.core.annotation.Internal;
 
-import io.micronaut.messaging.exceptions.MessageAcknowledgementException;
+import javax.annotation.Nullable;
+import java.util.List;
 
 /**
- * A contract that allows for responding to messages.
+ * An interface for configuring an application context.
  *
- * @author James Kleeh
- * @since 1.1.0
+ * @author Zachary Klein
+ * @since 1.0
  */
-public interface Acknowledgement {
+@Internal
+public interface ApplicationContextConfiguration {
 
     /**
-     * Acknowledges the message.
-     *
-     * @throws MessageAcknowledgementException if an error occurred acknowledging the message
+     * @return True if the environments should be deduced
      */
-    void ack() throws MessageAcknowledgementException;
+    @Nullable
+    Boolean getDeduceEnvironments();
 
     /**
-     * Rejects the message.
-     *
-     * @throws MessageAcknowledgementException if an error occurred rejecting the message
+     * @return The environment names
      */
-    void nack() throws MessageAcknowledgementException;
+    List<String> getEnvironments();
+
 }

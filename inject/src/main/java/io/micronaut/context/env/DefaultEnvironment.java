@@ -38,11 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.lang.annotation.Annotation;
 import java.net.HttpURLConnection;
 import java.net.URL;
@@ -77,6 +73,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private static final int DEFAULT_CONNECT_TIMEOUT = 500;
     private static final String GOOGLE_COMPUTE_METADATA = "http://metadata.google.internal";
     private static final String DO_SYS_VENDOR_FILE = "/sys/devices/virtual/dmi/id/sys_vendor";
+    private static final Boolean DEDUCE_ENVIRONMENT_DEFAULT = true;
 
     protected final ClassPathResourceLoader resourceLoader;
 
@@ -93,6 +90,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     private final Map<String, PropertySourceLoader> loaderByFormatMap = new ConcurrentHashMap<>();
     private final Map<String, Boolean> presenceCache = new ConcurrentHashMap<>();
     private final AtomicBoolean reading = new AtomicBoolean(false);
+    private final Boolean deduceEnvironments;
 
     /**
      * @param classLoader The class loader
@@ -125,18 +123,29 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     @SuppressWarnings("MagicNumber")
     public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... names) {
+        this(resourceLoader, conversionService, null, names);
+    }
+
+    /**
+     * @param resourceLoader     The resource loader
+     * @param conversionService  The conversion service
+     * @param deduceEnvironments Option to deduce environments
+     * @param names              The names
+     */
+    @SuppressWarnings("MagicNumber")
+    public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, @Nullable Boolean deduceEnvironments, String... names) {
         super(conversionService);
         Set<String> environments = new LinkedHashSet<>(3);
         List<String> specifiedNames = Arrays.asList(names);
 
-        if (shouldDeduceEnvironments()) {
-            EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage(specifiedNames);
-            environments.addAll(environmentsAndPackage.enviroments);
-            String aPackage = environmentsAndPackage.aPackage;
-            if (aPackage != null) {
-                packages.add(aPackage);
-            }
+        this.deduceEnvironments = deduceEnvironments;
+        EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage(specifiedNames);
+        environments.addAll(environmentsAndPackage.enviroments);
+        String aPackage = environmentsAndPackage.aPackage;
+        if (aPackage != null) {
+            packages.add(aPackage);
         }
+
         environments.addAll(specifiedNames);
 
         this.classLoader = resourceLoader.getClassLoader();
@@ -330,9 +339,37 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @return Whether environment names and packages should be deduced
      */
     protected boolean shouldDeduceEnvironments() {
-        return true;
-    }
+        if (deduceEnvironments != null) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Environment deduction was set explicitly via builder to: " + deduceEnvironments);
+            }
 
+            return deduceEnvironments;
+        } else {
+            String deduceProperty = System.getProperty(Environment.DEDUCE_ENVIRONMENT_PROPERTY);
+            String deduceEnv = System.getenv(Environment.DEDUCE_ENVIRONMENT_ENV);
+
+            if (StringUtils.isNotEmpty(deduceEnv)) {
+                boolean deduce = Boolean.valueOf(deduceEnv);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Environment deduction was set via environment variable to: " + deduce);
+                }
+                return deduce;
+            } else if (StringUtils.isNotEmpty(deduceProperty)) {
+                boolean deduce = Boolean.valueOf(deduceProperty);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Environment deduction was set via system property to: " + deduce);
+                }
+                return deduce;
+            } else {
+                boolean deduceDefault = DEDUCE_ENVIRONMENT_DEFAULT;
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Environment deduction is using the default of: " + deduceDefault);
+                }
+                return deduceDefault;
+            }
+        }
+    }
 
 
     /**
@@ -528,7 +565,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             synchronized (EnvironmentsAndPackage.class) { // double check
                 environmentsAndPackage = this.environmentsAndPackage;
                 if (environmentsAndPackage == null) {
-                    environmentsAndPackage = deduceEnvironments(extendedDeduction, extendedDeduction);
+                    environmentsAndPackage = deduceEnvironmentsAndPackage(shouldDeduceEnvironments(), extendedDeduction, extendedDeduction);
                     this.environmentsAndPackage = environmentsAndPackage;
                 }
             }
@@ -536,7 +573,8 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
         return environmentsAndPackage;
     }
 
-    private static EnvironmentsAndPackage deduceEnvironments(
+    private static EnvironmentsAndPackage deduceEnvironmentsAndPackage(
+            boolean deduceEnvironments,
             boolean deduceComputePlatform,
             boolean inspectTrace) {
 
@@ -565,76 +603,79 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
                     environmentsAndPackage.aPackage = NameUtils.getPackageName(className);
                 }
 
-                if (Stream.of("org.spockframework", "org.junit").anyMatch(className::startsWith)) {
-                    environments.add(TEST);
-                }
+                if (deduceEnvironments) {
+                    if (Stream.of("org.spockframework", "org.junit").anyMatch(className::startsWith)) {
+                        environments.add(TEST);
+                    }
 
-                if (className.startsWith("com.android")) {
-                    environments.add(ANDROID);
+                    if (className.startsWith("com.android")) {
+                        environments.add(ANDROID);
+                    }
                 }
             }
         }
 
+        if (deduceEnvironments) {
+            if (!environments.contains(ANDROID)) {
+                // deduce k8s
+                if (StringUtils.isNotEmpty(System.getenv(K8S_ENV))) {
+                    environments.add(Environment.KUBERNETES);
+                    environments.add(Environment.CLOUD);
+                }
+                // deduce CF
+                if (StringUtils.isNotEmpty(System.getenv(PCF_ENV))) {
+                    environments.add(Environment.CLOUD_FOUNDRY);
+                    environments.add(Environment.CLOUD);
+                }
 
-        if (!environments.contains(ANDROID)) {
-            // deduce k8s
-            if (StringUtils.isNotEmpty(System.getenv(K8S_ENV))) {
-                environments.add(Environment.KUBERNETES);
-                environments.add(Environment.CLOUD);
-            }
-            // deduce CF
-            if (StringUtils.isNotEmpty(System.getenv(PCF_ENV))) {
-                environments.add(Environment.CLOUD_FOUNDRY);
-                environments.add(Environment.CLOUD);
-            }
+                // deduce heroku
+                if (StringUtils.isNotEmpty(System.getenv(HEROKU_DYNO))) {
+                    environments.add(Environment.HEROKU);
+                    environments.add(Environment.CLOUD);
+                    deduceComputePlatform = false;
+                }
 
-            // deduce heroku
-            if (StringUtils.isNotEmpty(System.getenv(HEROKU_DYNO))) {
-                environments.add(Environment.HEROKU);
-                environments.add(Environment.CLOUD);
-                deduceComputePlatform = false;
-            }
+                // deduce GAE
+                if (StringUtils.isNotEmpty(System.getenv(GOOGLE_APPENGINE_ENVIRONMENT))) {
+                    environments.add(Environment.GAE);
+                    environments.add(Environment.GOOGLE_COMPUTE);
+                    deduceComputePlatform = false;
+                }
 
-            // deduce GAE
-            if (StringUtils.isNotEmpty(System.getenv(GOOGLE_APPENGINE_ENVIRONMENT))) {
-                environments.add(Environment.GAE);
-                environments.add(Environment.GOOGLE_COMPUTE);
-                deduceComputePlatform = false;
-            }
-
-            if (deduceComputePlatform) {
-                ComputePlatform computePlatform = determineCloudProvider();
-                if (computePlatform != null) {
-                    switch (computePlatform) {
-                        case GOOGLE_COMPUTE:
-                            //instantiate bean for GC metadata discovery
-                            environments.add(GOOGLE_COMPUTE);
-                            environments.add(Environment.CLOUD);
-                            break;
-                        case AMAZON_EC2:
-                            //instantiate bean for ec2 metadata discovery
-                            environments.add(AMAZON_EC2);
-                            environments.add(Environment.CLOUD);
-                            break;
-                        case AZURE:
-                            // not yet implemented
-                            environments.add(AZURE);
-                            environments.add(Environment.CLOUD);
-                            break;
-                        case IBM:
-                            // not yet implemented
-                            environments.add(IBM);
-                            environments.add(Environment.CLOUD);
-                            break;
-                        case DIGITAL_OCEAN:
-                            environments.add(DIGITAL_OCEAN);
-                            environments.add(Environment.CLOUD);
-                            break;
-                        case OTHER:
-                            // do nothing here
-                            break;
-                        default:
-                            // no-op
+                if (deduceComputePlatform) {
+                    ComputePlatform computePlatform = determineCloudProvider();
+                    if (computePlatform != null) {
+                        switch (computePlatform) {
+                            case GOOGLE_COMPUTE:
+                                //instantiate bean for GC metadata discovery
+                                environments.add(GOOGLE_COMPUTE);
+                                environments.add(Environment.CLOUD);
+                                break;
+                            case AMAZON_EC2:
+                                //instantiate bean for ec2 metadata discovery
+                                environments.add(AMAZON_EC2);
+                                environments.add(Environment.CLOUD);
+                                break;
+                            case AZURE:
+                                // not yet implemented
+                                environments.add(AZURE);
+                                environments.add(Environment.CLOUD);
+                                break;
+                            case IBM:
+                                // not yet implemented
+                                environments.add(IBM);
+                                environments.add(Environment.CLOUD);
+                                break;
+                            case DIGITAL_OCEAN:
+                                environments.add(DIGITAL_OCEAN);
+                                environments.add(Environment.CLOUD);
+                                break;
+                            case OTHER:
+                                // do nothing here
+                                break;
+                            default:
+                                // no-op
+                        }
                     }
                 }
             }
@@ -703,10 +744,6 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     }
 
     private static ComputePlatform determineCloudProvider() {
-        if (System.getenv("TRAVIS") != null) {
-            return ComputePlatform.OTHER;
-        }
-        
         String computePlatform = System.getProperty(CLOUD_PLATFORM_PROPERTY);
         if (computePlatform != null) {
 

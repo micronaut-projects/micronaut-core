@@ -19,10 +19,8 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.cookie.Cookie;
 
 import java.net.URI;
-import java.util.Arrays;
 import java.util.Map;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 /**
  * An extended version of {@link HttpRequest} that allows mutating headers, the body etc.
