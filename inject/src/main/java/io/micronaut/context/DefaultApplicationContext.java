@@ -39,14 +39,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -76,14 +69,35 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     /**
      * Construct a new ApplicationContext for the given environment name and classloader.
      *
-     * @param environmentNames The environment names
-     * @param resourceLoader   The class loader
+     * @param environmentNames   The environment names
+     * @param resourceLoader     The class loader
      */
     public DefaultApplicationContext(ClassPathResourceLoader resourceLoader, String... environmentNames) {
+        this(resourceLoader, new ApplicationContextConfiguration() {
+            @Override
+            public Boolean getDeduceEnvironments() {
+                return null;
+            }
+
+            @Override
+            public List<String> getEnvironments() {
+                return Arrays.asList(environmentNames);
+            }
+        });
+    }
+
+
+    /**
+     * Construct a new ApplicationContext for the given environment name and classloader.
+     *
+     * @param resourceLoader   The class loader
+     * @param configuration    The application context configuration
+     */
+    public DefaultApplicationContext(ClassPathResourceLoader resourceLoader, ApplicationContextConfiguration configuration) {
         super(resourceLoader);
         this.conversionService = createConversionService();
         this.resourceLoader = resourceLoader;
-        this.environment = createEnvironment(environmentNames);
+        this.environment = createEnvironment(configuration);
     }
 
     @Override
@@ -110,11 +124,34 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     /**
      * Creates the default environment for the given environment name.
      *
+     * @deprecated  Use {@link #createEnvironment(ApplicationContextConfiguration)} instead
      * @param environmentNames The environment name
      * @return The environment instance
      */
+    @Deprecated
     protected DefaultEnvironment createEnvironment(String... environmentNames) {
-        return new RuntimeConfiguredEnvironment(environmentNames);
+        return createEnvironment(new ApplicationContextConfiguration() {
+            @Nullable
+            @Override
+            public Boolean getDeduceEnvironments() {
+                return null;
+            }
+
+            @Override
+            public List<String> getEnvironments() {
+                return Arrays.asList(environmentNames);
+            }
+        });
+    }
+
+    /**
+     * Creates the default environment for the given environment name.
+     *
+     * @param configuration The application context configuration
+     * @return The environment instance
+     */
+    protected DefaultEnvironment createEnvironment(ApplicationContextConfiguration configuration) {
+        return new RuntimeConfiguredEnvironment(configuration);
     }
 
     /**
@@ -488,8 +525,8 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
         private BootstrapPropertySourceLocator bootstrapPropertySourceLocator;
         private BootstrapEnvironment bootstrapEnvironment;
 
-        RuntimeConfiguredEnvironment(String... environmentNames) {
-            super(DefaultApplicationContext.this.resourceLoader, DefaultApplicationContext.this.conversionService, environmentNames);
+        RuntimeConfiguredEnvironment(ApplicationContextConfiguration configuration) {
+            super(DefaultApplicationContext.this.resourceLoader, DefaultApplicationContext.this.conversionService, configuration.getDeduceEnvironments(), configuration.getEnvironments().toArray(new String[]{}));
             this.isRuntimeConfigured = Boolean.getBoolean(Environment.BOOTSTRAP_CONTEXT_PROPERTY) ||
                     DefaultApplicationContext.this.resourceLoader.getResource(Environment.BOOTSTRAP_NAME + ".yml").isPresent() ||
                     DefaultApplicationContext.this.resourceLoader.getResource(Environment.BOOTSTRAP_NAME + ".properties").isPresent();

@@ -545,6 +545,7 @@ subprojects { Project subproject ->
         reports.html.enabled = !System.getenv("TRAVIS")
         reports.junitXml.enabled = !System.getenv("TRAVIS")
 
+        systemProperty "micronaut.cloud.platform", "OTHER"
     }
 
     tasks.withType(Checkstyle) {
