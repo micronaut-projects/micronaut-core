@@ -120,6 +120,7 @@ public interface ClassElement extends TypedElement {
      *
      * @return True if this class element is an array
      */
+    @Override
     default boolean isArray() {
         return false;
     }
@@ -134,7 +135,7 @@ public interface ClassElement extends TypedElement {
     /**
      * @return The type arguments for this class element
      */
-    default Map<String, ClassElement> getTypeArguments() {
+    default @Nonnull Map<String, ClassElement> getTypeArguments() {
         return Collections.emptyMap();
     }
 

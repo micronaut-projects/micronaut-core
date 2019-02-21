@@ -224,32 +224,8 @@ public class ModelUtils {
      * @return The class
      */
     Class<?> classOfPrimitiveArrayFor(String primitiveType) {
-        try {
-
-            switch (primitiveType) {
-                case "byte":
-                    return Class.forName("[B");
-                case "int":
-                    return Class.forName("[I");
-                case "short":
-                    return Class.forName("[S");
-                case "long":
-                    return Class.forName("[J");
-                case "float":
-                    return Class.forName("[F");
-                case "double":
-                    return Class.forName("[D");
-                case "char":
-                    return Class.forName("[C");
-                case "boolean":
-                    return Class.forName("[Z");
-                default:
-                    // this can never occur
-                    throw new IllegalArgumentException("Unsupported primitive type " + primitiveType);
-            }
-        } catch (ClassNotFoundException e) {
-            throw new IllegalStateException(e);
-        }
+        return ClassUtils.arrayTypeForPrimitive(primitiveType)
+                    .orElseThrow(() -> new IllegalArgumentException("Unsupported primitive type " + primitiveType));
     }
 
     /**

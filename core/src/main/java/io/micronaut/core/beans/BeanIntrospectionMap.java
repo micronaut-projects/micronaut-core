@@ -18,6 +18,7 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 
 import javax.annotation.Nonnull;

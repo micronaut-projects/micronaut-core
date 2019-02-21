@@ -16,9 +16,11 @@
 
 package io.micronaut.inject.beans;
 
+import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanIntrospectionReference;
+import io.micronaut.inject.BeanType;
 
 
 /**
@@ -30,7 +32,7 @@ import io.micronaut.core.beans.BeanIntrospectionReference;
  */
 @Internal
 @UsedByGeneratedCode
-public abstract class AbstractBeanIntrospectionReference<T> implements BeanIntrospectionReference<T> {
+public abstract class AbstractBeanIntrospectionReference<T> implements BeanIntrospectionReference<T>, BeanType<T> {
 
     private Boolean present = null;
 
@@ -40,7 +42,6 @@ public abstract class AbstractBeanIntrospectionReference<T> implements BeanIntro
     @UsedByGeneratedCode
     @Internal
     protected AbstractBeanIntrospectionReference() {
-
     }
 
     @SuppressWarnings("ConstantConditions")
@@ -48,11 +49,21 @@ public abstract class AbstractBeanIntrospectionReference<T> implements BeanIntro
     public final boolean isPresent() {
         if (present == null) {
             try {
-                present = getType() != null;
+                present = getBeanType() != null;
             } catch (Throwable e) {
                 present = false;
             }
         }
         return present;
+    }
+
+    @Override
+    public boolean isEnabled(BeanContext context) {
+        return isPresent();
+    }
+
+    @Override
+    public boolean isPrimary() {
+        return true;
     }
 }

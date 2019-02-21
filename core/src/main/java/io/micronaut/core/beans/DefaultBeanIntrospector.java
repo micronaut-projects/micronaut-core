@@ -58,7 +58,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                     for (ServiceDefinition<BeanIntrospectionReference> definition : services) {
                         if (definition.isPresent()) {
                             final BeanIntrospectionReference ref = definition.load();
-                            introspectionMap.put(ref.getType(), ref);
+                            introspectionMap.put(ref.getBeanType(), ref);
                         }
                     }
 

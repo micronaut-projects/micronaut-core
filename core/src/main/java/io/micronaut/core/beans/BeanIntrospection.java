@@ -18,11 +18,12 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.reflect.exception.InstantiationException;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 
 import javax.annotation.Nonnull;
 import java.lang.annotation.Annotation;
-import java.util.List;
+import java.util.Collection;
 import java.util.Optional;
 
 /**
@@ -35,30 +36,48 @@ import java.util.Optional;
 public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
 
     /**
-     * @return The properties of the bean.
+     * @return A immutable collection of properties.
      */
-    @Nonnull List<BeanProperty<T, Object>> getProperties();
+    @Nonnull Collection<BeanProperty<T, Object>> getBeanProperties();
 
     /**
      * Get all the bean properties annotated for the given type.
      *
      * @param annotationType The annotation type
-     * @return The properties of the bean.
+     * @return A immutable collection of properties.
      */
-    @Nonnull List<BeanProperty<T, Object>> getProperties(Class<? extends Annotation> annotationType);
+    @Nonnull Collection<BeanProperty<T, Object>> getBeanProperties(Class<? extends Annotation> annotationType);
 
     /**
      * Instantiates an instance of the bean, throwing an exception is instantiation is not possible.
+     *
      * @return An instance
      * @throws InstantiationException If the bean cannot be insantiated.
      */
     @Nonnull T instantiate() throws InstantiationException;
 
     /**
+     * Instantiates an instance of the bean, throwing an exception is instantiation is not possible.
+     *
+     * @param arguments The arguments required to instantiate bean. Should match the types returned by {@link #getConstructorArguments()}
+     * @return An instance
+     * @throws InstantiationException If the bean cannot be instantiated.
+     */
+    @Nonnull T instantiate(Object... arguments) throws InstantiationException;
+
+    /**
      * The bean type.
      * @return The bean type
      */
     @Nonnull Class<T> getBeanType();
+
+    /**
+     * The constructor arguments needed to instantiate the bean.
+     * @return An argument array
+     */
+    default @Nonnull Argument<?>[] getConstructorArguments() {
+        return Argument.ZERO_ARGUMENTS;
+    }
 
     /**
      * Obtain a property by name.
@@ -94,6 +113,6 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
      * @return The properties names
      */
     default @Nonnull String[] getPropertyNames() {
-        return getProperties().stream().map(BeanProperty::getName).toArray(String[]::new);
+        return getBeanProperties().stream().map(BeanProperty::getName).toArray(String[]::new);
     }
 }

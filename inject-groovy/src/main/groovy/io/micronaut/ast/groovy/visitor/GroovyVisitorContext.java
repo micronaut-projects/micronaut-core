@@ -38,7 +38,10 @@ import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
 import javax.annotation.Nullable;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -128,6 +131,32 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     @Override
+    public OutputStream visitClass(String classname) throws IOException {
+        File classesDir = sourceUnit.getConfiguration().getTargetDirectory();
+        if (classesDir != null) {
+
+            DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
+                    classesDir
+            );
+            return outputVisitor.visitClass(classname);
+        }
+
+        return new ByteArrayOutputStream(); // in-memory
+    }
+
+    @Override
+    public void visitServiceDescriptor(String type, String classname) {
+        File classesDir = sourceUnit.getConfiguration().getTargetDirectory();
+        if (classesDir != null) {
+
+            DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
+                    classesDir
+            );
+            outputVisitor.visitServiceDescriptor(type, classname);
+        }
+    }
+
+    @Override
     public Optional<GeneratedFile> visitMetaInfFile(String path) {
         File classesDir = sourceUnit.getConfiguration().getTargetDirectory();
         if (classesDir != null) {
@@ -153,6 +182,11 @@ public class GroovyVisitorContext implements VisitorContext {
         }
 
         return Optional.empty();
+    }
+
+    @Override
+    public void finish() {
+        // no-op
     }
 
     /**

@@ -34,6 +34,8 @@ import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Optional;
@@ -125,6 +127,16 @@ public class JavaVisitorContext implements VisitorContext {
     }
 
     @Override
+    public OutputStream visitClass(String classname) throws IOException {
+        return outputVisitor.visitClass(classname);
+    }
+
+    @Override
+    public void visitServiceDescriptor(String type, String classname) {
+        outputVisitor.visitServiceDescriptor(type, classname);
+    }
+
+    @Override
     public Optional<GeneratedFile> visitMetaInfFile(String path) {
         return outputVisitor.visitMetaInfFile(path);
     }
@@ -132,6 +144,11 @@ public class JavaVisitorContext implements VisitorContext {
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path) {
         return outputVisitor.visitGeneratedFile(path);
+    }
+
+    @Override
+    public void finish() {
+        outputVisitor.finish();
     }
 
     /**
