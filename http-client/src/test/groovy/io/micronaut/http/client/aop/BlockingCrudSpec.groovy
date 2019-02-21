@@ -220,12 +220,6 @@ class BlockingCrudSpec extends Specification {
         }
     }
 
-    @Client("bookService")
-    public interface BookClient {
-
-
-    }
-
     static interface BookApi {
 
         @Get("/{id}")
