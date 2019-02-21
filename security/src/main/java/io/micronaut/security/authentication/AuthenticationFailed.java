@@ -90,4 +90,11 @@ public class AuthenticationFailed implements AuthenticationResponse {
         return Objects.hash(authenticationFailure);
     }
 
+    /**
+     *
+     * @return The reason why authentication failed.
+     */
+    public AuthenticationFailureReason getReason() {
+        return this.authenticationFailure;
+    }
 }
