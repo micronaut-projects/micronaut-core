@@ -133,7 +133,7 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param names              The names
      */
     @SuppressWarnings("MagicNumber")
-    public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, Boolean deduceEnvironments, String... names) {
+    public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, @Nullable Boolean deduceEnvironments, String... names) {
         super(conversionService);
         Set<String> environments = new LinkedHashSet<>(3);
         List<String> specifiedNames = Arrays.asList(names);
@@ -154,10 +154,10 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             LOG.info("Established active environments: {}", environments);
         }
         conversionService.addConverter(
-                CharSequence.class, Class.class, new StringToClassConverter(classLoader)
+            CharSequence.class, Class.class, new StringToClassConverter(classLoader)
         );
         conversionService.addConverter(
-                Object[].class, Class[].class, new StringArrayToClassArrayConverter(conversionService)
+            Object[].class, Class[].class, new StringArrayToClassArrayConverter(conversionService)
         );
         this.resourceLoader = resourceLoader;
         this.annotationScanner = createAnnotationScanner(classLoader);
@@ -339,11 +339,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @return Whether environment names and packages should be deduced
      */
     protected boolean shouldDeduceEnvironments() {
-
         if (deduceEnvironments != null) {
-
             if (LOG.isDebugEnabled()) {
-                LOG.debug("DeduceEnvironment builder setting: " + deduceEnvironments);
+                LOG.debug("Environment deduction was set explicitly via builder to: " + deduceEnvironments);
             }
 
             return deduceEnvironments;
@@ -351,20 +349,24 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
             String deduceProperty = System.getProperty(Environment.DEDUCE_ENVIRONMENT_PROPERTY);
             String deduceEnv = System.getenv(Environment.DEDUCE_ENVIRONMENT_ENV);
 
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("DeduceEnvironment system property: " + deduceProperty);
-                LOG.debug("DeduceEnvironment environment variable: " + deduceEnv);
-            }
-
             if (StringUtils.isNotEmpty(deduceEnv)) {
-                return Boolean.valueOf(deduceEnv);
-            } else if (StringUtils.isNotEmpty(deduceProperty)) {
-                return Boolean.valueOf(deduceProperty);
-            } else {
+                boolean deduce = Boolean.valueOf(deduceEnv);
                 if (LOG.isDebugEnabled()) {
-                    LOG.debug("DEDUCE_ENVIRONMENT_DEFAULT: " + DEDUCE_ENVIRONMENT_DEFAULT);
+                    LOG.debug("Environment deduction was set via environment variable to: " + deduce);
                 }
-                return DEDUCE_ENVIRONMENT_DEFAULT;
+                return deduce;
+            } else if (StringUtils.isNotEmpty(deduceProperty)) {
+                boolean deduce = Boolean.valueOf(deduceProperty);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Environment deduction was set via system property to: " + deduce);
+                }
+                return deduce;
+            } else {
+                boolean deduceDefault = DEDUCE_ENVIRONMENT_DEFAULT;
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Environment deduction is using the default of: " + deduceDefault);
+                }
+                return deduceDefault;
             }
         }
     }

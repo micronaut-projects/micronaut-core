@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.messaging;
 
 import io.micronaut.messaging.exceptions.MessageAcknowledgementException;
@@ -27,13 +28,15 @@ public interface Acknowledgement {
 
     /**
      * Acknowledges the message.
-     * @throws MessageAcknowledgementException may throw a MessageAcknowledgementException
+     *
+     * @throws MessageAcknowledgementException if an error occurred acknowledging the message
      */
     void ack() throws MessageAcknowledgementException;
 
     /**
      * Rejects the message.
-     * @throws MessageAcknowledgementException may throw a MessageAcknowledgementException
+     *
+     * @throws MessageAcknowledgementException if an error occurred rejecting the message
      */
     void nack() throws MessageAcknowledgementException;
 }
