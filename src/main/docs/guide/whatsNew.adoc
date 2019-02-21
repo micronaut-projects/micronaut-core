@@ -3,7 +3,7 @@ Micronaut {version} includes the following changes:
 
 === Modularization
 
-Micronaut is now modular with parts of Micronaut being shifted into subprojects. See the following links for new subprojects that now have indepent release cycles outside of Micronaut core:
+Micronaut is now modular with parts of Micronaut being shifted into sub-projects. See the following links for new sub-projects that now have independent release cycles outside of Micronaut core:
 
 * https://micronaut-projects.github.io/micronaut-kafka/1.1.x/guide/index.html[Micronaut Kafka]
 * https://micronaut-projects.github.io/micronaut-micrometer/1.1.x/guide/index.html[Micronaut Micrometer]
@@ -156,7 +156,7 @@ Note that api:http.server.types.files.SystemFile[] behaves differently from api:
 
 === Support for Freemarker Views
 
-Support for rendering <<freemarker,Freemaker Views>> has been added. Thanks to https://github.com/jerolba[Jeronimo López] for contributing this feature.
+Support for rendering <<freemarker,Freemarker Views>> has been added. Thanks to https://github.com/jerolba[Jeronimo López] for contributing this feature.
 
 === Constraint Bean Support
 
@@ -200,12 +200,7 @@ The following changes have been implemented:
 
 === Option to Disable Environment Detection
 
-Environment detection can be disabled by setting the `micronaut.env.deduction` system property or the `MICRONAUT_ENV_DEDUCTION` environment variable to `false`. Additionally, a new method has been added to api:context.ApplicationContextBuilder[] so that this setting can be made when the application context is instantiated.
-
-[source,groovy]
-----
-  ApplicationContext ctx = ApplicationContext.build().deduceEnvironment(false).start()
-----
+Environment detection can be disabled through a method on the application context builder, system property, or evnironment variable.
 
 See the <<environments, Environment>> documentation for more information.
 
