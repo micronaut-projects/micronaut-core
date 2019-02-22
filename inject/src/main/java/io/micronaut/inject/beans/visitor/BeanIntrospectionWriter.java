@@ -133,6 +133,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                         this,
                         propertyType,
                         name,
+                        isReadOnly,
                         propertyIndex++,
                         annotationMetadata,
                         typeArguments

@@ -64,12 +64,14 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
     private final ClassWriter classWriter;
     private final Map<String, Object> typeArguments;
     private final Type beanType;
+    private final boolean readOnly;
 
     /**
      * Default constructor.
      * @param introspectionWriter The outer inspection writer.
      * @param propertyType The property type
      * @param propertyName The property name
+     * @param isReadOnly Is the property read only
      * @param index The index for the type
      * @param annotationMetadata The annotation metadata
      * @param typeArguments The type arguments for the property
@@ -78,7 +80,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             @Nonnull BeanIntrospectionWriter introspectionWriter,
             @Nonnull Type propertyType,
             @Nonnull String propertyName,
-            int index,
+            boolean isReadOnly, int index,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Map<String, ClassElement> typeArguments) {
 
@@ -86,6 +88,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         this.beanType = introspectionWriter.getBeanType();
         this.propertyType = propertyType;
         this.propertyName = propertyName;
+        this.readOnly = isReadOnly;
         this.annotationMetadata = annotationMetadata == AnnotationMetadata.EMPTY_METADATA ? null : annotationMetadata;
         this.type = getTypeReference(introspectionType.getClassName() + "$$" + index);
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
@@ -148,6 +151,14 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             // the write method
             writeWriteMethod();
 
+            if (readOnly) {
+                // override isReadOnly method
+                final GeneratorAdapter isReadOnly = startPublicMethodZeroArgs(classWriter, boolean.class, "isReadOnly");
+                isReadOnly.push(true);
+                isReadOnly.returnValue();
+                isReadOnly.visitMaxs(1, 1);
+                isReadOnly.endMethod();
+            }
             classOutput.write(classWriter.toByteArray());
         }
     }
