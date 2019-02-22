@@ -17,10 +17,12 @@ package io.micronaut.security.rules;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.security.annotation.Secured;
+import io.micronaut.security.token.RolesParser;
 import io.micronaut.security.token.config.TokenConfiguration;
 import io.micronaut.web.router.MethodBasedRouteMatch;
 import io.micronaut.web.router.RouteMatch;
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.Arrays;
 import java.util.Map;
@@ -42,11 +44,21 @@ public class SecuredAnnotationRule extends AbstractSecurityRule {
     public static final Integer ORDER = ConfigurationInterceptUrlMapRule.ORDER - 100;
 
     /**
-     *
+     * @deprecated use {@link SecuredAnnotationRule(RolesParser)} instead.
      * @param tokenConfiguration Token Configuration.
      */
-    SecuredAnnotationRule(TokenConfiguration tokenConfiguration) {
+    @Deprecated
+    public SecuredAnnotationRule(TokenConfiguration tokenConfiguration) {
         super(tokenConfiguration);
+    }
+
+    /**
+     *
+     * @param rolesParser Roles Parser
+     */
+    @Inject
+    public SecuredAnnotationRule(RolesParser rolesParser) {
+        super(rolesParser);
     }
 
     /**
