@@ -17,9 +17,11 @@ package io.micronaut.inject.constructor.arrayinjection
 
 import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
+import io.micronaut.inject.AbstractTypeElementSpec
+import io.micronaut.inject.BeanDefinition
 import spock.lang.Specification
 
-class ConstructorArrayInjectionSpec extends Specification {
+class ConstructorArrayInjectionSpec extends AbstractTypeElementSpec {
 
     void "test array injection with constructor"() {
         given:
@@ -34,5 +36,35 @@ class ConstructorArrayInjectionSpec extends Specification {
         b.all.size() == 2
         b.all.contains(context.getBean(AImpl))
         b.all.contains(context.getBean(AnotherImpl))
+    }
+
+
+    void "test array injection with constructor - parsing"() {
+        when:
+        BeanDefinition beanDefinition = buildBeanDefinition('test.B', '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import javax.inject.*;
+class B {
+    private A[] all;
+
+    @Inject
+    public B(A[] all) {
+        this.all = all;
+    }
+
+    public java.util.List<A> getAll() {
+        return java.util.Arrays.asList(all);
+    }
+}
+
+@Singleton
+class A {}
+
+''')
+        then:
+        beanDefinition != null
+        beanDefinition.constructor.arguments.size() == 1
     }
 }
