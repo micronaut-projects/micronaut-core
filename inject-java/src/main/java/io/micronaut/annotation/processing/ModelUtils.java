@@ -163,7 +163,7 @@ public class ModelUtils {
      * @return The constructor
      */
     @Nullable
-    ExecutableElement concreteConstructorFor(TypeElement classElement) {
+    public ExecutableElement concreteConstructorFor(TypeElement classElement) {
         List<ExecutableElement> constructors = findNonPrivateConstructors(classElement);
         if (constructors.isEmpty()) {
             return null;

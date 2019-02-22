@@ -24,6 +24,8 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -73,8 +75,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
                                     metadata ? element.getAnnotationMetadata() : null
                             );
 
-                            final List<PropertyElement> beanProperties = ce.getBeanProperties();
-                            process(writer, beanProperties, includes, excludes, excludedAnnotations, indexedAnnotations, metadata);
+                            processElement(context, metadata, includes, excludes, excludedAnnotations, indexedAnnotations, ce, writer);
+
                         }
                     });
                 }
@@ -97,8 +99,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
                                     metadata ? element.getAnnotationMetadata() : null
                             );
 
-                            final List<PropertyElement> beanProperties = classElement.getBeanProperties();
-                            process(writer, beanProperties, includes, excludes, excludedAnnotations, indexedAnnotations, metadata);
+                            processElement(context, metadata, includes, excludes, excludedAnnotations, indexedAnnotations, classElement, writer);
                         }
                     }
                 }
@@ -109,8 +110,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
                         metadata ? element.getAnnotationMetadata() : null
                 );
 
-                final List<PropertyElement> beanProperties = element.getBeanProperties();
-                process(writer, beanProperties, includes, excludes, excludedAnnotations, indexedAnnotations, metadata);
+                processElement(context, metadata, includes, excludes, excludedAnnotations, indexedAnnotations, element, writer);
             }
 
         }
@@ -128,12 +128,36 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
         }
     }
 
+    private void processElement(VisitorContext context, boolean metadata, Set<String> includes, Set<String> excludes, Set<String> excludedAnnotations, Set<String> indexedAnnotations, ClassElement ce, BeanIntrospectionWriter writer) {
+        final List<PropertyElement> beanProperties = ce.getBeanProperties();
+        Optional<ConstructorElement> constructorElement = ce.getPublicConstructor();
+
+        if (!constructorElement.isPresent()) {
+            context.fail("Introspected types must have a single public constructor", ce);
+        } else {
+            final ConstructorElement constructor = constructorElement.get();
+            if (Arrays.stream(constructor.getParameters()).anyMatch(p -> p.getType() == null)) {
+                context.fail("Introspected constructor includes unsupported argument types", ce);
+            } else {
+                process(constructor, writer, beanProperties, includes, excludes, excludedAnnotations, indexedAnnotations, metadata);
+            }
+        }
+    }
+
     private void process(
+            ConstructorElement constructorElement, 
             BeanIntrospectionWriter writer,
             List<PropertyElement> beanProperties,
             Set<String> includes,
             Set<String> excludes,
             Set<String> ignored, Set<String> indexedAnnotations, boolean metadata) {
+
+        final ParameterElement[] parameters = constructorElement.getParameters();
+        if (ArrayUtils.isNotEmpty(parameters)) {
+
+            writer.visitConstructorArguments(parameters);
+        }
+
         for (PropertyElement beanProperty : beanProperties) {
             final ClassElement type = beanProperty.getType();
             if (type != null) {

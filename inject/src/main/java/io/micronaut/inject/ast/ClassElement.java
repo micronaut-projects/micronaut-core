@@ -40,6 +40,14 @@ public interface ClassElement extends TypedElement {
     boolean isAssignable(String type);
 
     /**
+     * Find and return a single public constructor. If more than one or no public constructor exists, then return empty.
+     * @return The public constructor if one is present
+     */
+    default @Nonnull Optional<ConstructorElement> getPublicConstructor() {
+        return Optional.empty();
+    }
+
+    /**
      * Returns the super type of this element or empty if the element has no super type.
      *
      * @return An optional of the super type
@@ -155,4 +163,5 @@ public interface ClassElement extends TypedElement {
     default boolean isAssignable(Class<?> type) {
         return isAssignable(type.getName());
     }
+
 }

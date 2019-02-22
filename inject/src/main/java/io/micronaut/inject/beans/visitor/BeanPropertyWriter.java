@@ -100,23 +100,6 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
 
     }
 
-    @NotNull
-    private Map<String, Object> toTypeArguments(@NotNull Map<String, ClassElement> typeArguments) {
-        final LinkedHashMap<String, Object> map = new LinkedHashMap<>(typeArguments.size());
-        for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
-            final ClassElement ce = entry.getValue();
-            final Map<String, ClassElement> subArgs = ce.getTypeArguments();
-            if (CollectionUtils.isNotEmpty(subArgs)) {
-                map.put(entry.getKey(), toTypeArguments(subArgs));
-            } else {
-                final Type typeReference = getTypeForElement(ce);
-                map.put(entry.getKey(), typeReference);
-            }
-        }
-
-        return map;
-    }
-
     @Nonnull
     @Override
     public String getName() {

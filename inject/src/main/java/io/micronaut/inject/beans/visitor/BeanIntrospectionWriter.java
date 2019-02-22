@@ -23,7 +23,11 @@ import io.micronaut.core.beans.BeanIntrospectionReference;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.beans.AbstractBeanIntrospection;
 import io.micronaut.inject.beans.AbstractBeanIntrospectionReference;
@@ -40,6 +44,7 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * A class file writer that writes a {@link io.micronaut.core.beans.BeanIntrospectionReference} and associated
@@ -63,6 +68,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private final List<BeanPropertyWriter> propertyDefinitions = new ArrayList<>();
     private final Map<String, Collection<String>> indexes = new HashMap<>(2);
     private int propertyIndex = 0;
+    private ParameterElement[] constructorArguments;
 
     /**
      * Default constructor.
@@ -237,14 +243,62 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
 
             // write the instantiate method
-            final GeneratorAdapter instantiateMethod = startPublicMethod(introspectionWriter, "instantiate", Object.class.getName());
-            pushNewInstance(instantiateMethod, beanType);
-            instantiateMethod.visitInsn(ARETURN);
-            instantiateMethod.visitMaxs(2, 1);
-            instantiateMethod.visitEnd();
+            writeInstantiateMethod();
+
+            // write constructor arguments
+            if (ArrayUtils.isNotEmpty(constructorArguments)) {
+                writeConstructorArguments();
+            }
 
             introspectionStream.write(introspectionWriter.toByteArray());
         }
+    }
+
+    private void writeConstructorArguments() {
+        final GeneratorAdapter getConstructorArguments = startPublicMethodZeroArgs(introspectionWriter, Argument[].class, "getConstructorArguments");
+        pushTypeArguments(getConstructorArguments, toTypeArguments(constructorArguments));
+        getConstructorArguments.returnValue();
+        getConstructorArguments.visitMaxs(1, 1);
+        getConstructorArguments.endMethod();
+
+        final String desc = getMethodDescriptor(Object.class, Collections.singleton(Object[].class));
+        final GeneratorAdapter instantiateInternal = new GeneratorAdapter(introspectionWriter.visitMethod(
+                ACC_PUBLIC,
+                "instantiateInternal",
+                desc,
+                null,
+                null
+        ), ACC_PUBLIC,
+                "instantiateInternal",
+                desc);
+
+        @SuppressWarnings("ConstantConditions") Collection<Type> argumentTypes = Arrays.stream(constructorArguments).map(pe ->
+            getTypeForElement(pe.getType())
+        ).collect(Collectors.toList());
+
+        instantiateInternal.newInstance(beanType);
+        instantiateInternal.dup();
+        int i = 0;
+        for (Type argumentType : argumentTypes) {
+            instantiateInternal.loadArg(0);
+            instantiateInternal.push(i++);
+            instantiateInternal.arrayLoad(TYPE_OBJECT);
+            pushCastToType(instantiateInternal, argumentType);
+        }
+        final String constructorDescriptor = getConstructorDescriptor((Collection) argumentTypes);
+        instantiateInternal.invokeConstructor(beanType, new Method("<init>", constructorDescriptor));
+        instantiateInternal.visitInsn(ARETURN);
+        instantiateInternal.visitMaxs(2, 1);
+        instantiateInternal.visitEnd();
+
+    }
+
+    private void writeInstantiateMethod() {
+        final GeneratorAdapter instantiateMethod = startPublicMethod(introspectionWriter, "instantiate", Object.class.getName());
+        pushNewInstance(instantiateMethod, beanType);
+        instantiateMethod.visitInsn(ARETURN);
+        instantiateMethod.visitMaxs(2, 1);
+        instantiateMethod.visitEnd();
     }
 
     private void writeIntrospectionReference(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
@@ -320,4 +374,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         return packageName + ".$" + shortName + INTROSPECTION_SUFFIX;
     }
 
+    void visitConstructorArguments(ParameterElement... parameters) {
+        this.constructorArguments = parameters;
+    }
 }

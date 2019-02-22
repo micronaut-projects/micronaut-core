@@ -22,16 +22,17 @@ import io.micronaut.ast.groovy.utils.PublicMethodVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.PropertyElement;
-import org.codehaus.groovy.ast.ClassHelper;
-import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.MethodNode;
-import org.codehaus.groovy.ast.PropertyNode;
+import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.control.SourceUnit;
 
 import javax.annotation.Nonnull;
+import javax.inject.Inject;
 import java.lang.reflect.Modifier;
 import java.util.*;
+
+import static org.codehaus.groovy.ast.ClassHelper.makeCached;
 
 /**
  * A class element returning data from a {@link ClassNode}.
@@ -68,6 +69,15 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
             );
         }
         return Optional.empty();
+    }
+
+    @Nonnull
+    @Override
+    public Optional<ConstructorElement> getPublicConstructor() {
+        return Optional.ofNullable(findConcreteConstructor(classNode.getDeclaredConstructors())).map(constructorNode -> {
+            final AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, constructorNode);
+            return new GroovyConstructorElement(sourceUnit, constructorNode, annotationMetadata);
+        });
     }
 
     @Override
@@ -275,6 +285,34 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
     @Override
     public boolean isAssignable(String type) {
         return AstClassUtils.isSubclassOf(classNode, type);
+    }
+
+    private ConstructorNode findConcreteConstructor(List<ConstructorNode> constructors) {
+        if (constructors == null) {
+            return null;
+        }
+        List<ConstructorNode> nonPrivateConstructors = findNonPrivateConstructors(constructors);
+
+        ConstructorNode constructorNode;
+        if (nonPrivateConstructors.size() == 1) {
+            constructorNode = nonPrivateConstructors.get(0);
+        } else {
+            constructorNode = nonPrivateConstructors.stream().filter(cn -> !cn.getAnnotations(makeCached(Inject.class)).isEmpty()).findFirst().orElse(null);
+            if (constructorNode == null) {
+                constructorNode = nonPrivateConstructors.stream().filter(cn -> Modifier.isPublic(cn.getModifiers())).findFirst().orElse(null);
+            }
+        }
+        return constructorNode;
+    }
+
+    private List<ConstructorNode> findNonPrivateConstructors(List<ConstructorNode> constructorNodes) {
+        List<ConstructorNode> nonPrivateConstructors = new ArrayList<>(2);
+        for (ConstructorNode node : constructorNodes) {
+            if (!Modifier.isPrivate(node.getModifiers())) {
+                nonPrivateConstructors.add(node);
+            }
+        }
+        return nonPrivateConstructors;
     }
 
     /**

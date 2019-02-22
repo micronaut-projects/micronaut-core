@@ -19,7 +19,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
+import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
@@ -216,6 +220,54 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         }
         return propertyType;
     }
+
+    /**
+     * Converts a map of class elements to type arguments.
+     * @param typeArguments The type arguments
+     * @return The type arguments
+     */
+    @NotNull
+    protected Map<String, Object> toTypeArguments(@NotNull Map<String, ClassElement> typeArguments) {
+        final LinkedHashMap<String, Object> map = new LinkedHashMap<>(typeArguments.size());
+        for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
+            final ClassElement ce = entry.getValue();
+            final Map<String, ClassElement> subArgs = ce.getTypeArguments();
+            if (CollectionUtils.isNotEmpty(subArgs)) {
+                map.put(entry.getKey(), toTypeArguments(subArgs));
+            } else {
+                final Type typeReference = getTypeForElement(ce);
+                map.put(entry.getKey(), typeReference);
+            }
+        }
+
+        return map;
+    }
+
+    /**
+     * Converts a parameters to type arguments.
+     * @param parameters The parameters
+     * @return The type arguments
+     */
+    @NotNull
+    protected Map<String, Object> toTypeArguments(ParameterElement... parameters) {
+        final LinkedHashMap<String, Object> map = new LinkedHashMap<>(parameters.length);
+        for (ParameterElement ce : parameters) {
+            final ClassElement type = ce.getType();
+            if (type == null) {
+                continue;
+            }
+            final Map<String, ClassElement> subArgs = type.getTypeArguments();
+            if (CollectionUtils.isNotEmpty(subArgs)) {
+                map.put(ce.getName(), toTypeArguments(subArgs));
+            } else {
+                final Type typeReference = getTypeForElement(type);
+                map.put(ce.getName(), typeReference);
+            }
+        }
+
+        return map;
+    }
+
 
     /**
      * Accept a ClassWriterOutputVisitor to write this writer to disk.
@@ -738,6 +790,7 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     protected void startFinalClass(ClassVisitor classWriter, String className, Type superType) {
         classWriter.visit(V1_8, ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
     }
+
     /**
      * @param classWriter      The current class writer
      * @param className        The class name
@@ -938,4 +991,5 @@ public abstract class AbstractClassFileWriter implements Opcodes {
         generatorAdapter.dup();
         generatorAdapter.invokeConstructor(typeToInstantiate, METHOD_DEFAULT_CONSTRUCTOR);
     }
+
 }
