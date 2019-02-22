@@ -226,7 +226,9 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                     if (fieldElement != null) {
                         annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(fieldElement, value.getter);
                     } else {
-                        annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(value.getter);
+                        annotationMetadata = visitorContext
+                                .getAnnotationUtils()
+                                .newAnnotationBuilder().buildForMethod(value.getter);
                     }
                     JavaPropertyElement propertyElement = new JavaPropertyElement(
                             value.declaringType == null ? this : value.declaringType,

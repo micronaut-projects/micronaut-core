@@ -6,6 +6,9 @@ import io.micronaut.core.beans.BeanIntrospector
 import spock.lang.Specification
 
 import javax.inject.Singleton
+import javax.persistence.Entity
+import javax.persistence.Id
+import javax.persistence.Version
 
 class BeanIntrospectorSpec extends Specification {
 
@@ -21,6 +24,20 @@ class BeanIntrospectorSpec extends Specification {
         and:"You get a unique instance per call"
         BeanIntrospection.getIntrospection(TestBean).instantiate() instanceof TestBean
         !beanIntrospection.is(BeanIntrospection.getIntrospection(TestBean))
+    }
+
+    void "test entity"() {
+        given:
+        BeanIntrospection<TestEntity> introspection = BeanIntrospection.getIntrospection(TestEntity)
+
+        expect:
+        introspection.getProperty("id").get().hasAnnotation(Id)
+        !introspection.getProperty("id").get().hasAnnotation(Entity)
+        !introspection.getProperty("id").get().hasStereotype(Entity)
+
+        introspection.getProperty("version").get().hasAnnotation(Version)
+        !introspection.getProperty("version").get().hasAnnotation(Entity)
+        !introspection.getProperty("version").get().hasStereotype(Entity)
     }
 
     void "test find introspections"() {

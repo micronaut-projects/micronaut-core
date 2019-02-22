@@ -15,6 +15,7 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder;
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.ast.groovy.utils.AstClassUtils;
 import io.micronaut.ast.groovy.utils.AstGenericUtils;
@@ -232,7 +233,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                     if (field != null) {
                         annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, field, value.getter);
                     } else {
-                        annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, value.getter);
+                        annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit).buildForMethod(value.getter);
                     }
                     GroovyPropertyElement propertyElement = new GroovyPropertyElement(
                             value.declaringType == null ? this : value.declaringType,

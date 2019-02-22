@@ -13,7 +13,9 @@ import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
 
 import javax.annotation.processing.SupportedAnnotationTypes
+import javax.persistence.Entity
 import javax.persistence.Id
+import javax.persistence.Version
 import javax.validation.constraints.Size
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
@@ -39,6 +41,8 @@ class Test {
     @Size(max=100)
     private int age;
     private int[] primitiveArray;
+    
+    private long v;
     
     public Test(String name, int age, int[] primitiveArray) {
         this.name = name;
@@ -72,6 +76,15 @@ class Test {
     public Long getVersion() {
         return this.version;
     }
+    
+    @Version
+    public long getAnotherVersion() {
+        return v;
+    }
+    
+    public void setAnotherVersion(long v) {
+        this.v = v;
+    }
 }
 ''')
 
@@ -90,7 +103,18 @@ class Test {
         bi.getConstructorArguments()[0].name == 'name'
         bi.getConstructorArguments()[0].type == String
         bi.getBeanProperties(Id).size() == 1
-        bi.getBeanProperties(Id).first().name == 'id'
+        bi.getProperty("version").get().hasAnnotation(Version)
+        bi.getProperty("anotherVersion").get().hasAnnotation(Version)
+        // should not inherit metadata from class
+        !bi.getProperty("anotherVersion").get().hasAnnotation(Entity)
+
+        when:
+        BeanProperty idProp = bi.getBeanProperties(Id).first()
+
+        then:
+        idProp.name == 'id'
+        !idProp.hasAnnotation(Entity)
+        !idProp.hasStereotype(Entity)
 
 
         when:
