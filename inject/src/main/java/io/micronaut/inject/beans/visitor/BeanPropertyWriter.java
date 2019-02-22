@@ -121,6 +121,14 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
     }
 
     /**
+     * @return The property name
+     */
+    @Nonnull
+    public String getPropertyName() {
+        return propertyName;
+    }
+
+    /**
      * @return The type for this writer.
      */
     public Type getType() {

@@ -13,9 +13,83 @@ import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
 
 import javax.annotation.processing.SupportedAnnotationTypes
+import javax.persistence.Id
 import javax.validation.constraints.Size
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
+
+
+    void "test write bean introspection data for entity"() {
+        given:
+        ApplicationContext context = buildContext('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import javax.persistence.*;
+import java.util.*;
+
+@Entity
+class Test {
+    @Id
+    @GeneratedValue
+    private Long id;
+    @Version
+    private Long version;
+    private String name;
+    @Size(max=100)
+    private int age;
+    
+    
+    public String getName() {
+        return this.name;
+    }
+    public void setName(String n) {
+        this.name = n;
+    }
+    public int getAge() {
+        return age;
+    }
+    public void setAge(int age) {
+        this.age = age;
+    }
+    
+    public void setId(Long id) {
+        this.id = id;
+    }
+    
+    public Long getId() {
+        return this.id;
+    }
+    
+    public void setVersion(Long version) {
+        this.version = version;
+    }
+    
+    public Long getVersion() {
+        return this.version;
+    }
+}
+''')
+
+        when:"the reference is loaded"
+        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+
+        when:"The introspection is loaded"
+        BeanIntrospection bi = reference.load()
+
+        then:"it is correct"
+        bi.instantiate()
+        bi.getBeanProperties(Id).size() == 1
+        bi.getBeanProperties(Id).first().name == 'id'
+
+        cleanup:
+        context?.close()
+    }
 
     void "test write bean introspection data for classes"() {
         given:

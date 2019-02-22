@@ -58,6 +58,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
             final Set<String> excludes = CollectionUtils.setOf(introspected.get("excludes", String[].class, StringUtils.EMPTY_STRING_ARRAY));
             final Set<String> excludedAnnotations = CollectionUtils.setOf(introspected.get("excludedAnnotations", String[].class, StringUtils.EMPTY_STRING_ARRAY));
             final Set<String> includedAnnotations = CollectionUtils.setOf(introspected.get("includedAnnotations", String[].class, StringUtils.EMPTY_STRING_ARRAY));
+            final Set<String> indexedAnnotations = CollectionUtils.setOf(introspected.get("indexed", String[].class, StringUtils.EMPTY_STRING_ARRAY));
 
             if (ArrayUtils.isNotEmpty(classes)) {
                 AtomicInteger index = new AtomicInteger(0);
@@ -73,7 +74,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
                             );
 
                             final List<PropertyElement> beanProperties = ce.getBeanProperties();
-                            process(writer, beanProperties, includes, excludes, excludedAnnotations, metadata);
+                            process(writer, beanProperties, includes, excludes, excludedAnnotations, indexedAnnotations, metadata);
                         }
                     });
                 }
@@ -85,8 +86,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
                     for (String aPackage : packages) {
                         ClassElement[] elements = context.getClassElements(aPackage, includedAnnotations.toArray(new String[0]));
                         int j = 0;
-                        for (int i = 0; i < elements.length; i++) {
-                            ClassElement classElement = elements[i];
+                        for (ClassElement classElement : elements) {
                             if (classElement.isAbstract() || !classElement.isPublic()) {
                                 continue;
                             }
@@ -98,7 +98,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
                             );
 
                             final List<PropertyElement> beanProperties = classElement.getBeanProperties();
-                            process(writer, beanProperties, includes, excludes, excludedAnnotations, metadata);
+                            process(writer, beanProperties, includes, excludes, excludedAnnotations, indexedAnnotations, metadata);
                         }
                     }
                 }
@@ -110,7 +110,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
                 );
 
                 final List<PropertyElement> beanProperties = element.getBeanProperties();
-                process(writer, beanProperties, includes, excludes, excludedAnnotations, metadata);
+                process(writer, beanProperties, includes, excludes, excludedAnnotations, indexedAnnotations, metadata);
             }
 
         }
@@ -133,7 +133,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
             List<PropertyElement> beanProperties,
             Set<String> includes,
             Set<String> excludes,
-            Set<String> ignored, boolean metadata) {
+            Set<String> ignored, Set<String> indexedAnnotations, boolean metadata) {
         for (PropertyElement beanProperty : beanProperties) {
             final ClassElement type = beanProperty.getType();
             if (type != null) {
@@ -157,6 +157,12 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
                         metadata ? beanProperty.getAnnotationMetadata() : null,
                         beanProperty.getType().getTypeArguments()
                 );
+
+                for (String indexedAnnotation : indexedAnnotations) {
+                    if (beanProperty.hasStereotype(indexedAnnotation)) {
+                        writer.indexProperty(indexedAnnotation, name);
+                    }
+                }
             }
         }
         writers.add(writer);
