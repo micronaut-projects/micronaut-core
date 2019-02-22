@@ -187,6 +187,7 @@ public class GroovyVisitorContext implements VisitorContext {
                     classesDir
             );
             outputVisitor.visitServiceDescriptor(type, classname);
+            outputVisitor.finish();
         }
     }
 
