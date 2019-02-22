@@ -19,7 +19,6 @@ import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.StringUtils;
 
-import javax.annotation.Nonnull;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.util.ArrayList;

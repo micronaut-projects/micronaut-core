@@ -58,8 +58,8 @@ public class UserDetails implements AuthenticationResponse {
     }
 
     /**
-     * @param rolesKey the key name used for the roles
-     * @param usernameKey the key name used for the username
+     * @param rolesKey the key for the roles attribute
+     * @param usernameKey the key for the username attribute
      * @return User's attributes
      */
     public Map<String, Object> getAttributes(String rolesKey, String usernameKey) {

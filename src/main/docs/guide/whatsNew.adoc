@@ -3,7 +3,7 @@ Micronaut {version} includes the following changes:
 
 === Modularization
 
-Micronaut is now modular with parts of Micronaut being shifted into subprojects. See the following links for new subprojects that now have indepent release cycles outside of Micronaut core:
+Micronaut is now modular with parts of Micronaut being shifted into sub-projects. See the following links for new sub-projects that now have independent release cycles outside of Micronaut core:
 
 * https://micronaut-projects.github.io/micronaut-kafka/1.1.x/guide/index.html[Micronaut Kafka]
 * https://micronaut-projects.github.io/micronaut-micrometer/1.1.x/guide/index.html[Micronaut Micrometer]
@@ -156,7 +156,7 @@ Note that api:http.server.types.files.SystemFile[] behaves differently from api:
 
 === Support for Freemarker Views
 
-Support for rendering <<freemarker,Freemaker Views>> has been added. Thanks to https://github.com/jerolba[Jeronimo López] for contributing this feature.
+Support for rendering <<freemarker,Freemarker Views>> has been added. Thanks to https://github.com/jerolba[Jeronimo López] for contributing this feature.
 
 === Constraint Bean Support
 
@@ -197,6 +197,12 @@ The following changes have been implemented:
 * Routes gain control of the data flow as soon as they are executed. A route cannot be executed until all of its arguments are fulfilled, so data will reside on memory or disk until the route can be executed.
 * After processing a chunk of data it is immediately released. For memory uploads this means the data is immediately freed. For disk uploads the data remains on disk until after processing.
 * Two new configuration options are available to support mixed uploads: `micronaut.server.multipart.mixed` and `micronaut.server.multipart.threshold`. When data needs to be buffered, mixed uploads will initially store data in memory. Once the threshold is reached, the data will be erased from memory and moved entirely onto disk.
+
+=== Option to Disable Environment Detection
+
+Environment detection can be disabled through a method on the application context builder, system property, or evnironment variable.
+
+See the <<environments, Environment>> documentation for more information.
 
 === Dependency Upgrades
 

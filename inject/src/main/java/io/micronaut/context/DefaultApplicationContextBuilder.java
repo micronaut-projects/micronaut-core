@@ -36,7 +36,7 @@ import java.util.Map;
  * @author graemerocher
  * @since 1.0
  */
-public class DefaultApplicationContextBuilder implements ApplicationContextBuilder {
+public class DefaultApplicationContextBuilder implements ApplicationContextBuilder, ApplicationContextConfiguration {
     private List<Object> singletons = new ArrayList<>();
     private List<String> environments = new ArrayList<>();
     private List<String> packages = new ArrayList<>();
@@ -45,6 +45,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private ClassPathResourceLoader classPathResourceLoader;
     private Collection<String> configurationIncludes = new HashSet<>();
     private Collection<String> configurationExcludes = new HashSet<>();
+    private Boolean deduceEnvironments = null;
 
     /**
      * Default constructor.
@@ -57,6 +58,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         if (beans != null) {
             singletons.addAll(Arrays.asList(beans));
         }
+        return this;
+    }
+
+    @Override
+    public ApplicationContextBuilder deduceEnvironment(@Nullable Boolean deduceEnvironments) {
+        this.deduceEnvironments = deduceEnvironments;
         return this;
     }
 
@@ -93,6 +100,16 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public Boolean getDeduceEnvironments() {
+        return deduceEnvironments;
+    }
+
+    @Override
+    public List<String> getEnvironments() {
+        return environments;
+    }
+
+    @Override
     public ApplicationContextBuilder mainClass(Class mainClass) {
         if (mainClass != null) {
             ClassLoader classLoader = mainClass.getClassLoader();
@@ -119,7 +136,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         ClassLoader classLoader = ApplicationContext.class.getClassLoader();
         DefaultApplicationContext applicationContext = new DefaultApplicationContext(
             classPathResourceLoader != null ? classPathResourceLoader : ClassPathResourceLoader.defaultLoader(classLoader),
-            environments.toArray(new String[0])
+            this
         );
 
         Environment environment = applicationContext.getEnvironment();

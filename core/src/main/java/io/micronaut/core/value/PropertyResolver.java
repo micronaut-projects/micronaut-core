@@ -22,11 +22,9 @@ import io.micronaut.core.type.Argument;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * A property resolver is capable of resolving properties from an underlying property source.

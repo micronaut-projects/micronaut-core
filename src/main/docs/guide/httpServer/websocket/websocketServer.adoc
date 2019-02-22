@@ -3,7 +3,7 @@ The ann:websocket.annotation.ServerWebSocket[] annotation can be applied to any 
 .WebSocket Chat Example
 [source,java]
 ----
-include::{testswebsocket}/ChatServerWebSocket.java[]
+include::{testswebsocket}/ChatServerWebSocket.java[tag=clazz]
 ----
 
 <1> The ann:websocket.annotation.ServerWebSocket[] annotation is used to define the path the WebSocket is mapped under. The URI can be a URI template.
