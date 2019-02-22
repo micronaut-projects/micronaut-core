@@ -39,10 +39,7 @@ import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
-import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.CollectionUtils;
-import io.micronaut.core.util.StreamUtils;
-import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.*;
 import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import io.micronaut.inject.*;
 import io.micronaut.inject.qualifiers.Qualified;
@@ -113,7 +110,6 @@ public class DefaultBeanContext implements BeanContext {
             BeanInitializedEventListener.class
     );
     private final CustomScopeRegistry customScopeRegistry;
-    private final ResourceLoader resourceLoader;
     private Collection<BeanRegistration<BeanCreatedEventListener>> beanCreationEventListeners;
 
     /**
@@ -128,8 +124,15 @@ public class DefaultBeanContext implements BeanContext {
      *
      * @param classLoader The class loader
      */
-    public DefaultBeanContext(ClassLoader classLoader) {
-        this(ClassPathResourceLoader.defaultLoader(classLoader));
+    public DefaultBeanContext(@Nonnull ClassLoader classLoader) {
+        this(new BeanContextConfiguration() {
+            @Nonnull
+            @Override
+            public ClassLoader getClassLoader() {
+                ArgumentUtils.requireNonNull("classLoader", classLoader);
+                return classLoader;
+            }
+        });
     }
 
     /**
@@ -137,9 +140,24 @@ public class DefaultBeanContext implements BeanContext {
      *
      * @param resourceLoader The resource loader
      */
-    public DefaultBeanContext(ClassPathResourceLoader resourceLoader) {
-        this.classLoader = resourceLoader.getClassLoader();
-        this.resourceLoader = resourceLoader;
+    public DefaultBeanContext(@Nonnull ClassPathResourceLoader resourceLoader) {
+        this(new BeanContextConfiguration() {
+            @Nonnull
+            @Override
+            public ClassLoader getClassLoader() {
+                ArgumentUtils.requireNonNull("resourceLoader", resourceLoader);
+                return resourceLoader.getClassLoader();
+            }
+        });
+    }
+
+    /**
+     * Creates a new bean context with the given configuration.
+     * @param contextConfiguration The context configuration
+     */
+    public DefaultBeanContext(@Nonnull BeanContextConfiguration contextConfiguration) {
+        ArgumentUtils.requireNonNull("contextConfiguration", contextConfiguration);
+        this.classLoader = contextConfiguration.getClassLoader();
         this.customScopeRegistry = new DefaultCustomScopeRegistry(this, classLoader);
 
         // startup optimization.. index Jackson modules

@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.env;
 
+import io.micronaut.context.ApplicationContextConfiguration;
 import io.micronaut.context.converters.StringArrayToClassArrayConverter;
 import io.micronaut.context.converters.StringToClassConverter;
 import io.micronaut.context.exceptions.ConfigurationException;
@@ -37,6 +38,7 @@ import io.micronaut.inject.BeanConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.*;
 import java.lang.annotation.Annotation;
@@ -95,14 +97,18 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
     /**
      * @param classLoader The class loader
      * @param names       The names
+     * @deprecated Use {@link #DefaultEnvironment(ApplicationContextConfiguration)} instead
      */
+    @Deprecated
     public DefaultEnvironment(ClassLoader classLoader, String... names) {
         this(classLoader, ConversionService.SHARED, names);
     }
 
     /**
      * @param names The names
+     * @deprecated Use {@link #DefaultEnvironment(ApplicationContextConfiguration)} instead
      */
+    @Deprecated
     public DefaultEnvironment(String... names) {
         this(DefaultEnvironment.class.getClassLoader(), ConversionService.SHARED, names);
     }
@@ -111,7 +117,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param classLoader       The class loader
      * @param conversionService The conversion service
      * @param names             The names
+     * @deprecated Use {@link #DefaultEnvironment(ApplicationContextConfiguration)} instead
      */
+    @Deprecated
     public DefaultEnvironment(ClassLoader classLoader, ConversionService conversionService, String... names) {
         this(ClassPathResourceLoader.defaultLoader(classLoader), conversionService, names);
     }
@@ -120,7 +128,9 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      * @param resourceLoader    The resource loader
      * @param conversionService The conversion service
      * @param names             The names
+     * @deprecated Use {@link #DefaultEnvironment(ApplicationContextConfiguration)} instead
      */
+    @Deprecated
     @SuppressWarnings("MagicNumber")
     public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, String... names) {
         this(resourceLoader, conversionService, null, names);
@@ -134,11 +144,43 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
      */
     @SuppressWarnings("MagicNumber")
     public DefaultEnvironment(ClassPathResourceLoader resourceLoader, ConversionService conversionService, @Nullable Boolean deduceEnvironments, String... names) {
-        super(conversionService);
-        Set<String> environments = new LinkedHashSet<>(3);
-        List<String> specifiedNames = Arrays.asList(names);
+        this(new ApplicationContextConfiguration() {
+            @Nonnull
+            @Override
+            public List<String> getEnvironments() {
+                return Arrays.asList(names);
+            }
 
-        this.deduceEnvironments = deduceEnvironments;
+            @Nonnull
+            @Override
+            public ConversionService<?> getConversionService() {
+                return conversionService;
+            }
+
+            @Override
+            public @Nonnull ClassPathResourceLoader getResourceLoader() {
+                return resourceLoader;
+            }
+
+            @Override
+            public Optional<Boolean> getDeduceEnvironments() {
+                return Optional.ofNullable(deduceEnvironments);
+            }
+
+        });
+    }
+
+    /**
+     * Construct a new environment for the given configuration.
+     *
+     * @param configuration The configuration
+     */
+    public DefaultEnvironment(@Nonnull ApplicationContextConfiguration configuration) {
+        super(configuration.getConversionService());
+        Set<String> environments = new LinkedHashSet<>(3);
+        List<String> specifiedNames = configuration.getEnvironments();
+
+        this.deduceEnvironments = configuration.getDeduceEnvironments().orElse(null);
         EnvironmentsAndPackage environmentsAndPackage = getEnvironmentsAndPackage(specifiedNames);
         environments.addAll(environmentsAndPackage.enviroments);
         String aPackage = environmentsAndPackage.aPackage;
@@ -148,18 +190,18 @@ public class DefaultEnvironment extends PropertySourcePropertyResolver implement
 
         environments.addAll(specifiedNames);
 
-        this.classLoader = resourceLoader.getClassLoader();
+        this.classLoader = configuration.getClassLoader();
         this.names = environments;
         if (LOG.isInfoEnabled() && !environments.isEmpty()) {
             LOG.info("Established active environments: {}", environments);
         }
         conversionService.addConverter(
-            CharSequence.class, Class.class, new StringToClassConverter(classLoader)
+                CharSequence.class, Class.class, new StringToClassConverter(classLoader)
         );
         conversionService.addConverter(
-            Object[].class, Class[].class, new StringArrayToClassArrayConverter(conversionService)
+                Object[].class, Class[].class, new StringArrayToClassArrayConverter(conversionService)
         );
-        this.resourceLoader = resourceLoader;
+        this.resourceLoader = configuration.getResourceLoader();
         this.annotationScanner = createAnnotationScanner(classLoader);
     }
 
