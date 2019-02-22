@@ -1,2 +1,3 @@
 io.micronaut.inject.annotation.internal.PersistenceContextAnnotationMapper
 io.micronaut.inject.annotation.internal.TimedAnnotationMapper
+io.micronaut.inject.beans.visitor.EntityIntrospectedAnnotationMapper

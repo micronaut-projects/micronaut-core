@@ -39,9 +39,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * A class file writer that writes a {@link io.micronaut.core.beans.BeanIntrospectionReference} and associated
@@ -53,6 +51,7 @@ import java.util.Map;
 @Internal
 class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private static final Method METHOD_ADD_PROPERTY = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanIntrospection.class, "addProperty", BeanProperty.class));
+    private static final Method METHOD_INDEX_PROPERTY = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanIntrospection.class, "indexProperty", Class.class, String.class));
     private static final String REFERENCE_SUFFIX = "$IntrospectionRef";
     private static final String INTROSPECTION_SUFFIX = "$Introspection";
 
@@ -62,6 +61,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private final Type beanType;
     private final ClassWriter introspectionWriter;
     private final List<BeanPropertyWriter> propertyDefinitions = new ArrayList<>();
+    private final Map<String, Collection<String>> indexes = new HashMap<>(2);
     private int propertyIndex = 0;
 
     /**
@@ -139,6 +139,16 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         ));
     }
 
+    /**
+     * Builds an index for the given property and annotation.
+     *
+     * @param annotation The annotation
+     * @param property The property
+     */
+    void indexProperty(String annotation, String property) {
+        indexes.computeIfAbsent(property, s -> new HashSet<>(2)).add(annotation);
+    }
+
     @Override
     public void accept(ClassWriterOutputVisitor classWriterOutputVisitor) throws IOException {
         // write the annotation metadata
@@ -199,6 +209,23 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                         METHOD_ADD_PROPERTY.getName(),
                         METHOD_ADD_PROPERTY.getDescriptor(),
                         false);
+
+                final String propertyName = propertyWriter.getPropertyName();
+                if (indexes.containsKey(propertyName)) {
+                    final Collection<String> annotations = indexes.get(propertyName);
+                    for (String annotation : annotations) {
+                        constructorWriter.loadThis();
+                        final Type typeReference = getTypeReference(annotation);
+                        constructorWriter.push(typeReference);
+                        constructorWriter.push(propertyName);
+                        constructorWriter.visitMethodInsn(INVOKESPECIAL,
+                                superType.getInternalName(),
+                                METHOD_INDEX_PROPERTY.getName(),
+                                METHOD_INDEX_PROPERTY.getDescriptor(),
+                                false);
+
+                    }
+                }
             }
 
             // RETURN
@@ -291,4 +318,5 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         final String shortName = NameUtils.getSimpleName(className);
         return packageName + ".$" + shortName + INTROSPECTION_SUFFIX;
     }
+
 }
