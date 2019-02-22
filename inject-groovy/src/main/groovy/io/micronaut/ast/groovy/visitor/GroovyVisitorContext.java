@@ -17,6 +17,7 @@ package io.micronaut.ast.groovy.visitor;
 
 import groovy.lang.GroovyClassLoader;
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
+import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
@@ -46,7 +47,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.*;
-import java.util.function.Consumer;
 
 /**
  * The visitor context when visiting Groovy code.
@@ -157,9 +157,25 @@ public class GroovyVisitorContext implements VisitorContext {
                     classesDir
             );
             return outputVisitor.visitClass(classname);
+        } else {
+            // should only arrive here in testing scenarios
+            if (sourceUnit.getClassLoader() instanceof InMemoryByteCodeGroovyClassLoader) {
+                return new OutputStream() {
+                    @Override
+                    public void write(int b) {
+                        // no-op
+                    }
+
+                    @Override
+                    public void write(byte[] b) {
+                        ((InMemoryByteCodeGroovyClassLoader) sourceUnit.getClassLoader()).addClass(classname, b);
+                    }
+                };
+            } else {
+                return new ByteArrayOutputStream(); // in-memory, mock or unit tests situation?
+            }
         }
 
-        return new ByteArrayOutputStream(); // in-memory
     }
 
     @Override

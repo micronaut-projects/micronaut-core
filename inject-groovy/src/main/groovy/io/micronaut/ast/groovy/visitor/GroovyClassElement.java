@@ -21,10 +21,13 @@ import io.micronaut.ast.groovy.utils.AstGenericUtils;
 import io.micronaut.ast.groovy.utils.PublicMethodVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.PropertyElement;
 import org.codehaus.groovy.ast.*;
+import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.control.SourceUnit;
 
 import javax.annotation.Nonnull;
@@ -54,6 +57,11 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
         super(classNode, annotationMetadata);
         this.classNode = classNode;
         this.sourceUnit = sourceUnit;
+    }
+
+    @Override
+    public boolean isPrimitive() {
+        return ClassHelper.isPrimitiveType(classNode) || (classNode.isArray() && ClassHelper.isPrimitiveType(classNode.getComponentType()));
     }
 
     @Override
@@ -213,10 +221,18 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                 String propertyName = entry.getKey();
                 GetterAndSetter value = entry.getValue();
                 if (value.getter != null) {
+
+                    final AnnotationMetadata annotationMetadata;
+                    final FieldNode field = classNode.getField(propertyName);
+                    if (field != null) {
+                        annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, field, value.getter);
+                    } else {
+                        annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, value.getter);
+                    }
                     GroovyPropertyElement propertyElement = new GroovyPropertyElement(
                             value.declaringType == null ? this : value.declaringType,
                             value.getter,
-                            AstAnnotationUtils.getAnnotationMetadata(sourceUnit, value.getter),
+                            annotationMetadata,
                             value.type,
                             propertyName,
                             value.setter == null,
@@ -288,8 +304,8 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
     }
 
     private ConstructorNode findConcreteConstructor(List<ConstructorNode> constructors) {
-        if (constructors == null) {
-            return null;
+        if (CollectionUtils.isEmpty(constructors)) {
+            return new ConstructorNode(Modifier.PUBLIC, new BlockStatement()); // empty default constructor
         }
         List<ConstructorNode> nonPrivateConstructors = findNonPrivateConstructors(constructors);
 
