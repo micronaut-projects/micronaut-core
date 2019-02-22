@@ -14,4 +14,10 @@ class AuthenticationFailedSpec extends Specification {
         expect:
         new AuthenticationFailed().getReason() == AuthenticationFailureReason.UNKNOWN
     }
+
+    def "constructor generates a Title Case string"() {
+        expect:
+        new AuthenticationFailed(AuthenticationFailureReason.USER_NOT_FOUND)
+                .getMessage().get() == 'User Not Found'
+    }
 }
