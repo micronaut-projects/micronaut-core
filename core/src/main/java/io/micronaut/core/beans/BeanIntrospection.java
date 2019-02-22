@@ -115,4 +115,16 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
     default @Nonnull String[] getPropertyNames() {
         return getBeanProperties().stream().map(BeanProperty::getName).toArray(String[]::new);
     }
+
+    /**
+     * Obtains an introspection from the default {@link BeanIntrospector}.
+     *
+     * @param type The type
+     * @param <T2> The generic type
+     * @return The introspection
+     * @throws io.micronaut.core.beans.exceptions.IntrospectionException If the introspection cannot be found or errors when loading
+     */
+    static <T2> BeanIntrospection<T2> getIntrospection(Class<T2> type) {
+        return BeanIntrospector.SHARED.getIntrospection(type);
+    }
 }

@@ -22,6 +22,8 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanIntrospectionReference;
 import io.micronaut.inject.BeanType;
 
+import javax.annotation.Nonnull;
+
 
 /**
  * Abstract bean introspection reference used by {@link io.micronaut.core.beans.BeanIntrospector} to soft load introspections.
@@ -58,12 +60,18 @@ public abstract class AbstractBeanIntrospectionReference<T> implements BeanIntro
     }
 
     @Override
-    public boolean isEnabled(BeanContext context) {
+    public final boolean isEnabled(BeanContext context) {
         return isPresent();
     }
 
     @Override
-    public boolean isPrimary() {
+    public final boolean isPrimary() {
         return true;
+    }
+
+    @Nonnull
+    @Override
+    public String getName() {
+        return getBeanType().getName();
     }
 }

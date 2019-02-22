@@ -244,13 +244,21 @@ public class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         // RETURN
         loadMethod.returnValue();
         loadMethod.visitMaxs(2, 1);
+        loadMethod.endMethod();
+
+        // start method: String getName()
+        final GeneratorAdapter nameMethod = startPublicMethodZeroArgs(classWriter, String.class, "getName");
+        nameMethod.push(beanType.getClassName());
+        nameMethod.returnValue();
+        nameMethod.visitMaxs(1, 1);
+        nameMethod.endMethod();
 
         // start method: Class getBeanType()
         GeneratorAdapter getBeanType = startPublicMethodZeroArgs(classWriter, Class.class, "getBeanType");
         getBeanType.push(beanType);
         getBeanType.returnValue();
         getBeanType.visitMaxs(2, 1);
-
+        getBeanType.endMethod();
 
         writeGetAnnotationMetadataMethod(classWriter);
 

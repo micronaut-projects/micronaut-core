@@ -1,4 +1,4 @@
-package io.micronaut.inject.visitor
+package io.micronaut.inject.visitor.beans
 
 import io.micronaut.annotation.processing.TypeElementVisitorProcessor
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
@@ -8,7 +8,9 @@ import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanProperty
+import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
+import io.micronaut.inject.visitor.TypeElementVisitor
 
 import javax.annotation.processing.SupportedAnnotationTypes
 import javax.validation.constraints.Size
@@ -95,7 +97,8 @@ class ParentBean {
 ''')
 
         when:"the reference is loaded"
-        BeanIntrospectionReference reference = context.classLoader.loadClass('test.$Test$IntrospectionRef').newInstance()
+        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        BeanIntrospectionReference reference = clazz.newInstance()
 
         then:"The reference is valid"
         reference != null
@@ -154,6 +157,13 @@ class ParentBean {
         ageProp.read(instance) == 10
         stringArrayProp.read(instance) == ['foo'] as String[]
         primitiveArrayProp.read(instance) == [10] as int[]
+
+        when:
+        introspection.instantiate("blah") // illegal argument
+
+        then:
+        def e = thrown(InstantiationException)
+        e.message == 'Argument count [1] doesn\'t match required argument count: 0'
 
         cleanup:
         context?.close()
