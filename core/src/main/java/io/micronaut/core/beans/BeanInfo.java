@@ -23,7 +23,9 @@ import java.util.Map;
  * @param <T> type Generic
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Use {@link BeanIntrospection} instead
  */
+@Deprecated
 public interface BeanInfo<T> {
 
     /**

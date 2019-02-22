@@ -24,6 +24,16 @@ class TestListener {
     @Executable
     void receive(String v) {
     }
+    
+    @Executable
+    int[] receiveArray(int[] v) {
+        return v;
+    }
+    
+    @Executable
+    int receiveInt(int v) {
+        return v;
+    }
 }
 
 ''')

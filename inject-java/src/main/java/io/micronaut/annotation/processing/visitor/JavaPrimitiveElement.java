@@ -112,4 +112,9 @@ public enum JavaPrimitiveElement implements ClassElement, AnnotationMetadataDele
             return valueOf(name() + "_ARRAY");
         }
     }
+
+    @Override
+    public boolean isPrimitive() {
+        return true;
+    }
 }

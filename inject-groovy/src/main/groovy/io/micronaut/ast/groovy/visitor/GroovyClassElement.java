@@ -15,22 +15,28 @@
  */
 package io.micronaut.ast.groovy.visitor;
 
+import io.micronaut.ast.groovy.annotation.GroovyAnnotationMetadataBuilder;
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.ast.groovy.utils.AstClassUtils;
 import io.micronaut.ast.groovy.utils.AstGenericUtils;
 import io.micronaut.ast.groovy.utils.PublicMethodVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.PropertyElement;
-import org.codehaus.groovy.ast.ClassHelper;
-import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.ast.MethodNode;
-import org.codehaus.groovy.ast.PropertyNode;
+import org.codehaus.groovy.ast.*;
+import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.control.SourceUnit;
 
+import javax.annotation.Nonnull;
+import javax.inject.Inject;
 import java.lang.reflect.Modifier;
 import java.util.*;
+
+import static org.codehaus.groovy.ast.ClassHelper.makeCached;
 
 /**
  * A class element returning data from a {@link ClassNode}.
@@ -55,6 +61,11 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
     }
 
     @Override
+    public boolean isPrimitive() {
+        return ClassHelper.isPrimitiveType(classNode) || (classNode.isArray() && ClassHelper.isPrimitiveType(classNode.getComponentType()));
+    }
+
+    @Override
     public Optional<ClassElement> getSuperType() {
         final ClassNode superClass = classNode.getSuperClass();
         if (superClass != null && !superClass.equals(ClassHelper.OBJECT_TYPE)) {
@@ -69,8 +80,17 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
         return Optional.empty();
     }
 
+    @Nonnull
     @Override
-    public Map<String, ClassElement> getTypeArguments() {
+    public Optional<ConstructorElement> getPublicConstructor() {
+        return Optional.ofNullable(findConcreteConstructor(classNode.getDeclaredConstructors())).map(constructorNode -> {
+            final AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, constructorNode);
+            return new GroovyConstructorElement(sourceUnit, constructorNode, annotationMetadata);
+        });
+    }
+
+    @Override
+    public @Nonnull Map<String, ClassElement> getTypeArguments() {
         Map<String, ClassNode> spec = AstGenericUtils.createGenericsSpec(classNode);
         if (!spec.isEmpty()) {
             Map<String, ClassElement> map = new LinkedHashMap<>(spec.size());
@@ -111,101 +131,114 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
             }
         }
         Map<String, GetterAndSetter> props = new LinkedHashMap<>();
-        classNode.visitContents(
-                new PublicMethodVisitor(null) {
+        ClassNode classNode = this.classNode;
+        while (classNode != null && !classNode.equals(ClassHelper.OBJECT_TYPE)) {
 
-                    @Override
-                    protected boolean isAcceptable(MethodNode node) {
-                        boolean validModifiers = node.isPublic() && !node.isStatic() && !node.isSynthetic() && !node.isAbstract();
-                        if (validModifiers) {
-                            String methodName = node.getName();
-                            if (methodName.contains("$")) {
-                                return false;
-                            }
+            classNode.visitContents(
+                    new PublicMethodVisitor(null) {
 
-                            if (NameUtils.isGetterName(methodName) && node.getParameters().length == 0) {
-                                return true;
-                            } else {
-                                return NameUtils.isSetterName(methodName) && node.getParameters().length == 1;
+                        @Override
+                        protected boolean isAcceptable(MethodNode node) {
+                            boolean validModifiers = node.isPublic() && !node.isStatic() && !node.isSynthetic() && !node.isAbstract();
+                            if (validModifiers) {
+                                String methodName = node.getName();
+                                if (methodName.contains("$")) {
+                                    return false;
+                                }
+
+                                if (NameUtils.isGetterName(methodName) && node.getParameters().length == 0) {
+                                    return true;
+                                } else {
+                                    return NameUtils.isSetterName(methodName) && node.getParameters().length == 1;
+                                }
                             }
+                            return validModifiers;
                         }
-                        return validModifiers;
-                    }
 
-                    @Override
-                    public void accept(ClassNode classNode, MethodNode node) {
-                        String methodName = node.getName();
-                        final ClassNode declaringTypeElement = node.getDeclaringClass();
-                        if (NameUtils.isGetterName(methodName) && node.getParameters().length == 0) {
-                            String propertyName = NameUtils.getPropertyNameForGetter(methodName);
-                            if (groovyProps.contains(propertyName)) {
-                                return;
-                            }
-                            ClassNode returnTypeNode = node.getReturnType();
-                            ClassElement getterReturnType;
-                            if (returnTypeNode.isGenericsPlaceHolder()) {
-                                final String placeHolderName = returnTypeNode.getUnresolvedName();
-                                final ClassElement classElement = getTypeArguments().get(placeHolderName);
-                                if (classElement != null) {
-                                    getterReturnType = classElement;
+                        @Override
+                        public void accept(ClassNode classNode, MethodNode node) {
+                            String methodName = node.getName();
+                            final ClassNode declaringTypeElement = node.getDeclaringClass();
+                            if (NameUtils.isGetterName(methodName) && node.getParameters().length == 0) {
+                                String propertyName = NameUtils.getPropertyNameForGetter(methodName);
+                                if (groovyProps.contains(propertyName)) {
+                                    return;
+                                }
+                                ClassNode returnTypeNode = node.getReturnType();
+                                ClassElement getterReturnType;
+                                if (returnTypeNode.isGenericsPlaceHolder()) {
+                                    final String placeHolderName = returnTypeNode.getUnresolvedName();
+                                    final ClassElement classElement = getTypeArguments().get(placeHolderName);
+                                    if (classElement != null) {
+                                        getterReturnType = classElement;
+                                    } else {
+                                        getterReturnType = new GroovyClassElement(sourceUnit, returnTypeNode, AnnotationMetadata.EMPTY_METADATA);
+                                    }
                                 } else {
                                     getterReturnType = new GroovyClassElement(sourceUnit, returnTypeNode, AnnotationMetadata.EMPTY_METADATA);
                                 }
-                            } else {
-                                getterReturnType = new GroovyClassElement(sourceUnit, returnTypeNode, AnnotationMetadata.EMPTY_METADATA);
-                            }
 
-                            GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
-                            configureDeclaringType(declaringTypeElement, getterAndSetter);
-                            getterAndSetter.type = getterReturnType;
-                            getterAndSetter.getter = node;
-                            if (getterAndSetter.setter != null) {
-                                ClassNode typeMirror = getterAndSetter.setter.getParameters()[0].getType();
-                                ClassElement setterParameterType = new GroovyClassElement(sourceUnit, typeMirror, AnnotationMetadata.EMPTY_METADATA);
-                                if (!setterParameterType.getName().equals(getterReturnType.getName())) {
-                                    getterAndSetter.setter = null; // not a compatible setter
+                                GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
+                                configureDeclaringType(declaringTypeElement, getterAndSetter);
+                                getterAndSetter.type = getterReturnType;
+                                getterAndSetter.getter = node;
+                                if (getterAndSetter.setter != null) {
+                                    ClassNode typeMirror = getterAndSetter.setter.getParameters()[0].getType();
+                                    ClassElement setterParameterType = new GroovyClassElement(sourceUnit, typeMirror, AnnotationMetadata.EMPTY_METADATA);
+                                    if (!setterParameterType.getName().equals(getterReturnType.getName())) {
+                                        getterAndSetter.setter = null; // not a compatible setter
+                                    }
                                 }
-                            }
-                        } else if (NameUtils.isSetterName(methodName) && node.getParameters().length == 1) {
-                            String propertyName = NameUtils.getPropertyNameForSetter(methodName);
-                            if (groovyProps.contains(propertyName)) {
-                                return;
-                            }
-                            ClassNode typeMirror = node.getParameters()[0].getType();
-                            ClassElement setterParameterType = new GroovyClassElement(sourceUnit, typeMirror, AnnotationMetadata.EMPTY_METADATA);
+                            } else if (NameUtils.isSetterName(methodName) && node.getParameters().length == 1) {
+                                String propertyName = NameUtils.getPropertyNameForSetter(methodName);
+                                if (groovyProps.contains(propertyName)) {
+                                    return;
+                                }
+                                ClassNode typeMirror = node.getParameters()[0].getType();
+                                ClassElement setterParameterType = new GroovyClassElement(sourceUnit, typeMirror, AnnotationMetadata.EMPTY_METADATA);
 
-                            GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
-                            configureDeclaringType(declaringTypeElement, getterAndSetter);
-                            ClassElement propertyType = getterAndSetter.type;
-                            if (propertyType != null) {
-                                if (propertyType.getName().equals(setterParameterType.getName())) {
+                                GetterAndSetter getterAndSetter = props.computeIfAbsent(propertyName, GetterAndSetter::new);
+                                configureDeclaringType(declaringTypeElement, getterAndSetter);
+                                ClassElement propertyType = getterAndSetter.type;
+                                if (propertyType != null) {
+                                    if (propertyType.getName().equals(setterParameterType.getName())) {
+                                        getterAndSetter.setter = node;
+                                    }
+                                } else {
                                     getterAndSetter.setter = node;
                                 }
-                            } else {
-                                getterAndSetter.setter = node;
                             }
                         }
-                    }
 
-                    private void configureDeclaringType(ClassNode declaringTypeElement, GetterAndSetter beanPropertyData) {
-                        if (beanPropertyData.declaringType == null && !classNode.equals(declaringTypeElement)) {
-                            beanPropertyData.declaringType = new GroovyClassElement(
-                                    sourceUnit,
-                                    declaringTypeElement,
-                                    AstAnnotationUtils.getAnnotationMetadata(sourceUnit, declaringTypeElement)
-                            );
+                        private void configureDeclaringType(ClassNode declaringTypeElement, GetterAndSetter beanPropertyData) {
+                            if (beanPropertyData.declaringType == null && !GroovyClassElement.this.classNode.equals(declaringTypeElement)) {
+                                beanPropertyData.declaringType = new GroovyClassElement(
+                                        sourceUnit,
+                                        declaringTypeElement,
+                                        AstAnnotationUtils.getAnnotationMetadata(sourceUnit, declaringTypeElement)
+                                );
+                            }
                         }
-                    }
-                });
+                    });
+            classNode = classNode.getSuperClass();
+        }
         if (!props.isEmpty()) {
             for (Map.Entry<String, GetterAndSetter> entry : props.entrySet()) {
                 String propertyName = entry.getKey();
                 GetterAndSetter value = entry.getValue();
                 if (value.getter != null) {
+
+                    final AnnotationMetadata annotationMetadata;
+                    final FieldNode field = this.classNode.getField(propertyName);
+                    if (field != null) {
+                        annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, field, value.getter);
+                    } else {
+                        annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit).buildForMethod(value.getter);
+                    }
                     GroovyPropertyElement propertyElement = new GroovyPropertyElement(
                             value.declaringType == null ? this : value.declaringType,
                             value.getter,
-                            AstAnnotationUtils.getAnnotationMetadata(sourceUnit, value.getter),
+                            annotationMetadata,
                             value.type,
                             propertyName,
                             value.setter == null,
@@ -274,6 +307,34 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
     @Override
     public boolean isAssignable(String type) {
         return AstClassUtils.isSubclassOf(classNode, type);
+    }
+
+    private ConstructorNode findConcreteConstructor(List<ConstructorNode> constructors) {
+        if (CollectionUtils.isEmpty(constructors)) {
+            return new ConstructorNode(Modifier.PUBLIC, new BlockStatement()); // empty default constructor
+        }
+        List<ConstructorNode> nonPrivateConstructors = findNonPrivateConstructors(constructors);
+
+        ConstructorNode constructorNode;
+        if (nonPrivateConstructors.size() == 1) {
+            constructorNode = nonPrivateConstructors.get(0);
+        } else {
+            constructorNode = nonPrivateConstructors.stream().filter(cn -> !cn.getAnnotations(makeCached(Inject.class)).isEmpty()).findFirst().orElse(null);
+            if (constructorNode == null) {
+                constructorNode = nonPrivateConstructors.stream().filter(cn -> Modifier.isPublic(cn.getModifiers())).findFirst().orElse(null);
+            }
+        }
+        return constructorNode;
+    }
+
+    private List<ConstructorNode> findNonPrivateConstructors(List<ConstructorNode> constructorNodes) {
+        List<ConstructorNode> nonPrivateConstructors = new ArrayList<>(2);
+        for (ConstructorNode node : constructorNodes) {
+            if (!Modifier.isPrivate(node.getModifiers())) {
+                nonPrivateConstructors.add(node);
+            }
+        }
+        return nonPrivateConstructors;
     }
 
     /**

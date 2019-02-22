@@ -15,6 +15,8 @@
  */
 package io.micronaut.core.naming;
 
+import javax.annotation.Nonnull;
+
 /**
  * An interface for components that are named.
  *
@@ -26,5 +28,5 @@ public interface Named {
     /**
      * @return The name of the component
      */
-    String getName();
+    @Nonnull String getName();
 }

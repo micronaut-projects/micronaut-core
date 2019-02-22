@@ -517,6 +517,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
         Collections.reverse(hierarchy);
         for (T currentElement : hierarchy) {
+            if (currentElement == null) {
+                continue;
+            }
             List<? extends A> annotationHierarchy = getAnnotationsForType(currentElement);
 
             if (annotationHierarchy.isEmpty()) {

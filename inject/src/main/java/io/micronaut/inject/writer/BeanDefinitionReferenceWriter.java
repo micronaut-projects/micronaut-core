@@ -145,9 +145,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         GeneratorAdapter loadMethod = startPublicMethodZeroArgs(classWriter, BeanDefinition.class, "load");
 
         // return new BeanDefinition()
-        loadMethod.newInstance(beanDefinitionType);
-        loadMethod.dup();
-        loadMethod.invokeConstructor(beanDefinitionType, METHOD_DEFAULT_CONSTRUCTOR);
+        pushNewInstance(loadMethod, beanDefinitionType);
 
         // RETURN
         loadMethod.returnValue();
