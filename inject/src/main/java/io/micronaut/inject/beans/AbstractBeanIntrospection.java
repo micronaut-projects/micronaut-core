@@ -178,4 +178,28 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
             indexed.add(property);
         }
     }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        AbstractBeanIntrospection<?> that = (AbstractBeanIntrospection<?>) o;
+        return Objects.equals(beanType, that.beanType);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(beanType);
+    }
+
+    @Override
+    public String toString() {
+        return "BeanIntrospection{" +
+                "type=" + beanType +
+                '}';
+    }
 }
