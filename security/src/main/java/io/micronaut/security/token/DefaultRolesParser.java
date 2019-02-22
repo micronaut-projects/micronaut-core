@@ -48,7 +48,7 @@ public class DefaultRolesParser implements RolesParser {
 
     @Override
     @Nonnull
-    public List<String> parseRoles(@Nonnull Map<String, Object> claims) {
+    public List<String> parseRoles(@Nonnull Claims claims) {
         List<String> roles = new ArrayList<>();
         Object rolesObject = claims.get(tokenConfiguration.getRolesName());
         if (rolesObject != null) {

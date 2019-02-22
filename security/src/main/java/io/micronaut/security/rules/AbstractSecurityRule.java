@@ -16,6 +16,7 @@
 package io.micronaut.security.rules;
 
 import io.micronaut.security.token.DefaultRolesParser;
+import io.micronaut.security.token.MapClaimsAdapter;
 import io.micronaut.security.token.RolesParser;
 import io.micronaut.security.token.config.TokenConfiguration;
 
@@ -68,7 +69,7 @@ public abstract class AbstractSecurityRule implements SecurityRule {
             roles.add(SecurityRule.IS_ANONYMOUS);
         } else {
             if (!claims.isEmpty()) {
-                roles.addAll(rolesParser.parseRoles(claims));
+                roles.addAll(rolesParser.parseRoles(new MapClaimsAdapter(claims)));
             }
             roles.add(SecurityRule.IS_ANONYMOUS);
             roles.add(SecurityRule.IS_AUTHENTICATED);

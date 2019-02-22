@@ -13,23 +13,40 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token;
 
 import javax.annotation.Nonnull;
-import java.util.List;
+import javax.annotation.Nullable;
+import java.util.Set;
 
 /**
- * Parse roles from token claims.
+ * Encapsulate authentication claims.
  *
- * @author Sergio del Amo
  * @since 1.1.0
+ * @author Sergio del Amo
  */
-public interface RolesParser {
+public interface Claims {
 
     /**
      *
-     * @param claims The claims of the token.
-     * @return The granted roles.
+     * @param claimName the claim name
+     * @return {@code null} if the claim not exist or the Claim value.
      */
-    List<String> parseRoles (@Nonnull Claims claims);
+    @Nullable
+    Object get(String claimName);
+
+    /**
+     *
+     * @return All claim names.
+     */
+    @Nonnull
+    Set<String> names();
+
+    /**
+     *
+     * @param claimName the claim name
+     * @return {@code false} if the claim does not exist.
+     */
+    boolean contains(String claimName);
 }
