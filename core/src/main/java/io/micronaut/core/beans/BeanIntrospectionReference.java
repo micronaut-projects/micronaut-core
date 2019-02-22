@@ -25,6 +25,10 @@ import javax.annotation.Nonnull;
 /**
  * A reference to a {@link BeanIntrospection} that may or may not be present on the classpath.
  *
+ * <p>This interface allows soft loading a {@link BeanIntrospection} without knowing if the class is present on the classpath or not. It also ensures that less memory is occupied as only a reference to the annotation metadata is retained and the full bean can be loaded via the {@link #load()} method.</p>
+ *
+ * <p>In general results of the {@link #load()} do not need to be cached as object creation is cheap and no runtime analysis is performed so it is extremely fast.</p>
+ *
  * @param <T> The bean type
  * @author graemerocher
  * @since 1.1
@@ -49,5 +53,5 @@ public interface BeanIntrospectionReference<T> extends AnnotationMetadataProvide
      * @return The loaded introspection.
      * @throws io.micronaut.core.beans.exceptions.IntrospectionException if the introspection cannot be loaded
      */
-    BeanIntrospection<T> load();
+    @Nonnull BeanIntrospection<T> load();
 }

@@ -27,11 +27,12 @@ import java.util.Optional;
 import java.util.function.Predicate;
 
 /**
- * Primary interface for obtaining bean introspections that are computed at compilation time.
+ * Primary interface for obtaining {@link BeanIntrospection} instances that are computed at compilation time.
  *
  * @author graemerocher
  * @since 1.0
  * @see io.micronaut.core.annotation.Introspected
+ * @see BeanIntrospection
  */
 public interface BeanIntrospector {
 

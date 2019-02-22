@@ -99,12 +99,14 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
     @Nonnull
     @Override
     public Optional<BeanProperty<T, Object>> getProperty(@Nonnull String name) {
+        ArgumentUtils.requireNonNull("name", name);
         return Optional.ofNullable(beanProperties.get(name));
     }
 
     @Nonnull
     @Override
-    public Collection<BeanProperty<T, Object>> getBeanProperties(Class<? extends Annotation> annotationType) {
+    public Collection<BeanProperty<T, Object>> getBeanProperties(@Nonnull Class<? extends Annotation> annotationType) {
+        ArgumentUtils.requireNonNull("annotationType", annotationType);
         if (indexed != null) {
             final List<BeanProperty<T, Object>> indexed = this.indexed.get(annotationType);
             if (indexed != null) {
