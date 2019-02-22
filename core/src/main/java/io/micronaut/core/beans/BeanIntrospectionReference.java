@@ -18,6 +18,7 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.naming.Named;
 
 import javax.annotation.Nonnull;
 
@@ -29,7 +30,7 @@ import javax.annotation.Nonnull;
  * @since 1.1
  */
 @Internal
-public interface BeanIntrospectionReference<T> extends AnnotationMetadataProvider {
+public interface BeanIntrospectionReference<T> extends AnnotationMetadataProvider, Named {
 
     /**
      * @return Is the introspection present?

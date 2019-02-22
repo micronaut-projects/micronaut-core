@@ -19,11 +19,12 @@ package io.micronaut.core.beans;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
+import io.micronaut.core.util.ArgumentUtils;
 
 import javax.annotation.Nonnull;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * Default implementation of the {@link BeanIntrospector} interface that uses service loader to discovery introspections.
@@ -33,12 +34,25 @@ import java.util.Optional;
  */
 class DefaultBeanIntrospector implements BeanIntrospector {
 
-    private Map<Class, BeanIntrospectionReference> introspectionMap;
+    private Map<String, BeanIntrospectionReference<Object>> introspectionMap;
+
+    @Nonnull
+    @Override
+    public Collection<BeanIntrospection<Object>> findIntrospections(@Nonnull Predicate<? super BeanIntrospectionReference> filter) {
+        ArgumentUtils.requireNonNull("filter", filter);
+        return getIntrospections()
+                .values()
+                .stream()
+                .filter(filter)
+                .map(BeanIntrospectionReference::load)
+                .collect(Collectors.toList());
+    }
 
     @Nonnull
     @Override
     public <T> Optional<BeanIntrospection<T>> findIntrospection(@Nonnull Class<T> beanType) {
-        final BeanIntrospectionReference reference = getIntrospections().get(beanType);
+        ArgumentUtils.requireNonNull("beanType", beanType);
+        final BeanIntrospectionReference reference = getIntrospections().get(beanType.getName());
         try {
             return Optional.ofNullable(reference).map(BeanIntrospectionReference::load);
         } catch (Throwable e) {
@@ -46,8 +60,8 @@ class DefaultBeanIntrospector implements BeanIntrospector {
         }
     }
 
-    private Map<Class, BeanIntrospectionReference> getIntrospections() {
-        Map<Class, BeanIntrospectionReference> introspectionMap = this.introspectionMap;
+    private Map<String, BeanIntrospectionReference<Object>> getIntrospections() {
+        Map<String, BeanIntrospectionReference<Object>> introspectionMap = this.introspectionMap;
         if (introspectionMap == null) {
             synchronized (this) { // double check
                 introspectionMap = this.introspectionMap;
@@ -58,7 +72,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                     for (ServiceDefinition<BeanIntrospectionReference> definition : services) {
                         if (definition.isPresent()) {
                             final BeanIntrospectionReference ref = definition.load();
-                            introspectionMap.put(ref.getBeanType(), ref);
+                            introspectionMap.put(ref.getName(), ref);
                         }
                     }
 

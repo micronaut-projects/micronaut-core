@@ -1,4 +1,4 @@
-package io.micronaut.inject.visitor;
+package io.micronaut.inject.visitor.beans;
 
 import io.micronaut.core.annotation.Introspected;
 
