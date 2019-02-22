@@ -22,13 +22,11 @@ import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospectionReference;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.beans.AbstractBeanIntrospection;
 import io.micronaut.inject.beans.AbstractBeanIntrospectionReference;
-import io.micronaut.inject.beans.AbstractBeanProperty;
 import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import org.jetbrains.annotations.NotNull;
@@ -44,7 +42,6 @@ import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * A class file writer that writes a {@link io.micronaut.core.beans.BeanIntrospectionReference} and associated
@@ -54,7 +51,7 @@ import java.util.Optional;
  * @since 1.1
  */
 @Internal
-public class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
+class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private static final Method METHOD_ADD_PROPERTY = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanIntrospection.class, "addProperty", BeanProperty.class));
     private static final String REFERENCE_SUFFIX = "$IntrospectionRef";
     private static final String INTROSPECTION_SUFFIX = "$Introspection";
@@ -82,10 +79,26 @@ public class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     }
 
     /**
+     * Constructor used to generate a reference for already compiled classes.
+     * @param generatingType The originating type
+     * @param index A unique index
+     * @param className The class name
+     * @param beanAnnotationMetadata The bean annotation metadata
+     */
+    BeanIntrospectionWriter(String generatingType, int index, String className, AnnotationMetadata beanAnnotationMetadata) {
+        super(computeReferenceName(generatingType) + index, beanAnnotationMetadata, true);
+        this.referenceWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        this.introspectionWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        this.introspectionName = computeIntrospectionName(className);
+        this.introspectionType = getTypeReference(introspectionName);
+        this.beanType = getTypeReference(className);
+    }
+
+    /**
      * The instropection type.
      * @return The type
      */
-    public Type getIntrospectionType() {
+    Type getIntrospectionType() {
         return introspectionType;
     }
 

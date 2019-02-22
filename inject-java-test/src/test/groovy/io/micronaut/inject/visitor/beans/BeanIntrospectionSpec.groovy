@@ -17,6 +17,85 @@ import javax.validation.constraints.Size
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
+    void "test write bean introspection data for classes"() {
+        given:
+        ApplicationContext context = buildContext('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.*;
+import io.micronaut.inject.visitor.beans.*;
+
+@Introspected(classes=TestBean.class)
+class Test {}
+''')
+
+        when:"the reference is loaded"
+        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef0')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+        reference.getBeanType() == TestBean
+
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test write bean introspection data for package with sources"() {
+        given:
+        ApplicationContext context = buildContext('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.*;
+
+@Introspected(packages="io.micronaut.inject.visitor.beans", includedAnnotations=Introspected.class)
+class Test {}
+''')
+
+        when:"the reference is loaded"
+        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef0')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+        reference.getBeanType() == TestBean
+
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test write bean introspection data for package with compiled classes"() {
+        given:
+        ApplicationContext context = buildContext('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.*;
+
+@Introspected(packages="io.micronaut.inject.beans.visitor", includedAnnotations=Internal.class)
+class Test {}
+''')
+
+        when:"the reference is loaded"
+        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef0')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+        reference.getBeanType() == IntrospectedTypeElementVisitor
+
+
+        cleanup:
+        context?.close()
+    }
+
     void "test write bean introspection data"() {
         given:
         ApplicationContext context = buildContext('test.Test', '''

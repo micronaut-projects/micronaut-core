@@ -22,6 +22,7 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Optional;
 
@@ -109,4 +110,13 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
         return Optional.empty();
     }
 
+    /**
+     * Find all the classes within the given package and having the given annotation.
+     * @param aPackage The package
+     * @param stereotypes The stereotypes
+     * @return The class elements
+     */
+    default @Nonnull ClassElement[] getClassElements(@Nonnull String aPackage, @Nonnull String... stereotypes) {
+        return new ClassElement[0];
+    }
 }

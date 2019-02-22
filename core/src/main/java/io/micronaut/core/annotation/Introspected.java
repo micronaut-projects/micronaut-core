@@ -34,6 +34,28 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 public @interface Introspected {
 
     /**
+     * By default {@link Introspected} applies to the class it is applied on. However if classes are specified
+     * introspections will instead be generated for each class specified. This is useful in cases where you cannot
+     * alter the source code and wish to generate introspections for already compiled classes.
+     *
+     * @return The classes to generate introspections for
+     */
+    Class<?>[] classes() default {};
+
+
+    /**
+     * <p>By default {@link Introspected} applies to the class it is applied on. However if packages are specified
+     * introspections will instead be generated for each classes in the given package. Note this only applies to already compiled
+     * classes, and classpath scanning will be used to find them. If the class is not compiled then apply the annotation directly
+     * to the classs instead.</p>
+     *
+     * <p>Must be specified in combination with {@link #includedAnnotations()}</p>
+     *
+     * @return The packages to generate introspections for
+     */
+    String[] packages() default {};
+
+    /**
      * The property names to include. Defaults to all properties.
      *
      * @return The names of the properties
@@ -53,7 +75,15 @@ public @interface Introspected {
      *
      * @return The annotation types
      */
-    Class<? extends Annotation>[] ignored() default {};
+    Class<? extends Annotation>[] excludedAnnotations() default {};
+
+    /**
+     * The annotation types that if present on the property cause the property to be ignored in
+     * introspection results.
+     *
+     * @return The annotation types
+     */
+    Class<? extends Annotation>[] includedAnnotations() default {};
 
     /**
      * The annotation types that should be indexed for lookup via {@link io.micronaut.core.beans.BeanIntrospection#getBeanProperties(Class)}.
