@@ -18,6 +18,92 @@ import javax.validation.constraints.Size
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
+    void "test bean introspection with constructor"() {
+        given:
+        ApplicationContext context = buildContext('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import javax.persistence.*;
+import java.util.*;
+
+@Entity
+class Test {
+    @Id
+    @GeneratedValue
+    private Long id;
+    @Version
+    private Long version;
+    private String name;
+    @Size(max=100)
+    private int age;
+    private int[] primitiveArray;
+    
+    public Test(String name, int age, int[] primitiveArray) {
+        this.name = name;
+        this.age = age;
+    }
+    public String getName() {
+        return this.name;
+    }
+    public void setName(String n) {
+        this.name = n;
+    }
+    public int getAge() {
+        return age;
+    }
+    public void setAge(int age) {
+        this.age = age;
+    }
+    
+    public void setId(Long id) {
+        this.id = id;
+    }
+    
+    public Long getId() {
+        return this.id;
+    }
+    
+    public void setVersion(Long version) {
+        this.version = version;
+    }
+    
+    public Long getVersion() {
+        return this.version;
+    }
+}
+''')
+
+        when:"the reference is loaded"
+        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+
+        when:"The introspection is loaded"
+        BeanIntrospection bi = reference.load()
+
+        then:"it is correct"
+        bi.getConstructorArguments().length == 3
+        bi.getConstructorArguments()[0].name == 'name'
+        bi.getConstructorArguments()[0].type == String
+        bi.getBeanProperties(Id).size() == 1
+        bi.getBeanProperties(Id).first().name == 'id'
+
+
+        when:
+        def object = bi.instantiate("test", 10, [20] as int[])
+
+        then:
+        object.name == 'test'
+        object.age == 10
+
+
+        cleanup:
+        context?.close()
+    }
 
     void "test write bean introspection data for entity"() {
         given:
@@ -287,7 +373,7 @@ class ParentBean {
         def instance = introspection.instantiate()
 
         then:
-        readOnlyProp.isReadOnly() 
+        readOnlyProp.isReadOnly()
         nameProp != null
         !nameProp.isReadOnly()
         !nameProp.isWriteOnly()

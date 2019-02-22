@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
@@ -87,7 +88,7 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
                     throw new InstantiationException("Null argument specified for [" + constructorArgument.getName() + "]. If this argument is allowed be null annotate it with @Nullable");
                 }
             }
-            if (!constructorArgument.getType().isInstance(specified)) {
+            if (!ReflectionUtils.getWrapperType(constructorArgument.getType()).isInstance(specified)) {
                 throw new InstantiationException("Invalid argument [" + specified + "] specified for argument: " + constructorArgument);
             }
         }

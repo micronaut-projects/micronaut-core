@@ -19,14 +19,12 @@ import io.micronaut.annotation.processing.PublicMethodVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.ElementModifier;
-import io.micronaut.inject.ast.FieldElement;
-import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.ast.*;
 import io.micronaut.inject.processing.JavaModelUtils;
 
 import javax.annotation.Nonnull;
 import javax.lang.model.element.*;
+import javax.lang.model.element.Element;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
@@ -34,6 +32,7 @@ import javax.lang.model.type.TypeVariable;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -295,6 +294,15 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
             return types.isAssignable(thisType, thatType);
         }
         return false;
+    }
+
+    @Nonnull
+    @Override
+    public Optional<ConstructorElement> getPublicConstructor() {
+        return Optional.ofNullable(visitorContext.getModelUtils().concreteConstructorFor(classElement)).map(executableElement -> {
+            final AnnotationMetadata annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(executableElement);
+            return new JavaConstructorElement(executableElement, annotationMetadata, visitorContext);
+        });
     }
 
     @Override
