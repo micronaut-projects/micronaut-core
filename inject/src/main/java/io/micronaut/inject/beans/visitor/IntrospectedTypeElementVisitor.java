@@ -84,6 +84,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
                 } else {
                     for (String aPackage : packages) {
                         ClassElement[] elements = context.getClassElements(aPackage, includedAnnotations.toArray(new String[0]));
+                        int j = 0;
                         for (int i = 0; i < elements.length; i++) {
                             ClassElement classElement = elements[i];
                             if (classElement.isAbstract() || !classElement.isPublic()) {
@@ -91,7 +92,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
                             }
                             final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
                                     element.getName(),
-                                    i,
+                                    j++,
                                     classElement.getName(),
                                     metadata ? element.getAnnotationMetadata() : null
                             );
