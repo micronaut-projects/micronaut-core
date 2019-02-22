@@ -79,7 +79,7 @@ public interface Element extends AnnotationMetadataDelegate {
      */
     @Nonnull
     default <T extends Annotation> Element annotate(@Nonnull String annotationType) {
-        return annotate(annotationType, (Consumer<AnnotationValueBuilder<T>>) annotationValueBuilder -> {});
+        return annotate(annotationType, (Consumer<AnnotationValueBuilder<T>>) annotationValueBuilder -> { });
     }
 
     /**

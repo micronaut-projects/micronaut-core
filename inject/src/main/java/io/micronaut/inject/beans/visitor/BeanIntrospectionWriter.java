@@ -25,7 +25,6 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
@@ -374,6 +373,10 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         return packageName + ".$" + shortName + INTROSPECTION_SUFFIX;
     }
 
+    /**
+     * Visit the constructor arguments. If any.
+     * @param parameters The parameters
+     */
     void visitConstructorArguments(ParameterElement... parameters) {
         this.constructorArguments = parameters;
     }
