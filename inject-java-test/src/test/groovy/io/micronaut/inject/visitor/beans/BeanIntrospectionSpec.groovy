@@ -137,6 +137,8 @@ class Test {}
 
         then:"The reference is valid"
         reference != null
+        reference.getBeanType() == TestBean
+
 
         cleanup:
         context?.close()
