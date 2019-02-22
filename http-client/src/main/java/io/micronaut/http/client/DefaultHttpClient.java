@@ -347,7 +347,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration) {
         this(
                 LoadBalancer.fixed(url), configuration, null, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                createSslBuilder(), createDefaultMediaTypeRegistry(),
+                createSslBuilder(configuration), createDefaultMediaTypeRegistry(),
                 AnnotationMetadataResolver.DEFAULT
         );
     }
@@ -360,7 +360,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
     public DefaultHttpClient(URL url, HttpClientConfiguration configuration, String contextPath) {
         this(
                 LoadBalancer.fixed(url), configuration, contextPath, new DefaultThreadFactory(MultithreadEventLoopGroup.class),
-                createSslBuilder(), createDefaultMediaTypeRegistry(),
+                createSslBuilder(configuration), createDefaultMediaTypeRegistry(),
                 AnnotationMetadataResolver.DEFAULT
         );
     }
@@ -1233,7 +1233,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         final SslContext sslCtx;
         if (uriObject.getScheme().equals("https")) {
             sslCtx = sslContext;
-            if (sslCtx == null) {
+            //Allow https requests to be sent if SSL is disabled but a proxy is present
+            if (sslCtx == null && !configuration.getProxyAddress().isPresent()) {
                 throw new HttpClientException("Cannot send HTTPS request. SSL is disabled");
             }
         } else {
@@ -1941,8 +1942,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         );
     }
 
-    private static NettyClientSslBuilder createSslBuilder() {
-        return new NettyClientSslBuilder(new ClientSslConfiguration(), new ResourceResolver());
+    private static NettyClientSslBuilder createSslBuilder(HttpClientConfiguration configuration) {
+        return new NettyClientSslBuilder(configuration.getSslConfiguration());
     }
 
     private <I> NettyRequestWriter prepareRequest(io.micronaut.http.HttpRequest<I> request, URI requestURI) throws HttpPostRequestEncoder.ErrorDataEncoderException {
@@ -2039,6 +2040,8 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                 ch.config().setAutoRead(false);
             }
 
+            Optional<SocketAddress> proxy = configuration.getProxyAddress();
+
             if (sslContext != null) {
                 SslHandler sslHandler = sslContext.newHandler(
                         ch.alloc(),
@@ -2046,10 +2049,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         port
                 );
                 p.addFirst(HANDLER_SSL, sslHandler);
-            }
 
-            Optional<SocketAddress> proxy = configuration.getProxyAddress();
-            if (proxy.isPresent()) {
+                if (LOG.isDebugEnabled() && proxy.isPresent()) {
+                    LOG.debug("HttpClient proxy settings will be ignored because SSL is enabled");
+                }
+            } else if (proxy.isPresent()) {
                 Type proxyType = configuration.getProxyType();
                 SocketAddress proxyAddress = proxy.get();
                 configureProxy(p, proxyType, proxyAddress);
