@@ -30,7 +30,6 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.beans.AbstractBeanProperty;
 import io.micronaut.inject.writer.AbstractClassFileWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
-import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
@@ -42,7 +41,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -157,7 +155,6 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         writeMethod.loadArg(0);
         writeMethod.checkCast(beanType);
         writeMethod.loadArg(1);
-        pushCastToType(writeMethod, propertyType);
         writeMethod.invokeVirtual(
                 beanType,
                 new Method(NameUtils.setterNameFor(propertyName),
