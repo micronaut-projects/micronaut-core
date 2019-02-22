@@ -3,6 +3,7 @@ package io.micronaut.security.token.jwt.customclaimsrolesparser
 import groovy.transform.CompileStatic
 import io.micronaut.context.annotation.Replaces
 import io.micronaut.context.annotation.Requires
+import io.micronaut.security.token.Claims
 import io.micronaut.security.token.DefaultRolesParser
 import io.micronaut.security.token.RolesParser
 import javax.annotation.Nonnull
@@ -18,7 +19,7 @@ class CustomRolesParser implements RolesParser {
     private static final String ROLES_KEY = "roles"
 
     @Override
-    List<String> parseRoles(@Nonnull Map<String, Object> claims) {
+    List<String> parseRoles(@Nonnull Claims claims) {
         List<String> roles = []
         if (claims[REALM_ACCESS_KEY]) {
             if (claims[REALM_ACCESS_KEY] && claims[REALM_ACCESS_KEY] instanceof Map) {
