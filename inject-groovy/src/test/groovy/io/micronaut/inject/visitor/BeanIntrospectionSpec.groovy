@@ -2,7 +2,6 @@ package io.micronaut.inject.visitor
 
 import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
-import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
@@ -227,30 +226,30 @@ class ParentBean {
         !nameProp.isReadOnly()
         !nameProp.isWriteOnly()
         nameProp.isReadWrite()
-        boolProp.read(instance) == false
-        nameProp.read(instance) == null
-        ageProp.read(instance) == 0
-        stringArrayProp.read(instance) == null
-        primitiveArrayProp.read(instance) == null
+        boolProp.get(instance) == false
+        nameProp.get(instance) == null
+        ageProp.get(instance) == 0
+        stringArrayProp.get(instance) == null
+        primitiveArrayProp.get(instance) == null
         ageProp.hasAnnotation(Size)
         listOfBytes.asArgument().getFirstTypeVariable().get().type == byte[].class
         listProp.asArgument().getFirstTypeVariable().isPresent()
         listProp.asArgument().getFirstTypeVariable().get().type == Number
 
         when:
-        boolProp.write(instance, true)
-        nameProp.write(instance, "foo")
-        ageProp.write(instance, 10)
-        primitiveArrayProp.write(instance, [10] as int[])
-        stringArrayProp.write(instance, ['foo'] as String[])
+        boolProp.set(instance, true)
+        nameProp.set(instance, "foo")
+        ageProp.set(instance, 10)
+        primitiveArrayProp.set(instance, [10] as int[])
+        stringArrayProp.set(instance, ['foo'] as String[])
 
 
         then:
-        boolProp.read(instance) == true
-        nameProp.read(instance) == 'foo'
-        ageProp.read(instance) == 10
-        stringArrayProp.read(instance) == ['foo'] as String[]
-        primitiveArrayProp.read(instance) == [10] as int[]
+        boolProp.get(instance) == true
+        nameProp.get(instance) == 'foo'
+        ageProp.get(instance) == 10
+        stringArrayProp.get(instance) == ['foo'] as String[]
+        primitiveArrayProp.get(instance) == [10] as int[]
 
         when:
         introspection.instantiate("blah") // illegal argument
