@@ -47,6 +47,12 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
     }
 
+    ClassLoader buildClassLoader(String classStr) {
+        def classLoader = new InMemoryByteCodeGroovyClassLoader()
+        classLoader.parseClass(classStr)
+        return classLoader
+    }
+
     AnnotationMetadata buildTypeAnnotationMetadata(String cls, String source) {
         ASTNode[] nodes = new AstBuilder().buildFromString(source)
 

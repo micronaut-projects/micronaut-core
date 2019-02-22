@@ -34,7 +34,7 @@ import org.codehaus.groovy.transform.GroovyASTTransformation
  * @since 1.0
  */
 @CompileStatic
-@GroovyASTTransformation(phase = CompilePhase.OUTPUT)
+@GroovyASTTransformation(phase = CompilePhase.CLASS_GENERATION)
 class TypeElementVisitorEnd implements ASTTransformation {
 
     @Override
