@@ -364,7 +364,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     return null;
                 }
 
-            } else if (typeAnnotationMetadata.hasStereotype(ANNOTATION_STEREOTYPES)) {
+            } else {
                 Element enclosingElement = classElement.getEnclosingElement();
                 // don't process inner class unless this is the visitor for it
                 if (!JavaModelUtils.isClass(enclosingElement) ||
@@ -462,7 +462,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     return null;
                 }
             }
-            return null;
         }
 
         private void visitIntroductionAdviceInterface(TypeElement classElement, AnnotationMetadata typeAnnotationMetadata, AopProxyWriter aopProxyWriter) {
