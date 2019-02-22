@@ -15,8 +15,11 @@
  */
 package io.micronaut.security.rules;
 
+import io.micronaut.security.token.DefaultRolesParser;
+import io.micronaut.security.token.RolesParser;
 import io.micronaut.security.token.config.TokenConfiguration;
 
+import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -31,14 +34,24 @@ import java.util.Map;
  */
 public abstract class AbstractSecurityRule implements SecurityRule {
 
-    private final TokenConfiguration tokenConfiguration;
+    private final RolesParser rolesParser;
+
+    /**
+     * @deprecated use {@link AbstractSecurityRule(RolesParser)} instead.
+     * @param tokenConfiguration General Token Configuration
+     */
+    @Deprecated
+    AbstractSecurityRule(TokenConfiguration tokenConfiguration) {
+        this.rolesParser = new DefaultRolesParser(tokenConfiguration);
+    }
 
     /**
      *
-     * @param tokenConfiguration General Token Configuration
+     * @param rolesParser Roles Parser
      */
-    AbstractSecurityRule(TokenConfiguration tokenConfiguration) {
-        this.tokenConfiguration = tokenConfiguration;
+    @Inject
+    AbstractSecurityRule(RolesParser rolesParser) {
+        this.rolesParser = rolesParser;
     }
 
     /**
@@ -55,16 +68,7 @@ public abstract class AbstractSecurityRule implements SecurityRule {
             roles.add(SecurityRule.IS_ANONYMOUS);
         } else {
             if (!claims.isEmpty()) {
-                Object rolesObject = claims.get(tokenConfiguration.getRolesName());
-                if (rolesObject != null) {
-                    if (rolesObject instanceof Iterable) {
-                        for (Object o : ((Iterable) rolesObject)) {
-                            roles.add(o.toString());
-                        }
-                    } else {
-                        roles.add(rolesObject.toString());
-                    }
-                }
+                roles.addAll(rolesParser.parseRoles(claims));
             }
             roles.add(SecurityRule.IS_ANONYMOUS);
             roles.add(SecurityRule.IS_AUTHENTICATED);
