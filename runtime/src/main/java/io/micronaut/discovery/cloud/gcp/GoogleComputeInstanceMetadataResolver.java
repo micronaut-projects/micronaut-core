@@ -115,8 +115,8 @@ public class GoogleComputeInstanceMetadataResolver implements ComputeInstanceMet
                     LOG.debug("No project metadata found at: " + configuration.getProjectMetadataUrl() + "?recursive=true", fnfe);
                 }
             } catch (IOException ioe) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Error connecting to" + configuration.getProjectMetadataUrl() + "?recursive=true reading project metadata. Not a Google environment?", ioe);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Error connecting to" + configuration.getProjectMetadataUrl() + "?recursive=true reading project metadata. Not a Google environment?", ioe);
                 }
             }
             JsonNode instanceMetadataJson = readMetadataUrl(new URL(configuration.getMetadataUrl() + "?recursive=true"), connectionTimeoutMs, readTimeoutMs, objectMapper, requestProperties);
@@ -192,7 +192,7 @@ public class GoogleComputeInstanceMetadataResolver implements ComputeInstanceMet
             }
         } catch (IOException ioe) {
             if (LOG.isErrorEnabled()) {
-                LOG.error("Error connecting to" + configuration.getMetadataUrl() + "?recursive=true reading instance metadata", ioe);
+                LOG.debug("Error connecting to" + configuration.getMetadataUrl() + "?recursive=true reading instance metadata", ioe);
             }
         }
 

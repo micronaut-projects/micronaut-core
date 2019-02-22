@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.reflect.ReflectionUtils;
 
+import javax.annotation.Nonnull;
 import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.Map;
@@ -32,8 +33,10 @@ import java.util.stream.Collectors;
  * @param <T> type Generic
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Replaced by {@link BeanIntrospectionMap}
  */
 @Internal
+@Deprecated
 class ReflectionBeanMap<T> implements BeanMap<T> {
 
     private final BeanInfo<T> beanInfo;
@@ -53,7 +56,7 @@ class ReflectionBeanMap<T> implements BeanMap<T> {
     }
 
     @Override
-    public Class<T> getBeanType() {
+    public @Nonnull Class<T> getBeanType() {
         return beanInfo.getBeanClass();
     }
 

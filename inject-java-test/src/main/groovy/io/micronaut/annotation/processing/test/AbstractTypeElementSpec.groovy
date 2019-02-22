@@ -83,7 +83,7 @@ abstract class AbstractTypeElementSpec extends Specification {
             }
         }
 
-        return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader),"test") {
+        return new DefaultApplicationContext(ClassPathResourceLoader.defaultLoader(classLoader), "test") {
             @Override
             protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
                 files.findAll { JavaFileObject jfo ->

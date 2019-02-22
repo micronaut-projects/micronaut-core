@@ -21,14 +21,9 @@ import io.micronaut.context.env.SystemPropertiesPropertySource;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.util.StringUtils;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Implementation of {@link ApplicationContextBuilder}.
@@ -59,6 +54,15 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
             singletons.addAll(Arrays.asList(beans));
         }
         return this;
+    }
+
+    @Override
+    public @Nonnull ClassPathResourceLoader getResourceLoader() {
+        if (classPathResourceLoader == null) {
+            return ClassPathResourceLoader.defaultLoader(getClassLoader());
+        } else {
+            return classPathResourceLoader;
+        }
     }
 
     @Override
@@ -100,12 +104,12 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
-    public Boolean getDeduceEnvironments() {
-        return deduceEnvironments;
+    public Optional<Boolean> getDeduceEnvironments() {
+        return Optional.ofNullable(deduceEnvironments);
     }
 
     @Override
-    public List<String> getEnvironments() {
+    public @Nonnull List<String> getEnvironments() {
         return environments;
     }
 
@@ -133,9 +137,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     @SuppressWarnings("MagicNumber")
     public ApplicationContext build() {
-        ClassLoader classLoader = ApplicationContext.class.getClassLoader();
         DefaultApplicationContext applicationContext = new DefaultApplicationContext(
-            classPathResourceLoader != null ? classPathResourceLoader : ClassPathResourceLoader.defaultLoader(classLoader),
             this
         );
 

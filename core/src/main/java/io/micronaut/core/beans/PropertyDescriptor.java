@@ -26,7 +26,9 @@ import java.lang.reflect.Method;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Use {@link BeanProperty} instead
  */
+@Deprecated
 public class PropertyDescriptor implements Named {
     private final String propertyName;
     private final Method getter;

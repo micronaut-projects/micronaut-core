@@ -33,4 +33,19 @@ public interface TypedElement extends Element {
     @Nullable
     ClassElement getType();
 
+    /**
+     * Whether the type is primitive.
+     * @return True if it is
+     */
+    default boolean isPrimitive() {
+        return false;
+    }
+
+    /**
+     * Is the type an array.
+     * @return True if it is.
+     */
+    default boolean isArray() {
+        return false;
+    }
 }

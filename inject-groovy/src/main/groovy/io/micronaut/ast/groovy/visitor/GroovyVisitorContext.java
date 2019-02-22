@@ -17,10 +17,13 @@ package io.micronaut.ast.groovy.visitor;
 
 import groovy.lang.GroovyClassLoader;
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
+import io.micronaut.ast.groovy.utils.InMemoryByteCodeGroovyClassLoader;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
+import io.micronaut.core.io.scan.ClassPathAnnotationScanner;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -37,12 +40,13 @@ import org.codehaus.groovy.control.messages.SimpleMessage;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.*;
 
 /**
  * The visitor context when visiting Groovy code.
@@ -88,6 +92,23 @@ public class GroovyVisitorContext implements VisitorContext {
         return Optional.empty();
     }
 
+    @Nonnull
+    @Override
+    public ClassElement[] getClassElements(@Nonnull String aPackage, @Nonnull String... stereotypes) {
+        ArgumentUtils.requireNonNull("aPackage", aPackage);
+        ArgumentUtils.requireNonNull("stereotypes", stereotypes);
+
+        ClassPathAnnotationScanner scanner = new ClassPathAnnotationScanner(sourceUnit.getClassLoader());
+        List<ClassElement> classElements = new ArrayList<>();
+        for (String s : stereotypes) {
+            scanner.scan(s, aPackage).forEach(aClass -> {
+                final ClassNode classNode = ClassHelper.make(aClass);
+                classElements.add(new GroovyClassElement(sourceUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, classNode)));
+            });
+        }
+        return classElements.toArray(new ClassElement[0]);
+    }
+
     @Override
     public void info(String message, @Nullable Element element) {
         StringBuilder msg = new StringBuilder("Note: ").append(message);
@@ -128,6 +149,49 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     @Override
+    public OutputStream visitClass(String classname) throws IOException {
+        File classesDir = sourceUnit.getConfiguration().getTargetDirectory();
+        if (classesDir != null) {
+
+            DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
+                    classesDir
+            );
+            return outputVisitor.visitClass(classname);
+        } else {
+            // should only arrive here in testing scenarios
+            if (sourceUnit.getClassLoader() instanceof InMemoryByteCodeGroovyClassLoader) {
+                return new OutputStream() {
+                    @Override
+                    public void write(int b) {
+                        // no-op
+                    }
+
+                    @Override
+                    public void write(byte[] b) {
+                        ((InMemoryByteCodeGroovyClassLoader) sourceUnit.getClassLoader()).addClass(classname, b);
+                    }
+                };
+            } else {
+                return new ByteArrayOutputStream(); // in-memory, mock or unit tests situation?
+            }
+        }
+
+    }
+
+    @Override
+    public void visitServiceDescriptor(String type, String classname) {
+        File classesDir = sourceUnit.getConfiguration().getTargetDirectory();
+        if (classesDir != null) {
+
+            DirectoryClassWriterOutputVisitor outputVisitor = new DirectoryClassWriterOutputVisitor(
+                    classesDir
+            );
+            outputVisitor.visitServiceDescriptor(type, classname);
+            outputVisitor.finish();
+        }
+    }
+
+    @Override
     public Optional<GeneratedFile> visitMetaInfFile(String path) {
         File classesDir = sourceUnit.getConfiguration().getTargetDirectory();
         if (classesDir != null) {
@@ -153,6 +217,11 @@ public class GroovyVisitorContext implements VisitorContext {
         }
 
         return Optional.empty();
+    }
+
+    @Override
+    public void finish() {
+        // no-op
     }
 
     /**

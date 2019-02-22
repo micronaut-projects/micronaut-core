@@ -69,7 +69,7 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
                             accept(type, enclosedElement, p);
                         }
                     } else {
-                        String qualifiedName = types.erasure(enclosedElement.asType()).toString();
+                        String qualifiedName = types.erasure(enclosedElement.asType()).toString() + "." + enclosedElement.getSimpleName().toString();
                         // if the method has already been processed then it is overridden so ignore
                         if (!processed.contains(qualifiedName)) {
                             processed.add(qualifiedName);

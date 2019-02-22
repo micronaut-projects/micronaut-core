@@ -16,7 +16,14 @@
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.TypedElement;
+import org.jetbrains.annotations.NotNull;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
@@ -25,16 +32,13 @@ import org.objectweb.asm.Type;
 import org.objectweb.asm.commons.GeneratorAdapter;
 import org.objectweb.asm.commons.Method;
 
+import javax.annotation.Nonnull;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.file.Files;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Abstract class that writes generated classes to disk and provides convenience methods for building classes.
@@ -53,6 +57,23 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     protected static final int DEFAULT_MAX_STACK = 13;
 
     protected static final Map<String, String> NAME_TO_TYPE_MAP = new HashMap<>();
+    private static final Method METHOD_CREATE_ARGUMENT_SIMPLE = Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(
+                    Argument.class,
+                    "of",
+                    Class.class,
+                    String.class
+            )
+    );
+    private static final Method METHOD_CREATE_ARGUMENT_WITH_GENERICS = Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(
+                    Argument.class,
+                    "of",
+                    Class.class,
+                    String.class,
+                    Argument[].class
+            )
+    );
 
     static {
         NAME_TO_TYPE_MAP.put("void", "V");
@@ -66,6 +87,101 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     }
 
     /**
+     * Pushes type arguments onto the stack.
+     * @param generatorAdapter The generator adapter
+     * @param types The type references
+     */
+    protected static void pushTypeArguments(GeneratorAdapter generatorAdapter, Map<String, Object> types) {
+        if (types == null || types.isEmpty()) {
+            generatorAdapter.visitInsn(ACONST_NULL);
+            return;
+        }
+        int len = types.size();
+        // Build calls to Argument.create(...)
+        pushNewArray(generatorAdapter, Argument.class, len);
+        int i = 0;
+        for (Map.Entry<String, Object> entry : types.entrySet()) {
+            // the array index
+            generatorAdapter.push(i);
+            String typeParameterName = entry.getKey();
+            Object value = entry.getValue();
+            if (value instanceof Map) {
+                buildArgumentWithGenerics(generatorAdapter, typeParameterName, (Map) value);
+            } else {
+                buildArgument(generatorAdapter, typeParameterName, value);
+            }
+
+            // store the type reference
+            generatorAdapter.visitInsn(AASTORE);
+            // if we are not at the end of the array duplicate array onto the stack
+            if (i != (len - 1)) {
+                generatorAdapter.visitInsn(DUP);
+            }
+            i++;
+        }
+    }
+
+    /**
+     * Builds an argument instance.
+     * @param generatorAdapter The generator adapter.
+     * @param argumentName The argument name
+     * @param objectType The object type
+     */
+    protected static void buildArgument(GeneratorAdapter generatorAdapter, String argumentName, Object objectType) {
+        // 1st argument: the type
+        generatorAdapter.push(getTypeReference(objectType));
+        // 2nd argument: the name
+        generatorAdapter.push(argumentName);
+
+        // Argument.create( .. )
+        invokeInterfaceStaticMethod(
+                generatorAdapter,
+                Argument.class,
+                METHOD_CREATE_ARGUMENT_SIMPLE
+        );
+    }
+
+    /**
+     * @param generatorAdapter The {@link GeneratorAdapter}
+     * @param argumentName     The argument name
+     * @param nestedTypeObject The nested type object
+     */
+    static void buildArgumentWithGenerics(GeneratorAdapter generatorAdapter, String argumentName, Map nestedTypeObject) {
+        Map nestedTypes = null;
+        @SuppressWarnings("unchecked") Optional<Map.Entry> nestedEntry = nestedTypeObject.entrySet().stream().findFirst();
+        Object objectType;
+        if (nestedEntry.isPresent()) {
+            Map.Entry data = nestedEntry.get();
+            Object key = data.getKey();
+            Object map = data.getValue();
+            objectType = key;
+            if (map instanceof Map) {
+                nestedTypes = (Map) map;
+            }
+        } else {
+            throw new IllegalArgumentException("Must be a map with a single key containing the argument type and a map of generics as the value");
+        }
+
+        // 1st argument: the type
+        generatorAdapter.push(getTypeReference(objectType));
+        // 2nd argument: the name
+        generatorAdapter.push(argumentName);
+
+        // 3rd argument: generic types
+        boolean hasGenerics = nestedTypes != null && !nestedTypes.isEmpty();
+        if (hasGenerics) {
+            pushTypeArguments(generatorAdapter, nestedTypes);
+        }
+
+        // Argument.create( .. )
+        invokeInterfaceStaticMethod(
+                generatorAdapter,
+                Argument.class,
+                hasGenerics ? METHOD_CREATE_ARGUMENT_WITH_GENERICS : METHOD_CREATE_ARGUMENT_SIMPLE
+        );
+    }
+
+    /**
      * Write the class to the target directory.
      *
      * @param targetDir The target directory
@@ -74,6 +190,84 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     public void writeTo(File targetDir) throws IOException {
         accept(newClassWriterOutputVisitor(targetDir));
     }
+
+    /**
+     * Obtain the type for a given element.
+     * @param type The element type
+     * @return The type
+     */
+    protected Type getTypeForElement(@Nonnull TypedElement type) {
+        Type propertyType;
+        final Optional<Class> pt;
+        final String typeName = type.getName();
+        if (type.isPrimitive()) {
+            if (type.isArray()) {
+                pt = ClassUtils.arrayTypeForPrimitive(typeName);
+            } else {
+                pt = ClassUtils.getPrimitiveType(typeName);
+            }
+        } else {
+            pt = Optional.empty();
+        }
+        if (pt.isPresent()) {
+            propertyType = getTypeReference(pt.get());
+        } else {
+            if (type.isArray()) {
+                propertyType = getTypeReference(typeName + "[]");
+            } else {
+                propertyType = getTypeReference(typeName);
+            }
+        }
+        return propertyType;
+    }
+
+    /**
+     * Converts a map of class elements to type arguments.
+     * @param typeArguments The type arguments
+     * @return The type arguments
+     */
+    @NotNull
+    protected Map<String, Object> toTypeArguments(@NotNull Map<String, ClassElement> typeArguments) {
+        final LinkedHashMap<String, Object> map = new LinkedHashMap<>(typeArguments.size());
+        for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
+            final ClassElement ce = entry.getValue();
+            final Map<String, ClassElement> subArgs = ce.getTypeArguments();
+            if (CollectionUtils.isNotEmpty(subArgs)) {
+                map.put(entry.getKey(), toTypeArguments(subArgs));
+            } else {
+                final Type typeReference = getTypeForElement(ce);
+                map.put(entry.getKey(), typeReference);
+            }
+        }
+
+        return map;
+    }
+
+    /**
+     * Converts a parameters to type arguments.
+     * @param parameters The parameters
+     * @return The type arguments
+     */
+    @NotNull
+    protected Map<String, Object> toTypeArguments(ParameterElement... parameters) {
+        final LinkedHashMap<String, Object> map = new LinkedHashMap<>(parameters.length);
+        for (ParameterElement ce : parameters) {
+            final ClassElement type = ce.getType();
+            if (type == null) {
+                continue;
+            }
+            final Map<String, ClassElement> subArgs = type.getTypeArguments();
+            if (CollectionUtils.isNotEmpty(subArgs)) {
+                map.put(ce.getName(), toTypeArguments(subArgs));
+            } else {
+                final Type typeReference = getTypeForElement(type);
+                map.put(ce.getName(), typeReference);
+            }
+        }
+
+        return map;
+    }
+
 
     /**
      * Accept a ClassWriterOutputVisitor to write this writer to disk.
@@ -92,6 +286,8 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     protected static String getTypeDescriptor(Object type) {
         if (type instanceof Class) {
             return Type.getDescriptor((Class) type);
+        } else if (type instanceof Type) {
+            return ((Type) type).getDescriptor();
         } else {
             String className = type.toString();
             return getTypeDescriptor(className, new String[0]);
@@ -117,7 +313,9 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      * @return The {@link Type}
      */
     protected static Type getTypeReference(Object type) {
-        if (type instanceof Class) {
+        if (type instanceof Type) {
+            return (Type) type;
+        } else if (type instanceof Class) {
             return Type.getType((Class) type);
         } else if (type instanceof String) {
             String className = type.toString();
@@ -137,14 +335,27 @@ public abstract class AbstractClassFileWriter implements Opcodes {
      * @param injectMethodVisitor The {@link MethodVisitor}
      */
     protected static void pushBoxPrimitiveIfNecessary(Object fieldType, MethodVisitor injectMethodVisitor) {
-        Class wrapperType = AbstractClassFileWriter.getWrapperType(fieldType);
-        if (wrapperType != null) {
-            Class primitiveType = (Class) fieldType;
-            Type wrapper = Type.getType(wrapperType);
-            String primitiveName = primitiveType.getName();
-            String sig = wrapperType.getName() + " valueOf(" + primitiveName + ")";
-            org.objectweb.asm.commons.Method valueOfMethod = org.objectweb.asm.commons.Method.getMethod(sig);
-            injectMethodVisitor.visitMethodInsn(INVOKESTATIC, wrapper.getInternalName(), "valueOf", valueOfMethod.getDescriptor(), false);
+        if (fieldType instanceof Type) {
+            final Type t = (Type) fieldType;
+            final Optional<Class> pt = ClassUtils.getPrimitiveType(t.getClassName());
+            Class wrapperType = pt.map(ReflectionUtils::getWrapperType).orElse(null);
+            if (wrapperType != null) {
+                Type wrapper = Type.getType(wrapperType);
+                String primitiveName = t.getClassName();
+                String sig = wrapperType.getName() + " valueOf(" + primitiveName + ")";
+                org.objectweb.asm.commons.Method valueOfMethod = org.objectweb.asm.commons.Method.getMethod(sig);
+                injectMethodVisitor.visitMethodInsn(INVOKESTATIC, wrapper.getInternalName(), "valueOf", valueOfMethod.getDescriptor(), false);
+            }
+        } else {
+            Class wrapperType = AbstractClassFileWriter.getWrapperType(fieldType);
+            if (wrapperType != null) {
+                Class primitiveType = (Class) fieldType;
+                Type wrapper = Type.getType(wrapperType);
+                String primitiveName = primitiveType.getName();
+                String sig = wrapperType.getName() + " valueOf(" + primitiveName + ")";
+                org.objectweb.asm.commons.Method valueOfMethod = org.objectweb.asm.commons.Method.getMethod(sig);
+                injectMethodVisitor.visitMethodInsn(INVOKESTATIC, wrapper.getInternalName(), "valueOf", valueOfMethod.getDescriptor(), false);
+            }
         }
     }
 
@@ -155,43 +366,52 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     protected static void pushCastToType(MethodVisitor methodVisitor, Object type) {
         String internalName = getInternalNameForCast(type);
         methodVisitor.visitTypeInsn(CHECKCAST, internalName);
+        Type primitiveType = null;
         if (type instanceof Class) {
             Class typeClass = (Class) type;
             if (typeClass.isPrimitive()) {
-                Type primitiveType = Type.getType(typeClass);
-                org.objectweb.asm.commons.Method valueMethod = null;
-                switch (primitiveType.getSort()) {
-                    case Type.BOOLEAN:
-                        valueMethod = org.objectweb.asm.commons.Method.getMethod("boolean booleanValue()");
-                        break;
-                    case Type.CHAR:
-                        valueMethod = org.objectweb.asm.commons.Method.getMethod("char charValue()");
-                        break;
-                    case Type.BYTE:
-                        valueMethod = org.objectweb.asm.commons.Method.getMethod("byte byteValue()");
-                        break;
-                    case Type.SHORT:
-                        valueMethod = org.objectweb.asm.commons.Method.getMethod("short shortValue()");
-                        break;
-                    case Type.INT:
-                        valueMethod = org.objectweb.asm.commons.Method.getMethod("int intValue()");
-                        break;
-                    case Type.LONG:
-                        valueMethod = org.objectweb.asm.commons.Method.getMethod("long longValue()");
-                        break;
-                    case Type.DOUBLE:
-                        valueMethod = org.objectweb.asm.commons.Method.getMethod("double doubleValue()");
-                        break;
-                    case Type.FLOAT:
-                        valueMethod = org.objectweb.asm.commons.Method.getMethod("float floatValue()");
-                        break;
-                    default:
-                        // no-ip
-                }
+                primitiveType = Type.getType(typeClass);
+            }
+        } else if (type instanceof Type) {
+            final Optional<Class> pt = ClassUtils.getPrimitiveType(((Type) type).getClassName());
+            if (pt.isPresent()) {
+                primitiveType = Type.getType(pt.get());
+            }
+        }
 
-                if (valueMethod != null) {
-                    methodVisitor.visitMethodInsn(INVOKEVIRTUAL, internalName, valueMethod.getName(), valueMethod.getDescriptor(), false);
-                }
+        if (primitiveType != null) {
+            org.objectweb.asm.commons.Method valueMethod = null;
+            switch (primitiveType.getSort()) {
+                case Type.BOOLEAN:
+                    valueMethod = org.objectweb.asm.commons.Method.getMethod("boolean booleanValue()");
+                    break;
+                case Type.CHAR:
+                    valueMethod = org.objectweb.asm.commons.Method.getMethod("char charValue()");
+                    break;
+                case Type.BYTE:
+                    valueMethod = org.objectweb.asm.commons.Method.getMethod("byte byteValue()");
+                    break;
+                case Type.SHORT:
+                    valueMethod = org.objectweb.asm.commons.Method.getMethod("short shortValue()");
+                    break;
+                case Type.INT:
+                    valueMethod = org.objectweb.asm.commons.Method.getMethod("int intValue()");
+                    break;
+                case Type.LONG:
+                    valueMethod = org.objectweb.asm.commons.Method.getMethod("long longValue()");
+                    break;
+                case Type.DOUBLE:
+                    valueMethod = org.objectweb.asm.commons.Method.getMethod("double doubleValue()");
+                    break;
+                case Type.FLOAT:
+                    valueMethod = org.objectweb.asm.commons.Method.getMethod("float floatValue()");
+                    break;
+                default:
+                    // no-ip
+            }
+
+            if (valueMethod != null) {
+                methodVisitor.visitMethodInsn(INVOKEVIRTUAL, internalName, valueMethod.getName(), valueMethod.getDescriptor(), false);
             }
         }
     }
@@ -563,6 +783,15 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     }
 
     /**
+     * @param classWriter The current class writer
+     * @param className   The class name
+     * @param superType   The super type
+     */
+    protected void startFinalClass(ClassVisitor classWriter, String className, Type superType) {
+        classWriter.visit(V1_8, ACC_PUBLIC | ACC_FINAL | ACC_SYNTHETIC, className, null, superType.getInternalName(), null);
+    }
+
+    /**
      * @param classWriter      The current class writer
      * @param className        The class name
      * @param superType        The super type
@@ -639,6 +868,14 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                 typeClass = ReflectionUtils.getWrapperType(typeClass);
             }
             return Type.getInternalName(typeClass);
+        } else if (type instanceof Type) {
+            final Type t = (Type) type;
+            final Optional<Class> pt = ClassUtils.getPrimitiveType(t.getClassName());
+            if (pt.isPresent()) {
+                return Type.getInternalName(ReflectionUtils.getWrapperType(pt.get()));
+            } else {
+                return t.getInternalName();
+            }
         } else {
             String className = type.toString();
             if (className.endsWith("[]")) {
@@ -743,4 +980,16 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             }
         }
     }
+
+    /**
+     * Push the instantiation of the given type.
+     * @param generatorAdapter The generator adaptor
+     * @param typeToInstantiate The type to instantiate.
+     */
+    protected void pushNewInstance(GeneratorAdapter generatorAdapter, Type typeToInstantiate) {
+        generatorAdapter.newInstance(typeToInstantiate);
+        generatorAdapter.dup();
+        generatorAdapter.invokeConstructor(typeToInstantiate, METHOD_DEFAULT_CONSTRUCTOR);
+    }
+
 }
