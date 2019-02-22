@@ -179,6 +179,7 @@ import java.util.*;
 
 @Introspected
 class Test extends ParentBean {
+    private String readOnly;
     private String name;
     @Size(max=100)
     private int age;
@@ -188,6 +189,9 @@ class Test extends ParentBean {
     private int[] primitiveArray;
     private boolean flag;
     
+    public String getReadOnly() {
+        return readOnly;
+    }
     public boolean isFlag() {
         return flag;
     }
@@ -264,7 +268,7 @@ class ParentBean {
         introspection != null
         introspection.hasAnnotation(Introspected)
         introspection.instantiate().getClass().name == 'test.Test'
-        introspection.getBeanProperties().size() == 7
+        introspection.getBeanProperties().size() == 8
         introspection.getProperty("name").isPresent()
         introspection.getProperty("name", String).isPresent()
         !introspection.getProperty("name", Integer).isPresent()
@@ -277,9 +281,11 @@ class ParentBean {
         BeanProperty primitiveArrayProp = introspection.getProperty("primitiveArray").get()
         BeanProperty stringArrayProp = introspection.getProperty("stringArray").get()
         BeanProperty listOfBytes = introspection.getProperty("listOfBytes").get()
+        def readOnlyProp = introspection.getProperty("readOnly", String).get()
         def instance = introspection.instantiate()
 
         then:
+        readOnlyProp.isReadOnly() 
         nameProp != null
         !nameProp.isReadOnly()
         !nameProp.isWriteOnly()
