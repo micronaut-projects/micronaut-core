@@ -155,6 +155,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         writeMethod.loadArg(0);
         writeMethod.checkCast(beanType);
         writeMethod.loadArg(1);
+        pushCastToType(writeMethod, propertyType);
         writeMethod.invokeVirtual(
                 beanType,
                 new Method(NameUtils.setterNameFor(propertyName),
