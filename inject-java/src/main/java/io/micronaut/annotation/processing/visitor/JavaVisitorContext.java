@@ -18,26 +18,29 @@ package io.micronaut.annotation.processing.visitor;
 import io.micronaut.annotation.processing.AnnotationProcessingOutputVisitor;
 import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.annotation.processing.ModelUtils;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Optional;
-import java.util.Set;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.*;
 
 /**
  * The visitor context when visiting Java code.
@@ -92,6 +95,20 @@ public class JavaVisitorContext implements VisitorContext {
     }
 
     @Override
+    public @Nonnull ClassElement[] getClassElements(@Nonnull String aPackage, @Nonnull String... stereotypes) {
+        ArgumentUtils.requireNonNull("aPackage", aPackage);
+        ArgumentUtils.requireNonNull("stereotypes", stereotypes);
+        final PackageElement packageElement = elements.getPackageElement(aPackage);
+        if (packageElement != null) {
+            List<ClassElement> classElements = new ArrayList<>();
+
+            populateClassElements(stereotypes, packageElement, classElements);
+            return classElements.toArray(new ClassElement[0]);
+        }
+        return new ClassElement[0];
+    }
+
+    @Override
     public void info(String message, @Nullable io.micronaut.inject.ast.Element element) {
         printMessage(message, Diagnostic.Kind.NOTE, element);
     }
@@ -125,6 +142,16 @@ public class JavaVisitorContext implements VisitorContext {
     }
 
     @Override
+    public OutputStream visitClass(String classname) throws IOException {
+        return outputVisitor.visitClass(classname);
+    }
+
+    @Override
+    public void visitServiceDescriptor(String type, String classname) {
+        outputVisitor.visitServiceDescriptor(type, classname);
+    }
+
+    @Override
     public Optional<GeneratedFile> visitMetaInfFile(String path) {
         return outputVisitor.visitMetaInfFile(path);
     }
@@ -132,6 +159,11 @@ public class JavaVisitorContext implements VisitorContext {
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path) {
         return outputVisitor.visitGeneratedFile(path);
+    }
+
+    @Override
+    public void finish() {
+        outputVisitor.finish();
     }
 
     /**
@@ -210,5 +242,28 @@ public class JavaVisitorContext implements VisitorContext {
     @Override
     public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
         return visitorAttributes.get(name, conversionContext);
+    }
+
+    private void populateClassElements(@Nonnull String[] stereotypes, PackageElement packageElement, List<ClassElement> classElements) {
+        final List<? extends Element> enclosedElements = packageElement.getEnclosedElements();
+
+        for (Element enclosedElement : enclosedElements) {
+            if (enclosedElement instanceof TypeElement) {
+                final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(enclosedElement);
+                if (Arrays.stream(stereotypes).anyMatch(annotationMetadata::hasStereotype)) {
+                    JavaClassElement classElement = new JavaClassElement(
+                            (TypeElement) enclosedElement,
+                            annotationMetadata,
+                            this
+                    );
+
+                    if (!classElement.isAbstract()) {
+                        classElements.add(classElement);
+                    }
+                }
+            } else if (enclosedElement instanceof PackageElement) {
+                populateClassElements(stereotypes, (PackageElement) enclosedElement, classElements);
+            }
+        }
     }
 }

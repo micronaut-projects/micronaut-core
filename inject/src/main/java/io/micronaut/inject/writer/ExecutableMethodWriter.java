@@ -15,7 +15,6 @@
  */
 package io.micronaut.inject.writer;
 
-import static io.micronaut.inject.writer.BeanDefinitionWriter.buildArgumentWithGenerics;
 import static io.micronaut.inject.writer.BeanDefinitionWriter.pushBuildArgumentsForMethod;
 
 import io.micronaut.context.AbstractExecutableMethod;

@@ -144,7 +144,11 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             hierarchy.add(p)
             return hierarchy
         } else {
-            return Collections.singletonList(element)
+            if (element == null) {
+                return []
+            } else {
+                return [element] as List<AnnotatedNode>
+            }
         }
     }
 

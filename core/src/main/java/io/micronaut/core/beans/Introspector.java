@@ -25,8 +25,10 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Replaced by {@link BeanIntrospector}
  */
 @Internal
+@Deprecated
 public final class Introspector {
 
     /* The cache to store Bean Info objects that have been found or created */

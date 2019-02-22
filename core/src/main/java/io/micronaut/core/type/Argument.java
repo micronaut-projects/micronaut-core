@@ -133,6 +133,18 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
     int typeHashCode();
 
     /**
+     * Whether the given argument is an instance.
+     * @param o The object
+     * @return True if it is an instance of this type
+     */
+    default boolean isInstance(@Nullable Object o) {
+        if (o == null) {
+            return false;
+        }
+        return getType().isInstance(o);
+    }
+
+    /**
      * Returns the string representation of the argument type, including generics.
      *
      * @param simple If true, output the simple name of types
