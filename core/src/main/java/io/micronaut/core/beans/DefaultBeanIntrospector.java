@@ -31,6 +31,8 @@ import java.util.stream.Collectors;
  *
  * @author graemerocher
  * @since 1.1
+ * @see BeanIntrospector
+ * @see BeanIntrospection
  */
 class DefaultBeanIntrospector implements BeanIntrospector {
 

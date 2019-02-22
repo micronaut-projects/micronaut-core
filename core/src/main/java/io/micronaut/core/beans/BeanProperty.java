@@ -30,12 +30,17 @@ import javax.annotation.Nullable;
 import java.util.Optional;
 
 /**
- * Represents a bean property.
+ * Represents a bean property and associated annotation metadata.
+ *
+ * <p>A {@link BeanProperty} allows you to read the value of a property via {@link #get(Object)} or write to it via {@link #set(Object, Object)}, without using reflection.</p>
+ *
+ * <p>The annotations of a property can be inspected via the {@link #getAnnotationMetadata()} method.</p>
  *
  * @param <B> The bean type
  * @param <T> The bean property type
  * @author graemerocher
  * @since 1.1
+ * @see BeanIntrospection
  */
 public interface BeanProperty<B, T> extends Named, AnnotationMetadataDelegate {
 

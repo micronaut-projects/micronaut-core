@@ -22,6 +22,7 @@ import java.util.Map;
 
 /**
  * Simple class that provides a map interface over a bean.
+ *
  * @param <T> type Generic
  * @author Graeme Rocher
  * @since 1.0

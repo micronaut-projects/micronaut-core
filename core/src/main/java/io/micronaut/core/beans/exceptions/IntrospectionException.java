@@ -18,6 +18,8 @@ package io.micronaut.core.beans.exceptions;
 /**
  * Thrown when an error occurs introspecting a bean type.
  *
+ * @see io.micronaut.core.beans.BeanIntrospector
+ * @see io.micronaut.core.beans.BeanIntrospection
  * @author Graeme Rocher
  * @since 1.0
  */

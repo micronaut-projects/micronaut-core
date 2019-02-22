@@ -21,7 +21,13 @@ import java.lang.annotation.*;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * An annotation that indicates a type should produce introspection results at compilation time.
+ * An annotation that indicates a type should produce a {@link io.micronaut.core.beans.BeanIntrospection} at compilation time.
+ *
+ * <p>Typically to produce a {@link io.micronaut.core.beans.BeanIntrospection} one simply annotates a class with this annotation.</p>
+ *
+ * <p>An alternative approach is to use a {@code AnnotationMapper} to enable introspection for existing annotations such as {@code javax.persistence.Entity}.</p>
+ *
+ * <p>If the classes you wish to introspect are already compiled then this annotation can be used on another class (doesn't matter which, but typically on a configuration class) to specify which existing compiled classes to produce {@link io.micronaut.core.beans.BeanIntrospection} instances for either through the {@link #classes()} method or the {@link #packages()} method. The latter uses compile time package scanning and for the moment is regarded as {@link Experimental}.</p>
  *
  * @author graemerocher
  * @since 1.1
@@ -53,6 +59,7 @@ public @interface Introspected {
      *
      * @return The packages to generate introspections for
      */
+    @Experimental
     String[] packages() default {};
 
     /**
@@ -70,16 +77,14 @@ public @interface Introspected {
     String[] excludes() default {};
 
     /**
-     * The annotation types that if present on the property cause the property to be ignored in
-     * introspection results.
+     * The annotation types that if present on the property cause the property to be excluded from results.
      *
      * @return The annotation types
      */
     Class<? extends Annotation>[] excludedAnnotations() default {};
 
     /**
-     * The annotation types that if present on the property cause the property to be ignored in
-     * introspection results.
+     * The annotation types that if present on the property cause only the properties with the specified annotation to be included in the result.
      *
      * @return The annotation types
      */

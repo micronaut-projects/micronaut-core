@@ -29,7 +29,16 @@ import java.util.Optional;
 /**
  * A {@link BeanIntrospection} is the result of compile time computation of a beans properties and annotation metadata.
  *
+ * <p>This interface allows you to instantiate and read and write to bean properties without using reflection or caching reflective metadata, which is
+ * expensive from a memory consumption perspective.</p>
+ *
+ * <p>{@link BeanIntrospection} instances can be obtained either via {@link #getIntrospection(Class)} or via the {@link BeanIntrospector}.</p>
+ *
+ * <p>A {@link BeanIntrospection} is only computed at compilation time if the class is annotated with {@link io.micronaut.core.annotation.Introspected}. </p>
+ *
  * @param <T> The bean type
+ * @see BeanIntrospector
+ * @see io.micronaut.core.annotation.Introspected
  * @author graemerocher
  * @since 1.1
  */
@@ -46,13 +55,13 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
      * @param annotationType The annotation type
      * @return A immutable collection of properties.
      */
-    @Nonnull Collection<BeanProperty<T, Object>> getBeanProperties(Class<? extends Annotation> annotationType);
+    @Nonnull Collection<BeanProperty<T, Object>> getBeanProperties(@Nonnull Class<? extends Annotation> annotationType);
 
     /**
      * Instantiates an instance of the bean, throwing an exception is instantiation is not possible.
      *
      * @return An instance
-     * @throws InstantiationException If the bean cannot be insantiated.
+     * @throws InstantiationException If the bean cannot be insantiated or the arguments are not satisfied.
      */
     @Nonnull T instantiate() throws InstantiationException;
 
