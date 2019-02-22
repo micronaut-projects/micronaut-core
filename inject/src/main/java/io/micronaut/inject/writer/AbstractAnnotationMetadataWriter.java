@@ -126,9 +126,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
             staticInit.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
         } else {
             Type concreteMetadataType = getTypeReference(annotationMetadataWriter.getClassName());
-            staticInit.newInstance(concreteMetadataType);
-            staticInit.dup();
-            staticInit.invokeConstructor(concreteMetadataType, METHOD_DEFAULT_CONSTRUCTOR);
+            pushNewInstance(staticInit, concreteMetadataType);
         }
 
         staticInit.putStatic(targetClassType, FIELD_ANNOTATION_METADATA, annotationMetadataType);

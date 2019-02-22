@@ -35,8 +35,10 @@ import java.util.Set;
  *
  * @author graemerocher
  * @since 1.0
+ * @deprecated Replaced by {@link BeanIntrospection}
  */
 @Internal
+@Deprecated
 class SimpleBeanInfo implements BeanInfo {
     private static final Set<String> EXCLUDED_PROPERTIES = CollectionUtils.setOf("class", "metaClass");
 

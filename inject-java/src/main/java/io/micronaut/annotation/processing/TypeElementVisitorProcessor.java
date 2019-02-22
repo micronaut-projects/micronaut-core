@@ -104,6 +104,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             }
         }
 
+        javaVisitorContext.finish();
         executed = true;
         return false;
     }

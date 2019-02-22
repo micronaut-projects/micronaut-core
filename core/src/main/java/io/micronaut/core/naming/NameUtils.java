@@ -15,8 +15,10 @@
  */
 package io.micronaut.core.naming;
 
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 
+import javax.annotation.Nonnull;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -36,6 +38,8 @@ public class NameUtils {
 
     private static final Pattern DOT_UPPER = Pattern.compile("\\.[A-Z\\$]");
     private static final Pattern SERVICE_ID_REGEX = Pattern.compile("[\\p{javaLowerCase}\\d-]+");
+    private static final String PREFIX_GET = "get";
+    private static final String PREFIX_SET = "set";
 
     /**
      * Checks whether the given name is a valid service identifier.
@@ -196,7 +200,7 @@ public class NameUtils {
      */
     public static boolean isSetterName(String methodName) {
         int len = methodName.length();
-        if (len > PREFIX_LENTGH && methodName.startsWith("set")) {
+        if (len > PREFIX_LENTGH && methodName.startsWith(PREFIX_SET)) {
             return Character.isUpperCase(methodName.charAt(PREFIX_LENTGH));
         }
         return false;
@@ -221,8 +225,9 @@ public class NameUtils {
      * @param propertyName The property name
      * @return The setter name
      */
-    public static String setterNameFor(String propertyName) {
-        return "set" + Character.toUpperCase(propertyName.charAt(0)) + propertyName.substring(1);
+    public static @Nonnull String setterNameFor(@Nonnull String propertyName) {
+        ArgumentUtils.requireNonNull("propertyName", propertyName);
+        return nameFor(PREFIX_SET, propertyName);
     }
 
     /**
@@ -234,7 +239,7 @@ public class NameUtils {
     public static boolean isGetterName(String methodName) {
         int len = methodName.length();
         int prefixLength = 0;
-        if (methodName.startsWith("get")) {
+        if (methodName.startsWith(PREFIX_GET)) {
             prefixLength = PREFIX_LENTGH;
         } else if (methodName.startsWith("is")) {
             prefixLength = IS_LENTGH;
@@ -256,7 +261,7 @@ public class NameUtils {
     public static String getPropertyNameForGetter(String getterName) {
         if (isGetterName(getterName)) {
             int prefixLength = 0;
-            if (getterName.startsWith("get")) {
+            if (getterName.startsWith(PREFIX_GET)) {
                 prefixLength = PREFIX_LENTGH;
             }
             if (getterName.startsWith("is")) {
@@ -273,8 +278,45 @@ public class NameUtils {
      * @param propertyName The property name
      * @return The getter name
      */
-    public static String getterNameFor(String propertyName) {
-        return "get" + Character.toUpperCase(propertyName.charAt(0)) + propertyName.substring(1);
+    public static @Nonnull String getterNameFor(@Nonnull String propertyName) {
+        ArgumentUtils.requireNonNull("propertyName", propertyName);
+        return nameFor(PREFIX_GET, propertyName);
+    }
+
+    /**
+     * Get the equivalent getter name for the given property.
+     *
+     * @param propertyName The property name
+     * @param type The type of the property
+     * @return The getter name
+     */
+    public static @Nonnull String getterNameFor(@Nonnull String propertyName, @Nonnull Class<?> type) {
+        ArgumentUtils.requireNonNull("propertyName", propertyName);
+        final boolean isBoolean = type == boolean.class;
+        return getterNameFor(propertyName, isBoolean);
+    }
+
+    /**
+     * Get the equivalent getter name for the given property.
+     *
+     * @param propertyName The property name
+     * @param isBoolean Is the property a boolean
+     * @return The getter name
+     */
+    public static String getterNameFor(@Nonnull String propertyName, boolean isBoolean) {
+        return nameFor(isBoolean ? "is" : PREFIX_GET, propertyName);
+    }
+
+    private static String nameFor(String prefix, @Nonnull String propertyName) {
+        final int len = propertyName.length();
+        switch (len) {
+            case 0:
+                return propertyName;
+            case 1:
+                return prefix + propertyName.toUpperCase(Locale.ENGLISH);
+            default:
+                return prefix + Character.toUpperCase(propertyName.charAt(0)) + propertyName.substring(1);
+        }
     }
 
     /**

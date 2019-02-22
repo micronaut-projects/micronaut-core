@@ -15,29 +15,50 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
 
-import javax.annotation.Nullable;
+import javax.annotation.Nonnull;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * An interface for configuring an application context.
  *
  * @author Zachary Klein
+ * @author graemerocher
  * @since 1.0
  */
-@Internal
-public interface ApplicationContextConfiguration {
-
-    /**
-     * @return True if the environments should be deduced
-     */
-    @Nullable
-    Boolean getDeduceEnvironments();
+public interface ApplicationContextConfiguration extends BeanContextConfiguration {
 
     /**
      * @return The environment names
      */
-    List<String> getEnvironments();
+    @Nonnull List<String> getEnvironments();
+
+    /**
+     * @return True if the environments should be deduced
+     */
+    default Optional<Boolean> getDeduceEnvironments() {
+        return Optional.empty();
+    }
+
+    /**
+     * The default conversion service to use.
+     *
+     * @return The conversion service
+     */
+    default @Nonnull ConversionService<?> getConversionService() {
+        return ConversionService.SHARED;
+    }
+
+    /**
+     * The class path resource loader to use.
+     *
+     * @return The classpath resource loader
+     */
+    default @Nonnull ClassPathResourceLoader getResourceLoader() {
+        return ClassPathResourceLoader.defaultLoader(getClassLoader());
+    }
 
 }

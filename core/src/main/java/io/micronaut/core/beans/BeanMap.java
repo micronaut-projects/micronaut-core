@@ -15,10 +15,14 @@
  */
 package io.micronaut.core.beans;
 
+import io.micronaut.core.util.ArgumentUtils;
+
+import javax.annotation.Nonnull;
 import java.util.Map;
 
 /**
  * Simple class that provides a map interface over a bean.
+ *
  * @param <T> type Generic
  * @author Graeme Rocher
  * @since 1.0
@@ -28,7 +32,7 @@ public interface BeanMap<T> extends Map<String, Object> {
     /**
      * @return The bean type
      */
-    Class<T> getBeanType();
+    @Nonnull Class<T> getBeanType();
 
     /**
      * Creates a {@link BeanMap} for the given bean.
@@ -37,7 +41,11 @@ public interface BeanMap<T> extends Map<String, Object> {
      * @param <B> type Generic
      * @return The bean map
      */
-    static <B> BeanMap<B> of(B bean) {
-        return new ReflectionBeanMap<>(bean);
+    @SuppressWarnings("unchecked")
+    static @Nonnull <B> BeanMap<B> of(@Nonnull B bean) {
+        ArgumentUtils.requireNonNull("bean", bean);
+        return BeanIntrospector.SHARED.findIntrospection(bean.getClass())
+                .map(i -> (BeanMap<B>) new BeanIntrospectionMap<>((BeanIntrospection<B>) i, bean))
+                .orElseGet(() -> new ReflectionBeanMap<>(bean));
     }
 }

@@ -537,7 +537,6 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             loadTypeGenerator.push(typeName);
             loadTypeGenerator.invokeConstructor(TYPE_ANNOTATION_CLASS_VALUE, CONSTRUCTOR_CLASS_VALUE);
             loadTypeGenerator.returnValue();
-
             return loadTypeGenerator;
         });
 

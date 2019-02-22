@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.websocket;
 
+//tag::clazz[]
 import io.micronaut.websocket.WebSocketBroadcaster;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.*;
@@ -57,3 +58,4 @@ public class ChatServerWebSocket {
         return s -> s != session && topic.equalsIgnoreCase(s.getUriVariables().get("topic", String.class, null));
     }
 }
+//end::clazz[]

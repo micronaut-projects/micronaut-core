@@ -15,7 +15,7 @@
  */
 package io.micronaut.inject.ast;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.util.ArgumentUtils;
 
@@ -30,7 +30,7 @@ import java.util.function.Consumer;
  * @author James Kleeh
  * @since 1.0
  */
-public interface Element extends AnnotationMetadata {
+public interface Element extends AnnotationMetadataDelegate {
 
     /**
      * @return The name of the element.
@@ -79,7 +79,7 @@ public interface Element extends AnnotationMetadata {
      */
     @Nonnull
     default <T extends Annotation> Element annotate(@Nonnull String annotationType) {
-        return annotate(annotationType, (Consumer<AnnotationValueBuilder<T>>) annotationValueBuilder -> {});
+        return annotate(annotationType, (Consumer<AnnotationValueBuilder<T>>) annotationValueBuilder -> { });
     }
 
     /**
