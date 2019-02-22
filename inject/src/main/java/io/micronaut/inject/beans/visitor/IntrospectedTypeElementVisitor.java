@@ -16,9 +16,13 @@
 
 package io.micronaut.inject.beans.visitor;
 
+import io.micronaut.core.annotation.AnnotationClassValue;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
@@ -26,8 +30,8 @@ import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassGenerationException;
 
 import java.io.IOException;
-import java.lang.annotation.Annotation;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * A {@link TypeElementVisitor} that visits classes annotated with {@link Introspected} and produces
@@ -43,44 +47,71 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
-        final Introspected introspected = element.synthesize(Introspected.class);
+        final AnnotationValue<Introspected> introspected = element.getAnnotation(Introspected.class);
         if (introspected != null) {
-            final boolean metadata = introspected.annotationMetadata();
-            final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
-                    element.getName(),
-                    metadata ? element.getAnnotationMetadata() : null
-            );
-            final List<PropertyElement> beanProperties = element.getBeanProperties();
-            final Set<String> includes = CollectionUtils.setOf(introspected.includes());
-            final Set<String> excludes = CollectionUtils.setOf(introspected.excludes());
-            final Set<Class<? extends Annotation>> ignored = CollectionUtils.setOf(introspected.ignored());
 
-            for (PropertyElement beanProperty : beanProperties) {
-                final ClassElement type = beanProperty.getType();
-                if (type != null) {
+            final String[] packages = introspected.get("packages", String[].class, StringUtils.EMPTY_STRING_ARRAY);
+            final AnnotationClassValue[] classes = introspected.get("classes", AnnotationClassValue[].class, new AnnotationClassValue[0]);
+            final boolean metadata = introspected.get("annotationMetadata", boolean.class, true);
 
-                    final String name = beanProperty.getName();
-                    if (!includes.isEmpty() && !includes.contains(name)) {
-                        continue;
-                    }
-                    if (!excludes.isEmpty() && excludes.contains(name)) {
-                        continue;
-                    }
+            final Set<String> includes = CollectionUtils.setOf(introspected.get("includes", String[].class, StringUtils.EMPTY_STRING_ARRAY));
+            final Set<String> excludes = CollectionUtils.setOf(introspected.get("excludes", String[].class, StringUtils.EMPTY_STRING_ARRAY));
+            final Set<String> excludedAnnotations = CollectionUtils.setOf(introspected.get("excludedAnnotations", String[].class, StringUtils.EMPTY_STRING_ARRAY));
+            final Set<String> includedAnnotations = CollectionUtils.setOf(introspected.get("includedAnnotations", String[].class, StringUtils.EMPTY_STRING_ARRAY));
 
-                    if (!ignored.isEmpty() && ignored.stream().anyMatch(beanProperty::hasAnnotation)) {
-                        continue;
-                    }
+            if (ArrayUtils.isNotEmpty(classes)) {
+                AtomicInteger index = new AtomicInteger(0);
+                for (AnnotationClassValue aClass : classes) {
+                    final Optional<ClassElement> classElement = context.getClassElement(aClass.getName());
+                    classElement.ifPresent(ce -> {
+                        if (!ce.isAbstract() && ce.isPublic()) {
+                            final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
+                                    element.getName(),
+                                    index.getAndIncrement(),
+                                    ce.getName(),
+                                    metadata ? element.getAnnotationMetadata() : null
+                            );
 
-                    writer.visitProperty(
-                            type,
-                            name,
-                            beanProperty.isReadOnly(),
-                            metadata ? beanProperty.getAnnotationMetadata() : null,
-                            beanProperty.getType().getTypeArguments()
-                    );
+                            final List<PropertyElement> beanProperties = ce.getBeanProperties();
+                            process(writer, beanProperties, includes, excludes, excludedAnnotations, metadata);
+                        }
+                    });
                 }
+            } else if (ArrayUtils.isNotEmpty(packages)) {
+
+                if (includedAnnotations.isEmpty()) {
+                    context.fail("When specifying 'packages' you must also specify 'includedAnnotations' to limit scanning", element);
+                } else {
+                    for (String aPackage : packages) {
+                        ClassElement[] elements = context.getClassElements(aPackage, includedAnnotations.toArray(new String[0]));
+                        for (int i = 0; i < elements.length; i++) {
+                            ClassElement classElement = elements[i];
+                            if (classElement.isAbstract() || !classElement.isPublic()) {
+                                continue;
+                            }
+                            final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
+                                    element.getName(),
+                                    i,
+                                    classElement.getName(),
+                                    metadata ? element.getAnnotationMetadata() : null
+                            );
+
+                            final List<PropertyElement> beanProperties = classElement.getBeanProperties();
+                            process(writer, beanProperties, includes, excludes, excludedAnnotations, metadata);
+                        }
+                    }
+                }
+            } else {
+
+                final BeanIntrospectionWriter writer = new BeanIntrospectionWriter(
+                        element.getName(),
+                        metadata ? element.getAnnotationMetadata() : null
+                );
+
+                final List<PropertyElement> beanProperties = element.getBeanProperties();
+                process(writer, beanProperties, includes, excludes, excludedAnnotations, metadata);
             }
-            writers.add(writer);
+
         }
     }
 
@@ -96,20 +127,38 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
         }
     }
 
-    private Map<String, Object> toNestedMap(Map<String, ClassElement> typeArguments) {
-        if (typeArguments.isEmpty()) {
-            return null;
-        } else {
-            Map<String, Object> args = new LinkedHashMap<>(typeArguments.size());
-            for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
-                final ClassElement ce = entry.getValue();
-                if (ce.getTypeArguments().isEmpty()) {
-                    args.put(entry.getKey(), ce.getName());
-                } else {
-                    args.put(entry.getKey(), toNestedMap(ce.getTypeArguments()));
+    private void process(
+            BeanIntrospectionWriter writer,
+            List<PropertyElement> beanProperties,
+            Set<String> includes,
+            Set<String> excludes,
+            Set<String> ignored, boolean metadata) {
+        for (PropertyElement beanProperty : beanProperties) {
+            final ClassElement type = beanProperty.getType();
+            if (type != null) {
+
+                final String name = beanProperty.getName();
+                if (!includes.isEmpty() && !includes.contains(name)) {
+                    continue;
                 }
+                if (!excludes.isEmpty() && excludes.contains(name)) {
+                    continue;
+                }
+
+                if (!ignored.isEmpty() && ignored.stream().anyMatch(beanProperty::hasAnnotation)) {
+                    continue;
+                }
+
+                writer.visitProperty(
+                        type,
+                        name,
+                        beanProperty.isReadOnly(),
+                        metadata ? beanProperty.getAnnotationMetadata() : null,
+                        beanProperty.getType().getTypeArguments()
+                );
             }
-            return args;
         }
+        writers.add(writer);
     }
+
 }

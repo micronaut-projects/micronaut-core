@@ -20,7 +20,9 @@ import io.micronaut.ast.groovy.utils.AstAnnotationUtils;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
+import io.micronaut.core.io.scan.ClassPathAnnotationScanner;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -37,15 +39,14 @@ import org.codehaus.groovy.control.messages.SimpleMessage;
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.syntax.SyntaxException;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * The visitor context when visiting Groovy code.
@@ -89,6 +90,23 @@ public class GroovyVisitorContext implements VisitorContext {
             });
         }
         return Optional.empty();
+    }
+
+    @Nonnull
+    @Override
+    public ClassElement[] getClassElements(@Nonnull String aPackage, @Nonnull String... stereotypes) {
+        ArgumentUtils.requireNonNull("aPackage", aPackage);
+        ArgumentUtils.requireNonNull("stereotypes", stereotypes);
+
+        ClassPathAnnotationScanner scanner = new ClassPathAnnotationScanner(sourceUnit.getClassLoader());
+        List<ClassElement> classElements = new ArrayList<>();
+        for (String s : stereotypes) {
+            scanner.scan(s, aPackage).forEach(aClass -> {
+                final ClassNode classNode = ClassHelper.make(aClass);
+                classElements.add(new GroovyClassElement(sourceUnit, classNode, AstAnnotationUtils.getAnnotationMetadata(sourceUnit, classNode)));
+            });
+        }
+        return classElements.toArray(new ClassElement[0]);
     }
 
     @Override
