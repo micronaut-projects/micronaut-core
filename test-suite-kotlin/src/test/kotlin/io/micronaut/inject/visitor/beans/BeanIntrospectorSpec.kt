@@ -17,14 +17,14 @@ class BeanIntrospectorSpec : TestCase() {
         assertEquals("fred", testBean.name)
 
         try {
-            introspection.getProperty("name").get().write(testBean, "bob")
+            introspection.getProperty("name").get().set(testBean, "bob")
             fail("Should have failed with unsupported operation, readonly")
         } catch (e: UnsupportedOperationException) {
         }
 
         assertEquals("default", testBean.stuff)
 
-        introspection.getProperty("stuff").get().write(testBean, "newvalue")
+        introspection.getProperty("stuff").get().set(testBean, "newvalue")
 
         assertEquals("newvalue", testBean.stuff)
     }

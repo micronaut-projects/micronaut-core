@@ -18,7 +18,6 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 
 import javax.annotation.Nonnull;
@@ -83,7 +82,7 @@ final class BeanIntrospectionMap<T> implements BeanMap<T> {
         if (key == null) {
             return null;
         }
-        return beanIntrospection.getProperty(key.toString()).map(bp -> bp.read(bean)).orElse(null);
+        return beanIntrospection.getProperty(key.toString()).map(bp -> bp.get(bean)).orElse(null);
     }
 
     @Override
@@ -95,9 +94,9 @@ final class BeanIntrospectionMap<T> implements BeanMap<T> {
             final Class<Object> propertyType = bp.getType();
             if (value != null && !propertyType.isInstance(value)) {
                 Optional<?> converted = ConversionService.SHARED.convert(value, propertyType);
-                converted.ifPresent(o -> bp.write(bean, o));
+                converted.ifPresent(o -> bp.set(bean, o));
             } else {
-                bp.write(bean, value);
+                bp.set(bean, value);
             }
         });
         return null;
