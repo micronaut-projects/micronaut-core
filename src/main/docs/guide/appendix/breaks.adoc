@@ -2,9 +2,17 @@ This section will document breaking changes that may happen during milestone or 
 
 ==== 1.1.0
 
+The following changes could potentially be considered to be breaking changes, however the likelihood of any negative impact is low.
+
 * link:{api}/io/micronaut/session/http/HttpSessionConfiguration.html[HttpSessionConfiguration] default value for `cookiePath` is `/`. The change was necessary for cookies to function normally.
 
 * The link:{api}/io/micronaut/security/token/jwt/render/AccessRefreshToken.html[AccessRefreshToken] API has been changed to  include `tokenType` and `expiresIn`. This change was necessary to comply with the token response link:https://tools.ietf.org/html/rfc6749#section-4.1.4.html[RFC 6749].
+
+* The behavior of the http client in regards to SSL and proxies has changed slightly. If SSL is enabled for the client (which is the default), the proxy settings will not be used. If you are currently using a proxy, disable SSL to keep the previous behavior. This change was required in order to send a request to an https URL through a proxy.
++
+  micronaut.http.client.ssl.enabled: false
++
+
 
 ==== 1.0.0.RC3
 
