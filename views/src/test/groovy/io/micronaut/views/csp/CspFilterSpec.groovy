@@ -73,7 +73,6 @@ class CspFilterSpec extends Specification {
         applicationContext.close()
     }
 
-    @Ignore
     void "test no CSP configuration"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
@@ -97,7 +96,6 @@ class CspFilterSpec extends Specification {
         embeddedServer.close()
     }
 
-    @Ignore
     void "test CSP no response header"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
