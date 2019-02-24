@@ -20,7 +20,7 @@
  * @since 1.1
  */
 @Configuration
-@Requires(property = CspConfiguration.PREFIX + ".enabled", value = StringUtils.TRUE)
+@Requires(property = CspConfiguration.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 package io.micronaut.views.csp;
 
 import io.micronaut.context.annotation.Configuration;
