@@ -15,6 +15,7 @@
  */
 package io.micronaut.views.csp;
 
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
@@ -75,10 +76,12 @@ public class CspFilter implements HttpServerFilter {
 
         return Flowable.fromPublisher(chain.proceed(request))
                 .doOnNext(response -> {
-                    if (cspConfiguration.isReportOnly()) {
-                        response.getHeaders().add(CSP_REPORT_ONLY_HEADER, cspConfiguration.getPolicyDirectives());
-                    } else {
-                        response.getHeaders().add(CSP_HEADER, cspConfiguration.getPolicyDirectives());
+                    if (StringUtils.isNotEmpty(cspConfiguration.getPolicyDirectives())) {
+                        if (cspConfiguration.isReportOnly()) {
+                            response.getHeaders().add(CSP_REPORT_ONLY_HEADER, cspConfiguration.getPolicyDirectives());
+                        } else {
+                            response.getHeaders().add(CSP_HEADER, cspConfiguration.getPolicyDirectives());
+                        }
                     }
                 });
     }
