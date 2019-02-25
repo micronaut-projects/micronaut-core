@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *#
+##tag::html[]
 <!DOCTYPE html>
 <html>
 <head>
@@ -33,3 +34,4 @@
 
 </body>
 </html>
+##end::html[]
