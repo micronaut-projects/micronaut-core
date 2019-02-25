@@ -13,26 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.security.token.jwt.generator.claims;
 
-import io.micronaut.security.token.Claims;
+package io.micronaut.security.token;
+
+import javax.annotation.Nonnull;
+import java.util.List;
 
 /**
- * @see <a href="https://tools.ietf.org/html/rfc7519#section-4.1">Registered Claims Names</a>
+ * Retrieves roles from token claims.
+ *
+ * @author Sergio del Amo
+ * @since 1.1.0
  */
-public interface JwtClaims extends Claims {
-    String ISSUER          = "iss";
+public interface RolesFinder {
 
-    String SUBJECT         = "sub";
-
-    String EXPIRATION_TIME = "exp";
-
-    String NOT_BEFORE      = "nbf";
-
-    String ISSUED_AT       = "iat";
-
-    String JWT_ID          = "jti";
-
-    String AUDIENCE        = "aud";
-
+    /**
+     * Retrieves the list of roles from the provided claims.
+     *
+     * @param claims The claims of the token.
+     * @return The granted roles.
+     */
+    @Nonnull
+    List<String> findInClaims(@Nonnull Claims claims);
 }
