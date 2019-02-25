@@ -15,7 +15,7 @@ and still access the authenticated user in the view (for example a velocity temp
 [source,html]
 .src/main/resources/views/books.vm
 ----
-include::{testsviews}/../../../../resources/views/securitydecorator.vm[lines=1..13]
+include::{testsviews}/../../../../resources/views/securitydecorator.vm[tag=html]
 ----
 
 You can access information about the current user with the `security` map.

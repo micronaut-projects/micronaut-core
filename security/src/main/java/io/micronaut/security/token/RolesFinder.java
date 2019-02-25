@@ -1,4 +1,4 @@
-#*
+/*
  * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,26 +12,27 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- *#
-##tag::html[]
-<!DOCTYPE html>
-<html>
-<head>
-    <title>User Books</title>
-</head>
-<body>
-    #if( $security )
-      <h1>User: ${security['name']} email: ${security['attributes']['email']}</h1>
-    #end
+ */
 
-    #foreach($book in $books)
-      $book
-    #end
+package io.micronaut.security.token;
 
-    #if( $securitycustom )
-    <h1>Custom: ${securitycustom['name']}</span></h1>
-    #end
+import javax.annotation.Nonnull;
+import java.util.List;
 
-</body>
-</html>
-##end::html[]
+/**
+ * Retrieves roles from token claims.
+ *
+ * @author Sergio del Amo
+ * @since 1.1.0
+ */
+public interface RolesFinder {
+
+    /**
+     * Retrieves the list of roles from the provided claims.
+     *
+     * @param claims The claims of the token.
+     * @return The granted roles.
+     */
+    @Nonnull
+    List<String> findInClaims(@Nonnull Claims claims);
+}
