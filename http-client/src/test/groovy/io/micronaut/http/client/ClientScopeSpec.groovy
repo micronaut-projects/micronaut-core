@@ -75,6 +75,18 @@ class ClientScopeSpec extends Specification {
         myJavaService.rxHttpClient == myService.rxHttpClient
     }
 
+    void "test client scope annotation constructor injection"() {
+        given:
+        MyServiceConstructor myService = context.getBean(MyServiceConstructor)
+
+        MyJavaService myJavaService = context.getBean(MyJavaService)
+
+        expect:
+        myService.get() == 'success'
+        myJavaService.client == myService.client
+        myJavaService.rxHttpClient == myService.rxHttpClient
+    }
+
     @Controller('/scope')
     static class ScopeController {
         @Get(produces = MediaType.TEXT_PLAIN)
@@ -108,6 +120,26 @@ class ClientScopeSpec extends Specification {
 
         @Inject @Client('${from.config}')
         protected RxHttpClient rxHttpClient
+
+        String get() {
+            rxHttpClient != null
+            client.toBlocking().retrieve(
+                    HttpRequest.GET('/scope'), String
+            )
+        }
+    }
+
+    @Singleton
+    static class MyServiceConstructor {
+
+        private final HttpClient client
+        private final RxHttpClient rxHttpClient
+
+        MyServiceConstructor(@Client('${from.config}')HttpClient client,
+                             @Client('${from.config}') RxHttpClient rxHttpClient) {
+            this.rxHttpClient = rxHttpClient
+            this.client = client
+        }
 
         String get() {
             rxHttpClient != null
