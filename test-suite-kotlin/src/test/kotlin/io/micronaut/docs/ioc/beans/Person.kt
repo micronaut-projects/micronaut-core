@@ -6,5 +6,7 @@ import io.micronaut.core.annotation.Introspected
 
 // tag::class[]
 @Introspected
-data class Person(var name : String)
+data class Person(var name : String) {
+    var age : Int = 18
+}
 // end::class[]

@@ -2,6 +2,7 @@ package io.micronaut.docs.ioc.beans
 
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanProperty
+import io.micronaut.core.beans.BeanWrapper
 import spock.lang.Specification
 
 class IntrospectionSpec extends Specification {
@@ -21,5 +22,19 @@ class IntrospectionSpec extends Specification {
 
         expect:
         name == 'Fred'
+    }
+
+    void testBeanWrapper() {
+        given:
+        // tag::wrapper[]
+        final BeanWrapper<Person> wrapper = BeanWrapper.getWrapper(new Person("Fred")) // <1>
+
+        wrapper.setProperty("age", "20") // <2>
+        int newAge = wrapper.getRequiredProperty("age", Integer) // <3>
+
+        println("Person's age now $newAge")
+        // end::wrapper[]
+        expect:
+        newAge == 20
     }
 }
