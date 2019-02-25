@@ -65,6 +65,12 @@ mn create-app hellorabbit --features rabbitmq
 
 See the https://micronaut-projects.github.io/micronaut-rabbitmq/latest/guide/[Micronaut RabbitMQ] documentation for more information.
 
+=== Compile Time Bean Introspection
+
+A compilation time replacement for jdk:java.beans.Introspector[] has been added which allows introspecting and creating bean instances without using reflection, improving performance, memory consumption and GraalVM support.
+
+See the new section on <<introspection, Bean Introspection>> for more information.
+
 === Cold Start and Performance Improvements
 
 Micronaut 1.1 cold start performance has been improved through a variety of optimizations including compilation time indexing of common bean types. Users should see superior cold start performance for both Microservices and Functions.

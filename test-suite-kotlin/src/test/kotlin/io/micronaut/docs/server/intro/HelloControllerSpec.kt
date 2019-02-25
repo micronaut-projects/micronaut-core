@@ -24,12 +24,12 @@ import junit.framework.TestCase
 class HelloControllerSpec : TestCase() {
 
     fun testNullableFieldInjection() {
-        var embeddedServer:EmbeddedServer= ApplicationContext.run(EmbeddedServer::class.java,
+        val embeddedServer:EmbeddedServer= ApplicationContext.run(EmbeddedServer::class.java,
                 mapOf("spec.name" to "HelloControllerSpec"),
                 Environment.TEST)
-        var client : HttpClient = HttpClient.create(embeddedServer.url)
-        var rsp : String = client.toBlocking().retrieve("/hello")
-        TestCase.assertEquals("Hello World", rsp)
+        val client : HttpClient = HttpClient.create(embeddedServer.url)
+        val rsp : String = client.toBlocking().retrieve("/hello")
+        assertEquals("Hello World", rsp)
         client.close()
         embeddedServer.close()
     }
