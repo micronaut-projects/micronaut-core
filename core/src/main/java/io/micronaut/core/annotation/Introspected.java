@@ -25,9 +25,21 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *
  * <p>Typically to produce a {@link io.micronaut.core.beans.BeanIntrospection} one simply annotates a class with this annotation.</p>
  *
+ * <pre class="code">
+ * &#064;Introspected
+ * public class MyBean {
+ *      ...
+ * }</pre>
+ *
  * <p>An alternative approach is to use a {@code AnnotationMapper} to enable introspection for existing annotations such as {@code javax.persistence.Entity}.</p>
  *
  * <p>If the classes you wish to introspect are already compiled then this annotation can be used on another class (doesn't matter which, but typically on a configuration class) to specify which existing compiled classes to produce {@link io.micronaut.core.beans.BeanIntrospection} instances for either through the {@link #classes()} method or the {@link #packages()} method. The latter uses compile time package scanning and for the moment is regarded as {@link Experimental}.</p>
+ *
+ * <pre class="code">
+ * &#064;Introspected(classes=MyBean.class)
+ * public class MyConfiguration {
+ *      ...
+ * }</pre>
  *
  * @author graemerocher
  * @since 1.1

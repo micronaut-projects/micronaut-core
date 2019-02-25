@@ -16,6 +16,7 @@
 package io.micronaut.http.hateoas;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalMultiValues;
@@ -39,6 +40,7 @@ import java.util.Optional;
  * @since 1.1
  */
 @Produces(MediaType.APPLICATION_HAL_JSON)
+@Introspected
 public abstract class AbstractResource<Impl extends AbstractResource> implements Resource {
 
     private final Map<CharSequence, List<Link>> linkMap = new LinkedHashMap<>(1);

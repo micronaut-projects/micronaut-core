@@ -13,11 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
- * Micronaut core bean information classes.
+ * This package provides interfaces and abstractions to introspect beans with bean metadata
+ * computed at compilation time. See {@link io.micronaut.core.beans.BeanIntrospector} for the main entry point.
  *
  * @author graemerocher
  * @since 1.0
+ * @see io.micronaut.core.annotation.Introspected
+ * @see io.micronaut.core.beans.BeanIntrospector
+ * @see io.micronaut.core.beans.BeanIntrospection
  */
 package io.micronaut.core.beans;
 
