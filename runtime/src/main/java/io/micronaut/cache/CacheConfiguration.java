@@ -38,6 +38,12 @@ public class CacheConfiguration {
     public static final String PREFIX = "micronaut.caches";
 
     /**
+     * The default record stats value.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_RECORD_STATS = false;
+
+    /**
      * The default test mode value.
      */
     @SuppressWarnings("WeakerAccess")
@@ -50,6 +56,7 @@ public class CacheConfiguration {
     private Long maximumWeight;
     private Duration expireAfterWrite;
     private Duration expireAfterAccess;
+    private boolean recordStats = DEFAULT_RECORD_STATS;
     private boolean testMode = DEFAULT_TESTMODE;
     private final String cacheName;
 
@@ -111,6 +118,15 @@ public class CacheConfiguration {
     }
 
     /**
+     * Some caches support recording statistics. For example to record hit and miss ratio's fine tune the cache characteristics.
+     *
+     * @return True if record stats is enabled
+     */
+    public boolean isRecordStats() {
+        return recordStats;
+    }
+
+    /**
      * @return The charset used to serialize and deserialize values
      */
     public Charset getCharset() {
@@ -154,6 +170,15 @@ public class CacheConfiguration {
      */
     public void setExpireAfterAccess(Duration expireAfterAccess) {
         this.expireAfterAccess = expireAfterAccess;
+    }
+
+    /**
+     * Set whether record stats is enabled. Default value ({@value #DEFAULT_RECORD_STATS}).
+     *
+     * @param recordStats True if record status is enabled
+     */
+    public void setRecordStats(final boolean recordStats) {
+        this.recordStats = recordStats;
     }
 
     /**
