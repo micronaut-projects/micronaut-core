@@ -45,12 +45,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Internal
 public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Introspected, Object> {
 
-    private List<BeanIntrospectionWriter> writers = new ArrayList<>(10);
+    private Map<String, BeanIntrospectionWriter> writers = new LinkedHashMap<>(10);
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         final AnnotationValue<Introspected> introspected = element.getAnnotation(Introspected.class);
-        if (introspected != null) {
+        if (introspected != null && !writers.containsKey(element.getName()) && !element.isAbstract()) {
 
             final String[] packages = introspected.get("packages", String[].class, StringUtils.EMPTY_STRING_ARRAY);
             final AnnotationClassValue[] classes = introspected.get("classes", AnnotationClassValue[].class, new AnnotationClassValue[0]);
@@ -119,7 +119,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
     @Override
     public void finish(VisitorContext visitorContext) {
 
-        for (BeanIntrospectionWriter writer : writers) {
+        for (BeanIntrospectionWriter writer : writers.values()) {
             try {
                 writer.accept(visitorContext);
             } catch (IOException e) {
@@ -189,7 +189,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
                 }
             }
         }
-        writers.add(writer);
+        writers.put(writer.getBeanType().getClassName(), writer);
     }
 
 }
