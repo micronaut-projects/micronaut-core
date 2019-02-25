@@ -13,6 +13,7 @@ import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
 
 import javax.annotation.processing.SupportedAnnotationTypes
+import javax.persistence.Column
 import javax.persistence.Entity
 import javax.persistence.Id
 import javax.persistence.Version
@@ -37,6 +38,7 @@ class Test {
     private Long id;
     @Version
     private Long version;
+    @Column(name="test_name")
     private String name;
     @Size(max=100)
     private int age;
@@ -102,14 +104,17 @@ class Test {
         bi.getConstructorArguments().length == 3
         bi.getConstructorArguments()[0].name == 'name'
         bi.getConstructorArguments()[0].type == String
-        bi.getBeanProperties(Id).size() == 1
+        bi.getIndexedProperties(Id).size() == 1
+        bi.getIndexedProperty(Id).isPresent()
+        bi.getIndexedProperty(Column, "test_name").isPresent()
+        bi.getIndexedProperty(Column, "test_name").get().name == 'name'
         bi.getProperty("version").get().hasAnnotation(Version)
         bi.getProperty("anotherVersion").get().hasAnnotation(Version)
         // should not inherit metadata from class
         !bi.getProperty("anotherVersion").get().hasAnnotation(Entity)
 
         when:
-        BeanProperty idProp = bi.getBeanProperties(Id).first()
+        BeanProperty idProp = bi.getIndexedProperties(Id).first()
 
         then:
         idProp.name == 'id'
@@ -194,8 +199,8 @@ class Test {
 
         then:"it is correct"
         bi.instantiate()
-        bi.getBeanProperties(Id).size() == 1
-        bi.getBeanProperties(Id).first().name == 'id'
+        bi.getIndexedProperties(Id).size() == 1
+        bi.getIndexedProperties(Id).first().name == 'id'
 
         cleanup:
         context?.close()
@@ -378,7 +383,7 @@ class ParentBean {
         introspection != null
         introspection.hasAnnotation(Introspected)
         introspection.instantiate().getClass().name == 'test.Test'
-        introspection.getBeanProperties().size() == 8
+        introspection.getIndexedProperties().size() == 8
         introspection.getProperty("name").isPresent()
         introspection.getProperty("name", String).isPresent()
         !introspection.getProperty("name", Integer).isPresent()

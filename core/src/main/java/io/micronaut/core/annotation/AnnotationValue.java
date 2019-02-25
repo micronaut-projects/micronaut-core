@@ -267,7 +267,7 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
 
     @Override
     public int hashCode() {
-        return AnnotationUtil.calculateHashCode(getValues());
+        return 31 * annotationName.hashCode() + AnnotationUtil.calculateHashCode(getValues());
     }
 
     @Override
@@ -283,6 +283,10 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
         }
 
         AnnotationValue other = AnnotationValue.class.cast(obj);
+
+        if (!annotationName.equals(other.getAnnotationName())) {
+            return false;
+        }
 
         Map<CharSequence, Object> otherValues = other.getValues();
         Map<CharSequence, Object> values = getValues();

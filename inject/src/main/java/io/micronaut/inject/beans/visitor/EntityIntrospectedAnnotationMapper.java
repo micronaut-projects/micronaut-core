@@ -47,16 +47,29 @@ public class EntityIntrospectedAnnotationMapper implements NamedAnnotationMapper
                 .member("excludedAnnotations", "javax.persistence.Transient")
                 // following are indexed for fast lookups
                 .member("indexed",
-                        "javax.persistence.Id",
-                        "javax.persistence.Version",
-                        "javax.persistence.GeneratedValue",
-                        "javax.persistence.Basic",
-                        "javax.persistence.Embedded",
-                        "javax.persistence.OneToMany",
-                        "javax.persistence.OneToOne",
-                        "javax.persistence.ManyToOne",
-                        "javax.persistence.ElementCollection",
-                        "javax.persistence.Enumerated"
+                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
+                                .member("annotation", "javax.persistence.Id").build(),
+                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
+                                .member("annotation", "javax.persistence.Version").build(),
+                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
+                                .member("annotation", "javax.persistence.GeneratedValue").build(),
+                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
+                                .member("annotation", "javax.persistence.Basic").build(),
+                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
+                                .member("annotation", "javax.persistence.Embedded").build(),
+                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
+                                .member("annotation", "javax.persistence.OneToMany").build(),
+                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
+                                .member("annotation", "javax.persistence.OneToOne").build(),
+                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
+                                .member("annotation", "javax.persistence.ManyToOne").build(),
+                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
+                                .member("annotation", "javax.persistence.ElementCollection").build(),
+                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
+                                .member("annotation", "javax.persistence.Enumerated").build(),
+                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
+                                .member("annotation", "javax.persistence.Column")
+                                .member("member", "name").build()
                 );
         return Collections.singletonList(
                 builder.build()

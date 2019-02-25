@@ -103,16 +103,53 @@ public @interface Introspected {
     Class<? extends Annotation>[] includedAnnotations() default {};
 
     /**
-     * The annotation types that should be indexed for lookup via {@link io.micronaut.core.beans.BeanIntrospection#getBeanProperties(Class)}.
-     *
-     * @return The indexed annotation types
-     */
-    Class<? extends Annotation>[] indexed() default {};
-
-    /**
      * Whether annotation metadata should be included in the inspection results.
      *
      * @return True if annotation metadata should be included.
      */
     boolean annotationMetadata() default true;
+
+    /**
+     * The annotation types that should be indexed for lookup via {@link io.micronaut.core.beans.BeanIntrospection#getIndexedProperties(Class)} or {@link io.micronaut.core.beans.BeanIntrospection#getIndexedProperty(Class, String)} if {@link IndexedAnnotation#member()} is specified.
+     *
+     * <p>Property lookup indexing allows building indexes at compilation time for performing reverse property lookups. Consider for example a property with an annotation such as {@code @Column(name="foo_bar"}. To lookup the property by "foo_bar" you can specify:</p>
+     *
+     * <pre class="code">
+     * &#064;Introspected(
+     *   indexed = &#064;IndexedAnnotation(annotation=Column.class, member="name")
+     * )
+     * public class MyBean {
+     *      ...
+     * }</pre>
+     *
+     * <p>With the above in place a reverse lookup on the column can be done using {@link io.micronaut.core.beans.BeanIntrospection#getIndexedProperty(Class, String)}:</p>
+     *
+     * <pre class="code">
+     * BeanProperty property = introspection.getIndexedProperty(Column.class, "foo_bar").orElse(null);
+     * </pre>
+     *
+     *
+     * @return The indexed annotation types
+     */
+    IndexedAnnotation[] indexed() default {};
+
+    /**
+     * Allow pre-computed indexes for property lookups based on an annotation and a member.
+     *
+     * @see io.micronaut.core.beans.BeanIntrospection#getIndexedProperty(Class, String)
+     */
+    @Documented
+    @Retention(RUNTIME)
+    @Target({ElementType.TYPE, ElementType.ANNOTATION_TYPE})
+    @interface IndexedAnnotation {
+        /**
+         * @return The annotation
+         */
+        Class<? extends Annotation> annotation();
+
+        /**
+         * @return The member
+         */
+        String member() default "";
+    }
 }
