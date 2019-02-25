@@ -18,6 +18,7 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.reflect.exception.InstantiationException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
@@ -124,6 +125,18 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
      */
     default @Nonnull Optional<BeanProperty<T, Object>> getProperty(@Nonnull String name) {
         return Optional.empty();
+    }
+
+    /**
+     * Gets a property of the given name and type or throws {@link IntrospectionException} if the property is not present.
+     * @param name The name
+     * @param type The type
+     * @param <P> The property generic type
+     * @return The property
+     */
+    default @Nonnull <P> BeanProperty<T, P> getRequiredProperty(@Nonnull String name, @Nonnull Class<P> type) {
+        return getProperty(name, type)
+                .orElseThrow(() -> new IntrospectionException("No property [" + name + "] of type [" + type + "] present"));
     }
 
     /**

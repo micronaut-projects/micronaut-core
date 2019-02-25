@@ -31,6 +31,7 @@ ioc:
   lifecycle: Life-Cycle Methods
   contextEvents: Context Events
   events: Bean Events
+  introspection: Bean Introspection
   annotationMetadata: Bean Annotation Metadata
   springBeans: Micronaut Beans And Spring
   android: Android Support
