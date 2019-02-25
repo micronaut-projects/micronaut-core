@@ -10,5 +10,7 @@ The example shown in the <<views, Views>> section, could be rendered with the fo
 [source,html]
 .src/main/resources/views/home.vm
 ----
-include::{testsviews}/../../../../resources/views/home.vm[]
+include::{testsviews}/../../../../resources/views/home.vm[tag=html]
 ----
+
+
