@@ -47,3 +47,17 @@ If there is an existing annotation that you wish to introspect by default you ca
 An example of this is https://github.com/micronaut-projects/micronaut-core/blob/master/inject/src/main/java/io/micronaut/inject/beans/visitor/EntityIntrospectedAnnotationMapper.java[EntityIntrospectedAnnotationMapper] which ensures all beans annotated with `javax.persistence.Entity` are introspectable by default.
 
 NOTE: The `AnnotationMapper` should be on the annotation processor classpath.
+
+=== The BeanWrapper API
+
+A api:core.beans.BeanProperty[] provides raw access to read and write a property value for a given class and does not provide any automatic type conversion.
+
+It is expected that the values you pass to the `set` and `get` methods match the underlying property type otherwise an exception will occur.
+
+To provide additional type conversion smarts the api:core.beans.BeanWrapper[] interface allows wrapping an existing bean instance and setting and getting properties from the bean, plus performing type conversion as necessary.
+
+snippet::io.micronaut.docs.ioc.beans.IntrospectionSpec[tags="wrapper", indent=0]
+
+<1> The `getWrapper` static mean can be used to obtain a api:core.beans.BeanWrapper[] for a bean instance.
+<2> You can set properties and the api:core.beans.BeanWrapper[] will perform type conversion, or throw api:core.convert.exceptions.ConversionErrorException[] if conversion is not possible.
+<3> You can retrieve a property using `getRequiredProperty` and request the appropriate type.

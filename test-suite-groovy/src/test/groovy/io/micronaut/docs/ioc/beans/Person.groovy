@@ -11,6 +11,7 @@ import io.micronaut.core.annotation.Introspected
 class Person {
 
     String name
+    int age = 18
 
     Person(String name) {
         this.name = name

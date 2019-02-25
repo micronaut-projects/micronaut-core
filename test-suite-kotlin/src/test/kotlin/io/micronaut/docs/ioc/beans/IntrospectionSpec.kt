@@ -2,6 +2,7 @@ package io.micronaut.docs.ioc.beans
 
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanProperty
+import io.micronaut.core.beans.BeanWrapper
 import junit.framework.TestCase
 
 class IntrospectionSpec : TestCase() {
@@ -19,5 +20,17 @@ class IntrospectionSpec : TestCase() {
         // end::usage[]
 
         assertEquals("Fred", name)
+    }
+
+    fun testBeanWrapper() {
+        // tag::wrapper[]
+        val wrapper = BeanWrapper.getWrapper(Person("Fred")) // <1>
+
+        wrapper.setProperty("age", "20") // <2>
+        val newAge = wrapper.getRequiredProperty("age", Int::class.java) // <3>
+
+        println("Person's age now $newAge")
+        // end::wrapper[]
+        TestCase.assertEquals(20, newAge)
     }
 }
