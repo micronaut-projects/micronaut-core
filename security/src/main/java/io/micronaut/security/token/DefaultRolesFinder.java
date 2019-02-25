@@ -13,28 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token;
 
-import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.security.token.config.TokenConfiguration;
-import io.micronaut.security.token.config.TokenConfigurationProperties;
 
 import javax.annotation.Nonnull;
 import javax.inject.Singleton;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
- * Default implementation of {@link RolesParser}.
+ * Default implementation of {@link RolesFinder}.
  *
  * @author Sergio del Amo
  * @since 1.1.0
  */
-@Requires(property = TokenConfigurationProperties.PREFIX + "rolesparser.default", notEquals = StringUtils.FALSE)
 @Singleton
-public class DefaultRolesParser implements RolesParser {
+public class DefaultRolesFinder implements RolesFinder {
 
     private TokenConfiguration tokenConfiguration;
 
@@ -42,13 +38,13 @@ public class DefaultRolesParser implements RolesParser {
      * Constructs a Roles Parser.
      * @param tokenConfiguration General Token Configuration
      */
-    public DefaultRolesParser(TokenConfiguration tokenConfiguration) {
+    public DefaultRolesFinder(TokenConfiguration tokenConfiguration) {
         this.tokenConfiguration = tokenConfiguration;
     }
 
     @Override
     @Nonnull
-    public List<String> parseRoles(@Nonnull Claims claims) {
+    public List<String> findInClaims(@Nonnull Claims claims) {
         List<String> roles = new ArrayList<>();
         Object rolesObject = claims.get(tokenConfiguration.getRolesName());
         if (rolesObject != null) {

@@ -8,10 +8,9 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.security.token.RolesParser
+import io.micronaut.security.token.RolesFinder
 import io.micronaut.security.token.generator.TokenGenerator
 import io.micronaut.security.token.jwt.generator.JwtTokenGenerator
-import io.micronaut.security.token.jwt.validator.JwtTokenValidator
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -87,7 +86,7 @@ class CustomRolesParserSpec extends Specification {
         embeddedServer.applicationContext.containsBean(ControllerWithRealmAccessRole)
 
         when:
-        RolesParser rolesParser = embeddedServer.applicationContext.getBean(RolesParser)
+        RolesFinder rolesParser = embeddedServer.applicationContext.getBean(RolesFinder)
 
         then:
         noExceptionThrown()

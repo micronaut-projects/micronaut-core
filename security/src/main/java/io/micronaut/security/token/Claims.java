@@ -21,7 +21,7 @@ import javax.annotation.Nullable;
 import java.util.Set;
 
 /**
- * Encapsulate authentication claims.
+ * Authentication claims.
  *
  * @since 1.1.0
  * @author Sergio del Amo
@@ -29,12 +29,13 @@ import java.util.Set;
 public interface Claims {
 
     /**
+     * Retrieves a value from the claims for the given name.
      *
-     * @param claimName the claim name
-     * @return {@code null} if the claim not exist or the Claim value.
+     * @param name the claim name
+     * @return {@code null} if the claim not exist or the claim value.
      */
     @Nullable
-    Object get(String claimName);
+    Object get(String name);
 
     /**
      *
@@ -45,8 +46,8 @@ public interface Claims {
 
     /**
      *
-     * @param claimName the claim name
+     * @param name the claim name
      * @return {@code false} if the claim does not exist.
      */
-    boolean contains(String claimName);
+    boolean contains(String name);
 }

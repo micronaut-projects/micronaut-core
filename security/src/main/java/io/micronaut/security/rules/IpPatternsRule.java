@@ -18,7 +18,7 @@ package io.micronaut.security.rules;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.security.config.SecurityConfiguration;
 import io.micronaut.security.config.SecurityConfigurationProperties;
-import io.micronaut.security.token.RolesParser;
+import io.micronaut.security.token.RolesFinder;
 import io.micronaut.security.token.config.TokenConfiguration;
 import io.micronaut.web.router.RouteMatch;
 import javax.annotation.Nullable;
@@ -46,7 +46,7 @@ public class IpPatternsRule extends AbstractSecurityRule {
     private final List<Pattern> patternList;
 
     /**
-     * @deprecated use {@link IpPatternsRule(RolesParser, SecurityConfiguration )} instead.
+     * @deprecated use {@link IpPatternsRule( RolesFinder , SecurityConfiguration )} instead.
      * @param tokenConfiguration Token Configuration
      * @param securityConfiguration Security Configuration
      */
@@ -62,13 +62,13 @@ public class IpPatternsRule extends AbstractSecurityRule {
 
     /**
      *
-     * @param rolesParser Roles Parser
+     * @param rolesFinder Roles Parser
      * @param securityConfiguration Security Configuration
      */
     @Inject
-    public IpPatternsRule(RolesParser rolesParser,
+    public IpPatternsRule(RolesFinder rolesFinder,
                           SecurityConfiguration securityConfiguration) {
-        super(rolesParser);
+        super(rolesFinder);
         this.patternList = securityConfiguration.getIpPatterns()
                 .stream()
                 .map(Pattern::compile)
