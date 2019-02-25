@@ -6,16 +6,22 @@ import java.util.function.Function;
 import javax.inject.Singleton;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
 import io.micronaut.scheduling.instrument.RunnableInstrumenter;
 import org.slf4j.MDC;
 
 /**
- * A function that instruments an existing Runnable with the Mapped Diagnostic Context.
+ * A function that instruments an existing Runnable with the Mapped Diagnostic Context for Slf4j.
+ *
+ * @author graemerocher
+ * @author LarsEckart
+ * @since 1.1
  */
 @Singleton
 @Requires(classes = MDC.class)
-public class MdcInstrumenter implements Function<Runnable, Runnable>, RunnableInstrumenter, ReactiveInstrumenter {
+@Internal
+public final class MdcInstrumenter implements Function<Runnable, Runnable>, RunnableInstrumenter, ReactiveInstrumenter {
 
     @Override
     public Runnable apply(Runnable runnable) {
