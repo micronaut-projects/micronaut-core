@@ -17,6 +17,7 @@
 package io.micronaut.inject.beans.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospectionReference;
@@ -28,8 +29,8 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
-import io.micronaut.inject.beans.AbstractBeanIntrospection;
-import io.micronaut.inject.beans.AbstractBeanIntrospectionReference;
+import io.micronaut.core.beans.AbstractBeanIntrospection;
+import io.micronaut.core.beans.AbstractBeanIntrospectionReference;
 import io.micronaut.inject.writer.AbstractAnnotationMetadataWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import org.jetbrains.annotations.NotNull;
@@ -55,7 +56,7 @@ import java.util.stream.Collectors;
 @Internal
 class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private static final Method METHOD_ADD_PROPERTY = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanIntrospection.class, "addProperty", BeanProperty.class));
-    private static final Method METHOD_INDEX_PROPERTY = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanIntrospection.class, "indexProperty", Class.class, String.class));
+    private static final Method METHOD_INDEX_PROPERTY = Method.getMethod(ReflectionUtils.getRequiredInternalMethod(AbstractBeanIntrospection.class, "indexProperty", Class.class, String.class, String.class));
     private static final String REFERENCE_SUFFIX = "$IntrospectionRef";
     private static final String INTROSPECTION_SUFFIX = "$Introspection";
 
@@ -65,7 +66,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private final Type beanType;
     private final ClassWriter introspectionWriter;
     private final List<BeanPropertyWriter> propertyDefinitions = new ArrayList<>();
-    private final Map<String, Collection<String>> indexes = new HashMap<>(2);
+    private final Map<String, Collection<AnnotationValueIndex>> indexes = new HashMap<>(2);
     private int propertyIndex = 0;
     private ParameterElement[] constructorArguments;
 
@@ -150,9 +151,10 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      *
      * @param annotation The annotation
      * @param property The property
+     * @param value the value of the annotation
      */
-    void indexProperty(String annotation, String property) {
-        indexes.computeIfAbsent(property, s -> new HashSet<>(2)).add(annotation);
+    void indexProperty(AnnotationValue<?> annotation, String property, @Nullable String value) {
+        indexes.computeIfAbsent(property, s -> new HashSet<>(2)).add(new AnnotationValueIndex(annotation, property, value));
     }
 
     @Override
@@ -218,12 +220,13 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
                 final String propertyName = propertyWriter.getPropertyName();
                 if (indexes.containsKey(propertyName)) {
-                    final Collection<String> annotations = indexes.get(propertyName);
-                    for (String annotation : annotations) {
+                    final Collection<AnnotationValueIndex> annotations = indexes.get(propertyName);
+                    for (AnnotationValueIndex index : annotations) {
                         constructorWriter.loadThis();
-                        final Type typeReference = getTypeReference(annotation);
+                        final Type typeReference = getTypeReference(index.annotationValue.getAnnotationName());
                         constructorWriter.push(typeReference);
                         constructorWriter.push(propertyName);
+                        constructorWriter.push(index.value);
                         constructorWriter.visitMethodInsn(INVOKESPECIAL,
                                 superType.getInternalName(),
                                 METHOD_INDEX_PROPERTY.getName(),
@@ -379,5 +382,20 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      */
     void visitConstructorArguments(ParameterElement... parameters) {
         this.constructorArguments = parameters;
+    }
+
+    /**
+     * index to be created.
+     */
+    private class AnnotationValueIndex {
+        final @Nonnull AnnotationValue annotationValue;
+        final @Nonnull String property;
+        final @Nullable String value;
+
+        public AnnotationValueIndex(@Nonnull AnnotationValue annotationValue, @Nonnull String property, @Nullable String value) {
+            this.annotationValue = annotationValue;
+            this.property = property;
+            this.value = value;
+        }
     }
 }

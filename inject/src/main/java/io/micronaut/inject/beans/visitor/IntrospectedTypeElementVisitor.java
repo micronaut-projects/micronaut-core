@@ -32,8 +32,10 @@ import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassGenerationException;
 
 import java.io.IOException;
+import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 /**
  * A {@link TypeElementVisitor} that visits classes annotated with {@link Introspected} and produces
@@ -60,7 +62,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
             final Set<String> excludes = CollectionUtils.setOf(introspected.get("excludes", String[].class, StringUtils.EMPTY_STRING_ARRAY));
             final Set<String> excludedAnnotations = CollectionUtils.setOf(introspected.get("excludedAnnotations", String[].class, StringUtils.EMPTY_STRING_ARRAY));
             final Set<String> includedAnnotations = CollectionUtils.setOf(introspected.get("includedAnnotations", String[].class, StringUtils.EMPTY_STRING_ARRAY));
-            final Set<String> indexedAnnotations = CollectionUtils.setOf(introspected.get("indexed", String[].class, StringUtils.EMPTY_STRING_ARRAY));
+            final Set<AnnotationValue> indexedAnnotations = CollectionUtils.setOf(introspected.get("indexed", AnnotationValue[].class, new AnnotationValue[0]));
 
             if (ArrayUtils.isNotEmpty(classes)) {
                 AtomicInteger index = new AtomicInteger(0);
@@ -128,7 +130,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
         }
     }
 
-    private void processElement(VisitorContext context, boolean metadata, Set<String> includes, Set<String> excludes, Set<String> excludedAnnotations, Set<String> indexedAnnotations, ClassElement ce, BeanIntrospectionWriter writer) {
+    private void processElement(VisitorContext context, boolean metadata, Set<String> includes, Set<String> excludes, Set<String> excludedAnnotations, Set<AnnotationValue> indexedAnnotations, ClassElement ce, BeanIntrospectionWriter writer) {
         final List<PropertyElement> beanProperties = ce.getBeanProperties();
         Optional<ConstructorElement> constructorElement = ce.getPublicConstructor();
 
@@ -150,7 +152,9 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
             List<PropertyElement> beanProperties,
             Set<String> includes,
             Set<String> excludes,
-            Set<String> ignored, Set<String> indexedAnnotations, boolean metadata) {
+            Set<String> ignored,
+            Set<AnnotationValue> indexedAnnotations,
+            boolean metadata) {
 
         final ParameterElement[] parameters = constructorElement.getParameters();
         if (ArrayUtils.isNotEmpty(parameters)) {
@@ -182,10 +186,18 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
                         beanProperty.getType().getTypeArguments()
                 );
 
-                for (String indexedAnnotation : indexedAnnotations) {
-                    if (beanProperty.hasStereotype(indexedAnnotation)) {
-                        writer.indexProperty(indexedAnnotation, name);
-                    }
+                for (AnnotationValue<?> indexedAnnotation : indexedAnnotations) {
+                    indexedAnnotation.get("annotation", String.class).ifPresent(annotationName -> {
+                        if (beanProperty.hasStereotype(annotationName)) {
+                            writer.indexProperty(
+                                    new AnnotationValue<>(annotationName),
+                                    name,
+                                    indexedAnnotation.get("member", String.class)
+                                            .flatMap(m -> beanProperty.getValue(annotationName, m, String.class)).orElse(null)
+                            );
+                        }
+                    });
+
                 }
             }
         }

@@ -89,8 +89,8 @@ class Test {
         bi.getConstructorArguments().length == 3
         bi.getConstructorArguments()[0].name == 'name'
         bi.getConstructorArguments()[0].type == String
-        bi.getBeanProperties(Id).size() == 1
-        bi.getBeanProperties(Id).first().name == 'id'
+        bi.getIndexedProperties(Id).size() == 1
+        bi.getIndexedProperties(Id).first().name == 'id'
 
 
         when:
@@ -204,7 +204,7 @@ class ParentBean {
         introspection != null
         introspection.hasAnnotation(Introspected)
         introspection.instantiate().getClass().name == 'test.Test'
-        introspection.getBeanProperties().size() == 8
+        introspection.getIndexedProperties().size() == 8
         introspection.getProperty("name").isPresent()
         introspection.getProperty("name", String).isPresent()
         !introspection.getProperty("name", Integer).isPresent()

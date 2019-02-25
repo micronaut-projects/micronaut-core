@@ -27,6 +27,7 @@ import io.micronaut.core.util.ArgumentUtils;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.annotation.concurrent.Immutable;
 import java.util.Optional;
 
 /**
@@ -42,6 +43,7 @@ import java.util.Optional;
  * @since 1.1
  * @see BeanIntrospection
  */
+@Immutable
 public interface BeanProperty<B, T> extends Named, AnnotationMetadataDelegate {
 
     /**

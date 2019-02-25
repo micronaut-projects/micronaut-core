@@ -14,13 +14,10 @@
  * limitations under the License.
  */
 
-package io.micronaut.inject.beans;
+package io.micronaut.core.beans;
 
-import io.micronaut.context.BeanContext;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
-import io.micronaut.core.beans.BeanIntrospectionReference;
-import io.micronaut.inject.BeanType;
 
 import javax.annotation.Nonnull;
 
@@ -34,7 +31,7 @@ import javax.annotation.Nonnull;
  */
 @Internal
 @UsedByGeneratedCode
-public abstract class AbstractBeanIntrospectionReference<T> implements BeanIntrospectionReference<T>, BeanType<T> {
+public abstract class AbstractBeanIntrospectionReference<T> implements BeanIntrospectionReference<T> {
 
     private Boolean present = null;
 
@@ -57,16 +54,6 @@ public abstract class AbstractBeanIntrospectionReference<T> implements BeanIntro
             }
         }
         return present;
-    }
-
-    @Override
-    public final boolean isEnabled(BeanContext context) {
-        return isPresent();
-    }
-
-    @Override
-    public final boolean isPrimary() {
-        return true;
     }
 
     @Nonnull
