@@ -17,7 +17,7 @@ package io.micronaut.security.rules;
 
 import io.micronaut.security.config.InterceptUrlMapPattern;
 import io.micronaut.security.config.SecurityConfiguration;
-import io.micronaut.security.token.RolesParser;
+import io.micronaut.security.token.RolesFinder;
 import io.micronaut.security.token.config.TokenConfiguration;
 
 import javax.inject.Inject;
@@ -41,7 +41,7 @@ public class ConfigurationInterceptUrlMapRule extends InterceptUrlMapRule {
     private final List<InterceptUrlMapPattern> patternList;
 
     /**
-     * @deprecated use {@link ConfigurationInterceptUrlMapRule(RolesParser, SecurityConfiguration)} instead.
+     * @deprecated use {@link ConfigurationInterceptUrlMapRule( RolesFinder , SecurityConfiguration)} instead.
      * @param tokenConfiguration The Token Configuration
      * @param securityConfiguration The Security Configuration
      */
@@ -54,13 +54,13 @@ public class ConfigurationInterceptUrlMapRule extends InterceptUrlMapRule {
 
      /**
      *
-     * @param rolesParser Roles Parser
+     * @param rolesFinder Roles Parser
      * @param securityConfiguration The Security Configuration
      */
     @Inject
-    public ConfigurationInterceptUrlMapRule(RolesParser rolesParser,
+    public ConfigurationInterceptUrlMapRule(RolesFinder rolesFinder,
                                             SecurityConfiguration securityConfiguration) {
-        super(rolesParser);
+        super(rolesFinder);
         this.patternList = securityConfiguration.getInterceptUrlMap();
     }
 

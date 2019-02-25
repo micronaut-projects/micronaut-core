@@ -15,9 +15,9 @@
  */
 package io.micronaut.security.rules;
 
-import io.micronaut.security.token.DefaultRolesParser;
-import io.micronaut.security.token.MapClaimsAdapter;
-import io.micronaut.security.token.RolesParser;
+import io.micronaut.security.token.DefaultRolesFinder;
+import io.micronaut.security.token.MapClaims;
+import io.micronaut.security.token.RolesFinder;
 import io.micronaut.security.token.config.TokenConfiguration;
 
 import javax.inject.Inject;
@@ -35,24 +35,24 @@ import java.util.Map;
  */
 public abstract class AbstractSecurityRule implements SecurityRule {
 
-    private final RolesParser rolesParser;
+    private final RolesFinder rolesFinder;
 
     /**
-     * @deprecated use {@link AbstractSecurityRule(RolesParser)} instead.
+     * @deprecated use {@link AbstractSecurityRule( RolesFinder )} instead.
      * @param tokenConfiguration General Token Configuration
      */
     @Deprecated
     AbstractSecurityRule(TokenConfiguration tokenConfiguration) {
-        this.rolesParser = new DefaultRolesParser(tokenConfiguration);
+        this.rolesFinder = new DefaultRolesFinder(tokenConfiguration);
     }
 
     /**
      *
-     * @param rolesParser Roles Parser
+     * @param rolesFinder Roles Parser
      */
     @Inject
-    AbstractSecurityRule(RolesParser rolesParser) {
-        this.rolesParser = rolesParser;
+    AbstractSecurityRule(RolesFinder rolesFinder) {
+        this.rolesFinder = rolesFinder;
     }
 
     /**
@@ -69,7 +69,7 @@ public abstract class AbstractSecurityRule implements SecurityRule {
             roles.add(SecurityRule.IS_ANONYMOUS);
         } else {
             if (!claims.isEmpty()) {
-                roles.addAll(rolesParser.parseRoles(new MapClaimsAdapter(claims)));
+                roles.addAll(rolesFinder.findInClaims(new MapClaims(claims)));
             }
             roles.add(SecurityRule.IS_ANONYMOUS);
             roles.add(SecurityRule.IS_AUTHENTICATED);

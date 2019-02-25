@@ -13,23 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.token;
 
 import javax.annotation.Nonnull;
 import java.util.List;
 
 /**
- * Parse roles from token claims.
+ * Retrieves roles from token claims.
  *
  * @author Sergio del Amo
  * @since 1.1.0
  */
-public interface RolesParser {
+public interface RolesFinder {
 
     /**
+     * Retrieves the list of roles from the provided claims.
      *
      * @param claims The claims of the token.
      * @return The granted roles.
      */
-    List<String> parseRoles (@Nonnull Claims claims);
+    @Nonnull
+    List<String> findInClaims(@Nonnull Claims claims);
 }
