@@ -21,10 +21,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.CollectionUtils;
 
 import javax.annotation.Nonnull;
-import java.util.Collection;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -36,8 +33,8 @@ import java.util.stream.Collectors;
  */
 @Internal
 final class BeanIntrospectionMap<T> implements BeanMap<T> {
-    final BeanIntrospection<T> beanIntrospection;
-    final T bean;
+    private final BeanIntrospection<T> beanIntrospection;
+    private final T bean;
 
     /**
      * Default constructor.
@@ -47,6 +44,24 @@ final class BeanIntrospectionMap<T> implements BeanMap<T> {
     BeanIntrospectionMap(BeanIntrospection<T> beanIntrospection, T bean) {
         this.beanIntrospection = beanIntrospection;
         this.bean = bean;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        BeanIntrospectionMap<?> that = (BeanIntrospectionMap<?>) o;
+        return beanIntrospection.equals(that.beanIntrospection) &&
+                bean.equals(that.bean);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(beanIntrospection, bean);
     }
 
     @Override
