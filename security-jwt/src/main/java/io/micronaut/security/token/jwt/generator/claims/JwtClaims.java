@@ -15,14 +15,12 @@
  */
 package io.micronaut.security.token.jwt.generator.claims;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import java.util.Set;
+import io.micronaut.security.token.Claims;
 
 /**
  * @see <a href="https://tools.ietf.org/html/rfc7519#section-4.1">Registered Claims Names</a>
  */
-public interface JwtClaims {
+public interface JwtClaims extends Claims {
     String ISSUER          = "iss";
 
     String SUBJECT         = "sub";
@@ -37,25 +35,4 @@ public interface JwtClaims {
 
     String AUDIENCE        = "aud";
 
-    /**
-     *
-     * @param claimName the JWT Claim name
-     * @return {@code null} if the claim not exist or the Claim value.
-     */
-    @Nullable
-    Object get(String claimName);
-
-    /**
-     *
-     * @return All claim names.
-     */
-    @Nonnull
-    Set<String> names();
-
-    /**
-     *
-     * @param claimName the JWT Claim name
-     * @return {@code false} if the claim does not exist.
-     */
-    boolean contains(String claimName);
 }
