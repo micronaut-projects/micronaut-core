@@ -20,9 +20,12 @@ import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.util.ArgumentUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -35,6 +38,8 @@ import java.util.stream.Collectors;
  * @see BeanIntrospection
  */
 class DefaultBeanIntrospector implements BeanIntrospector {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultBeanIntrospector.class);
 
     private Map<String, BeanIntrospectionReference<Object>> introspectionMap;
 
@@ -56,9 +61,21 @@ class DefaultBeanIntrospector implements BeanIntrospector {
         ArgumentUtils.requireNonNull("beanType", beanType);
         final BeanIntrospectionReference reference = getIntrospections().get(beanType.getName());
         try {
-            return Optional.ofNullable(reference).map(BeanIntrospectionReference::load);
+            if (reference != null) {
+                return Optional.of(reference).map((Function<BeanIntrospectionReference, BeanIntrospection<T>>) ref -> {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Found BeanIntrospection for type: " + ref.getBeanType());
+                    }
+                    return ref.load();
+                });
+            } else {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("No BeanIntrospection found for bean type: " + beanType);
+                }
+                return Optional.empty();
+            }
         } catch (Throwable e) {
-            throw new IntrospectionException("Error loading bean introspection for type [" + beanType + "]: " + e.getMessage(), e);
+            throw new IntrospectionException("Error loading BeanIntrospection for type [" + beanType + "]: " + e.getMessage(), e);
         }
     }
 
@@ -75,6 +92,10 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                         if (definition.isPresent()) {
                             final BeanIntrospectionReference ref = definition.load();
                             introspectionMap.put(ref.getName(), ref);
+                        } else {
+                            if (LOG.isDebugEnabled()) {
+                                LOG.debug("BeanIntrospection {} not loaded since associated bean is not present on the classpath", definition.getName());
+                            }
                         }
                     }
 

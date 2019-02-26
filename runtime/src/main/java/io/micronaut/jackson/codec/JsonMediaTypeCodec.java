@@ -120,7 +120,7 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
         try {
             return objectMapper.treeToValue(node, type.getType());
         } catch (IOException e) {
-            throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage());
+            throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
         }
     }
 
@@ -136,7 +136,7 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
                 return objectMapper.readValue(buffer.toByteArray(), type.getType());
             }
         } catch (IOException e) {
-            throw new CodecException("Error decoding JSON stream for type [" + type.getType() + "]: " + e.getMessage());
+            throw new CodecException("Error decoding JSON stream for type [" + type.getType() + "]: " + e.getMessage(), e);
         }
     }
 
@@ -151,7 +151,7 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
                 return objectMapper.readValue(data, type.getType());
             }
         } catch (IOException e) {
-            throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage());
+            throw new CodecException("Error decoding JSON stream for type [" + type.getName() + "]: " + e.getMessage(), e);
         }
     }
 
@@ -160,7 +160,7 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
         try {
             objectMapper.writeValue(outputStream, object);
         } catch (IOException e) {
-            throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage());
+            throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
         }
     }
 
@@ -173,7 +173,7 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
                 return objectMapper.writeValueAsBytes(object);
             }
         } catch (JsonProcessingException e) {
-            throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage());
+            throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
         }
     }
 

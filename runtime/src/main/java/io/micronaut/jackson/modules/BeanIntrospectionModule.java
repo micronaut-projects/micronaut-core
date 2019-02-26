@@ -94,7 +94,8 @@ public class BeanIntrospectionModule extends SimpleModule {
         @Override
         public BeanSerializerBuilder updateBuilder(SerializationConfig config, BeanDescription beanDesc, BeanSerializerBuilder builder) {
             final Class<?> beanClass = beanDesc.getBeanClass();
-            final BeanIntrospection<Object> introspection = (BeanIntrospection<Object>) BeanIntrospector.SHARED.findIntrospection(beanClass).orElse(null);
+            final BeanIntrospection<Object> introspection =
+                    (BeanIntrospection<Object>) BeanIntrospector.SHARED.findIntrospection(beanClass).orElse(null);
             if (introspection == null) {
                 return super.updateBuilder(config, beanDesc, builder);
             } else {
