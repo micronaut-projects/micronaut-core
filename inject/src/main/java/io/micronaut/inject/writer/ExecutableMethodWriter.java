@@ -15,8 +15,6 @@
  */
 package io.micronaut.inject.writer;
 
-import static io.micronaut.inject.writer.BeanDefinitionWriter.pushBuildArgumentsForMethod;
-
 import io.micronaut.context.AbstractExecutableMethod;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;

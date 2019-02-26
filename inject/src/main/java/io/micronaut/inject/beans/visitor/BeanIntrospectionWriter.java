@@ -69,6 +69,7 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     private final Map<String, Collection<AnnotationValueIndex>> indexes = new HashMap<>(2);
     private int propertyIndex = 0;
     private ParameterElement[] constructorArguments;
+    private final HashMap<String, GeneratorAdapter> loadTypeMethods = new HashMap<>();
 
     /**
      * Default constructor.
@@ -258,7 +259,21 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
 
     private void writeConstructorArguments() {
         final GeneratorAdapter getConstructorArguments = startPublicMethodZeroArgs(introspectionWriter, Argument[].class, "getConstructorArguments");
-        pushTypeArguments(getConstructorArguments, toTypeArguments(constructorArguments));
+        final Map<String, Object> args = toParameterTypes(constructorArguments);
+        Map<String, AnnotationMetadata> annotationMetadataMap = new LinkedHashMap<>(args.size());
+        for (ParameterElement constructorArgument : constructorArguments) {
+            annotationMetadataMap.put(constructorArgument.getName(), constructorArgument.getAnnotationMetadata());
+        }
+        pushBuildArgumentsForMethod(
+                introspectionType,
+                introspectionWriter,
+                getConstructorArguments,
+                args,
+                annotationMetadataMap,
+                toTypeArguments(constructorArguments),
+                loadTypeMethods
+                );
+
         getConstructorArguments.returnValue();
         getConstructorArguments.visitMaxs(1, 1);
         getConstructorArguments.endMethod();

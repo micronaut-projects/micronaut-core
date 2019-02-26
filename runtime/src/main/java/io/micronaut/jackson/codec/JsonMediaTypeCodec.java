@@ -28,6 +28,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodec;
+import io.micronaut.jackson.JacksonConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
 
 import javax.annotation.Nullable;
@@ -183,24 +184,8 @@ public class JsonMediaTypeCodec implements MediaTypeCodec {
     }
 
     private <T> JavaType constructJavaType(Argument<T> type) {
-        Map<String, Argument<?>> typeVariables = type.getTypeVariables();
         TypeFactory typeFactory = objectMapper.getTypeFactory();
-        JavaType[] objects = toJavaTypeArray(typeFactory, typeVariables);
-        return typeFactory.constructParametricType(
-            type.getType(),
-            objects
-        );
+        return JacksonConfiguration.constructType(type, typeFactory);
     }
 
-    private JavaType[] toJavaTypeArray(TypeFactory typeFactory, Map<String, Argument<?>> typeVariables) {
-        List<JavaType> javaTypes = new ArrayList<>();
-        for (Argument<?> argument : typeVariables.values()) {
-            if (argument.hasTypeVariables()) {
-                javaTypes.add(typeFactory.constructParametricType(argument.getType(), toJavaTypeArray(typeFactory, argument.getTypeVariables())));
-            } else {
-                javaTypes.add(typeFactory.constructType(argument.getType()));
-            }
-        }
-        return javaTypes.toArray(new JavaType[0]);
-    }
 }
