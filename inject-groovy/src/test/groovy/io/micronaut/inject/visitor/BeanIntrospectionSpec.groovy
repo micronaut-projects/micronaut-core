@@ -204,7 +204,7 @@ class ParentBean {
         introspection != null
         introspection.hasAnnotation(Introspected)
         introspection.instantiate().getClass().name == 'test.Test'
-        introspection.getIndexedProperties().size() == 8
+        introspection.getBeanProperties().size() == 8
         introspection.getProperty("name").isPresent()
         introspection.getProperty("name", String).isPresent()
         !introspection.getProperty("name", Integer).isPresent()

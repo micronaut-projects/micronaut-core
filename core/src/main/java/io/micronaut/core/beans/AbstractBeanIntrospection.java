@@ -96,7 +96,7 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
                 if (constructorArgument.isAnnotationPresent(Nullable.class)) {
                     continue;
                 } else {
-                    throw new InstantiationException("Null argument specified for [" + constructorArgument.getName() + "]. If this argument is allowed be null annotate it with @Nullable");
+                    throw new InstantiationException("Null argument specified for [" + constructorArgument.getName() + "]. If this argument is allowed to be null annotate it with @Nullable");
                 }
             }
             if (!ReflectionUtils.getWrapperType(constructorArgument.getType()).isInstance(specified)) {
@@ -134,7 +134,7 @@ public abstract class AbstractBeanIntrospection<T> implements BeanIntrospection<
 
     @Nonnull
     @Override
-    public Collection<BeanProperty<T, Object>> getIndexedProperties() {
+    public Collection<BeanProperty<T, Object>> getBeanProperties() {
         return Collections.unmodifiableCollection(beanProperties.values());
     }
 

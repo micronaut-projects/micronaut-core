@@ -63,7 +63,7 @@ public interface BeanWrapper<T> extends AnnotationMetadataProvider {
      * @return The properties
      */
     default @Nonnull Collection<BeanProperty<T, Object>> getBeanProperties() {
-        return getIntrospection().getIndexedProperties();
+        return getIntrospection().getBeanProperties();
     }
 
     /**

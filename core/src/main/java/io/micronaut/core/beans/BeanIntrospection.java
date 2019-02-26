@@ -51,7 +51,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
     /**
      * @return A immutable collection of properties.
      */
-    @Nonnull Collection<BeanProperty<T, Object>> getIndexedProperties();
+    @Nonnull Collection<BeanProperty<T, Object>> getBeanProperties();
 
     /**
      * Get all the bean properties annotated for the given annotation type. If the annotation is {@link Introspected#indexed()} by the given annotation,
@@ -164,7 +164,7 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate {
      * @return The properties names
      */
     default @Nonnull String[] getPropertyNames() {
-        return getIndexedProperties().stream().map(BeanProperty::getName).toArray(String[]::new);
+        return getBeanProperties().stream().map(BeanProperty::getName).toArray(String[]::new);
     }
 
     /**

@@ -46,7 +46,7 @@ class Test {
     
     private long v;
     
-    public Test(String name, int age, int[] primitiveArray) {
+    public Test(String name, @Size(max=100) int age, int[] primitiveArray) {
         this.name = name;
         this.age = age;
     }
@@ -104,6 +104,8 @@ class Test {
         bi.getConstructorArguments().length == 3
         bi.getConstructorArguments()[0].name == 'name'
         bi.getConstructorArguments()[0].type == String
+        bi.getConstructorArguments()[1].name == 'age'
+        bi.getConstructorArguments()[1].getAnnotationMetadata().hasAnnotation(Size)
         bi.getIndexedProperties(Id).size() == 1
         bi.getIndexedProperty(Id).isPresent()
         bi.getIndexedProperty(Column, "test_name").isPresent()
@@ -383,7 +385,7 @@ class ParentBean {
         introspection != null
         introspection.hasAnnotation(Introspected)
         introspection.instantiate().getClass().name == 'test.Test'
-        introspection.getIndexedProperties().size() == 8
+        introspection.getBeanProperties().size() == 8
         introspection.getProperty("name").isPresent()
         introspection.getProperty("name", String).isPresent()
         !introspection.getProperty("name", Integer).isPresent()

@@ -89,17 +89,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             Argument[].class)
             .orElseThrow(() -> new ClassGenerationException("Invalid version of Micronaut present on the class path"));
 
-    private static final org.objectweb.asm.commons.Method METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS = org.objectweb.asm.commons.Method.getMethod(
-            ReflectionUtils.getRequiredInternalMethod(
-                    Argument.class,
-                    "of",
-                    Class.class,
-                    String.class,
-                    AnnotationMetadata.class,
-                    Argument[].class
-            )
-    );
-
     private static final org.objectweb.asm.commons.Method METHOD_MAP_OF = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalMethod(
                     CollectionUtils.class,
@@ -1517,77 +1506,6 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
 
         // increment the method index
         currentMethodIndex++;
-    }
-
-    /**
-     * @param owningType                 The owning type
-     * @param declaringClassWriter       The declaring class writer
-     * @param generatorAdapter           The {@link GeneratorAdapter}
-     * @param argumentTypes              The argument types
-     * @param argumentAnnotationMetadata The argument annotation metadata
-     * @param genericTypes               The generic types
-     * @param loadTypeMethods            The load type methods
-     */
-    static void pushBuildArgumentsForMethod(
-            Type owningType,
-            ClassWriter declaringClassWriter,
-            GeneratorAdapter generatorAdapter,
-            Map<String, Object> argumentTypes,
-            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
-            Map<String, Map<String, Object>> genericTypes,
-            Map<String, GeneratorAdapter> loadTypeMethods) {
-        int len = argumentTypes.size();
-        pushNewArray(generatorAdapter, Argument.class, len);
-        int i = 0;
-        for (Map.Entry<String, Object> entry : argumentTypes.entrySet()) {
-            // the array index position
-            generatorAdapter.push(i);
-
-            String argumentName = entry.getKey();
-            Type argumentType = getTypeReference(entry.getValue());
-
-            // 1st argument: The type
-            generatorAdapter.push(argumentType);
-
-            // 2nd argument: The argument name
-            generatorAdapter.push(argumentName);
-
-            // 3rd argument: The annotation metadata
-            AnnotationMetadata annotationMetadata = argumentAnnotationMetadata.get(argumentName);
-            if (annotationMetadata == null || annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
-                generatorAdapter.visitInsn(ACONST_NULL);
-            } else {
-                AnnotationMetadataWriter.instantiateNewMetadata(
-                        owningType,
-                        declaringClassWriter,
-                        generatorAdapter,
-                        (DefaultAnnotationMetadata) annotationMetadata,
-                        loadTypeMethods
-                );
-            }
-
-            // 4th argument: The generic types
-            if (genericTypes != null && genericTypes.containsKey(argumentName)) {
-                Map<String, Object> types = genericTypes.get(argumentName);
-                pushTypeArguments(generatorAdapter, types);
-            } else {
-                generatorAdapter.visitInsn(ACONST_NULL);
-            }
-
-            // Argument.create( .. )
-            invokeInterfaceStaticMethod(
-                    generatorAdapter,
-                    Argument.class,
-                    METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
-            );
-            // store the type reference
-            generatorAdapter.visitInsn(AASTORE);
-            // if we are not at the end of the array duplicate array onto the stack
-            if (i != (len - 1)) {
-                generatorAdapter.visitInsn(DUP);
-            }
-            i++;
-        }
     }
 
     private void pushInvokeMethodOnSuperClass(MethodVisitor constructorVisitor, Method methodToInvoke) {

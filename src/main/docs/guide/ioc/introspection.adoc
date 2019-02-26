@@ -60,4 +60,22 @@ snippet::io.micronaut.docs.ioc.beans.IntrospectionSpec[tags="wrapper", indent=0]
 
 <1> The `getWrapper` static method can be used to obtain a api:core.beans.BeanWrapper[] for a bean instance.
 <2> You can set properties and the api:core.beans.BeanWrapper[] will perform type conversion, or throw api:core.convert.exceptions.ConversionErrorException[] if conversion is not possible.
-<3> You can retrieve a property using `getRequiredProperty` and request the appropriate type.
+<3> You can retrieve a property using `getRequiredProperty` and request the appropriate type. If the property doesn't exist a api:core.beans.exceptions.IntrospectionException[] will be thrown and if it cannot be converted a api:core.convert.exceptions.ConversionErrorException[] will be thrown.
+
+
+=== Jackson and Bean Introspection
+
+You can enable bean introspection integration with Jackson for reflection-free JSON serialization and deserialization using the `jackson.bean-introspection-module` setting.
+
+NOTE: This feature is currently regarded as experimental and may be subject to changes in the future.
+
+.Enabling Jackson Bean Introspection
+[source,yaml]
+----
+jackson:
+    bean-introspection-module: true
+----
+
+With the above configuration in place Jackson will be configured to use the api:core.beans.BeanIntrospection[] API to read and write property values and construct objects resulting in reflection-free serialization/deserialization which is benefitial from a performance perspective and requires less configuring to operate correctly with runtimes such as GraalVM native.
+
+NOTE: Currently only bean properties (private field with public getter/setter) are supported and usage of public fields is not supported.

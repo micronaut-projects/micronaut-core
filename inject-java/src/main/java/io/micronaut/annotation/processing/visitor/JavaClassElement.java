@@ -19,6 +19,8 @@ import io.micronaut.annotation.processing.PublicMethodVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.inject.ast.*;
 import io.micronaut.inject.processing.JavaModelUtils;
 
@@ -73,6 +75,11 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         this.classElement = classElement;
         this.visitorContext = visitorContext;
         this.typeArguments = typeArguments;
+    }
+
+    @Override
+    public boolean isPrimitive() {
+        return ClassUtils.getPrimitiveType(getName()).isPresent();
     }
 
     @Override

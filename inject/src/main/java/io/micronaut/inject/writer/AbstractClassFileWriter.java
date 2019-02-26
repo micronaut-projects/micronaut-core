@@ -15,11 +15,14 @@
  */
 package io.micronaut.inject.writer;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.inject.annotation.AnnotationMetadataWriter;
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
@@ -71,6 +74,16 @@ public abstract class AbstractClassFileWriter implements Opcodes {
                     "of",
                     Class.class,
                     String.class,
+                    Argument[].class
+            )
+    );
+    private static final Method METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS = Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(
+                    Argument.class,
+                    "of",
+                    Class.class,
+                    String.class,
+                    AnnotationMetadata.class,
                     Argument[].class
             )
     );
@@ -182,6 +195,77 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     }
 
     /**
+     * @param owningType                 The owning type
+     * @param declaringClassWriter       The declaring class writer
+     * @param generatorAdapter           The {@link GeneratorAdapter}
+     * @param argumentTypes              The argument types
+     * @param argumentAnnotationMetadata The argument annotation metadata
+     * @param genericTypes               The generic types
+     * @param loadTypeMethods            The load type methods
+     */
+    protected static void pushBuildArgumentsForMethod(
+            Type owningType,
+            ClassWriter declaringClassWriter,
+            GeneratorAdapter generatorAdapter,
+            Map<String, Object> argumentTypes,
+            Map<String, AnnotationMetadata> argumentAnnotationMetadata,
+            Map<String, Map<String, Object>> genericTypes,
+            Map<String, GeneratorAdapter> loadTypeMethods) {
+        int len = argumentTypes.size();
+        pushNewArray(generatorAdapter, Argument.class, len);
+        int i = 0;
+        for (Map.Entry<String, Object> entry : argumentTypes.entrySet()) {
+            // the array index position
+            generatorAdapter.push(i);
+
+            String argumentName = entry.getKey();
+            Type argumentType = getTypeReference(entry.getValue());
+
+            // 1st argument: The type
+            generatorAdapter.push(argumentType);
+
+            // 2nd argument: The argument name
+            generatorAdapter.push(argumentName);
+
+            // 3rd argument: The annotation metadata
+            AnnotationMetadata annotationMetadata = argumentAnnotationMetadata.get(argumentName);
+            if (annotationMetadata == null || annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
+                generatorAdapter.visitInsn(ACONST_NULL);
+            } else {
+                AnnotationMetadataWriter.instantiateNewMetadata(
+                        owningType,
+                        declaringClassWriter,
+                        generatorAdapter,
+                        (DefaultAnnotationMetadata) annotationMetadata,
+                        loadTypeMethods
+                );
+            }
+
+            // 4th argument: The generic types
+            if (genericTypes != null && genericTypes.containsKey(argumentName)) {
+                Map<String, Object> types = genericTypes.get(argumentName);
+                pushTypeArguments(generatorAdapter, types);
+            } else {
+                generatorAdapter.visitInsn(ACONST_NULL);
+            }
+
+            // Argument.create( .. )
+            invokeInterfaceStaticMethod(
+                    generatorAdapter,
+                    Argument.class,
+                    METHOD_CREATE_ARGUMENT_WITH_ANNOTATION_METADATA_GENERICS
+            );
+            // store the type reference
+            generatorAdapter.visitInsn(AASTORE);
+            // if we are not at the end of the array duplicate array onto the stack
+            if (i != (len - 1)) {
+                generatorAdapter.visitInsn(DUP);
+            }
+            i++;
+        }
+    }
+
+    /**
      * Write the class to the target directory.
      *
      * @param targetDir The target directory
@@ -244,13 +328,13 @@ public abstract class AbstractClassFileWriter implements Opcodes {
     }
 
     /**
-     * Converts a parameters to type arguments.
-     * @param parameters The parameters
+     * Converts a map of class elements to type arguments.
+     * @param parameters The parametesr
      * @return The type arguments
      */
     @NotNull
-    protected Map<String, Object> toTypeArguments(ParameterElement... parameters) {
-        final LinkedHashMap<String, Object> map = new LinkedHashMap<>(parameters.length);
+    protected  Map<String, Map<String, Object>>  toTypeArguments(ParameterElement... parameters) {
+        final LinkedHashMap<String, Map<String, Object>>  map = new LinkedHashMap<>(parameters.length);
         for (ParameterElement ce : parameters) {
             final ClassElement type = ce.getType();
             if (type == null) {
@@ -259,10 +343,26 @@ public abstract class AbstractClassFileWriter implements Opcodes {
             final Map<String, ClassElement> subArgs = type.getTypeArguments();
             if (CollectionUtils.isNotEmpty(subArgs)) {
                 map.put(ce.getName(), toTypeArguments(subArgs));
-            } else {
-                final Type typeReference = getTypeForElement(type);
-                map.put(ce.getName(), typeReference);
             }
+        }
+        return map;
+    }
+
+    /**
+     * Converts a parameters to type arguments.
+     * @param parameters The parameters
+     * @return The type arguments
+     */
+    @NotNull
+    protected Map<String, Object> toParameterTypes(ParameterElement... parameters) {
+        final LinkedHashMap<String, Object> map = new LinkedHashMap<>(parameters.length);
+        for (ParameterElement ce : parameters) {
+            final ClassElement type = ce.getType();
+            if (type == null) {
+                continue;
+            }
+            final Type typeReference = getTypeForElement(type);
+            map.put(ce.getName(), typeReference);
         }
 
         return map;
