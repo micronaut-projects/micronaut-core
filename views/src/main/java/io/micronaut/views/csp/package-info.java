@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
  * Contains classes specific to CSP support within Micronaut.
  *
@@ -20,7 +21,7 @@
  * @since 1.1
  */
 @Configuration
-@Requires(property = CspConfiguration.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
+@Requires(property = CspConfiguration.PREFIX + ".enabled", value = StringUtils.TRUE)
 package io.micronaut.views.csp;
 
 import io.micronaut.context.annotation.Configuration;

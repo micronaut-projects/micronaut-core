@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.views.csp;
 
 import io.micronaut.core.util.StringUtils;
@@ -24,7 +25,8 @@ import io.micronaut.http.filter.ServerFilterChain;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
-import static io.micronaut.views.csp.CspConfiguration.PATH;
+import static io.micronaut.views.csp.CspConfiguration.DEFAULT_FILTER_PATH;
+import static io.micronaut.views.csp.CspConfiguration.FILTER_PATH;
 
 /**
  * <p>
@@ -54,9 +56,9 @@ import static io.micronaut.views.csp.CspConfiguration.PATH;
  * </ul>
  *
  * @author Arul Dhesiaseelan
- * @since 1.1
+ * @since 1.1.0
  */
-@Filter("${" + PATH + ":/}**")
+@Filter("${" + FILTER_PATH + ":" + DEFAULT_FILTER_PATH +"}")
 public class CspFilter implements HttpServerFilter {
 
     public static final String CSP_HEADER = "Content-Security-Policy";
@@ -76,13 +78,12 @@ public class CspFilter implements HttpServerFilter {
 
         return Flowable.fromPublisher(chain.proceed(request))
                 .doOnNext(response -> {
-                    if (StringUtils.isNotEmpty(cspConfiguration.getPolicyDirectives())) {
-                        if (cspConfiguration.isReportOnly()) {
-                            response.getHeaders().add(CSP_REPORT_ONLY_HEADER, cspConfiguration.getPolicyDirectives());
-                        } else {
-                            response.getHeaders().add(CSP_HEADER, cspConfiguration.getPolicyDirectives());
-                        }
-                    }
+                    cspConfiguration.getPolicyDirectives()
+                            .map(StringUtils::trimToNull)
+                            .ifPresent(directives -> {
+                        String header = cspConfiguration.isReportOnly() ? CSP_REPORT_ONLY_HEADER : CSP_HEADER;
+                        response.getHeaders().add(header, directives);
+                    });
                 });
     }
 
