@@ -19,6 +19,9 @@ import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.views.ViewsConfigurationProperties;
 
+import javax.annotation.Nullable;
+import java.util.Optional;
+
 /**
  * Defines CSP configuration properties.
  *
@@ -36,18 +39,18 @@ public class CspConfiguration implements Toggleable {
     /**
      * The path for endpoints settings.
      */
-    public static final String PATH = PREFIX + ".path";
-
+    public static final String FILTER_PATH = PREFIX + ".filter-path";
     public static final boolean DEFAULT_ENABLED = false;
+    public static final boolean DEFAULT_REPORT_ONLY = false;
+    public static final String DEFAULT_FILTER_PATH = "/**";
 
     private boolean enabled = DEFAULT_ENABLED;
-
     private String policyDirectives;
-
-    private boolean reportOnly = false;
+    private boolean reportOnly = DEFAULT_REPORT_ONLY;
+    private String filterPath = DEFAULT_FILTER_PATH;
 
     /**
-     * @return Whether csp is enabled. Defaults to false.
+     * @return Whether csp headers will be sent
      */
     @Override
     public boolean isEnabled() {
@@ -55,21 +58,22 @@ public class CspConfiguration implements Toggleable {
     }
 
     /**
-     * @return Policy directives
+     * @return The policy directives
      */
-    public String getPolicyDirectives() {
-        return policyDirectives;
+    public Optional<String> getPolicyDirectives() {
+        return Optional.of(policyDirectives);
     }
 
     /**
-     * @return Whether reportOnly is set. Defaults to false.
+     * @return Whether the report only header should be set
      */
     public boolean isReportOnly() {
         return reportOnly;
     }
 
     /**
-     * Sets whether CSP is enabled. Default value ({@value #DEFAULT_ENABLED})
+     * Sets whether CSP is enabled. Default {@value #DEFAULT_ENABLED}.
+     *
      * @param enabled True if CSP is enabled
      */
     public void setEnabled(boolean enabled) {
@@ -80,17 +84,33 @@ public class CspConfiguration implements Toggleable {
      * Sets the policy directives.
      * @param policyDirectives CSP policy directives
      */
-    public void setPolicyDirectives(String policyDirectives) {
+    public void setPolicyDirectives(@Nullable String policyDirectives) {
         this.policyDirectives = policyDirectives;
     }
 
     /**
-     * Sets whether to include Content-Security-Policy-Report-Only header in the response,
-     * defaults to Content-Security-Policy header. Default value ({@value #DEFAULT_ENABLED})
+     * If true, the Content-Security-Policy-Report-Only header will be sent instead
+     * of Content-Security-Policy. Default {@value #DEFAULT_REPORT_ONLY}.
+     *
      * @param reportOnly set to true for reporting purpose only
      */
     public void setReportOnly(boolean reportOnly) {
         this.reportOnly = reportOnly;
     }
 
+    /**
+     * @return The path the CSP filter should apply to
+     */
+    public String getFilterPath() {
+        return filterPath;
+    }
+
+    /**
+     * Sets the path the CSP filter should apply to. Default value {@value #DEFAULT_FILTER_PATH}.
+     *
+     * @param filterPath The filter path
+     */
+    public void setFilterPath(String filterPath) {
+        this.filterPath = filterPath;
+    }
 }

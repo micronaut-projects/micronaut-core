@@ -17,6 +17,7 @@ package io.micronaut.views.csp
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.context.annotation.Infrastructure
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.PropertySource
 import io.micronaut.http.HttpRequest
@@ -69,7 +70,7 @@ class CspFilterSpec extends Specification {
         then:
         config.enabled
         !config.reportOnly
-        config.policyDirectives == 'default-src https:'
+        config.policyDirectives.get() == 'default-src https:'
 
         cleanup:
         applicationContext.close()
@@ -151,7 +152,7 @@ class CspFilterSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
                 'micronaut.views.csp.enabled': true,
-                'micronaut.views.csp.path': "/csp",
+                'micronaut.views.csp.filterPath': "/csp",
                 'micronaut.views.csp.reportOnly': false,
                 'micronaut.views.csp.policyDirectives': "default-src self:"
         ])
@@ -178,7 +179,7 @@ class CspFilterSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
                 'micronaut.views.csp.enabled': true,
-                'micronaut.views.csp.path': "/csp",
+                'micronaut.views.csp.filterPath': "/csp",
                 'micronaut.views.csp.reportOnly': true,
                 'micronaut.views.csp.policyDirectives': "default-src self:"
         ])
@@ -205,7 +206,7 @@ class CspFilterSpec extends Specification {
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
                 'spec.name': getClass().simpleName,
                 'micronaut.views.csp.enabled': true,
-                'micronaut.views.csp.path': "/csp",
+                'micronaut.views.csp.filterPath': "/csp",
                 'micronaut.views.csp.reportOnly': false,
                 'micronaut.views.csp.policyDirectives': "default-src self:"
         ])
@@ -227,18 +228,4 @@ class CspFilterSpec extends Specification {
         embeddedServer.close()
     }
 
-    @Controller('/csp')
-    @Requires(property = 'spec.name', value = 'CspFilterSpec')
-    static class TestController {
-
-        @Get
-        HttpResponse index() {
-            HttpResponse.ok()
-        }
-
-        @Get("/ignore")
-        HttpResponse ignore() {
-            HttpResponse.ok()
-        }
-    }
 }

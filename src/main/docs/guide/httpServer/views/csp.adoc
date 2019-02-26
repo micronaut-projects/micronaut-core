@@ -1,30 +1,15 @@
-Micronaut supports CSP (link:https://www.w3.org/TR/CSP2/[Content Security Policy Level 2]) out of the box. By default, CSP is disabled. To enable CSP, modify your configuration. For example with `application.yml`:
+Micronaut supports CSP (link:https://www.w3.org/TR/CSP2/[Content Security Policy Level 2]) out of the box. By default, CSP is disabled. To enable CSP, modify your configuration. For example:
 
-.CSP Configuration Example
+.application.yml
 [source,yaml]
 ----
 micronaut:
     views:
         csp:
             enabled: true
-            reportOnly: false
-            policyDirectives: "default-src self"
 ----
 
-In the above example, the policy directive enforces any resources (images, fonts, scripts, etc.) that are not on the same origin to be blocked from loading. In this case, if an attempt is made to load a script or a resource from a different origin, say from, \http://evil.com, the browser would block these from loading, optionally report such violations, which could be very useful in mitigating XSS attacks.
+See the following table for all configuration options:
 
-.CSP Reporting Example
-[source,yaml]
+include::{includedir}configurationProperties/io.micronaut.views.csp.CspConfiguration.adoc[]
 
-----
-micronaut:
-    views:
-        csp:
-            enabled: true
-            reportOnly: false
-            policyDirectives: "default-src https:; report-uri /csp-violation-report-endpoint"
-----
-
-NOTE: CSP filter path is enabled for '/**' by default. If you prefer policy directives applied to only a subset of your views, configure `views.csp.path`. For example, if the value is set to `/views*`, policy directive will be applied to that path.
-
-If you would like to dry run the policy, you could just report violations that would have occurred by enabling 'reportOnly' key in your CSP configuration.
