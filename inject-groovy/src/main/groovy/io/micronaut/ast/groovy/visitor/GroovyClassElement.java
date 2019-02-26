@@ -242,7 +242,20 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                             value.type,
                             propertyName,
                             value.setter == null,
-                            value.getter);
+                            value.getter) {
+                        @Override
+                        public Optional<String> getWriteMethodName() {
+                            if (value.setter != null) {
+                                return Optional.of(value.setter.getName());
+                            }
+                            return Optional.empty();
+                        }
+
+                        @Override
+                        public Optional<String> getReadMethodName() {
+                            return Optional.of(value.getter.getName());
+                        }
+                    };
                     propertyElements.add(propertyElement);
                 }
             }
