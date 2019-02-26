@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty.configuration
 
-import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.server.HttpServerConfiguration
 import io.netty.channel.ChannelOption
 import io.micronaut.context.ApplicationContext

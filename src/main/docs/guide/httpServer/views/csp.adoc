@@ -1,0 +1,15 @@
+Micronaut supports CSP (link:https://www.w3.org/TR/CSP2/[Content Security Policy Level 2]) out of the box. By default, CSP is disabled. To enable CSP, modify your configuration. For example:
+
+.application.yml
+[source,yaml]
+----
+micronaut:
+    views:
+        csp:
+            enabled: true
+----
+
+See the following table for all configuration options:
+
+include::{includedir}configurationProperties/io.micronaut.views.csp.CspConfiguration.adoc[]
+
