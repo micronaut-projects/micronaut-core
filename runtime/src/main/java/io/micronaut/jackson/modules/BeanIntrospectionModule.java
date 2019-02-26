@@ -44,6 +44,8 @@ import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.jackson.JacksonConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import javax.inject.Singleton;
@@ -62,6 +64,8 @@ import java.util.*;
 @Singleton
 @Requires(property = JacksonConfiguration.PROPERTY_USE_BEAN_INTROSPECTION)
 public class BeanIntrospectionModule extends SimpleModule {
+
+    private static final Logger LOG = LoggerFactory.getLogger(BeanIntrospectionModule.class);
 
     /**
      * Default constructor.
@@ -99,21 +103,43 @@ public class BeanIntrospectionModule extends SimpleModule {
             if (introspection == null) {
                 return super.updateBuilder(config, beanDesc, builder);
             } else {
+                final BeanSerializerBuilder newBuilder = new BeanSerializerBuilder(beanDesc) {
+                    @Override
+                    public JsonSerializer<?> build() {
+                        setConfig(config);
+                        try {
+                            return super.build();
+                        } catch (RuntimeException e) {
+                            if (LOG.isErrorEnabled()) {
+                                LOG.error("Error building bean serializer for type [" + beanClass + "]: " + e.getMessage(), e);
+                            }
+                            throw e;
+                        }
+                    }
+                };
                 final List<BeanPropertyWriter> properties = builder.getProperties();
                 final Collection<BeanProperty<Object, Object>> beanProperties = introspection.getBeanProperties();
                 if (CollectionUtils.isEmpty(properties) && CollectionUtils.isNotEmpty(beanProperties)) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Bean {} has no properties, while BeanIntrospection does. Recreating from introspection.", beanClass);
+                    }
                     final List<BeanPropertyWriter> newProperties = new ArrayList<>(beanProperties.size());
                     for (BeanProperty<Object, Object> beanProperty : beanProperties) {
                         BeanPropertyWriter writer = new BeanIntrospectionPropertyWriter(
                                 beanProperty.getValue(JsonProperty.class, String.class).orElse(beanProperty.getName()),
-                                beanProperty
+                                beanProperty,
+                                config.getTypeFactory()
                         );
 
                         newProperties.add(writer);
                     }
 
-                    builder.setProperties(newProperties);
+                    newBuilder.setProperties(newProperties);
                 } else {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Updating {} properties with BeanIntrospection data for type: ", properties.size(), beanClass);
+                    }
+
                     final List<BeanPropertyWriter> newProperties = new ArrayList<>(properties);
                     Map<String, BeanProperty> named = new LinkedHashMap<>(properties.size());
                     for (BeanProperty<Object, Object> beanProperty : beanProperties) {
@@ -131,16 +157,15 @@ public class BeanIntrospectionModule extends SimpleModule {
                             property = introspection.getProperty(existingName);
                         }
                         if (property.isPresent()) {
-                            newProperties.set(i, new BeanIntrospectionPropertyWriter(existing, property.get(), existing.getSerializer()));
+                            newProperties.set(i, new BeanIntrospectionPropertyWriter(existing, property.get(), existing.getSerializer(), config.getTypeFactory()));
                         } else {
                             newProperties.set(i, existing);
                         }
                     }
-                    builder.setProperties(newProperties);
+                    newBuilder.setProperties(newProperties);
                 }
+                return newBuilder;
             }
-
-            return builder;
         }
     }
 
@@ -395,20 +420,35 @@ public class BeanIntrospectionModule extends SimpleModule {
     private class BeanIntrospectionPropertyWriter extends BeanPropertyWriter {
         final BeanProperty<Object, Object> beanProperty;
         final SerializableString fastName;
+        private final JavaType type;
 
         BeanIntrospectionPropertyWriter(BeanPropertyWriter src,
                                         BeanProperty<Object, Object> introspection,
-                                        JsonSerializer<Object> ser) {
+                                        JsonSerializer<Object> ser,
+                                        TypeFactory typeFactory) {
             super(src);
             // either use the passed on serializer or the original one
             _serializer = (ser != null) ? ser : src.getSerializer();
             beanProperty = introspection;
             fastName = src.getSerializedName();
+            this.type = JacksonConfiguration.constructType(beanProperty.asArgument(), typeFactory);
         }
 
-        BeanIntrospectionPropertyWriter(String name, BeanProperty<Object, Object> introspection) {
+        BeanIntrospectionPropertyWriter(String name, BeanProperty<Object, Object> introspection,
+                                        TypeFactory typeFactory) {
             beanProperty = introspection;
             fastName = new SerializedString(name);
+            this.type = JacksonConfiguration.constructType(beanProperty.asArgument(), typeFactory);
+        }
+
+        @Override
+        public void fixAccess(SerializationConfig config) {
+            // no-op
+        }
+
+        @Override
+        public JavaType getType() {
+            return type;
         }
 
         @Override
