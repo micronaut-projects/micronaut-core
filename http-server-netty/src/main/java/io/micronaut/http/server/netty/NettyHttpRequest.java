@@ -252,15 +252,13 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
      */
     @Internal
     public void release() {
+        Object body = getBody().orElse(null);
+        releaseIfNecessary(body);
         for (ByteBufHolder byteBuf : receivedContent) {
             releaseIfNecessary(byteBuf);
         }
         for (ByteBufHolder byteBuf : receivedData.values()) {
             releaseIfNecessary(byteBuf);
-        }
-        Object body = getBody().orElse(null);
-        if (body instanceof ReferenceCounted) {
-            releaseIfNecessary(body);
         }
         for (Map.Entry<String, Object> attribute : attributes) {
             Object value = attribute.getValue();
@@ -274,11 +272,9 @@ public class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> implements 
     protected void releaseIfNecessary(Object value) {
         if (value instanceof ReferenceCounted) {
             ReferenceCounted referenceCounted = (ReferenceCounted) value;
-            if ((!(value instanceof CompositeByteBuf))) {
-                int i = referenceCounted.refCnt();
-                if (i != 0) {
-                    referenceCounted.release();
-                }
+            int i = referenceCounted.refCnt();
+            if (i != 0) {
+                referenceCounted.release();
             }
         }
     }
