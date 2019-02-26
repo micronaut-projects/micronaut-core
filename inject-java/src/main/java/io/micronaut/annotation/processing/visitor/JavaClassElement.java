@@ -251,6 +251,19 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                             String docComment = elements.getDocComment(value.getter);
                             return Optional.ofNullable(docComment);
                         }
+
+                        @Override
+                        public Optional<String> getWriteMethodName() {
+                            if (value.setter != null) {
+                                return Optional.of(value.setter.getSimpleName().toString());
+                            }
+                            return Optional.empty();
+                        }
+
+                        @Override
+                        public Optional<String> getReadMethodName() {
+                            return Optional.of(value.getter.getSimpleName().toString());
+                        }
                     };
                     propertyElements.add(propertyElement);
                 }

@@ -13,17 +13,27 @@ import javax.persistence.Version
 class BeanIntrospectorSpec extends Specification {
 
     void "test getIntrospection"() {
-        given:
+        when:
         BeanIntrospection<TestBean> beanIntrospection = BeanIntrospector.SHARED.getIntrospection(TestBean)
 
-        expect:
+        then:
         beanIntrospection
         beanIntrospection.instantiate() instanceof TestBean
-        beanIntrospection.propertyNames == ['name', 'age', 'stringArray'] as String[]
+        beanIntrospection.propertyNames.size() == 4
 
         and:"You get a unique instance per call"
         BeanIntrospection.getIntrospection(TestBean).instantiate() instanceof TestBean
         !beanIntrospection.is(BeanIntrospection.getIntrospection(TestBean))
+
+        when:
+        def flagProp = beanIntrospection.getRequiredProperty("flag", boolean.class)
+        def testBean = beanIntrospection.instantiate()
+        flagProp.set(testBean, true)
+
+        then:
+        flagProp.get(testBean)
+        testBean.flag
+
     }
 
     void "test entity"() {

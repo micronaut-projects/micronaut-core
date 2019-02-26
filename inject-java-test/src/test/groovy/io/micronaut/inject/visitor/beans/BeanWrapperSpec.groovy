@@ -11,9 +11,9 @@ class BeanWrapperSpec extends Specification {
         BeanWrapper<TestBean> wrapper = BeanWrapper.getWrapper(bean)
 
         then:"it is correct"
-        wrapper.propertyNames.size() == 3
+        wrapper.propertyNames.size() == 4
         wrapper.bean == bean
-        wrapper.beanProperties.size() == 3
+        wrapper.beanProperties.size() == 4
 
         when:
         wrapper.setProperty("name", "Fred")

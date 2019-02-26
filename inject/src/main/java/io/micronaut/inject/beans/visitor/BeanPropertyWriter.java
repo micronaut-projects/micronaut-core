@@ -63,12 +63,16 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
     private final Map<String, Object> typeArguments;
     private final Type beanType;
     private final boolean readOnly;
+    private final String readMethodName;
+    private final String writeMethodName;
 
     /**
      * Default constructor.
      * @param introspectionWriter The outer inspection writer.
      * @param propertyType The property type
      * @param propertyName The property name
+     * @param readMethodName The read method name
+     * @param writeMethodName The write method name
      * @param isReadOnly Is the property read only
      * @param index The index for the type
      * @param annotationMetadata The annotation metadata
@@ -78,6 +82,8 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             @Nonnull BeanIntrospectionWriter introspectionWriter,
             @Nonnull Type propertyType,
             @Nonnull String propertyName,
+            @Nullable String readMethodName,
+            @Nullable String writeMethodName,
             boolean isReadOnly, int index,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Map<String, ClassElement> typeArguments) {
@@ -85,6 +91,8 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         Type introspectionType = introspectionWriter.getIntrospectionType();
         this.beanType = introspectionWriter.getBeanType();
         this.propertyType = propertyType;
+        this.readMethodName = readMethodName;
+        this.writeMethodName = writeMethodName;
         this.propertyName = propertyName;
         this.readOnly = isReadOnly;
         this.annotationMetadata = annotationMetadata == AnnotationMetadata.EMPTY_METADATA ? null : annotationMetadata;
@@ -156,9 +164,10 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         writeMethod.checkCast(beanType);
         writeMethod.loadArg(1);
         pushCastToType(writeMethod, propertyType);
+        final String methodName = writeMethodName != null ? writeMethodName : NameUtils.setterNameFor(propertyName);
         writeMethod.invokeVirtual(
                 beanType,
-                new Method(NameUtils.setterNameFor(propertyName),
+                new Method(methodName,
                         getMethodDescriptor(void.class, Collections.singleton(propertyType)))
         );
         writeMethod.visitInsn(RETURN);
@@ -177,7 +186,8 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         readMethod.loadArg(0);
         pushCastToType(readMethod, beanType.getClassName());
         final boolean isBoolean = propertyType.getClassName().equals("boolean");
-        readMethod.invokeVirtual(beanType, new Method(NameUtils.getterNameFor(propertyName, isBoolean), getMethodDescriptor(propertyType, Collections.emptyList())));
+        final String methodName = readMethodName != null ? readMethodName : NameUtils.getterNameFor(propertyName, isBoolean);
+        readMethod.invokeVirtual(beanType, new Method(methodName, getMethodDescriptor(propertyType, Collections.emptyList())));
         pushBoxPrimitiveIfNecessary(propertyType, readMethod);
         readMethod.returnValue();
         readMethod.visitMaxs(1, 1);

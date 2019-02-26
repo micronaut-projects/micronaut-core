@@ -5,6 +5,7 @@ import io.micronaut.core.annotation.Introspected;
 @Introspected
 public class TestBean {
 
+    private boolean flag;
     private String name;
     private int age;
     private String[] stringArray;
@@ -31,5 +32,14 @@ public class TestBean {
 
     public void setStringArray(String[] stringArray) {
         this.stringArray = stringArray;
+    }
+
+    // variation with getter
+    public boolean getFlag() {
+        return flag;
+    }
+
+    public void setFlag(boolean flag) {
+        this.flag = flag;
     }
 }

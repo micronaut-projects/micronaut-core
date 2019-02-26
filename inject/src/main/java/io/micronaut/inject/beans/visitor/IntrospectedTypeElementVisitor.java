@@ -32,10 +32,8 @@ import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassGenerationException;
 
 import java.io.IOException;
-import java.lang.annotation.Annotation;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 
 /**
  * A {@link TypeElementVisitor} that visits classes annotated with {@link Introspected} and produces
@@ -181,6 +179,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
                 writer.visitProperty(
                         type,
                         name,
+                        beanProperty.getReadMethodName().orElse(null),
+                        beanProperty.getWriteMethodName().orElse(null),
                         beanProperty.isReadOnly(),
                         metadata ? beanProperty.getAnnotationMetadata() : null,
                         beanProperty.getType().getTypeArguments()

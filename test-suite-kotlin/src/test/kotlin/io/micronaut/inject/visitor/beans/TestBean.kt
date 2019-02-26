@@ -8,4 +8,5 @@ data class TestBean(
         val age : Int,
         val stringArray : Array<String>) {
     var stuff : String = "default"
+    var flag : Boolean = false
 }

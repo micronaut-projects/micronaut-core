@@ -122,6 +122,8 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      *
      * @param type The property type
      * @param name The property name
+     * @param readMethodName The read method name
+     * @param writeMethodName The write method name
      * @param isReadOnly Is the property read only
      * @param annotationMetadata The property annotation metadata
      * @param typeArguments The type arguments
@@ -129,6 +131,8 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     void visitProperty(
             @Nonnull TypedElement type,
             @Nonnull String name,
+            @Nullable String readMethodName,
+            @Nullable String writeMethodName,
             boolean isReadOnly,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Map<String, ClassElement> typeArguments) {
@@ -140,6 +144,8 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                         this,
                         propertyType,
                         name,
+                        readMethodName,
+                        writeMethodName,
                         isReadOnly,
                         propertyIndex++,
                         annotationMetadata,

@@ -8,13 +8,14 @@ class BeanIntrospectorSpec : TestCase() {
     fun testGetIntrospection() {
         val introspection = BeanIntrospector.SHARED.getIntrospection(TestBean::class.java)
 
-        assertEquals(4, introspection.propertyNames.size)
+        assertEquals(5, introspection.propertyNames.size)
         assertTrue(introspection.getProperty("age").isPresent)
         assertTrue(introspection.getProperty("name").isPresent)
 
         val testBean = introspection.instantiate("fred", 10, arrayOf("one"))
 
         assertEquals("fred", testBean.name)
+        assertFalse(testBean.flag)
 
         try {
             introspection.getProperty("name").get().set(testBean, "bob")
@@ -25,6 +26,8 @@ class BeanIntrospectorSpec : TestCase() {
         assertEquals("default", testBean.stuff)
 
         introspection.getProperty("stuff").get().set(testBean, "newvalue")
+        introspection.getProperty("flag").get().set(testBean, true)
+        assertEquals(true, introspection.getProperty("flag", Boolean::class.java).get().get(testBean))
 
         assertEquals("newvalue", testBean.stuff)
     }

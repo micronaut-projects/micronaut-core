@@ -16,6 +16,7 @@
 package io.micronaut.inject.ast;
 
 import javax.annotation.Nullable;
+import java.util.Optional;
 
 /**
  * A property element represents a JavaBean property on a {@link ClassElement}.
@@ -37,4 +38,18 @@ public interface PropertyElement extends TypedElement, MemberElement {
      * @return True if the property is read only.
      */
     boolean isReadOnly();
+
+    /**
+     * @return The name of the method used to write the property
+     */
+    default Optional<String> getWriteMethodName() {
+        return Optional.empty();
+    }
+
+    /**
+     * @return The name of the method used to read the property
+     */
+    default Optional<String> getReadMethodName() {
+        return Optional.empty();
+    }
 }
