@@ -1,3 +1,5 @@
+apply plugin: "com.github.johnrengelman.shadow"
+
 dependencies {
     compile project(":router")
     compile project(":runtime")
@@ -14,4 +16,12 @@ dependencies {
 
     compileOnly "ch.qos.logback:logback-classic:1.2.3"
 }
+
+shadowJar {
+    relocate "com.github.benmanes.caffeine", "io.micronaut.caffeine"
+}
+tasks.withType(com.github.jengelman.gradle.plugins.shadow.tasks.ConfigureShadowRelocation) { t ->
+    t.enabled = false
+}
+
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']

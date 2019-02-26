@@ -8,13 +8,21 @@ When the `management` dependency is added to your project, the following built-i
 | `/beans`
 |Returns information about the loaded bean definitions in the application (see <<beansEndpoint, BeansEndpoint>>)
 
-|api:management.endpoint.info.InfoEndpoint[]
-| `/info`
-|Returns static information from the state of the application (see <<infoEndpoint, InfoEndpoint>>)
+|api:management.endpoint.caches.CachesEndpoint[]
+| `/caches`
+|Returns information about the caches and permits invalidating them (see <<cachesEndpoint, CachesEndpoint>>)
 
 |api:management.endpoint.health.HealthEndpoint[]
 | `/health`
 |Returns information about the "health" of the application (see <<healthEndpoint, HealthEndpoint>>)
+
+|api:management.endpoint.info.InfoEndpoint[]
+| `/info`
+|Returns static information from the state of the application (see <<infoEndpoint, InfoEndpoint>>)
+
+|api:management.endpoint.loggers.LoggersEndpoint[]
+| `/loggers`
+|Returns information about available loggers and permits changing the configured log level (see <<loggersEndpoint, LoggersEndpoint>>)
 
 |api:configuration.metrics.management.endpoint.MetricsEndpoint[]
 | `/metrics`
@@ -27,10 +35,6 @@ When the `management` dependency is added to your project, the following built-i
 |api:management.endpoint.routes.RoutesEndpoint[]
 | `/routes`
 |Returns information about URIs available to be called for your application (see <<routesEndpoint, RoutesEndpoint>>)
-
-|api:management.endpoint.loggers.LoggersEndpoint[]
-| `/loggers`
-|Returns information about available loggers and permits changing the configured log level (see <<loggersEndpoint, LoggersEndpoint>>)
 
 |===
 
