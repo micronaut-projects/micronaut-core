@@ -31,7 +31,7 @@ apply plugin: 'org.aim42.htmlSanityCheck'
 
 repositories {
     maven { url "https://repo.grails.org/grails/core" }
-    maven { url "http://oss.sonatype.org/content/repositories/snapshots/" }
+    maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
 }
 
 version project.projectVersion
@@ -484,7 +484,7 @@ subprojects { Project subproject ->
 
 
     repositories {
-        maven { url "http://oss.sonatype.org/content/repositories/snapshots/" }
+        maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
         maven { url "https://repo.grails.org/grails/core" }
     }
 
