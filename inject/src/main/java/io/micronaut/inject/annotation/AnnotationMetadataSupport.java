@@ -45,7 +45,6 @@ import java.util.function.Function;
 @Internal
 class AnnotationMetadataSupport {
 
-    static final Map<String, Map<String, Object>> CURRENT_DEFAULTS = new ConcurrentHashMap<>(20);
     private static final Map<String, Map<String, Object>> ANNOTATION_DEFAULTS = new ConcurrentHashMap<>(20);
 
     private static final Map<Class<? extends Annotation>, Optional<Constructor<InvocationHandler>>> ANNOTATION_PROXY_CACHE = new ConcurrentHashMap<>(20);
@@ -140,7 +139,6 @@ class AnnotationMetadataSupport {
     static void registerDefaultValues(String annotation, Map<String, Object> defaultValues) {
         if (StringUtils.isNotEmpty(annotation)) {
             ANNOTATION_DEFAULTS.put(annotation.intern(), defaultValues);
-            CURRENT_DEFAULTS.put(annotation.intern(), defaultValues);
         }
     }
 
@@ -151,7 +149,9 @@ class AnnotationMetadataSupport {
      * @param defaultValues The default values
      */
     static void registerDefaultValues(AnnotationClassValue<?> annotation, Map<String, Object> defaultValues) {
-        registerDefaultValues(annotation.getName(), defaultValues);
+        if (defaultValues != null) {
+            registerDefaultValues(annotation.getName(), defaultValues);
+        }
         registerAnnotationType(annotation);
     }
 

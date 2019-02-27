@@ -446,6 +446,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 annotationDefaults.put(entry.getKey().toString(), entry.getValue());
             }
             DefaultAnnotationMetadata.registerAnnotationDefaults(annotationName, annotationDefaults);
+        } else {
+            metadata.addDefaultAnnotationValues(annotationName, Collections.emptyMap());
         }
     }
 

@@ -72,7 +72,6 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     public void accept(ClassWriterOutputVisitor outputVisitor) throws IOException {
         if (annotationMetadataWriter != null) {
             annotationMetadataWriter.accept(outputVisitor);
-            annotationMetadataWriter.clearDefaults();
         }
         try (OutputStream outputStream = outputVisitor.visitClass(getBeanDefinitionQualifiedClassName())) {
             ClassWriter classWriter = generateClassBytes();
