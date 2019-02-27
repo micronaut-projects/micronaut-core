@@ -28,6 +28,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataWriter;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.core.beans.AbstractBeanProperty;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.writer.AbstractClassFileWriter;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import org.objectweb.asm.ClassWriter;
@@ -63,16 +64,16 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
     private final Map<String, Object> typeArguments;
     private final Type beanType;
     private final boolean readOnly;
-    private final String readMethodName;
-    private final String writeMethodName;
+    private final MethodElement readMethod;
+    private final MethodElement writeMethod;
 
     /**
      * Default constructor.
      * @param introspectionWriter The outer inspection writer.
      * @param propertyType The property type
      * @param propertyName The property name
-     * @param readMethodName The read method name
-     * @param writeMethodName The write method name
+     * @param readMethod The read method name
+     * @param writeMethod The write method name
      * @param isReadOnly Is the property read only
      * @param index The index for the type
      * @param annotationMetadata The annotation metadata
@@ -82,8 +83,8 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
             @Nonnull BeanIntrospectionWriter introspectionWriter,
             @Nonnull Type propertyType,
             @Nonnull String propertyName,
-            @Nullable String readMethodName,
-            @Nullable String writeMethodName,
+            @Nullable MethodElement readMethod,
+            @Nullable MethodElement writeMethod,
             boolean isReadOnly, int index,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Map<String, ClassElement> typeArguments) {
@@ -91,8 +92,8 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         Type introspectionType = introspectionWriter.getIntrospectionType();
         this.beanType = introspectionWriter.getBeanType();
         this.propertyType = propertyType;
-        this.readMethodName = readMethodName;
-        this.writeMethodName = writeMethodName;
+        this.readMethod = readMethod;
+        this.writeMethod = writeMethod;
         this.propertyName = propertyName;
         this.readOnly = isReadOnly;
         this.annotationMetadata = annotationMetadata == AnnotationMetadata.EMPTY_METADATA ? null : annotationMetadata;
@@ -164,11 +165,13 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         writeMethod.checkCast(beanType);
         writeMethod.loadArg(1);
         pushCastToType(writeMethod, propertyType);
-        final String methodName = writeMethodName != null ? writeMethodName : NameUtils.setterNameFor(propertyName);
+        final boolean hasWriteMethod = this.writeMethod != null;
+        final String methodName = hasWriteMethod ? this.writeMethod.getName() : NameUtils.setterNameFor(propertyName);
+        final Object returnType = hasWriteMethod ? getTypeForElement(this.writeMethod.getReturnType()) : void.class;
         writeMethod.invokeVirtual(
                 beanType,
                 new Method(methodName,
-                        getMethodDescriptor(void.class, Collections.singleton(propertyType)))
+                        getMethodDescriptor(returnType, Collections.singleton(propertyType)))
         );
         writeMethod.visitInsn(RETURN);
         writeMethod.visitMaxs(1, 1);
@@ -186,7 +189,7 @@ class BeanPropertyWriter extends AbstractClassFileWriter implements Named {
         readMethod.loadArg(0);
         pushCastToType(readMethod, beanType.getClassName());
         final boolean isBoolean = propertyType.getClassName().equals("boolean");
-        final String methodName = readMethodName != null ? readMethodName : NameUtils.getterNameFor(propertyName, isBoolean);
+        final String methodName = this.readMethod != null ? this.readMethod.getName() : NameUtils.getterNameFor(propertyName, isBoolean);
         readMethod.invokeVirtual(beanType, new Method(methodName, getMethodDescriptor(propertyType, Collections.emptyList())));
         pushBoxPrimitiveIfNecessary(propertyType, readMethod);
         readMethod.returnValue();

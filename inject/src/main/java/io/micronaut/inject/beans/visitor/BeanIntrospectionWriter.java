@@ -27,6 +27,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.core.beans.AbstractBeanIntrospection;
@@ -122,8 +123,8 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
      *
      * @param type The property type
      * @param name The property name
-     * @param readMethodName The read method name
-     * @param writeMethodName The write method name
+     * @param readMethod The read method
+     * @param writeMethod The write methodname
      * @param isReadOnly Is the property read only
      * @param annotationMetadata The property annotation metadata
      * @param typeArguments The type arguments
@@ -131,8 +132,8 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
     void visitProperty(
             @Nonnull TypedElement type,
             @Nonnull String name,
-            @Nullable String readMethodName,
-            @Nullable String writeMethodName,
+            @Nullable MethodElement readMethod,
+            @Nullable MethodElement writeMethod,
             boolean isReadOnly,
             @Nullable AnnotationMetadata annotationMetadata,
             @Nullable Map<String, ClassElement> typeArguments) {
@@ -144,8 +145,8 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
                         this,
                         propertyType,
                         name,
-                        readMethodName,
-                        writeMethodName,
+                        readMethod,
+                        writeMethod,
                         isReadOnly,
                         propertyIndex++,
                         annotationMetadata,

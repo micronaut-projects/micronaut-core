@@ -179,8 +179,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
                 writer.visitProperty(
                         type,
                         name,
-                        beanProperty.getReadMethodName().orElse(null),
-                        beanProperty.getWriteMethodName().orElse(null),
+                        beanProperty.getReadMethod().orElse(null),
+                        beanProperty.getWriteMethod().orElse(null),
                         beanProperty.isReadOnly(),
                         metadata ? beanProperty.getAnnotationMetadata() : null,
                         beanProperty.getType().getTypeArguments()
