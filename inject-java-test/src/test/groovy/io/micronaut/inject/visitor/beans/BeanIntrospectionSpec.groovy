@@ -21,6 +21,77 @@ import javax.validation.constraints.Size
 
 class BeanIntrospectionSpec extends AbstractTypeElementSpec {
 
+    void "test multiple constructors with @JsonCreator"() {
+        given:
+        ApplicationContext context = buildContext('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.*;
+import com.fasterxml.jackson.annotation.*;
+
+@Introspected
+class Test {
+    private String name;
+    private int age;
+    
+    @JsonCreator
+    Test(@JsonProperty("name") String name) {
+        this.name = name;
+    }
+    
+    Test(int age) {
+        this.age = age;
+    }
+    
+    public int getAge() {
+        return age;
+    }
+    public void setAge(int age) {
+        this.age = age;
+    }
+    
+    public String getName() {
+        return this.name;
+    }
+    public Test setName(String n) {
+        this.name = n;
+        return this;
+    }
+}
+
+''')
+
+        when:"the reference is loaded"
+        def clazz = context.classLoader.loadClass('test.$Test$IntrospectionRef')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+        reference.getAnnotationMetadata().hasAnnotation(Introspected)
+        reference.isPresent()
+        reference.beanType.name == 'test.Test'
+
+        when:"the introspection is loaded"
+        BeanIntrospection introspection = reference.load()
+
+        then:"The introspection is valid"
+        introspection != null
+        introspection.hasAnnotation(Introspected)
+        introspection.propertyNames.length == 2
+
+        when:
+        def test = introspection.instantiate("Fred")
+        def prop = introspection.getRequiredProperty("name", String)
+
+        then:
+        prop.get(test) == 'Fred'
+
+        cleanup:
+        context?.close()
+    }
+
     void "test write bean introspection with builder style properties"() {
         given:
         ApplicationContext context = buildContext('test.Test', '''

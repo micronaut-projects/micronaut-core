@@ -330,7 +330,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
             if (annotationUtils.hasStereotype(classElement, INTRODUCTION_TYPE)) {
                 AopProxyWriter aopProxyWriter = createIntroductionAdviceWriter(classElement);
-                ExecutableElement constructor = JavaModelUtils.resolveKind(classElement, ElementKind.CLASS).isPresent() ? modelUtils.concreteConstructorFor(classElement) : null;
+                ExecutableElement constructor = JavaModelUtils.resolveKind(classElement, ElementKind.CLASS).isPresent() ? modelUtils.concreteConstructorFor(classElement, annotationUtils) : null;
                 ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(constructor) : null;
 
                 if (constructorData != null) {
@@ -370,7 +370,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         qualifiedName.equals(classElement.getQualifiedName())) {
 
                     if (qualifiedName.equals(classElement.getQualifiedName())) {
-                        ExecutableElement constructor = modelUtils.concreteConstructorFor(classElement);
+                        ExecutableElement constructor = modelUtils.concreteConstructorFor(classElement, annotationUtils);
                         this.constructorParamterInfo = populateParameterData(constructor);
                         final boolean isBean = isAopProxyType ||
                                 isConfigurationPropertiesType ||
@@ -724,7 +724,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     return;
                 }
 
-                ExecutableElement constructor = JavaModelUtils.isClass(returnTypeElement) ? modelUtils.concreteConstructorFor(returnTypeElement) : null;
+                ExecutableElement constructor = JavaModelUtils.isClass(returnTypeElement) ? modelUtils.concreteConstructorFor(returnTypeElement, annotationUtils) : null;
                 ExecutableElementParamInfo constructorData = constructor != null ? populateParameterData(constructor) : null;
 
                 OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean.class);

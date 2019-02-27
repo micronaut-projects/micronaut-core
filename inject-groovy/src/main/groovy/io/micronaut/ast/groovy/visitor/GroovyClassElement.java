@@ -82,7 +82,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
 
     @Nonnull
     @Override
-    public Optional<ConstructorElement> getPublicConstructor() {
+    public Optional<ConstructorElement> getPrimaryConstructor() {
         return Optional.ofNullable(findConcreteConstructor(classNode.getDeclaredConstructors())).map(constructorNode -> {
             final AnnotationMetadata annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, constructorNode);
             return new GroovyConstructorElement(sourceUnit, constructorNode, annotationMetadata);
