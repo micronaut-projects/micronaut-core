@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.caches.impl;
 
 import io.micronaut.cache.SyncCache;
@@ -29,7 +30,6 @@ import org.reactivestreams.Publisher;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 
@@ -37,7 +37,7 @@ import java.util.concurrent.ExecutorService;
  * A RxJava cache data collector.
  *
  * @author Marcel Overdijk
- * @since 1.1
+ * @since 1.1.0
  */
 @Singleton
 @Requires(beans = CachesEndpoint.class)
@@ -47,10 +47,11 @@ public class RxJavaCacheDataCollector implements CacheDataCollector<Map<String, 
     private final ExecutorService executorService;
 
     /**
-     * @param cacheData       The {@link CacheData}
-     * @param executorService The {@link ExecutorService}
+     * @param cacheData       The cache data provider
+     * @param executorService The executor service to run on
      */
-    public RxJavaCacheDataCollector(CacheData cacheData, @Named(TaskExecutors.IO) ExecutorService executorService) {
+    public RxJavaCacheDataCollector(CacheData cacheData,
+                                    @Named(TaskExecutors.IO) ExecutorService executorService) {
         this.cacheData = cacheData;
         this.executorService = executorService;
     }
@@ -59,7 +60,7 @@ public class RxJavaCacheDataCollector implements CacheDataCollector<Map<String, 
      * {@inheritDoc}
      */
     @Override
-    public Publisher<Map<String, Object>> getData(List<SyncCache> caches) {
+    public Publisher<Map<String, Object>> getData(Publisher<SyncCache> caches) {
         return getCaches(caches)
                 .map((cacheMap) -> {
                     Map<String, Object> cacheData = new LinkedHashMap<>(1);
@@ -80,11 +81,11 @@ public class RxJavaCacheDataCollector implements CacheDataCollector<Map<String, 
      * @param caches The caches
      * @return A {@link Single} that wraps a Map
      */
-    protected Single<Map<String, Object>> getCaches(List<SyncCache> caches) {
-        Map<String, Object> cacheMap = new LinkedHashMap<>(caches.size());
+    protected Single<Map<String, Object>> getCaches(Publisher<SyncCache> caches) {
+        Map<String, Object> cacheMap = new LinkedHashMap<>();
 
         return Flowable
-                .fromIterable(caches)
+                .fromPublisher(caches)
                 .subscribeOn(Schedulers.from(executorService))
                 .collectInto(cacheMap, (map, cache) ->
                         map.put(cache.getName(), cacheData.getData(cache))

@@ -16,6 +16,8 @@
 package io.micronaut.management.endpoint.caches
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.management.endpoint.caches.impl.DefaultCacheData
+import io.micronaut.management.endpoint.caches.impl.RxJavaCacheDataCollector
 import spock.lang.Specification
 
 /**
@@ -29,7 +31,9 @@ class CachesEndpointConfigurationSpec extends Specification {
         ApplicationContext context = ApplicationContext.run()
 
         expect:
-        context.containsBean(CachesEndpoint)
+        !context.containsBean(CachesEndpoint)
+        !context.containsBean(DefaultCacheData)
+        !context.containsBean(RxJavaCacheDataCollector)
 
         cleanup:
         context.close()
@@ -37,10 +41,12 @@ class CachesEndpointConfigurationSpec extends Specification {
 
     void "test caches endpoint can be disabled"() {
         given:
-        ApplicationContext context = ApplicationContext.run(["endpoints.caches.enabled": false])
+        ApplicationContext context = ApplicationContext.run(["endpoints.caches.enabled": true])
 
         expect:
-        !context.containsBean(CachesEndpoint)
+        context.containsBean(CachesEndpoint)
+        context.containsBean(DefaultCacheData)
+        context.containsBean(RxJavaCacheDataCollector)
 
         cleanup:
         context.close()

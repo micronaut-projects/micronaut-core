@@ -13,22 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.management.endpoint.caches;
-
-import io.micronaut.cache.SyncCache;
 
 /**
- * Returns data for a given cache to be used for the {@link CachesEndpoint}.
+ * Implementations for the cache endpoint
  *
- * @param <T> The type
  * @author Marcel Overdijk
  * @since 1.1.0
  */
-public interface CacheData<T> {
-
-    /**
-     * @param cache The cache
-     * @return Cache data
-     */
-    T getData(SyncCache cache);
-}
+package io.micronaut.management.endpoint.caches.impl;
