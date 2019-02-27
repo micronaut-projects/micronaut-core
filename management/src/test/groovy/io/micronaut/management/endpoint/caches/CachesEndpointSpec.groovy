@@ -33,7 +33,10 @@ class CachesEndpointSpec extends Specification {
 
     void "test no caches are returned from caches endpoint"() {
         given:
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, ["endpoints.caches.sensitive": false], Environment.TEST)
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                "endpoints.caches.enabled": true,
+                "endpoints.caches.sensitive": false
+        ], Environment.TEST)
         RxHttpClient rxClient = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
         when:
@@ -53,6 +56,7 @@ class CachesEndpointSpec extends Specification {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
                 [
+                        "endpoints.caches.enabled": true,
                         "endpoints.caches.sensitive": false,
                         "micronaut.caches.foo-cache.maximumSize": 10,
                         "micronaut.caches.foo-cache.recordStats": true,
@@ -122,6 +126,7 @@ class CachesEndpointSpec extends Specification {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
                 [
+                        "endpoints.caches.enabled": true,
                         "endpoints.caches.sensitive": false,
                         "micronaut.caches.foo-cache.maximumSize": 10,
                         "micronaut.caches.bar-cache.maximumSize": 10
@@ -169,6 +174,7 @@ class CachesEndpointSpec extends Specification {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer,
                 [
+                        "endpoints.caches.enabled": true,
                         "endpoints.caches.sensitive": false,
                         "micronaut.caches.foo-cache.maximumSize": 10,
                         "micronaut.caches.bar-cache.maximumSize": 10

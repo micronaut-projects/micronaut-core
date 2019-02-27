@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.caches;
 
 import io.micronaut.cache.CacheManager;
@@ -21,22 +22,19 @@ import io.micronaut.management.endpoint.annotation.Delete;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.management.endpoint.annotation.Selector;
+import io.reactivex.Flowable;
 import io.reactivex.Maybe;
 import io.reactivex.Single;
 
 import javax.validation.constraints.NotBlank;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Exposes an {@link Endpoint} to manage caches.
  *
  * @author Marcel Overdijk
- * @since 1.1
+ * @since 1.1.0
  */
-@Endpoint(id = CachesEndpoint.NAME)
+@Endpoint(id = CachesEndpoint.NAME, defaultEnabled = false)
 public class CachesEndpoint {
 
     /**
@@ -44,14 +42,15 @@ public class CachesEndpoint {
      */
     public static final String NAME = "caches";
 
-    private final CacheManager cacheManager;
+    private final CacheManager<?> cacheManager;
     private final CacheDataCollector cacheDataCollector;
 
     /**
      * @param cacheManager       The {@link CacheManager}
      * @param cacheDataCollector The {@link CacheDataCollector}
      */
-    public CachesEndpoint(CacheManager cacheManager, CacheDataCollector cacheDataCollector) {
+    public CachesEndpoint(CacheManager cacheManager,
+                          CacheDataCollector cacheDataCollector) {
         this.cacheManager = cacheManager;
         this.cacheDataCollector = cacheDataCollector;
     }
@@ -74,12 +73,7 @@ public class CachesEndpoint {
      */
     @Read
     public Maybe getCache(@NotBlank @Selector String name) {
-        Optional<SyncCache> cache = getSyncCache(name);
-        if (cache.isPresent()) {
-            return Maybe.just(cacheDataCollector.getData(cache.get()));
-        } else {
-            return Maybe.empty();
-        }
+        return getSyncCache(name).map(cacheDataCollector::getData);
     }
 
     /**
@@ -87,6 +81,7 @@ public class CachesEndpoint {
      */
     @Delete
     public void invalidateCaches() {
+        //noinspection ResultOfMethodCallIgnored
         getSyncCaches().forEach(SyncCache::invalidateAll);
     }
 
@@ -97,26 +92,24 @@ public class CachesEndpoint {
      */
     @Delete
     public void invalidateCache(@NotBlank @Selector String name) {
-        getSyncCache(name).ifPresent(SyncCache::invalidateAll);
+        //noinspection ResultOfMethodCallIgnored
+        getSyncCache(name).subscribe(SyncCache::invalidateAll);
     }
 
-    private List<SyncCache> getSyncCaches() {
+    private Flowable<SyncCache> getSyncCaches() {
         return getCacheNames()
-                .stream()
-                .map((cacheName) -> cacheManager.getCache(cacheName))
-                .collect(Collectors.toList());
+                .map(cacheManager::getCache);
     }
 
-    private Optional<SyncCache> getSyncCache(String name) {
+    private Maybe<? extends SyncCache<?>> getSyncCache(String name) {
         return getCacheNames()
-                .stream()
-                .filter((cacheName) -> cacheName.equals(name))
-                .findFirst()
-                .map((cacheName) -> cacheManager.getCache(cacheName));
+                .filter(name::equals)
+                .map(cacheManager::getCache)
+                .firstElement();
     }
 
-    private List<String> getCacheNames() {
-        Set<String> cacheNames = cacheManager.getCacheNames();
-        return cacheNames.stream().sorted().collect(Collectors.toList());
+    private Flowable<String> getCacheNames() {
+        return Flowable.fromIterable(cacheManager.getCacheNames())
+                .sorted();
     }
 }

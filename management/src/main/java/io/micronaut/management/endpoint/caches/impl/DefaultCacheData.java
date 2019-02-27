@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.management.endpoint.caches.impl;
 
 import com.github.benmanes.caffeine.cache.Cache;
@@ -32,7 +33,7 @@ import java.util.concurrent.TimeUnit;
  * Default cache data implementation.
  *
  * @author Marcel Overdijk
- * @since 1.1
+ * @since 1.1.0
  */
 @Singleton
 @Requires(beans = CachesEndpoint.class)
