@@ -253,16 +253,24 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                         }
 
                         @Override
-                        public Optional<String> getWriteMethodName() {
+                        public Optional<MethodElement> getWriteMethod() {
                             if (value.setter != null) {
-                                return Optional.of(value.setter.getSimpleName().toString());
+                                return Optional.of(new JavaMethodElement(
+                                        value.setter,
+                                        visitorContext.getAnnotationUtils().newAnnotationBuilder().buildForMethod(value.setter),
+                                        visitorContext
+                                ));
                             }
                             return Optional.empty();
                         }
 
                         @Override
-                        public Optional<String> getReadMethodName() {
-                            return Optional.of(value.getter.getSimpleName().toString());
+                        public Optional<MethodElement> getReadMethod() {
+                            return Optional.of(new JavaMethodElement(
+                                    value.getter,
+                                    annotationMetadata,
+                                    visitorContext
+                            ));
                         }
                     };
                     propertyElements.add(propertyElement);
@@ -303,7 +311,7 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
 
     @Override
     public String getName() {
-        return classElement.getQualifiedName().toString();
+        return JavaModelUtils.getClassName(classElement);
     }
 
     @Override

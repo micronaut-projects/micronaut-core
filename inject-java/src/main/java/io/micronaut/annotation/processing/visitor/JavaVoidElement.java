@@ -30,6 +30,11 @@ import io.micronaut.inject.ast.ClassElement;
 final class JavaVoidElement implements ClassElement, AnnotationMetadataDelegate {
 
     @Override
+    public boolean isPrimitive() {
+        return true;
+    }
+
+    @Override
     public boolean isAssignable(String type) {
         return "void".equals(type);
     }

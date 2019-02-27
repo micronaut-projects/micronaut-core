@@ -22,10 +22,10 @@ import io.micronaut.ast.groovy.utils.AstGenericUtils;
 import io.micronaut.ast.groovy.utils.PublicMethodVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
 import org.codehaus.groovy.ast.*;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
@@ -229,11 +229,12 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                 if (value.getter != null) {
 
                     final AnnotationMetadata annotationMetadata;
+                    final GroovyAnnotationMetadataBuilder groovyAnnotationMetadataBuilder = new GroovyAnnotationMetadataBuilder(sourceUnit);
                     final FieldNode field = this.classNode.getField(propertyName);
                     if (field != null) {
                         annotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, field, value.getter);
                     } else {
-                        annotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit).buildForMethod(value.getter);
+                        annotationMetadata = groovyAnnotationMetadataBuilder.buildForMethod(value.getter);
                     }
                     GroovyPropertyElement propertyElement = new GroovyPropertyElement(
                             value.declaringType == null ? this : value.declaringType,
@@ -244,16 +245,20 @@ public class GroovyClassElement extends AbstractGroovyElement implements ClassEl
                             value.setter == null,
                             value.getter) {
                         @Override
-                        public Optional<String> getWriteMethodName() {
+                        public Optional<MethodElement> getWriteMethod() {
                             if (value.setter != null) {
-                                return Optional.of(value.setter.getName());
+                                return Optional.of(new GroovyMethodElement(
+                                        sourceUnit,
+                                        value.setter,
+                                        groovyAnnotationMetadataBuilder.buildForMethod(value.setter)
+                                ));
                             }
                             return Optional.empty();
                         }
 
                         @Override
-                        public Optional<String> getReadMethodName() {
-                            return Optional.of(value.getter.getName());
+                        public Optional<MethodElement> getReadMethod() {
+                            return Optional.of(new GroovyMethodElement(sourceUnit, value.getter, annotationMetadata));
                         }
                     };
                     propertyElements.add(propertyElement);

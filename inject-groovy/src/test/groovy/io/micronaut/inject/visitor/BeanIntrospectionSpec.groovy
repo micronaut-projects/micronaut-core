@@ -2,6 +2,7 @@ package io.micronaut.inject.visitor
 
 import io.micronaut.AbstractBeanDefinitionSpec
 import io.micronaut.ast.groovy.TypeElementVisitorStart
+import io.micronaut.context.ApplicationContext
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
 import io.micronaut.core.beans.BeanIntrospectionReference
@@ -15,6 +16,105 @@ import javax.validation.constraints.Size
 class BeanIntrospectionSpec extends AbstractBeanDefinitionSpec {
     def setup() {
         System.setProperty(TypeElementVisitorStart.ELEMENT_VISITORS_PROPERTY, IntrospectedTypeElementVisitor.name)
+    }
+
+    void "test write bean introspection with builder style properties"() {
+        given:
+        ClassLoader classLoader = buildClassLoader( '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.*;
+
+@Introspected
+class Test {
+    private String name;
+    public String getName() {
+        return this.name;
+    }
+    public Test setName(String n) {
+        this.name = n;
+        return this;
+    }
+}
+
+''')
+
+        when:"the reference is loaded"
+        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+        reference.getAnnotationMetadata().hasAnnotation(Introspected)
+        reference.isPresent()
+        reference.beanType.name == 'test.Test'
+
+        when:"the introspection is loaded"
+        BeanIntrospection introspection = reference.load()
+
+        then:"The introspection is valid"
+        introspection != null
+        introspection.hasAnnotation(Introspected)
+        introspection.propertyNames.length == 1
+
+        when:
+        def test = introspection.instantiate()
+        def prop = introspection.getRequiredProperty("name", String)
+        prop.set(test, "Foo")
+
+        then:
+        prop.get(test) == 'Foo'
+
+    }
+
+
+    void "test write bean introspection with inner classes"() {
+        given:
+        def classLoader = buildClassLoader( '''
+package test;
+
+import io.micronaut.core.annotation.*;
+import javax.validation.constraints.*;
+import java.util.*;
+
+@Introspected
+class Test {
+    private Status status;
+    
+    public void setStatus(Status status) {
+        this.status = status;
+    }
+    
+    public Status getStatus() {
+        return this.status;
+    }
+
+    public enum Status {
+        UP, DOWN
+    }
+}
+
+''')
+
+        when:"the reference is loaded"
+        def clazz = classLoader.loadClass('test.$Test$IntrospectionRef')
+        BeanIntrospectionReference reference = clazz.newInstance()
+
+        then:"The reference is valid"
+        reference != null
+        reference.getAnnotationMetadata().hasAnnotation(Introspected)
+        reference.isPresent()
+        reference.beanType.name == 'test.Test'
+
+        when:"the introspection is loaded"
+        BeanIntrospection introspection = reference.load()
+
+        then:"The introspection is valid"
+        introspection != null
+        introspection.hasAnnotation(Introspected)
+        introspection.propertyNames.length == 1
     }
 
 

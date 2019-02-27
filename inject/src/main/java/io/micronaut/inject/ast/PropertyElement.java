@@ -42,14 +42,14 @@ public interface PropertyElement extends TypedElement, MemberElement {
     /**
      * @return The name of the method used to write the property
      */
-    default Optional<String> getWriteMethodName() {
+    default Optional<MethodElement> getWriteMethod() {
         return Optional.empty();
     }
 
     /**
      * @return The name of the method used to read the property
      */
-    default Optional<String> getReadMethodName() {
+    default Optional<MethodElement> getReadMethod() {
         return Optional.empty();
     }
 }
