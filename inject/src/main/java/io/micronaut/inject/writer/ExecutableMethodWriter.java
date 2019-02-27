@@ -68,8 +68,13 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      * @param isInterface          Whether is an interface
      * @param annotationMetadata   The annotation metadata
      */
-    public ExecutableMethodWriter(String beanFullClassName, String methodClassName, String methodProxyShortName, boolean isInterface, AnnotationMetadata annotationMetadata) {
-        super(methodClassName, annotationMetadata, false);
+    public ExecutableMethodWriter(
+            String beanFullClassName,
+            String methodClassName,
+            String methodProxyShortName,
+            boolean isInterface,
+            AnnotationMetadata annotationMetadata) {
+        super(methodClassName, annotationMetadata, true);
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         this.beanFullClassName = beanFullClassName;
         this.methodProxyShortName = methodProxyShortName;

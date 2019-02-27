@@ -51,8 +51,6 @@ public class ClassUtils {
     static final List<ClassLoadingReporter> CLASS_LOADING_REPORTERS;
     static final boolean CLASS_LOADING_REPORTER_ENABLED;
 
-    private static final Logger LOG = LoggerFactory.getLogger(ClassUtils.class);
-
     @SuppressWarnings("unchecked")
     private static final Map<String, Class> PRIMITIVE_TYPE_MAP = CollectionUtils.mapOf(
         "int", Integer.TYPE,
@@ -247,6 +245,7 @@ public class ClassUtils {
      * @return An optional of the class
      */
     public static Optional<Class> forName(String name, @Nullable ClassLoader classLoader) {
+        final Logger logger = LoggerFactory.getLogger(ClassUtils.class);
         try {
             if (classLoader == null) {
                 classLoader = Thread.currentThread().getContextClassLoader();
@@ -259,20 +258,20 @@ public class ClassUtils {
             if (commonType.isPresent()) {
                 return commonType;
             } else {
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Attempting to dynamically load class {}", name);
+                if (logger.isDebugEnabled()) {
+                    logger.debug("Attempting to dynamically load class {}", name);
                 }
                 Class<?> type = Class.forName(name, true, classLoader);
                 ClassLoadingReporter.reportPresent(type);
-                if (LOG.isDebugEnabled()) {
-                    LOG.debug("Successfully loaded class {}", name);
+                if (logger.isDebugEnabled()) {
+                    logger.debug("Successfully loaded class {}", name);
                 }
                 return Optional.of(type);
             }
         } catch (ClassNotFoundException | NoClassDefFoundError e) {
             ClassLoadingReporter.reportMissing(name);
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Class {} is not present", name);
+            if (logger.isDebugEnabled()) {
+                logger.debug("Class {} is not present", name);
             }
             return Optional.empty();
         }

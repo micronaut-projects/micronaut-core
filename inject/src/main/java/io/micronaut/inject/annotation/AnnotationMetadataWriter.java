@@ -292,14 +292,14 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
         constructor.visitMaxs(1, 1);
         constructor.visitEnd();
 
-        final Map<String, Map<String, Object>> annotationDefaultValues = AnnotationMetadataSupport.CURRENT_DEFAULTS;
-        if (writeAnnotationDefaults && !annotationDefaultValues.isEmpty()) {
+        final Map<String, Map<CharSequence, Object>> annotationDefaultValues = annotationMetadata.annotationDefaultValues;
+        if (writeAnnotationDefaults && CollectionUtils.isNotEmpty(annotationDefaultValues)) {
 
             MethodVisitor si = classWriter.visitMethod(ACC_STATIC, "<clinit>", "()V", null, null);
             GeneratorAdapter staticInit = new GeneratorAdapter(si, ACC_STATIC, "<clinit>", "()V");
 
-            for (Map.Entry<String, Map<String, Object>> entry : annotationDefaultValues.entrySet()) {
-                final Map<String, Object> annotationValues = entry.getValue();
+            for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationDefaultValues.entrySet()) {
+                final Map<CharSequence, Object> annotationValues = entry.getValue();
 
                 if (CollectionUtils.isNotEmpty(annotationValues)) {
                     String annotationName = entry.getKey();

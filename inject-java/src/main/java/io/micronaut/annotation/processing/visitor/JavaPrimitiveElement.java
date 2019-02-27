@@ -93,7 +93,7 @@ public enum JavaPrimitiveElement implements ClassElement, AnnotationMetadataDele
 
     @Override
     public Object getNativeType() {
-        return ClassUtils.forName(typeName, getClass().getClassLoader());
+        return ClassUtils.getPrimitiveType(typeName).orElse(null);
     }
 
     @Override

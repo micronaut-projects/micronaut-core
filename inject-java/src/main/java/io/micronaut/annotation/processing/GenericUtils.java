@@ -288,7 +288,7 @@ public class GenericUtils {
             case INT:
             case LONG:
             case SHORT:
-                Optional<Class> type = ClassUtils.forName(mirror.toString(), getClass().getClassLoader());
+                Optional<Class> type = ClassUtils.getPrimitiveType(mirror.toString());
                 if (type.isPresent()) {
                     return type.get();
                 } else {

@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.annotation;
 
+import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
@@ -24,16 +25,13 @@ import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.StringUtils;
 
+import javax.inject.*;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -52,6 +50,35 @@ class AnnotationMetadataSupport {
 
     private static final Map<Class<? extends Annotation>, Optional<Constructor<InvocationHandler>>> ANNOTATION_PROXY_CACHE = new ConcurrentHashMap<>(20);
     private static final Map<String, Class<? extends Annotation>> ANNOTATION_TYPES = new ConcurrentHashMap<>(20);
+
+    static {
+        // some common ones for startup optimization
+        Arrays.asList(
+                Named.class,
+                Singleton.class,
+                Inject.class,
+                Qualifier.class,
+                Scope.class,
+                Prototype.class,
+                Executable.class,
+                Bean.class,
+                Primary.class,
+                Value.class,
+                Property.class,
+                Provided.class,
+                Requires.class,
+                Secondary.class,
+                Type.class,
+                Context.class,
+                EachBean.class,
+                EachProperty.class,
+                Parameter.class,
+                Replaces.class,
+                Requirements.class,
+                Factory.class).forEach(ann ->
+                ANNOTATION_TYPES.put(ann.getName(), ann)
+        );
+    }
 
     /**
      * @param annotation The annotation

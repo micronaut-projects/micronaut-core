@@ -82,11 +82,11 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     @Nullable Map<String, Map<CharSequence, Object>> declaredStereotypes;
     @Nullable Map<String, Map<CharSequence, Object>> allStereotypes;
     @Nullable Map<String, List<String>> annotationsByStereotype;
+    @Nullable Map<String, Map<CharSequence, Object>> annotationDefaultValues;
     private Map<Class, List> annotationValuesByType = new ConcurrentHashMap<>(2);
 
     // should not be used in any of the read methods
     // The following fields are used only at compile time, and
-    private Map<String, Map<CharSequence, Object>> annotationDefaultValues;
     private Map<String, String> repeated = null;
 
     /**
