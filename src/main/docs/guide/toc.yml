@@ -104,6 +104,7 @@ httpServer:
     handlebars: Handlebars.java
     velocity: Apache Velocity
     freemarker: Apache Freemarker
+    csp: CSP Header Support
   openapi: OpenAPI / Swagger Support
 httpClient:
   title: The HTTP Client
