@@ -25,6 +25,10 @@ import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.StringUtils;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import javax.annotation.PostConstruct;
+import javax.annotation.PreDestroy;
 import javax.inject.*;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Constructor;
@@ -53,6 +57,10 @@ class AnnotationMetadataSupport {
     static {
         // some common ones for startup optimization
         Arrays.asList(
+                Nullable.class,
+                Nonnull.class,
+                PreDestroy.class,
+                PostConstruct.class,
                 Named.class,
                 Singleton.class,
                 Inject.class,
