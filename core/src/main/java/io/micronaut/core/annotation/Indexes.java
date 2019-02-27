@@ -18,22 +18,15 @@ package io.micronaut.core.annotation;
 
 import java.lang.annotation.*;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
-
 /**
- * An annotation that can be used on types where there may be many implementations of a
- * particular interface. This triggers building of an index internal to the bean context that speeds up bean lookups by type.
+ * Allows {@link Indexed} to be repeatable.
  *
- * @since 1.1
  * @author graemerocher
+ * @since 1.1
  */
 @Documented
-@Retention(RUNTIME)
-@Target({ElementType.TYPE, ElementType.METHOD, ElementType.ANNOTATION_TYPE})
-@Repeatable(value = Indexes.class)
-public @interface Indexed {
-    /**
-     * @return The indexed type
-     */
-    Class<?> value();
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE})
+public @interface Indexes {
+    Indexed[] value() default {};
 }

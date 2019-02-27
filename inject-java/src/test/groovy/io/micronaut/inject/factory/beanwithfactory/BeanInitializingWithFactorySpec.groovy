@@ -30,6 +30,14 @@ class BeanInitializingWithFactorySpec extends Specification {
 
         then:"The event is triggered prior to @PostConstruct hooks"
         b.name == "CHANGED"
+
+        when:"a bean is retrieved that is both a created and initialized listener"
+        DualListener listener = context.getBean(DualListener)
+
+        then:
+        listener.initialized
+        listener.created
+
     }
 }
 

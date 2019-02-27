@@ -2100,17 +2100,22 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     private void indexBeanDefinitionIfNecessary(BeanDefinitionReference beanDefinitionReference) {
-        Optional<Class> indexedType = beanDefinitionReference.getAnnotationMetadata().classValue(Indexed.class);
-        if (indexedType.isPresent()) {
-            final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType.get());
-            indexed.add(beanDefinitionReference);
+        final List<AnnotationValue<Indexed>> indexes = beanDefinitionReference.getAnnotationMetadata().getAnnotationValuesByType(Indexed.class);
+        if (CollectionUtils.isNotEmpty(indexes)) {
+            for (AnnotationValue<Indexed> index : indexes) {
+                final Class indexedType = index.getValue(Class.class).orElse(null);
+                if (indexedType != null) {
+                    final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(indexedType);
+                    indexed.add(beanDefinitionReference);
+                }
+            }
         } else if (beanDefinitionReference.isPresent()) {
             final Class beanType = beanDefinitionReference.getBeanType();
             if (indexedTypes.contains(beanType)) {
                 final Collection<BeanDefinitionReference> indexed = resolveTypeIndex(beanType);
                 indexed.add(beanDefinitionReference);
             } else {
-                indexedType = indexedTypes.stream().filter(t ->
+                Optional<Class> indexedType = indexedTypes.stream().filter(t ->
                         t == beanType || t.isAssignableFrom(beanType)
                 ).findFirst();
                 if (indexedType.isPresent()) {

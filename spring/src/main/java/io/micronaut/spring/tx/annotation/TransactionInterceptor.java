@@ -92,6 +92,11 @@ public class TransactionInterceptor extends TransactionAspectSupport implements 
         }
     }
 
+    @Override
+    public void afterPropertiesSet() {
+        // no-op - override this because TransactionAspectSupport provides some undesired validation behaviour
+    }
+
     /**
      * @param targetMethod           The target method
      * @param annotationMetadata     The annotation metadata
