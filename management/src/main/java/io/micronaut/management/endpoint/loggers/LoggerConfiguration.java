@@ -15,7 +15,7 @@
  */
 package io.micronaut.management.endpoint.loggers;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
@@ -70,7 +70,7 @@ public class LoggerConfiguration {
      * @return a Map of data to emit (less the name)
      */
     public Map<String, Object> getData() {
-        Map<String, Object> data = new HashMap<>(2);
+        Map<String, Object> data = new LinkedHashMap<>(2);
         data.put(CONFIGURED_LEVEL, getConfiguredLevel());
         data.put(EFFECTIVE_LEVEL, getEffectiveLevel());
         return data;

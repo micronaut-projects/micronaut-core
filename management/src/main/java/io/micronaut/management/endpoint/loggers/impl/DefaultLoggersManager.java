@@ -39,7 +39,7 @@ public class DefaultLoggersManager implements LoggersManager<Map<String, Object>
 
     @Override
     public Publisher<Map<String, Object>> getLoggers(LoggingSystem loggingSystem) {
-        Map<String, Object> data = new HashMap<>(2);
+        Map<String, Object> data = new LinkedHashMap<>(2);
 
         data.put(LEVELS, getLogLevels());
         data.put(LOGGERS, getLoggerData(loggingSystem.getLoggers()));
@@ -68,7 +68,9 @@ public class DefaultLoggersManager implements LoggersManager<Map<String, Object>
                 .stream()
                 .collect(Collectors.toMap(
                         LoggerConfiguration::getName,
-                        LoggerConfiguration::getData));
+                        LoggerConfiguration::getData,
+                        (l1, l2) -> l1,
+                        LinkedHashMap::new));
     }
 
     /**
