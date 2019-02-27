@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.convert.ConversionService;
 
 import java.time.Duration;
@@ -33,6 +34,7 @@ import java.util.Optional;
  * @since 1.0
  */
 @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
+@Introspected
 public abstract class NewCheck implements Check {
 
     private Duration deregisterCriticalServiceAfter;
