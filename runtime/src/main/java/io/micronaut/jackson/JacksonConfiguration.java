@@ -19,11 +19,13 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.core.JsonGenerator;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.*;
+import com.fasterxml.jackson.databind.type.TypeBindings;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 
 import javax.annotation.Nonnull;
@@ -293,10 +295,16 @@ public class JacksonConfiguration {
         ArgumentUtils.requireNonNull("typeFactory", typeFactory);
         Map<String, Argument<?>> typeVariables = type.getTypeVariables();
         JavaType[] objects = toJavaTypeArray(typeFactory, typeVariables);
-        return typeFactory.constructParametricType(
-                type.getType(),
-                objects
-        );
+        if (ArrayUtils.isNotEmpty(objects)) {
+            return typeFactory.constructType(
+                    type.getType(),
+                    TypeBindings.create(type.getType(), objects)
+            );
+        } else {
+            return typeFactory.constructType(
+                    type.getType()
+            );
+        }
     }
 
     private static JavaType[] toJavaTypeArray(TypeFactory typeFactory, Map<String, Argument<?>> typeVariables) {

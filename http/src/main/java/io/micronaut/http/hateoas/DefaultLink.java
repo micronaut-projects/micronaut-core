@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.hateoas;
 
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.http.MediaType;
 
 import java.net.URI;
@@ -26,6 +27,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.1
  */
+@Introspected
 public class DefaultLink implements Link, Link.Builder {
 
     final URI href;

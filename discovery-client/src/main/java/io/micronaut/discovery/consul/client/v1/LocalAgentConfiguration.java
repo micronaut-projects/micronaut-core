@@ -18,6 +18,7 @@ package io.micronaut.discovery.consul.client.v1;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import io.micronaut.core.annotation.Introspected;
 
 import java.util.Map;
 
@@ -27,6 +28,7 @@ import java.util.Map;
  * @author Álvaro Sánchez-Mariscal
  */
 @JsonNaming(PropertyNamingStrategy.UpperCamelCaseStrategy.class)
+@Introspected
 public class LocalAgentConfiguration {
 
     private Map<String, String> configuration;
