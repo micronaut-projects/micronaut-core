@@ -190,6 +190,10 @@ class CacheFactory {
 
 ----
 
+=== Support for JAsync SQL
+
+Support for https://micronaut-projects.github.io/micronaut-sql/1.1.x/guide/index.html#jasync[JAsync SQL] has been added, which includes non-blocking drivers for both Postgres and MySQL. Thanks to https://github.com/oshai[Ohad Shai] for contributing this feature.
+
 === Major Improvements for Multipart File Uploads
 
 Several issues and improvements have been made in regards to file uploads in comparison to the previous version of Micronaut. These fixes have been substantial enough that they have caused the behavior of uploads to change, however these changes should not break any existing use cases. To summarize the issues:
