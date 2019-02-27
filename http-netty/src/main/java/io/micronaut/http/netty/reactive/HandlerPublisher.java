@@ -74,6 +74,7 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
             return "COMPLETE";
         }
     };
+    private final AtomicBoolean completed = new AtomicBoolean(false);
 
     private final EventExecutor executor;
     private final TypeParameterMatcher matcher;
@@ -486,24 +487,25 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     }
 
     private void complete() {
-
-        switch (state) {
-            case NO_SUBSCRIBER:
-            case BUFFERING:
-                buffer.add(COMPLETE);
-                state = DRAINING;
-                break;
-            case DEMANDING:
-            case IDLE:
-                subscriber.onComplete();
-                state = DONE;
-                break;
-            case NO_SUBSCRIBER_ERROR:
-                // Ignore, we're already going to complete the stream with an error
-                // when the subscriber subscribes.
-                break;
-            default:
-                // no-op
+        if (completed.compareAndSet(false, true)) {
+            switch (state) {
+                case NO_SUBSCRIBER:
+                case BUFFERING:
+                    buffer.add(COMPLETE);
+                    state = DRAINING;
+                    break;
+                case DEMANDING:
+                case IDLE:
+                    subscriber.onComplete();
+                    state = DONE;
+                    break;
+                case NO_SUBSCRIBER_ERROR:
+                    // Ignore, we're already going to complete the stream with an error
+                    // when the subscriber subscribes.
+                    break;
+                default:
+                    // no-op
+            }
         }
     }
 
