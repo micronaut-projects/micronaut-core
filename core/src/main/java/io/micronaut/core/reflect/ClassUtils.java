@@ -19,6 +19,8 @@ import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -49,6 +51,9 @@ public class ClassUtils {
     static final List<ClassLoadingReporter> CLASS_LOADING_REPORTERS;
     static final boolean CLASS_LOADING_REPORTER_ENABLED;
 
+    private static final Logger LOG = LoggerFactory.getLogger(ClassUtils.class);
+
+    @SuppressWarnings("unchecked")
     private static final Map<String, Class> PRIMITIVE_TYPE_MAP = CollectionUtils.mapOf(
         "int", Integer.TYPE,
             "boolean", Boolean.TYPE,
@@ -61,6 +66,7 @@ public class ClassUtils {
             "void", void.class
     );
 
+    @SuppressWarnings("unchecked")
     private static final Map<String, Class> PRIMITIVE_ARRAY_MAP = CollectionUtils.mapOf(
             "int", int[].class,
             "boolean", boolean[].class,
@@ -253,12 +259,21 @@ public class ClassUtils {
             if (commonType.isPresent()) {
                 return commonType;
             } else {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Attempting to dynamically load class {}", name);
+                }
                 Class<?> type = Class.forName(name, true, classLoader);
                 ClassLoadingReporter.reportPresent(type);
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Successfully loaded class {}", name);
+                }
                 return Optional.of(type);
             }
         } catch (ClassNotFoundException | NoClassDefFoundError e) {
             ClassLoadingReporter.reportMissing(name);
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Class {} is not present", name);
+            }
             return Optional.empty();
         }
     }
