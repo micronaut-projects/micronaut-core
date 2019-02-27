@@ -230,8 +230,12 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             }
 
             String nextName = unprocessed.next();
-            Optional<Class> loadedClass = ClassUtils.forName(nextName, classLoader);
-            return newService(nextName, loadedClass);
+            try {
+                final Class<?> loadedClass = Class.forName(nextName, false, classLoader);
+                return newService(nextName, Optional.of(loadedClass));
+            } catch (NoClassDefFoundError | ClassNotFoundException e) {
+                return newService(nextName, Optional.empty());
+            }
         }
     }
 }

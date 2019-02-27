@@ -577,7 +577,7 @@ abstract class AbstractOpenApiVisitor  {
             final boolean isBasicType = ClassUtils.isJavaBasicType(type.getName());
             final PrimitiveType primitiveType;
             if (isBasicType) {
-                primitiveType = ClassUtils.forName(type.getName(), getClass().getClassLoader()).map(PrimitiveType::fromType).orElse(null);
+                primitiveType = ClassUtils.getPrimitiveType(type.getName()).map(PrimitiveType::fromType).orElse(null);
             } else {
                 primitiveType = null;
             }
@@ -748,7 +748,7 @@ abstract class AbstractOpenApiVisitor  {
 
     private Schema getPrimitiveType(String typeName) {
         Schema schema = null;
-        Optional<Class> aClass = ClassUtils.forName(typeName, getClass().getClassLoader());
+        Optional<Class> aClass = ClassUtils.getPrimitiveType(typeName);
         if (aClass.isPresent()) {
             Class concreteType = aClass.get();
             Class wrapperType = ReflectionUtils.getWrapperType(concreteType);
