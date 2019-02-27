@@ -31,7 +31,6 @@ import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -72,7 +71,7 @@ public class RxJavaBeanDefinitionDataCollector implements BeanDefinitionDataColl
      * @return A {@link Single} that wraps a Map
      */
     protected Single<Map<String, Object>> getBeans(Collection<BeanDefinition<?>> definitions) {
-        Map<String, Object> beans = new ConcurrentHashMap<>(definitions.size());
+        Map<String, Object> beans = new LinkedHashMap<>(definitions.size());
 
         return Flowable
             .fromIterable(definitions)

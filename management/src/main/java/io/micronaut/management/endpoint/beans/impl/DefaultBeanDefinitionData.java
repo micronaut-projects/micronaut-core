@@ -60,7 +60,7 @@ public class DefaultBeanDefinitionData implements BeanDefinitionData<Map<String,
      * @return A list of dependencies for the bean definition
      */
     protected List getDependencies(BeanDefinition<?> beanDefinition) {
-        return beanDefinition.getRequiredComponents().stream().map(Class::getName).collect(Collectors.toList());
+        return beanDefinition.getRequiredComponents().stream().map(Class::getName).sorted().collect(Collectors.toList());
     }
 
     /**
