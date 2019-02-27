@@ -295,14 +295,29 @@ public class JacksonConfiguration {
         ArgumentUtils.requireNonNull("typeFactory", typeFactory);
         Map<String, Argument<?>> typeVariables = type.getTypeVariables();
         JavaType[] objects = toJavaTypeArray(typeFactory, typeVariables);
+        final Class<T> rawType = type.getType();
         if (ArrayUtils.isNotEmpty(objects)) {
-            return typeFactory.constructType(
-                    type.getType(),
-                    TypeBindings.create(type.getType(), objects)
+            final JavaType javaType = typeFactory.constructType(
+                    rawType
             );
+            if (javaType.isCollectionLikeType()) {
+                return typeFactory.constructCollectionLikeType(
+                        rawType,
+                        objects[0]
+                );
+            } else if (javaType.isMapLikeType()) {
+                return typeFactory.constructMapLikeType(
+                        rawType,
+                        objects[0],
+                        objects[1]
+                );
+            } else if (javaType.isReferenceType()) {
+                return typeFactory.constructReferenceType(rawType, objects[0]);
+            }
+            return typeFactory.constructParametricType(rawType, objects);
         } else {
             return typeFactory.constructType(
-                    type.getType()
+                    rawType
             );
         }
     }
