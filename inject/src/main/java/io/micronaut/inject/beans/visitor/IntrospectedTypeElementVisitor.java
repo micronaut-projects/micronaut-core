@@ -130,7 +130,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
 
     private void processElement(VisitorContext context, boolean metadata, Set<String> includes, Set<String> excludes, Set<String> excludedAnnotations, Set<AnnotationValue> indexedAnnotations, ClassElement ce, BeanIntrospectionWriter writer) {
         final List<PropertyElement> beanProperties = ce.getBeanProperties();
-        Optional<ConstructorElement> constructorElement = ce.getPublicConstructor();
+        Optional<ConstructorElement> constructorElement = ce.getPrimaryConstructor();
 
         if (!constructorElement.isPresent()) {
             context.fail("Introspected types must have a single public constructor", ce);

@@ -26,6 +26,8 @@ import static javax.lang.model.type.TypeKind.ERROR;
 import static javax.lang.model.type.TypeKind.NONE;
 import static javax.lang.model.type.TypeKind.VOID;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
@@ -160,10 +162,11 @@ public class ModelUtils {
      * The constructor inject for the given class element.
      *
      * @param classElement The class element
+     * @param annotationUtils The annotation utilities
      * @return The constructor
      */
     @Nullable
-    public ExecutableElement concreteConstructorFor(TypeElement classElement) {
+    public ExecutableElement concreteConstructorFor(TypeElement classElement, AnnotationUtils annotationUtils) {
         List<ExecutableElement> constructors = findNonPrivateConstructors(classElement);
         if (constructors.isEmpty()) {
             return null;
@@ -171,8 +174,11 @@ public class ModelUtils {
         if (constructors.size() == 1) {
             return constructors.get(0);
         }
-        Optional<ExecutableElement> element = constructors.stream().filter(ctor ->
-            Objects.nonNull(ctor.getAnnotation(Inject.class))
+
+        Optional<ExecutableElement> element = constructors.stream().filter(ctor -> {
+                    final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(ctor);
+                    return annotationMetadata.hasStereotype(Inject.class) || annotationMetadata.hasStereotype(Creator.class);
+                }
         ).findFirst();
         if (!element.isPresent()) {
             element = constructors.stream().filter(ctor ->

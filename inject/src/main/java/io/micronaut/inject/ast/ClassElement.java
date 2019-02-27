@@ -40,10 +40,12 @@ public interface ClassElement extends TypedElement {
     boolean isAssignable(String type);
 
     /**
-     * Find and return a single public constructor. If more than one or no public constructor exists, then return empty.
-     * @return The public constructor if one is present
+     * Find and return a single primary constructor. If more than constructor candidate exists, then return empty unless a
+     * constructor is found that is annotated with either {@link io.micronaut.core.annotation.Creator} or {@link javax.inject.Inject}.
+     *
+     * @return The primary constructor if one is present
      */
-    default @Nonnull Optional<ConstructorElement> getPublicConstructor() {
+    default @Nonnull Optional<ConstructorElement> getPrimaryConstructor() {
         return Optional.empty();
     }
 
