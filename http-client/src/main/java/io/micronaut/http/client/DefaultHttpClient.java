@@ -525,9 +525,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
         Flowable<Event<ByteBuffer<?>>> eventFlowable = Flowable.create(emitter ->
                 dataStream(request).subscribe(new Subscriber<ByteBuffer<?>>() {
                     private Subscription dataSubscription;
-                    private CurrentEvent currentEvent = new CurrentEvent(
-                            byteBufferFactory.getNativeAllocator().compositeBuffer(10)
-                    );
+                    private CurrentEvent currentEvent;
 
                     @Override
                     public void onSubscribe(Subscription s) {
@@ -559,11 +557,14 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                                     );
                                 } finally {
                                     currentEvent.data.release();
+                                    currentEvent = null;
+                                }
+                            } else {
+                                if (currentEvent == null) {
                                     currentEvent = new CurrentEvent(
                                             byteBufferFactory.getNativeAllocator().compositeBuffer(10)
                                     );
                                 }
-                            } else {
                                 int colonIndex = buffer.indexOf((byte) ':');
                                 // SSE comments start with colon, so skip
                                 if (colonIndex > 0) {
@@ -2120,7 +2121,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
                 });
 
-                p.addLast(HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandler<ByteBuf>() {
+                p.addLast(HANDLER_MICRONAUT_SSE_CONTENT, new SimpleChannelInboundHandler<ByteBuf>(false) {
 
                     @Override
                     public boolean acceptInboundMessage(Object msg) {
@@ -2129,7 +2130,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
                     @Override
                     protected void channelRead0(ChannelHandlerContext ctx, ByteBuf msg) {
-                        ctx.fireChannelRead(new DefaultHttpContent(msg.retain()));
+                        ctx.fireChannelRead(new DefaultHttpContent(msg));
                     }
                 });
             }
