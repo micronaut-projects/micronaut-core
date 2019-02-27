@@ -103,11 +103,14 @@ class BlockingCrudSpec extends Specification {
 
         when:
         book = client.update(book.id, "The Shining")
+        books = client.list()
 
         then:
         book != null
         book.title == "The Shining"
         book.id == 1
+        books.size() == 1
+        books.first() instanceof Book
 
         when:
         client.delete(book.id)

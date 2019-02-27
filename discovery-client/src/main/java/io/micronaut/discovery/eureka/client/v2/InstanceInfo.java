@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonRootName;
-import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.util.StringUtils;
 
 import javax.validation.constraints.Min;
@@ -41,7 +40,6 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 1.0
  */
 @JsonRootName("instance")
-@Introspected
 public class InstanceInfo implements ConfigurableInstanceInfo {
 
     /**
