@@ -22,6 +22,7 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.core.cli.CommandLine;
 import io.micronaut.core.naming.Described;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.runtime.context.env.CommandLinePropertySource;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import io.micronaut.runtime.server.EmbeddedServer;

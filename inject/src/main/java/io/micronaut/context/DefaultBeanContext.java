@@ -26,7 +26,6 @@ import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.TypeConverterRegistrar;
-import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -157,6 +156,8 @@ public class DefaultBeanContext implements BeanContext {
      */
     public DefaultBeanContext(@Nonnull BeanContextConfiguration contextConfiguration) {
         ArgumentUtils.requireNonNull("contextConfiguration", contextConfiguration);
+        // enable classloader logging
+        System.setProperty(ClassUtils.PROPERTY_MICRONAUT_CLASSLOADER_LOGGING, "true");
         this.classLoader = contextConfiguration.getClassLoader();
         this.customScopeRegistry = new DefaultCustomScopeRegistry(this, classLoader);
 

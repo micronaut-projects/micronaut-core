@@ -43,13 +43,20 @@ import java.util.*;
  */
 public class ClassUtils {
 
+    /**
+     * System property to indicate whether classloader logging should be activated. This is required
+     * because this class is used both at compilation time and runtime and we don't want logging at compilation time.
+     */
+    public static final String PROPERTY_MICRONAUT_CLASSLOADER_LOGGING = "micronaut.classloader.logging";
     public static final int EMPTY_OBJECT_ARRAY_HASH_CODE = Arrays.hashCode(ArrayUtils.EMPTY_OBJECT_ARRAY);
     public static final Map<String, Class> COMMON_CLASS_MAP = new HashMap<>(34);
     public static final Map<String, Class> BASIC_TYPE_MAP = new HashMap<>(18);
     public static final String CLASS_EXTENSION = ".class";
-    
+
     static final List<ClassLoadingReporter> CLASS_LOADING_REPORTERS;
     static final boolean CLASS_LOADING_REPORTER_ENABLED;
+
+    private static final boolean ENABLE_CLASS_LOADER_LOGGING = Boolean.getBoolean(PROPERTY_MICRONAUT_CLASSLOADER_LOGGING);
 
     @SuppressWarnings("unchecked")
     private static final Map<String, Class> PRIMITIVE_TYPE_MAP = CollectionUtils.mapOf(
@@ -245,7 +252,7 @@ public class ClassUtils {
      * @return An optional of the class
      */
     public static Optional<Class> forName(String name, @Nullable ClassLoader classLoader) {
-        final Logger logger = LoggerFactory.getLogger(ClassUtils.class);
+        final Logger logger = ENABLE_CLASS_LOADER_LOGGING ? LoggerFactory.getLogger(ClassUtils.class) : null;
         try {
             if (classLoader == null) {
                 classLoader = Thread.currentThread().getContextClassLoader();
@@ -258,19 +265,19 @@ public class ClassUtils {
             if (commonType.isPresent()) {
                 return commonType;
             } else {
-                if (logger.isDebugEnabled()) {
+                if (logger != null && logger.isDebugEnabled()) {
                     logger.debug("Attempting to dynamically load class {}", name);
                 }
                 Class<?> type = Class.forName(name, true, classLoader);
                 ClassLoadingReporter.reportPresent(type);
-                if (logger.isDebugEnabled()) {
+                if (logger != null && logger.isDebugEnabled()) {
                     logger.debug("Successfully loaded class {}", name);
                 }
                 return Optional.of(type);
             }
         } catch (ClassNotFoundException | NoClassDefFoundError e) {
             ClassLoadingReporter.reportMissing(name);
-            if (logger.isDebugEnabled()) {
+            if (logger != null && logger.isDebugEnabled()) {
                 logger.debug("Class {} is not present", name);
             }
             return Optional.empty();

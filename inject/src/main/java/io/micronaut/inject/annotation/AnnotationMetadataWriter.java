@@ -181,13 +181,6 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
     }
 
     /**
-     * Clears the annotation defaults.
-     */
-    public void clearDefaults() {
-        AnnotationMetadataSupport.CURRENT_DEFAULTS.clear();
-    }
-
-    /**
      * Write the class to the output stream, such a JavaFileObject created from a java annotation processor Filer object.
      *
      * @param outputStream the output stream pointing to the target class file
@@ -301,21 +294,23 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationDefaultValues.entrySet()) {
                 final Map<CharSequence, Object> annotationValues = entry.getValue();
 
+                String annotationName = entry.getKey();
+                Label falseCondition = new Label();
+
+                staticInit.push(annotationName);
+                staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_ARE_DEFAULTS_REGISTERED);
+                staticInit.push(true);
+                staticInit.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.EQ, falseCondition);
+                staticInit.visitLabel(new Label());
+
+                invokeLoadClassValueMethod(owningType, classWriter, staticInit, loadTypeMethods, new AnnotationClassValue(annotationName));
                 if (CollectionUtils.isNotEmpty(annotationValues)) {
-                    String annotationName = entry.getKey();
-                    Label falseCondition = new Label();
-
-                    staticInit.push(annotationName);
-                    staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_ARE_DEFAULTS_REGISTERED);
-                    staticInit.push(true);
-                    staticInit.ifCmp(Type.BOOLEAN_TYPE, GeneratorAdapter.EQ, falseCondition);
-                    staticInit.visitLabel(new Label());
-
-                    invokeLoadClassValueMethod(owningType, classWriter, staticInit, loadTypeMethods, new AnnotationClassValue(annotationName));
                     pushAnnotationAttributes(owningType, classWriter, staticInit, annotationValues, loadTypeMethods);
-                    staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_ANNOTATION_DEFAULTS);
-                    staticInit.visitLabel(falseCondition);
+                } else {
+                    staticInit.visitInsn(ACONST_NULL);
                 }
+                staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_ANNOTATION_DEFAULTS);
+                staticInit.visitLabel(falseCondition);
             }
             staticInit.visitInsn(RETURN);
 

@@ -170,7 +170,6 @@ class BeanIntrospectionWriter extends AbstractAnnotationMetadataWriter {
         // write the annotation metadata
         if (annotationMetadataWriter != null) {
             annotationMetadataWriter.accept(classWriterOutputVisitor);
-            annotationMetadataWriter.clearDefaults();
         }
         // write the reference
         writeIntrospectionReference(classWriterOutputVisitor);
