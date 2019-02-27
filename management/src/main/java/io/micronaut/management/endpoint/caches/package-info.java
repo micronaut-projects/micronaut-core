@@ -13,10 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 /**
  * Caches management endpoint.
  *
  * @author Marcel Overdijk
- * @since 1.1
+ * @since 1.1.0
  */
 package io.micronaut.management.endpoint.caches;

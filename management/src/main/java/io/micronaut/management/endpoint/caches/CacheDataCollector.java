@@ -25,7 +25,7 @@ import java.util.List;
  *
  * @param <T> The type
  * @author Marcel Overdijk
- * @since 1.1
+ * @since 1.1.0
  */
 public interface CacheDataCollector<T> {
 
@@ -33,7 +33,7 @@ public interface CacheDataCollector<T> {
      * @param caches A java stream of caches
      * @return A publisher that returns data representing all of the given caches
      */
-    Publisher<T> getData(List<SyncCache> caches);
+    Publisher<T> getData(Publisher<SyncCache> caches);
 
     /**
      * @param cache The cache
