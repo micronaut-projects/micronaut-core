@@ -18,7 +18,11 @@ package io.micronaut.management.endpoint.routes;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
 import io.micronaut.web.router.Router;
+import io.micronaut.web.router.UriRoute;
 import io.reactivex.Single;
+
+import java.util.Comparator;
+import java.util.stream.Stream;
 
 /**
  * <p>Exposes an {@link Endpoint} to display application routes.</p>
@@ -47,6 +51,10 @@ public class RoutesEndpoint {
      */
     @Read
     public Single getRoutes() {
-        return Single.fromPublisher(routeDataCollector.getData(router.uriRoutes()));
+        Stream<UriRoute> uriRoutes = router.uriRoutes()
+                .sorted(Comparator
+                        .comparing((UriRoute r) -> r.getUriMatchTemplate().toPathString())
+                        .thenComparing((UriRoute r) -> r.getHttpMethod().ordinal()));
+        return Single.fromPublisher(routeDataCollector.getData(uriRoutes));
     }
 }
