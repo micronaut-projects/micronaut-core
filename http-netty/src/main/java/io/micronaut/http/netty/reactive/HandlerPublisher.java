@@ -485,10 +485,6 @@ public class HandlerPublisher<T> extends ChannelDuplexHandler implements Publish
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) {
         complete();
-        if (state == DRAINING) {
-            state = DONE;
-            cleanup();
-        }
     }
 
     private void complete() {
