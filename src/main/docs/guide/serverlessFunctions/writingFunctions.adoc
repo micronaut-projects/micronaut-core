@@ -52,7 +52,7 @@ When using this approach the FaaS system (in this case AWS Lambda) will directly
 [TIP]
 .Using the CLI
 ====
-You can create a AWS API Gateway service using `mn create-app myapp --features aws-api-proxy`
+You can create a AWS API Gateway service using `mn create-app myapp --features aws-api-gateway`
 ====
 
 Another approach to FaaS is to build a regular REST application and then deploy the application using tools offered by the FaaS system such as https://aws.amazon.com/api-gateway/[AWS API Gateway].
