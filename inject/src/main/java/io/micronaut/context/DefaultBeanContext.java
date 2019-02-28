@@ -2063,12 +2063,14 @@ public class DefaultBeanContext implements BeanContext {
         List<BeanDefinitionReference> contextScopeBeans = new ArrayList<>(20);
         List<BeanDefinitionReference> processedBeans = new ArrayList<>(10);
         List<BeanDefinitionReference> beanDefinitionReferences = resolveBeanDefinitionReferences();
-        List<BeanDefinitionReference> allReferences = new ArrayList<>(beanDefinitionReferences.size());
+        List<BeanDefinitionReference> disabled = new ArrayList<>(20);
+
+        final boolean reportingEnabled = ClassLoadingReporter.isReportingEnabled();
+
+        beanDefinitionsClasses.addAll(beanDefinitionReferences);
 
         Map<BeanConfiguration, Boolean> configurationEnabled = beanConfigurations.values().stream()
                 .collect(Collectors.toMap(Function.identity(), bc -> bc.isEnabled(this)));
-
-        final boolean reportingEnabled = ClassLoadingReporter.isReportingEnabled();
 
         for (BeanDefinitionReference beanDefinitionReference : beanDefinitionReferences) {
             boolean disabledByConfiguration = beanConfigurations.values()
@@ -2077,12 +2079,13 @@ public class DefaultBeanContext implements BeanContext {
                     .anyMatch(c -> !configurationEnabled.get(c));
 
             if (disabledByConfiguration) {
+                disabled.add(beanDefinitionReference);
+
                 if (reportingEnabled) {
                     ClassLoadingReporter.reportMissing(beanDefinitionReference.getBeanDefinitionName());
                     ClassLoadingReporter.reportMissing(beanDefinitionReference.getName());
                 }
             } else {
-                allReferences.add(beanDefinitionReference);
                 if (beanDefinitionReference.isContextScope()) {
                     contextScopeBeans.add(beanDefinitionReference);
                 }
@@ -2092,9 +2095,9 @@ public class DefaultBeanContext implements BeanContext {
             }
         }
 
-        this.beanDefinitionsClasses.addAll(allReferences);
-
-        allReferences.forEach(this::indexBeanDefinitionIfNecessary);
+        beanDefinitionsClasses.removeAll(disabled);
+        beanDefinitionsClasses.forEach(this::indexBeanDefinitionIfNecessary);
+        disabled.clear();
 
         initializeEventListeners();
         initializeContext(contextScopeBeans, processedBeans);
