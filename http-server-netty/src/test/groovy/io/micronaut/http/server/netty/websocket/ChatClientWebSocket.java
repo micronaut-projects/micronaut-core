@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.websocket;
 
 // tag::imports[]
+import io.micronaut.http.HttpRequest;
 import io.micronaut.websocket.WebSocketSession;
 import io.micronaut.websocket.annotation.*;
 import io.reactivex.Single;
@@ -29,15 +30,17 @@ import java.util.concurrent.Future;
 public abstract class ChatClientWebSocket implements AutoCloseable { // <2>
 
     private WebSocketSession session;
+    private HttpRequest request;
     private String topic;
     private String username;
     private Collection<String> replies = new ConcurrentLinkedQueue<>();
 
     @OnOpen
-    public void onOpen(String topic, String username, WebSocketSession session) { // <3>
+    public void onOpen(String topic, String username, WebSocketSession session, HttpRequest request) { // <3>
         this.topic = topic;
         this.username = username;
         this.session = session;
+        this.request = request;
     }
 
     public String getTopic() {
@@ -54,6 +57,10 @@ public abstract class ChatClientWebSocket implements AutoCloseable { // <2>
 
     public WebSocketSession getSession() {
         return session;
+    }
+
+    public HttpRequest getRequest() {
+        return request;
     }
 
     @OnMessage
