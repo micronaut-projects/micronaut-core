@@ -40,13 +40,13 @@ class SimpleTextWebSocketSpec extends Specification {
         then:"The connection is valid"
         fred.session != null
         fred.session.id != null
-
-
+        fred.request != null
 
         then:"A session is established"
         fred.session != null
         fred.session.id != null
         fred.session.id != bob.session.id
+        fred.request != null
         fred.topic == 'stuff'
         fred.username == 'fred'
         bob.username == 'bob'
