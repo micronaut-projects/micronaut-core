@@ -255,6 +255,11 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         }
     }
 
+    @Override
+    public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
+        handleCloseReason(ctx, CloseReason.ABNORMAL_CLOSURE);
+    }
+
     /**
      * Subclasses should implement to create the actual {@link NettyRxWebSocketSession}.
      *
@@ -424,7 +429,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      * @param cr The reason
      */
     private void handleCloseReason(ChannelHandlerContext ctx, CloseReason cr) {
-        if (getSession().isOpen()) {
+        if (closed.compareAndSet(false, true)) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Closing WebSocket session {} with reason {}", getSession(), cr);
             }
@@ -454,10 +459,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     }
 
     private void handleCloseFrame(ChannelHandlerContext ctx, CloseWebSocketFrame cwsf) {
-        if (closed.compareAndSet(false, true)) {
-            CloseReason cr = new CloseReason(cwsf.statusCode(), cwsf.reasonText());
-            handleCloseReason(ctx, cr);
-        }
+        CloseReason cr = new CloseReason(cwsf.statusCode(), cwsf.reasonText());
+        handleCloseReason(ctx, cr);
     }
 
     private void invokeAndClose(ChannelHandlerContext ctx, Object target, BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> methodExecutionHandle, boolean isClose) {
