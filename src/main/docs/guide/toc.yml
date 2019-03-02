@@ -167,8 +167,8 @@ serverlessFunctions:
   callingFunctions: Calling Functions with FunctionClient
 messaging:
   title: Message-Driven Microservices
-  kafka:
-    title: Kafka Support
+  kafka: Kafka Support
+  rabbitmq: RabbitMQ Support
 commandLineApps:
   title: Standalone Command Line Applications
   picocli:
