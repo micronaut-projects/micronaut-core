@@ -36,4 +36,4 @@ public @interface Driver {
 }
 ----
 
-<1> api:context.annotation.DefaultScope[] is used to declare which scope to be used if non is present
+<1> api:context.annotation.DefaultScope[] is used to declare which scope to be used if none is present
