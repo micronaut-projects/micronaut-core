@@ -21,10 +21,7 @@ import io.micronaut.cli.MicronautCli
 import io.micronaut.cli.console.logging.ConsoleAntBuilder
 import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.io.support.BuildTokens
-import io.micronaut.cli.io.support.GradleBuildTokens
-import io.micronaut.cli.io.support.MavenBuildTokens
 import io.micronaut.cli.profile.ExecutionContext
-import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.util.VersionInfo
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
@@ -106,7 +103,9 @@ class CreateFederationCommand extends AbstractCreateAppCommand {
     protected void withTokens(BuildTokens buildTokens) {
         final AntBuilder ant = new ConsoleAntBuilder()
 
-        Map tokens = buildTokens.getTokens(services)
+        Map tokens = buildTokens.getTokens(services.collect {
+            groupAppName(it)[1]
+        })
 
         ant.replace(dir: targetDirectory) {
             tokens.each { k, v ->
