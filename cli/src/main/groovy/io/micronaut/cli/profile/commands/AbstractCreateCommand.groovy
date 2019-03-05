@@ -726,23 +726,30 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
     }
 
     private String establishGroupAndAppName(String groupAndAppName) {
-        String defaultPackage
-        List<String> parts = groupAndAppName.split(/\./) as List
-        if (parts.size() == 1) {
-            appname = parts[0]
-            defaultPackage = createValidPackageName()
-            groupname = defaultPackage
-        } else {
-            appname = parts[-1]
-            groupname = parts[0..-2].join('.')
-            defaultPackage = groupname
-        }
+        String[] groupApp = groupAppName(groupAndAppName)
+        appname = groupApp[1]
+        groupname = groupApp[0]
 
-        return defaultPackage
+        return groupname
     }
 
-    private String createValidPackageName() {
-        String defaultPackage = appname.split(/[-]+/).collect { String token -> (token.toLowerCase().toCharArray().findAll { char ch -> Character.isJavaIdentifierPart(ch) } as char[]) as String }.join('.')
+    protected String[] groupAppName(String groupAndAppName) {
+        String packageName
+        String appName
+        List<String> parts = groupAndAppName.split(/\./) as List
+        if (parts.size() == 1) {
+            appName = parts[0]
+            packageName = createValidPackageName(appName)
+        } else {
+            appName = parts[-1]
+            packageName = parts[0..-2].join('.')
+        }
+
+        [packageName, appName] as String[]
+    }
+
+    private String createValidPackageName(String appName) {
+        String defaultPackage = appName.split(/[-]+/).collect { String token -> (token.toLowerCase().toCharArray().findAll { char ch -> Character.isJavaIdentifierPart(ch) } as char[]) as String }.join('.')
         if (!NameUtils.isValidJavaPackage(defaultPackage)) {
             throw new IllegalArgumentException("Cannot create a valid package name for [$appname]. Please specify a name that is also a valid Java package.")
         }
@@ -778,9 +785,6 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
         copyBuildFiles(new File(skeletonDir, build + "-build"), build, buildMergeProfileNames.contains(participatingProfile.name))
 
         ant.chmod(dir: targetDirectory, includes: profile.executablePatterns.join(' '), perm: 'u+x')
-
-        deleteDirectory(tmpDir)
-        deleteDirectory(skeletonDir)
     }
 
     @CompileDynamic

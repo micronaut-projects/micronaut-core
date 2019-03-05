@@ -170,6 +170,10 @@ class MicronautCli {
         }
 
         MicronautCli cli = new MicronautCli()
+        if (MavenProfileRepository.DEFAULT_REPO == MavenProfileRepository.SNAPSHOT_REPO) {
+            cli.profileRepositories.add(MavenProfileRepository.RELEASE_REPO)
+        }
+
         try {
             exit(cli.execute(args))
         } catch (ParameterException e) {
