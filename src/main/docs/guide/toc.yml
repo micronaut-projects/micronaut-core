@@ -188,9 +188,6 @@ configurations:
     cassandraSupport: Configuring Cassandra
     liquibaseSupport: Configuring Liquibase
     flywaySupport: Configuring Flyway
-  otherConfigurations:
-    title: Other Configurations
-    rabbitmq: RabbitMQ
 languageSupport:
   title: Language Support
   java: Micronaut for Java
