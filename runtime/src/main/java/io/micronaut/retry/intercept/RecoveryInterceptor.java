@@ -126,7 +126,7 @@ public class RecoveryInterceptor implements MethodInterceptor<Object, Object> {
      * @return The fallback method if it is present
      */
     public Optional<? extends MethodExecutionHandle<?, Object>> findFallbackMethod(MethodInvocationContext<Object, Object> context) {
-        Class<?> declaringType = context.getTarget().getClass();
+        Class<?> declaringType = context.getDeclaringType();
         Optional<? extends MethodExecutionHandle<?, Object>> result = beanContext
                 .findExecutionHandle(declaringType, Qualifiers.byStereotype(Fallback.class), context.getMethodName(), context.getArgumentTypes());
         if (!result.isPresent()) {
