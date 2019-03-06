@@ -15,6 +15,9 @@ dependencies {
     compile project(':http-client')
     compile project(':runtime')
 
+    testCompile project(":inject")
+    testCompile dependencyVersion("jcache")
+    
     testCompileOnly project(':inject-java')
     kaptTest project(':inject-java')
     kaptTest project(':validation')

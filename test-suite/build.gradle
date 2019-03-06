@@ -19,6 +19,9 @@ dependencies {
     testCompile project(":inject-java")
     testCompile project(":tracing")
     testCompile project(":management")
+    testCompile project(":runtime")
+    testCompile project(":inject")
+    testCompile dependencyVersion("jcache")
 
     testCompile dependencyVersion("jaeger")
     testCompile dependencyModuleVersion("groovy", "groovy-json")
