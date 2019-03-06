@@ -48,7 +48,7 @@ micronaut:
 <3> Enables or disables header based versioning
 <4> Specify the header names as a YAML list
 
-If this is not enough you can also implement the api:web.router.version.strategy.VersionExtractingStrategy[] interface which receives the api:http.HttpRequest[] and can implement any strategy you choose.
+If this is not enough you can also implement the api:web.router.version.resolution.RequestVersionResolver[] interface which receives the api:http.HttpRequest[] and can implement any strategy you choose.
 
 === Versioning Client Requests
 
