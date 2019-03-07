@@ -135,6 +135,11 @@ public class ObjectMapperFactory {
 
         if (hasConfiguration) {
 
+            ObjectMapper.DefaultTyping defaultTyping = jacksonConfiguration.getDefaultTyping();
+            if (defaultTyping != null) {
+                objectMapper.enableDefaultTyping(defaultTyping);
+            }
+
             JsonInclude.Include include = jacksonConfiguration.getSerializationInclusion();
             if (include != null) {
                 objectMapper.setSerializationInclusion(include);
