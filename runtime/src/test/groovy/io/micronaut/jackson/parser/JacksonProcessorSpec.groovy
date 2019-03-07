@@ -318,6 +318,9 @@ class JacksonProcessorSpec extends Specification {
         mountainBike.gear == 3
         mountainBike.speed == 30
         mountainBike.seatHeight == 10
+
+        cleanup:
+        applicationContext1.close()
     }
 
     void "test publish JSON array async"() {
