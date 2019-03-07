@@ -221,3 +221,7 @@ See the <<environments, Environment>> documentation for more information.
 - Mongo Java Driver `3.8.0` -> `3.10.0`
 - Mongo Reactive Driver `1.8.0` -> `1.10.0`
 - Redis Lettuce Driver `5.0.4.RELEASE` -> `5.1.3.RELEASE`
+- Jaeger `0.31.0` -> `0.33.1`
+- Zipkin Reporter `2.7.9` -> `2.8.0`
+- Brave Instrumentation HTTP `5.4.2` -> `5.6.1`
+- Brave Opentracing -> `0.33.3` -> `0.33.10`
