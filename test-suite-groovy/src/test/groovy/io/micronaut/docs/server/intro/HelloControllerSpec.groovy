@@ -17,6 +17,9 @@ package io.micronaut.docs.server.intro
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
+
+// tag::imports[]
+
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
@@ -24,18 +27,40 @@ import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
+// end::imports[]
+
+/**
+ * @author Graeme Rocher
+ * @since 1.0
+ */
+// tag::classinit[]
 class HelloControllerSpec extends Specification {
+    // end::classinit[]
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer =
+            ApplicationContext.run(EmbeddedServer.class,
+                    [
+                        "spec.name": HelloControllerSpec.simpleName
+                    ]
+                    , Environment.TEST)
 
-    @Shared @AutoCleanup EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer,
-                    ['spec.name': HelloControllerSpec.simpleName],
-                     Environment.TEST)
-
-    @Shared @AutoCleanup HttpClient client = HttpClient.create(embeddedServer.URL)
+    /*
+    // tag::embeddedServer[]
+        @Shared
+        @AutoCleanup
+        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer) // <1>
+    // end::embeddedServer[]
+    */
+    // tag::class[]
+    @Shared
+    @AutoCleanup
+    HttpClient client = HttpClient.create(embeddedServer.URL) // <2>
 
     void "test hello world response"() {
         expect:
-        client.toBlocking()
-              .retrieve(HttpRequest.GET('/hello')) == "Hello World"
+            client.toBlocking() // <3>
+                    .retrieve(HttpRequest.GET('/hello')) == "Hello World" // <4>
     }
 }
+// end::class[]
