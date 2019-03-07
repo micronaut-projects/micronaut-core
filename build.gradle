@@ -261,7 +261,7 @@ ext {
                               'netty-transport-rxtx', 'netty-transport-sctp', 'netty-transport-udt']
             ],
             opentracing                : [
-                    version: '0.31.0',
+                    version: opentracingVersion,
                     group  : 'io.opentracing',
                     name   : 'opentracing-api',
                     modules: ['opentracing-util']
