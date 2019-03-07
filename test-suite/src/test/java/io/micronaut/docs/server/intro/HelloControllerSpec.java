@@ -16,7 +16,9 @@
 package io.micronaut.docs.server.intro;
 
 // tag::imports[]
+
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.env.Environment;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -24,18 +26,32 @@ import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import java.util.HashMap;
+
 import static org.junit.Assert.assertEquals;
 
 // end::imports[]
 
-// tag::class[]
+// tag::classinit[]
 public class HelloControllerSpec {
     private static EmbeddedServer server;
     private static HttpClient client;
 
     @BeforeClass
     public static void setupServer() {
-        server = ApplicationContext.run(EmbeddedServer.class);// <1>
+        // end::classinit[]
+        server = ApplicationContext.run(EmbeddedServer.class,
+                new HashMap<String, Object>() {{
+                    put("spec.name", HelloControllerSpec.class.getSimpleName());
+                    put("spec.lang", "java");
+                }}
+                , Environment.TEST);
+        /*
+        // tag::embeddedServer[]
+            server = ApplicationContext.run(EmbeddedServer) // <1>
+        // end::embeddedServer[]
+        */
+        // tag::class[]
         client = server
                 .getApplicationContext()
                 .createBean(HttpClient.class, server.getURL());// <2>
@@ -43,10 +59,10 @@ public class HelloControllerSpec {
 
     @AfterClass
     public static void stopServer() {
-        if(server != null) {
+        if (server != null) {
             server.stop();
         }
-        if(client != null) {
+        if (client != null) {
             client.stop();
         }
     }

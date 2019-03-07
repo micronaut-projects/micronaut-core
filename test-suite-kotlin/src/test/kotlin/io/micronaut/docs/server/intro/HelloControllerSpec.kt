@@ -17,37 +17,44 @@ package io.micronaut.docs.server.intro
 
 // tag::imports[]
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.server.EmbeddedServer
-import junit.framework.TestCase
-import org.junit.AfterClass
-import org.junit.BeforeClass
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
 
 // end::imports[]
 
-// tag::class[]
-class HelloControllerSpec : TestCase() {
+// tag::classinit[]
+class HelloControllerSpec() {
+    lateinit var server: EmbeddedServer
+    lateinit var client: HttpClient
 
-    companion object {
-        lateinit var server: EmbeddedServer
-        lateinit var client: HttpClient
+    @BeforeTest
+    fun setup() {
+        // end::classinit[]
+        server = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to HelloControllerSpec::class.simpleName), Environment.TEST)// <1>
 
-        @JvmStatic
-        @BeforeClass
-        fun setup() {
-            server = ApplicationContext.run(EmbeddedServer::class.java)// <1>
-            client = server
-                    .getApplicationContext()
-                    .createBean(HttpClient::class.java, server.getURL())// <2>
-        }
-        @JvmStatic
-        @AfterClass
-        fun teardown() {
-            server?.close()
-            client?.close()
-        }
+        /*
+        // tag::embeddedServer[]
+        server = ApplicationContext.run(EmbeddedServer::class.java) // <1>
+        // end::embeddedServer[]
+        */
+
+        client = server
+                .getApplicationContext()
+                .createBean(HttpClient::class.java, server.getURL())// <2>
     }
 
+    @AfterTest
+    fun teardown() {
+        server?.close()
+        client?.close()
+    }
+
+    @Test
     fun testHelloWorldResponse() {
         val rsp: String = client.toBlocking() // <3>
                 .retrieve("/hello")
