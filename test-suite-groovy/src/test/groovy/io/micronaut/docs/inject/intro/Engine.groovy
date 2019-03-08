@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.intro
+package io.micronaut.docs.inject.intro
 
 /**
  * @author Graeme Rocher

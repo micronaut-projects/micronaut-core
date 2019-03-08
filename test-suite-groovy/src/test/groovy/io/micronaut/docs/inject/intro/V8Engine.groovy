@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.intro
+package io.micronaut.docs.inject.intro
 
-import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
@@ -23,16 +22,12 @@ import javax.inject.Singleton
  * @since 1.0
  */
 // tag::class[]
-@Singleton
-class Vehicle {
-    final Engine engine
-
-    Vehicle(Engine engine) { // <3>
-        this.engine = engine
-    }
+@Singleton // <2>
+class V8Engine implements Engine {
+    int cylinders = 8
 
     String start() {
-        engine.start()
+        "Starting V8"
     }
 }
 // end::class[]
