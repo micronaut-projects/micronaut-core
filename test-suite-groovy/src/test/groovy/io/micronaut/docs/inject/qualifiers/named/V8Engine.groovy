@@ -13,10 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.qualifiers.named
+package io.micronaut.docs.inject.qualifiers.named
 
-import javax.inject.Inject
-import javax.inject.Named
 import javax.inject.Singleton
 
 /**
@@ -25,15 +23,11 @@ import javax.inject.Singleton
  */
 // tag::class[]
 @Singleton
-class Vehicle {
-    final Engine engine
-
-    @Inject Vehicle(@Named('v8') Engine engine) { // <4>
-        this.engine = engine
-    }
+class V8Engine implements Engine { // <3>
+    int cylinders = 8
 
     String start() {
-        engine.start() // <5>
+        "Starting V8"
     }
 }
 // end::class[]
