@@ -35,7 +35,7 @@ class HelloControllerSpec() {
     @BeforeTest
     fun setup() {
         // end::classinit[]
-        server = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to HelloControllerSpec::class.simpleName), Environment.TEST)// <1>
+        server = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to HelloControllerSpec::class.simpleName), Environment.TEST)
 
         /*
 // tag::embeddedServer[]

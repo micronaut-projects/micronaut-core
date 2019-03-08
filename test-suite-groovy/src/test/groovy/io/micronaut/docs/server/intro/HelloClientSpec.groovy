@@ -17,11 +17,15 @@ package io.micronaut.docs.server.intro
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
+import io.micronaut.runtime.server.EmbeddedServer
 
 
 // tag::imports[]
-import io.micronaut.runtime.server.EmbeddedServer
-import spock.lang.*
+
+import spock.lang.AutoCleanup
+import spock.lang.Shared
+import spock.lang.Specification
+
 // end::imports[]
 
 /**

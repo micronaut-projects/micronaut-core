@@ -16,12 +16,9 @@ To create a client, simply create an interface annotated with `@Client`. For exa
 
 
 .src/main/java/hello/world/HelloClient.java
-[source,groovy]
-----
-include::{testsuitejava}/server/intro/HelloClient.java[tags=imports, indent=0]
 
-include::{testsuitejava}/server/intro/HelloClient.java[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.server.intro.HelloClient[tags="imports,class",indent=0]
+
 
 <1> The `@Client` annotation is used with value that is a relative path to the current server
 <2> The same ann:http.annotation.Get[] annotation used on the server is used to define the client mapping
@@ -30,14 +27,9 @@ include::{testsuitejava}/server/intro/HelloClient.java[tags=class, indent=0]
 To test the `HelloClient` simply retrieve it from the api:context.ApplicationContext[] associated with the server:
 
 .Testing HelloClient
-[source,groovy]
-----
-include::{testsuite}/server/intro/HelloClientSpec.groovy[tags=class-init, indent=0]
 
-include::{testsuite}/server/intro/HelloClientSpec.groovy[tags=embeddedServer, indent=0]
+snippet::io.micronaut.docs.server.intro.HelloClientSpec[tags="class-init,embeddedServer,class-end",indent=0]
 
-include::{testsuite}/server/intro/HelloClientSpec.groovy[tags=class-end, indent=0]
-----
 
 <1> The api:runtime.server.EmbeddedServer[] is run
 <2> The `HelloClient` is retrieved from the api:context.ApplicationContext[]
