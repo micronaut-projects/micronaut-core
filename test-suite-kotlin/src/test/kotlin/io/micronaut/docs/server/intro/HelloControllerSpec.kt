@@ -38,11 +38,11 @@ class HelloControllerSpec() {
         server = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to HelloControllerSpec::class.simpleName), Environment.TEST)// <1>
 
         /*
-        // tag::embeddedServer[]
+// tag::embeddedServer[]
         server = ApplicationContext.run(EmbeddedServer::class.java) // <1>
-        // end::embeddedServer[]
+// end::embeddedServer[]
         */
-
+        //tag::class[]
         client = server
                 .getApplicationContext()
                 .createBean(HttpClient::class.java, server.getURL())// <2>
