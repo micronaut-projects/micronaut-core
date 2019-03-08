@@ -47,9 +47,9 @@ public class HelloControllerSpec {
                 }}
                 , Environment.TEST);
         /*
-        // tag::embeddedServer[]
-            server = ApplicationContext.run(EmbeddedServer) // <1>
-        // end::embeddedServer[]
+// tag::embeddedServer[]
+        server = ApplicationContext.run(EmbeddedServer) // <1>
+// end::embeddedServer[]
         */
         // tag::class[]
         client = server

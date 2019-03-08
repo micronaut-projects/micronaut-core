@@ -46,11 +46,11 @@ class HelloControllerSpec extends Specification {
                     , Environment.TEST)
 
     /*
-    // tag::embeddedServer[]
-        @Shared
-        @AutoCleanup
-        EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer) // <1>
-    // end::embeddedServer[]
+// tag::embeddedServer[]
+    @Shared
+    @AutoCleanup
+    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer) // <1>
+// end::embeddedServer[]
     */
     // tag::class[]
     @Shared
