@@ -13,27 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.qualifiers.named
+package io.micronaut.docs.inject.qualifiers.named
 
-import io.micronaut.context.DefaultBeanContext
-import spock.lang.Specification
+import javax.inject.Singleton
 
 /**
  * @author Graeme Rocher
  * @since 1.0
  */
-class VehicleSpec extends Specification {
+// tag::class[]
+@Singleton
+class V6Engine implements Engine { // <2>
+    int cylinders = 6
 
-    void "test start vehicle"() {
-        when:
-        // tag::start[]
-        Vehicle vehicle = new DefaultBeanContext()
-                .start()
-                .getBean(Vehicle)
-        println( vehicle.start() )
-        // end::start[]
-
-        then:
-        vehicle.start() == "Starting V8"
+    String start() {
+        "Starting V6"
     }
 }
+// end::class[]
