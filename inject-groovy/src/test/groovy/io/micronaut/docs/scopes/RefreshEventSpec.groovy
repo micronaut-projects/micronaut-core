@@ -13,20 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.docs.scopes
+package io.micronaut.docs.inject.scope
 
 import groovy.json.JsonOutput
 import io.micronaut.context.ApplicationContext
-import io.micronaut.core.io.socket.SocketUtils
+import io.micronaut.context.annotation.Requires
+import io.micronaut.context.env.Environment
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.client.HttpClient
 import io.micronaut.runtime.context.scope.Refreshable
 import io.micronaut.runtime.context.scope.refresh.RefreshEvent
 import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
-import spock.lang.Ignore
 import spock.lang.Shared
 import spock.lang.Specification
 
@@ -35,81 +37,57 @@ import javax.inject.Inject
 
 import static io.micronaut.http.HttpResponse.ok
 
-/**
- * @author Sergio del Amo
- * @since 1.0
- */
-@Ignore
 class RefreshEventSpec extends Specification {
-    @Shared int port = SocketUtils.findAvailableTcpPort()
-    @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
-            'micronaut.server.port':port,
-            'micronaut.http.clients.myService.url': "http://localhost:$port"
-    )
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Shared @AutoCleanup EmbeddedServer embeddedServer =
+            ApplicationContext.run(EmbeddedServer, [
+                    'spec.name': 'RefreshEventSpec'
+            ], Environment.TEST)
 
-    String getUrl() {
-        "http://localhost:$port"
-    }
+    @Shared @AutoCleanup HttpClient client = HttpClient.create(embeddedServer.URL)
 
     def "publishing a refresh event, destroys beans with @Refreshable Scope"() {
         when: 'requesting a forecast for the first time'
-        String firstResponse = fetchForecast()
+            String firstResponse = fetchForecast()
 
         then: 'the server sends a valid response'
-        firstResponse
-        firstResponse.contains('"forecast": "Scattered Clouds')
+            firstResponse
+            firstResponse.contains('"forecast": "Scattered Clouds')
 
         when: 'we ask for a forecast'
-        String secondResponse = fetchForecast()
+            String secondResponse = fetchForecast()
 
         then: 'we receive an identical response since the WeatherService is a Singleton storing the previous forecast'
-        firstResponse == secondResponse
+            firstResponse == secondResponse
 
         when:
-        String response = evictForecast()
+            String response = evictForecast()
 
         then:
-        response == """
+            response == """
 // tag::evictResponse[]
 {
     "msg": "OK"
 }
 // end::evictResponse[]
 """.replace('\n// tag::evictResponse[]\n', '')
-                .replace('\n// end::evictResponse[]\n', '')
+                    .replace('\n// end::evictResponse[]\n', '')
 
         when: 'we ask for a forecast, since the evict endpoint triggered a Refresh event'
-        String thirdResponse = fetchForecast()
+            String thirdResponse = fetchForecast()
 
         then: 'the server responds a different forecast because WeatherService was destroyed and instantiated again'
-        thirdResponse != secondResponse
-        thirdResponse.contains('"forecast": "Scattered Clouds')
+            thirdResponse != secondResponse
+            thirdResponse.contains('"forecast": "Scattered Clouds')
     }
 
     String fetchForecast() {
-        String curlCommand = '''
-            // tag::forecastCurlCommand[]
-curl "{url}/weather/forecast" 
-            // end::forecastCurlCommand[]
-        '''.toString().replace('{url}', url)
-
-        Process process = [ 'bash', '-c', curlCommand ].execute()
-        process.waitFor()
-
-        JsonOutput.prettyPrint(process.text)
+        String response = client.toBlocking().retrieve(HttpRequest.GET("/weather/forecast"))
+        JsonOutput.prettyPrint(response)
     }
 
     String evictForecast() {
-        String curlCommand = '''
-            // tag::evictCurlCommand[]
-curl -X "POST" "{url}/weather/evict" 
-            // end::evictCurlCommand[]
-        '''.toString().replace('{url}', url)
-        Process process = [ 'bash', '-c', curlCommand ].execute()
-        process.waitFor()
-
-        JsonOutput.prettyPrint(process.text)
+        String response = client.toBlocking().retrieve(HttpRequest.POST("/weather/evict", [:]))
+        JsonOutput.prettyPrint(response)
 
     }
 
@@ -121,7 +99,7 @@ curl -X "POST" "{url}/weather/evict"
 
         @PostConstruct
         void init() {
-            forecast = "Scattered Clouds ${new Date().format('dd/MMM/yy HH:ss.SSS')}" // <2>
+            forecast = "Scattered Clouds ${new Date()}" // <2>
         }
 
         String latestForecast() {
@@ -131,6 +109,7 @@ curl -X "POST" "{url}/weather/evict"
     //end::weatherService[]
 
 
+    @Requires(property = "spec.name", value = "RefreshEventSpec")
     @Controller('/weather')
     static class WeatherController {
         @Inject
@@ -152,7 +131,4 @@ curl -X "POST" "{url}/weather/evict"
             ok([msg: 'OK']) as HttpResponse<Map<String, String>>
         }
     }
-
-
-
 }
