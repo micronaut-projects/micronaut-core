@@ -1,12 +1,8 @@
 Scopes can be defined on Meta annotations that you can then apply to your classes. Consider the following example meta annotation:
 
 .Driver.java Annotation
-[source,java]
-----
-include::{testsuite}/ioc/scopes/Driver.java[tags=imports, indent=0]
 
-include::{testsuite}/ioc/scopes/Driver.java[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.ioc.scopes.Driver[tags="imports,class",indent=0]
 
 <1> The scope declares a requirement on a `Car` class using api:context.annotation.Requires[]
 <2> The annotation is declared as `@Singleton`
@@ -26,7 +22,9 @@ class Foo {}
 If you wish for the scope to be overridable you should instead using the api:context.annotation.DefaultScope[] annotation on `@Driver` which allows a default scope to be specified if none other is present:
 
 .Using @DefaultScope
-[source,java]
+
+
+[source.multi-language-sample,java]
 ----
 @Requires(classes = Car.class )
 @DefaultScope(Singleton.class) // <1>
@@ -34,6 +32,23 @@ If you wish for the scope to be overridable you should instead using the api:con
 @Retention(RUNTIME)
 public @interface Driver {
 }
+----
+[source.multi-language-sample,groovy]
+----
+@Requires(classes = Car.class )
+@DefaultScope(Singleton.class) // <1>
+@Documented
+@Retention(RUNTIME)
+@interface Driver {
+}
+----
+[source.multi-language-sample,kotlin]
+----
+@Requires(classes = [Car::class])
+@DefaultScope(Singleton::class) // <1>
+@Documented
+@Retention(RUNTIME)
+annotation class Driver
 ----
 
 <1> api:context.annotation.DefaultScope[] is used to declare which scope to be used if none is present
