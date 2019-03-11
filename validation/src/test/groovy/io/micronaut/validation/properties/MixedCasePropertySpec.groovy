@@ -22,7 +22,7 @@ class MyService {
 """)
         then:
         def e = thrown(RuntimeException)
-        e.message.contains("Value 'fooBar' used in @Property is not valid. Please use kebab-case notation.")
+        e.message.contains("Value 'fooBar' is not valid. Please use kebab-case notation.")
     }
 
     void "test wrong property name in @Value"() {
@@ -43,6 +43,42 @@ class MyService {
 """)
         then:
             def e = thrown(RuntimeException)
-            e.message.contains("Value 'fooBar' used in @Value is not valid. Please use kebab-case notation.")
+            e.message.contains("Value 'fooBar' is not valid. Please use kebab-case notation.")
+    }
+
+    void "test wrong property name in @Controller"() {
+        when:
+            buildTypeElement("""
+package test;
+
+import io.micronaut.http.annotation.Controller;
+
+@Controller(value = \"\${controllerPath}\")
+class MyController {
+
+}
+
+""")
+        then:
+            def e = thrown(RuntimeException)
+            e.message.contains("Value 'controllerPath' is not valid. Please use kebab-case notation.")
+    }
+
+    void "test wrong property name in @Controller with 'produces' property"() {
+        when:
+            buildTypeElement("""
+package test;
+
+import io.micronaut.http.annotation.Controller;
+
+@Controller(value = \"\${controller-path}\", produces = {\"\${app.produces1}\", \"\${app.myWrongValue}\"})
+class MyController {
+
+}
+
+""")
+        then:
+            def e = thrown(RuntimeException)
+            e.message.contains("Value 'app.myWrongValue' is not valid. Please use kebab-case notation.")
     }
 }
