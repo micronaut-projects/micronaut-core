@@ -62,6 +62,28 @@ class MyService {
         e.message.contains("Value 'userName' is not valid. Please use kebab-case notation.")
     }
 
+    void "test more than one property in @Value"() {
+        when:
+        buildTypeElement("""
+package test;
+
+import io.micronaut.context.annotation.Value;
+import javax.inject.Singleton;
+
+@Singleton
+class MyService {
+
+    @Value(\"Hello \${user-name:John} \${lastName:Doe}\")
+    private String property;
+}
+
+""")
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Value 'lastName' is not valid. Please use kebab-case notation.")
+    }
+
     void "test wrong property name in @Controller"() {
         when:
         buildTypeElement("""
