@@ -38,6 +38,12 @@ import java.util.OptionalInt;
 public class NettyHttpServerConfiguration extends HttpServerConfiguration {
 
     /**
+     * The default use netty's native transport flag.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_USE_NATIVE_TRANSPORT = false;
+
+    /**
      * The default max initial line length.
      */
     @SuppressWarnings("WeakerAccess")
@@ -91,6 +97,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     private int initialBufferSize = DEFAULT_INITIALBUFFERSIZE;
     private LogLevel logLevel;
     private int compressionThreshold = DEFAULT_COMPRESSIONTHRESHOLD;
+    private boolean useNativeTransport = DEFAULT_USE_NATIVE_TRANSPORT;
 
     /**
      * Default empty constructor.
@@ -149,6 +156,15 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public boolean isChunkedSupported() {
         return chunkedSupported;
+    }
+
+    /**
+     * Whether to use netty's native transport (epoll or kqueue) if available.
+     *
+     * @return To use netty's native transport (epoll or kqueue) if available.
+     */
+    public boolean isUseNativeTransport() {
+        return useNativeTransport;
     }
 
     /**
@@ -271,6 +287,14 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
      */
     public void setChunkedSupported(boolean chunkedSupported) {
         this.chunkedSupported = chunkedSupported;
+    }
+
+    /**
+     * Sets whether to use netty's native transport (epoll or kqueue) if available . Default value ({@value #DEFAULT_USE_NATIVE_TRANSPORT_IF_AVAILABLE}).
+     * @param useNativeTransport True if netty's native transport should be use if available.
+     */
+    public void setUseNativeTransport(boolean useNativeTransport) {
+        this.useNativeTransport = useNativeTransport;
     }
 
     /**

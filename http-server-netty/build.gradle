@@ -3,6 +3,8 @@ dependencies {
     compile project(":http-netty")
 
     compileOnly project(":inject-java")
+    compileOnly dependencyModuleVersion("netty", "netty-transport-native-epoll")
+    compileOnly dependencyModuleVersion("netty", "netty-transport-native-kqueue")
 
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")

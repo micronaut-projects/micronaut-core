@@ -59,9 +59,9 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPipeline;
+import io.netty.channel.EventLoopGroup;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
@@ -90,6 +90,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -141,9 +142,10 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private final SslContext sslContext;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final ChannelGroup webSocketSessions = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
-    private NioEventLoopGroup workerGroup;
-    private NioEventLoopGroup parentGroup;
+    private EventLoopGroup workerGroup;
+    private EventLoopGroup parentGroup;
     private EmbeddedServerInstance serviceInstance;
+    private EventLoopGroupFactory eventLoopGroupFactory;
 
     /**
      * @param serverConfiguration                     The Netty HTTP server configuration
@@ -158,6 +160,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @param executorSelector                        The executor selector
      * @param nettyServerSslBuilder                   The Netty Server SSL builder
      * @param outboundHandlers                        The outbound handlers
+     * @param eventLoopGroupFactory                   The EventLoopGroupFactory
      */
     @SuppressWarnings("ParameterNumber")
     @Inject
@@ -173,7 +176,8 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         @javax.inject.Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
         ExecutorSelector executorSelector,
         NettyServerSslBuilder nettyServerSslBuilder,
-        List<ChannelOutboundHandler> outboundHandlers
+        List<ChannelOutboundHandler> outboundHandlers,
+        EventLoopGroupFactory eventLoopGroupFactory
     ) {
         Optional<File> location = serverConfiguration.getMultipart().getLocation();
         location.ifPresent(dir -> DiskFileUpload.baseDirectory = dir.getAbsolutePath());
@@ -207,6 +211,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         this.sslContext = nettyServerSslBuilder.build().orElse(null);
         this.threadFactory = threadFactory;
         this.webSocketBeanRegistry = WebSocketBeanRegistry.forServer(applicationContext);
+        this.eventLoopGroupFactory = eventLoopGroupFactory;
     }
 
     /**
@@ -233,7 +238,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             processOptions(serverConfiguration.getChildOptions(), serverBootstrap::childOption);
 
             serverBootstrap = serverBootstrap.group(parentGroup, workerGroup)
-                .channel(NioServerSocketChannel.class)
+                .channel(eventLoopGroupFactory.serverSocketChannelClass())
                 .childHandler(new ChannelInitializer() {
                     @Override
                     protected void initChannel(Channel ch) {
@@ -364,7 +369,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @return The parent event loop group
      */
     @SuppressWarnings("WeakerAccess")
-    protected NioEventLoopGroup createParentEventLoopGroup() {
+    protected EventLoopGroup createParentEventLoopGroup() {
         return newEventLoopGroup(serverConfiguration.getParent());
     }
 
@@ -372,7 +377,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @return The worker event loop group
      */
     @SuppressWarnings("WeakerAccess")
-    protected NioEventLoopGroup createWorkerEventLoopGroup() {
+    protected EventLoopGroup createWorkerEventLoopGroup() {
         return newEventLoopGroup(serverConfiguration.getWorker());
     }
 
@@ -462,25 +467,24 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         }
     }
 
-    private NioEventLoopGroup newEventLoopGroup(NettyHttpServerConfiguration.EventLoopConfig config) {
+    private EventLoopGroup newEventLoopGroup(NettyHttpServerConfiguration.EventLoopConfig config) {
         if (config != null) {
             Optional<ExecutorService> executorService = config.getExecutorName().flatMap(name -> beanLocator.findBean(ExecutorService.class, Qualifiers.byName(name)));
-            NioEventLoopGroup group = executorService.map(service ->
-                new NioEventLoopGroup(config.getNumOfThreads(), service)
+            EventLoopGroup group = executorService.map(service ->
+                eventLoopGroupFactory.createEventLoopGroup(config.getNumOfThreads(), service, config.getIoRatio())
             ).orElseGet(() -> {
                 if (threadFactory != null) {
-                    return new NioEventLoopGroup(config.getNumOfThreads(), threadFactory);
+                    return eventLoopGroupFactory.createEventLoopGroup(config.getNumOfThreads(), threadFactory, config.getIoRatio());
                 } else {
-                    return new NioEventLoopGroup(config.getNumOfThreads());
+                    return eventLoopGroupFactory.createEventLoopGroup(config.getNumOfThreads(), config.getIoRatio());
                 }
             });
-            config.getIoRatio().ifPresent(group::setIoRatio);
             return group;
         } else {
             if (threadFactory != null) {
-                return new NioEventLoopGroup(NettyThreadFactory.DEFAULT_EVENT_LOOP_THREADS, threadFactory);
+                return eventLoopGroupFactory.createEventLoopGroup(NettyThreadFactory.DEFAULT_EVENT_LOOP_THREADS, threadFactory, OptionalInt.empty());
             } else {
-                return new NioEventLoopGroup();
+                return eventLoopGroupFactory.createEventLoopGroup(OptionalInt.empty());
             }
         }
     }
