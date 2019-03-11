@@ -286,7 +286,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         private final boolean isAopProxyType;
         private final OptionalValues<Boolean> aopSettings;
         private ConfigurationMetadata configurationMetadata;
-        private ExecutableElementParamInfo constructorParamterInfo;
+        private ExecutableElementParamInfo constructorParameterInfo;
         private AtomicInteger adaptedMethodIndex = new AtomicInteger(0);
 
         /**
@@ -371,11 +371,11 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                     if (qualifiedName.equals(classElement.getQualifiedName())) {
                         ExecutableElement constructor = modelUtils.concreteConstructorFor(classElement, annotationUtils);
-                        this.constructorParamterInfo = populateParameterData(constructor);
+                        this.constructorParameterInfo = populateParameterData(constructor);
                         final boolean isBean = isAopProxyType ||
                                 isConfigurationPropertiesType ||
                                 typeAnnotationMetadata.hasStereotype(ANNOTATION_STEREOTYPES) ||
-                                (constructorParamterInfo.getAnnotationMetadata().hasStereotype(Inject.class));
+                                (constructorParameterInfo.getAnnotationMetadata().hasStereotype(Inject.class));
 
                         if (isBean) {
                             // we know this class has supported annotations so we need a beandef writer for it
@@ -394,7 +394,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                                         beanDefinitionWriter,
                                         aopSettings,
                                         false,
-                                        this.constructorParamterInfo,
+                                        this.constructorParameterInfo,
                                         interceptorTypes);
                             }
                         }
@@ -468,19 +468,19 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                 BeanDefinitionVisitor proxyWriter = beanDefinitionWriters.get(proxyKey);
                 if (proxyWriter != null) {
                     proxyWriter.visitBeanDefinitionConstructor(
-                            constructorParamterInfo.getAnnotationMetadata(),
-                            constructorParamterInfo.isRequiresReflection(),
-                            constructorParamterInfo.getParameters(),
-                            constructorParamterInfo.getParameterMetadata(),
-                            constructorParamterInfo.getGenericTypes());
+                            constructorParameterInfo.getAnnotationMetadata(),
+                            constructorParameterInfo.isRequiresReflection(),
+                            constructorParameterInfo.getParameters(),
+                            constructorParameterInfo.getParameterMetadata(),
+                            constructorParameterInfo.getGenericTypes());
                 }
 
                 beanDefinitionWriter.visitBeanDefinitionConstructor(
-                        constructorParamterInfo.getAnnotationMetadata(),
-                        constructorParamterInfo.isRequiresReflection(),
-                        constructorParamterInfo.getParameters(),
-                        constructorParamterInfo.getParameterMetadata(),
-                        constructorParamterInfo.getGenericTypes());
+                        constructorParameterInfo.getAnnotationMetadata(),
+                        constructorParameterInfo.isRequiresReflection(),
+                        constructorParameterInfo.getParameters(),
+                        constructorParameterInfo.getParameterMetadata(),
+                        constructorParameterInfo.getGenericTypes());
             }
             return beanDefinitionWriter;
         }
@@ -920,7 +920,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                             beanWriter,
                             settings,
                             false,
-                            this.constructorParamterInfo,
+                            this.constructorParameterInfo,
                             interceptorTypes
                     );
 
