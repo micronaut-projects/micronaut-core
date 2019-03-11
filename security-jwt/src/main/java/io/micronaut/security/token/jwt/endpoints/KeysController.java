@@ -25,7 +25,6 @@ import io.micronaut.security.rules.SecurityRule;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import net.minidev.json.JSONObject;
-
 import java.util.Collection;
 
 /**
@@ -56,7 +55,8 @@ public class KeysController {
     @Get
     public Single<JSONObject> keys() {
         return Flowable.fromIterable(jwkProviders)
-                .map(JwkProvider::retrieveJsonWebKey)
+                .map(JwkProvider::retrieveJsonWebKeys)
+                .flatMap(Flowable::fromIterable)
                 .toList()
                 .map(JWKSet::new)
                 .map(JWKSet::toJSONObject);

@@ -17,8 +17,10 @@ package io.micronaut.security.token.jwt.endpoints;
 
 import com.nimbusds.jose.jwk.JWK;
 
+import java.util.List;
+
 /**
- * Defines an interface for Json Web Key (JKW) providers.
+ * Defines an interface for JSON Web Key (JKW) providers.
  * Those providers are used in the {@link io.micronaut.security.token.jwt.endpoints.KeysController}.
  *
  * @author Sergio del Amo
@@ -28,7 +30,7 @@ public interface JwkProvider {
 
     /**
      *
-     * @return a JSON Web Key.
+     * @return a List of JWK (JSON Web Key).
      */
-    JWK retrieveJsonWebKey();
+    List<JWK> retrieveJsonWebKeys();
 }
