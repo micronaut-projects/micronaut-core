@@ -94,8 +94,8 @@ class KeysControllerSpec extends Specification {
         }
 
         @Override
-        JWK retrieveJsonWebKey() {
-            return jwk
+        List<JWK> retrieveJsonWebKeys() {
+            [jwk]
         }
     }
 }
