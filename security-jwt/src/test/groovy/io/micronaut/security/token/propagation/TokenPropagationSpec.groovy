@@ -177,10 +177,12 @@ class TokenPropagationSpec extends Specification {
         rsp.body().refreshToken
 
         when:
+
+        // tag::bearerAuth[]
         String accessToken = rsp.body().accessToken
         List<Book> books = gatewayClient.toBlocking().retrieve(HttpRequest.GET("/api/gateway")
                 .bearerAuth(accessToken), Argument.listOf(Book))
-
+        // end::bearerAuth[]
         then:
         noExceptionThrown()
         books
