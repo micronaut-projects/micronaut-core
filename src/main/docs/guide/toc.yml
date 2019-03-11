@@ -31,6 +31,7 @@ ioc:
   lifecycle: Life-Cycle Methods
   contextEvents: Context Events
   events: Bean Events
+  introspection: Bean Introspection
   annotationMetadata: Bean Annotation Metadata
   springBeans: Micronaut Beans And Spring
   android: Android Support
@@ -79,6 +80,7 @@ httpServer:
   datavalidation: Data Validation
   staticResources: Serving Static Resources
   errorHandling: Error Handling
+  apiVersioning: API Versioning
   formData: Handling Form Data
   serverIO: Writing Response Data
   uploads: File Uploads
@@ -101,6 +103,8 @@ httpServer:
     thymeleaf: Thymeleaf
     handlebars: Handlebars.java
     velocity: Apache Velocity
+    freemarker: Apache Freemarker
+    csp: CSP Header Support
   openapi: OpenAPI / Swagger Support
 httpClient:
   title: The HTTP Client
@@ -129,6 +133,7 @@ cloud:
     title: Cloud Configuration
     distributedConfiguration: Distributed Configuration
     distributedConfigurationConsul: Consul Support
+    distributedConfigurationSpringCloud: Spring Cloud Config Support
     distributedConfigurationAwsParameterStore: AWS Parameter Store Support
   serviceDiscovery:
     title: Service Discovery
@@ -162,29 +167,8 @@ serverlessFunctions:
   callingFunctions: Calling Functions with FunctionClient
 messaging:
   title: Message-Driven Microservices
-  kafka:
-    title: Kafka Support
-    kafkaCli: Using the Micronaut CLI
-    kafkaQuickStart: Kafka Quick Start
-    kafkaClient:
-      title: Kafka Producers Using @KafkaClient
-      kafkaClientMethods: Defining @KafkaClient Methods
-      kafkaClientConfiguration: Configuring @KafkaClient beans
-      kafkaClientBatch: Sending Records in Batch
-      kafkaClientScope: Injecting Kafka Producer Beans
-      kafkaEmbedded: Embedding Kafka
-    kafkaListener:
-      title: Kafka Consumers Using @KafkaListener
-      kafkaListenerMethods: Defining @KafkaListener Methods
-      kafkaListenerConfiguration: Configuring @KafkaListener beans
-      kafkaOffsets: Commiting Kafka Offsets
-      kafkaListenerBatch: Kafka Batch Processing
-      kafkaSendTo: Forwarding Messages with @SendTo
-      kafkaExceptions: Handling Consumer Exceptions
-    kafkaApplications:
-      title: Running Kafka Applications
-      kafkaHealth: Kafka Health Checks
-    kafkaStream: Building Kafka Stream Applications
+  kafka: Kafka Support
+  rabbitmq: RabbitMQ Support
 commandLineApps:
   title: Standalone Command Line Applications
   picocli:
@@ -202,9 +186,8 @@ configurations:
     postgresSupport: Configuring Postgres
     redisSupport: Configuring Redis
     cassandraSupport: Configuring Cassandra
-  otherConfigurations:
-    title: Other Configurations
-    rabbitmq: RabbitMQ
+    liquibaseSupport: Configuring Liquibase
+    flywaySupport: Configuring Flyway
 languageSupport:
   title: Language Support
   java: Micronaut for Java
@@ -273,7 +256,10 @@ security:
     login: Login Controller
     logout: Logout Controller
     refresh: Refresh Controller
-  retrievingAuthenticatedUser: Retrieve the authenticated user
+  retrievingAuthenticatedUser:
+    title: Retrieve the authenticated user
+    securityService: User outside of a controller
+    accessSecurityInViews: User in a view
   securityEvents: Security Events
 
 multitenancy:
@@ -289,6 +275,7 @@ cli:
   commands: Commands
   reloading:
     title: Reloading
+    automaticRestart: Automatic Restart
     jrebel: JRebel
     springloaded: Spring-Loaded
     gradleReload: Reloading with Gradle

@@ -13,9 +13,9 @@ The following cache annotations are supported:
 - link:{api}/io/micronaut/cache/annotation/CacheInvalidate.html[@CacheInvalidate] - Indicates the invocation of a method should cause the invalidation of one or many caches.
 
 
-By using one of the annotations the link:{api}/io/micronaut/cache/interceptor/CacheInterceptor.html[CacheInterceptor] is activated which in the case of `@Cacheable` will cache the return result of the method.
+By using one of the annotations the api:cache.interceptor.CacheInterceptor[] is activated which in the case of `@Cacheable` will cache the return result of the method.
 
-If the return type of the method is a non-blocking type (either link:{jdkapi}/java/util/concurrent/CompletableFuture.html[CompletableFuture] or an instance of link:{rsapi}/org/reactivestreams/Publisher.html[org.reactivestreams.Publisher]) the emitted result will be cached.
+If the return type of the method is a non-blocking type (either link:{jdkapi}/java/util/concurrent/CompletableFuture.html[CompletableFuture] or an instance of rs:Publisher[] the emitted result will be cached.
 
 In addition if the underlying Cache implementation supports non-blocking cache operations then cache values will be read from the cache without blocking, resulting in the ability to implement completely non-blocking cache operations.
 
@@ -29,16 +29,22 @@ By default https://github.com/ben-manes/caffeine[Caffeine] is used for cache def
 ----
 micronaut:
     caches:
-        myCache:
+        my-cache:
             maximumSize: 20
 ----
 
-The above example will configure a cache called "myCache" with a maximum size of 20.
+The above example will configure a cache called "my-cache" with a maximum size of 20.
+
+[NOTE]
+.Naming Caches
+====
+Names of caches under `micronaut.caches` should be defined in kebab case (lowercase and hyphen seperated), if camel case is used the names are normalized to kebab case. So for example specifing `myCache` will become `my-cache`. The kebab case form should be used when referencing caches in the ann:cache.annotation.Cacheable[] annotation.
+====
 
 To configure a weigher to be used with the `maximumWeight` configuration, create a bean that implements `io.micronaut.caffeine.cache.Weigher`. To associate a given weigher with only a specific cache, annotate the bean with `@Named(<cache name>)`. Weighers without a named qualifier will apply to all caches that don't have a named weigher. If no beans are found, a default implementation will be used.
 
 
-include::{includedir}configurationProperties/io.micronaut.cache.CacheConfiguration.adoc[]
+include::{includedir}configurationProperties/io.micronaut.cache.DefaultCacheConfiguration.adoc[]
 
 
 == Caching with Redis
@@ -52,32 +58,4 @@ $ mn create-app my-app --features redis-lettuce
 ----
 ====
 
-If you wish to use Redis to cache results then you need to have the Lettuce configuration dependency on your classpath. Lettuce is a non-blocking, reactive Redis client implementation and Micronaut provides an implementation that allows cached results to be read reactively.
-
-To enable Lettuce, add the `redis-lettuce` dependency to your application:
-
-.Lettuce Configuration build.gradle
-[source,groovy]
-----
-dependencies {
-    ...
-    compile "io.micronaut.configuration:micronaut-redis-lettuce"
-    ...
-}
-----
-
-Then within your application configuration configure the Redis URL and Redis caches:
-
-//TODO: Move YAML snippet to test
-.Cache Configuration Example
-[source,yaml]
-----
-micronaut:
-    redis:
-        uri: redis://localhost
-        caches:
-            myCache:
-                expireAfterWrite: "1h" # expire one hour after write
-----
-
-include::{includedir}configurationProperties/io.micronaut.configuration.lettuce.cache.RedisCacheConfiguration.adoc[]
+If you wish to use Redis to cache results the https://micronaut-projects.github.io/micronaut-redis/snapshot/guide/#cache[Micronaut Redis] module provides a api:cache.CacheManager[] implementation that allows using Redis as a backing cache.

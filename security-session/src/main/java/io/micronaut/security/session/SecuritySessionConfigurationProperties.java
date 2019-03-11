@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.session;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.security.config.SecurityConfigurationProperties;
+import io.micronaut.security.handlers.ForbiddenRejectionUriProvider;
+import io.micronaut.security.handlers.UnauthorizedRejectionUriProvider;
+
+import java.util.Optional;
 
 /**
  * Implementation of {@link SecuritySessionConfiguration}. Session-based Authentication configuration properties.
@@ -26,7 +30,9 @@ import io.micronaut.security.config.SecurityConfigurationProperties;
  * @since 1.0
  */
 @ConfigurationProperties(SecuritySessionConfigurationProperties.PREFIX)
-public class SecuritySessionConfigurationProperties implements SecuritySessionConfiguration {
+public class SecuritySessionConfigurationProperties implements SecuritySessionConfiguration,
+        UnauthorizedRejectionUriProvider,
+        ForbiddenRejectionUriProvider {
     public static final String PREFIX = SecurityConfigurationProperties.PREFIX + ".session";
 
     /**
@@ -53,6 +59,13 @@ public class SecuritySessionConfigurationProperties implements SecuritySessionCo
     @SuppressWarnings("WeakerAccess")
     public static final String DEFAULT_LOGOUTTARGETURL = "/";
 
+    /**
+     * The default value to disable rejection handler.
+     */
+    @Deprecated
+    @SuppressWarnings("WeakerAccess")
+    public static final boolean DEFAULT_LEGACYREJECTIONHANDLER = true;
+
     private String loginSuccessTargetUrl = DEFAULT_LOGINSUCCESSTARGETURL;
     private String loginFailureTargetUrl = DEFAULT_LOGINFAILURETARGETURL;
     private String logoutTargetUrl = DEFAULT_LOGOUTTARGETURL;
@@ -60,6 +73,22 @@ public class SecuritySessionConfigurationProperties implements SecuritySessionCo
     private String forbiddenTargetUrl;
     private boolean enabled = DEFAULT_ENABLED;
 
+    @Deprecated
+    private boolean legacyRejectionHandler = DEFAULT_LEGACYREJECTIONHANDLER;
+
+    @Override
+    public boolean isLegacyRejectionHandler() {
+        return legacyRejectionHandler;
+    }
+
+    /**
+     * Decides whether the deprecated {@link SessionSecurityFilterOrderProvider} is loaded, instead of the new {@link io.micronaut.security.handlers.RedirectRejectionHandler}. Defaults to (#DEFAULT_LEGACYREJECTIONHANDLER).
+     * @param legacyRejectionHandler whether the deprecated {@link SessionSecurityFilterOrderProvider} is loaded
+     */
+    public void setLegacyRejectionHandler(boolean legacyRejectionHandler) {
+        this.legacyRejectionHandler = legacyRejectionHandler;
+    }
+    
     @Override
     public boolean isEnabled() {
         return enabled;
@@ -152,5 +181,29 @@ public class SecuritySessionConfigurationProperties implements SecuritySessionCo
      */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    /**
+     * @return A uri to redirect to when a user tries to access a secured resource without authentication.
+     */
+    public Optional<String> getUnauthorizedRedirectUri() {
+        return Optional.ofNullable(unauthorizedTargetUrl);
+    }
+
+    @Override
+    public Optional<String> getUnauthorizedRedirectUri(HttpRequest<?> request) {
+        return getUnauthorizedRedirectUri();
+    }
+
+    /**
+     * @return A uri to redirect to when an authenticated user tries to access a resource for which he does not have the required authorization level.
+     */
+    public Optional<String> getForbiddenRedirectUri() {
+        return Optional.ofNullable(forbiddenTargetUrl);
+    }
+
+    @Override
+    public Optional<String> getForbiddenRedirectUri(HttpRequest<?> request) {
+        return getForbiddenRedirectUri();
     }
 }

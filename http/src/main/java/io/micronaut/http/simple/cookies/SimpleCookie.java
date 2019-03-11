@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.simple.cookies;
 
 import io.micronaut.http.cookie.Cookie;
 
+import javax.annotation.Nonnull;
 import java.util.Objects;
 
 /**
@@ -48,12 +48,12 @@ public class SimpleCookie implements Cookie {
     }
 
     @Override
-    public String getName() {
+    public @Nonnull String getName() {
         return name;
     }
 
     @Override
-    public String getValue() {
+    public @Nonnull String getValue() {
         return value;
     }
 
@@ -83,37 +83,37 @@ public class SimpleCookie implements Cookie {
     }
 
     @Override
-    public Cookie maxAge(long maxAge) {
+    public @Nonnull Cookie maxAge(long maxAge) {
         this.maxAge = maxAge;
         return this;
     }
 
     @Override
-    public Cookie value(String value) {
+    public @Nonnull Cookie value(@Nonnull String value) {
         this.value = value;
         return this;
     }
 
     @Override
-    public Cookie domain(String domain) {
+    public @Nonnull Cookie domain(String domain) {
         this.domain = domain;
         return this;
     }
 
     @Override
-    public Cookie path(String path) {
+    public @Nonnull Cookie path(String path) {
         this.path = path;
         return this;
     }
 
     @Override
-    public Cookie secure(boolean secure) {
+    public @Nonnull Cookie secure(boolean secure) {
         this.secure = secure;
         return this;
     }
 
     @Override
-    public Cookie httpOnly(boolean httpOnly) {
+    public @Nonnull Cookie httpOnly(boolean httpOnly) {
         this.httpOnly = httpOnly;
         return this;
     }
@@ -144,14 +144,11 @@ public class SimpleCookie implements Cookie {
         }
 
         if (getDomain() == null) {
-            if (that.getDomain() != null) {
-                return false;
-            }
+            return that.getDomain() == null;
         } else {
             return getDomain().equalsIgnoreCase(that.getDomain());
         }
 
-        return true;
     }
 
     @Override

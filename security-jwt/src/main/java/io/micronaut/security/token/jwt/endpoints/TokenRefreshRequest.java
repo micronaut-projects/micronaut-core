@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.token.jwt.endpoints;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import javax.validation.constraints.NotBlank;
-import javax.validation.constraints.NotNull;
 import javax.validation.constraints.Pattern;
 
 /**
@@ -31,12 +29,10 @@ import javax.validation.constraints.Pattern;
 public class TokenRefreshRequest {
 
     @NotBlank
-    @NotNull
     @Pattern(regexp = "refresh_token")
     @JsonProperty("grant_type")
     private String grantType;
 
-    @NotNull
     @NotBlank
     @JsonProperty("refresh_token")
     private String refreshToken;

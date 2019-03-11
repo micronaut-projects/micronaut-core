@@ -7,11 +7,7 @@ Micronaut features integration with both Zipkin and Jaeger (via the Open Tracing
 
 To enable tracing you should add the `tracing` module to your `build.gradle` or `pom.xml` file:
 
-.build.gradle
-[source,groovy]
-----
-compile "io.micronaut:micronaut-tracing"
-----
+dependency:micronaut-tracing[]
 
 == Tracing Annotations
 

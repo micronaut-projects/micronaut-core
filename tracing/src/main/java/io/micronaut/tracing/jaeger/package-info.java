@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 /**
  * This package contains configuration for Jaeger based tracing.
  *
@@ -22,10 +21,11 @@
  */
 @Configuration
 @Requires(classes = io.jaegertracing.Configuration.class)
-@Requires(property = PREFIX + ".enabled", value = "true")
+@Requires(property = PREFIX + ".enabled", value = StringUtils.TRUE)
 package io.micronaut.tracing.jaeger;
 
 import static io.micronaut.tracing.jaeger.JaegerConfiguration.PREFIX;
 
 import io.micronaut.context.annotation.Configuration;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ class NettyHttpRequestSpec extends Specification {
     void "test netty http request parameters"() {
         given:
         DefaultFullHttpRequest nettyRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uri)
-        NettyHttpRequest request = new NettyHttpRequest(nettyRequest,Mock(ChannelHandlerContext), new DefaultConversionService(), new HttpServerConfiguration())
+        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, Mock(ChannelHandlerContext), new DefaultConversionService(), new HttpServerConfiguration())
         String fullURI = request.uri.toString()
         String expectedPath = fullURI.indexOf('?') > -1 ? fullURI.substring(0, fullURI.indexOf('?')) : fullURI
 
@@ -43,7 +43,7 @@ class NettyHttpRequestSpec extends Specification {
         fullURI == uri
         request.path.toString() == expectedPath
         request.method == HttpMethod."$method"
-        request.parameters.names()== params as Set
+        request.parameters.names() == params as Set
 
         where:
         method | uri               | headers | content | params
@@ -58,7 +58,7 @@ class NettyHttpRequestSpec extends Specification {
             nettyRequest.headers().add(header.key.toString(), header.value)
         }
 
-        NettyHttpRequest request = new NettyHttpRequest(nettyRequest,Mock(ChannelHandlerContext), new DefaultConversionService(), new HttpServerConfiguration())
+        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, Mock(ChannelHandlerContext), new DefaultConversionService(), new HttpServerConfiguration())
         String fullURI = request.uri.toString()
         String expectedPath = fullURI.indexOf('?') > -1 ? fullURI.substring(0, fullURI.indexOf('?')) : fullURI
 
@@ -80,7 +80,7 @@ class NettyHttpRequestSpec extends Specification {
             nettyRequest.headers().add(header.key.toString(), header.value)
         }
 
-        NettyHttpRequest request = new NettyHttpRequest(nettyRequest,Mock(ChannelHandlerContext), new DefaultConversionService(), new HttpServerConfiguration())
+        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, Mock(ChannelHandlerContext), new DefaultConversionService(), new HttpServerConfiguration())
         String fullURI = request.uri.toString()
         String expectedPath = fullURI.indexOf('?') > -1 ? fullURI.substring(0, fullURI.indexOf('?')) : fullURI
 
@@ -96,5 +96,28 @@ class NettyHttpRequestSpec extends Specification {
         GET    | '/foo/bar' | [(HttpHeaders.ACCEPT_LANGUAGE): 'en-US,en;q=0.5']                               | null    | 'en_US'
         GET    | '/foo/bar' | [(HttpHeaders.ACCEPT_LANGUAGE): 'fr-CH, fr;q=0.9, en;q=0.8, de;q=0.7, *;q=0.5'] | null    | 'fr_CH'
         GET    | '/foo/bar' | [(HttpHeaders.ACCEPT_LANGUAGE): '*']                                            | null    | Locale.default.toString()
+    }
+
+    void "test accept-charset parsing"() {
+        given:
+        DefaultFullHttpRequest nettyRequest = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, method, uri)
+        for (header in headers) {
+            nettyRequest.headers().add(header.key.toString(), header.value)
+        }
+
+        NettyHttpRequest request = new NettyHttpRequest(nettyRequest, Mock(ChannelHandlerContext), new DefaultConversionService(), new HttpServerConfiguration())
+        String fullURI = request.uri.toString()
+        String expectedPath = fullURI.indexOf('?') > -1 ? fullURI.substring(0, fullURI.indexOf('?')) : fullURI
+
+        expect:
+        fullURI == uri
+        request.path.toString() == expectedPath
+        request.method == HttpMethod."$method"
+        request.characterEncoding.name() == charset
+
+        where:
+        method | uri        | headers                                                                         | content | charset
+        GET    | '/foo/bar' | [(HttpHeaders.ACCEPT_CHARSET): 'utf-8, iso-8859-1;q=0.5']                       | null    | 'UTF-8'
+        GET    | '/foo/bar' | [(HttpHeaders.ACCEPT_CHARSET): 'utf-16, iso-8859-1;q=0.5']                       | null    | 'UTF-16'
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.ast.groovy.visitor
 
 import groovy.transform.CompileStatic
@@ -57,8 +56,13 @@ class LoadedVisitor {
             it.name == TypeElementVisitor.class.name
         }
         GenericsType[] generics = definition.getGenericsTypes()
-        classAnnotation = generics[0].type.name
-        elementAnnotation = generics[1].type.name
+        if (generics) {
+            classAnnotation = generics[0].type.name
+            elementAnnotation = generics[1].type.name
+        } else {
+            classAnnotation = ClassHelper.OBJECT
+            elementAnnotation = ClassHelper.OBJECT
+        }
     }
 
     TypeElementVisitor getVisitor() {
@@ -119,7 +123,7 @@ class LoadedVisitor {
         switch (annotatedNode.getClass()) {
             case FieldNode:
             case PropertyNode:
-                visitor.visitField(new GroovyFieldElement(sourceUnit, (Variable) annotatedNode, annotationMetadata), visitorContext)
+                visitor.visitField(new GroovyFieldElement(sourceUnit, (Variable) annotatedNode,  annotatedNode, annotationMetadata), visitorContext)
                 break
             case ConstructorNode:
                 visitor.visitConstructor(new GroovyConstructorElement(sourceUnit, (ConstructorNode) annotatedNode, annotationMetadata), visitorContext)

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.tracing.instrument.util;
 
 import io.micronaut.core.async.publisher.Publishers;
@@ -103,10 +102,13 @@ public class TracingPublisher<T> implements Publisher<T> {
     @Override
     public void subscribe(Subscriber<? super T> actual) {
         Span span;
+        boolean finishOnClose;
         if (spanBuilder != null) {
             span = spanBuilder.start();
+            finishOnClose = true;
         } else {
             span = parentSpan;
+            finishOnClose = false;
         }
         if (span != null) {
             try (Scope ignored = tracer.scopeManager().activate(span, false)) {
@@ -122,7 +124,7 @@ public class TracingPublisher<T> implements Publisher<T> {
 
                     @Override
                     public void onNext(T object) {
-                        try (Scope ignored = tracer.scopeManager().activate(span, isSingle)) {
+                        try (Scope ignored = tracer.scopeManager().activate(span, isSingle && finishOnClose)) {
                             if (object instanceof MutableHttpResponse) {
                                 MutableHttpResponse response = (MutableHttpResponse) object;
                                 Optional<?> body = response.getBody();
@@ -148,7 +150,7 @@ public class TracingPublisher<T> implements Publisher<T> {
 
                     @Override
                     public void onError(Throwable t) {
-                        try (Scope ignored = tracer.scopeManager().activate(span, true)) {
+                        try (Scope ignored = tracer.scopeManager().activate(span, finishOnClose)) {
                             TracingPublisher.this.onError(t, span);
                             actual.onError(t);
                             finished = true;
@@ -158,7 +160,7 @@ public class TracingPublisher<T> implements Publisher<T> {
                     @Override
                     public void onComplete() {
                         if (!finished) {
-                            try (Scope ignored = tracer.scopeManager().activate(span, true)) {
+                            try (Scope ignored = tracer.scopeManager().activate(span, finishOnClose)) {
                                 actual.onComplete();
                                 TracingPublisher.this.doOnFinish(span);
                             }

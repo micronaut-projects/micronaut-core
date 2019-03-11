@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,18 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.SmartHttpContentCompressor;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
 import io.micronaut.http.server.types.CustomizableResponseTypeException;
+import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.http.server.types.files.SystemFile;
 import io.micronaut.http.server.types.files.SystemFileCustomizableResponseType;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.DefaultFileRegion;
+import io.netty.channel.*;
 import io.netty.handler.codec.http.DefaultHttpResponse;
 import io.netty.handler.codec.http.FullHttpResponse;
 import io.netty.handler.codec.http.HttpChunkedInput;
@@ -32,6 +33,8 @@ import io.netty.handler.codec.http.HttpHeaders;
 import io.netty.handler.codec.http.LastHttpContent;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedFile;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -49,10 +52,11 @@ import java.util.Optional;
 public class NettySystemFileCustomizableResponseType extends SystemFileCustomizableResponseType implements NettyFileCustomizableResponseType {
 
     private static final int LENGTH_8K = 8192;
+    private static final Logger LOG = LoggerFactory.getLogger(NettySystemFileCustomizableResponseType.class);
 
     protected final RandomAccessFile raf;
     protected final long rafLength;
-    protected Optional<SystemFileCustomizableResponseType> delegate = Optional.empty();
+    protected Optional<FileCustomizableResponseType> delegate = Optional.empty();
 
     /**
      * @param file The file
@@ -79,6 +83,14 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
         this.delegate = Optional.of(delegate);
     }
 
+    /**
+     * @param delegate The system file customizable response type
+     */
+    public NettySystemFileCustomizableResponseType(SystemFile delegate) {
+        this(delegate.getFile());
+        this.delegate = Optional.of(delegate);
+    }
+
     @Override
     public long getLength() {
         return rafLength;
@@ -86,12 +98,18 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
 
     @Override
     public long getLastModified() {
-        return delegate.map(SystemFileCustomizableResponseType::getLastModified).orElse(super.getLastModified());
+        return delegate.map(FileCustomizableResponseType::getLastModified).orElse(super.getLastModified());
     }
 
     @Override
+    @Deprecated
     public String getName() {
-        return delegate.map(SystemFileCustomizableResponseType::getName).orElse(super.getName());
+        return delegate.map(FileCustomizableResponseType::getName).orElse(super.getName());
+    }
+
+    @Override
+    public MediaType getMediaType() {
+        return delegate.map(FileCustomizableResponseType::getMediaType).orElse(super.getMediaType());
     }
 
     /**
@@ -113,21 +131,30 @@ public class NettySystemFileCustomizableResponseType extends SystemFileCustomiza
             HttpHeaders headers = nettyResponse.headers();
             context.write(new DefaultHttpResponse(nettyResponse.protocolVersion(), nettyResponse.status(), headers), context.voidPromise());
 
+            ChannelFuture sendFileFuture;
             // Write the content.
             if (context.pipeline().get(SslHandler.class) == null && context.pipeline().get(SmartHttpContentCompressor.class).shouldSkip(headers)) {
                 // SSL not enabled - can use zero-copy file transfer.
-                context.write(new DefaultFileRegion(raf.getChannel(), 0, getLength()), context.newProgressivePromise());
+                sendFileFuture = context.write(new DefaultFileRegion(raf.getChannel(), 0, getLength()), context.newProgressivePromise());
                 context.writeAndFlush(LastHttpContent.EMPTY_LAST_CONTENT);
             } else {
                 // SSL enabled - cannot use zero-copy file transfer.
                 try {
                     // HttpChunkedInput will write the end marker (LastHttpContent) for us.
-                    context.writeAndFlush(new HttpChunkedInput(new ChunkedFile(raf, 0, getLength(), LENGTH_8K)),
+                    sendFileFuture = context.writeAndFlush(new HttpChunkedInput(new ChunkedFile(raf, 0, getLength(), LENGTH_8K)),
                         context.newProgressivePromise());
                 } catch (IOException e) {
                     throw new CustomizableResponseTypeException("Could not read file", e);
                 }
             }
+
+            sendFileFuture.addListener((future) -> {
+                try {
+                    raf.close();
+                } catch (IOException e) {
+                    LOG.warn("An error occurred closing the file reference: " + file.getAbsolutePath(), e);
+                }
+            });
 
         } else {
             throw new IllegalArgumentException("Unsupported response type. Not a Netty response: " + response);

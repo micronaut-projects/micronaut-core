@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,17 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.annotation;
-
-import io.micronaut.core.type.Argument;
-import io.micronaut.core.value.OptionalValues;
-
-import java.lang.annotation.Annotation;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
 
 /**
  * An empty representation of {@link AnnotationMetadata}.
@@ -33,93 +23,4 @@ import java.util.Set;
  */
 @Internal
 class EmptyAnnotationMetadata implements AnnotationMetadata {
-    @Override
-    public boolean hasDeclaredAnnotation(String annotation) {
-        return false;
-    }
-
-    @Override
-    public boolean hasAnnotation(String annotation) {
-        return false;
-    }
-
-    @Override
-    public boolean hasStereotype(String annotation) {
-        return false;
-    }
-
-    @Override
-    public boolean hasDeclaredStereotype(String annotation) {
-        return false;
-    }
-
-    @Override
-    public List<String> getAnnotationNamesByStereotype(String stereotype) {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public Set<String> getAnnotationNames() {
-        return Collections.emptySet();
-    }
-
-    @Override
-    public Set<String> getDeclaredAnnotationNames() {
-        return Collections.emptySet();
-    }
-
-    @Override
-    public List<String> getDeclaredAnnotationNamesByStereotype(String stereotype) {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
-        return Optional.empty();
-    }
-
-    @Override
-    public <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(String annotation) {
-        return Optional.empty();
-    }
-
-    @Override
-    public <T> OptionalValues<T> getValues(String annotation, Class<T> valueType) {
-        return OptionalValues.empty();
-    }
-
-    @Override
-    public <T> Optional<T> getDefaultValue(String annotation, String member, Argument<T> requiredType) {
-        return Optional.empty();
-    }
-
-    @Override
-    public <T> Optional<T> getDefaultValue(String annotation, String member, Class<T> requiredType) {
-        return Optional.empty();
-    }
-
-    @Override
-    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(Class<T> annotationType) {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(Class<T> annotationType) {
-        return Collections.emptyList();
-    }
-
-    @Override
-    public <T extends Annotation> T synthesize(Class<T> annotationClass) {
-        return null;
-    }
-
-    @Override
-    public Annotation[] synthesizeAll() {
-        return AnnotationUtil.ZERO_ANNOTATIONS;
-    }
-
-    @Override
-    public Annotation[] synthesizeDeclared() {
-        return AnnotationUtil.ZERO_ANNOTATIONS;
-    }
 }

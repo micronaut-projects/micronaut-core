@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,6 +30,14 @@ class BeanInitializingWithFactorySpec extends Specification {
 
         then:"The event is triggered prior to @PostConstruct hooks"
         b.name == "CHANGED"
+
+        when:"a bean is retrieved that is both a created and initialized listener"
+        DualListener listener = context.getBean(DualListener)
+
+        then:
+        listener.initialized
+        listener.created
+
     }
 }
 

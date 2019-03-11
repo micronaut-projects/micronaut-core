@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
 import io.micronaut.http.annotation.QueryValue
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.multipart.MultipartBody
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
@@ -277,6 +278,11 @@ class HttpPostSpec extends Specification {
         body == "a,b"
     }
 
+    void "test content length is 0 with a post and no body"() {
+        expect:
+        context.getBean(PostClient).call() == "0"
+    }
+
     @Controller('/post')
     static class PostController {
 
@@ -298,6 +304,11 @@ class HttpPostSpec extends Specification {
         @Post('/queryNoBody')
         Book simple(@QueryValue("title") String title) {
             return new Book(title: title, pages: 0)
+        }
+
+        @Post('/noBody')
+        String noBody(@Header("Content-Length") String contentLength) {
+            return contentLength
         }
 
         @Post('/title/{title}')
@@ -346,5 +357,12 @@ class HttpPostSpec extends Specification {
 
     static class Params {
         List<String> param
+    }
+
+    @Client("/post")
+    static interface PostClient {
+
+        @Post("/noBody")
+        String call()
     }
 }

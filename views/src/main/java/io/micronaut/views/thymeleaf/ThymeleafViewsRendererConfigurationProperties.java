@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,10 +17,8 @@
 package io.micronaut.views.thymeleaf;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.views.ViewsConfigurationProperties;
-import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.templatemode.TemplateMode;
 import org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver;
 
@@ -32,7 +30,6 @@ import java.time.Duration;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(classes = TemplateEngine.class)
 @ConfigurationProperties(ThymeleafViewsRendererConfigurationProperties.PREFIX)
 public class ThymeleafViewsRendererConfigurationProperties implements ThymeleafViewsRendererConfiguration {
 

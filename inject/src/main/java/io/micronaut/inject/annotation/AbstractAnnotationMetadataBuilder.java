@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.inject.annotation;
 
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Aliases;
 import io.micronaut.context.annotation.DefaultScope;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.AnnotationValue;
-import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.*;
 import io.micronaut.core.io.service.ServiceDefinition;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.util.CollectionUtils;
@@ -32,6 +28,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 
 import javax.annotation.Nullable;
 import javax.inject.Scope;
+import java.lang.annotation.Annotation;
 import java.util.*;
 
 /**
@@ -45,6 +42,7 @@ import java.util.*;
 public abstract class AbstractAnnotationMetadataBuilder<T, A> {
 
     private static final Map<String, List<AnnotationMapper>> ANNOTATION_MAPPERS = new HashMap<>();
+    private static final Map<Object, AnnotationMetadata> MUTATED_ANNOTATION_METADATA = new HashMap<>();
 
     static {
         SoftServiceLoader<AnnotationMapper> serviceLoader = SoftServiceLoader.load(AnnotationMapper.class, AbstractAnnotationMetadataBuilder.class.getClassLoader());
@@ -82,20 +80,26 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata build(T element) {
-        DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
+        final AnnotationMetadata existing = MUTATED_ANNOTATION_METADATA.get(element);
+        if (existing != null) {
+            return existing;
+        } else {
 
-        try {
-            AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, true);
-            if (metadata.isEmpty()) {
-                return AnnotationMetadata.EMPTY_METADATA;
-            }
-            return metadata;
-        } catch(RuntimeException e) {
-            if("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
-                // workaround for a bug in the Eclipse APT implementation. See bug 541466 on their Bugzilla.
-                return AnnotationMetadata.EMPTY_METADATA;
-            } else {
-                throw e;
+            DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
+
+            try {
+                AnnotationMetadata metadata = buildInternal(null, element, annotationMetadata, true);
+                if (metadata.isEmpty()) {
+                    return AnnotationMetadata.EMPTY_METADATA;
+                }
+                return metadata;
+            } catch (RuntimeException e) {
+                if ("org.eclipse.jdt.internal.compiler.problem.AbortCompilation".equals(e.getClass().getName())) {
+                    // workaround for a bug in the Eclipse APT implementation. See bug 541466 on their Bugzilla.
+                    return AnnotationMetadata.EMPTY_METADATA;
+                } else {
+                    throw e;
+                }
             }
         }
     }
@@ -107,8 +111,13 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata buildForMethod(T element) {
-        DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
-        return buildInternal(null, element, annotationMetadata, false);
+        final AnnotationMetadata existing = MUTATED_ANNOTATION_METADATA.get(element);
+        if (existing != null) {
+            return existing;
+        } else {
+            DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
+            return buildInternal(null, element, annotationMetadata, false);
+        }
     }
 
     /**
@@ -130,6 +139,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The type
      */
     protected abstract T getTypeForAnnotation(A annotationMirror);
+
+    /**
+     * Checks whether an annotation is present.
+     *
+     * @param element The element
+     * @param annotation The annotation type
+     * @return True if the annotation is present
+     */
+    protected abstract boolean hasAnnotation(T element, Class<? extends Annotation> annotation);
 
     /**
      * Get the given type of the annotation.
@@ -304,31 +322,41 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                     continue;
                 }
 
+                boolean isInstantiatedMember = hasAnnotation(member, InstantiatedMember.class);
                 Optional<?> aliases = getAnnotationValues(member, Aliases.class).get("value");
                 Object annotationValue = entry.getValue();
-
-                if (aliases.isPresent()) {
-                    Object value = aliases.get();
-                    if (value instanceof io.micronaut.core.annotation.AnnotationValue[]) {
-                        io.micronaut.core.annotation.AnnotationValue[] values = (io.micronaut.core.annotation.AnnotationValue[]) value;
-                        for (io.micronaut.core.annotation.AnnotationValue av : values) {
-                            OptionalValues<Object> aliasForValues = OptionalValues.of(Object.class, av.getValues());
-                            processAnnotationAlias(
-                                    metadata,
-                                    isDeclared,
-                                    parentAnnotations,
-                                    annotationValues,
-                                    annotationValue,
-                                    aliasForValues
-                            );
-                        }
+                if (isInstantiatedMember) {
+                    final String memberName = getAnnotationMemberName(member);
+                    final Object rawValue = readAnnotationValue(memberName, annotationValue);
+                    if (rawValue instanceof AnnotationClassValue) {
+                        AnnotationClassValue acv = (AnnotationClassValue) rawValue;
+                        annotationValues.put(memberName, new AnnotationClassValue(acv.getName(), true));
                     }
-                    readAnnotationRawValues(getAnnotationMemberName(member), annotationValue, annotationValues);
                 } else {
-                    OptionalValues<?> aliasForValues = getAnnotationValues(member, AliasFor.class);
-                    processAnnotationAlias(metadata, isDeclared, parentAnnotations, annotationValues, annotationValue, aliasForValues);
-                    readAnnotationRawValues(getAnnotationMemberName(member), annotationValue, annotationValues);
+                    if (aliases.isPresent()) {
+                        Object value = aliases.get();
+                        if (value instanceof io.micronaut.core.annotation.AnnotationValue[]) {
+                            io.micronaut.core.annotation.AnnotationValue[] values = (io.micronaut.core.annotation.AnnotationValue[]) value;
+                            for (io.micronaut.core.annotation.AnnotationValue av : values) {
+                                OptionalValues<Object> aliasForValues = OptionalValues.of(Object.class, av.getValues());
+                                processAnnotationAlias(
+                                        metadata,
+                                        isDeclared,
+                                        parentAnnotations,
+                                        annotationValues,
+                                        annotationValue,
+                                        aliasForValues
+                                );
+                            }
+                        }
+                        readAnnotationRawValues(getAnnotationMemberName(member), annotationValue, annotationValues);
+                    } else {
+                        OptionalValues<?> aliasForValues = getAnnotationValues(member, AliasFor.class);
+                        processAnnotationAlias(metadata, isDeclared, parentAnnotations, annotationValues, annotationValue, aliasForValues);
+                        readAnnotationRawValues(getAnnotationMemberName(member), annotationValue, annotationValues);
+                    }
                 }
+
             }
         }
         List<AnnotationMapper> mappers = ANNOTATION_MAPPERS.get(annotationName);
@@ -418,6 +446,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                 annotationDefaults.put(entry.getKey().toString(), entry.getValue());
             }
             DefaultAnnotationMetadata.registerAnnotationDefaults(annotationName, annotationDefaults);
+        } else {
+            metadata.addDefaultAnnotationValues(annotationName, Collections.emptyMap());
         }
     }
 
@@ -489,6 +519,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         }
         Collections.reverse(hierarchy);
         for (T currentElement : hierarchy) {
+            if (currentElement == null) {
+                continue;
+            }
             List<? extends A> annotationHierarchy = getAnnotationsForType(currentElement);
 
             if (annotationHierarchy.isEmpty()) {
@@ -599,6 +632,27 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         List<String> stereoTypeParents = new ArrayList<>(parents);
         stereoTypeParents.add(annotationTypeName);
         buildStereotypeHierarchy(stereoTypeParents, annotationType, metadata, isDeclared);
+    }
+
+    /**
+     * Used to store metadata mutations at compilation time. Not for public consumption.
+     *
+     * @param element The element
+     * @param metadata The metadata
+     */
+    @Internal
+    public static void addMutatedMetadata(Object element, AnnotationMetadata metadata) {
+        if (element != null && metadata != null) {
+            MUTATED_ANNOTATION_METADATA.put(element, metadata);
+        }
+    }
+
+    /**
+     * Used to clear mutated metadata at the end of a compilation cycle.
+     */
+    @Internal
+    public static void clearMutated() {
+        MUTATED_ANNOTATION_METADATA.clear();
     }
 
     /**

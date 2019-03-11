@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.management.endpoint.beans.impl;
 
 import io.micronaut.context.annotation.Requires;
@@ -61,7 +60,7 @@ public class DefaultBeanDefinitionData implements BeanDefinitionData<Map<String,
      * @return A list of dependencies for the bean definition
      */
     protected List getDependencies(BeanDefinition<?> beanDefinition) {
-        return beanDefinition.getRequiredComponents().stream().map(Class::getName).collect(Collectors.toList());
+        return beanDefinition.getRequiredComponents().stream().map(Class::getName).sorted().collect(Collectors.toList());
     }
 
     /**

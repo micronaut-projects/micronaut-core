@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,23 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.netty.buffer.ByteBufHolder;
 import io.netty.handler.codec.http.HttpContent;
-import io.netty.handler.codec.http.multipart.Attribute;
-import io.netty.handler.codec.http.multipart.DefaultHttpDataFactory;
-import io.netty.handler.codec.http.multipart.FileUpload;
-import io.netty.handler.codec.http.multipart.HttpData;
-import io.netty.handler.codec.http.multipart.HttpPostRequestDecoder;
-import io.netty.handler.codec.http.multipart.InterfaceHttpData;
+import io.netty.handler.codec.http.multipart.*;
 import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 
 import java.nio.charset.Charset;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * <p>Decodes {@link MediaType#MULTIPART_FORM_DATA} in a non-blocking manner.</p>
@@ -44,6 +43,7 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
 
     private final HttpPostRequestDecoder decoder;
     private final boolean enabled;
+    private AtomicLong extraMessages = new AtomicLong(0);
 
     /**
      * @param nettyHttpRequest The {@link NettyHttpRequest}
@@ -52,11 +52,19 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
     FormDataHttpContentProcessor(NettyHttpRequest<?> nettyHttpRequest, NettyHttpServerConfiguration configuration) {
         super(nettyHttpRequest, configuration);
         Charset characterEncoding = nettyHttpRequest.getCharacterEncoding();
-        DefaultHttpDataFactory factory = new DefaultHttpDataFactory(configuration.getMultipart().isDisk(), characterEncoding);
-        factory.setMaxLimit(configuration.getMultipart().getMaxFileSize());
+        HttpServerConfiguration.MultipartConfiguration multipart = configuration.getMultipart();
+        DefaultHttpDataFactory factory;
+        if (multipart.isDisk()) {
+            factory = new DefaultHttpDataFactory(true, characterEncoding);
+        } else if (multipart.isMixed()) {
+            factory = new DefaultHttpDataFactory(multipart.getThreshold(), characterEncoding);
+        } else {
+            factory = new DefaultHttpDataFactory(false, characterEncoding);
+        }
+        factory.setMaxLimit(multipart.getMaxFileSize());
         this.decoder = new HttpPostRequestDecoder(factory, nettyHttpRequest.getNativeRequest(), characterEncoding);
         this.enabled = nettyHttpRequest.getContentType().map(type -> type.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)).orElse(false) ||
-            configuration.getMultipart().isEnabled();
+            multipart.isEnabled();
     }
 
     @Override
@@ -65,45 +73,76 @@ public class FormDataHttpContentProcessor extends AbstractHttpContentProcessor<H
     }
 
     @Override
+    protected void doOnSubscribe(Subscription subscription, Subscriber<? super HttpData> subscriber) {
+        subscriber.onSubscribe(new Subscription() {
+
+            @Override
+            public void request(long n) {
+                extraMessages.updateAndGet((p) -> {
+                    long newVal = p - n;
+                    if (newVal < 0) {
+                        subscription.request(n - p);
+                        return 0;
+                    } else {
+                        return newVal;
+                    }
+                });
+            }
+
+            @Override
+            public void cancel() {
+                subscription.cancel();
+            }
+        });
+    }
+
+    @Override
     protected void onData(ByteBufHolder message) {
         Subscriber<? super HttpData> subscriber = getSubscriber();
 
         if (message instanceof HttpContent) {
             HttpContent httpContent = (HttpContent) message;
+            List<InterfaceHttpData> messages = new ArrayList<>(1);
+
             try {
                 HttpPostRequestDecoder postRequestDecoder = this.decoder;
                 postRequestDecoder.offer(httpContent);
+
                 while (postRequestDecoder.hasNext()) {
                     InterfaceHttpData data = postRequestDecoder.next();
-                    try {
-                        switch (data.getHttpDataType()) {
-                            case Attribute:
-                                Attribute attribute = (Attribute) data;
-                                subscriber.onNext(attribute);
-                                break;
-                            case FileUpload:
-                                FileUpload fileUpload = (FileUpload) data;
-                                if (fileUpload.isCompleted()) {
-                                    subscriber.onNext(fileUpload);
-                                }
-                                break;
-                            default:
-                                // no-op
-                        }
-                    } finally {
-                        data.release();
+                    switch (data.getHttpDataType()) {
+                        case Attribute:
+                            Attribute attribute = (Attribute) data;
+                            messages.add(attribute);
+                            break;
+                        case FileUpload:
+                            FileUpload fileUpload = (FileUpload) data;
+                            if (fileUpload.isCompleted()) {
+                                messages.add(fileUpload);
+                            }
+                            break;
+                        default:
+                            // no-op
                     }
                 }
 
                 InterfaceHttpData currentPartialHttpData = postRequestDecoder.currentPartialHttpData();
                 if (currentPartialHttpData instanceof HttpData) {
-                    subscriber.onNext((HttpData) currentPartialHttpData);
+                    messages.add(currentPartialHttpData);
                 }
+
             } catch (HttpPostRequestDecoder.EndOfDataDecoderException e) {
                 // ok, ignore
             } catch (Throwable e) {
                 onError(e);
             } finally {
+                if (messages.isEmpty()) {
+                    subscription.request(1);
+                } else {
+                    extraMessages.updateAndGet((p) -> p + messages.size() - 1);
+                    messages.stream().map(HttpData.class::cast).forEach(subscriber::onNext);
+                }
+
                 httpContent.release();
             }
         } else {

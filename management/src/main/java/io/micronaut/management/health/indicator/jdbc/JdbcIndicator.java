@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.management.health.indicator.jdbc;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.async.publisher.AsyncSingleResultPublisher;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.health.HealthStatus;
 import io.micronaut.management.endpoint.health.HealthEndpoint;
 import io.micronaut.management.health.aggregator.HealthAggregator;
@@ -50,7 +50,7 @@ import java.util.stream.Collectors;
  */
 @Singleton
 @Requires(beans = HealthEndpoint.class)
-@Requires(property = HealthEndpoint.PREFIX + ".jdbc.enabled", notEquals = "false")
+@Requires(property = HealthEndpoint.PREFIX + ".jdbc.enabled", notEquals = StringUtils.FALSE)
 public class JdbcIndicator implements HealthIndicator {
 
     private static final String NAME = "jdbc";
@@ -82,9 +82,7 @@ public class JdbcIndicator implements HealthIndicator {
             Optional<Throwable> throwable = Optional.empty();
             Map<String, Object> details = null;
             String key;
-            Connection connection = null;
-            try {
-                connection = dataSource.getConnection();
+            try (Connection connection = dataSource.getConnection()) {
                 if (connection.isValid(CONNECTION_TIMEOUT)) {
                     DatabaseMetaData metaData = connection.getMetaData();
                     key = metaData.getURL();
@@ -100,14 +98,6 @@ public class JdbcIndicator implements HealthIndicator {
                     key = dataSource.getClass().getMethod("getUrl").invoke(dataSource).toString();
                 } catch (Exception n) {
                     key = dataSource.getClass().getName() + "@" + Integer.toHexString(dataSource.hashCode());
-                }
-            } finally {
-                if (connection != null) {
-                    try {
-                        connection.close();
-                    } catch (SQLException e) {
-                        //no-op
-                    }
                 }
             }
 

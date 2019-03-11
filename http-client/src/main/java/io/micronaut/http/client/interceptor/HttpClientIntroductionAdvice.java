@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.client.interceptor;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -21,44 +20,42 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
-import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.format.Format;
-import io.micronaut.core.io.buffer.ByteBuffer;
-import io.micronaut.http.client.annotation.Client;
-import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.CompletionAwareSubscriber;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.convert.format.Format;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.MutableArgumentValue;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.HttpAttributes;
-import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.HttpStatus;
-import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.core.version.annotation.Version;
+import io.micronaut.http.*;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.client.*;
+import io.micronaut.http.client.annotation.Client;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.client.interceptor.configuration.ClientVersioningConfiguration;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.client.sse.SseClient;
+import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.cookies.NettyCookie;
 import io.micronaut.http.sse.Event;
+import io.micronaut.http.uri.UriBuilder;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.jackson.ObjectMapperFactory;
@@ -77,8 +74,6 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.Closeable;
 import java.lang.annotation.Annotation;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -93,6 +88,7 @@ import java.util.function.Function;
  */
 @Singleton
 @Internal
+@BootstrapContextCompatible
 public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, Object>, Closeable, AutoCloseable {
 
     private static final Logger LOG = LoggerFactory.getLogger(DefaultHttpClient.class);
@@ -103,8 +99,10 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
     private static final MediaType[] DEFAULT_ACCEPT_TYPES = {MediaType.APPLICATION_JSON_TYPE};
 
     private final int HEADERS_INITIAL_CAPACITY = 3;
+    private final int ATTRIBUTES_INITIAL_CAPACITY = 1;
     private final BeanContext beanContext;
     private final Map<String, HttpClient> clients = new ConcurrentHashMap<>();
+    private final Map<String, ClientVersioningConfiguration> versioningConfigurations = new ConcurrentHashMap<>();
     private final List<ReactiveClientResultTransformer> transformers;
     private final LoadBalancerResolver loadBalancerResolver;
     private final JsonMediaTypeCodec jsonMediaTypeCodec;
@@ -211,6 +209,31 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
             }
 
+            context.findAnnotation(Version.class)
+                    .flatMap(versionAnnotation -> versionAnnotation.getValue(String.class))
+                    .filter(StringUtils::isNotEmpty)
+                    .ifPresent(version -> {
+
+                        ClientVersioningConfiguration configuration = getVersioningConfiguration(clientAnnotation);
+
+                        configuration.getHeaders()
+                                .forEach(header -> headers.put(header, version));
+
+                        configuration.getParameters()
+                                .forEach(parameter -> queryParams.put(parameter, version));
+                    });
+          
+            Map<String, Object> attributes = new LinkedHashMap<>(ATTRIBUTES_INITIAL_CAPACITY);
+
+            List<AnnotationValue<RequestAttribute>> attributeAnnotations = context.getAnnotationValuesByType(RequestAttribute.class);
+            for (AnnotationValue<RequestAttribute> attributeAnnotation : attributeAnnotations) {
+                String attributeName = attributeAnnotation.get("name", String.class).orElse(null);
+                Object attributeValue = attributeAnnotation.getValue(Object.class).orElse(null);
+                if (StringUtils.isNotEmpty(attributeName) && attributeValue != null) {
+                    attributes.put(attributeName, attributeValue);
+                }
+            }
+
             List<NettyCookie> cookies = new ArrayList<>();
             List<Argument> bodyArguments = new ArrayList<>();
             ConversionService<?> conversionService = ConversionService.SHARED;
@@ -267,6 +290,21 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                             queryParams.put(parameterName, o);
                         } else {
                             queryParams.put(argumentName, o);
+                        }
+                    });
+                } else if (annotationMetadata.isAnnotationPresent(RequestAttribute.class)) {
+                    String attributeName = annotationMetadata.getValue(Annotation.class, String.class).orElse(null);
+                    if (StringUtils.isEmpty(attributeName)) {
+                        attributeName = NameUtils.hyphenate(argumentName);
+                    }
+                    String finalAttributeName = attributeName;
+                    conversionService.convert(definedValue, Object.class)
+                        .ifPresent(o -> attributes.put(finalAttributeName, o));
+                } else if (annotationMetadata.isAnnotationPresent(PathVariable.class)) {
+                    String parameterName = annotationMetadata.getValue(PathVariable.class, String.class).orElse(null);
+                    conversionService.convert(definedValue, ConversionContext.of(String.class).with(annotationMetadata)).ifPresent(o -> {
+                        if (!StringUtils.isEmpty(o)) {
+                            paramMap.put(parameterName, o);
                         }
                     });
                 } else if (!uriVariables.contains(argumentName)) {
@@ -332,6 +370,12 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             }
 
             cookies.forEach(request::cookie);
+
+            if (!attributes.isEmpty()) {
+                for (Map.Entry<String, Object> entry : attributes.entrySet()) {
+                    request.setAttribute(entry.getKey(), entry.getValue());
+                }
+            }
 
             MediaType[] acceptTypes = context.getValue(Consumes.class, MediaType[].class).orElse(DEFAULT_ACCEPT_TYPES);
 
@@ -489,7 +533,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 } else {
                     try {
                         return blockingHttpClient.retrieve(
-                            request, returnType.asArgument(), errorType
+                                request, returnType.asArgument(), errorType
                         );
                     } catch (RuntimeException t) {
                         if (t instanceof HttpClientResponseException && ((HttpClientResponseException) t).getStatus() == HttpStatus.NOT_FOUND) {
@@ -506,6 +550,16 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         }
         // try other introduction advice
         return context.proceed();
+    }
+
+    private ClientVersioningConfiguration getVersioningConfiguration(AnnotationValue<Client> clientAnnotation) {
+        return versioningConfigurations.computeIfAbsent(getClientId(clientAnnotation), clientId ->
+                beanContext.findBean(ClientVersioningConfiguration.class, Qualifiers.byName(clientId))
+                        .orElseGet(() -> beanContext.findBean(ClientVersioningConfiguration.class, Qualifiers.byName(ClientVersioningConfiguration.DEFAULT))
+                                .orElseThrow(() -> new ConfigurationException("Attempt to apply a '@Version' to the request, but " +
+                                        "versioning configuration found neither for '" + clientId + "' nor '" + ClientVersioningConfiguration.DEFAULT + "' provided.")
+                                )));
+
     }
 
     private boolean isJsonParsedMediaType(MediaType[] acceptTypes) {
@@ -546,7 +600,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
      * @return client registration
      */
     private HttpClient getClient(MethodInvocationContext<Object, Object> context, AnnotationValue<Client> clientAnn) {
-        String clientId = clientAnn.getValue(String.class).orElse(null);
+        String clientId = getClientId(clientAnn);
         String path = clientAnn.get("path", String.class).orElse(null);
         String clientKey = computeClientKey(clientId, path);
         if (clientKey == null) {
@@ -558,7 +612,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             if (null != clientBean) {
                 return clientBean;
             }
-            
+
             LoadBalancer loadBalancer = loadBalancerResolver.resolve(clientId)
                 .orElseThrow(() ->
                     new HttpClientException("Invalid service reference [" + clientId + "] specified to @Client")
@@ -642,6 +696,14 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
         });
     }
 
+    private String getClientId(AnnotationValue<Client> clientAnn) {
+        String clientId = clientAnn.getValue(String.class).orElse(null);
+        if (clientId == null) {
+            throw new HttpClientException("Either the id or value of the @Client annotation must be specified");
+        }
+        return clientId;
+    }
+
     private String computeClientKey(String clientId, String path) {
         if (StringUtils.isEmpty(clientId)) {
             return null;
@@ -655,30 +717,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
 
     private String appendQuery(String uri, Map<String, String> queryParams) {
         if (!queryParams.isEmpty()) {
-            try {
-                URI oldUri = new URI(uri);
-
-                StringBuilder sb = new StringBuilder(oldUri.getQuery() == null ? "" : oldUri.getQuery());
-                if (sb.length() > 0) {
-                    sb.append('&');
-                }
-
-                Iterator<Map.Entry<String, String>> iterator = queryParams.entrySet().iterator();
-                while (iterator.hasNext()) {
-                    Map.Entry<String, String> entry = iterator.next();
-                    sb.append(entry.getKey());
-                    sb.append('=');
-                    sb.append(entry.getValue());
-                    if (iterator.hasNext()) {
-                        sb.append('&');
-                    }
-                }
-
-                return new URI(oldUri.getScheme(), oldUri.getAuthority(), oldUri.getPath(),
-                        sb.toString(), oldUri.getFragment()).toString();
-            } catch (URISyntaxException e) {
-                //no-op
+            final UriBuilder builder = UriBuilder.of(uri);
+            for (Map.Entry<String, String> entry : queryParams.entrySet()) {
+                builder.queryParam(entry.getKey(), entry.getValue());
             }
+            return builder.toString();
         }
         return uri;
     }

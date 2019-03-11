@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.uri;
 
 import java.util.*;
@@ -101,6 +100,27 @@ public class UriMatchTemplate extends UriTemplate implements UriMatcher {
         return Collections.unmodifiableList(variables);
     }
 
+    /**
+     * Returns the path string excluding any query variables.
+     *
+     * @return The path string
+     */
+    public String toPathString() {
+        return toString(pathSegment -> {
+            final Optional<String> var = pathSegment.getVariable();
+            if (var.isPresent()) {
+                final Optional<UriMatchVariable> umv = variables.stream()
+                        .filter(v -> v.getName().equals(var.get())).findFirst();
+                if (umv.isPresent()) {
+                    final UriMatchVariable uriMatchVariable = umv.get();
+                    if (uriMatchVariable.isQuery()) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        });
+    }
 
     /**
      * Match the given URI string.

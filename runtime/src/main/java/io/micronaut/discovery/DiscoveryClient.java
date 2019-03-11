@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.discovery;
 
+import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.core.naming.Described;
 import org.reactivestreams.Publisher;
 
@@ -36,10 +36,12 @@ public interface DiscoveryClient extends Closeable, AutoCloseable, Described {
      * @param serviceId The service id
      * @return A {@link Publisher} that emits a list of {@link ServiceInstance}
      */
+    @SingleResult
     Publisher<List<ServiceInstance>> getInstances(String serviceId);
 
     /**
      * @return The known service IDs
      */
+    @SingleResult
     Publisher<List<String>> getServiceIds();
 }

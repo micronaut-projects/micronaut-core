@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.management.endpoint.beans.impl;
 
 import io.micronaut.context.annotation.Requires;
@@ -32,7 +31,6 @@ import javax.inject.Singleton;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -73,7 +71,7 @@ public class RxJavaBeanDefinitionDataCollector implements BeanDefinitionDataColl
      * @return A {@link Single} that wraps a Map
      */
     protected Single<Map<String, Object>> getBeans(Collection<BeanDefinition<?>> definitions) {
-        Map<String, Object> beans = new ConcurrentHashMap<>(definitions.size());
+        Map<String, Object> beans = new LinkedHashMap<>(definitions.size());
 
         return Flowable
             .fromIterable(definitions)

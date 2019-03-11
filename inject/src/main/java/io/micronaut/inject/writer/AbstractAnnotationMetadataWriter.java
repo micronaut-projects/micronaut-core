@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -49,7 +48,10 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
      * @param annotationMetadata      The annotation metadata
      * @param writeAnnotationDefaults Whether to write annotation defaults
      */
-    protected AbstractAnnotationMetadataWriter(String className, AnnotationMetadata annotationMetadata, boolean writeAnnotationDefaults) {
+    protected AbstractAnnotationMetadataWriter(
+            String className,
+            AnnotationMetadata annotationMetadata,
+            boolean writeAnnotationDefaults) {
         this.targetClassType = getTypeReference(className);
         if (annotationMetadata == AnnotationMetadata.EMPTY_METADATA) {
             this.annotationMetadataWriter = null;
@@ -127,9 +129,7 @@ public abstract class AbstractAnnotationMetadataWriter extends AbstractClassFile
             staticInit.getStatic(Type.getType(AnnotationMetadata.class), "EMPTY_METADATA", Type.getType(AnnotationMetadata.class));
         } else {
             Type concreteMetadataType = getTypeReference(annotationMetadataWriter.getClassName());
-            staticInit.newInstance(concreteMetadataType);
-            staticInit.dup();
-            staticInit.invokeConstructor(concreteMetadataType, METHOD_DEFAULT_CONSTRUCTOR);
+            pushNewInstance(staticInit, concreteMetadataType);
         }
 
         staticInit.putStatic(targetClassType, FIELD_ANNOTATION_METADATA, annotationMetadataType);

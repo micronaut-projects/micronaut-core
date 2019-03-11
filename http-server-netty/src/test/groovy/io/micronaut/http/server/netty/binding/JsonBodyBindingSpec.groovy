@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.binding
 import com.fasterxml.jackson.core.JsonParseException
 import groovy.json.JsonSlurper
 import io.reactivex.Flowable
+import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
@@ -26,12 +27,13 @@ import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Error
 import io.micronaut.http.client.exceptions.HttpClientResponseException
-import io.micronaut.http.hateos.Link
-import io.micronaut.http.hateos.JsonError
+import io.micronaut.http.hateoas.Link
+import io.micronaut.http.hateoas.JsonError
 import io.micronaut.http.server.netty.AbstractMicronautSpec
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
 import org.reactivestreams.Publisher
+import reactor.core.publisher.Mono
 
 import java.util.concurrent.CompletableFuture
 
@@ -232,6 +234,29 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         response.body() == "[Foo(Fred, 10)]".toString()
     }
 
+    void "test mono argument handling"() {
+        when:
+        def json = '{"message":"foo"}'
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/mono', json), String
+        ).blockingFirst()
+
+        then:
+        response.body() == "$json".toString()
+    }
+
+
+    void "test singe argument handling"() {
+        when:
+        def json = '{"message":"foo"}'
+        def response = rxClient.exchange(
+                HttpRequest.POST('/json/single', json), String
+        ).blockingFirst()
+
+        then:
+        response.body() == "$json".toString()
+    }
+
     @Controller(value = "/json", produces = io.micronaut.http.MediaType.APPLICATION_JSON)
     static class JsonController {
 
@@ -275,6 +300,17 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         @Post("/nested")
         String nested(@Body('foo') Foo foo) {
             "Body: $foo"
+        }
+
+        @Post("/mono")
+        Mono<String> mono(@Body Mono<String> message) {
+            message
+        }
+
+        @Post("/single")
+        Single<String> single(@Body Single<String> message) {
+            message
+
         }
 
         @Post("/future")

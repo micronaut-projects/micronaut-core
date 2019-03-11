@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,15 +16,19 @@
 package io.micronaut.http.client
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.ReadTimeoutException
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.http.annotation.Get
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+
+import javax.inject.Inject
 
 /**
  * @author Graeme Rocher
@@ -56,13 +60,63 @@ class ReadTimeoutSpec extends Specification {
         e.message == 'Read Timeout'
     }
 
+    void "test read timeout setting with connection pool"() {
+        given:
+        ApplicationContext clientContext = ApplicationContext.run(
+                'micronaut.http.client.read-timeout':'1s',
+                'micronaut.http.client.pool.enabled':true
+        )
+        RxHttpClient client = clientContext.createBean(RxHttpClient, embeddedServer.getURL())
+        when:
+        client.retrieve(HttpRequest.GET('/timeout/client'), String).blockingFirst()
+
+        then:
+        def e = thrown(ReadTimeoutException)
+        e.message == 'Read Timeout'
+
+        cleanup:
+        clientContext.close()
+    }
+
+    void "test disable read timeout"() {
+        given:
+
+        ApplicationContext clientContext = ApplicationContext.run(
+                'micronaut.http.client.read-timeout':'-1s')
+        def server = clientContext.getBean(EmbeddedServer).start()
+        RxHttpClient client = clientContext.createBean(RxHttpClient, server.getURL())
+        when:
+        def result = client.retrieve(HttpRequest.GET('/timeout/client'), String).blockingFirst()
+
+        then:
+        result == 'success'
+
+        cleanup:
+        server.stop()
+        clientContext.close()
+    }
+
     @Controller("/timeout")
     static class GetController {
+
+        @Inject
+        TestClient testClient
 
         @Get(value = "/", produces = MediaType.TEXT_PLAIN)
         String index() {
             sleep 5000
             return "success"
         }
+
+        @Get(value = "/client", produces = MediaType.TEXT_PLAIN)
+        String test() {
+            return testClient.get()
+        }
+    }
+
+    @Client("/timeout")
+    static interface TestClient {
+        @Get
+        String get()
     }
 }

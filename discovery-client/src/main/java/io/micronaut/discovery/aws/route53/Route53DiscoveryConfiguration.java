@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.discovery.aws.route53;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.DiscoveryConfiguration;
 import io.micronaut.discovery.aws.route53.client.Route53AutoNamingClient;
 
@@ -28,7 +28,7 @@ import io.micronaut.discovery.aws.route53.client.Route53AutoNamingClient;
  * See https://docs.aws.amazon.com/Route53/latest/APIReference/overview-service-discovery.html for details info
  */
 @Requires(env = Environment.AMAZON_EC2)
-@Requires(property = Route53AutoNamingClient.ENABLED, value = "true", defaultValue = "false")
+@Requires(property = Route53AutoNamingClient.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @ConfigurationProperties(Route53DiscoveryConfiguration.PREFIX)
 public class Route53DiscoveryConfiguration extends DiscoveryConfiguration {
 

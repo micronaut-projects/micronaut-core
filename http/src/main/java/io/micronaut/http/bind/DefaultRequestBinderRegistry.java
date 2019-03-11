@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.bind;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.core.bind.ArgumentBinder;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ConversionService;
@@ -25,20 +22,17 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
+import io.micronaut.http.bind.binders.RequestAttributeAnnotationBinder;
+import io.micronaut.http.bind.binders.*;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
-import io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder;
-import io.micronaut.http.bind.binders.CookieAnnotationBinder;
-import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
-import io.micronaut.http.bind.binders.HeaderAnnotationBinder;
-import io.micronaut.http.bind.binders.ParameterAnnotationBinder;
-import io.micronaut.http.bind.binders.RequestArgumentBinder;
-import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
@@ -60,8 +54,8 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     private final Map<TypeAndAnnotation, RequestArgumentBinder> byTypeAndAnnotation = new LinkedHashMap<>();
     private final Map<Integer, RequestArgumentBinder> byType = new LinkedHashMap<>();
     private final ConversionService<?> conversionService;
-    private final Cache<TypeAndAnnotation, Optional<RequestArgumentBinder>> argumentBinderCache =
-        Caffeine.newBuilder().maximumSize(CACHE_MAX_SIZE).build();
+    private final Map<TypeAndAnnotation, Optional<RequestArgumentBinder>> argumentBinderCache =
+        new ConcurrentLinkedHashMap.Builder<TypeAndAnnotation, Optional<RequestArgumentBinder>>().maximumWeightedCapacity(CACHE_MAX_SIZE).build();
 
     /**
      * @param conversionService The conversion service
@@ -155,7 +149,7 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
      */
     protected <T> RequestArgumentBinder findBinder(Argument<T> argument, Class<? extends Annotation> annotationType) {
         TypeAndAnnotation key = new TypeAndAnnotation(argument, annotationType);
-        return argumentBinderCache.get(key, key1 -> {
+        return argumentBinderCache.computeIfAbsent(key, key1 -> {
             RequestArgumentBinder requestArgumentBinder = byTypeAndAnnotation.get(key1);
             if (requestArgumentBinder == null) {
                 Class<?> javaType = key1.type.getType();
@@ -185,7 +179,19 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
     protected void registerDefaultConverters(ConversionService<?> conversionService) {
         conversionService.addConverter(
             CharSequence.class,
-            MediaType.class, (object, targetType, context) -> Optional.of(new MediaType(object.toString())));
+            MediaType.class, (object, targetType, context) -> {
+                    if (StringUtils.isEmpty(object)) {
+                        return Optional.empty();
+                    } else {
+                        final String str = object.toString();
+                        try {
+                            return Optional.of(new MediaType(str));
+                        } catch (IllegalArgumentException e) {
+                            context.reject(e);
+                            return Optional.empty();
+                        }
+                    }
+                });
 
     }
 
@@ -204,6 +210,12 @@ public class DefaultRequestBinderRegistry implements RequestBinderRegistry {
 
         ParameterAnnotationBinder<Object> parameterAnnotationBinder = new ParameterAnnotationBinder<>(conversionService);
         byAnnotation.put(parameterAnnotationBinder.getAnnotationType(), parameterAnnotationBinder);
+
+        RequestAttributeAnnotationBinder<Object> requestAttributeAnnotationBinder = new RequestAttributeAnnotationBinder<>(conversionService);
+        byAnnotation.put(requestAttributeAnnotationBinder.getAnnotationType(), requestAttributeAnnotationBinder);
+
+        PathVariableAnnotationBinder<Object> pathVariableAnnotationBinder = new PathVariableAnnotationBinder<>(conversionService);
+        byAnnotation.put(pathVariableAnnotationBinder.getAnnotationType(), pathVariableAnnotationBinder);
     }
 
     /**

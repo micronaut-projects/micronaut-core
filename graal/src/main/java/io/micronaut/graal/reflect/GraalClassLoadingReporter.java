@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.graal.reflect;
 
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
@@ -26,7 +25,7 @@ import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.http.hateos.JsonError;
+import io.micronaut.http.hateoas.JsonError;
 
 import java.io.File;
 import java.io.IOException;
@@ -69,7 +68,7 @@ public class GraalClassLoadingReporter implements ClassLoadingReporter {
     );
 
     private static final List<String> KNOWN_BEANS = Arrays.asList(
-            JsonError.class.getName(), "io.micronaut.http.hateos.DefaultLink"
+            JsonError.class.getName(), "io.micronaut.http.hateoas.DefaultLink"
     );
 
     private final Set<String> classes = new ConcurrentSkipListSet<>();

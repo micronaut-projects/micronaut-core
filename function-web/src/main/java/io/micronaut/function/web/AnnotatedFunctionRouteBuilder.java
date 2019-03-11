@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.function.web;
 
 import io.micronaut.context.ExecutionHandleLocator;
@@ -32,6 +31,8 @@ import io.micronaut.function.DefaultLocalFunctionRegistry;
 import io.micronaut.function.FunctionBean;
 import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.inject.BeanDefinition;
@@ -94,6 +95,13 @@ public class AnnotatedFunctionRouteBuilder
             String functionMethod = beanDefinition.getValue(FunctionBean.class, "method", String.class).orElse(null);
 
             UriRoute route = null;
+            MediaType[] consumes = method.getValue(Consumes.class, String[].class).map((types) ->
+                    Arrays.stream(types).map(MediaType::new).toArray(MediaType[]::new)
+            ).orElse(null);
+            MediaType[] produces = method.getValue(Produces.class, String[].class).map((types) ->
+                    Arrays.stream(types).map(MediaType::new).toArray(MediaType[]::new)
+            ).orElse(null);
+
             if (Stream.of(java.util.function.Function.class, Consumer.class, BiFunction.class, BiConsumer.class).anyMatch(type -> type.isAssignableFrom(declaringType))) {
                 if (methodName.equals("accept") || methodName.equals("apply") || methodName.equals(functionMethod)) {
                     String functionPath = resolveFunctionPath(methodName, declaringType, functionName);
@@ -111,8 +119,8 @@ public class AnnotatedFunctionRouteBuilder
                         int size = typeArguments.size();
 
                         Argument<?> firstArgument = typeArguments.get(0);
-                        if (size < 3 && ClassUtils.isJavaLangType(firstArgument.getType())) {
-                            route.consumes(MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE);
+                        if (size < 3 && ClassUtils.isJavaLangType(firstArgument.getType()) && consumes == null) {
+                            consumes = new MediaType[] {MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE};
                         }
 
                         if (size < 3) {
@@ -121,13 +129,13 @@ public class AnnotatedFunctionRouteBuilder
 
                         if (size > 1) {
                             Argument<?> argument = typeArguments.get(size == 3 ? 2 : 1);
-                            if (ClassUtils.isJavaLangType(argument.getType())) {
-                                route.produces(MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE);
+                            if (ClassUtils.isJavaLangType(argument.getType()) && produces == null) {
+                                produces = new MediaType[] {MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE};
                             }
                         }
                     } else {
-                        if (argCount == 1 && ClassUtils.isJavaLangType(method.getArgumentTypes()[0])) {
-                            route.consumes(MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE);
+                        if (argCount == 1 && ClassUtils.isJavaLangType(method.getArgumentTypes()[0]) && consumes == null) {
+                            consumes = new MediaType[] {MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE};
                         }
                     }
                 }
@@ -147,7 +155,9 @@ public class AnnotatedFunctionRouteBuilder
                             } else {
                                 route = POST(functionPath, beanDefinition, method);
                                 if (argCount == 2 || !ClassUtils.isJavaLangType(argumentTypes[0].getType())) {
-                                    route.consumes(MediaType.APPLICATION_JSON_TYPE);
+                                    if (consumes == null) {
+                                        consumes = new MediaType[] {MediaType.APPLICATION_JSON_TYPE};
+                                    }
                                 } else {
                                     route.body(method.getArgumentNames()[0])
                                             .acceptAll();
@@ -161,6 +171,14 @@ public class AnnotatedFunctionRouteBuilder
             if (route != null) {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Created Route to Function: {}", route);
+                }
+
+                if (consumes != null) {
+                    route.consumes(consumes);
+                }
+
+                if (produces != null) {
+                    route.produces(produces);
                 }
 
                 ClassLoadingReporter.reportBeanPresent(method.getReturnType().getType());

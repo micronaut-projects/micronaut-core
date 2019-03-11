@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.ast.groovy
 
 import groovy.transform.CompileStatic
@@ -49,10 +48,12 @@ import static org.codehaus.groovy.ast.ClassHelper.makeCached
  * Executes type element visitors.
  *
  * @author James Kleeh
+ * @author Graeme Rocher
  * @since 1.0
  */
 @CompileStatic
-@GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
+// IMPORTANT NOTE: This transform runs in phase SEMANTIC_ANALYSIS so it runs before InjectTransform
+@GroovyASTTransformation(phase = CompilePhase.SEMANTIC_ANALYSIS)
 class TypeElementVisitorTransform implements ASTTransformation {
 
     protected static Map<String, LoadedVisitor> loadedVisitors = null

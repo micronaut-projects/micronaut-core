@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.jackson.serialize;
 
 import com.fasterxml.jackson.databind.BeanDescription;
@@ -21,8 +20,10 @@ import com.fasterxml.jackson.databind.SerializationConfig;
 import com.fasterxml.jackson.databind.ser.BeanPropertyWriter;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
 import com.fasterxml.jackson.databind.util.NameTransformer;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.hateos.Resource;
+import io.micronaut.http.hateoas.Resource;
+import io.micronaut.jackson.modules.BeanIntrospectionModule;
 
 import javax.inject.Singleton;
 import java.util.Iterator;
@@ -36,6 +37,7 @@ import java.util.List;
  */
 @Internal
 @Singleton
+@Requires(missingBeans = BeanIntrospectionModule.class)
 class ResourceSerializerModifier extends BeanSerializerModifier {
 
     @Override

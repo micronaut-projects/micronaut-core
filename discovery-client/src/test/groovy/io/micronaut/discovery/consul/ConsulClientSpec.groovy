@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -205,6 +205,25 @@ class ConsulClientSpec extends Specification {
         result == HttpStatus.OK
 
     }
+
+    void "test list members"() {
+        when:
+        List<MemberEntry> members = Flowable.fromPublisher(client.members).blockingFirst()
+
+        then:
+        members
+        members.first().status == 1
+    }
+
+    void "test get self"() {
+        when:
+        LocalAgentConfiguration self = Flowable.fromPublisher(client.self).blockingFirst()
+
+        then:
+        self
+        self.member.status == 1
+    }
+
     @Controller('/consul/test')
     static class TestController {
         @Get

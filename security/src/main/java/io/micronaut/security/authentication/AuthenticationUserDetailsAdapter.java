@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.authentication;
 
-import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -27,22 +25,31 @@ import java.util.Map;
  */
 public class AuthenticationUserDetailsAdapter implements Authentication {
 
-    private UserDetails userDetails;
+    private final UserDetails userDetails;
+    private final String rolesKey;
+
+    /**
+     *
+     * @param userDetails Authenticated user's representation.
+     * @param rolesKey The key name that should used to store the roles
+     */
+    public AuthenticationUserDetailsAdapter(UserDetails userDetails, String rolesKey) {
+        this.userDetails = userDetails;
+        this.rolesKey = rolesKey;
+    }
 
     /**
      *
      * @param userDetails Authenticated user's representation.
      */
+    @Deprecated
     public AuthenticationUserDetailsAdapter(UserDetails userDetails) {
-        this.userDetails = userDetails;
+        this(userDetails, "roles");
     }
 
     @Override
     public Map<String, Object> getAttributes() {
-        Map<String, Object> attributes = new HashMap<>();
-        attributes.put("roles", userDetails.getRoles());
-        attributes.put("username", userDetails.getUsername());
-        return attributes;
+        return userDetails.getAttributes(rolesKey, "username");
     }
 
     @Override

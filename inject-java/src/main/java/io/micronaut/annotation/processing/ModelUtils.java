@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.annotation.processing;
 
 import static javax.lang.model.element.Modifier.ABSTRACT;
@@ -27,6 +26,8 @@ import static javax.lang.model.type.TypeKind.ERROR;
 import static javax.lang.model.type.TypeKind.NONE;
 import static javax.lang.model.type.TypeKind.VOID;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ClassUtils;
@@ -84,11 +85,14 @@ public class ModelUtils {
      * @param element The element
      * @return The {@link TypeElement}
      */
-    final TypeElement classElementFor(Element element) {
-        while (!(JavaModelUtils.isClass(element) || JavaModelUtils.isInterface(element))) {
+    @Nullable final TypeElement classElementFor(Element element) {
+        while (element != null && !(JavaModelUtils.isClass(element) || JavaModelUtils.isInterface(element))) {
             element = element.getEnclosingElement();
         }
-        return (TypeElement) element;
+        if (element instanceof  TypeElement) {
+            return (TypeElement) element;
+        }
+        return null;
     }
 
     /**
@@ -121,6 +125,10 @@ public class ModelUtils {
         String setterName = setterNameFor(name);
         // FIXME refine this to discover one of possible overloaded methods with correct signature (i.e. single arg of field type)
         TypeElement typeElement = classElementFor(field);
+        if (typeElement == null) {
+            return Optional.empty();
+        }
+
         List<? extends Element> elements = typeElement.getEnclosedElements();
         List<ExecutableElement> methods = ElementFilter.methodsIn(elements);
         return methods.stream()
@@ -154,10 +162,11 @@ public class ModelUtils {
      * The constructor inject for the given class element.
      *
      * @param classElement The class element
+     * @param annotationUtils The annotation utilities
      * @return The constructor
      */
     @Nullable
-    ExecutableElement concreteConstructorFor(TypeElement classElement) {
+    public ExecutableElement concreteConstructorFor(TypeElement classElement, AnnotationUtils annotationUtils) {
         List<ExecutableElement> constructors = findNonPrivateConstructors(classElement);
         if (constructors.isEmpty()) {
             return null;
@@ -165,8 +174,11 @@ public class ModelUtils {
         if (constructors.size() == 1) {
             return constructors.get(0);
         }
-        Optional<ExecutableElement> element = constructors.stream().filter(ctor ->
-            Objects.nonNull(ctor.getAnnotation(Inject.class))
+
+        Optional<ExecutableElement> element = constructors.stream().filter(ctor -> {
+                    final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(ctor);
+                    return annotationMetadata.hasStereotype(Inject.class) || annotationMetadata.hasStereotype(Creator.class);
+                }
         ).findFirst();
         if (!element.isPresent()) {
             element = constructors.stream().filter(ctor ->
@@ -189,6 +201,19 @@ public class ModelUtils {
     }
 
     /**
+     * Finds a no argument method of the given name.
+     * 
+     * @param classElement The class element
+     * @param methodName The method name
+     * @return The executable element
+     */
+    Optional<ExecutableElement> findAccessibleNoArgumentInstanceMethod(TypeElement classElement, String methodName) {
+        return ElementFilter.methodsIn(elementUtils.getAllMembers(classElement))
+                .stream().filter(m -> m.getSimpleName().toString().equals(methodName) && !isPrivate(m) && !isStatic(m))
+                .findFirst();
+    }
+
+    /**
      * Obtains the class for a given primitive type name.
      *
      * @param primitiveType The primitive type name
@@ -205,32 +230,8 @@ public class ModelUtils {
      * @return The class
      */
     Class<?> classOfPrimitiveArrayFor(String primitiveType) {
-        try {
-
-            switch (primitiveType) {
-                case "byte":
-                    return Class.forName("[B");
-                case "int":
-                    return Class.forName("[I");
-                case "short":
-                    return Class.forName("[S");
-                case "long":
-                    return Class.forName("[J");
-                case "float":
-                    return Class.forName("[F");
-                case "double":
-                    return Class.forName("[D");
-                case "char":
-                    return Class.forName("[C");
-                case "boolean":
-                    return Class.forName("[Z");
-                default:
-                    // this can never occur
-                    throw new IllegalArgumentException("Unsupported primitive type " + primitiveType);
-            }
-        } catch (ClassNotFoundException e) {
-            throw new IllegalStateException(e);
-        }
+        return ClassUtils.arrayTypeForPrimitive(primitiveType)
+                    .orElseThrow(() -> new IllegalArgumentException("Unsupported primitive type " + primitiveType));
     }
 
     /**

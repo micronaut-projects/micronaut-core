@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.context;
 
 import io.micronaut.core.annotation.Internal;
 
+import javax.annotation.Nullable;
 import javax.inject.Provider;
 
 /**
@@ -31,6 +31,7 @@ import javax.inject.Provider;
 class UnresolvedProvider<T> implements Provider<T> {
 
     private final Class<T> beanType;
+    private final Qualifier<T> qualifier;
     private final BeanContext context;
 
     /**
@@ -38,12 +39,22 @@ class UnresolvedProvider<T> implements Provider<T> {
      * @param context  The bean context
      */
     UnresolvedProvider(Class<T> beanType, BeanContext context) {
+        this(beanType, null, context);
+    }
+
+    /**
+     * @param beanType The bean type
+     * @param qualifier The qualifier to use
+     * @param context  The bean context
+     */
+    UnresolvedProvider(Class<T> beanType, @Nullable Qualifier<T> qualifier, BeanContext context) {
         this.beanType = beanType;
         this.context = context;
+        this.qualifier = qualifier;
     }
 
     @Override
     public T get() {
-        return context.getBean(beanType);
+        return context.getBean(beanType, qualifier);
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -47,6 +47,12 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
     }
 
+    ClassLoader buildClassLoader(String classStr) {
+        def classLoader = new InMemoryByteCodeGroovyClassLoader()
+        classLoader.parseClass(classStr)
+        return classLoader
+    }
+
     AnnotationMetadata buildTypeAnnotationMetadata(String cls, String source) {
         ASTNode[] nodes = new AstBuilder().buildFromString(source)
 
@@ -83,7 +89,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
 
     protected AnnotationMetadata writeAndLoadMetadata(String className, AnnotationMetadata toWrite) {
         def stream = new ByteArrayOutputStream()
-        new AnnotationMetadataWriter(className, toWrite)
+        new AnnotationMetadataWriter(className, toWrite, true)
                 .writeTo(stream)
         className = className + AnnotationMetadata.CLASS_NAME_SUFFIX
         ClassLoader classLoader = new ClassLoader() {

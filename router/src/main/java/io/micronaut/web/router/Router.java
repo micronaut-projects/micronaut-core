@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.web.router;
 
 import io.micronaut.http.HttpMethod;
@@ -218,4 +217,17 @@ public interface Router {
     default <T, R> Stream<UriRouteMatch<T, R>> find(HttpMethod httpMethod, URI uri) {
         return find(httpMethod, uri.toString());
     }
+
+    /**
+     * Finds all of the possible routes for the given HTTP request.
+     *
+     * @param request The HTTP request
+     * @param <T>     The target type
+     * @param <R>     The URI route match
+     * @return A {@link Stream} of possible {@link Route} instances.
+     */
+    default <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request) {
+        return find(request.getMethod(), request.getPath());
+    }
+
 }

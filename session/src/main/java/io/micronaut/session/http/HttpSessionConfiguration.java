@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.session.http;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -31,6 +30,12 @@ import java.util.Optional;
  */
 @ConfigurationProperties("http")
 public class HttpSessionConfiguration extends SessionConfiguration {
+
+    /**
+     * Default Cookie Path.
+     */
+    @SuppressWarnings("WeakerAccess")
+    public static final String DEFAULT_COOKIEPATH = "/";
 
     /**
      * Cookie name.
@@ -53,7 +58,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     private boolean rememberMe = DEFAULT_REMEMBERME;
     private boolean base64Encode = DEFAULT_BASE64ENCODE;
     private TemporalAmount cookieMaxAge;
-    private String cookiePath;
+    private String cookiePath = DEFAULT_COOKIEPATH;
     private String domainName;
     private String cookieName = DEFAULT_COOKIENAME;
     private String prefix;
@@ -126,7 +131,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     }
 
     /**
-     * @param cookiePath Set the cookie path to use
+     * @param cookiePath Set the cookie path to use. Default value ({@value DEFAULT_COOKIEPATH}).
      */
     public void setCookiePath(String cookiePath) {
         this.cookiePath = cookiePath;

@@ -1,4 +1,4 @@
-apply plugin: 'com.github.johnrengelman.plugin-shadow'
+apply plugin: 'com.github.johnrengelman.shadow'
 shadowJar {
     dependencies {
         for(dep in project.configurations.shadowCompile.dependencies) {
@@ -44,6 +44,7 @@ dependencies {
     testCompile dependencyModuleVersion("groovy", "groovy-json")
     testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     testRuntime 'org.glassfish:javax.el:3.0.1-b08'
+    testCompile dependencyVersion("micrometer")
 }
 
 

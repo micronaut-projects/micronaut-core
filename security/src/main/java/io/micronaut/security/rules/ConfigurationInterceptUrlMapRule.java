@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.rules;
 
 import io.micronaut.security.config.InterceptUrlMapPattern;
 import io.micronaut.security.config.SecurityConfiguration;
+import io.micronaut.security.token.RolesFinder;
 import io.micronaut.security.token.config.TokenConfiguration;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.List;
 
@@ -40,13 +41,26 @@ public class ConfigurationInterceptUrlMapRule extends InterceptUrlMapRule {
     private final List<InterceptUrlMapPattern> patternList;
 
     /**
-     *
+     * @deprecated use {@link ConfigurationInterceptUrlMapRule( RolesFinder , SecurityConfiguration)} instead.
      * @param tokenConfiguration The Token Configuration
      * @param securityConfiguration The Security Configuration
      */
+    @Deprecated
     public ConfigurationInterceptUrlMapRule(TokenConfiguration tokenConfiguration,
                                             SecurityConfiguration securityConfiguration) {
         super(tokenConfiguration);
+        this.patternList = securityConfiguration.getInterceptUrlMap();
+    }
+
+     /**
+     *
+     * @param rolesFinder Roles Parser
+     * @param securityConfiguration The Security Configuration
+     */
+    @Inject
+    public ConfigurationInterceptUrlMapRule(RolesFinder rolesFinder,
+                                            SecurityConfiguration securityConfiguration) {
+        super(rolesFinder);
         this.patternList = securityConfiguration.getInterceptUrlMap();
     }
 

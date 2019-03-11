@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,10 +49,10 @@ public class HttpGetTest {
         ));
         HttpResponse<String> response = flowable.blockingFirst();
 
-        Assert.assertEquals(response.getStatus(), HttpStatus.OK);
+        Assert.assertEquals(HttpStatus.OK, response.getStatus());
         Optional<String> body = response.getBody(String.class);
         assertTrue(body.isPresent());
-        assertEquals(body.get(), "success");
+        assertEquals("success", body.get());
 
         client.stop();
         applicationContext.stop();
@@ -70,12 +70,12 @@ public class HttpGetTest {
         ));
         HttpResponse<List> response = flowable.blockingFirst();
 
-        assertEquals(response.getStatus(), HttpStatus.OK);
+        assertEquals(HttpStatus.OK, response.getStatus());
         Optional<List> body = response.getBody();
         assertTrue(body.isPresent());
 
         List<HttpGetSpec.Book> list = body.get();
-        assertEquals(list.size(), 1);
+        assertEquals(1, list.size());
         assertTrue(list.get(0) instanceof HttpGetSpec.Book);
 
         client.stop();

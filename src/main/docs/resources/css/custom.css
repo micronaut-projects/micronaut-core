@@ -223,3 +223,16 @@ a:hover,
         display: none !important;
     }
 }
+
+.copytoclipboard {
+    cursor: pointer;
+    background-color: lightgray;
+    color: #000000;
+    float: right;
+    padding: 10px 15px;
+    font-size: 10px;
+    margin-right: 20px;
+    display: block;
+    border-bottom-left-radius: 5px;
+    border-bottom-right-radius: 5px;
+}

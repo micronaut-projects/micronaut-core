@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.annotation.Internal;
@@ -118,9 +117,8 @@ public class ReflectionUtils {
     public static Class getWrapperType(Class primitiveType) {
         if (primitiveType.isPrimitive()) {
             return PRIMITIVES_TO_WRAPPERS.get(primitiveType);
-        } else {
-            return primitiveType;
         }
+        return primitiveType;
     }
 
     /**
@@ -133,9 +131,8 @@ public class ReflectionUtils {
         Class<?> wrapper = WRAPPER_TO_PRIMITIVE.get(wrapperType);
         if (wrapper != null) {
             return wrapper;
-        } else {
-            return wrapperType;
         }
+        return wrapperType;
     }
 
     /**
@@ -308,8 +305,7 @@ public class ReflectionUtils {
     public static Optional<Field> findField(Class type, String name) {
         Optional<Field> declaredField = findDeclaredField(type, name);
         if (!declaredField.isPresent()) {
-            type = type.getSuperclass();
-            while (type != null) {
+            while ((type = type.getSuperclass()) != null) {
                 declaredField = findField(type, name);
                 if (declaredField.isPresent()) {
                     break;

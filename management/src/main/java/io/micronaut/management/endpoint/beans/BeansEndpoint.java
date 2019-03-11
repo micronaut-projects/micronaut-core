@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.management.endpoint.beans;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * <p>Exposes an {@link Endpoint} to provide information about the beans of the application.</p>
@@ -50,8 +53,12 @@ public class BeansEndpoint {
      */
     @Read
     public Single getBeans() {
+        List<BeanDefinition<?>> beanDefinitions = beanContext.getAllBeanDefinitions()
+                .stream()
+                .sorted(Comparator.comparing((BeanDefinition<?> bd) -> bd.getClass().getName()))
+                .collect(Collectors.toList());
         return Flowable
-            .fromPublisher(beanDefinitionDataCollector.getData(beanContext.getAllBeanDefinitions()))
+            .fromPublisher(beanDefinitionDataCollector.getData(beanDefinitions))
             .first(Collections.emptyMap());
     }
 }

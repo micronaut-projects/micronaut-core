@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.context.env;
 
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.io.socket.SocketUtils;
@@ -33,6 +33,7 @@ import io.micronaut.core.value.PropertyResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -57,7 +58,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     // properties are stored in an array of maps organized by character in the alphabet
     // this allows optimization of searches by prefix
     @SuppressWarnings("MagicNumber")
-    protected final Map<String, Object>[] catalog = new Map[57];
+    protected final Map<String, Object>[] catalog = new Map[58];
     private final Random random = new Random();
     private final Map<String, Boolean> containsCache = new ConcurrentHashMap<>(20);
     private final Map<String, Optional<?>> resolvedValueCache = new ConcurrentHashMap<>(20);
@@ -164,14 +165,35 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     }
 
     @Override
+    public @Nonnull Map<String, Object> getProperties(String name, StringConvention keyFormat) {
+        if (keyFormat == null) {
+            keyFormat = StringConvention.RAW;
+        }
+        if (!StringUtils.isEmpty(name)) {
+            Map<String, Object> entries = resolveEntriesForKey(name, false);
+            if (entries != null) {
+                return resolveSubMap(
+                        name,
+                        entries,
+                        ConversionContext.of(Map.class),
+                        keyFormat,
+                        MapFormat.MapTransformation.FLAT
+                );
+            }
+        }
+        return Collections.emptyMap();
+    }
+
+    @Override
     public <T> Optional<T> getProperty(@Nullable String name, ArgumentConversionContext<T> conversionContext) {
         if (StringUtils.isEmpty(name)) {
             return Optional.empty();
         } else {
             Class<T> requiredType = conversionContext.getArgument().getType();
             boolean cacheableType = requiredType == Boolean.class || requiredType == String.class;
-            if (cacheableType && resolvedValueCache.containsKey(name)) {
-                return (Optional<T>) resolvedValueCache.get(name);
+            String cacheName = name + '|' + requiredType.getSimpleName();
+            if (cacheableType && resolvedValueCache.containsKey(cacheName)) {
+                return (Optional<T>) resolvedValueCache.get(cacheName);
             } else {
                 Map<String, Object> entries = resolveEntriesForKey(name, false);
                 if (entries != null) {
@@ -223,12 +245,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                         }
 
                         if (cacheableType) {
-                            resolvedValueCache.put(name, converted);
+                            resolvedValueCache.put(cacheName, converted);
                         }
                         return converted;
                     } else if (cacheableType) {
                         Optional<?> e = Optional.empty();
-                        resolvedValueCache.put(name, e);
+                        resolvedValueCache.put(cacheName, e);
                         return (Optional<T>) e;
                     } else if (Properties.class.isAssignableFrom(requiredType)) {
                         Properties properties = resolveSubProperties(name, entries, conversionContext);
@@ -330,7 +352,6 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
      */
     protected Map<String, Object> resolveSubMap(String name, Map<String, Object> entries, ArgumentConversionContext<?> conversionContext) {
         // special handling for maps for resolving sub keys
-        Map<String, Object> subMap = new LinkedHashMap<>(entries.size());
         AnnotationMetadata annotationMetadata = conversionContext.getAnnotationMetadata();
         StringConvention keyConvention = annotationMetadata.getValue(MapFormat.class, "keyFormat", StringConvention.class).orElse(StringConvention.RAW);
         MapFormat.MapTransformation transformation = annotationMetadata.getValue(
@@ -338,7 +359,28 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 "transformation",
                 MapFormat.MapTransformation.class)
                 .orElse(conversionContext.isAnnotationPresent(Property.class) ? MapFormat.MapTransformation.FLAT : MapFormat.MapTransformation.NESTED);
+        return resolveSubMap(name, entries, conversionContext, keyConvention, transformation);
+    }
+
+    /**
+     * Resolves a submap for the given name and parameters.
+     *
+     * @param name The name
+     * @param entries The entries
+     * @param conversionContext The conversion context
+     * @param keyConvention The key convention to use
+     * @param transformation The map transformation to apply
+     * @return The resulting map
+     */
+    @Nonnull
+    protected Map<String, Object> resolveSubMap(
+            String name,
+            Map<String, Object> entries,
+            ArgumentConversionContext<?> conversionContext,
+            StringConvention keyConvention,
+            MapFormat.MapTransformation transformation) {
         final Argument<?> valueType = conversionContext.getTypeVariable("V").orElse(Argument.OBJECT_ARGUMENT);
+        Map<String, Object> subMap = new LinkedHashMap<>(entries.size());
 
         String prefix = name + '.';
         for (Map.Entry<String, Object> entry : entries.entrySet()) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.annotation;
 
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.value.OptionalValues;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.util.*;
@@ -33,256 +33,255 @@ import java.util.*;
 public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, AnnotationMetadata {
 
     @Override
-    default <T> Optional<T> getValue(String annotation, Argument<T> requiredType) {
+    default @Nonnull <T> Optional<T> getValue(@Nonnull String annotation, @Nonnull Argument<T> requiredType) {
         return getAnnotationMetadata().getValue(annotation, requiredType);
     }
 
     @Override
-    default <T> Optional<T> getValue(Class<? extends Annotation> annotation, Argument<T> requiredType) {
+    default @Nonnull <T> Optional<T> getValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull Argument<T> requiredType) {
         return getAnnotationMetadata().getValue(annotation, requiredType);
     }
 
     @Override
-    default <T> Optional<T> getValue(String annotation, String member, Argument<T> requiredType) {
+    default @Nonnull <T> Optional<T> getValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Argument<T> requiredType) {
         return getAnnotationMetadata().getValue(annotation, member, requiredType);
     }
 
     @Override
-    default <T> Optional<T> getDefaultValue(String annotation, String member, Argument<T> requiredType) {
+    default @Nonnull <T> Optional<T> getDefaultValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Argument<T> requiredType) {
         return getAnnotationMetadata().getDefaultValue(annotation, member, requiredType);
     }
 
     @Override
-    default <T> Optional<T> getDefaultValue(Class<? extends Annotation> annotation, String member, Argument<T> requiredType) {
+    default @Nonnull <T> Optional<T> getDefaultValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, @Nonnull Argument<T> requiredType) {
         return getAnnotationMetadata().getDefaultValue(annotation, member, requiredType);
     }
 
     @Override
-    default <T> Optional<T> getValue(Class<? extends Annotation> annotation, String member, Argument<T> requiredType) {
+    default @Nonnull <T> Optional<T> getValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, @Nonnull Argument<T> requiredType) {
         return getAnnotationMetadata().getDefaultValue(annotation, member, requiredType);
     }
 
     @Override
-    default <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass) {
+    default <T extends Annotation> T synthesizeDeclared(@Nonnull Class<T> annotationClass) {
         return getAnnotationMetadata().synthesizeDeclared(annotationClass);
     }
 
     @Override
-    default <T extends Annotation> T[] synthesizeAnnotationsByType(Class<T> annotationClass) {
+    default @Nonnull <T extends Annotation> T[] synthesizeAnnotationsByType(@Nonnull Class<T> annotationClass) {
         return getAnnotationMetadata().synthesizeAnnotationsByType(annotationClass);
     }
 
     @Override
-    default <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(Class<T> annotationClass) {
+    default @Nonnull <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(@Nonnull Class<T> annotationClass) {
         return getAnnotationMetadata().synthesizeDeclaredAnnotationsByType(annotationClass);
     }
 
     @Nullable
     @Override
-    default <T extends Annotation> AnnotationValue<T> getAnnotation(String annotation) {
+    default <T extends Annotation> AnnotationValue<T> getAnnotation(@Nonnull String annotation) {
         return getAnnotationMetadata().getAnnotation(annotation);
     }
 
     @Nullable
     @Override
-    default <T extends Annotation> AnnotationValue<T> getAnnotation(Class<T> annotation) {
-        return getAnnotationMetadata().getAnnotation(annotation);
+    default <T extends Annotation> AnnotationValue<T> getAnnotation(@Nonnull Class<T> annotationClass) {
+        return getAnnotationMetadata().getAnnotation(annotationClass);
     }
 
     @Nullable
     @Override
-    default <T extends Annotation> AnnotationValue<T> getDeclaredAnnotation(String annotation) {
+    default <T extends Annotation> AnnotationValue<T> getDeclaredAnnotation(@Nonnull String annotation) {
         return getAnnotationMetadata().getDeclaredAnnotation(annotation);
     }
 
     @Override
-    default <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(Class<T> annotation) {
-        return getAnnotationMetadata().findDeclaredAnnotation(annotation);
-    }
-
-    @Nullable
-    @Override
-    default <T extends Annotation> AnnotationValue<T> getDeclaredAnnotation(Class<T> annotation) {
-        return getAnnotationMetadata().getDeclaredAnnotation(annotation);
+    default @Nonnull <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(@Nonnull Class<T> annotationClass) {
+        return getAnnotationMetadata().findDeclaredAnnotation(annotationClass);
     }
 
     @Override
-    default boolean isAnnotationPresent(Class<? extends Annotation> annotationClass) {
+    default @Nullable <T extends Annotation> AnnotationValue<T> getDeclaredAnnotation(@Nonnull Class<T> annotationClass) {
+        return getAnnotationMetadata().getDeclaredAnnotation(annotationClass);
+    }
+
+    @Override
+    default boolean isAnnotationPresent(@Nonnull Class<? extends Annotation> annotationClass) {
         return getAnnotationMetadata().isAnnotationPresent(annotationClass);
     }
 
     @Override
-    default boolean isDeclaredAnnotationPresent(Class<? extends Annotation> annotationClass) {
+    default boolean isDeclaredAnnotationPresent(@Nonnull Class<? extends Annotation> annotationClass) {
         return getAnnotationMetadata().isDeclaredAnnotationPresent(annotationClass);
     }
 
     @Override
-    default <T> Optional<T> getDefaultValue(Class<? extends Annotation> annotation, String member, Class<T> requiredType) {
+    default @Nonnull <T> Optional<T> getDefaultValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, @Nonnull Class<T> requiredType) {
         return getAnnotationMetadata().getDefaultValue(annotation, member, requiredType);
     }
 
     @Override
-    default <T> Optional<T> getValue(Class<? extends Annotation> annotation, String member, Class<T> requiredType) {
+    default @Nonnull <T> Optional<T> getValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member, @Nonnull Class<T> requiredType) {
         return getAnnotationMetadata().getValue(annotation, member, requiredType);
     }
 
     @Override
-    default Optional<String> getAnnotationNameByStereotype(String stereotype) {
+    default @Nonnull Optional<String> getAnnotationNameByStereotype(String stereotype) {
         return getAnnotationMetadata().getAnnotationNameByStereotype(stereotype);
     }
 
     @Override
-    default Optional<String> getDeclaredAnnotationNameByStereotype(String stereotype) {
+    default @Nonnull Optional<String> getDeclaredAnnotationNameByStereotype(String stereotype) {
         return getAnnotationMetadata().getDeclaredAnnotationNameByStereotype(stereotype);
     }
 
     @Override
-    default Optional<Class<? extends Annotation>> getAnnotationTypeByStereotype(Class<? extends Annotation> stereotype) {
+    default @Nonnull Optional<Class<? extends Annotation>> getAnnotationTypeByStereotype(@Nonnull Class<? extends Annotation> stereotype) {
         return getAnnotationMetadata().getAnnotationTypeByStereotype(stereotype);
     }
 
     @Override
-    default Optional<Class<? extends Annotation>> getDeclaredAnnotationTypeByStereotype(Class<? extends Annotation> stereotype) {
+    default @Nonnull Optional<Class<? extends Annotation>> getDeclaredAnnotationTypeByStereotype(@Nonnull Class<? extends Annotation> stereotype) {
         return getAnnotationMetadata().getDeclaredAnnotationTypeByStereotype(stereotype);
     }
 
     @Override
-    default Optional<Class<? extends Annotation>> getDeclaredAnnotationTypeByStereotype(String stereotype) {
+    default @Nonnull Optional<Class<? extends Annotation>> getDeclaredAnnotationTypeByStereotype(String stereotype) {
         return getAnnotationMetadata().getDeclaredAnnotationTypeByStereotype(stereotype);
     }
 
     @Override
-    default Optional<Class<? extends Annotation>> getAnnotationTypeByStereotype(String stereotype) {
+    default @Nonnull Optional<Class<? extends Annotation>> getAnnotationTypeByStereotype(String stereotype) {
         return getAnnotationMetadata().getAnnotationTypeByStereotype(stereotype);
     }
 
     @Override
-    default Optional<String> getAnnotationNameByStereotype(Class<? extends Annotation> stereotype) {
+    default @Nonnull Optional<String> getAnnotationNameByStereotype(@Nonnull Class<? extends Annotation> stereotype) {
         return getAnnotationMetadata().getAnnotationNameByStereotype(stereotype);
     }
 
     @Override
-    default <T> OptionalValues<T> getValues(Class<? extends Annotation> annotation, Class<T> valueType) {
+    default @Nonnull <T> OptionalValues<T> getValues(@Nonnull Class<? extends Annotation> annotation, @Nonnull Class<T> valueType) {
         return getAnnotationMetadata().getValues(annotation, valueType);
     }
 
     @Override
-    default List<String> getAnnotationNamesByStereotype(Class<? extends Annotation> stereotype) {
+    default @Nonnull List<String> getAnnotationNamesByStereotype(@Nonnull Class<? extends Annotation> stereotype) {
         return getAnnotationMetadata().getAnnotationNamesByStereotype(stereotype);
     }
 
     @Override
-    default List<Class<? extends Annotation>> getAnnotationTypesByStereotype(Class<? extends Annotation> stereotype) {
+    default @Nonnull List<Class<? extends Annotation>> getAnnotationTypesByStereotype(@Nonnull Class<? extends Annotation> stereotype) {
         return getAnnotationMetadata().getAnnotationTypesByStereotype(stereotype);
     }
 
     @Override
-    default <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(Class<T> annotation) {
-        return getAnnotationMetadata().findAnnotation(annotation);
+    default @Nonnull <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@Nonnull Class<T> annotationClass) {
+        return getAnnotationMetadata().findAnnotation(annotationClass);
     }
 
     @Override
-    default <T> Optional<T> getValue(String annotation, String member, Class<T> requiredType) {
+    default @Nonnull <T> Optional<T> getValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Class<T> requiredType) {
         return getAnnotationMetadata().getValue(annotation, member, requiredType);
     }
 
     @Override
-    default OptionalLong longValue(String annotation, String member) {
+    default @Nonnull OptionalLong longValue(@Nonnull String annotation, @Nonnull String member) {
         return getAnnotationMetadata().longValue(annotation, member);
     }
 
     @Override
-    default Optional<Class> classValue(String annotation) {
+    default @Nonnull Optional<Class> classValue(@Nonnull String annotation) {
         return getAnnotationMetadata().classValue(annotation);
     }
 
     @Override
-    default Optional<Class> classValue(String annotation, String member) {
+    default @Nonnull Optional<Class> classValue(@Nonnull String annotation, @Nonnull String member) {
         return getAnnotationMetadata().classValue(annotation, member);
     }
 
     @Override
-    default Optional<Class> classValue(Class<? extends Annotation> annotation) {
+    default @Nonnull Optional<Class> classValue(@Nonnull Class<? extends Annotation> annotation) {
         return getAnnotationMetadata().classValue(annotation);
     }
 
     @Override
-    default Optional<Class> classValue(Class<? extends Annotation> annotation, String member) {
+    default @Nonnull Optional<Class> classValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         return getAnnotationMetadata().classValue(annotation, member);
     }
 
     @Override
-    default OptionalInt intValue(String annotation, String member) {
+    default @Nonnull OptionalInt intValue(@Nonnull String annotation, @Nonnull String member) {
         return getAnnotationMetadata().intValue(annotation, member);
     }
 
     @Override
-    default OptionalDouble doubleValue(String annotation, String member) {
+    default @Nonnull OptionalDouble doubleValue(@Nonnull String annotation, @Nonnull String member) {
         return getAnnotationMetadata().doubleValue(annotation, member);
     }
 
     @Override
-    default <T> Optional<T> getValue(String annotation, Class<T> requiredType) {
+    default @Nonnull <T> Optional<T> getValue(@Nonnull String annotation, @Nonnull Class<T> requiredType) {
         return getAnnotationMetadata().getValue(annotation, requiredType);
     }
 
     @Override
-    default Optional<Object> getValue(String annotation, String member) {
+    default @Nonnull Optional<Object> getValue(@Nonnull String annotation, @Nonnull String member) {
         return getAnnotationMetadata().getValue(annotation, member);
     }
 
     @Override
-    default Optional<Object> getValue(Class<? extends Annotation> annotation, String member) {
+    default @Nonnull Optional<Object> getValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         return getAnnotationMetadata().getValue(annotation, member);
     }
 
     @Override
-    default boolean isTrue(String annotation, String member) {
+    default boolean isTrue(@Nonnull String annotation, @Nonnull String member) {
         return getAnnotationMetadata().isTrue(annotation, member);
     }
 
     @Override
-    default boolean isTrue(Class<? extends Annotation> annotation, String member) {
+    default boolean isTrue(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         return getAnnotationMetadata().isTrue(annotation, member);
     }
 
     @Override
-    default boolean isPresent(String annotation, String member) {
+    default boolean isPresent(@Nonnull String annotation, @Nonnull String member) {
         return getAnnotationMetadata().isPresent(annotation, member);
     }
 
     @Override
-    default boolean isPresent(Class<? extends Annotation> annotation, String member) {
+    default boolean isPresent(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         return getAnnotationMetadata().isPresent(annotation, member);
     }
 
     @Override
-    default boolean isFalse(Class<? extends Annotation> annotation, String member) {
+    default boolean isFalse(@Nonnull Class<? extends Annotation> annotation, @Nonnull String member) {
         return getAnnotationMetadata().isFalse(annotation, member);
     }
 
     @Override
-    default boolean isFalse(String annotation, String member) {
+    default boolean isFalse(@Nonnull String annotation, @Nonnull String member) {
         return getAnnotationMetadata().isFalse(annotation, member);
     }
 
     @Override
-    default Optional<Object> getValue(String annotation) {
+    default @Nonnull Optional<Object> getValue(@Nonnull String annotation) {
         return getAnnotationMetadata().getValue(annotation);
     }
 
     @Override
-    default Optional<Object> getValue(Class<? extends Annotation> annotation) {
+    default @Nonnull Optional<Object> getValue(@Nonnull Class<? extends Annotation> annotation) {
         return getAnnotationMetadata().getValue(annotation);
     }
 
     @Override
-    default <T> Optional<T> getValue(Class<? extends Annotation> annotation, Class<T> requiredType) {
+    default @Nonnull <T> Optional<T> getValue(@Nonnull Class<? extends Annotation> annotation, @Nonnull Class<T> requiredType) {
         return getAnnotationMetadata().getValue(annotation, requiredType);
     }
 
     @Override
-    default Optional<Class<? extends Annotation>> getAnnotationType(String name) {
+    default @Nonnull Optional<Class<? extends Annotation>> getAnnotationType(@Nonnull String name) {
         return getAnnotationMetadata().getAnnotationType(name);
     }
 
@@ -332,12 +331,12 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default Set<String> getAnnotationNames() {
+    default @Nonnull Set<String> getAnnotationNames() {
         return getAnnotationMetadata().getAnnotationNames();
     }
 
     @Override
-    default Set<String> getDeclaredAnnotationNames() {
+    default @Nonnull Set<String> getDeclaredAnnotationNames() {
         return getAnnotationMetadata().getDeclaredAnnotationNames();
     }
 
@@ -357,57 +356,57 @@ public interface AnnotationMetadataDelegate extends AnnotationMetadataProvider, 
     }
 
     @Override
-    default List<String> getAnnotationNamesByStereotype(String stereotype) {
+    default @Nonnull List<String> getAnnotationNamesByStereotype(String stereotype) {
         return getAnnotationMetadata().getAnnotationNamesByStereotype(stereotype);
     }
 
     @Override
-    default List<String> getDeclaredAnnotationNamesByStereotype(String stereotype) {
+    default @Nonnull List<String> getDeclaredAnnotationNamesByStereotype(String stereotype) {
         return getAnnotationMetadata().getDeclaredAnnotationNamesByStereotype(stereotype);
     }
 
     @Override
-    default <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
+    default @Nonnull <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@Nonnull String annotation) {
         return getAnnotationMetadata().findAnnotation(annotation);
     }
 
     @Override
-    default <T> OptionalValues<T> getValues(String annotation, Class<T> valueType) {
+    default @Nonnull <T> OptionalValues<T> getValues(@Nonnull String annotation, @Nonnull Class<T> valueType) {
         return getAnnotationMetadata().getValues(annotation, valueType);
     }
 
     @Override
-    default <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(String annotation) {
+    default @Nonnull <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(@Nonnull String annotation) {
         return getAnnotationMetadata().findAnnotation(annotation);
     }
 
     @Override
-    default <T> Optional<T> getDefaultValue(String annotation, String member, Class<T> requiredType) {
+    default @Nonnull <T> Optional<T> getDefaultValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Class<T> requiredType) {
         return getAnnotationMetadata().getDefaultValue(annotation, member, requiredType);
     }
 
     @Override
-    default <T extends Annotation> T synthesize(Class<T> annotationClass) {
+    default @Nullable <T extends Annotation> T synthesize(@Nonnull Class<T> annotationClass) {
         return getAnnotationMetadata().synthesize(annotationClass);
     }
 
     @Override
-    default Annotation[] synthesizeAll() {
+    default @Nonnull Annotation[] synthesizeAll() {
         return getAnnotationMetadata().synthesizeAll();
     }
 
     @Override
-    default Annotation[] synthesizeDeclared() {
+    default @Nonnull Annotation[] synthesizeDeclared() {
         return getAnnotationMetadata().synthesizeDeclared();
     }
 
     @Override
-    default <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(Class<T> annotationType) {
+    default @Nonnull <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(@Nonnull Class<T> annotationType) {
         return getAnnotationMetadata().getAnnotationValuesByType(annotationType);
     }
 
     @Override
-    default <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(Class<T> annotationType) {
+    default @Nonnull <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(@Nonnull Class<T> annotationType) {
         return getAnnotationMetadata().getDeclaredAnnotationValuesByType(annotationType);
     }
 

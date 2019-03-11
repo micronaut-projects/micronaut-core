@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.annotation;
 
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import io.micronaut.context.annotation.AliasFor;
+import io.micronaut.core.async.annotation.SingleResult;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -79,6 +79,7 @@ public @interface Post {
      */
     @AliasFor(annotation = Produces.class, member = "single")
     @AliasFor(annotation = Consumes.class, member = "single")
+    @AliasFor(annotation = SingleResult.class, member = "value")
     boolean single() default false;
 
 }

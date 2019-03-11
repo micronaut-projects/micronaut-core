@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.discovery.cloud.gcp;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -23,7 +22,6 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadata;
 import io.micronaut.discovery.cloud.ComputeInstanceMetadataResolver;
 import io.micronaut.discovery.cloud.NetworkInterface;
-import io.micronaut.http.HttpMethod;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,16 +29,13 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.io.InputStream;
-import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.net.URLConnection;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.*;
+import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.readMetadataUrl;
 
 /**
  * Resolves {@link ComputeInstanceMetadata} for Google Cloud Platform.
@@ -86,63 +81,103 @@ public class GoogleComputeInstanceMetadataResolver implements ComputeInstanceMet
     @Override
     public Optional<ComputeInstanceMetadata> resolve(Environment environment) {
         if (!configuration.isEnabled()) {
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Resolving of Google Compute Instance metadata is disabled");
+            }
             return Optional.empty();
         }
         if (cachedMetadata != null) {
-            cachedMetadata.cached = true;
+            cachedMetadata.setCached(true);
             return Optional.of(cachedMetadata);
         }
+
+        GoogleComputeInstanceMetadata instanceMetadata = null;
 
         try {
             int connectionTimeoutMs = (int) configuration.getConnectTimeout().toMillis();
             int readTimeoutMs = (int) configuration.getReadTimeout().toMillis();
-            JsonNode projectResultJson = readGcMetadataUrl(new URL(configuration.getProjectMetadataUrl() + "?recursive=true"), connectionTimeoutMs, readTimeoutMs);
-            JsonNode instanceMetadataJson = readGcMetadataUrl(new URL(configuration.getMetadataUrl() + "?recursive=true"), connectionTimeoutMs, readTimeoutMs);
+            Map<String, String> requestProperties = new HashMap<>();
+            requestProperties.put(HEADER_METADATA_FLAVOR, "Google");
+            JsonNode projectResultJson = null;
+            try {
+                projectResultJson = readMetadataUrl(
+                        new URL(configuration.getProjectMetadataUrl() + "?recursive=true"),
+                        connectionTimeoutMs,
+                        readTimeoutMs,
+                        objectMapper,
+                        requestProperties);
+            } catch (MalformedURLException me) {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Google compute project metadataUrl value is invalid!: " + configuration.getProjectMetadataUrl(), me);
+                }
+            } catch (FileNotFoundException fnfe) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("No project metadata found at: " + configuration.getProjectMetadataUrl() + "?recursive=true", fnfe);
+                }
+            } catch (IOException ioe) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Error connecting to" + configuration.getProjectMetadataUrl() + "?recursive=true reading project metadata. Not a Google environment?", ioe);
+                }
+            }
+            JsonNode instanceMetadataJson = readMetadataUrl(new URL(configuration.getMetadataUrl() + "?recursive=true"), connectionTimeoutMs, readTimeoutMs, objectMapper, requestProperties);
+
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Read compute instance metadata from URL [{}]. Resulting JSON: {}", configuration.getMetadataUrl(), instanceMetadataJson);
+            }
+
+
+            if (environment.getActiveNames().contains(Environment.GAE)) {
+                instanceMetadata = new GoogleComputeInstanceMetadata();
+                instanceMetadata.setInstanceId(System.getenv("GAE_INSTANCE"));
+                instanceMetadata.setAccount(System.getenv("GOOGLE_CLOUD_PROJECT"));
+            }
 
             if (instanceMetadataJson != null) {
-                GoogleComputeInstanceMetadata instanceMetadata = new GoogleComputeInstanceMetadata();
-                instanceMetadata.instanceId = instanceMetadataJson.findValue(GoogleComputeMetadataKeys.ID.getName()).asText();
-                instanceMetadata.account = projectResultJson.findValue(GoogleComputeMetadataKeys.PROJECT_ID.getName()).textValue();
-                instanceMetadata.availabilityZone = instanceMetadataJson.findValue(GoogleComputeMetadataKeys.ZONE.getName()).textValue();
-                instanceMetadata.machineType = instanceMetadataJson.findValue(GoogleComputeMetadataKeys.MACHINE_TYPE.getName()).textValue();
-                instanceMetadata.description = instanceMetadataJson.findValue(GoogleComputeMetadataKeys.DESCRIPTION.getName()).textValue();
-                instanceMetadata.imageId = instanceMetadataJson.findValue(GoogleComputeMetadataKeys.IMAGE.getName()).textValue();
-                instanceMetadata.localHostname = instanceMetadataJson.findValue(GoogleComputeMetadataKeys.HOSTNAME.getName()).textValue();
-                instanceMetadata.name = instanceMetadataJson.findValue(GoogleComputeMetadataKeys.NAME.getName()).textValue();
-                JsonNode networkInterfaces = instanceMetadataJson.findValue(GoogleComputeMetadataKeys.NETWORK_INTERFACES.getName());
-                List<NetworkInterface> interfaces = new ArrayList<NetworkInterface>();
-                AtomicReference<Integer> networkCounter = new AtomicReference<>(0);
-                networkInterfaces.elements().forEachRemaining(
-                    jsonNode -> {
-                        GoogleComputeNetworkInterface networkInterface = new GoogleComputeNetworkInterface();
-                        networkInterface.setId(networkCounter.toString());
-                        if (jsonNode.findValue(GoogleComputeMetadataKeys.ACCESS_CONFIGS.getName()) != null) {
-                            JsonNode accessConfigs = jsonNode.findValue(GoogleComputeMetadataKeys.ACCESS_CONFIGS.getName());
-                            // we just grab the first one
-                            instanceMetadata.publicIpV4 = accessConfigs.get(0).findValue("externalIp").textValue();
-                        }
-                        if (jsonNode.findValue(GoogleComputeMetadataKeys.IP.getName()) != null) {
-                            networkInterface.setIpv4(jsonNode.findValue(GoogleComputeMetadataKeys.IP.getName()).textValue());
-                            instanceMetadata.privateIpV4 = jsonNode.findValue(GoogleComputeMetadataKeys.IP.getName()).textValue();
-                        }
-                        if (jsonNode.findValue(GoogleComputeMetadataKeys.MAC.getName()) != null) {
-                            networkInterface.setMac(jsonNode.findValue(GoogleComputeMetadataKeys.MAC.getName()).textValue());
-                        }
-                        if (jsonNode.findValue(GoogleComputeMetadataKeys.NETWORK.getName()) != null) {
-                            networkInterface.setNetwork(jsonNode.findValue(GoogleComputeMetadataKeys.NETWORK.getName()).textValue());
-                        }
-                        if (jsonNode.findValue(GoogleComputeMetadataKeys.NETMASK.getName()) != null) {
-                            networkInterface.setNetmask(jsonNode.findValue(GoogleComputeMetadataKeys.NETMASK.getName()).textValue());
-                        }
-                        if (jsonNode.findValue(GoogleComputeMetadataKeys.GATEWAY.getName()) != null) {
-                            networkInterface.setGateway(jsonNode.findValue(GoogleComputeMetadataKeys.GATEWAY.getName()).textValue());
-                        }
-                        networkCounter.getAndSet(networkCounter.get() + 1);
-                        interfaces.add(networkInterface);
+                if (instanceMetadata == null) {
+                    instanceMetadata = new GoogleComputeInstanceMetadata();
+                }
+                stringValue(instanceMetadataJson, GoogleComputeMetadataKeys.ID.getName()).ifPresent(instanceMetadata::setInstanceId);
+                if (projectResultJson != null) {
+                    stringValue(projectResultJson, GoogleComputeMetadataKeys.PROJECT_ID.getName()).ifPresent(instanceMetadata::setAccount);
+                } else {
+                    stringValue(instanceMetadataJson, GoogleComputeMetadataKeys.PROJECT_ID.getName()).ifPresent(instanceMetadata::setAccount);
+                }
+                stringValue(instanceMetadataJson, GoogleComputeMetadataKeys.ZONE.getName()).ifPresent(instanceMetadata::setAvailabilityZone);
+                stringValue(instanceMetadataJson, GoogleComputeMetadataKeys.MACHINE_TYPE.getName()).ifPresent(instanceMetadata::setMachineType);
+                stringValue(instanceMetadataJson, GoogleComputeMetadataKeys.DESCRIPTION.getName()).ifPresent(instanceMetadata::setDescription);
+                stringValue(instanceMetadataJson, GoogleComputeMetadataKeys.IMAGE.getName()).ifPresent(instanceMetadata::setImageId);
+                stringValue(instanceMetadataJson, GoogleComputeMetadataKeys.HOSTNAME.getName()).ifPresent(instanceMetadata::setLocalHostname);
+                stringValue(instanceMetadataJson, GoogleComputeMetadataKeys.NAME.getName()).ifPresent(instanceMetadata::setName);
 
-                    });
-                instanceMetadata.interfaces = interfaces;
-                instanceMetadata.metadata = objectMapper.convertValue(instanceMetadata, Map.class);
+                JsonNode networkInterfaces = instanceMetadataJson.findValue(GoogleComputeMetadataKeys.NETWORK_INTERFACES.getName());
+                if (networkInterfaces != null) {
+
+                    List<NetworkInterface> interfaces = new ArrayList<NetworkInterface>();
+                    AtomicInteger networkCounter = new AtomicInteger(0);
+                    GoogleComputeInstanceMetadata finalInstanceMetadata = instanceMetadata;
+                    networkInterfaces.elements().forEachRemaining(
+                            jsonNode -> {
+                                GoogleComputeNetworkInterface networkInterface = new GoogleComputeNetworkInterface();
+                                networkInterface.setId(String.valueOf(networkCounter.getAndIncrement()));
+
+                                if (jsonNode.findValue(GoogleComputeMetadataKeys.ACCESS_CONFIGS.getName()) != null) {
+                                    JsonNode accessConfigs = jsonNode.findValue(GoogleComputeMetadataKeys.ACCESS_CONFIGS.getName());
+                                    // we just grab the first one
+                                    finalInstanceMetadata.setPublicIpV4(accessConfigs.get(0).findValue("externalIp").textValue());
+                                }
+
+                                stringValue(jsonNode, GoogleComputeMetadataKeys.IP.getName()).ifPresent(finalInstanceMetadata::setPrivateIpV4);
+                                stringValue(jsonNode, GoogleComputeMetadataKeys.IP.getName()).ifPresent(networkInterface::setIpv4);
+                                stringValue(jsonNode, GoogleComputeMetadataKeys.MAC.getName()).ifPresent(networkInterface::setMac);
+                                stringValue(jsonNode, GoogleComputeMetadataKeys.NETWORK.getName()).ifPresent(networkInterface::setNetwork);
+                                stringValue(jsonNode, GoogleComputeMetadataKeys.NETMASK.getName()).ifPresent(networkInterface::setNetmask);
+                                stringValue(jsonNode, GoogleComputeMetadataKeys.GATEWAY.getName()).ifPresent(networkInterface::setGateway);
+                                interfaces.add(networkInterface);
+                            });
+                    instanceMetadata.setInterfaces(interfaces);
+                }
+                final Map<?, ?> metadata = objectMapper.convertValue(instanceMetadata, Map.class);
+                populateMetadata(instanceMetadata, metadata);
                 cachedMetadata = instanceMetadata;
 
                 return Optional.of(instanceMetadata);
@@ -157,11 +192,11 @@ public class GoogleComputeInstanceMetadataResolver implements ComputeInstanceMet
             }
         } catch (IOException ioe) {
             if (LOG.isErrorEnabled()) {
-                LOG.error("Error connecting to" + configuration.getMetadataUrl() + "?recursive=true reading instance metadata", ioe);
+                LOG.debug("Error connecting to" + configuration.getMetadataUrl() + "?recursive=true reading instance metadata", ioe);
             }
         }
 
-        return Optional.empty();
+        return Optional.ofNullable(instanceMetadata);
     }
 
     /**
@@ -172,27 +207,11 @@ public class GoogleComputeInstanceMetadataResolver implements ComputeInstanceMet
      * @param readTimeoutMs       read timeout in millis
      * @return The Metadata JSON
      * @throws IOException Failed or interrupted I/O operations while reading from input stream.
+     * @deprecated See {@link io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils#readMetadataUrl(URL, int, int, ObjectMapper, Map)}
      */
+    @Deprecated
     protected JsonNode readGcMetadataUrl(URL url, int connectionTimeoutMs, int readTimeoutMs) throws IOException {
-        URLConnection urlConnection = url.openConnection();
-
-        if (url.getProtocol().equalsIgnoreCase("file")) {
-            urlConnection.connect();
-            try (InputStream in = urlConnection.getInputStream()) {
-                return objectMapper.readTree(in);
-            }
-        } else {
-            HttpURLConnection uc = (HttpURLConnection) urlConnection;
-
-            uc.setConnectTimeout(connectionTimeoutMs);
-            uc.setRequestProperty(HEADER_METADATA_FLAVOR, "Google");
-            uc.setReadTimeout(readTimeoutMs);
-            uc.setRequestMethod(HttpMethod.GET.name());
-            uc.setDoOutput(true);
-            int responseCode = uc.getResponseCode();
-            try (InputStream in = uc.getInputStream()) {
-                return objectMapper.readTree(in);
-            }
-        }
+        return readMetadataUrl(url, connectionTimeoutMs, readTimeoutMs, objectMapper, Collections.emptyMap());
     }
+
 }

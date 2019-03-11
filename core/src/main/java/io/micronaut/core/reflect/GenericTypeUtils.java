@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.reflect;
 
 import io.micronaut.core.util.ArrayUtils;
@@ -84,20 +83,22 @@ public class GenericTypeUtils {
      * Resolve all of the type arguments for the given super type from the given type.
      *
      * @param type      The type to resolve from
-     * @param superType The interface to resolve from
+     * @param superTypeToResolve The suepr type to resolve from
      * @return The type arguments to the interface
      */
-    public static Class[] resolveSuperTypeGenericArguments(Class<?> type, Class<?> superType) {
-        Type superclass = type.getGenericSuperclass();
-        while (superclass != null) {
-            if (superclass instanceof ParameterizedType) {
-                ParameterizedType pt = (ParameterizedType) superclass;
-                if (pt.getRawType() == superType) {
-                    return resolveTypeArguments(superclass);
+    public static Class[] resolveSuperTypeGenericArguments(Class<?> type, Class<?> superTypeToResolve) {
+        Type supertype = type.getGenericSuperclass();
+        Class<?> superclass = type.getSuperclass();
+        while (superclass != null && superclass != Object.class) {
+            if (supertype instanceof ParameterizedType) {
+                ParameterizedType pt = (ParameterizedType) supertype;
+                if (pt.getRawType() == superTypeToResolve) {
+                    return resolveTypeArguments(supertype);
                 }
             }
 
-            superclass = superType.getGenericSuperclass();
+            supertype = superclass.getGenericSuperclass();
+            superclass = superclass.getSuperclass();
         }
         return ReflectionUtils.EMPTY_CLASS_ARRAY;
     }
@@ -186,7 +187,8 @@ public class GenericTypeUtils {
         ParameterizedType pt;
         if (actualTypeArgument instanceof Class) {
             return Optional.of((Class) actualTypeArgument);
-        } else if (actualTypeArgument instanceof ParameterizedType) {
+        }
+        if (actualTypeArgument instanceof ParameterizedType) {
             pt = (ParameterizedType) actualTypeArgument;
             Type rawType = pt.getRawType();
             if (rawType instanceof Class) {

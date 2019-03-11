@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package io.micronaut.cache
 
+import io.micronaut.core.async.annotation.SingleResult
 import io.reactivex.Flowable
 import io.reactivex.Single
 import io.micronaut.cache.annotation.CacheConfig
@@ -25,6 +26,7 @@ import io.micronaut.cache.annotation.InvalidateOperations
 import io.micronaut.cache.annotation.PutOperations
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.qualifiers.Qualifiers
+import spock.lang.Retry
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -35,6 +37,7 @@ import java.util.concurrent.CompletableFuture
  * @author Graeme Rocher
  * @since 1.0
  */
+@Retry
 class SyncCacheSpec extends Specification {
 
     void "test cacheable annotations"() {
@@ -234,6 +237,7 @@ class SyncCacheSpec extends Specification {
         }
 
         @Cacheable
+        @SingleResult
         Flowable<Integer> flowableValue(String name) {
             return Flowable.just(counters.computeIfAbsent(name, { 0 }))
         }

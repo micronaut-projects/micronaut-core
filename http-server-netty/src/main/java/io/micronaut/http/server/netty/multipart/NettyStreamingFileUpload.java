@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.annotation.Internal;
@@ -25,11 +24,11 @@ import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
 import io.reactivex.Flowable;
-import io.reactivex.Observable;
-import io.reactivex.internal.functions.Functions;
+import io.reactivex.Single;
 import io.reactivex.schedulers.Schedulers;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -114,29 +113,41 @@ public class NettyStreamingFileUpload implements StreamingFileUpload {
                 return destination != null && fileUpload.renameTo(destination);
             } catch (IOException e) {
                 throw new MultipartException("Error transferring file: " + fileUpload.getName(), e);
-            } finally {
-                fileUpload.release();
             }
         };
-        if (isComplete()) {
-            return new AsyncSingleResultPublisher<>(ioExecutor, transferOperation);
-        } else {
-            return Observable.<Boolean>create((emitter) -> {
 
-                subject.subscribeOn(Schedulers.from(ioExecutor))
-                    .subscribe(Functions.emptyConsumer(),
-                        (t) -> emitter.onError((Throwable) t),
-                        () -> {
-                            if (fileUpload.isCompleted()) {
-                                emitter.onNext(transferOperation.get());
-                                emitter.onComplete();
-                            } else {
-                                emitter.onError(new MultipartException("Transfer did not complete"));
-                            }
-                        });
+        return Single.<Boolean>create((emitter) -> {
 
-            }).firstOrError().toFlowable();
-        }
+            subject.subscribeOn(Schedulers.from(ioExecutor))
+                .subscribe(new Subscriber() {
+                    Subscription subscription;
+                    @Override
+                    public void onSubscribe(Subscription s) {
+                        subscription = s;
+                        subscription.request(1);
+                    }
+
+                    @Override
+                    public void onNext(Object o) {
+                        subscription.request(1);
+                    }
+
+                    @Override
+                    public void onError(Throwable t) {
+                        emitter.onError(t);
+                    }
+
+                    @Override
+                    public void onComplete() {
+                        if (fileUpload.isCompleted()) {
+                            emitter.onSuccess(transferOperation.get());
+                        } else {
+                            emitter.onError(new MultipartException("Transfer did not complete"));
+                        }
+                    }
+                });
+        }).toFlowable();
+
     }
 
     @Override

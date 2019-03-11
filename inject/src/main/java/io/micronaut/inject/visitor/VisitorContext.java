@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.inject.visitor;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.Optional;
 
 /**
@@ -31,7 +33,7 @@ import java.util.Optional;
  * @author Graeme Rocher
  * @since 1.0
  */
-public interface VisitorContext extends MutableConvertibleValues<Object> {
+public interface VisitorContext extends MutableConvertibleValues<Object>, ClassWriterOutputVisitor {
 
     /**
      * Allows printing informational messages.
@@ -39,13 +41,15 @@ public interface VisitorContext extends MutableConvertibleValues<Object> {
      * @param message The message
      * @param element The element
      */
-    void info(String message, Element element);
+    void info(String message, @Nullable Element element);
 
     /**
      * Allows printing informational messages.
      *
+     * @deprecated Use {@link #info(String, Element)} with a null element
      * @param message The message
      */
+    @Deprecated
     void info(String message);
 
     /**
@@ -54,7 +58,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object> {
      * @param message The message
      * @param element The element
      */
-    void fail(String message, Element element);
+    void fail(String message, @Nullable Element element);
 
     /**
      * Allows printing a warning for the given message and element.
@@ -62,7 +66,7 @@ public interface VisitorContext extends MutableConvertibleValues<Object> {
      * @param message The message
      * @param element The element
      */
-    void warn(String message, Element element);
+    void warn(String message, @Nullable Element element);
 
     /**
      * Visit a file within the META-INF directory.
@@ -104,5 +108,15 @@ public interface VisitorContext extends MutableConvertibleValues<Object> {
             return getClassElement(type.getName());
         }
         return Optional.empty();
+    }
+
+    /**
+     * Find all the classes within the given package and having the given annotation.
+     * @param aPackage The package
+     * @param stereotypes The stereotypes
+     * @return The class elements
+     */
+    default @Nonnull ClassElement[] getClassElements(@Nonnull String aPackage, @Nonnull String... stereotypes) {
+        return new ClassElement[0];
     }
 }

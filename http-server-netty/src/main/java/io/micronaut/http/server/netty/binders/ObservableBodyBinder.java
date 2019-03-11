@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.server.netty.binders;
 
 import io.micronaut.context.BeanLocator;
@@ -70,7 +69,7 @@ public class ObservableBodyBinder extends DefaultBodyAnnotationBinder<Observable
         Collection<Argument<?>> typeVariables = context.getArgument().getTypeVariables().values();
 
         BindingResult<Publisher> result = publisherBodyBinder.bind(
-            ConversionContext.of(Argument.of(Publisher.class, (Argument[]) typeVariables.toArray(new Argument[typeVariables.size()]))),
+            ConversionContext.of(Argument.of(Publisher.class, (Argument[]) typeVariables.toArray(new Argument[0]))),
             source
         );
         if (result.isPresentAndSatisfied()) {

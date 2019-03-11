@@ -1,5 +1,5 @@
- /*
- * Copyright 2017-2018 original authors
+/*
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.tracing.brave;
 
 import brave.Clock;
@@ -27,6 +26,7 @@ import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -42,7 +42,7 @@ import javax.inject.Inject;
  * @since 1.0
  */
 @Requires(classes = {Tracing.class})
-@Requires(property = BraveTracerConfiguration.PREFIX + ".enabled", value = "true")
+@Requires(property = BraveTracerConfiguration.PREFIX + ".enabled", value = StringUtils.TRUE)
 @ConfigurationProperties(BraveTracerConfiguration.PREFIX)
 public class BraveTracerConfiguration implements Toggleable {
 

@@ -68,7 +68,7 @@ Once you are satisfied with your changes:
 
 - Commit your changes in your local branch
 - Push your changes to your remote branch on GitHub
-- Send us a (pull request)[https://help.github.com/articles/creating-a-pull-request]
+- Send us a [pull request](https://help.github.com/articles/creating-a-pull-request)
 
 ## Checkstyle
 
@@ -95,3 +95,10 @@ In this case, to fix the issues, we need to:
 
 The plugin also adds a new tab in the bottom to run checkstyle report and see all the errors and warnings. It is recommended
 to run the report and fixing all the issues before submitting a pull request.
+
+##Building on Windows 10
+
+The following prerequisites are needed for building and testing on Windows 10:
+
+* Docker Desktop version 2.0.0.0 win81 build 29211 or higher is installed and running.
+* OpenSSL binaries are installed, for example (https://indy.fulgan.com/SSL/) and on the PATH.

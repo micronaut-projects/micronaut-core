@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.health;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.micronaut.runtime.ApplicationConfiguration;
@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicReference;
  * @since 1.0
  */
 @Singleton
-@Requires(property = "micronaut.heartbeat.enabled", value = "true", defaultValue = "true")
+@Requires(property = "micronaut.heartbeat.enabled", value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 @Requires(property = ApplicationConfiguration.APPLICATION_NAME)
 @Requires(beans = EmbeddedServer.class)
 @Requires(notEnv = Environment.ANDROID)

@@ -1,0 +1,8 @@
+dependencies {
+    testCompile project(":http-client")
+    testCompile project(":inject-groovy")
+    testCompile project(":http-server-netty")
+    testCompile project(":runtime")
+    testCompile project(":inject")
+    testCompile dependencyVersion("jcache")
+}

@@ -1,0 +1,21 @@
+Micronaut includes api:views.freemarker.FreemarkerViewsRenderer[] which uses
+the https://freemarker.apache.org[Apache Freemarker] Java-based template engine.
+
+In addition to the <<views, Views>> dependency, add the following dependency on your classpath.
+
+dependency:freemarker[groupId="org.freemarker",scope="runtime",version="2.3.28"]
+
+The example shown in the <<views, Views>> section, could be rendered with the following Freemarker template:
+
+[source,html]
+.src/main/resources/views/home.ftl
+----
+include::{testsviews}/../../../../resources/views/home.ftl[]
+----
+
+Freemarker integration instantiates a freemarker https://freemarker.apache.org/docs/api/freemarker/template/Configuration.html[`Configuration`].
+
+All configurable properties are extracted from https://freemarker.apache.org/docs/api/freemarker/template/Configuration.html[`Configuration`] and
+https://freemarker.apache.org/docs/api/freemarker/core/Configurable.html[`Configurable`], and properties names are reused in the micronaut configuration.
+
+If a value is not declared and is null, the default configuration from Freemarker is used. The expected format of each value is the same from Freemarker, and no conversion or validation is done by Micronaut. You can find in https://freemarker.apache.org/docs/pgui_config.html[Freemarker documentation] how to configure each one.

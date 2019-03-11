@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.server;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
@@ -372,10 +371,24 @@ public class HttpServerConfiguration {
         @SuppressWarnings("WeakerAccess")
         public static final boolean DEFAULT_DISK = false;
 
+        /**
+         * The default mixed value.
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final boolean DEFAULT_MIXED = false;
+
+        /**
+         * The default threshold value.
+         */
+        @SuppressWarnings("WeakerAccess")
+        public static final long DEFAULT_THRESHOLD = 1024 * 1024 * 10; // 10MB
+
         private File location;
         private long maxFileSize = DEFAULT_MAX_FILE_SIZE;
         private boolean enabled = DEFAULT_ENABLED;
         private boolean disk = DEFAULT_DISK;
+        private boolean mixed = DEFAULT_MIXED;
+        private long threshold = DEFAULT_THRESHOLD;
 
         /**
          * @return The location to store temporary files
@@ -404,6 +417,20 @@ public class HttpServerConfiguration {
          */
         public boolean isDisk() {
             return disk;
+        }
+
+        /**
+         * @return Whether to use a mixed upload
+         */
+        public boolean isMixed() {
+            return mixed;
+        }
+
+        /**
+         * @return The threshold to trigger storage to disk
+         */
+        public long getThreshold() {
+            return threshold;
         }
 
         /**
@@ -436,6 +463,26 @@ public class HttpServerConfiguration {
          */
         public void setDisk(boolean disk) {
             this.disk = disk;
+        }
+
+        /**
+         * Sets whether to buffer data to disk if the size is greater than the
+         * threshold. Default value ({@value #DEFAULT_MIXED}).
+         *
+         * @param mixed True if data should be written to disk after a threshold.
+         */
+        public void setMixed(boolean mixed) {
+            this.mixed = mixed;
+        }
+
+        /**
+         * Sets the amount of data that should be received that will trigger
+         * the data to be stored to disk. Default value ({@value #DEFAULT_THRESHOLD}).
+         *
+         * @param threshold The threshold
+         */
+        public void setThreshold(@ReadableBytes long threshold) {
+            this.threshold = threshold;
         }
     }
 

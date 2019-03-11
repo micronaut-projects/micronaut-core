@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,8 +58,8 @@ public class IssuesControllerTest {
         String body = client.toBlocking().retrieve("/issues/12"); // <2>
         assertNotNull(body);
         assertEquals( // <3>
-                body,
-                "Issue # 12!"
+                "Issue # 12!",
+                body
         );
     }
     // end::test[]

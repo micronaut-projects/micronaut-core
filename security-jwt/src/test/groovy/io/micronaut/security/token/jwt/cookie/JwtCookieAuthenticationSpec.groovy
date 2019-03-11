@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,7 +32,7 @@ import io.micronaut.security.token.jwt.bearer.BearerTokenReader
 import io.micronaut.security.token.jwt.encryption.EncryptionConfiguration
 import io.micronaut.security.token.jwt.signature.SignatureConfiguration
 import spock.lang.AutoCleanup
-import spock.lang.IgnoreIf
+import spock.lang.Requires
 import spock.lang.Shared
 
 class JwtCookieAuthenticationSpec extends GebSpec {
@@ -121,7 +121,7 @@ class JwtCookieAuthenticationSpec extends GebSpec {
         then:
         cookie
         cookie.contains('JWT=')
-        !cookie.contains('Path=/')
+        cookie.contains('Path=/')
 
         when:
         String sessionId = cookie.substring('JWT='.size(), cookie.indexOf(';'))
@@ -134,7 +134,7 @@ class JwtCookieAuthenticationSpec extends GebSpec {
         rsp.body().contains('sherlock')
     }
 
-    @IgnoreIf({ !sys['geb.env']})
+    @Requires({sys['geb.env']})
     def "verify jwt cookie authentication works"() {
         given:
         browser.baseUrl = "http://localhost:${embeddedServer.port}"

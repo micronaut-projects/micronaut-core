@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.util;
 
+import javax.annotation.Nonnull;
 import java.util.Objects;
 
 /**
@@ -25,6 +25,49 @@ import java.util.Objects;
  * @since 1.0
  */
 public class ArgumentUtils {
+
+    /**
+     * Adds a check that the given number is positive.
+     *
+     * @param name The name of the argument
+     * @param value The value
+     * @throws IllegalArgumentException if the argument is not positive
+     * @return The value
+     */
+    public static @Nonnull Number requirePositive(String name, Number value) {
+        requireNonNull(name, value);
+        requirePositive(name, value.intValue());
+        return value;
+    }
+
+    /**
+     * Adds a check that the given number is positive.
+     *
+     * @param name The name of the argument
+     * @param value The value
+     * @param <T> The generic type
+     * @throws IllegalArgumentException if the argument is not positive
+     * @return The value
+     */
+    public static <T> T requireNonNull(String name, T value) {
+        Objects.requireNonNull(value, "Argument [" + name + "] cannot be null");
+        return value;
+    }
+
+    /**
+     * Adds a check that the given number is positive.
+     *
+     * @param name The name of the argument
+     * @param value The value
+     * @throws IllegalArgumentException if the argument is not positive
+     * @return The value
+     */
+    public static int requirePositive(String name, int value) {
+        if (value < 0) {
+            throw new IllegalArgumentException("Argument [" + name + "] cannot be negative");
+        }
+        return value;
+    }
 
     /**
      * Perform a check on an argument.

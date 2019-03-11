@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.io.scan;
 
 import io.micronaut.core.annotation.Internal;
@@ -22,7 +21,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.JarURLConnection;
@@ -33,6 +31,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
@@ -92,10 +91,9 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
     public Stream<Class> scan(String annotation, String pkg) {
         if (pkg == null) {
             return Stream.empty();
-        } else {
-            List<Class> classes = doScan(annotation, pkg);
-            return classes.stream();
         }
+        List<Class> classes = doScan(annotation, pkg);
+        return classes.stream();
     }
 
     /**
@@ -123,7 +121,7 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
                             LOG.debug("Ignoring file [" + url + "] due to URI error: " + e.getMessage(), e);
                         }
                     }
-                } else if (includeJars && Stream.of("jar", "zip", "war").anyMatch(it -> it.equals(protocol))) {
+                } else if (includeJars && Arrays.asList("jar", "zip", "war").contains(protocol)) {
                     URLConnection con = url.openConnection();
                     if (con instanceof JarURLConnection) {
                         JarURLConnection jarCon = (JarURLConnection) con;
@@ -200,7 +198,7 @@ public class ClassPathAnnotationScanner implements AnnotationScanner {
         if (fileName.endsWith(".class")) {
             // ignore generated classes
             if (fileName.indexOf('$') == -1) {
-                try (FileInputStream inputStream = new FileInputStream(file)) {
+                try (InputStream inputStream = Files.newInputStream(file.toPath())) {
                     scanInputStream(annotation, inputStream, classes);
                 } catch (IOException e) {
                     if (LOG.isDebugEnabled()) {

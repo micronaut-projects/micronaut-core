@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.annotation.processing;
 
-import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.util.StringUtils;
@@ -73,7 +71,13 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
      * @param modelUtils The model utils
      * @param filer The filer
      */
-    public JavaAnnotationMetadataBuilder(Elements elements, Messager messager, AnnotationUtils annotationUtils, Types types, ModelUtils modelUtils, Filer filer) {
+    public JavaAnnotationMetadataBuilder(
+            Elements elements,
+            Messager messager,
+            AnnotationUtils annotationUtils,
+            Types types,
+            ModelUtils modelUtils,
+            Filer filer) {
         this.elementUtils = elements;
         this.messager = messager;
         this.annotationUtils = annotationUtils;
@@ -124,14 +128,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Override
     protected VisitorContext createVisitorContext() {
-        return new JavaVisitorContext(
-                messager,
-                elementUtils,
-                annotationUtils,
-                types,
-                modelUtils,
-                filer
-        );
+        return annotationUtils.newVisitorContext();
     }
 
     @Override
@@ -374,6 +371,24 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                 .map(el -> (ExecutableElement) el)
                 .filter(method -> elementUtils.overrides(executableElement, method, (TypeElement) method.getEnclosingElement()))
                 .findFirst();
+    }
+
+    /**
+     * Checks if a method has an annotation.
+     *
+     * @param element The method
+     * @param ann    The annotation to look for
+     * @return Whether if the method has the annotation
+     */
+    @Override
+    public boolean hasAnnotation(Element element, Class<? extends Annotation> ann) {
+        List<? extends AnnotationMirror> annotationMirrors = element.getAnnotationMirrors();
+        for (AnnotationMirror annotationMirror : annotationMirrors) {
+            if (annotationMirror.getAnnotationType().toString().equals(ann.getName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

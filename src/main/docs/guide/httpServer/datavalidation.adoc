@@ -3,11 +3,7 @@ It is easy to validate incoming data with Micronaut's controllers with the
 
 First, add the Hibernate Validator configuration to your application:
 
-.build.gradle
-[source,groovy]
-----
-compile "io.micronaut.configuration:micronaut-hibernate-validator"
-----
+dependency:micronaut-hibernate-validator[groupId="io.micronaut.configuration"]
 
 We can validate parameters using `javax.validation` annotations and the api:validation.Validated[] annotation at the class level.
 
@@ -57,3 +53,5 @@ The validation of POJOs is shown in the following test:
 ----
 include::{testsvalidation}/datavalidation/pogo/EmailControllerSpec.groovy[tag=pojovalidated,indent=0]
 ----
+
+NOTE: Bean injection is supported in custom constraints with the hibernate validator configuration.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http;
 
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Headers;
 
 import java.time.LocalDateTime;
@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Constants for common HTTP headers. See https://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html.
@@ -483,8 +484,7 @@ public interface HttpHeaders extends Headers {
      * @return The content type
      */
     default Optional<MediaType> contentType() {
-        return findFirst(HttpHeaders.CONTENT_TYPE)
-            .map(MediaType::new);
+        return getFirst(HttpHeaders.CONTENT_TYPE, MediaType.class);
     }
 
     /**
@@ -506,7 +506,7 @@ public interface HttpHeaders extends Headers {
         return getAll(HttpHeaders.ACCEPT)
             .stream()
             .flatMap(x -> Arrays.stream(x.split(",")))
-            .map(MediaType::new)
+            .flatMap(s -> ConversionService.SHARED.convert(s, MediaType.class).map(Stream::of).orElse(Stream.empty()))
             .distinct()
             .collect(Collectors.toList());
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.function.executor;
 
 import io.micronaut.context.ApplicationContext;
@@ -24,6 +23,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.function.LocalFunctionRegistry;
 import io.micronaut.inject.ExecutableMethod;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Optional;
 
@@ -77,7 +77,7 @@ class AbstractExecutor<C> {
     protected ApplicationContext buildApplicationContext(@Nullable C context) {
         if (applicationContext == null) {
 
-            final ApplicationContextBuilder contextBuilder = ApplicationContext.build(Environment.FUNCTION);
+            final ApplicationContextBuilder contextBuilder = newApplicationContextBuilder();
             final Package pkg = getClass().getPackage();
             if (pkg != null) {
                 final String name = pkg.getName();
@@ -94,6 +94,15 @@ class AbstractExecutor<C> {
             }));
         }
         return applicationContext;
+    }
+
+    /**
+     * Builds a new builder.
+     *
+     * @return The {@link ApplicationContextBuilder}
+     */
+    protected @Nonnull ApplicationContextBuilder newApplicationContextBuilder() {
+        return ApplicationContext.build(Environment.FUNCTION);
     }
 
     /**

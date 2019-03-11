@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,14 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.annotation.processing;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
+import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
@@ -32,6 +33,7 @@ import javax.lang.model.util.Types;
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Utility methods for annotations.
@@ -40,32 +42,61 @@ import java.util.List;
  * @author Dean Wette
  */
 @SuppressWarnings("ConstantName")
+@Internal
 public class AnnotationUtils {
 
     private static final int CACHE_SIZE = 100;
-    private static final Cache<Element, AnnotationMetadata> annotationMetadataCache = Caffeine.newBuilder().maximumSize(CACHE_SIZE).build();
+    private static final Map<Element, AnnotationMetadata> annotationMetadataCache
+            = new ConcurrentLinkedHashMap.Builder<Element, AnnotationMetadata>().maximumWeightedCapacity(CACHE_SIZE).build();
 
     private final Elements elementUtils;
     private final Messager messager;
     private final Types types;
     private final ModelUtils modelUtils;
     private final Filer filer;
+    private final MutableConvertibleValues<Object> visitorAttributes;
 
     /**
      * Default constructor.
      *
-     * @param elementUtils The elements
-     * @param messager     The messager
-     * @param types        The types
-     * @param modelUtils   The model utils
-     * @param filer        The filer
+     * @param elementUtils      The elements
+     * @param messager          The messager
+     * @param types             The types
+     * @param modelUtils        The model utils
+     * @param filer             The filer
+     * @param visitorAttributes The visitor attributes
      */
-    protected AnnotationUtils(Elements elementUtils, Messager messager, Types types, ModelUtils modelUtils, Filer filer) {
+    protected AnnotationUtils(
+            Elements elementUtils,
+            Messager messager,
+            Types types,
+            ModelUtils modelUtils,
+            Filer filer,
+            MutableConvertibleValues<Object> visitorAttributes) {
         this.elementUtils = elementUtils;
         this.messager = messager;
         this.types = types;
         this.modelUtils = modelUtils;
         this.filer = filer;
+        this.visitorAttributes = visitorAttributes;
+    }
+
+    /**
+     * Default constructor.
+     *
+     * @param elementUtils      The elements
+     * @param messager          The messager
+     * @param types             The types
+     * @param modelUtils        The model utils
+     * @param filer             The filer
+     */
+    protected AnnotationUtils(
+            Elements elementUtils,
+            Messager messager,
+            Types types,
+            ModelUtils modelUtils,
+            Filer filer) {
+        this(elementUtils, messager, types, modelUtils, filer, new MutableConvertibleValuesMap<>());
     }
 
     /**
@@ -120,7 +151,7 @@ public class AnnotationUtils {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata getAnnotationMetadata(Element element) {
-        AnnotationMetadata metadata = annotationMetadataCache.getIfPresent(element);
+        AnnotationMetadata metadata = annotationMetadataCache.get(element);
         if (metadata == null) {
             metadata = newAnnotationBuilder().build(element);
             annotationMetadataCache.put(element, metadata);
@@ -158,6 +189,7 @@ public class AnnotationUtils {
 
     /**
      * Creates a new annotation builder.
+     *
      * @return The builder
      */
     public JavaAnnotationMetadataBuilder newAnnotationBuilder() {
@@ -167,7 +199,25 @@ public class AnnotationUtils {
                 this,
                 types,
                 modelUtils,
-                filer);
+                filer
+        );
+    }
+
+    /**
+     * Creates a new {@link JavaVisitorContext}.
+     *
+     * @return The visitor context
+     */
+    public JavaVisitorContext newVisitorContext() {
+        return new JavaVisitorContext(
+                messager,
+                elementUtils,
+                this,
+                types,
+                modelUtils,
+                filer,
+                visitorAttributes
+        );
     }
 
     /**
@@ -175,7 +225,18 @@ public class AnnotationUtils {
      */
     @Internal
     static void invalidateCache() {
-        annotationMetadataCache.invalidateAll();
+        annotationMetadataCache.clear();
     }
 
+    /**
+     * Invalidates any cached metadata.
+     *
+     * @param element The element
+     */
+    @Internal
+    public void invalidateMetadata(Element element) {
+        if (element != null) {
+            annotationMetadataCache.remove(element);
+        }
+    }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.codec;
 
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -52,12 +51,12 @@ public interface MediaTypeCodec {
     <T> T decode(Argument<T> type, InputStream inputStream) throws CodecException;
 
     /**
-     * Encode the given type from the given {@link InputStream}.
+     * Encode the given type to the given {@link OutputStream}.
      *
      * @param object       The object to encode
-     * @param outputStream The input stream
+     * @param outputStream The output stream
      * @param <T>          The generic type
-     * @throws CodecException When the result cannot be decoded
+     * @throws CodecException When the result cannot be encoded
      */
     <T> void encode(T object, OutputStream outputStream) throws CodecException;
 
@@ -67,7 +66,7 @@ public interface MediaTypeCodec {
      * @param object The object to encode
      * @param <T>    The generic type
      * @return The decoded result
-     * @throws CodecException When the result cannot be decoded
+     * @throws CodecException When the result cannot be encoded
      */
     <T> byte[] encode(T object) throws CodecException;
 
@@ -78,7 +77,7 @@ public interface MediaTypeCodec {
      * @param allocator The allocator
      * @param <T>       The generic type
      * @return The decoded result
-     * @throws CodecException When the result cannot be decoded
+     * @throws CodecException When the result cannot be encoded
      */
     <T> ByteBuffer encode(T object, ByteBufferFactory allocator) throws CodecException;
 

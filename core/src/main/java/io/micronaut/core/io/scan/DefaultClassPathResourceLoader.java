@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.io.scan;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,9 +27,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.*;
-import java.util.Collections;
-import java.util.Enumeration;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Stream;
 
 /**
@@ -47,7 +43,8 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
 
     private final ClassLoader classLoader;
     private final String basePath;
-    private final Cache<String, Boolean> isDirectoryCache = Caffeine.newBuilder().maximumSize(50).build();
+    private final Map<String, Boolean> isDirectoryCache = new ConcurrentLinkedHashMap.Builder<String, Boolean>()
+            .maximumWeightedCapacity(50).build();
 
     /**
      * Default constructor.
@@ -78,9 +75,8 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
     public Optional<InputStream> getResourceAsStream(String path) {
         if (!isDirectory(path)) {
             return Optional.ofNullable(classLoader.getResourceAsStream(prefixPath(path)));
-        } else {
-            return Optional.empty();
         }
+        return Optional.empty();
     }
 
     /**
@@ -153,7 +149,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
 
     @SuppressWarnings("ConstantConditions")
     private boolean isDirectory(String path) {
-        return isDirectoryCache.get(path, s -> {
+        return isDirectoryCache.computeIfAbsent(path, s -> {
             URL url = classLoader.getResource(prefixPath(path));
             if (url != null) {
                 try {
@@ -207,12 +203,10 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         if (basePath != null) {
             if (path.startsWith("/")) {
                 return basePath + path.substring(1);
-            } else {
-                return basePath + path;
             }
-        } else {
-            return path;
+            return basePath + path;
         }
+        return path;
     }
 
 }

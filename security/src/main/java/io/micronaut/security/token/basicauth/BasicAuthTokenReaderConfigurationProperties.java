@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.token.basicauth;
 
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaderValues;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.security.token.config.TokenConfigurationProperties;
@@ -28,11 +28,11 @@ import io.micronaut.security.token.config.TokenConfigurationProperties;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(property = TokenConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
+@Requires(property = TokenConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 @ConfigurationProperties(BasicAuthTokenReaderConfigurationProperties.PREFIX)
 public class BasicAuthTokenReaderConfigurationProperties implements BasicAuthTokenReaderConfiguration {
 
-    public static final String PREFIX = TokenConfigurationProperties.PREFIX + ".basicAuth";
+    public static final String PREFIX = TokenConfigurationProperties.PREFIX + ".basic-auth";
 
     /**
      * The default enable value.

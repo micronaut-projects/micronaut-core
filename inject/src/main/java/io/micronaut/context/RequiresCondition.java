@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.context;
 
 import groovy.lang.GroovySystem;
@@ -27,6 +26,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.reflect.ClassLoadingReporter;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -37,6 +37,7 @@ import io.micronaut.core.version.VersionUtils;
 import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import kotlin.KotlinVersion;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
@@ -121,6 +122,10 @@ public class RequiresCondition implements Condition {
      */
     private void processPreStartRequirements(ConditionContext context, AnnotationValue<Requires> requirements) {
         if (!matchesPresenceOfClasses(context, requirements)) {
+            return;
+        }
+
+        if (!matchesAbsenceOfClasses(context, requirements)) {
             return;
         }
 
@@ -255,7 +260,7 @@ public class RequiresCondition implements Condition {
                     ApplicationContext applicationContext = (ApplicationContext) beanContext;
                     Environment environment = applicationContext.getEnvironment();
                     Set<String> activeNames = environment.getActiveNames();
-                    boolean result = Arrays.stream(env).anyMatch(s -> !activeNames.contains(s));
+                    boolean result = Arrays.stream(env).noneMatch(activeNames::contains);
                     if (!result) {
                         context.fail("Disallowed environments [" + ArrayUtils.toString(env) + "] are active: " + activeNames);
                     }
@@ -286,7 +291,12 @@ public class RequiresCondition implements Condition {
         if (conditionClass == TrueCondition.class) {
             return true;
         } else if (conditionClass != null) {
-            Optional<? extends Condition> condition = InstantiationUtils.tryInstantiate(conditionClass);
+            // try first via instantiated metadata
+
+            Optional<? extends Condition> condition = requirements.get("condition", conditionClass);
+            if (!condition.isPresent()) {
+                condition = InstantiationUtils.tryInstantiate(conditionClass);
+            }
             if (condition.isPresent()) {
                 boolean conditionResult = condition.get().matches(context);
                 if (!conditionResult) {
@@ -331,6 +341,13 @@ public class RequiresCondition implements Condition {
                         context.fail("Groovy version [" + groovyVersion + "] must be at least " + version);
                     }
                     return versionMatch;
+                case KOTLIN:
+                    String kotlinVersion = KotlinVersion.CURRENT.toString();
+                    boolean isSupported = SemanticVersion.isAtLeast(kotlinVersion, version);
+                    if (!isSupported) {
+                        context.fail("Kotlin version [" + kotlinVersion + "] must be at least " + version);
+                    }
+                    return isSupported;
                 case JAVA:
                     String javaVersion = System.getProperty("java.version");
                     try {
@@ -384,6 +401,40 @@ public class RequiresCondition implements Condition {
 
     private boolean matchesPresenceOfClasses(ConditionContext context, AnnotationValue<Requires> convertibleValues) {
         return matchesPresenceOfClasses(context, convertibleValues, "classes");
+    }
+
+    private boolean matchesAbsenceOfClasses(ConditionContext context, AnnotationValue<Requires> requirements) {
+        if (requirements.contains("missing")) {
+            Optional<AnnotationClassValue[]> classNames = requirements.get("missing", AnnotationClassValue[].class);
+            if (classNames.isPresent()) {
+                AnnotationClassValue[] classValues = classNames.get();
+                if (ArrayUtils.isNotEmpty(classValues)) {
+                    for (AnnotationClassValue classValue : classValues) {
+                        if (classValue.getType().isPresent()) {
+                            context.fail("Class [" + classValue.getName() + "] is not absent");
+                            return false;
+                        }
+                    }
+                } else {
+                    return matchAbsenceOfClassNames(context, requirements);
+                }
+            } else {
+                return matchAbsenceOfClassNames(context, requirements);
+            }
+        }
+        return true;
+    }
+
+    private boolean matchAbsenceOfClassNames(ConditionContext context, AnnotationValue<Requires> requirements) {
+        final String[] classNameArray = requirements.get("missing", String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
+        final ClassLoader classLoader = context.getBeanContext().getClassLoader();
+        for (String name : classNameArray) {
+            if (ClassUtils.isPresent(name, classLoader)) {
+                context.fail("Class [" + name + "] is not absent");
+                return false;
+            }
+        }
+        return true;
     }
 
     private boolean matchesPresenceOfClasses(ConditionContext context, AnnotationValue<Requires> requirements, String attr) {

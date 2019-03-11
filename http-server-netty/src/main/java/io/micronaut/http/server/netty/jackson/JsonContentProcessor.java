@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.server.netty.jackson;
 
 import com.fasterxml.jackson.core.JsonFactory;
@@ -65,6 +64,8 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
             return;
         }
 
+        boolean streamArray = false;
+
         if (subscriber instanceof TypedSubscriber) {
             TypedSubscriber typedSubscriber = (TypedSubscriber) subscriber;
             Argument typeArgument = typedSubscriber.getTypeArgument();
@@ -74,15 +75,12 @@ public class JsonContentProcessor extends AbstractHttpContentProcessor<JsonNode>
                 Optional<Argument<?>> genericArgument = typeArgument.getFirstTypeVariable();
                 if (genericArgument.isPresent() && !Iterable.class.isAssignableFrom(genericArgument.get().getType())) {
                     // if the generic argument is not a iterable type them stream the array into the publisher
-                    this.jacksonProcessor = new JacksonProcessor(jsonFactory, true);
-                } else {
-                    this.jacksonProcessor = new JacksonProcessor(jsonFactory);
+                    streamArray = true;
                 }
             }
-        } else {
-            this.jacksonProcessor = new JacksonProcessor(jsonFactory);
         }
 
+        this.jacksonProcessor = new JacksonProcessor(jsonFactory, streamArray);
         this.jacksonProcessor.subscribe(new CompletionAwareSubscriber<JsonNode>() {
 
             @Override

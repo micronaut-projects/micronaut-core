@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.token.jwt.cookie;
 
 import io.micronaut.http.HttpRequest;
@@ -60,10 +59,12 @@ public class JwtCookieLoginHandler implements LoginHandler {
     public HttpResponse loginSuccess(UserDetails userDetails, HttpRequest<?> request) {
         Optional<AccessRefreshToken> accessRefreshTokenOptional = accessRefreshTokenGenerator.generate(userDetails);
         if (accessRefreshTokenOptional.isPresent()) {
+
             Cookie cookie = Cookie.of(jwtCookieConfiguration.getCookieName(), accessRefreshTokenOptional.get().getAccessToken());
-            cookie.path(jwtCookieConfiguration.getCookiePath());
-            cookie.maxAge(jwtGeneratorConfiguration.getAccessTokenExpiration());
-            cookie.httpOnly(true).secure(request.isSecure());
+            cookie.configure(jwtCookieConfiguration, request.isSecure());
+            if (!jwtCookieConfiguration.getCookieMaxAge().isPresent()) {
+                cookie.maxAge(jwtGeneratorConfiguration.getAccessTokenExpiration());
+            }
             try {
                 URI location = new URI(jwtCookieConfiguration.getLoginSuccessTargetUrl());
                 return HttpResponse.seeOther(location).cookie(cookie);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.cache.exceptions;
 
 /**
@@ -39,5 +38,17 @@ public class CacheSystemException extends RuntimeException {
      */
     public CacheSystemException(String message, Throwable cause) {
         super(message, cause);
+    }
+
+    /**
+     * Constructs a new CacheSystem exception with the specified detail message.  <p>Note that the detail message associated with
+     * {@code cause} is <i>not</i> automatically incorporated in
+     * this exception's detail message.
+     *
+     * @param message The detail message (which is saved for later retrieval
+     *                by the {@link #getMessage()} method).
+     */
+    public CacheSystemException(String message) {
+        super(message);
     }
 }

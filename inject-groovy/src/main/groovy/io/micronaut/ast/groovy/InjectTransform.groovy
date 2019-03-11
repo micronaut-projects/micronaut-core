@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,14 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.ast.groovy
 
+import groovy.transform.CompileDynamic
 import io.micronaut.aop.Adapter
 import io.micronaut.ast.groovy.utils.AstClassUtils
 import io.micronaut.ast.groovy.utils.ExtendedParameter
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.PropertySource
+import io.micronaut.core.annotation.AnnotationClassValue
 import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.util.CollectionUtils
@@ -32,7 +33,9 @@ import io.micronaut.inject.writer.DirectoryClassWriterOutputVisitor
 import io.micronaut.inject.writer.GeneratedFile
 
 import javax.inject.Named
+import javax.lang.model.element.VariableElement
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Function
 import static org.codehaus.groovy.ast.ClassHelper.makeCached
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getGetterName
@@ -115,6 +118,7 @@ import java.lang.reflect.Modifier
  * @since 1.0
  */
 @CompileStatic
+// IMPORTANT NOTE: This transform runs in phase CANONICALIZATION so it runs after TypeElementVisitorTransform
 @GroovyASTTransformation(phase = CompilePhase.CANONICALIZATION)
 class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
@@ -238,9 +242,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
             } catch (Throwable e) {
                 AstMessageUtils.error(source, beanClassNode, "Error generating bean definition class for dependency injection of class [${beanTypeName}]: $e.message")
-                if (e.message == null) {
-                    e.printStackTrace(System.err)
-                }
+                e.printStackTrace(System.err)
             }
         }
         if (!beanDefinitionWriters.isEmpty()) {
@@ -295,6 +297,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
         final Map<AnnotatedNode, BeanDefinitionVisitor> beanDefinitionWriters = [:]
         private BeanDefinitionVisitor beanWriter
         BeanDefinitionVisitor aopProxyWriter
+        final AtomicInteger adaptedMethodIndex = new AtomicInteger(0)
 
         InjectVisitor(SourceUnit sourceUnit, ClassNode targetClassNode, ConfigurationMetadataBuilder<ClassNode> configurationMetadataBuilder) {
             this(sourceUnit, targetClassNode, null, configurationMetadataBuilder)
@@ -494,7 +497,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         @Override
         protected void visitConstructorOrMethod(MethodNode methodNode, boolean isConstructor) {
-            if (methodNode.isSynthetic()) return
+            if (methodNode.isSynthetic() || methodNode.name.contains('$')) return
 
             String methodName = methodNode.name
             ClassNode declaringClass = methodNode.declaringClass
@@ -523,9 +526,9 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 ClassNode returnType = methodNode.getReturnType()
                 Map<String, ClassNode> genericsSpec = AstGenericUtils.createGenericsSpec(returnType)
                 if (genericsSpec) {
+                    Map<String, Object> boundTypes = [:]
                     GenericsType[] genericsTypes = returnType.redirect().getGenericsTypes()
                     Map<String, Map<String, Object>> typeArguments = [:]
-                    Map<String, Object> boundTypes = [:]
                     for (gt in genericsTypes) {
                         ClassNode cn = genericsSpec[gt.name]
                         boundTypes.put(gt.name, AstGenericUtils.resolveTypeReference(cn))
@@ -552,6 +555,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 )
 
                 if (methodAnnotationMetadata.hasStereotype(AROUND_TYPE)) {
+
+                    if (Modifier.isFinal(returnType.modifiers)) {
+                        addError(
+                                "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: $methodNode",
+                                methodNode
+                        )
+                        return
+                    }
 
                     Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
                     OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean)
@@ -636,7 +647,13 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                     String destroyMethodName = preDestroy.get()
                     MethodNode destroyMethod = producedType.getMethod(destroyMethodName)
                     if (destroyMethod != null) {
-                        beanMethodWriter.visitPreDestroyMethod(destroyMethod.declaringClass.name, destroyMethodName)
+                        beanMethodWriter.visitPreDestroyMethod(
+                                destroyMethod.declaringClass.name,
+                                AstGenericUtils.resolveTypeReference(destroyMethod.returnType, genericsSpec),
+                                destroyMethodName
+                        )
+                    } else {
+                        addError("@Bean method defines a preDestroy method that does not exist or is not public: $destroyMethodName", methodNode )
                     }
                 }
                 beanDefinitionWriters.put(methodNode, beanMethodWriter)
@@ -807,8 +824,14 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                 if ((isAopProxyType && isPublic) || (methodAnnotationMetadata.hasStereotype(AROUND_TYPE) && !concreteClass.isAbstract())) {
 
+                    boolean hasExplicitAround = methodAnnotationMetadata.hasDeclaredStereotype(AROUND_TYPE)
+
                     if (methodNode.isFinal()) {
-                        addError("Public method defines AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on class.", methodNode)
+                        if (hasExplicitAround) {
+                            addError("Method defines AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.", methodNode)
+                        } else {
+                            addError("Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.", methodNode)
+                        }
                     } else {
                         Object[] interceptorTypeReferences = methodAnnotationMetadata.getAnnotationNamesByStereotype(Around).toArray()
                         OptionalValues<Boolean> aopSettings = methodAnnotationMetadata.getValues(AROUND_TYPE, Boolean)
@@ -1284,6 +1307,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             }
         }
 
+        @CompileDynamic
         private void visitAdaptedMethod(MethodNode method, AnnotationMetadata methodAnnotationMetadata) {
             Optional<ClassNode> adaptedType = methodAnnotationMetadata.getValue(Adapter.class, String.class).flatMap({ String s ->
                 ClassNode cn = sourceUnit.AST.classes.find { ClassNode cn -> cn.name == s }
@@ -1304,7 +1328,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
                     String packageName = concreteClass.packageName;
                     String declaringClassSimpleName = concreteClass.nameWithoutPackage
-                    String beanClassName = declaringClassSimpleName + '$' + typeToImplement.nameWithoutPackage + '$' + method.getName()
+                    String beanClassName = generateAdaptedMethodClassName(declaringClassSimpleName, typeToImplement, method)
 
                     AopProxyWriter aopProxyWriter = new AopProxyWriter(
                             packageName,
@@ -1321,7 +1345,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
 
                     GenericsType[] typeArguments = typeToImplement.getGenericsTypes()
-                    Map<String, ClassNode> typeVariables = new HashMap<>(typeArguments.size())
+                    Map<String, ClassNode> typeVariables = new HashMap<>(typeArguments?.size() ?: 1)
 
                     for (GenericsType typeArgument : typeArguments) {
                         typeVariables.put(typeArgument.name, typeArgument.type)
@@ -1402,10 +1426,22 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                         targetAnnotationMetadata,
                                         targetMethodGenericTypeMap)
 
+                                AnnotationClassValue[] adaptedArgumentTypes = new AnnotationClassValue[sourceParameters.length]
+                                int j = 0
+                                for (Parameter ve in sourceParameters) {
+                                    Object r = AstGenericUtils.resolveTypeReference(ve.type, boundTypes)
+                                    if (r instanceof Class) {
+                                        adaptedArgumentTypes[j] = new AnnotationClassValue((Class) r)
+                                    } else {
+                                        adaptedArgumentTypes[j] = new AnnotationClassValue(r.toString())
+                                    }
+                                    j++
+                                }
 
                                 def values = CollectionUtils.mapOf(
                                         Adapter.InternalAttributes.ADAPTED_BEAN, concreteClass.name,
-                                        Adapter.InternalAttributes.ADAPTED_METHOD, method.name
+                                        Adapter.InternalAttributes.ADAPTED_METHOD, method.name,
+                                        Adapter.InternalAttributes.ADAPTED_ARGUMENT_TYPES, adaptedArgumentTypes
                                 )
 
 
@@ -1442,6 +1478,11 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                 }
 
             }
+        }
+
+        private String generateAdaptedMethodClassName(String declaringClassSimpleName, ClassNode typeToImplement, MethodNode method) {
+            String rootName = declaringClassSimpleName + '$' + typeToImplement.nameWithoutPackage + '$' + method.getName()
+            return rootName + adaptedMethodIndex.incrementAndGet()
         }
 
         private void visitTypeArguments(ClassNode typeElement, BeanDefinitionWriter beanDefinitionWriter) {

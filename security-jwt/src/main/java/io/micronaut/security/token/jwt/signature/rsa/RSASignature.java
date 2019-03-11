@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.token.jwt.signature.rsa;
 
 import com.nimbusds.jose.JOSEException;
@@ -23,7 +22,7 @@ import com.nimbusds.jose.crypto.RSASSAVerifier;
 import com.nimbusds.jwt.SignedJWT;
 import io.micronaut.security.token.jwt.signature.AbstractSignatureConfiguration;
 
-import javax.validation.constraints.NotNull;
+import javax.annotation.Nonnull;
 import java.security.interfaces.RSAPublicKey;
 
 /**
@@ -64,7 +63,7 @@ public class RSASignature extends AbstractSignatureConfiguration {
         return verifyWithPublicKey(jwt, this.publicKey);
     }
 
-    private boolean verifyWithPublicKey(final SignedJWT jwt, @NotNull RSAPublicKey publicKey) throws JOSEException {
+    private boolean verifyWithPublicKey(final SignedJWT jwt, @Nonnull RSAPublicKey publicKey) throws JOSEException {
         final JWSVerifier verifier = new RSASSAVerifier(publicKey);
         return jwt.verify(verifier);
     }

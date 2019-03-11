@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.tracing.jaeger;
 
 import io.jaegertracing.Configuration;
@@ -40,6 +39,7 @@ import java.io.IOException;
  * @since 1.0
  */
 @Factory
+@Requires(classes = JaegerTracer.Builder.class)
 @Requires(beans = JaegerConfiguration.class)
 public class JaegerTracerFactory implements Closeable {
 
@@ -84,6 +84,7 @@ public class JaegerTracerFactory implements Closeable {
      */
     @Singleton
     @Primary
+    @Requires(classes = JaegerTracer.Builder.class)
     Configuration jaegerConfiguration() {
         return this.configuration.getConfiguration();
     }
@@ -96,6 +97,7 @@ public class JaegerTracerFactory implements Closeable {
      */
     @Singleton
     @Primary
+    @Requires(classes = JaegerTracer.Builder.class)
     JaegerTracer.Builder jaegerTracerBuilder(Configuration configuration) {
         JaegerTracer.Builder tracerBuilder = resolveBuilder(configuration);
         if (this.configuration.isExpandExceptionLogs()) {
@@ -121,6 +123,7 @@ public class JaegerTracerFactory implements Closeable {
      */
     @Singleton
     @Primary
+    @Requires(classes = JaegerTracer.Builder.class)
     Tracer jaegerTracer(JaegerTracer.Builder tracerBuilder) {
         Tracer tracer = tracerBuilder.build();
         if (!GlobalTracer.isRegistered()) {

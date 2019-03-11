@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,24 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.token.basicauth;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.authentication.AuthenticationResponse;
 import io.micronaut.security.authentication.AuthenticationUserDetailsAdapter;
 import io.micronaut.security.authentication.Authenticator;
 import io.micronaut.security.authentication.UserDetails;
 import io.micronaut.security.authentication.UsernamePasswordCredentials;
+import io.micronaut.security.token.config.TokenConfiguration;
 import io.micronaut.security.token.validator.TokenValidator;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Inject;
 import javax.inject.Singleton;
-import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Optional;
 
@@ -40,7 +42,7 @@ import java.util.Optional;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(property = BasicAuthTokenReaderConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
+@Requires(property = BasicAuthTokenReaderConfigurationProperties.PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 @Singleton
 public class BasicAuthTokenValidator implements TokenValidator {
 
@@ -53,11 +55,27 @@ public class BasicAuthTokenValidator implements TokenValidator {
 
     protected final Authenticator authenticator;
 
+    private final String rolesKeyName;
+
     /**
+     * @deprecated Use {@link #BasicAuthTokenValidator(Authenticator, TokenConfiguration)}
      * @param authenticator The Authenticator
      */
+    @Deprecated
     public BasicAuthTokenValidator(Authenticator authenticator) {
         this.authenticator = authenticator;
+        this.rolesKeyName = TokenConfiguration.DEFAULT_ROLES_NAME;
+    }
+
+    /**
+     * @param authenticator The Authenticator
+     * @param tokenConfiguration The Token configuration.
+     */
+    @Inject
+    public BasicAuthTokenValidator(Authenticator authenticator,
+                                   TokenConfiguration tokenConfiguration) {
+        this.authenticator = authenticator;
+        this.rolesKeyName = tokenConfiguration.getRolesName();
     }
 
     @Override
@@ -69,7 +87,7 @@ public class BasicAuthTokenValidator implements TokenValidator {
             return authenticationResponse.switchMap(response -> {
                 if (response.isAuthenticated()) {
                     UserDetails userDetails = (UserDetails) response;
-                    return Flowable.just(new AuthenticationUserDetailsAdapter(userDetails));
+                    return Flowable.just(new AuthenticationUserDetailsAdapter(userDetails, rolesKeyName));
                 } else {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Could not authenticate {}", creds.get().getUsername());
@@ -99,14 +117,7 @@ public class BasicAuthTokenValidator implements TokenValidator {
         }
 
         String token;
-        try {
-            token = new String(decoded, "UTF-8");
-        } catch (final UnsupportedEncodingException e) {
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Bad format of the basic auth header");
-            }
-            return Optional.empty();
-        }
+        token = new String(decoded, StandardCharsets.UTF_8);
 
         final int delim = token.indexOf(":");
         if (delim < 0) {

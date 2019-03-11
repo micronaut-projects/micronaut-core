@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -38,7 +38,7 @@ class PropertyCircularDependencyFailureSpec extends Specification {
 
         then:"The implementation is injected"
         def e = thrown(CircularDependencyException)
-        e.message == '''\
+        e.message.normalize() == '''\
 Failed to inject value for parameter [a] of method [setA] of class: io.micronaut.inject.failures.PropertyCircularDependencyFailureSpec$B
 
 Message: Circular dependency detected

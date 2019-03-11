@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.jackson.serialize;
 
 import com.fasterxml.jackson.databind.BeanDescription;
 import com.fasterxml.jackson.databind.DeserializationConfig;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.introspect.BeanPropertyDefinition;
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.hateos.Resource;
+import io.micronaut.http.hateoas.Resource;
+import io.micronaut.jackson.modules.BeanIntrospectionModule;
 
 import java.util.List;
 
@@ -30,6 +31,7 @@ import java.util.List;
  * @since 1.0
  */
 @Internal
+@Requires(missingBeans = BeanIntrospectionModule.class)
 public class ResourceDeserializerModifier extends BeanDeserializerModifier {
 
     @Override

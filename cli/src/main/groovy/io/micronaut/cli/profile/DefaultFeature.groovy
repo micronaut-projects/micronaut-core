@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.cli.profile
 
 import groovy.transform.CompileStatic
@@ -72,6 +71,10 @@ class DefaultFeature implements Feature {
             for (entry in ((List) dependencyMap)) {
                 if (entry instanceof Map) {
                     def scope = (String)entry.scope
+                    def os = entry.os
+                    if (os && !isSupportedOs(os.toString())) {
+                        continue
+                    }
                     String coords = (String)entry.coords
 
                     if (coords.count(':') == 1) {
@@ -149,5 +152,23 @@ class DefaultFeature implements Feature {
         }
 
         true
+    }
+
+
+    static boolean isSupportedOs(String os) {
+        os = os.toLowerCase(Locale.ENGLISH).trim()
+        String osName = System.getProperty("os.name")?.toLowerCase(Locale.ENGLISH) ?: "unix"
+        switch (os) {
+            case "windows":
+                return osName.contains("windows")
+            case "osx":
+                return osName.contains("mac os x") || osName.contains("darwin") || osName.contains("osx")
+            case "unix":
+                return osName.contains("mac os x") || osName.contains("darwin") || osName.contains("osx") ||
+                        osName.contains("sunos") || osName.contains("solaris") || osName.contains("linux") ||
+                        osName.contains("freebsd")
+            default:
+                return false
+        }
     }
 }

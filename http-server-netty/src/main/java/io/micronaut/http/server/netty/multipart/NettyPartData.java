@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.server.netty.multipart;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.multipart.PartData;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufInputStream;
-import io.netty.buffer.ByteBufUtil;
-import io.netty.handler.codec.http.multipart.FileUpload;
+import io.micronaut.http.server.netty.HttpDataReference;
+import io.netty.buffer.*;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,19 +35,16 @@ import java.util.Optional;
 @Internal
 public class NettyPartData implements PartData {
 
-    private final FileUpload fileUpload;
-    private final int start;
-    private final int length;
+    private final HttpDataReference httpData;
+    private final HttpDataReference.Component component;
 
     /**
-     * @param fileUpload The file upload
-     * @param start      The index where to start reading bytes
-     * @param length     The number of bytes to read
+     * @param httpData   The data reference
+     * @param component  The component reference
      */
-    public NettyPartData(FileUpload fileUpload, int start, int length) {
-        this.fileUpload = fileUpload;
-        this.start = start;
-        this.length = length;
+    public NettyPartData(HttpDataReference httpData, HttpDataReference.Component component) {
+        this.httpData = httpData;
+        this.component = component;
     }
 
     /**
@@ -98,7 +92,7 @@ public class NettyPartData implements PartData {
      */
     @Override
     public Optional<MediaType> getContentType() {
-        return Optional.of(MediaType.of(fileUpload.getContentType()));
+        return httpData.getContentType();
     }
 
     /**
@@ -106,6 +100,6 @@ public class NettyPartData implements PartData {
      * @throws IOException If an error occurs retrieving the buffer
      */
     public ByteBuf getByteBuf() throws IOException {
-        return fileUpload.getByteBuf().retainedSlice(start, length);
+        return component.getByteBuf();
     }
 }

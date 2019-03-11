@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.cache;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
@@ -25,6 +24,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
+import javax.inject.Inject;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
@@ -38,7 +38,7 @@ import java.util.function.Supplier;
  * @author Graeme Rocher
  * @since 1.0
  */
-@EachBean(CacheConfiguration.class)
+@EachBean(DefaultCacheConfiguration.class)
 public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.cache.Cache> {
 
     private final CacheConfiguration cacheConfiguration;
@@ -53,7 +53,24 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
      * @param applicationContext The application context
      * @param conversionService To convert the value from the cache into given required type
      */
-    public DefaultSyncCache(CacheConfiguration cacheConfiguration, ApplicationContext applicationContext, ConversionService<?> conversionService) {
+    @Inject public DefaultSyncCache(
+            DefaultCacheConfiguration cacheConfiguration,
+            ApplicationContext applicationContext,
+            ConversionService<?> conversionService) {
+        this((CacheConfiguration) cacheConfiguration, applicationContext, conversionService);
+    }
+
+    /**
+     * Construct a sync cache implementation with given configurations.
+     *
+     * @param cacheConfiguration The cache configurations
+     * @param applicationContext The application context
+     * @param conversionService To convert the value from the cache into given required type
+     */
+    public DefaultSyncCache(
+            CacheConfiguration cacheConfiguration,
+            ApplicationContext applicationContext,
+            ConversionService<?> conversionService) {
         this.cacheConfiguration = cacheConfiguration;
         this.applicationContext = applicationContext;
         this.conversionService = conversionService;
@@ -134,7 +151,9 @@ public class DefaultSyncCache implements SyncCache<com.github.benmanes.caffeine.
             builder.maximumWeight(weight);
             builder.weigher(findWeigher());
         });
-
+        if (cacheConfiguration.isRecordStats()) {
+            builder.recordStats();
+        }
         if (cacheConfiguration.isTestMode()) {
             // run commands on same thread
             builder.executor(Runnable::run);

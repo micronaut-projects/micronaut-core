@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.configuration.jmx.endpoint;
 
 import io.micronaut.configuration.jmx.JmxConfiguration;
@@ -24,6 +23,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.async.SupplierUtil;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.annotation.Endpoint;
@@ -44,7 +44,7 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Singleton
-@Requires(property = JmxConfiguration.PREFIX + ".registerEndpoints", defaultValue = "true")
+@Requires(property = JmxConfiguration.PREFIX + ".registerEndpoints", defaultValue = StringUtils.TRUE)
 public class EndpointMethodJmxProcessor implements ExecutableMethodProcessor<Endpoint> {
 
     private static final Logger LOG = LoggerFactory.getLogger(EndpointMethodJmxProcessor.class);
