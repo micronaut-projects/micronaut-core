@@ -23,6 +23,14 @@ curl "http://localhost:8080/info" \
 After credentials are read from the HTTP Header, they are feed into an link:{api}/io/micronaut/security/authentication/Authenticator.html[Authenticator]
 which attempts to validate them.
 
+The code snippet below illustrates how to send credentials using the `basicAuth` method from api:http.MutableHttpRequest[] method:
+
+[source, groovy]
+.Accessing a protected resource using an Authorization request header
+----
+include::http-client/src/test/groovy/io/micronaut/http/client/BasicAuthSpec.groovy[tag=basicAuth, indent=0]
+----
+
 The following configuration properties are available to customize basic authentication behaviour:
 
 include::{includedir}configurationProperties/io.micronaut.security.token.basicauth.BasicAuthTokenReaderConfigurationProperties.adoc[]
