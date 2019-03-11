@@ -40,6 +40,7 @@ import java.util.Collection;
 public class KeysController {
 
     private final Collection<JwkProvider> jwkProviders;
+    public static final String EMPTY_KEYS = "{\"keys\":[]}";
 
     /**
      * Instantiates a {@link io.micronaut.security.token.jwt.endpoints.KeysController}.
@@ -60,5 +61,8 @@ public class KeysController {
                 .toList()
                 .map(JWKSet::new)
                 .map(JWKSet::toJSONObject);
+        if (jwkProviders.isEmpty()) {
+            return  Single.just(EMPTY_KEYS);
+        }
     }
 }
