@@ -22,7 +22,9 @@ class BasicAuthSpec extends Specification {
 
     def "basicAuth() sets Authorization Header with Basic base64(username:password)"() {
         when:
+        // tag::basicAuth[]
         HttpRequest request = HttpRequest.GET("/home").basicAuth('sherlock', 'password')
+        // end::basicAuth[]
 
         then:
         request.headers.get('Authorization')
