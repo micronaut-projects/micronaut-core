@@ -81,4 +81,34 @@ class MyController {
             def e = thrown(RuntimeException)
             e.message.contains("Value 'app.myWrongValue' is not valid. Please use kebab-case notation.")
     }
+
+    void "test wrong property name in @Named in a constructor"() {
+        when:
+            buildTypeElement("""
+package test;
+
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+
+import javax.inject.Named;
+
+@Controller()
+class VehicleController {
+
+    private final Engine engine;
+
+    public VehicleController(@Named(\"\${vehicleCylinders}\") Engine engine) {
+        this.engine = engine;
+    }
+}
+
+interface Engine {
+    int getCylinders();
+}
+
+""")
+        then:
+            def e = thrown(RuntimeException)
+            e.message.contains("Value 'vehicleCylinders' is not valid. Please use kebab-case notation.")
+    }
 }

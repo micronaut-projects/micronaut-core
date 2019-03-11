@@ -6,9 +6,11 @@ import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
@@ -42,6 +44,13 @@ public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<O
             }
         } else {
             visitElement(element, context);
+        }
+    }
+
+    @Override
+    public void visitConstructor(ConstructorElement element, VisitorContext context) {
+        for (ParameterElement parameter : element.getParameters()) {
+            visitElement(parameter, context);
         }
     }
 
