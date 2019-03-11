@@ -13,7 +13,7 @@ The code snippet below illustrates how to send a JWT token in the `Authorization
 [source, groovy]
 .Accessing a protected resource using an Authorization request header
 ----
-include::security-jwt/src/test/groovy/io/micronaut/security/token/propagation/TokenPropagationSpec.groovy[tag=bearerAuth]
+include::security-jwt/src/test/groovy/io/micronaut/security/token/propagation/TokenPropagationSpec.groovy[tag=bearerAuth, indent=0]
 ----
 
 [source, bash]
