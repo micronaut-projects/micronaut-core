@@ -63,4 +63,41 @@ abstract class AbstractBean {
         cleanup:
         ctx.close()
     }
+
+    void "test getBeansOfType filters proxy targets with context scoped beans"() {
+        when:
+        def ctx = DefaultBeanContext.run()
+        def targetBean = ctx.getProxyTargetBean(ContextScopedInterceptedBean, null)
+        def bean = ctx.getBean(ContextScopedInterceptedBean)
+
+
+        then:
+        bean instanceof Intercepted
+        targetBean != bean
+        ctx.getBeansOfType(ContextScopedInterceptedBean).size() == 1
+        targetBean != null
+        bean != null
+
+        cleanup:
+        ctx.close()
+    }
+
+    void "test getBeansOfType filters proxy targets with parallel beans"() {
+        when:
+        def ctx = DefaultBeanContext.run()
+        Thread.sleep(100)
+        def targetBean = ctx.getProxyTargetBean(ParallelBean, null)
+        def bean = ctx.getBean(ParallelBean)
+
+
+        then:
+        bean instanceof Intercepted
+        targetBean != bean
+        ctx.getBeansOfType(ParallelBean).size() == 1
+        targetBean != null
+        bean != null
+
+        cleanup:
+        ctx.close()
+    }
 }
