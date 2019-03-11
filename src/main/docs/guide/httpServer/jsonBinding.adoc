@@ -77,8 +77,6 @@ All jackson configuration keys start with `jackson`.
 | defaultTyping          | String | The global defaultTyping for polymorphic type handling from enum link:{jackson-databind}com/fasterxml/jackson/databind/ObjectMapper.DefaultTyping.html[ObjectMapper.DefaultTyping]. Example: `NON_FINAL`
 |=======
 
-WARNING: Use of "default typing" is not encouraged in general, and in particular is recommended against if the source of content is not trusted. Conversely, default typing may be used for processing content in cases where both ends (sender and receiver) are controlled by same entity.
-
 === Features
 
 All features can be configured with their name as the key and a boolean to indicate enabled or disabled.
