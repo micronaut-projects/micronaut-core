@@ -74,6 +74,7 @@ All jackson configuration keys start with `jackson`.
 | timeZone   | String |Uses link:{javase}java/util/TimeZone.html#getTimeZone-java.lang.String-[TimeZone.getTimeZone]. Example: `PST`
 | serializationInclusion | String | One of link:{jackson-annotations}com/fasterxml/jackson/annotation/JsonInclude.Include.html[JsonInclude.Include]
 | propertyNamingStrategy | String | Name of an instance of link:{jackson-databind}com/fasterxml/jackson/databind/PropertyNamingStrategy.html[PropertyNamingStrategy]. Example: `SNAKE_CASE`
+| defaultTyping          | String | The global defaultTyping for polymorphic type handling from enum link:{jackson-databind}com/fasterxml/jackson/databind/ObjectMapper.DefaultTyping.html[ObjectMapper.DefaultTyping]. Example: `NON_FINAL`
 |=======
 
 === Features
