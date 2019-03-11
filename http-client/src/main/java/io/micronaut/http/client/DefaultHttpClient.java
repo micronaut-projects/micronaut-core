@@ -2042,6 +2042,11 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             }
 
             Optional<SocketAddress> proxy = configuration.getProxyAddress();
+            if (proxy.isPresent()) {
+                Type proxyType = configuration.getProxyType();
+                SocketAddress proxyAddress = proxy.get();
+                configureProxy(p, proxyType, proxyAddress);
+            }
 
             if (sslContext != null) {
                 SslHandler sslHandler = sslContext.newHandler(
@@ -2049,15 +2054,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
                         host,
                         port
                 );
-                p.addFirst(HANDLER_SSL, sslHandler);
-
-                if (LOG.isDebugEnabled() && proxy.isPresent()) {
-                    LOG.debug("HttpClient proxy settings will be ignored because SSL is enabled");
-                }
-            } else if (proxy.isPresent()) {
-                Type proxyType = configuration.getProxyType();
-                SocketAddress proxyAddress = proxy.get();
-                configureProxy(p, proxyType, proxyAddress);
+                p.addLast(HANDLER_SSL, sslHandler);
             }
 
             // read timeout settings are not applied to streamed requests.
