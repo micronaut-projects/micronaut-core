@@ -2,7 +2,7 @@ Micronaut supports the https://tools.ietf.org/html/rfc6750[RFC 6750 Bearer Token
 
 image::jwt-bearer-token.svg[]
 
-The following configuration properties are available to customize how the Bearer Token will be embedded in the request:
+The following configuration properties are available to customize how the Bearer Token will be read:
 
 include::{includedir}configurationProperties/io.micronaut.security.token.jwt.bearer.BearerTokenConfigurationProperties.adoc[]
 
@@ -14,8 +14,16 @@ The code snippet below illustrates how to send a JWT token in the `Authorization
 .Accessing a protected resource using an Authorization request header
 ----
 String accessToken = //... obtain the access token
-HttpRequest requestWithAuthorization = HttpRequest.GET('/' ).header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken") 
+HttpRequest requestWithAuthorization = HttpRequest.GET('/' ).bearer(accessToken)
 HttpResponse<String> response = client.toBlocking().exchange(requestWithAuthorization, String)
+----
+
+[source, bash]
+.Example of HTTP GET request using Authorization request header
+----
+GET /protectedResource HTTP/1.1
+Host: micronaut.example
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJleHAiOjE0MjI5OTU5MjIsInN1YiI6ImppbWkiLCJyb2xlcyI6WyJST0xFX0FETUlOIiwiUk9MRV9VU0VSIl0sImlhdCI6MTQyMjk5MjMyMn0.rA7A2Gwt14LaYMpxNRtrCdO24RGrfHtZXY9fIjV8x8o
 ----
 
 TIP: Check out the http://guides.micronaut.io/micronaut-security-jwt/guide/index.html[Micronaut JWT Authentication guide] for a tutorial on Micronaut's JWT support.
