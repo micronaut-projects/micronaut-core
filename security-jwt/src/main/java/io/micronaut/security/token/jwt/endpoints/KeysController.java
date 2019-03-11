@@ -27,6 +27,7 @@ import io.reactivex.Single;
 import net.minidev.json.JSONObject;
 
 import java.util.Collection;
+import java.util.Collections;
 
 /**
  * Endpoint which exposes a JSON Web Key Set built with the JWK provided by {@link io.micronaut.security.token.jwt.endpoints.JwkProvider} beans.
@@ -41,6 +42,7 @@ public class KeysController {
 
     private final Collection<JwkProvider> jwkProviders;
     public static final String EMPTY_KEYS = "{\"keys\":[]}";
+    public static final String JSONKEY_KEYS = "keys";
 
     /**
      * Instantiates a {@link io.micronaut.security.token.jwt.endpoints.KeysController}.
@@ -55,14 +57,16 @@ public class KeysController {
      * @return a JSON Web Key Set (JWKS) payload.
      */
     @Get
-    public Single<JSONObject> keys() {
+    public Single<String> keys() {
+        if (jwkProviders.isEmpty()) {
+
+            return  Single.just(EMPTY_KEYS);
+        }
         return Flowable.fromIterable(jwkProviders)
                 .map(JwkProvider::retrieveJsonWebKey)
                 .toList()
                 .map(JWKSet::new)
-                .map(JWKSet::toJSONObject);
-        if (jwkProviders.isEmpty()) {
-            return  Single.just(EMPTY_KEYS);
-        }
+                .map(jwks -> jwks.toJSONObject().toJSONString());
+
     }
 }
