@@ -55,8 +55,7 @@ public class KeysController {
     @Get
     public Single<JSONObject> keys() {
         return Flowable.fromIterable(jwkProviders)
-                .map(JwkProvider::retrieveJsonWebKeys)
-                .flatMap(Flowable::fromIterable)
+                .flatMapIterable(JwkProvider::retrieveJsonWebKeys)
                 .toList()
                 .map(JWKSet::new)
                 .map(JWKSet::toJSONObject);
