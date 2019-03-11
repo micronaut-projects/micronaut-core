@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.cli.io.support;
 
 import java.io.File;
@@ -267,7 +266,7 @@ public class PathMatchingResourcePatternResolver {
             URL url = resourceUrls.nextElement();
             result.add(convertClassLoaderURL(url));
         }
-        return result.toArray(new Resource[result.size()]);
+        return result.toArray(new Resource[0]);
     }
 
     /**
@@ -307,7 +306,7 @@ public class PathMatchingResourcePatternResolver {
                 result.addAll(doFindPathMatchingFileResources(rootDirResource, subPattern));
             }
         }
-        return result.toArray(new Resource[result.size()]);
+        return result.toArray(new Resource[0]);
     }
 
     /**

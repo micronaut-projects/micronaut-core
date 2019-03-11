@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.discovery.aws.parameterstore;
 
 import com.amazonaws.SdkClientException;
@@ -21,6 +20,7 @@ import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagement
 import com.amazonaws.services.simplesystemsmanagement.AWSSimpleSystemsManagementAsyncClient;
 import com.amazonaws.services.simplesystemsmanagement.model.*;
 import io.micronaut.configuration.aws.AWSClientConfiguration;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.EnvironmentPropertySource;
@@ -58,6 +58,7 @@ import java.util.concurrent.Future;
 @Requires(classes = {AWSSimpleSystemsManagementAsyncClient.class, AWSClientConfiguration.class})
 @Requires(env = Environment.AMAZON_EC2)
 @Requires(beans = AWSParameterStoreConfiguration.class)
+@BootstrapContextCompatible
 public class AWSParameterStoreConfigClient implements ConfigurationClient {
 
     private static final Logger LOG = LoggerFactory.getLogger(AWSParameterStoreConfiguration.class);
@@ -297,7 +298,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
      * @return A set of calculated property names
      */
     private Set<String> calcPropertySourceNames(String prefix, Set<String> activeNames) {
-        return ClientUtil.calcPropertySourceNames(prefix, activeNames);
+        return ClientUtil.calcPropertySourceNames(prefix, activeNames, "_");
     }
 
     /**

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.cli.profile.repository
 
 import groovy.transform.CompileDynamic
@@ -41,21 +40,22 @@ import org.springframework.boot.cli.compiler.grape.DependencyResolutionFailedExc
 class MavenProfileRepository extends AbstractJarProfileRepository {
 
     public static final RepositoryConfiguration DEFAULT_REPO
+    public static final RepositoryConfiguration SNAPSHOT_REPO = new RepositoryConfiguration(
+            "micronautSnapshots",
+            new URI("https://oss.sonatype.org/content/repositories/snapshots"), true
+    )
+    public static final RepositoryConfiguration RELEASE_REPO = new RepositoryConfiguration(
+            "jcenter",
+            new URI("https://jcenter.bintray.com"), true
+    )
 
     static {
         def version = VersionInfo.getVersion(MicronautCli)
 
-        if(version == null || version.endsWith("-SNAPSHOT")) {
-            DEFAULT_REPO = new RepositoryConfiguration(
-                    "micronautSnapshots",
-                    new URI("https://oss.sonatype.org/content/repositories/snapshots"), true
-            )
-        }
-        else {
-            DEFAULT_REPO = new RepositoryConfiguration(
-                    "jcenter",
-                    new URI("https://jcenter.bintray.com"), true
-            )
+        if (version == null || version.endsWith("-SNAPSHOT")) {
+            DEFAULT_REPO = SNAPSHOT_REPO
+        } else {
+            DEFAULT_REPO = RELEASE_REPO
         }
     }
 

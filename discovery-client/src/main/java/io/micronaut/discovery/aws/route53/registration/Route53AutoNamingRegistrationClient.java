@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.discovery.aws.route53.registration;
 
 import com.amazonaws.services.servicediscovery.AWSServiceDiscovery;
@@ -24,6 +23,7 @@ import io.micronaut.configuration.aws.AWSClientConfiguration;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.convert.value.ConvertibleValues;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.aws.route53.AWSServiceDiscoveryResolver;
 import io.micronaut.discovery.aws.route53.Route53AutoRegistrationConfiguration;
@@ -59,7 +59,7 @@ import java.util.concurrent.Future;
 @Requires(classes = com.amazonaws.services.servicediscovery.AWSServiceDiscovery.class)
 @Requires(env = Environment.AMAZON_EC2)
 @Requires(beans = {Route53AutoRegistrationConfiguration.class})
-@Requires(property = Route53AutoNamingRegistrationClient.ENABLED, value = "true", defaultValue = "false")
+@Requires(property = Route53AutoNamingRegistrationClient.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @Requires(property = ApplicationConfiguration.APPLICATION_NAME)
 public class Route53AutoNamingRegistrationClient extends DiscoveryServiceAutoRegistration {
 

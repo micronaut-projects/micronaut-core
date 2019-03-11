@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.convert
 
 import io.micronaut.core.convert.format.Format
@@ -44,9 +43,11 @@ class DefaultConversionServiceSpec extends Specification {
         10                     | Float       | 10.0f
         10                     | String      | "10"
         "1,2"                  | int[]       | [1, 2] as int[]
+        "10"                   | Byte        | 10
         "10"                   | Integer     | 10
         "${5 + 5}"             | Integer     | 10
         "yes"                  | Boolean     | true
+        "true"                 | Boolean     | true
         "Y"                    | Boolean     | true
         "yes"                  | boolean     | true
         "on"                   | boolean     | true
@@ -78,6 +79,5 @@ class DefaultConversionServiceSpec extends Specification {
         "1"          | Optional   | [T: Argument.of(Long, 'T')]    | Optional.of(1L)
 
     }
-
 
 }

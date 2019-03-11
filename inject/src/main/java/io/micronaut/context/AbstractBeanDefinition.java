@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 /*
  * Copyright 2017 original authors
  *
@@ -47,6 +46,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.DefaultArgument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
@@ -628,7 +628,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     BeanInitializedEventListener listener = registration.getBean();
                     bean = listener.onInitialized(new BeanInitializingEvent(context, this, bean));
                     if (bean == null) {
-                        throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onCreated event");
+                        throw new BeanInstantiationException(resolutionContext, "Listener [" + listener + "] returned null from onInitialized event");
                     }
                 }
             }
@@ -660,7 +660,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         DefaultBeanContext defaultContext = (DefaultBeanContext) context;
         for (int i = 0; i < methodInjectionPoints.size(); i++) {
             MethodInjectionPoint methodInjectionPoint = methodInjectionPoints.get(i);
-            if (methodInjectionPoint.isPostConstructMethod() && methodInjectionPoint.requiresReflection()) {
+            if (methodInjectionPoint.isPreDestroyMethod() && methodInjectionPoint.requiresReflection()) {
                 injectBeanMethod(resolutionContext, defaultContext, i, bean);
             }
         }
@@ -841,6 +841,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     protected final Object getBeanForMethodArgument(BeanResolutionContext resolutionContext, BeanContext context, int methodIndex, int argIndex) {
         MethodInjectionPoint injectionPoint = methodInjectionPoints.get(methodIndex);
         Argument argument = injectionPoint.getArguments()[argIndex];
+        if (argument instanceof DefaultArgument) {
+            argument = new EnvironmentAwareArgument((DefaultArgument) argument);
+            instrumentAnnotationMetadata(context, argument);
+        }
         return getBeanForMethodArgument(resolutionContext, context, injectionPoint, argument);
     }
 
@@ -943,6 +947,10 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     protected final Object getBeanForConstructorArgument(BeanResolutionContext resolutionContext, BeanContext context, int argIndex) {
         ConstructorInjectionPoint<T> constructorInjectionPoint = getConstructor();
         Argument<?> argument = constructorInjectionPoint.getArguments()[argIndex];
+        if (argument instanceof DefaultArgument) {
+            argument = new EnvironmentAwareArgument((DefaultArgument) argument);
+            instrumentAnnotationMetadata(context, argument);
+        }
         Class argumentType = argument.getType();
         if (argumentType == BeanResolutionContext.class) {
             return resolutionContext;
@@ -973,7 +981,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
                     bean = ((DefaultBeanContext) context).getBean(resolutionContext, argumentType, qualifier);
                     path.pop();
                     return bean;
-                } catch (NoSuchBeanException | BeanInstantiationException e) {
+                } catch (NoSuchBeanException e) {
                     if (isNullable) {
                         path.pop();
                         return null;
@@ -1135,6 +1143,7 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     @UsedByGeneratedCode
     protected final Object getBeanForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex) {
         FieldInjectionPoint injectionPoint = fieldInjectionPoints.get(fieldIndex);
+        instrumentAnnotationMetadata(context, injectionPoint);
         return getBeanForField(resolutionContext, context, injectionPoint);
     }
 
@@ -1764,6 +1773,11 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
         }
     }
 
+    private void instrumentAnnotationMetadata(BeanContext context, Object object) {
+        if (object instanceof EnvironmentConfigurable && context instanceof ApplicationContext) {
+            ((EnvironmentConfigurable) object).configure(((ApplicationContext) context).getEnvironment());
+        }
+    }
 
     /**
      * Internal environment aware annotation metadata delegate.

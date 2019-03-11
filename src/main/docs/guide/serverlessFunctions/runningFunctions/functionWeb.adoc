@@ -1,26 +1,14 @@
 To run your function as a web application as described in this section, you will need the `function-web` dependency on your classpath. For example, in `build.gradle`
 
-.build.gradle
-[source,groovy]
-----
-dependencies {
-    ...
-    runtime "io.micronaut:micronaut-function-web"
-    runtime "io.micronaut:micronaut-http-server-netty" //<1>
-    ...
-}
-----
+dependency:micronaut-http-server-netty[]
+
+dependency:micronaut-function-web[]
+
 <1> In order to run the function as a web application, you will need an HTTP server, such as the `http-server-netty` dependency
 
 Once the dependencies have been added to the project, you can run the function via an `Application` class.
 
-.Example Application class
-[source,java]
-----
-include::{testsuite}/server/intro/Application.java[tags=imports, indent=0]
-
-include::{testsuite}/server/intro/Application.java[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.server.intro.Application[tags="imports,class"]
 
 You can now make requests against the function with a REST client.
 
@@ -60,16 +48,10 @@ TIP: For further information on the use of `@FunctionClient`, please see <<calli
 
 Functions can also be run as part of the Micronaut application context for ease of testing. Similarly to the example above, this approach requires the `function-web` and an HTTP server dependency on the classpath for tests. For example, in `build.gradle`:
 
-.build.gradle
-[source,groovy]
-----
-dependencies {
-    ...
-    testRuntime "io.micronaut:micronaut-function-web"
-    testRuntime "io.micronaut:micronaut-http-server-netty" //<1>
-    ...
-}
-----
+dependency:micronaut-http-server-netty[scope="testCompile"]
+
+dependency:micronaut-function-web[scope="testCompile"]
+
 <1> In order to run the function as a web application, you will need an HTTP server, such as the `http-server-netty` dependency
 
 Create a ann:function.client.FunctionClient[] interface as shown below:

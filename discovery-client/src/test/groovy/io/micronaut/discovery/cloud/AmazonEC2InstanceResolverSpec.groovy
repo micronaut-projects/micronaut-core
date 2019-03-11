@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -88,7 +88,10 @@ class AmazonEC2InstanceResolverSpec extends Specification {
         NetworkInterface networkInterface = computeInstanceMetadata.get().getInterfaces().get(0)
 
         Optional<ComputeInstanceMetadata> computeInstanceMetadata1 = resolver.resolve(environment)
-
+        computeInstanceMetadata.get().interfaces.size() == 1
+        computeInstanceMetadata.get().metadata
+        !computeInstanceMetadata.get().metadata.containsKey("interfaces")
+        computeInstanceMetadata.get().metadata.values().every()  { it instanceof String }
         computeInstanceMetadata1.isPresent()
         computeInstanceMetadata1.get().isCached()
 

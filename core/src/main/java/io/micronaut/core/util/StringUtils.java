@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.util;
 
 import javax.annotation.Nullable;
@@ -42,8 +41,18 @@ public final class StringUtils {
      */
     public static final String[] EMPTY_STRING_ARRAY = new String[0];
 
-    private static final Pattern DIGIT_PATTERN = Pattern.compile("\\d+");
 
+    /**
+     * Constant for an empty String.
+     */
+    public static final String EMPTY_STRING = "";
+
+    /**
+     * a space.
+     */
+    public static final char SPACE = 0x20;
+
+    private static final Pattern DIGIT_PATTERN = Pattern.compile("\\d+");
 
     /**
      * Return whether the given string is empty.
@@ -120,7 +129,7 @@ public final class StringUtils {
             throw new IllegalArgumentException("Number of arguments should be an even number representing the keys and values");
         }
 
-        Map<String, Object> answer = new HashMap<>(len / 2);
+        Map<String, Object> answer = new HashMap<>((int) (len / 2 / 0.75));
         int i = 0;
         while (i < values.length - 1) {
             String key = values[i++].toString().intern();
@@ -200,7 +209,7 @@ public final class StringUtils {
                 tokens.add(token);
             }
         }
-        return tokens.toArray(new String[tokens.size()]);
+        return tokens.toArray(new String[0]);
     }
 
     /**
@@ -266,5 +275,20 @@ public final class StringUtils {
             array[0] = Character.toUpperCase(array[0]);
         }
         return new String(array);
+    }
+
+    /**
+     * Trims the supplied string. If the string is empty or null before or after
+     * trimming, null is returned.
+     *
+     * @param string the string to trim
+     * @return the trimmed string or null
+     */
+    @Nullable
+    public static String trimToNull(@Nullable String string) {
+        return Optional.ofNullable(string)
+                .map(String::trim)
+                .filter(StringUtils::isNotEmpty)
+                .orElse(null);
     }
 }

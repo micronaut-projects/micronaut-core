@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.rules;
 
+import io.micronaut.security.token.DefaultRolesFinder;
+import io.micronaut.security.token.MapClaims;
+import io.micronaut.security.token.RolesFinder;
 import io.micronaut.security.token.config.TokenConfiguration;
 
+import javax.inject.Inject;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -32,14 +35,24 @@ import java.util.Map;
  */
 public abstract class AbstractSecurityRule implements SecurityRule {
 
-    private final TokenConfiguration tokenConfiguration;
+    private final RolesFinder rolesFinder;
+
+    /**
+     * @deprecated use {@link AbstractSecurityRule( RolesFinder )} instead.
+     * @param tokenConfiguration General Token Configuration
+     */
+    @Deprecated
+    AbstractSecurityRule(TokenConfiguration tokenConfiguration) {
+        this.rolesFinder = new DefaultRolesFinder(tokenConfiguration);
+    }
 
     /**
      *
-     * @param tokenConfiguration General Token Configuration
+     * @param rolesFinder Roles Parser
      */
-    AbstractSecurityRule(TokenConfiguration tokenConfiguration) {
-        this.tokenConfiguration = tokenConfiguration;
+    @Inject
+    AbstractSecurityRule(RolesFinder rolesFinder) {
+        this.rolesFinder = rolesFinder;
     }
 
     /**
@@ -56,16 +69,7 @@ public abstract class AbstractSecurityRule implements SecurityRule {
             roles.add(SecurityRule.IS_ANONYMOUS);
         } else {
             if (!claims.isEmpty()) {
-                Object rolesObject = claims.get(tokenConfiguration.getRolesName());
-                if (rolesObject != null) {
-                    if (rolesObject instanceof Iterable) {
-                        for (Object o : ((Iterable) rolesObject)) {
-                            roles.add(o.toString());
-                        }
-                    } else {
-                        roles.add(rolesObject.toString());
-                    }
-                }
+                roles.addAll(rolesFinder.findInClaims(new MapClaims(claims)));
             }
             roles.add(SecurityRule.IS_ANONYMOUS);
             roles.add(SecurityRule.IS_AUTHENTICATED);

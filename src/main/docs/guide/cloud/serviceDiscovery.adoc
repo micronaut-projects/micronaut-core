@@ -22,11 +22,7 @@ With that in mind, Micronaut tries to flexible to support all of these approache
 
 To include Service Discovery in your application simply the first step is to add the `discovery-client` dependency to your application:
 
-.build.gradle
-[source,groovy]
-----
-compile "io.micronaut:micronaut-discovery-client"
-----
+dependency:micronaut-discovery-client[]
 
 The `discovery-client` dependency provides implementations of the api:discovery.DiscoveryClient[] interface.
 

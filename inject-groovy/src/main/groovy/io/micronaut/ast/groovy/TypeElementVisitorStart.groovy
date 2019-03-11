@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.ast.groovy
 
 import groovy.transform.CompileStatic
@@ -90,18 +89,6 @@ class TypeElementVisitorStart implements ASTTransformation {
             }
 
 
-            def val = System.getProperty(ELEMENT_VISITORS_PROPERTY)
-            if (val) {
-                for (v in val.split(",")) {
-                    def visitor = InstantiationUtils.tryInstantiate(v, source.classLoader).orElse(null)
-                    if (visitor instanceof TypeElementVisitor) {
-                        LoadedVisitor newLoadedVisitor = new LoadedVisitor(source, visitor)
-                        loadedVisitors.put(visitor.getClass().getName(), newLoadedVisitor)
-                    }
-                }
-            }
-
-
             def visitorContext = new GroovyVisitorContext(source)
             for(loadedVisitor in loadedVisitors.values()) {
                 try {
@@ -111,6 +98,17 @@ class TypeElementVisitorStart implements ASTTransformation {
                             source,
                             moduleNode,
                             "Error starting type visitor [$loadedVisitor.visitor]: $e.message")
+                }
+            }
+        }
+
+        def val = System.getProperty(ELEMENT_VISITORS_PROPERTY)
+        if (val) {
+            for (v in val.split(",")) {
+                def visitor = InstantiationUtils.tryInstantiate(v, source.classLoader).orElse(null)
+                if (visitor instanceof TypeElementVisitor) {
+                    LoadedVisitor newLoadedVisitor = new LoadedVisitor(source, visitor)
+                    loadedVisitors.put(visitor.getClass().getName(), newLoadedVisitor)
                 }
             }
         }

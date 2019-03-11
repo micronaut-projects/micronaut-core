@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.annotation.processing;
 
+import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
+import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 
 import javax.annotation.processing.AbstractProcessor;
@@ -43,7 +45,9 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
     protected AnnotationUtils annotationUtils;
     protected GenericUtils genericUtils;
     protected ModelUtils modelUtils;
+    protected MutableConvertibleValues<Object> visitorAttributes = new MutableConvertibleValuesMap<>();
     protected ClassWriterOutputVisitor classWriterOutputVisitor;
+    protected JavaVisitorContext javaVisitorContext;
 
     @Override
     public SourceVersion getSupportedSourceVersion() {
@@ -68,8 +72,28 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         this.elementUtils = processingEnv.getElementUtils();
         this.typeUtils = processingEnv.getTypeUtils();
         this.modelUtils = new ModelUtils(elementUtils, typeUtils);
-        this.annotationUtils = new AnnotationUtils(elementUtils,  messager, typeUtils, modelUtils, filer);
-        this.genericUtils = new GenericUtils(elementUtils, typeUtils, modelUtils);
+        this.annotationUtils = new AnnotationUtils(
+                elementUtils,
+                messager,
+                typeUtils,
+                modelUtils,
+                filer,
+                visitorAttributes
+        );
+        this.genericUtils = new GenericUtils(
+                elementUtils,
+                typeUtils,
+                modelUtils
+        );
+        this.javaVisitorContext = new JavaVisitorContext(
+                messager,
+                elementUtils,
+                annotationUtils,
+                typeUtils,
+                modelUtils,
+                filer,
+                visitorAttributes
+        );
     }
 
     /**

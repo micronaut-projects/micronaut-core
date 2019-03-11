@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.cli.profile.commands
 
 import groovy.transform.CompileDynamic
@@ -328,10 +327,11 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                 def location = f.location
 
                 File skeletonDir
+                File tmpDir
                 if (location instanceof FileSystemResource) {
                     skeletonDir = location.createRelative("skeleton").file
                 } else {
-                    File tmpDir = unzipProfile(ant, location)
+                    tmpDir = unzipProfile(ant, location)
                     skeletonDir = new File(tmpDir, "META-INF/profile/features/$f.name/skeleton")
                 }
 
@@ -344,8 +344,10 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                     copySrcToTarget(ant, new File(skeletonDir, cmd.build + "-build"), ['**/' + APPLICATION_YML], profileInstance.binaryExtensions)
                     ant.chmod(dir: targetDirectory, includes: profileInstance.executablePatterns.join(' '), perm: 'u+x')
                 }
-            }
 
+                deleteDirectory(tmpDir)
+                deleteDirectory(skeletonDir)
+            }
             replaceBuildTokens(cmd.build, profileInstance, features, projectTargetDirectory)
 
             messageOnComplete(cmd.console, cmd, projectTargetDirectory)
@@ -609,6 +611,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             oneOfFeatureNames.addAll(g.oneOfFeatures*.feature*.name)
         }
 
+        List<Feature> dependentFeatures = []
         for (int i = 0; i < features.size(); i++) {
             Feature feature = features[i]
 
@@ -620,13 +623,20 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                         if (feature.requested) {
                             d.requested = true
                         }
-                        features.add(d)
+                        dependentFeatures.add(d)
                     }
                 }
             }
         }
 
-        features
+        if (dependentFeatures) {
+            Set<Feature> newFeatures = new LinkedHashSet<>()
+            newFeatures.addAll(dependentFeatures)
+            newFeatures.addAll(features)
+            return newFeatures
+        } else {
+            return features
+        }
     }
 
     protected static String getLanguage(Set<Feature> features) {
@@ -686,7 +696,7 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
             defaultpackagename = establishGroupAndAppName(groupAndAppName)
 
             if (!NameUtils.isValidServiceId(appname)) {
-                MicronautConsole.instance.error("Application name should be all lower case and separated by underscores. For example: hello-world")
+                MicronautConsole.instance.error("Application name should be all lower case and separated by dashes. For example: hello-world")
                 return false
             } else {
                 return true
@@ -716,23 +726,30 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
     }
 
     private String establishGroupAndAppName(String groupAndAppName) {
-        String defaultPackage
-        List<String> parts = groupAndAppName.split(/\./) as List
-        if (parts.size() == 1) {
-            appname = parts[0]
-            defaultPackage = createValidPackageName()
-            groupname = defaultPackage
-        } else {
-            appname = parts[-1]
-            groupname = parts[0..-2].join('.')
-            defaultPackage = groupname
-        }
+        String[] groupApp = groupAppName(groupAndAppName)
+        appname = groupApp[1]
+        groupname = groupApp[0]
 
-        return defaultPackage
+        return groupname
     }
 
-    private String createValidPackageName() {
-        String defaultPackage = appname.split(/[-]+/).collect { String token -> (token.toLowerCase().toCharArray().findAll { char ch -> Character.isJavaIdentifierPart(ch) } as char[]) as String }.join('.')
+    protected String[] groupAppName(String groupAndAppName) {
+        String packageName
+        String appName
+        List<String> parts = groupAndAppName.split(/\./) as List
+        if (parts.size() == 1) {
+            appName = parts[0]
+            packageName = createValidPackageName(appName)
+        } else {
+            appName = parts[-1]
+            packageName = parts[0..-2].join('.')
+        }
+
+        [packageName, appName] as String[]
+    }
+
+    private String createValidPackageName(String appName) {
+        String defaultPackage = appName.split(/[-]+/).collect { String token -> (token.toLowerCase().toCharArray().findAll { char ch -> Character.isJavaIdentifierPart(ch) } as char[]) as String }.join('.')
         if (!NameUtils.isValidJavaPackage(defaultPackage)) {
             throw new IllegalArgumentException("Cannot create a valid package name for [$appname]. Please specify a name that is also a valid Java package.")
         }
@@ -753,11 +770,12 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
 
         def skeletonResource = participatingProfile.profileDir.createRelative("skeleton")
         File skeletonDir
+        File tmpDir
         if (skeletonResource instanceof FileSystemResource) {
             skeletonDir = skeletonResource.file
         } else {
             // establish the JAR file name and extract
-            def tmpDir = unzipProfile(ant, skeletonResource)
+            tmpDir = unzipProfile(ant, skeletonResource)
             skeletonDir = new File(tmpDir, "META-INF/profile/skeleton")
         }
         copySrcToTarget(ant, skeletonDir, excludes, profile.binaryExtensions)
@@ -821,6 +839,14 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
                     }
                 }
             }
+        }
+    }
+
+    private void deleteDirectory(File directory) {
+        try {
+            directory?.deleteDir()
+        } catch (Throwable t) {
+            // Ignore error deleting temporal directory
         }
     }
 

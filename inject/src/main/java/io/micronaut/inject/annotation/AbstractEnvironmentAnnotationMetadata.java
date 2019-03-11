@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.inject.annotation;
 
 import io.micronaut.context.env.Environment;
@@ -21,9 +20,11 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
@@ -55,7 +56,14 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     }
 
     @Override
-    public <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(Class<T> annotationType) {
+    public @Nonnull Optional<Class<? extends Annotation>> getAnnotationType(@Nonnull String name) {
+        ArgumentUtils.requireNonNull("name", name);
+        return annotationMetadata.getAnnotationType(name);
+    }
+
+    @Override
+    public @Nonnull <T extends Annotation> List<AnnotationValue<T>> getAnnotationValuesByType(@Nonnull Class<T> annotationType) {
+        ArgumentUtils.requireNonNull("annotationType", annotationType);
         Environment environment = getEnvironment();
         List<AnnotationValue<T>> values = annotationMetadata.getAnnotationValuesByType(annotationType);
         if (environment != null) {
@@ -67,7 +75,8 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     }
 
     @Override
-    public <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(Class<T> annotationType) {
+    public @Nonnull <T extends Annotation> List<AnnotationValue<T>> getDeclaredAnnotationValuesByType(@Nonnull Class<T> annotationType) {
+        ArgumentUtils.requireNonNull("annotationType", annotationType);
         Environment environment = getEnvironment();
         List<AnnotationValue<T>> values = annotationMetadata.getDeclaredAnnotationValuesByType(annotationType);
         if (environment != null) {
@@ -77,8 +86,10 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
         return values;
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public <T extends Annotation> T[] synthesizeAnnotationsByType(Class<T> annotationClass) {
+    public @Nonnull <T extends Annotation> T[] synthesizeAnnotationsByType(@Nonnull Class<T> annotationClass) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         Environment environment = getEnvironment();
         if (environment != null) {
 
@@ -92,8 +103,10 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
-    public <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(Class<T> annotationClass) {
+    public @Nonnull <T extends Annotation> T[] synthesizeDeclaredAnnotationsByType(@Nonnull Class<T> annotationClass) {
+        ArgumentUtils.requireNonNull("annotationClass", annotationClass);
         Environment environment = getEnvironment();
         if (environment != null) {
 
@@ -128,27 +141,28 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     }
 
     @Override
-    public List<String> getAnnotationNamesByStereotype(String stereotype) {
+    public @Nonnull List<String> getAnnotationNamesByStereotype(String stereotype) {
         return annotationMetadata.getAnnotationNamesByStereotype(stereotype);
     }
 
     @Override
-    public Set<String> getAnnotationNames() {
+    public @Nonnull Set<String> getAnnotationNames() {
         return annotationMetadata.getAnnotationNames();
     }
 
     @Override
-    public Set<String> getDeclaredAnnotationNames() {
+    public @Nonnull Set<String> getDeclaredAnnotationNames() {
         return annotationMetadata.getDeclaredAnnotationNames();
     }
 
     @Override
-    public List<String> getDeclaredAnnotationNamesByStereotype(String stereotype) {
+    public @Nonnull List<String> getDeclaredAnnotationNamesByStereotype(String stereotype) {
         return annotationMetadata.getDeclaredAnnotationNamesByStereotype(stereotype);
     }
 
     @Override
-    public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
+    public @Nonnull <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(@Nonnull String annotation) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
         Environment env = getEnvironment();
 
         Optional<AnnotationValue<T>> values = annotationMetadata.findAnnotation(annotation);
@@ -160,7 +174,8 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     }
 
     @Override
-    public <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(String annotation) {
+    public @Nonnull <T extends Annotation> Optional<AnnotationValue<T>> findDeclaredAnnotation(@Nonnull String annotation) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
         Environment env = getEnvironment();
 
         Optional<AnnotationValue<T>> values = annotationMetadata.findDeclaredAnnotation(annotation);
@@ -172,7 +187,9 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     }
 
     @Override
-    public <T> OptionalValues<T> getValues(String annotation, Class<T> valueType) {
+    public @Nonnull <T> OptionalValues<T> getValues(@Nonnull String annotation, @Nonnull Class<T> valueType) {
+        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull("valueType", valueType);
         Map<String, Map<CharSequence, Object>> allAnnotations = annotationMetadata.allAnnotations;
         Map<String, Map<CharSequence, Object>> allStereotypes = annotationMetadata.allStereotypes;
         Environment environment = getEnvironment();
@@ -184,12 +201,12 @@ public abstract class AbstractEnvironmentAnnotationMetadata extends AbstractAnno
     }
 
     @Override
-    public <T> Optional<T> getDefaultValue(String annotation, String member, Class<T> requiredType) {
+    public @Nonnull <T> Optional<T> getDefaultValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Class<T> requiredType) {
         return annotationMetadata.getDefaultValue(annotation, member, requiredType);
     }
 
     @Override
-    public <T> Optional<T> getDefaultValue(String annotation, String member, Argument<T> requiredType) {
+    public @Nonnull <T> Optional<T> getDefaultValue(@Nonnull String annotation, @Nonnull String member, @Nonnull Argument<T> requiredType) {
         return annotationMetadata.getDefaultValue(annotation, member, requiredType);
     }
 

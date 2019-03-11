@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.convert;
+
+import io.micronaut.core.annotation.Indexed;
 
 /**
  * An interface for classes that register type conversions with the {@link ConversionService}.
@@ -22,6 +23,7 @@ package io.micronaut.core.convert;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Indexed(TypeConverterRegistrar.class)
 public interface TypeConverterRegistrar {
 
     /**

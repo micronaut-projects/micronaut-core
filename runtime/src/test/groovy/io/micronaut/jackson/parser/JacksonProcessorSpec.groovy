@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.jackson.parser
+
 
 import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.core.io.JsonEOFException
@@ -102,7 +103,6 @@ class JacksonProcessorSpec extends Specification {
         foo.name == "Fred"
         foo.age == 10
     }
-
 
     void "test publish JSON array async"() {
 

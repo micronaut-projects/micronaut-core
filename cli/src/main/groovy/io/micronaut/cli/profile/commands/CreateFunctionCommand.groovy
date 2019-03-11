@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.cli.profile.commands
 
 import groovy.transform.CompileStatic
@@ -42,8 +41,8 @@ class CreateFunctionCommand extends AbstractCreateCommand {
     @Parameters(arity = '0..1', paramLabel = 'NAME', description = 'The name of the function to create.')
     String functionName
 
-    @Option(names = ['-r', '--provider'], paramLabel = 'PROVIDER', description = 'Which cloud provider to use. Possible values: ${DEFAULT-VALUE}.')
-    protected String provider = 'aws'
+    @Option(names = ['-r', '--provider'], paramLabel = 'PROVIDER', description = 'Which cloud provider to use. Possible values: ${COMPLETION-CANDIDATES-VALUE}.')
+    protected SupportedProvider provider = SupportedProvider.aws
 
     @Option(names = ['-l', '--lang'], paramLabel = 'LANG', description = 'Which language to use. Possible values: ${COMPLETION-CANDIDATES}.')
     SupportedLanguage lang = SupportedLanguage.java
@@ -96,7 +95,7 @@ class CreateFunctionCommand extends AbstractCreateCommand {
 
     @Override
     protected String evaluateProfileName() {
-        "function-${provider}"
+        "function-${provider.fullName}"
     }
 
     protected String evaluateLangFeature(String profile) {
@@ -104,7 +103,7 @@ class CreateFunctionCommand extends AbstractCreateCommand {
     }
 
     protected String evaluateTestFeature() {
-        "test-${provider}-${resolveTest()}"
+        "test-${provider.fullName}-${resolveTest()}"
     }
 
     protected SupportedTestFramework resolveTest() {

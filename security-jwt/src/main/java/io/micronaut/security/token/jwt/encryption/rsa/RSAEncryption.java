@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.token.jwt.encryption.rsa;
 
 import com.nimbusds.jose.EncryptionMethod;
@@ -23,7 +22,8 @@ import com.nimbusds.jose.JWEEncrypter;
 import com.nimbusds.jose.crypto.RSADecrypter;
 import com.nimbusds.jose.crypto.RSAEncrypter;
 import io.micronaut.security.token.jwt.encryption.AbstractEncryptionConfiguration;
-import javax.validation.constraints.NotNull;
+
+import javax.annotation.Nonnull;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 
@@ -72,7 +72,7 @@ public class RSAEncryption extends AbstractEncryptionConfiguration {
         return buildEncrypterWithPublicKey(this.publicKey);
     }
 
-    private JWEEncrypter buildEncrypterWithPublicKey(@NotNull RSAPublicKey publicKey) {
+    private JWEEncrypter buildEncrypterWithPublicKey(@Nonnull RSAPublicKey publicKey) {
         return new RSAEncrypter(publicKey);
     }
 
@@ -81,7 +81,7 @@ public class RSAEncryption extends AbstractEncryptionConfiguration {
         return buildDecrypterWithPrivateKey(this.privateKey);
     }
 
-    private JWEDecrypter buildDecrypterWithPrivateKey(@NotNull RSAPrivateKey privateKey) {
+    private JWEDecrypter buildDecrypterWithPrivateKey(@Nonnull RSAPrivateKey privateKey) {
         return new RSADecrypter(privateKey);
     }
 }

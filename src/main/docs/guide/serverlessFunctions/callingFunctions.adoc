@@ -1,10 +1,6 @@
-Micronaut provides support for invoking functions (either locally or deployed to a cloud provider) directly within the application context. To use the features described in this section, you will need to have the `function-client` dependency on your classpath. For example, in `build.gradle`
+Micronaut provides support for invoking functions (either locally or deployed to a cloud provider) directly within the application context. To use the features described in this section, you will need to have the `function-client` dependency on your classpath.
 
-.build.gradle
-[source,groovy]
-----
-compile "io.micronaut:micronaut-function-client"
-----
+dependency:micronaut-function-client[]
 
 [TIP]
 .Using the CLI

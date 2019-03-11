@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.server.netty.types.files;
 
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.server.netty.types.NettyFileCustomizableResponseType;
@@ -29,6 +29,7 @@ import io.netty.handler.stream.ChunkedStream;
 
 import java.io.InputStream;
 import java.net.URL;
+import java.util.Optional;
 
 /**
  * Writes an {@link InputStream} to the Netty context.
@@ -38,12 +39,24 @@ import java.net.URL;
  */
 public class NettyStreamedFileCustomizableResponseType extends StreamedFile implements NettyFileCustomizableResponseType {
 
+    private final Optional<StreamedFile> delegate;
+
     /**
      * @param inputStream The input stream
-     * @param name        The name
+     * @param name        The file name
      */
     public NettyStreamedFileCustomizableResponseType(InputStream inputStream, String name) {
-        super(inputStream, name);
+        super(inputStream, MediaType.forFilename(name));
+        this.delegate = Optional.empty();
+    }
+
+    /**
+     * @param inputStream The input stream
+     * @param mediaType   The file media type
+     */
+    public NettyStreamedFileCustomizableResponseType(InputStream inputStream, MediaType mediaType) {
+        super(inputStream, mediaType);
+        this.delegate = Optional.empty();
     }
 
     /**
@@ -51,13 +64,15 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
      */
     public NettyStreamedFileCustomizableResponseType(URL url) {
         super(url);
+        this.delegate = Optional.empty();
     }
 
     /**
      * @param delegate The streamed file
      */
     public NettyStreamedFileCustomizableResponseType(StreamedFile delegate) {
-        super(delegate.getInputStream(), delegate.getName(), delegate.getLastModified(), delegate.getLength());
+        super(delegate.getInputStream(), delegate.getMediaType(), delegate.getLastModified(), delegate.getLength());
+        this.delegate = Optional.of(delegate);
     }
 
     @Override
@@ -66,6 +81,7 @@ public class NettyStreamedFileCustomizableResponseType extends StreamedFile impl
         if (length > -1) {
             response.header(io.micronaut.http.HttpHeaders.CONTENT_LENGTH, String.valueOf(length));
         }
+        delegate.ifPresent((type) -> type.process(response));
     }
 
     @Override

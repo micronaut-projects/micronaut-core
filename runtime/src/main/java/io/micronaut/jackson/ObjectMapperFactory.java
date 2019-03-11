@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.jackson;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
@@ -22,13 +21,11 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.deser.BeanDeserializerModifier;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.databind.ser.BeanSerializerModifier;
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Factory;
-import io.micronaut.context.annotation.Primary;
-import io.micronaut.context.annotation.Type;
+import io.micronaut.context.annotation.*;
 import io.micronaut.core.reflect.GenericTypeUtils;
 
 import javax.annotation.Nullable;
@@ -46,6 +43,7 @@ import java.util.TimeZone;
  * @since 1.0
  */
 @Factory
+@BootstrapContextCompatible
 public class ObjectMapperFactory {
 
     /**
@@ -79,12 +77,16 @@ public class ObjectMapperFactory {
     @Bean
     @Singleton
     @Primary
+    @BootstrapContextCompatible
     public ObjectMapper objectMapper(@Nullable JacksonConfiguration jacksonConfiguration,
                                      @Nullable JsonFactory jsonFactory) {
 
         ObjectMapper objectMapper = jsonFactory != null ? new ObjectMapper(jsonFactory) : new ObjectMapper();
 
-        objectMapper.findAndRegisterModules();
+        final boolean hasConfiguration = jacksonConfiguration != null;
+        if (!hasConfiguration || jacksonConfiguration.isModuleScan()) {
+            objectMapper.findAndRegisterModules();
+        }
         objectMapper.registerModules(jacksonModules);
         SimpleModule module = new SimpleModule(MICRONAUT_MODULE);
         for (JsonSerializer serializer : serializers) {
@@ -131,7 +133,12 @@ public class ObjectMapperFactory {
         objectMapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
         objectMapper.configure(DeserializationFeature.UNWRAP_SINGLE_VALUE_ARRAYS, true);
 
-        if (jacksonConfiguration != null) {
+        if (hasConfiguration) {
+
+            ObjectMapper.DefaultTyping defaultTyping = jacksonConfiguration.getDefaultTyping();
+            if (defaultTyping != null) {
+                objectMapper.enableDefaultTyping(defaultTyping);
+            }
 
             JsonInclude.Include include = jacksonConfiguration.getSerializationInclusion();
             if (include != null) {
@@ -149,7 +156,11 @@ public class ObjectMapperFactory {
             if (timeZone != null) {
                 objectMapper.setTimeZone(timeZone);
             }
-
+            PropertyNamingStrategy propertyNamingStrategy = jacksonConfiguration.getPropertyNamingStrategy();
+            if (propertyNamingStrategy != null) {
+                objectMapper.setPropertyNamingStrategy(propertyNamingStrategy);
+            }
+            
             jacksonConfiguration.getSerializationSettings().forEach(objectMapper::configure);
             jacksonConfiguration.getDeserializationSettings().forEach(objectMapper::configure);
             jacksonConfiguration.getMapperSettings().forEach(objectMapper::configure);

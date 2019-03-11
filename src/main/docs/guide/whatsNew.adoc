@@ -1,31 +1,227 @@
-Apart from https://github.com/micronaut-projects/micronaut-core/milestone/9?closed=1[issues resolved and minor enhancements] since the last release of Micronaut, this section covers significant new features and improvements.
+Micronaut {version} includes the following changes:
 
-=== Micronaut for Spring
 
-It is now possible using Ahead of Time compilation to use the Spring annotation based programming model to build Micronaut applications. See the documentation for https://github.com/micronaut-projects/micronaut-spring[Micronaut for Spring] for details.
+=== Modularization
 
-=== Improved GraalVM Docker Files
+Micronaut is now modular with parts of Micronaut being shifted into sub-projects. See the following links for new sub-projects that now have independent release cycles outside of Micronaut core:
 
-The Dockerfiles for GraalVM have been improved including a new all-in-one docker file that will build a slimmed down image including only your application using:
+* https://micronaut-projects.github.io/micronaut-kafka/1.1.x/guide/index.html[Micronaut Kafka]
+* https://micronaut-projects.github.io/micronaut-micrometer/1.1.x/guide/index.html[Micronaut Micrometer]
+* https://micronaut-projects.github.io/micronaut-groovy/1.1.x/guide/index.html[Micronaut Groovy]
+* https://micronaut-projects.github.io/micronaut-sql/1.1.x/guide/index.html[Micronaut SQL]
+* https://micronaut-projects.github.io/micronaut-mongodb/1.1.x/guide/index.html[Micronaut MongoDB]
+* https://micronaut-projects.github.io/micronaut-neo4j/1.1.x/guide/index.html[Micronaut Neo4j]
+* https://micronaut-projects.github.io/micronaut-redis/1.1.x/guide/index.html[Micronaut Redis]
+* https://micronaut-projects.github.io/micronaut-rabbitmq/1.1.x/guide/index.html[Micronaut RabbitMQ]
+* https://micronaut-projects.github.io/micronaut-test/latest/guide/index.html[Micronaut Test]
+* https://micronaut-projects.github.io/micronaut-netflix/latest/guide/index.html[Micronaut Netflix]
+* https://micronaut-projects.github.io/micronaut-aws/latest/guide/index.html[Micronaut AWS]
+* https://micronaut-projects.github.io/micronaut-grpc/latest/guide/index.html[Micronaut GRPC]
+* https://micronaut-projects.github.io/micronaut-flyway/latest/guide/index.html[Micronaut Flyway]
+* https://micronaut-projects.github.io/micronaut-liquibase/latest/guide/index.html[Micronaut Liquibase]
+* https://micronaut-projects.github.io/micronaut-elasticsearch/latest/guide/index.html[Micronaut Elasticsearch]
 
-.Using `DockerAllInOne`
-[source,bash]
+=== File Watch and Server Restart
+
+A new <<automaticRestart,Automatic Restart>> feature is included that allows the server to restart if a change occurs to a file. This feature can be used both in production and at development time to achieve automatic application restarts when changing source code (when combined with a third party tool such as Gradle or Kubernetes in production).
+
+[TIP]
+.Using the CLI
+====
 ----
-$ docker build . -f DockerfileAllInOne -t hello-world
+$ mn create-app my-app --features file-watch
+$ cd my-app
+$ ./gradlew run --continuous
 ----
+====
 
-=== Inheritance support for Swagger
+=== GRPC Support
 
-Compile-time support for Swagger has been improved to support inheritance when building the Swagger models.
+Support for creating https://grpc.io/[GRPC] + Micronaut applications has been added.
 
-=== Improvements for JDK 11
+See the https://micronaut-projects.github.io/micronaut-grpc/latest/guide/[Micronaut GRPC] documentation for more information and example applications.
 
-Various improvements have been made to improve the Micronaut experience on JDK 11.
+[TIP]
+.Using the CLI
+====
+Use the CLI to quickly create a GRPC application.
+----
+mn create-app helloworld --profile grpc --lang java --build gradle
+----
+====
 
-=== Improved support for OpenFaaS
+=== RabbitMQ Support
 
-The OpenFaaS feature of the CLI now generates an appropriate `function.yml` file so you can use the OpenFaaS CLI to deploy functions implemented in Micronaut.
+Support for creating Message-Driven Microservices with https://www.rabbitmq.com[RabbitMQ] has been added.
 
-=== AOP Advice on Factory Beans
+[TIP]
+.Using the CLI
+====
+Use the CLI to quickly create a RabbitMQ application.
+----
+mn create-app hellorabbit --features rabbitmq
+----
+====
 
-It is now possible to apply AOP advice like `@Retryable` at the class level for `@Factory` beans allowing for the container to be dynamic (for example to retry bean creation if it fails in a cloud environment).
+See the https://micronaut-projects.github.io/micronaut-rabbitmq/latest/guide/[Micronaut RabbitMQ] documentation for more information.
+
+=== Compile Time Bean Introspection
+
+A compilation time replacement for jdk:java.beans.Introspector[] has been added which allows introspecting and creating bean instances without using reflection, improving performance, memory consumption and GraalVM support.
+
+See the new section on <<introspection, Bean Introspection>> for more information.
+
+=== Cold Start and Performance Improvements
+
+Micronaut 1.1 cold start performance has been improved through a variety of optimizations including compilation time indexing of common bean types. Users should see superior cold start performance for both Microservices and Functions.
+
+
+=== AWS API Gateway Proxy Support
+
+Support for AWS API Gateway Proxy has been added allowing AWS Lambda's to be defined as regular controllers. See the documentation on https://micronaut-projects.github.io/micronaut-aws/latest/guide/#apiProxy[AWS API Gateway Proxy Support] for more information and links to examples.
+
+[TIP]
+.Using the CLI
+====
+----
+$ mn create-app my-app --features aws-api-gateway
+----
+====
+
+=== AWS Lambda Custom Runtime + GraalVM Support
+
+Support for creating AWS API Gateway applications (see above) that are compiled into GraalVM native images and run using an AWS Lambda Custom Runtime has been added. This reduces cold starts on Lambda to 100-200ms.
+
+[TIP]
+.Using the CLI
+====
+----
+$ mn create-app my-app --features aws-api-gateway-graal
+----
+====
+
+=== AWS Lambda Alexa Skill Support
+
+Support for creating https://micronaut-projects.github.io/micronaut-aws/latest/guide/#alexa[Alexa Skills with Micronaut] has been added.
+
+[TIP]
+.Using the CLI
+====
+You can create Alexa functions with the CLI. Use the `-lang` parameter to specify `java`, `kotlin` or `groovy`.
+----
+$ mn create-function hello-alexa --provider alexa
+----
+====
+
+=== Micronaut Test Templates
+
+The CLI has been updated to generate tests that use https://micronaut-projects.github.io/micronaut-test/latest/guide/index.html[Micronaut Test] for JUnit 5 and Spock.
+
+=== Micrometer 1.1 and @Timed Support
+
+Micrometer has been upgraded to 1.1 and support for https://micrometer.io/docs/concepts#_the_code_timed_code_annotation[@Timed] AOP advice added.
+
+
+[TIP]
+.Using the CLI
+====
+----
+$ mn create-app my-app --features micrometer
+----
+====
+
+=== Kafka 2.1 and Kafka Improvements
+
+Kafka support has been improved with the release of https://micronaut-projects.github.io/micronaut-kafka/1.1.x/guide/[Micronaut Kafka] 1.1 including supports for metrics, distributed tracing and Kafka 2.1.
+
+=== API Versioning Support
+
+API versioning is now supported. See the <<apiVersioning, API Versioning>> documentation for more information on how to use this feature. Thanks for https://github.com/BogdanOros[Bogdan Oros] for contributing this feature.
+
+=== Jackson `@JsonView` Support
+
+Support for using `@JsonView` on controller methods has been added can be optionally enabled by setting `jackson.json-view.enabled` to `true` in `application.yml`. Thanks to https://github.com/mmindenhall[Mark Mindenhall] for contributing this feature.
+
+=== Support for Spring Cloud Config Server
+
+If you are already using https://spring.io/projects/spring-cloud-config[Spring Config Server] then Micronaut now features native integration for distributed configuration.
+
+See the <<distributedConfigurationSpringCloud, Documentation on Distributed Configuration with Spring Cloud Config>> for more information.
+
+Thanks to https://github.com/thiagolocatelli[Thiago Locatelli] and https://github.com/MichelSchudel[Michel Schudel] for contributing this feature.
+
+=== Refactoring of File Responses
+
+In an effort to make a more consistent and understandable API, some methods and classes related to sending file responses have been deprecated. api:http.server.types.files.SystemFile[] is the replacement for api:http.server.types.files.AttachedFile[] and the constructors of api:http.server.types.files.StreamedFile[] have been deprecated in favor of new constructors that better convey the intended functionality.
+
+Note that api:http.server.types.files.SystemFile[] behaves differently from api:http.server.types.files.AttachedFile[] in that responses are by default sent inline instead of attached. In addition, support for sending attached responses has been added to api:http.server.types.files.StreamedFile[]. The following methods can be used to attach a system or streamed file.
+
+* api:http.server.types.files.StreamedFile#attach-java.lang.String-[StreamedFile#attach(String)]
+* api:http.server.types.files.SystemFile#attach--[SystemFile#attach()]
+* api:http.server.types.files.SystemFile#attach-java.lang.String-[SystemFile#attach(String)]
+
+=== Support for Freemarker Views
+
+Support for rendering <<freemarker,Freemarker Views>> has been added. Thanks to https://github.com/jerolba[Jeronimo López] for contributing this feature.
+
+=== Constraint Bean Support
+
+For those using the `micronaut-hibernate-validator` configuration, constraints will now be attempted to be retrieved from the bean context. This means you can now use dependency injection in your custom constraints.
+
+=== Support for JCache Caching
+
+Support has been added for the JCache specification. If you define a `javax.cache.CacheManager` bean it will be used for caching. For example:
+
+.Using JCache Caching
+snippet::io.micronaut.docs.whatsNew.CacheFactory[tags="imports,class"]
+
+=== Support for JAsync SQL
+
+Support for https://micronaut-projects.github.io/micronaut-sql/1.1.x/guide/index.html#jasync[JAsync SQL] has been added, which includes non-blocking drivers for both Postgres and MySQL. Thanks to https://github.com/oshai[Ohad Shai] for contributing this feature.
+
+=== Major Improvements for Multipart File Uploads
+
+Several issues and improvements have been made in regards to file uploads in comparison to the previous version of Micronaut. These fixes have been substantial enough that they have caused the behavior of uploads to change, however these changes should not break any existing use cases. To summarize the issues:
+
+* Routes were not in control of the flow of bytes coming from the client with multipart uploads
+* It was not possible to read and release a chunk of data at a time. The entire upload would be put into memory or disk
+* Mixed (memory/disk with a threshold) uploads are not supported
+
+The following changes have been implemented:
+
+* Routes gain control of the data flow as soon as they are executed. A route cannot be executed until all of its arguments are fulfilled, so data will reside on memory or disk until the route can be executed.
+* After processing a chunk of data it is immediately released. For memory uploads this means the data is immediately freed. For disk uploads the data remains on disk until after processing.
+* Two new configuration options are available to support mixed uploads: `micronaut.server.multipart.mixed` and `micronaut.server.multipart.threshold`. When data needs to be buffered, mixed uploads will initially store data in memory. Once the threshold is reached, the data will be erased from memory and moved entirely onto disk.
+
+=== Option to Disable Environment Detection
+
+Environment detection can be disabled through a method on the application context builder, system property, or evnironment variable.
+
+See the <<environments, Environment>> documentation for more information.
+
+=== Dependency Upgrades
+
+- Groovy `2.5.4` -> `2.5.6`
+- Gradle `4.10.2` -> `5.1.1` (CLI Only)
+- Kafka `2.0.1` -> `2.1.0`
+- Micrometer `1.0.6` -> `1.1.2`
+- Reactive Streams `1.0.1` -> `1.0.2`
+- Jackson `2.9.7` -> `2.9.8`
+- Nimbus JOSE+JWT  `6.0.2` -> `6.8`
+- Spring `5.0.10.RELEASE` -> `5.1.4.RELEASE`
+- Reactor `3.2.0.RELEASE` -> `3.2.5.RELEASE`
+- RxJava 2 `2.2.2` -> `2.2.6`
+- Reactive Postgres `0.10.5` -> `0.11.2`
+- GORM `6.1.8.RELEASE` -> `7.0.0.RC1`
+- Hibernate `5.3.7.Final` -> `5.4.0.Final`
+- Hikari `2.7.9` -> `3.3.0`
+- Commons DBCP 2 `2.1.1` -> `2.5.0`
+- Tomcat Pool `9.0.1` -> `9.0.14`
+- Neo4j Java Driver `1.6.4` -> `1.7.2`
+- Mongo Java Driver `3.8.0` -> `3.10.0`
+- Mongo Reactive Driver `1.8.0` -> `1.10.0`
+- Redis Lettuce Driver `5.0.4.RELEASE` -> `5.1.3.RELEASE`
+- Jaeger `0.31.0` -> `0.33.1`
+- Zipkin Reporter `2.7.9` -> `2.8.0`
+- Brave Instrumentation HTTP `5.4.2` -> `5.6.1`
+- Brave Opentracing -> `0.33.3` -> `0.33.10`

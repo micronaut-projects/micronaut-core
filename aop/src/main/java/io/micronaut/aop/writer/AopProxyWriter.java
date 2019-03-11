@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.aop.writer;
 
 import io.micronaut.aop.HotSwappableInterceptedProxy;
@@ -27,6 +26,7 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.Qualifier;
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -567,7 +567,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
         this.constructArgumentMetadata = new LinkedHashMap<>(this.constructArgumentMetadata);
         this.constructArgumentMetadata.put("interceptors", new DefaultAnnotationMetadata() {{
             addDeclaredAnnotation(io.micronaut.context.annotation.Type.class.getName(), Collections.singletonMap(
-                "value", Arrays.stream(interceptorTypes).map(Type::getClassName).toArray()
+                "value", Arrays.stream(interceptorTypes).map(t -> new AnnotationClassValue(t.getClassName())).toArray()
             ));
         }});
         String constructorDescriptor = getConstructorDescriptor(constructorNewArgumentTypes.values());
@@ -685,9 +685,7 @@ public class AopProxyWriter extends AbstractClassFileWriter implements ProxyingB
                         null, null
                     );
                     proxyConstructorGenerator.loadThis();
-                    proxyConstructorGenerator.newInstance(TYPE_READ_WRITE_LOCK);
-                    proxyConstructorGenerator.dup();
-                    proxyConstructorGenerator.invokeConstructor(TYPE_READ_WRITE_LOCK, METHOD_DEFAULT_CONSTRUCTOR);
+                    pushNewInstance(proxyConstructorGenerator, TYPE_READ_WRITE_LOCK);
                     proxyConstructorGenerator.putField(proxyType, FIELD_READ_WRITE_LOCK, TYPE_READ_WRITE_LOCK);
 
                     // Add Read Lock field

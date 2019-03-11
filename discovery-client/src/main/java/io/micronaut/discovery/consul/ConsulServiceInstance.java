@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.discovery.consul;
 
 import io.micronaut.core.convert.value.ConvertibleValues;
@@ -138,7 +137,7 @@ public class ConsulServiceInstance implements ServiceInstance {
         for (String tag : tags) {
             int i = tag.indexOf('=');
             if (i > -1) {
-                map.put(tag.substring(0, i), tag.substring(i + 1, tag.length()));
+                map.put(tag.substring(0, i), tag.substring(i + 1));
             }
         }
         return ConvertibleValues.of(map);

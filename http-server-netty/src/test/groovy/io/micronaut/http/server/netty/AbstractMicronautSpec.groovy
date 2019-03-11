@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,7 +43,7 @@ abstract class AbstractMicronautSpec extends Specification {
     }
 
     Map<String, Object> getConfiguration() {
-        ['micronaut.server.multipart.location':uploadDir.absolutePath]
+        ['micronaut.server.multipart.location': uploadDir.absolutePath]
     }
 
     void cleanupSpec()  {

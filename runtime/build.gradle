@@ -1,4 +1,4 @@
-apply plugin: 'com.github.johnrengelman.plugin-shadow'
+apply plugin: 'com.github.johnrengelman.shadow'
 
 dependencies {
     for(proj in ['inject', 'http', 'aop']) {
@@ -7,21 +7,39 @@ dependencies {
     }
 
     shadowCompile dependencyVersion("validation")
+    shadowCompile dependencyVersion("jcache")
     shadowCompile dependencyVersion("jackson")
     shadowCompile dependencyVersion("rxjava2")
 
+    compileOnly dependencyVersion("jcache")
     compile dependencyVersion("validation")
     compile dependencyVersion("jackson")
     compile dependencyVersion("rxjava2")
 
-    shadowRuntime([
+    shadowCompile([
         dependencyVersion('jackson.datatype'),
         dependencyModuleVersion('jackson.datatype', 'jackson-datatype-jsr310')
     ])
-    runtime([
+    compile([
         dependencyVersion('jackson.datatype'),
         dependencyModuleVersion('jackson.datatype', 'jackson-datatype-jsr310')
     ])
+
+    compileOnly(
+        dependencyModuleVersion('jackson.modules', 'jackson-module-kotlin')
+    ) {
+        transitive = false
+    }
+    compileOnly(
+            dependencyVersion('jackson.modules')
+    ) {
+        transitive = false
+    }
+    compileOnly(
+        dependencyModuleVersion('jackson.modules', 'jackson-module-parameter-names')
+    ) {
+        transitive = false
+    }
 
     compileOnly 'org.glassfish:javax.el:3.0.1-b09'
     compileOnly dependencyVersion("reactor")
@@ -29,6 +47,8 @@ dependencies {
     compileOnly "com.github.ben-manes.caffeine:caffeine:$caffeineVersion"
     compileOnly project(":inject-java")
 
+    testCompile 'org.jsr107.ri:cache-ri-impl:1.1.0'
+    testCompile dependencyVersion("jcache")
     testCompile dependencyVersion("rxjava1.interop")
     testCompile dependencyVersion("reactor")
     testCompile project(":inject-java")

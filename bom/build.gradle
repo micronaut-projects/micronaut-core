@@ -7,7 +7,6 @@ publishing {
                 def profiles = new Properties()
                 profiles.load(new StringReader(new File("$projectDir/profiles.properties").text))
 
-
                 xml.children().last() + {
                     def mkp = delegate
 

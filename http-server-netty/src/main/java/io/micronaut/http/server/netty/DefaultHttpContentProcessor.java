@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
@@ -78,7 +77,7 @@ public class DefaultHttpContentProcessor extends SingleThreadedBufferingProcesso
         long receivedLength = this.receivedLength.addAndGet(resolveLength(message));
 
         if ((advertisedLength != -1 && receivedLength > advertisedLength) || (receivedLength > requestMaxSize)) {
-            fireExceedsLength(receivedLength, advertisedLength == -1 ? requestMaxSize : advertisedLength);
+            fireExceedsLength(advertisedLength == -1 ? receivedLength : advertisedLength, requestMaxSize);
         } else {
             if (verifyPartDefinedSize(message)) {
                 publishVerifiedContent(message);

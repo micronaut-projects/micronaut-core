@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.rules;
 
 import io.micronaut.core.util.AntPathMatcher;
@@ -21,9 +20,11 @@ import io.micronaut.core.util.PathMatcher;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.security.config.InterceptUrlMapPattern;
+import io.micronaut.security.token.RolesFinder;
 import io.micronaut.security.token.config.TokenConfiguration;
 import io.micronaut.web.router.RouteMatch;
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import java.util.*;
 
 /**
@@ -43,11 +44,22 @@ abstract class InterceptUrlMapRule extends AbstractSecurityRule {
     private final AntPathMatcher pathMatcher;
 
     /**
-     *
+     * @deprecated use {@link InterceptUrlMapRule( RolesFinder )} instead.
      * @param tokenConfiguration The Token configuration.
      */
-    InterceptUrlMapRule(TokenConfiguration tokenConfiguration) {
+    @Deprecated
+    public InterceptUrlMapRule(TokenConfiguration tokenConfiguration) {
         super(tokenConfiguration);
+        this.pathMatcher = PathMatcher.ANT;
+    }
+
+    /**
+     *
+     * @param rolesFinder Roles Parser
+     */
+    @Inject
+    public InterceptUrlMapRule(RolesFinder rolesFinder) {
+        super(rolesFinder);
         this.pathMatcher = PathMatcher.ANT;
     }
 

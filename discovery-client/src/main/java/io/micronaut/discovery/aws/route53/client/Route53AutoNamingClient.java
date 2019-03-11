@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.discovery.aws.route53.client;
 
 import com.amazonaws.services.servicediscovery.AWSServiceDiscoveryAsync;
@@ -22,6 +21,7 @@ import io.micronaut.configuration.aws.AWSClientConfiguration;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.discovery.aws.route53.AWSServiceDiscoveryResolver;
@@ -51,7 +51,7 @@ import java.util.concurrent.Future;
 @Requires(env = Environment.AMAZON_EC2)
 @Requires(beans = Route53DiscoveryConfiguration.class)
 @Requires(beans = AWSClientConfiguration.class)
-@Requires(property = Route53AutoNamingClient.ENABLED, value = "true", defaultValue = "false")
+@Requires(property = Route53AutoNamingClient.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 public class Route53AutoNamingClient implements DiscoveryClient {
 
     /**

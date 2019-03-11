@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.discovery.consul;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.util.Toggleable;
 import io.micronaut.discovery.DiscoveryConfiguration;
@@ -42,6 +42,7 @@ import java.util.Optional;
  */
 @RequiresConsul
 @ConfigurationProperties(ConsulConfiguration.PREFIX)
+@BootstrapContextCompatible
 public class ConsulConfiguration extends DiscoveryClientConfiguration {
 
     /**
@@ -53,6 +54,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
     private final ConsulConnectionPoolConfiguration consulConnectionPoolConfiguration;
 
     private String aslToken;
+    private boolean healthCheck = true;
     private ConsulRegistrationConfiguration registration = new ConsulRegistrationConfiguration();
     private ConsulDiscoveryConfiguration discovery = new ConsulDiscoveryConfiguration();
     private ConsulConfigDiscoveryConfiguration configuration = new ConsulConfigDiscoveryConfiguration();
@@ -74,6 +76,24 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
         super(applicationConfiguration);
         setPort(CONSULT_DEFAULT_PORT);
         this.consulConnectionPoolConfiguration = consulConnectionPoolConfiguration;
+    }
+
+    /**
+     * @return Whether the Consul server should be considered for health checks.
+     * @see io.micronaut.discovery.consul.health.ConsulHealthIndicator
+     */
+    public boolean isHealthCheck() {
+        return healthCheck;
+    }
+
+    /**
+     * Sets whether the Consul server should be considered for health checks.
+     * @see io.micronaut.discovery.consul.health.ConsulHealthIndicator
+
+     * @param healthCheck True if it should
+     */
+    public void setHealthCheck(boolean healthCheck) {
+        this.healthCheck = healthCheck;
     }
 
     @Override
@@ -169,6 +189,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
      * Configuration class for Consul client config.
      */
     @ConfigurationProperties(ConfigDiscoveryConfiguration.PREFIX)
+    @BootstrapContextCompatible
     public static class ConsulConfigDiscoveryConfiguration extends ConfigDiscoveryConfiguration {
 
         /**
@@ -199,6 +220,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
      * Configuration class for Consul client discovery.
      */
     @ConfigurationProperties(DiscoveryConfiguration.PREFIX)
+    @BootstrapContextCompatible
     public static class ConsulDiscoveryConfiguration extends DiscoveryConfiguration {
 
         private Map<String, String> tags = Collections.emptyMap();
@@ -288,6 +310,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
      * The default connection pool configuration.
      */
     @ConfigurationProperties(ConnectionPoolConfiguration.PREFIX)
+    @BootstrapContextCompatible
     public static class ConsulConnectionPoolConfiguration extends ConnectionPoolConfiguration {
     }
 
@@ -295,6 +318,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
      * Configuration class for Consul client registration.
      */
     @ConfigurationProperties(RegistrationConfiguration.PREFIX)
+    @BootstrapContextCompatible
     public static class ConsulRegistrationConfiguration extends RegistrationConfiguration {
 
         /**

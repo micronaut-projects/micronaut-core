@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.authentication;
 
+import javax.annotation.Nullable;
 import java.util.Collection;
-import java.util.Objects;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -30,6 +31,7 @@ public class UserDetails implements AuthenticationResponse {
 
     private String username;
     private Collection<String> roles;
+    private Map<String, Object> attributes;
 
     /**
      *
@@ -37,8 +39,34 @@ public class UserDetails implements AuthenticationResponse {
      * @param roles e.g. ['ROLE_ADMIN', 'ROLE_USER']
      */
     public UserDetails(String username, Collection<String> roles) {
+        this(username, roles, null);
+    }
+
+    /**
+     *
+     * @param username e.g. admin
+     * @param roles e.g. ['ROLE_ADMIN', 'ROLE_USER']
+     * @param attributes User's attributes
+     */
+    public UserDetails(String username, Collection<String> roles, Map<String, Object> attributes) {
+        if (username == null || roles == null) {
+            throw new IllegalArgumentException("Cannot construct a UserDetails with a null username or authorities");
+        }
         this.username = username;
         this.roles = roles;
+        this.attributes = attributes;
+    }
+
+    /**
+     * @param rolesKey the key for the roles attribute
+     * @param usernameKey the key for the username attribute
+     * @return User's attributes
+     */
+    public Map<String, Object> getAttributes(String rolesKey, String usernameKey) {
+        Map<String, Object> result = attributes == null ? new HashMap<>() : new HashMap<>(attributes);
+        result.putIfAbsent(rolesKey, getRoles());
+        result.putIfAbsent(usernameKey, getUsername());
+        return result;
     }
 
     /**
@@ -54,6 +82,9 @@ public class UserDetails implements AuthenticationResponse {
      * @param username e.g. admin
      */
     public void setUsername(String username) {
+        if (username == null) {
+            throw new IllegalArgumentException("Cannot set username to null");
+        }
         this.username = username;
     }
 
@@ -70,6 +101,9 @@ public class UserDetails implements AuthenticationResponse {
      * @param roles e.g. ['ROLE_USER', 'ROLE_ADMIN']
      */
     public void setRoles(Collection<String> roles) {
+        if (roles == null) {
+            throw new IllegalArgumentException("Cannot set roles to null");
+        }
         this.roles = roles;
     }
 
@@ -83,6 +117,14 @@ public class UserDetails implements AuthenticationResponse {
         return Optional.empty();
     }
 
+    /**
+     * Sets user's attributes.
+     * @param attributes User's attributes.
+     */
+    public void setAttributes(@Nullable Map<String, Object> attributes) {
+        this.attributes = attributes;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) {
@@ -91,14 +133,14 @@ public class UserDetails implements AuthenticationResponse {
         if (o == null || getClass() != o.getClass()) {
             return false;
         }
+
         UserDetails that = (UserDetails) o;
-        return Objects.equals(username, that.username) &&
-                Objects.equals(roles, that.roles);
+
+        return username.equals(that.username);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(username, roles);
+        return username.hashCode();
     }
-
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.cli.profile
 
 import groovy.transform.CompileStatic
@@ -291,7 +290,7 @@ abstract class AbstractProfile implements Profile {
 
     @Override
     Iterable<Feature> getFeatures() {
-        Set<Feature> calculatedFeatures = []
+        Set<Feature> calculatedFeatures = new LinkedHashSet()
         calculatedFeatures.addAll(features)
         def parents = getExtends()
         for (profile in parents) {
@@ -435,7 +434,7 @@ abstract class AbstractProfile implements Profile {
     @Override
     Iterable<Command> getCommands(io.micronaut.cli.profile.ProjectContext context) {
         if (commandsByName == null) {
-            commandsByName = [:]
+            commandsByName = new LinkedHashMap<String, Command>()
             List excludes = []
             def registerCommand = { Command command ->
                 new CommandLine(command) // initialize @Spec
@@ -444,12 +443,12 @@ abstract class AbstractProfile implements Profile {
                     if (command instanceof ProfileRepositoryAware) {
                         ((ProfileRepositoryAware) command).setProfileRepository(profileRepository)
                     }
-                    commandsByName[name] = command
+                    commandsByName.put(name, command)
                     def desc = command.commandSpec
                     def synonyms = desc?.aliases()
                     if (synonyms) {
-                        for (syn in synonyms) {
-                            commandsByName[syn] = command
+                        for(String syn in synonyms) {
+                            commandsByName.put(syn, command)
                         }
                     }
                     if (command instanceof ProjectContextAware) {

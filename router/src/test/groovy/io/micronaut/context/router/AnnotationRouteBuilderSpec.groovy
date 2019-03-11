@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,11 @@
 package io.micronaut.context.router
 
 import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.annotation.Controller
+import io.micronaut.http.annotation.Error
 import io.micronaut.web.router.Router
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
@@ -53,6 +57,19 @@ class AnnotationRouteBuilderSpec extends Specification {
         GET    | '/person/1/friend/Joe'  | []             | "Person 1 Friend Joe"
 
 
+
+    }
+
+    void "test local status and error routes are both resolved"() {
+        Router router = new DefaultApplicationContext("test")
+                .start()
+                .getBean(Router)
+
+        expect:
+        router.route(ApplicationController, HttpStatus.INSUFFICIENT_STORAGE).isPresent()
+        router.route(PersonController, HttpStatus.INSUFFICIENT_STORAGE).isPresent()
+        router.route(ApplicationController, new RuntimeException()).isPresent()
+        router.route(PersonController, new RuntimeException()).isPresent()
     }
 
     @Controller('/')
@@ -60,6 +77,16 @@ class AnnotationRouteBuilderSpec extends Specification {
         @Get
         String index() {
             'welcome'
+        }
+
+        @Error
+        HttpResponse<String> handleError(HttpRequest request, Throwable e) {
+            return HttpResponse.<String>status(HttpStatus.BAD_REQUEST).body(e.getMessage())
+        }
+
+        @Error(status = HttpStatus.INSUFFICIENT_STORAGE)
+        HttpResponse<String> handleStatus(HttpRequest request) {
+            return HttpResponse.<String>status(HttpStatus.BAD_REQUEST)
         }
     }
 
@@ -84,6 +111,16 @@ class AnnotationRouteBuilderSpec extends Specification {
         @Post('/message{/text}')
         String message(String text) {
             "Hello $text"
+        }
+
+        @Error
+        HttpResponse<String> handleError(HttpRequest request, Throwable e) {
+            return HttpResponse.<String>status(HttpStatus.BAD_REQUEST).body(e.getMessage())
+        }
+
+        @Error(status = HttpStatus.INSUFFICIENT_STORAGE)
+        HttpResponse<String> handleStatus(HttpRequest request) {
+            return HttpResponse.<String>status(HttpStatus.BAD_REQUEST)
         }
     }
 }

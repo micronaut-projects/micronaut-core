@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.web.router;
 
 import io.micronaut.core.order.OrderUtil;
@@ -41,9 +40,9 @@ import java.util.stream.Stream;
 public class DefaultRouter implements Router {
 
     private final UriRoute[][] routesByMethod = new UriRoute[HttpMethod.values().length][];
-    private final SortedSet<StatusRoute> routesByStatus = new TreeSet<>();
+    private final Set<StatusRoute> statusRoutes = new HashSet<>();
     private final Collection<FilterRoute> filterRoutes = new ArrayList<>();
-    private final SortedSet<ErrorRoute> errorRoutes = new TreeSet<>();
+    private final Set<ErrorRoute> errorRoutes = new HashSet<>();
 
     /**
      * Construct a new router for the given route builders.
@@ -98,7 +97,7 @@ public class DefaultRouter implements Router {
                 }
             }
 
-            this.routesByStatus.addAll(builder.getStatusRoutes());
+            this.statusRoutes.addAll(builder.getStatusRoutes());
             this.errorRoutes.addAll(builder.getErrorRoutes());
             this.filterRoutes.addAll(builder.getFilterRoutes());
         }
@@ -181,7 +180,7 @@ public class DefaultRouter implements Router {
 
     @Override
     public <R> Optional<RouteMatch<R>> route(HttpStatus status) {
-        for (StatusRoute statusRoute : routesByStatus) {
+        for (StatusRoute statusRoute : statusRoutes) {
             if (statusRoute.originatingType() == null) {
                 Optional<RouteMatch<R>> match = statusRoute.match(status);
                 if (match.isPresent()) {
@@ -194,7 +193,7 @@ public class DefaultRouter implements Router {
 
     @Override
     public <R> Optional<RouteMatch<R>> route(Class originatingClass, HttpStatus status) {
-        for (StatusRoute statusRoute : routesByStatus) {
+        for (StatusRoute statusRoute : statusRoutes) {
             Optional<RouteMatch<R>> match = statusRoute.match(originatingClass, status);
             if (match.isPresent()) {
                 return match;
@@ -260,7 +259,7 @@ public class DefaultRouter implements Router {
     private UriRoute[] finalizeRoutes(List<UriRoute> routes) {
         Collections.sort(routes);
         Collections.reverse(routes);
-        return routes.toArray(new UriRoute[routes.size()]);
+        return routes.toArray(new UriRoute[0]);
     }
 
     private <T> Optional<RouteMatch<T>> findRouteMatch(Map<ErrorRoute, RouteMatch<T>> matchedRoutes, Throwable error) {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.management.endpoint.refresh;
 
 import io.micronaut.context.env.Environment;
@@ -68,7 +67,7 @@ public class RefreshEndpoint {
                 eventPublisher.publishEvent(new RefreshEvent(changes));
             }
             Set<String> keys = changes.keySet();
-            return keys.toArray(new String[keys.size()]);
+            return keys.toArray(new String[0]);
         }
     }
 }

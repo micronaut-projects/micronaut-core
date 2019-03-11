@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -58,7 +58,13 @@ some.bootstrap.config=yyy
 
             @Override
             Optional<URL> getResource(String path) {
-                return null
+                if(path == "bootstrap.properties") {
+                    return Optional.of(new URL("file://bootstrap.properties"))
+                }
+                if(path == "application.properties") {
+                    return Optional.of(new URL("file://application.properties"))
+                }
+                return Optional.empty()
             }
 
             @Override

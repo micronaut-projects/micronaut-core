@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.io.service;
 
 import io.micronaut.core.reflect.ClassUtils;
@@ -141,7 +140,8 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             public boolean hasNext() {
                 if (loaded.hasNext()) {
                     return true;
-                } else if (unloadedServices.hasNext()) {
+                }
+                if (unloadedServices.hasNext()) {
                     return true;
                 }
                 return false;
@@ -155,7 +155,8 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
 
                 if (loaded.hasNext()) {
                     return loaded.next();
-                } else if (unloadedServices.hasNext()) {
+                }
+                if (unloadedServices.hasNext()) {
                     ServiceDefinition<S> nextService = unloadedServices.next();
                     loadedServices.put(nextService.getName(), nextService);
                     return nextService;
@@ -229,8 +230,12 @@ public final class SoftServiceLoader<S> implements Iterable<ServiceDefinition<S>
             }
 
             String nextName = unprocessed.next();
-            Optional<Class> loadedClass = ClassUtils.forName(nextName, classLoader);
-            return newService(nextName, loadedClass);
+            try {
+                final Class<?> loadedClass = Class.forName(nextName, false, classLoader);
+                return newService(nextName, Optional.of(loadedClass));
+            } catch (NoClassDefFoundError | ClassNotFoundException e) {
+                return newService(nextName, Optional.empty());
+            }
         }
     }
 }

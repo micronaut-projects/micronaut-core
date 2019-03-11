@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.validation.websocket;
 
 import io.micronaut.core.bind.annotation.Bindable;
@@ -37,6 +36,7 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
 
     private static final String WEB_SOCKET_COMPONENT = "io.micronaut.websocket.annotation.WebSocketComponent";
     private static final String WEB_SOCKET_SESSION = "io.micronaut.websocket.WebSocketSession";
+    private static final String HTTP_REQUEST = "io.micronaut.http.HttpRequest";
     private static final String CLOSE_REASON = "io.micronaut.websocket.CloseReason";
     private static final String ON_OPEN = "io.micronaut.websocket.annotation.OnOpen";
     private static final String ON_CLOSE = "io.micronaut.websocket.annotation.OnClose";
@@ -55,8 +55,8 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
 
             if (element.hasAnnotation(ON_OPEN)) {
                 for (ParameterElement parameter : parameters) {
-                    if (isInvalidParameter(variables, parameter, WEB_SOCKET_SESSION)) {
-                        context.fail("Parameter to @OnOpen must either be a URI variable, a WebSocketSession or annotated with an HTTP binding annotation (such as @Header)", parameter);
+                    if (isInvalidParameter(variables, parameter, WEB_SOCKET_SESSION, HTTP_REQUEST)) {
+                        context.fail("Parameter to @OnOpen must either be a URI variable, a WebSocketSession , the HttpRequest, or annotated with an HTTP binding annotation (such as @Header)", parameter);
                         break;
                     }
                 }

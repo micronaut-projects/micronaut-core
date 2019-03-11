@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.openapi.visitor;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -56,6 +55,7 @@ import io.swagger.v3.oas.models.servers.Server;
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.lang.annotation.Annotation;
+import java.security.Principal;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -162,7 +162,7 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 }
 
                 ClassElement returnType = element.getReturnType();
-                if (isResponseType(returnType)) {
+                if (returnType != null && isResponseType(returnType)) {
                     returnType = returnType.getFirstTypeArgument().orElse(returnType);
                 }
                 if (returnType != null) {
@@ -180,11 +180,17 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 swaggerOperation.setParameters(swaggerParameters);
             }
 
+
+
             for (ParameterElement parameter : element.getParameters()) {
 
                 ClassElement parameterType = parameter.getType();
                 String parameterName = parameter.getName();
                 if (parameterType == null) {
+                    continue;
+                }
+
+                if (isIgnoredParameterType(parameterType)) {
                     continue;
                 }
 
@@ -222,7 +228,8 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 if (!parameter.hasStereotype(Bindable.class) && pathVariables.containsKey(parameterName)) {
                     UriMatchVariable var = pathVariables.get(parameterName);
                     newParameter = new Parameter();
-                    newParameter.setIn(ParameterIn.PATH.toString());
+
+                    newParameter.setIn(var.isQuery() ? ParameterIn.QUERY.toString() : ParameterIn.PATH.toString());
                     final boolean exploded = var.isExploded();
                     if (exploded) {
                         newParameter.setExplode(exploded);
@@ -248,10 +255,24 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                     AnnotationValue<io.swagger.v3.oas.annotations.Parameter> paramAnn = parameter.findAnnotation(io.swagger.v3.oas.annotations.Parameter.class).orElse(null);
 
                     if (paramAnn != null) {
+
+                        if (paramAnn.get("hidden", Boolean.class, false)) {
+                            // ignore hidden parameters
+                            continue;
+                        }
+
                         Map<CharSequence, Object> paramValues = toValueMap(paramAnn.getValues(), context);
                         normalizeEnumValues(paramValues, Collections.singletonMap(
                                 "in", ParameterIn.class
                         ));
+                        if (parameter.isAnnotationPresent(Header.class)) {
+                            paramValues.put("in", ParameterIn.HEADER.toString());
+                        } else if (parameter.isAnnotationPresent(CookieValue.class)) {
+                            paramValues.put("in", ParameterIn.COOKIE.toString());
+                        } else if (parameter.isAnnotationPresent(QueryValue.class)) {
+                            paramValues.put("in", ParameterIn.QUERY.toString());
+                        }
+
 
                         JsonNode jsonNode = jsonMapper.valueToTree(paramValues);
 
@@ -287,6 +308,16 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                                 context.warn("Error reading Swagger Parameter for element [" + parameter + "]: " + e.getMessage(), parameter);
                             }
                         }
+
+                        if (newParameter != null) {
+                            final Schema parameterSchema = newParameter.getSchema();
+                            if (paramAnn.contains("schema") && parameterSchema != null) {
+                                final AnnotationValue schemaAnn = paramAnn.get("schema", AnnotationValue.class).orElse(null);
+                                if (schemaAnn != null) {
+                                    bindSchemaAnnotationValue(context, parameter, parameterSchema, schemaAnn);
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -296,9 +327,11 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                         newParameter.setName(parameterName);
                     }
 
-                    newParameter.setRequired(!parameter.isAnnotationPresent(Nullable.class));
+                    if (newParameter.getRequired() == null) {
+                        newParameter.setRequired(!parameter.isAnnotationPresent(Nullable.class));
+                    }
                     // calc newParameter.setExplode();
-                    if (javadocDescription != null) {
+                    if (javadocDescription != null && StringUtils.isEmpty(newParameter.getDescription())) {
 
                         CharSequence desc = javadocDescription.getParameters().get(parameterName);
                         if (desc != null) {
@@ -328,20 +361,29 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                     io.swagger.v3.oas.models.media.MediaType mt = new io.swagger.v3.oas.models.media.MediaType();
                     ObjectSchema schema = new ObjectSchema();
                     for (ParameterElement parameter : bodyParameters) {
-                        if (parameter.isAnnotationPresent(JsonIgnore.class) || parameter.isAnnotationPresent(Hidden.class)) {
+                        if (parameter.isAnnotationPresent(JsonIgnore.class) ||
+                                parameter.isAnnotationPresent(Hidden.class) ||
+                                parameter.getValue(io.swagger.v3.oas.annotations.Parameter.class, "hidden", Boolean.class).orElse(false) ||
+                                isIgnoredParameterType(parameter.getType())) {
                             continue;
                         }
+
+
+
                         Schema propertySchema = resolveSchema(openAPI, parameter, parameter.getType(), context, consumesMediaType);
+                        if (propertySchema != null) {
 
-                        processSchemaProperty(context, parameter, parameter.getType(), schema, propertySchema);
+                            processSchemaProperty(context, parameter, parameter.getType(), schema, propertySchema);
 
-                        propertySchema.setNullable(parameter.isAnnotationPresent(Nullable.class));
-                        if (javadocDescription != null && StringUtils.isEmpty(propertySchema.getDescription())) {
-                            CharSequence doc = javadocDescription.getParameters().get(parameter.getName());
-                            if (doc != null) {
-                                propertySchema.setDescription(doc.toString());
+                            propertySchema.setNullable(parameter.isAnnotationPresent(Nullable.class));
+                            if (javadocDescription != null && StringUtils.isEmpty(propertySchema.getDescription())) {
+                                CharSequence doc = javadocDescription.getParameters().get(parameter.getName());
+                                if (doc != null) {
+                                    propertySchema.setDescription(doc.toString());
+                                }
                             }
                         }
+
                     }
                     mt.setSchema(schema);
                     content.addMediaType(consumesMediaType, mt);
@@ -352,6 +394,12 @@ public class OpenApiControllerVisitor extends AbstractOpenApiVisitor implements 
                 }
             }
         });
+    }
+
+    private boolean isIgnoredParameterType(ClassElement parameterType) {
+        return parameterType == null ||
+                parameterType.isAssignable(Principal.class) ||
+            parameterType.isAssignable("io.micronaut.security.authentication.Authentication");
     }
 
     private boolean isResponseType(ClassElement returnType) {

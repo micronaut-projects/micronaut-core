@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.value;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.type.Argument;
 
-import java.util.Arrays;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import java.util.Collections;
+import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 /**
  * A property resolver is capable of resolving properties from an underlying property source.
@@ -77,6 +79,27 @@ public interface PropertyResolver extends ValueResolver<String> {
      */
     default <T> Optional<T> getProperty(String name, Argument<T> argument) {
         return getProperty(name, ConversionContext.of(argument));
+    }
+
+    /**
+     * Return all the properties under the given key.
+     *
+     * @param name The name
+     * @return The properties
+     */
+    default @Nonnull Map<String, Object> getProperties(String name) {
+        return getProperties(name, StringConvention.RAW);
+    }
+
+    /**
+     * Return all the properties under the given key.
+     *
+     * @param name The name
+     * @param keyFormat The key format to use for the keys. Default is kebab-case.
+     * @return The properties
+     */
+    default @Nonnull Map<String, Object> getProperties(@Nullable String name, @Nullable StringConvention keyFormat) {
+        return Collections.emptyMap();
     }
 
     /**
@@ -146,6 +169,6 @@ public interface PropertyResolver extends ValueResolver<String> {
      * @return The property name
      */
     static String nameOf(String... path) {
-        return Arrays.stream(path).collect(Collectors.joining("."));
+        return String.join(".", path);
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.runtime;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.naming.NameUtils;
@@ -35,6 +35,7 @@ import java.util.Optional;
  */
 @ConfigurationProperties(ApplicationConfiguration.PREFIX)
 @Primary
+@BootstrapContextCompatible
 public class ApplicationConfiguration {
 
     /**
@@ -111,6 +112,7 @@ public class ApplicationConfiguration {
      * Configuration for instance settings.
      */
     @ConfigurationProperties(InstanceConfiguration.PREFIX)
+    @BootstrapContextCompatible
     public static class InstanceConfiguration {
         /**
          * Prefix for Micronaut instance settings.
@@ -125,8 +127,7 @@ public class ApplicationConfiguration {
         private String id;
         private String group;
         private String zone;
-        @SuppressWarnings("unchecked")
-        private Map<String, String> metadata = Collections.EMPTY_MAP;
+        private Map<String, String> metadata = Collections.emptyMap();
 
         /**
          * @return An optional instance identifier

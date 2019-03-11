@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.annotation.processing;
 
 import io.micronaut.inject.processing.JavaModelUtils;
@@ -70,7 +69,7 @@ public abstract class SuperclassAwareTypeVisitor<R, P> extends AbstractTypeVisit
                             accept(type, enclosedElement, p);
                         }
                     } else {
-                        String qualifiedName = types.erasure(enclosedElement.asType()).toString();
+                        String qualifiedName = types.erasure(enclosedElement.asType()).toString() + "." + enclosedElement.getSimpleName().toString();
                         // if the method has already been processed then it is overridden so ignore
                         if (!processed.contains(qualifiedName)) {
                             processed.add(qualifiedName);

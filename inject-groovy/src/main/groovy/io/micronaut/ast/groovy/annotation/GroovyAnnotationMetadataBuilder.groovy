@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,6 +41,7 @@ import org.codehaus.groovy.ast.stmt.ReturnStatement
 import org.codehaus.groovy.ast.stmt.Statement
 import org.codehaus.groovy.control.SourceUnit
 
+import java.lang.annotation.Annotation
 import java.lang.annotation.Repeatable
 import java.lang.reflect.Array
 
@@ -59,6 +60,11 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
 
     GroovyAnnotationMetadataBuilder(SourceUnit sourceUnit) {
         this.sourceUnit = sourceUnit
+    }
+
+    @Override
+    protected boolean hasAnnotation(AnnotatedNode element, Class<? extends Annotation> annotation) {
+        return !element.getAnnotations(ClassHelper.makeCached(annotation)).isEmpty()
     }
 
     @Override
@@ -138,7 +144,11 @@ class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataBuilder<
             hierarchy.add(p)
             return hierarchy
         } else {
-            return Collections.singletonList(element)
+            if (element == null) {
+                return []
+            } else {
+                return [element] as List<AnnotatedNode>
+            }
         }
     }
 

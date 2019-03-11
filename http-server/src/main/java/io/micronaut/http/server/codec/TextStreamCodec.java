@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.server.codec;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.codec.CodecConfiguration;
 import io.micronaut.core.io.buffer.ByteBuffer;
@@ -27,14 +27,17 @@ import io.micronaut.http.codec.MediaTypeCodec;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.sse.Event;
+import io.micronaut.runtime.ApplicationConfiguration;
 
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Provider;
 import javax.inject.Singleton;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -50,6 +53,7 @@ import java.util.List;
  */
 @Singleton
 @Internal
+@BootstrapContextCompatible
 public class TextStreamCodec implements MediaTypeCodec {
 
     public static final String CONFIGURATION_QUALIFIER = "text-stream";
@@ -61,10 +65,10 @@ public class TextStreamCodec implements MediaTypeCodec {
     private static final byte[] COMMENT_PREFIX = ": ".getBytes(StandardCharsets.UTF_8);
     private static final byte[] NEWLINE = "\n".getBytes(StandardCharsets.UTF_8);
 
-    private final HttpServerConfiguration serverConfiguration;
     private final Provider<MediaTypeCodecRegistry> codecRegistryProvider;
     private final ByteBufferFactory byteBufferFactory;
     private final List<MediaType> additionalTypes;
+    private final Charset defaultCharset;
     private MediaTypeCodecRegistry codecRegistry;
 
     /**
@@ -73,12 +77,42 @@ public class TextStreamCodec implements MediaTypeCodec {
      * @param codecRegistryProvider A media type codec registry
      * @param codecConfiguration    The configuration for the codec
      */
+    @Deprecated
     public TextStreamCodec(
         HttpServerConfiguration serverConfiguration,
         ByteBufferFactory byteBufferFactory,
         Provider<MediaTypeCodecRegistry> codecRegistryProvider,
         @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
-        this.serverConfiguration = serverConfiguration;
+        this(serverConfiguration.getDefaultCharset(), byteBufferFactory, codecRegistryProvider, codecConfiguration);
+    }
+
+    /**
+     * @param applicationConfiguration The application configuration
+     * @param byteBufferFactory     A byte buffer factory
+     * @param codecRegistryProvider A media type codec registry
+     * @param codecConfiguration    The configuration for the codec
+     */
+    @Inject
+    public TextStreamCodec(
+            ApplicationConfiguration applicationConfiguration,
+            ByteBufferFactory byteBufferFactory,
+            Provider<MediaTypeCodecRegistry> codecRegistryProvider,
+            @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
+        this(applicationConfiguration.getDefaultCharset(), byteBufferFactory, codecRegistryProvider, codecConfiguration);
+    }
+
+    /**
+     * @param defaultCharset The default charset
+     * @param byteBufferFactory     A byte buffer factory
+     * @param codecRegistryProvider A media type codec registry
+     * @param codecConfiguration    The configuration for the codec
+     */
+    protected TextStreamCodec(
+            Charset defaultCharset,
+            ByteBufferFactory byteBufferFactory,
+            Provider<MediaTypeCodecRegistry> codecRegistryProvider,
+            @Named(CONFIGURATION_QUALIFIER) @Nullable CodecConfiguration codecConfiguration) {
+        this.defaultCharset = defaultCharset;
         this.byteBufferFactory = byteBufferFactory;
         this.codecRegistryProvider = codecRegistryProvider;
         if (codecConfiguration != null) {
@@ -133,7 +167,7 @@ public class TextStreamCodec implements MediaTypeCodec {
         Object data = event.getData();
         ByteBuffer body;
         if (data instanceof CharSequence) {
-            body = allocator.copiedBuffer(data.toString().getBytes(serverConfiguration.getDefaultCharset()));
+            body = allocator.copiedBuffer(data.toString().getBytes(defaultCharset));
         } else {
             MediaTypeCodec jsonCodec = resolveMediaTypeCodecRegistry().findCodec(MediaType.APPLICATION_JSON_TYPE)
                 .orElseThrow(() -> new CodecException("No possible JSON encoders found!"));
@@ -170,7 +204,7 @@ public class TextStreamCodec implements MediaTypeCodec {
     protected void writeAttribute(ByteBuffer eventData, byte[] attribute, String value) {
         if (value != null) {
             eventData.write(attribute)
-                .write(value, serverConfiguration.getDefaultCharset())
+                .write(value, defaultCharset)
                 .write(NEWLINE);
         }
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.inject.writer;
-
-import static io.micronaut.inject.writer.BeanDefinitionWriter.buildArgumentWithGenerics;
-import static io.micronaut.inject.writer.BeanDefinitionWriter.pushBuildArgumentsForMethod;
 
 import io.micronaut.context.AbstractExecutableMethod;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -72,8 +68,13 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
      * @param isInterface          Whether is an interface
      * @param annotationMetadata   The annotation metadata
      */
-    public ExecutableMethodWriter(String beanFullClassName, String methodClassName, String methodProxyShortName, boolean isInterface, AnnotationMetadata annotationMetadata) {
-        super(methodClassName, annotationMetadata, false);
+    public ExecutableMethodWriter(
+            String beanFullClassName,
+            String methodClassName,
+            String methodProxyShortName,
+            boolean isInterface,
+            AnnotationMetadata annotationMetadata) {
+        super(methodClassName, annotationMetadata, true);
         this.classWriter = new ClassWriter(ClassWriter.COMPUTE_MAXS | ClassWriter.COMPUTE_FRAMES);
         this.beanFullClassName = beanFullClassName;
         this.methodProxyShortName = methodProxyShortName;

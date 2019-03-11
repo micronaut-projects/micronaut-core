@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -40,16 +39,23 @@ class JavaPropertyElement extends AbstractJavaElement implements PropertyElement
 
     /**
      * Default constructor.
-     *
-     * @param declaringElement The declaring element
+     *  @param declaringElement The declaring element
      * @param getter The element
      * @param annotationMetadata The annotation metadata
      * @param name The name
      * @param type The type
      * @param readOnly Whether it is read only
+     * @param visitorContext The java visitor context
      */
-    JavaPropertyElement(ClassElement declaringElement, ExecutableElement getter, AnnotationMetadata annotationMetadata, String name, ClassElement type, boolean readOnly) {
-        super(getter, annotationMetadata);
+    JavaPropertyElement(
+            ClassElement declaringElement,
+            ExecutableElement getter,
+            AnnotationMetadata annotationMetadata,
+            String name,
+            ClassElement type,
+            boolean readOnly,
+            JavaVisitorContext visitorContext) {
+        super(getter, annotationMetadata, visitorContext);
         this.name = name;
         this.type = type;
         this.readOnly = readOnly;

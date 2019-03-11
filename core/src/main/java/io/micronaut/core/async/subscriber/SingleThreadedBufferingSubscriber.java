@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.async.subscriber;
 
 import org.reactivestreams.Subscriber;
@@ -193,15 +192,14 @@ public abstract class SingleThreadedBufferingSubscriber<T> implements Subscriber
         if (demand <= 0) {
             illegalDemand();
             return false;
-        } else {
-            if (upstreamDemand < Long.MAX_VALUE) {
-                upstreamDemand += demand;
-                if (upstreamDemand < 0) {
-                    upstreamDemand = Long.MAX_VALUE;
-                }
-            }
-            return true;
         }
+        if (upstreamDemand < Long.MAX_VALUE) {
+            upstreamDemand += demand;
+            if (upstreamDemand < 0) {
+                upstreamDemand = Long.MAX_VALUE;
+            }
+        }
+        return true;
     }
 
     private void flushBuffer() {

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.server.context;
 
 import io.micronaut.context.event.BeanCreatedEvent;
@@ -23,6 +22,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.scheduling.instrument.InstrumentedExecutorService;
 import io.micronaut.scheduling.instrument.InstrumentedScheduledExecutorService;
+import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
 import io.micronaut.scheduling.instrument.RunnableInstrumenter;
 
 import javax.inject.Singleton;
@@ -41,7 +41,7 @@ import java.util.function.Function;
  */
 @Singleton
 @Internal
-final class ServerRequestContextInstrumentation implements Function<Runnable, Runnable>, RunnableInstrumenter, BeanCreatedEventListener<ThreadFactory> {
+final class ServerRequestContextInstrumentation implements Function<Runnable, Runnable>, RunnableInstrumenter, ReactiveInstrumenter, BeanCreatedEventListener<ThreadFactory> {
 
     @Override
     public Runnable apply(Runnable runnable) {
@@ -69,6 +69,17 @@ final class ServerRequestContextInstrumentation implements Function<Runnable, Ru
         final Optional<HttpRequest<Object>> httpRequest = ServerRequestContext.currentRequest();
         return httpRequest.map(objectHttpRequest -> ServerRequestContext.instrument(objectHttpRequest, runnable))
                 .orElse(runnable);
+    }
+
+    @Override
+    public Optional<RunnableInstrumenter> newInstrumentation() {
+        final Optional<HttpRequest<Object>> httpRequest = ServerRequestContext.currentRequest();
+        return httpRequest.map(request -> new RunnableInstrumenter() {
+            @Override
+            public Runnable instrument(Runnable command) {
+                return ServerRequestContext.instrument(request, command);
+            }
+        });
     }
 
     /**

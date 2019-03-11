@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,10 +24,12 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.http.cookie.Cookie
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.security.handlers.RejectionHandler
+import io.micronaut.security.session.SessionSecurityfilterRejectionHandler
 import io.micronaut.testutils.YamlAsciidocTagCleaner
 import org.yaml.snakeyaml.Yaml
 import spock.lang.AutoCleanup
-import spock.lang.IgnoreIf
+import spock.lang.Requires
 import spock.lang.Shared
 
 class SessionAuthenticationSpec extends GebSpec implements YamlAsciidocTagCleaner {
@@ -82,7 +84,7 @@ micronaut:
     @AutoCleanup
     RxHttpClient client = embeddedServer.applicationContext.createBean(RxHttpClient, embeddedServer.getURL())
 
-    @IgnoreIf({ !sys['geb.env'] })
+    @Requires({sys['geb.env']})
     def "verify session based authentication works"() {
         given:
         browser.baseUrl = "http://localhost:${embeddedServer.port}"
@@ -199,5 +201,14 @@ micronaut:
         rsp.status().code == 200
         rsp.body()
         rsp.body().contains('sherlock')
+    }
+
+    def "verifies default RejectionHandler is SessionSecurityfilterRejectionHandler"() {
+        when:
+        RejectionHandler rejectionHandler = context.getBean(RejectionHandler)
+
+        then:
+        noExceptionThrown()
+        rejectionHandler instanceof SessionSecurityfilterRejectionHandler
     }
 }

@@ -11,7 +11,7 @@ So far Micronaut's HTTP server, HTTP client, function support and service discov
 
 === Getting Started
 
-NOTE: Use of GraalVM's `nativeimage` tool is only supported in Java or Kotlin projects. Groovy relies heavily on reflection which is only partially supported by GraalVM.
+NOTE: Use of GraalVM's `native-image` tool is only supported in Java or Kotlin projects. Groovy relies heavily on reflection which is only partially supported by GraalVM.
 
 To start using GraalVM you should first install the GraalVM SDK via the https://www.graalvm.org/docs/getting-started/[Getting Started].
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.cli.profile.commands
 
 import groovy.transform.CompileDynamic
@@ -22,10 +21,7 @@ import io.micronaut.cli.MicronautCli
 import io.micronaut.cli.console.logging.ConsoleAntBuilder
 import io.micronaut.cli.console.logging.MicronautConsole
 import io.micronaut.cli.io.support.BuildTokens
-import io.micronaut.cli.io.support.GradleBuildTokens
-import io.micronaut.cli.io.support.MavenBuildTokens
 import io.micronaut.cli.profile.ExecutionContext
-import io.micronaut.cli.profile.Profile
 import io.micronaut.cli.util.VersionInfo
 import picocli.CommandLine.Command
 import picocli.CommandLine.Option
@@ -107,7 +103,9 @@ class CreateFederationCommand extends AbstractCreateAppCommand {
     protected void withTokens(BuildTokens buildTokens) {
         final AntBuilder ant = new ConsoleAntBuilder()
 
-        Map tokens = buildTokens.getTokens(services)
+        Map tokens = buildTokens.getTokens(services.collect {
+            groupAppName(it)[1]
+        })
 
         ant.replace(dir: targetDirectory) {
             tokens.each { k, v ->

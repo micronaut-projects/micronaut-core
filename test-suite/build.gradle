@@ -15,17 +15,18 @@ dependencies {
     testCompile project(":http-server-netty")
     testCompile project(":http-client")
     testCompile project(":configurations:hibernate-validator")
-    testCompile project(":configurations:postgres-reactive")
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
     testCompile project(":tracing")
     testCompile project(":management")
+    testCompile project(":runtime")
+    testCompile project(":inject")
+    testCompile dependencyVersion("jcache")
 
     testCompile dependencyVersion("jaeger")
     testCompile dependencyModuleVersion("groovy", "groovy-json")
     // tag::testcontainers-dependencies[]
     testCompile "org.testcontainers:spock:1.10.1"
-    testCompile "org.testcontainers:postgresql:1.10.1"
     // end::testcontainers-dependencies[]
 
     testRuntime dependencyVersion("tomcatJdbc")
@@ -36,16 +37,17 @@ dependencies {
 apply from: "${rootProject.projectDir}/gradle/geb.gradle"
 apply from: "${rootProject.projectDir}/gradle/webdriverbinaries.gradle"
 
-//tasks.withType(Test) {
-//    testLogging {
-//        showStandardStreams = true
-//    }
-//    beforeTest {
-//        System.out.println("STARTING: ${it.className}.$it.name")
-//        System.out.flush()
-//    }
-//    afterTest {
-//        System.out.println("FINISHED: ${it.className}.$it.name")
-//        System.out.flush()
-//    }
-//}
+tasks.withType(Test) {
+    jvmArgs('-Dio.netty.leakDetection.level=paranoid')
+/*    testLogging {
+        showStandardStreams = true
+    }
+    beforeTest {
+        System.out.println("STARTING: ${it.className}.$it.name")
+        System.out.flush()
+    }
+    afterTest {
+        System.out.println("FINISHED: ${it.className}.$it.name")
+        System.out.flush()
+    }*/
+}

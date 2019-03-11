@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.cli.io.support;
 
 import groovy.util.XmlSlurper;
@@ -30,8 +29,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -40,6 +37,7 @@ import java.io.StringWriter;
 import java.io.Writer;
 import java.lang.reflect.Array;
 import java.net.URL;
+import java.nio.file.Files;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
@@ -118,9 +116,8 @@ public class SpringIOUtils {
     }
 
     private static byte[] compute(File f, String algorithm) throws IOException {
-        InputStream is = new FileInputStream(f);
 
-        try {
+        try (InputStream is = Files.newInputStream(f.toPath())) {
             MessageDigest md = getMessageDigest(algorithm);
             md.reset();
 
@@ -130,8 +127,6 @@ public class SpringIOUtils {
                 md.update(buf, 0, len);
             }
             return md.digest();
-        } finally {
-            is.close();
         }
     }
 
@@ -188,7 +183,7 @@ public class SpringIOUtils {
         for (Resource resource : resources) {
             final InputStream input = resource.getInputStream();
             final File target = new File(targetDir, resource.getURL().toString().substring(baseUrl.toString().length()));
-            copy(new BufferedInputStream(input), new BufferedOutputStream(new FileOutputStream(target)));
+            copy(new BufferedInputStream(input), new BufferedOutputStream(Files.newOutputStream(target.toPath())));
         }
     }
 
@@ -203,8 +198,8 @@ public class SpringIOUtils {
     public static int copy(File in, File out) throws IOException {
         assert in != null : "No input File specified";
         assert out != null : "No output File specified";
-        return copy(new BufferedInputStream(new FileInputStream(in)),
-            new BufferedOutputStream(new FileOutputStream(out)));
+        return copy(new BufferedInputStream(Files.newInputStream(in.toPath())),
+            new BufferedOutputStream(Files.newOutputStream(out.toPath())));
     }
 
     /**
@@ -219,7 +214,7 @@ public class SpringIOUtils {
         assert in != null : "No input File specified";
         assert out != null : "No output File specified";
         return copy(new BufferedInputStream(in.getInputStream()),
-            new BufferedOutputStream(new FileOutputStream(out)));
+            new BufferedOutputStream(Files.newOutputStream(out.toPath())));
     }
 
     /**
@@ -233,7 +228,7 @@ public class SpringIOUtils {
         assert in != null : "No input byte array specified";
         assert out != null : "No output File specified";
         ByteArrayInputStream inStream = new ByteArrayInputStream(in);
-        OutputStream outStream = new BufferedOutputStream(new FileOutputStream(out));
+        OutputStream outStream = new BufferedOutputStream(Files.newOutputStream(out.toPath()));
         copy(inStream, outStream);
     }
 
@@ -247,7 +242,7 @@ public class SpringIOUtils {
     public static byte[] copyToByteArray(File in) throws IOException {
         assert in != null : "No input File specified";
 
-        return copyToByteArray(new BufferedInputStream(new FileInputStream(in)));
+        return copyToByteArray(new BufferedInputStream(Files.newInputStream(in.toPath())));
     }
 
     //---------------------------------------------------------------------

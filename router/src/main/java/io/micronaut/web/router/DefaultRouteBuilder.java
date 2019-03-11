@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.web.router;
 
 import io.micronaut.context.ApplicationContext;
@@ -48,7 +47,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 /**
  * A DefaultRouteBuilder implementation for building roots.
@@ -428,6 +426,22 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             targetMethod.getValue(Produces.class, MediaType[].class).ifPresent(produces ->
                     this.producesMediaTypes = Arrays.asList(produces)
             );
+
+
+            this.conditions.add(req -> {
+                if (!permitsRequestBody()) {
+                    return true;
+                }
+                List<MediaType> consumes = this.acceptedMediaTypes;
+                if (consumes != null && !consumes.isEmpty()) {
+                    if (consumes.contains(MediaType.ALL_TYPE)) {
+                        return true;
+                    }
+                    return req.getContentType().map(consumes::contains).orElse(true);
+                } else {
+                    return true;
+                }
+            });
         }
 
         @Override
@@ -490,12 +504,20 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         public MethodExecutionHandle getTargetMethod() {
             return this.targetMethod;
         }
+
+        /**
+         * Whether the route permits a request body.
+         * @return True if the route permits a request body
+         */
+        protected boolean permitsRequestBody() {
+            return true;
+        }
     }
 
     /**
      * Default Error Route.
      */
-    class DefaultErrorRoute extends AbstractRoute implements ErrorRoute, Comparable<ErrorRoute> {
+    class DefaultErrorRoute extends AbstractRoute implements ErrorRoute {
 
         private final Class<? extends Throwable> error;
         private final Class originatingClass;
@@ -605,30 +627,12 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 .append(targetMethod)
                 .toString();
         }
-
-        @Override
-        public int compareTo(ErrorRoute o) {
-            if (o == this) {
-                return 0;
-            }
-            Class<? extends Throwable> thatExceptionType = o.exceptionType();
-            Class<? extends Throwable> thisExceptionType = this.error;
-
-            if (thisExceptionType == thatExceptionType) {
-                return 0;
-            } else if (thisExceptionType.isAssignableFrom(thatExceptionType)) {
-                return 1;
-            } else if (thatExceptionType.isAssignableFrom(thisExceptionType)) {
-                return -1;
-            }
-            return -1;
-        }
     }
 
     /**
      * Represents a route for an {@link io.micronaut.http.HttpStatus} code.
      */
-    class DefaultStatusRoute extends AbstractRoute implements StatusRoute, Comparable<StatusRoute> {
+    class DefaultStatusRoute extends AbstractRoute implements StatusRoute {
 
         private final HttpStatus status;
         private final Class originatingClass;
@@ -733,21 +737,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             result = 31 * result + (originatingClass != null ? originatingClass.hashCode() : 0);
             return result;
         }
-
-        @Override
-        public int compareTo(StatusRoute o) {
-            if (o == this) {
-                return 0;
-            }
-            Class<?> thatType = o.originatingType();
-            Class<?> thisType = this.originatingType();
-
-            if (thisType == thatType && this.status().equals(o.status())) {
-                return 0;
-            } else {
-                return -1;
-            }
-        }
     }
 
     /**
@@ -757,7 +746,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         final HttpMethod httpMethod;
         final UriMatchTemplate uriMatchTemplate;
-        final List<DefaultUriRoute> nestedRoutes = new ArrayList<>();
+        final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
 
         /**
          * @param httpMethod The HTTP method
@@ -809,7 +798,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 .append('#')
                 .append(targetMethod)
                 .append(" (")
-                .append(acceptedMediaTypes.stream().collect(Collectors.joining(",")))
+                .append(String.join(",", acceptedMediaTypes))
                 .append(" )")
                 .toString();
         }
@@ -871,6 +860,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public int compareTo(UriRoute o) {
             return uriMatchTemplate.compareTo(o.getUriMatchTemplate());
+        }
+
+        @Override
+        protected boolean permitsRequestBody() {
+            return HttpMethod.permitsRequestBody(httpMethod);
         }
     }
 

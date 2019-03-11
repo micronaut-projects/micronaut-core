@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.multitenancy.writer;
 
 import io.micronaut.context.annotation.Requires;
@@ -50,8 +49,19 @@ public class CookieTenantWriter implements TenantWriter {
      */
     @Override
     public void writeTenant(MutableHttpRequest<?> request, Serializable tenant) {
+
         if (tenant instanceof String) {
-            request.cookie((Cookie.of(cookieTenantWriterConfiguration.getCookiename(), (String) tenant)));
+            Cookie cookie = Cookie.of(
+                    cookieTenantWriterConfiguration.getCookiename(),
+                    (String) tenant
+            );
+            cookie.configure(cookieTenantWriterConfiguration, request.isSecure());
+            if (cookieTenantWriterConfiguration.getCookieMaxAge().isPresent()) {
+                cookie.maxAge(cookieTenantWriterConfiguration.getCookieMaxAge().get());
+            } else {
+                cookie.maxAge(Integer.MAX_VALUE);
+            }
+            request.cookie(cookie);
         }
     }
 }

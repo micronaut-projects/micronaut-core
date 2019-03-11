@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.session.http;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.cookie.Cookie;
@@ -38,7 +38,7 @@ import java.util.Map;
  * @since 1.0
  */
 @Singleton
-@Requires(property = SessionSettings.HTTP_COOKIE_STRATEGY, notEquals = "false")
+@Requires(property = SessionSettings.HTTP_COOKIE_STRATEGY, notEquals = StringUtils.FALSE)
 public class CookieHttpSessionStrategy implements HttpSessionIdStrategy {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(CookieHttpSessionStrategy.class);

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.context;
 
+import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -23,6 +23,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.FieldInjectionPoint;
+import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 
 import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
@@ -37,13 +39,15 @@ import java.util.Objects;
  * @since 1.0
  */
 @Internal
-class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
+class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T>, EnvironmentConfigurable {
+
     private final BeanDefinition declaringBean;
     private final Class declaringType;
     private final Class<T> fieldType;
     private final String field;
     private final AnnotationMetadata annotationMetadata;
     private final Argument[] typeArguments;
+    private Environment environment;
 
     /**
      * @param declaringBean      The declaring bean
@@ -65,8 +69,13 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
         this.declaringType = declaringType;
         this.fieldType = fieldType;
         this.field = field;
-        this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : annotationMetadata;
+        this.annotationMetadata = initAnnotationMetadata(annotationMetadata);
         this.typeArguments = ArrayUtils.isEmpty(typeArguments) ? Argument.ZERO_ARGUMENTS : typeArguments;
+    }
+
+    @Override
+    public void configure(Environment environment) {
+        this.environment = environment;
     }
 
     @Override
@@ -157,5 +166,29 @@ class DefaultFieldInjectionPoint<T> implements FieldInjectionPoint<T> {
     @Override
     public Annotation[] synthesizeDeclared() {
         return getAnnotationMetadata().synthesizeDeclared();
+    }
+
+    private AnnotationMetadata initAnnotationMetadata(@Nullable AnnotationMetadata annotationMetadata) {
+        if (annotationMetadata instanceof DefaultAnnotationMetadata) {
+            return new FieldAnnotationMetadata((DefaultAnnotationMetadata) annotationMetadata);
+        } else if (annotationMetadata != null) {
+            return annotationMetadata;
+        }
+        return AnnotationMetadata.EMPTY_METADATA;
+    }
+
+    /**
+     * Internal environment aware annotation metadata delegate.
+     */
+    private final class FieldAnnotationMetadata extends AbstractEnvironmentAnnotationMetadata {
+        FieldAnnotationMetadata(DefaultAnnotationMetadata targetMetadata) {
+            super(targetMetadata);
+        }
+
+        @Nullable
+        @Override
+        protected Environment getEnvironment() {
+            return environment;
+        }
     }
 }

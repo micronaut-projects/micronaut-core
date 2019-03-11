@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.inject.writer;
 
 import io.micronaut.context.AbstractBeanDefinitionReference;
@@ -73,7 +72,6 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
     public void accept(ClassWriterOutputVisitor outputVisitor) throws IOException {
         if (annotationMetadataWriter != null) {
             annotationMetadataWriter.accept(outputVisitor);
-            annotationMetadataWriter.clearDefaults();
         }
         try (OutputStream outputStream = outputVisitor.visitClass(getBeanDefinitionQualifiedClassName())) {
             ClassWriter classWriter = generateClassBytes();
@@ -146,9 +144,7 @@ public class BeanDefinitionReferenceWriter extends AbstractAnnotationMetadataWri
         GeneratorAdapter loadMethod = startPublicMethodZeroArgs(classWriter, BeanDefinition.class, "load");
 
         // return new BeanDefinition()
-        loadMethod.newInstance(beanDefinitionType);
-        loadMethod.dup();
-        loadMethod.invokeConstructor(beanDefinitionType, METHOD_DEFAULT_CONSTRUCTOR);
+        pushNewInstance(loadMethod, beanDefinitionType);
 
         // RETURN
         loadMethod.returnValue();

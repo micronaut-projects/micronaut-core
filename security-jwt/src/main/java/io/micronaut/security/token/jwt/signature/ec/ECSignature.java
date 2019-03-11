@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.token.jwt.signature.ec;
 
 import com.nimbusds.jose.JOSEException;
@@ -26,7 +25,7 @@ import io.micronaut.security.token.jwt.signature.AbstractSignatureConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.validation.constraints.NotNull;
+import javax.annotation.Nonnull;
 import java.security.interfaces.ECPublicKey;
 
 /**
@@ -73,7 +72,7 @@ public class ECSignature extends AbstractSignatureConfiguration {
         return verify(jwt, this.publicKey);
     }
 
-    private boolean verify(final SignedJWT jwt, @NotNull ECPublicKey publicKey) throws JOSEException {
+    private boolean verify(final SignedJWT jwt, @Nonnull ECPublicKey publicKey) throws JOSEException {
         final JWSVerifier verifier = new ECDSAVerifier(this.publicKey);
         return jwt.verify(verifier);
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -64,7 +64,7 @@ public class ViewsConfigurationProperties implements ViewsConfiguration {
      */
     @Override
     public String getFolder() {
-        return this.folder;
+        return ViewUtils.normalizeFolder(folder);
     }
 
     /**
@@ -97,4 +97,5 @@ public class ViewsConfigurationProperties implements ViewsConfiguration {
             this.folder = folder;
         }
     }
+
 }

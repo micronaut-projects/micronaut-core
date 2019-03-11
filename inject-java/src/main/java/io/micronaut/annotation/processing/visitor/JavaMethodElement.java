@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -36,6 +36,7 @@ import java.util.function.Function;
  * @author James Kleeh
  * @since 1.0
  */
+@Internal
 class JavaMethodElement extends AbstractJavaElement implements MethodElement {
 
     private final ExecutableElement executableElement;
@@ -50,7 +51,7 @@ class JavaMethodElement extends AbstractJavaElement implements MethodElement {
             ExecutableElement executableElement,
             AnnotationMetadata annotationMetadata,
             JavaVisitorContext visitorContext) {
-        super(executableElement, annotationMetadata);
+        super(executableElement, annotationMetadata, visitorContext);
         this.executableElement = executableElement;
         this.visitorContext = visitorContext;
     }

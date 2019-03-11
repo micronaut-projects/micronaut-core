@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.tracing.annotation.ContinueSpan
 import io.opentracing.Tracer
 import io.reactivex.Single
 import io.reactivex.schedulers.Schedulers
@@ -123,6 +124,102 @@ class HttpTracingSpec extends Specification {
 
         cleanup:
         context.close()
+    }
+
+    void "tested continue http tracing"() {
+        given:
+        ApplicationContext context = buildContext()
+        InMemoryReporter reporter = context.getBean(InMemoryReporter)
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        PollingConditions conditions = new PollingConditions()
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange('/traced/continued/John', String)
+
+        then:
+        response
+        conditions.eventually {
+            reporter.spans.size() == 4
+            reporter.spans.find {
+                it.operationName == 'GET /traced/hello/{name}' &&
+                        it.tags.get('foo') == 'bar' &&
+                        it.tags.get('http.path') == '/traced/hello/John' &&
+                        it.tags.get('http.server')
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/hello/{name}' &&
+                        !it.tags.get('foo') &&
+                        it.tags.get('http.path') == '/traced/hello/John' &&
+                        it.tags.get('http.client')
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/continued/{name}' &&
+                        !it.tags.get('foo') &&
+                        it.tags.get('http.path') == '/traced/continued/John' &&
+                        it.tags.get('http.server')
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/continued/John' &&
+                        !it.tags.get('foo') &&
+                        it.tags.get('http.path') == '/traced/continued/John' &&
+                        it.tags.get('http.client')
+            } != null
+        }
+
+        cleanup:
+        client.close()
+        context.close(
+
+        )
+    }
+
+    void "tested continue http tracing - rx"() {
+        given:
+        ApplicationContext context = buildContext()
+        InMemoryReporter reporter = context.getBean(InMemoryReporter)
+        EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+        HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
+        PollingConditions conditions = new PollingConditions()
+
+        when:
+        HttpResponse<String> response = client.toBlocking().exchange('/traced/continueRx/John', String)
+
+        then:
+        response
+        conditions.eventually {
+            reporter.spans.size() == 4
+            reporter.spans.find {
+                it.operationName == 'GET /traced/hello/{name}' &&
+                        it.tags.get('foo') == 'bar' &&
+                        it.tags.get('http.path') == '/traced/hello/John' &&
+                        it.tags.get('http.server')
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/hello/{name}' &&
+                        !it.tags.get('foo') &&
+                        it.tags.get('http.path') == '/traced/hello/John' &&
+                        it.tags.get('http.client')
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/continueRx/{name}' &&
+                        !it.tags.get('foo') &&
+                        it.tags.get('http.path') == '/traced/continueRx/John' &&
+                        it.tags.get('http.server')
+            } != null
+            reporter.spans.find {
+                it.operationName == 'GET /traced/continueRx/John' &&
+                        !it.tags.get('foo') &&
+                        it.tags.get('http.path') == '/traced/continueRx/John' &&
+                        it.tags.get('http.client')
+            } != null
+        }
+
+        cleanup:
+        client.close()
+        context.close(
+
+        )
     }
 
     void "tested nested http tracing"() {
@@ -258,6 +355,18 @@ class HttpTracingSpec extends Specification {
             tracedClient.hello(name)
         }
 
+        @ContinueSpan
+        @Get("/continued/{name}")
+        String continued(String name) {
+            tracedClient.continued(name)
+        }
+
+        @ContinueSpan
+        @Get("/continueRx/{name}")
+        Single<String> continuedRx(String name) {
+            tracedClient.continuedRx(name)
+        }
+
         @Get("/nestedError/{name}")
         String nestedError(String name) {
             tracedClient.error(name)
@@ -271,5 +380,11 @@ class HttpTracingSpec extends Specification {
 
         @Get("/error/{name}")
         String error(String name)
+
+        @Get("/hello/{name}")
+        String continued(String name)
+
+        @Get("/hello/{name}")
+        Single<String> continuedRx(String name)
     }
 }

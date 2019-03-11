@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,11 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.discovery.registration;
 
 import io.micronaut.core.util.Toggleable;
 
+import javax.annotation.Nullable;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
@@ -72,6 +72,42 @@ public abstract class RegistrationConfiguration implements Toggleable {
     private boolean failFast = DEFAULT_FAILFAST;
     private boolean enabled = DEFAULT_ENABLED;
     private boolean deregister = DEFAULT_DEREGISTER;
+    private boolean preferIpAddress = false;
+    private String ipAddr;
+
+    /**
+     * The IP address to use to register.
+     *
+     * @return The IP address.
+     */
+    public Optional<String> getIpAddr() {
+        return Optional.ofNullable(ipAddr);
+    }
+
+    /**
+     * The IP address to use to register.
+     *
+     * @param ipAddr The ip address
+     */
+    public void setIpAddr(@Nullable String ipAddr) {
+        this.ipAddr = ipAddr;
+    }
+
+    /**
+     * Should the IP address by used to register with the discovery server. Defaults to false.
+     * @return True if the IP address should be used.
+     */
+    public boolean isPreferIpAddress() {
+        return preferIpAddress;
+    }
+
+    /**
+     * Sets whether the IP address by used to register with the discovery server. Defaults to false.
+     * @param preferIpAddress True if the IP address should be used
+     */
+    public void setPreferIpAddress(boolean preferIpAddress) {
+        this.preferIpAddress = preferIpAddress;
+    }
 
     /**
      * @return The default timeout for registration

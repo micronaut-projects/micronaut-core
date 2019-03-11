@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.bind.binders;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -107,6 +106,13 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
             result = doBind(context, source.getAttributes(), parameterName);
         }
 
+        Class argumentType;
+        if (argument.getType() == Optional.class) {
+            argumentType = argument.getFirstTypeVariable().orElse(argument).getType();
+        } else {
+            argumentType = argument.getType();
+        }
+
         // If there is still no value at this point and no annotation is specified and
         // the HTTP method allows a request body try and bind from the body
         if (!result.getValue().isPresent() && !hasAnnotation && permitsRequestBody) {
@@ -114,12 +120,6 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
             if (body.isPresent()) {
                 result = doBind(context, body.get(), parameterName);
                 if (!result.getValue().isPresent()) {
-                    Class argumentType;
-                    if (argument.getType() == Optional.class) {
-                        argumentType = argument.getFirstTypeVariable().orElse(argument).getType();
-                    } else {
-                        argumentType = argument.getType();
-                    }
                     if (ClassUtils.isJavaLangType(argumentType)) {
                         return Optional::empty;
                     } else {
@@ -128,8 +128,15 @@ public class ParameterAnnotationBinder<T> extends AbstractAnnotatedArgumentBinde
                     }
                 }
             } else {
+                if (source.getBody().isPresent()) {
+                    Optional<String> text = source.getBody(String.class);
+                    if (text.isPresent()) {
+                        return doConvert(text.get(), context);
+                    }
+                }
                 //noinspection unchecked
                 return BindingResult.UNSATISFIED;
+
             }
         }
         return result;

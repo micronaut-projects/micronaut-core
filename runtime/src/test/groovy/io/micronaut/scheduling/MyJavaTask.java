@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package io.micronaut.scheduling;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.scheduling.annotation.Scheduled;
 
 import javax.inject.Singleton;
@@ -25,7 +26,7 @@ import javax.inject.Singleton;
  * @since 1.0
  */
 @Singleton
-@Requires(property = "scheduled-test.task.enabled", value = "true")
+@Requires(property = "scheduled-test.task.enabled", value = StringUtils.TRUE)
 public class MyJavaTask {
     private boolean wasRun = false;
 

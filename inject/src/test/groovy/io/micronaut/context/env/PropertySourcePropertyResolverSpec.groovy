@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.env
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.ConfigurationException
 import io.micronaut.core.value.MapPropertyResolver
 import io.micronaut.core.value.PropertyResolver
@@ -274,5 +275,28 @@ class PropertySourcePropertyResolverSpec extends Specification {
         resolver.getProperty("baz", String).get() == "some:other:value"
         resolver.getProperty("single", String).get() == "some default with `something` in backticks"
         resolver.getProperty("start", String).get() == "`startswithtick"
+    }
+
+    void "test properties starting with z"() {
+        given:
+        def values = [
+                'z': true
+        ]
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("zprops", values)
+        )
+
+        expect:
+        resolver.getProperty("z", Boolean).isPresent()
+    }
+
+    void "test retrieving a property as string then boolean"() {
+        given:
+        def applicationContext = ApplicationContext.run(['micronaut.security.enabled': true])
+
+        expect:
+        applicationContext.getProperty('micronaut.security.enabled', String).get() == "true"
+        applicationContext.getProperty('micronaut.security.enabled', Boolean).get() == true
+
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,17 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.cli.io.support;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
 import java.net.URL;
+import java.nio.file.Files;
 
 /**
  * Based on Spring FileSystemResource implementation.
@@ -96,7 +94,7 @@ public class FileSystemResource implements Resource {
      */
     @Override
     public InputStream getInputStream() throws IOException {
-        return new FileInputStream(file);
+        return Files.newInputStream(file.toPath());
     }
 
     /**
@@ -193,7 +191,7 @@ public class FileSystemResource implements Resource {
      * @see java.io.FileOutputStream
      */
     public OutputStream getOutputStream() throws IOException {
-        return new FileOutputStream(file);
+        return Files.newOutputStream(file.toPath());
     }
 
     /**

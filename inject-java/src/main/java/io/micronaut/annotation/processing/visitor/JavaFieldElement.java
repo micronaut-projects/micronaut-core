@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
 
@@ -32,10 +32,12 @@ import javax.lang.model.type.TypeMirror;
  * @author James Kleeh
  * @since 1.0
  */
+@Internal
 class JavaFieldElement extends AbstractJavaElement implements FieldElement {
 
     private final JavaVisitorContext visitorContext;
     private final VariableElement variableElement;
+    private ClassElement declaringElement;
 
     /**
      * @param variableElement    The {@link VariableElement}
@@ -43,9 +45,23 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
      * @param visitorContext     The visitor context
      */
     JavaFieldElement(VariableElement variableElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        super(variableElement, annotationMetadata);
+        super(variableElement, annotationMetadata, visitorContext);
         this.variableElement = variableElement;
         this.visitorContext = visitorContext;
+    }
+
+    /**
+     * @param declaringElement  The declaring element
+     * @param variableElement    The {@link VariableElement}
+     * @param annotationMetadata The annotation metadata
+     * @param visitorContext     The visitor context
+     */
+    JavaFieldElement(ClassElement declaringElement,
+                     VariableElement variableElement,
+                     AnnotationMetadata annotationMetadata,
+                     JavaVisitorContext visitorContext) {
+        this(variableElement, annotationMetadata, visitorContext);
+        this.declaringElement = declaringElement;
     }
 
     @Nullable
@@ -57,14 +73,19 @@ class JavaFieldElement extends AbstractJavaElement implements FieldElement {
 
     @Override
     public ClassElement getDeclaringType() {
-        final Element enclosingElement = variableElement.getEnclosingElement();
-        if (!(enclosingElement instanceof TypeElement)) {
-            throw new IllegalStateException("Enclosing element should be a type element");
+        if (declaringElement == null) {
+
+            final Element enclosingElement = variableElement.getEnclosingElement();
+            if (!(enclosingElement instanceof TypeElement)) {
+                throw new IllegalStateException("Enclosing element should be a type element");
+            }
+            declaringElement = new JavaClassElement(
+                    (TypeElement) enclosingElement,
+                    visitorContext.getAnnotationUtils().getAnnotationMetadata(enclosingElement),
+                    visitorContext
+            );
         }
-        return new JavaClassElement(
-                (TypeElement) enclosingElement,
-                visitorContext.getAnnotationUtils().getAnnotationMetadata(enclosingElement),
-                visitorContext
-        );
+
+        return declaringElement;
     }
 }

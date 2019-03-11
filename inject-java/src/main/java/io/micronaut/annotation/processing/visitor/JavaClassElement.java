@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,17 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.annotation.processing.visitor;
 
+import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.annotation.processing.PublicMethodVisitor;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.inject.ast.*;
 import io.micronaut.inject.processing.JavaModelUtils;
 
+import javax.annotation.Nonnull;
 import javax.lang.model.element.*;
+import javax.lang.model.element.Element;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
@@ -31,13 +34,17 @@ import javax.lang.model.type.TypeVariable;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import java.util.*;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * A class element returning data from a {@link TypeElement}.
  *
  * @author James Kleeh
+ * @author graemerocher
  * @since 1.0
  */
+@Internal
 public class JavaClassElement extends AbstractJavaElement implements ClassElement {
 
     private final TypeElement classElement;
@@ -47,10 +54,10 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     /**
      * @param classElement       The {@link TypeElement}
      * @param annotationMetadata The annotation metadata
-     * @param visitorContext The visitor context
+     * @param visitorContext     The visitor context
      */
     JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext) {
-        super(classElement, annotationMetadata);
+        super(classElement, annotationMetadata, visitorContext);
         this.classElement = classElement;
         this.visitorContext = visitorContext;
         this.typeArguments = Collections.emptyList();
@@ -59,14 +66,19 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     /**
      * @param classElement       The {@link TypeElement}
      * @param annotationMetadata The annotation metadata
-     * @param visitorContext The visitor context
-     * @param typeArguments The type arguments
+     * @param visitorContext     The visitor context
+     * @param typeArguments      The type arguments
      */
     JavaClassElement(TypeElement classElement, AnnotationMetadata annotationMetadata, JavaVisitorContext visitorContext, List<? extends TypeMirror> typeArguments) {
-        super(classElement, annotationMetadata);
+        super(classElement, annotationMetadata, visitorContext);
         this.classElement = classElement;
         this.visitorContext = visitorContext;
         this.typeArguments = typeArguments;
+    }
+
+    @Override
+    public boolean isPrimitive() {
+        return ClassUtils.getPrimitiveType(getName()).isPresent();
     }
 
     @Override
@@ -220,7 +232,9 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                     if (fieldElement != null) {
                         annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(fieldElement, value.getter);
                     } else {
-                        annotationMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(value.getter);
+                        annotationMetadata = visitorContext
+                                .getAnnotationUtils()
+                                .newAnnotationBuilder().buildForMethod(value.getter);
                     }
                     JavaPropertyElement propertyElement = new JavaPropertyElement(
                             value.declaringType == null ? this : value.declaringType,
@@ -228,12 +242,34 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
                             annotationMetadata,
                             propertyName,
                             value.type,
-                            value.setter == null) {
+                            value.setter == null,
+                            visitorContext) {
                         @Override
                         public Optional<String> getDocumentation() {
                             Elements elements = visitorContext.getElements();
                             String docComment = elements.getDocComment(value.getter);
                             return Optional.ofNullable(docComment);
+                        }
+
+                        @Override
+                        public Optional<MethodElement> getWriteMethod() {
+                            if (value.setter != null) {
+                                return Optional.of(new JavaMethodElement(
+                                        value.setter,
+                                        visitorContext.getAnnotationUtils().newAnnotationBuilder().buildForMethod(value.setter),
+                                        visitorContext
+                                ));
+                            }
+                            return Optional.empty();
+                        }
+
+                        @Override
+                        public Optional<MethodElement> getReadMethod() {
+                            return Optional.of(new JavaMethodElement(
+                                    value.getter,
+                                    annotationMetadata,
+                                    visitorContext
+                            ));
                         }
                     };
                     propertyElements.add(propertyElement);
@@ -247,13 +283,34 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
     }
 
     @Override
+    public List<FieldElement> getFields(@Nonnull Predicate<Set<ElementModifier>> modifierFilter) {
+        List<FieldElement> fields = new ArrayList<>();
+        classElement.asType().accept(new PublicMethodVisitor<Object, Object>(visitorContext.getTypes()) {
+            @Override
+            protected boolean isAcceptable(javax.lang.model.element.Element element) {
+                final Set<ElementModifier> mods = element.getModifiers().stream().map(m -> ElementModifier.valueOf(m.name())).collect(Collectors.toSet());
+                return element.getKind() == ElementKind.FIELD && element instanceof VariableElement && modifierFilter.test(mods);
+            }
+
+            @Override
+            protected void accept(DeclaredType type, Element element, Object o) {
+                final AnnotationMetadata fieldMetadata = visitorContext.getAnnotationUtils().getAnnotationMetadata(element);
+                fields.add(new JavaFieldElement(JavaClassElement.this, (VariableElement) element, fieldMetadata, visitorContext));
+            }
+
+        }, null);
+
+        return Collections.unmodifiableList(fields);
+    }
+
+    @Override
     public boolean isArray() {
         return classElement.asType().getKind() == TypeKind.ARRAY;
     }
 
     @Override
     public String getName() {
-        return classElement.getQualifiedName().toString();
+        return JavaModelUtils.getClassName(classElement);
     }
 
     @Override
@@ -268,8 +325,18 @@ public class JavaClassElement extends AbstractJavaElement implements ClassElemen
         return false;
     }
 
+    @Nonnull
     @Override
-    public Map<String, ClassElement> getTypeArguments() {
+    public Optional<ConstructorElement> getPrimaryConstructor() {
+        final AnnotationUtils annotationUtils = visitorContext.getAnnotationUtils();
+        return Optional.ofNullable(visitorContext.getModelUtils().concreteConstructorFor(classElement, annotationUtils)).map(executableElement -> {
+            final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(executableElement);
+            return new JavaConstructorElement(executableElement, annotationMetadata, visitorContext);
+        });
+    }
+
+    @Override
+    public @Nonnull Map<String, ClassElement> getTypeArguments() {
         List<? extends TypeParameterElement> typeParameters = classElement.getTypeParameters();
         if (typeParameters.size() == typeArguments.size()) {
             Iterator<? extends TypeParameterElement> tpi = typeParameters.iterator();

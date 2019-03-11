@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -134,6 +133,18 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
     int typeHashCode();
 
     /**
+     * Whether the given argument is an instance.
+     * @param o The object
+     * @return True if it is an instance of this type
+     */
+    default boolean isInstance(@Nullable Object o) {
+        if (o == null) {
+            return false;
+        }
+        return getType().isInstance(o);
+    }
+
+    /**
      * Returns the string representation of the argument type, including generics.
      *
      * @param simple If true, output the simple name of types
@@ -171,14 +182,13 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
     static Class[] toClassArray(Argument... arguments) {
         if (ArrayUtils.isEmpty(arguments)) {
             return ReflectionUtils.EMPTY_CLASS_ARRAY;
-        } else {
-            Class[] types = new Class[arguments.length];
-            for (int i = 0; i < arguments.length; i++) {
-                Argument argument = arguments[i];
-                types[i] = argument.getType();
-            }
-            return types;
         }
+        Class[] types = new Class[arguments.length];
+        for (int i = 0; i < arguments.length; i++) {
+            Argument argument = arguments[i];
+            types[i] = argument.getType();
+        }
+        return types;
     }
 
     /**
@@ -289,20 +299,19 @@ public interface Argument<T> extends TypeVariableResolver, Named, AnnotationMeta
     static <T> Argument<T> of(Class<T> type, @Nullable Class<?>... typeParameters) {
         if (typeParameters == null) {
             return of(type);
-        } else {
-
-            TypeVariable<Class<T>>[] parameters = type.getTypeParameters();
-            int len = typeParameters.length;
-            if (parameters.length != len) {
-                throw new IllegalArgumentException("Type parameter length does not match. Required: " + parameters.length + ", Specified: " + len);
-            }
-            Argument[] typeArguments = new Argument[len];
-            for (int i = 0; i < parameters.length; i++) {
-                TypeVariable<Class<T>> parameter = parameters[i];
-                typeArguments[i] = Argument.of(typeParameters[i], parameter.getName());
-            }
-            return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), AnnotationMetadata.EMPTY_METADATA, typeArguments);
         }
+
+        TypeVariable<Class<T>>[] parameters = type.getTypeParameters();
+        int len = typeParameters.length;
+        if (parameters.length != len) {
+            throw new IllegalArgumentException("Type parameter length does not match. Required: " + parameters.length + ", Specified: " + len);
+        }
+        Argument[] typeArguments = new Argument[len];
+        for (int i = 0; i < parameters.length; i++) {
+            TypeVariable<Class<T>> parameter = parameters[i];
+            typeArguments[i] = Argument.of(typeParameters[i], parameter.getName());
+        }
+        return new DefaultArgument<>(type, NameUtils.decapitalize(type.getSimpleName()), AnnotationMetadata.EMPTY_METADATA, typeArguments);
     }
 
     /**

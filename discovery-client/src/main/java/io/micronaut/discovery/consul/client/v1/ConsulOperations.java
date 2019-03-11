@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.discovery.consul.client.v1;
 
 import io.micronaut.http.HttpStatus;
@@ -119,6 +118,7 @@ public interface ConsulOperations {
      * @return The current leader address
      */
     @Get(uri = "/status/leader", single = true)
+    @Retryable
     Publisher<String> status();
 
     /**
@@ -172,6 +172,22 @@ public interface ConsulOperations {
      */
     @Get(uri = "/agent/services", single = true)
     Publisher<Map<String, ServiceEntry>> getServices();
+
+    /**
+     * Returns the members the agent sees in the cluster gossip pool.
+     *
+     * @return the {@link MemberEntry} instances
+     */
+    @Get(uri = "/agent/members", single = true)
+    Publisher<List<MemberEntry>> getMembers();
+
+    /**
+     * Returns the configuration and member information of the local agent.
+     *
+     * @return the {@link LocalAgentConfiguration} instance
+     */
+    @Get(uri = "/agent/self", single = true)
+    Publisher<LocalAgentConfiguration> getSelf();
 
     /**
      * Gets the healthy services that are passing health checks.

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,27 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.annotation.processing.AnnotationProcessingOutputVisitor;
 import io.micronaut.annotation.processing.AnnotationUtils;
 import io.micronaut.annotation.processing.ModelUtils;
-import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
-import java.util.Collections;
-import java.util.Optional;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.util.*;
 
 /**
  * The visitor context when visiting Java code.
@@ -41,7 +48,8 @@ import java.util.Optional;
  * @author James Kleeh
  * @since 1.0
  */
-public class JavaVisitorContext extends MutableConvertibleValuesMap<Object> implements VisitorContext {
+@Internal
+public class JavaVisitorContext implements VisitorContext {
 
     private final Messager messager;
     private final Elements elements;
@@ -49,23 +57,33 @@ public class JavaVisitorContext extends MutableConvertibleValuesMap<Object> impl
     private final Types types;
     private final ModelUtils modelUtils;
     private final AnnotationProcessingOutputVisitor outputVisitor;
+    private final MutableConvertibleValues<Object> visitorAttributes;
 
     /**
      * The default constructor.
-     *  @param messager The messager
+     * @param messager The messager
      * @param elements The elements
      * @param annotationUtils The annotation utils
      * @param types Type types
      * @param modelUtils The model utils
      * @param filer The filer
+     * @param visitorAttributes The attributes
      */
-    public JavaVisitorContext(Messager messager, Elements elements, AnnotationUtils annotationUtils, Types types, ModelUtils modelUtils, Filer filer) {
+    public JavaVisitorContext(
+            Messager messager,
+            Elements elements,
+            AnnotationUtils annotationUtils,
+            Types types,
+            ModelUtils modelUtils,
+            Filer filer,
+            MutableConvertibleValues<Object> visitorAttributes) {
         this.messager = messager;
         this.elements = elements;
         this.annotationUtils = annotationUtils;
         this.types = types;
         this.modelUtils = modelUtils;
         this.outputVisitor = new AnnotationProcessingOutputVisitor(filer);
+        this.visitorAttributes = visitorAttributes;
     }
 
     @Override
@@ -77,11 +95,22 @@ public class JavaVisitorContext extends MutableConvertibleValuesMap<Object> impl
     }
 
     @Override
-    public void info(String message, io.micronaut.inject.ast.Element element) {
-        if (StringUtils.isNotEmpty(message)) {
-            Element el = (Element) element.getNativeType();
-            messager.printMessage(Diagnostic.Kind.NOTE, message, el);
+    public @Nonnull ClassElement[] getClassElements(@Nonnull String aPackage, @Nonnull String... stereotypes) {
+        ArgumentUtils.requireNonNull("aPackage", aPackage);
+        ArgumentUtils.requireNonNull("stereotypes", stereotypes);
+        final PackageElement packageElement = elements.getPackageElement(aPackage);
+        if (packageElement != null) {
+            List<ClassElement> classElements = new ArrayList<>();
+
+            populateClassElements(stereotypes, packageElement, classElements);
+            return classElements.toArray(new ClassElement[0]);
         }
+        return new ClassElement[0];
+    }
+
+    @Override
+    public void info(String message, @Nullable io.micronaut.inject.ast.Element element) {
+        printMessage(message, Diagnostic.Kind.NOTE, element);
     }
 
     @Override
@@ -92,15 +121,34 @@ public class JavaVisitorContext extends MutableConvertibleValuesMap<Object> impl
     }
 
     @Override
-    public void fail(String message, io.micronaut.inject.ast.Element element) {
-        Element el = (Element) element.getNativeType();
-        messager.printMessage(Diagnostic.Kind.ERROR, message, el);
+    public void fail(String message, @Nullable io.micronaut.inject.ast.Element element) {
+        printMessage(message, Diagnostic.Kind.ERROR, element);
     }
 
     @Override
-    public void warn(String message, io.micronaut.inject.ast.Element element) {
-        Element el = (Element) element.getNativeType();
-        messager.printMessage(Diagnostic.Kind.WARNING, message, el);
+    public void warn(String message, @Nullable io.micronaut.inject.ast.Element element) {
+        printMessage(message, Diagnostic.Kind.WARNING, element);
+    }
+
+    private void printMessage(String message, Diagnostic.Kind kind, @Nullable io.micronaut.inject.ast.Element element) {
+        if (StringUtils.isNotEmpty(message)) {
+            if (element != null) {
+                Element el = (Element) element.getNativeType();
+                messager.printMessage(kind, message, el);
+            } else {
+                messager.printMessage(kind, message);
+            }
+        }
+    }
+
+    @Override
+    public OutputStream visitClass(String classname) throws IOException {
+        return outputVisitor.visitClass(classname);
+    }
+
+    @Override
+    public void visitServiceDescriptor(String type, String classname) {
+        outputVisitor.visitServiceDescriptor(type, classname);
     }
 
     @Override
@@ -111,6 +159,11 @@ public class JavaVisitorContext extends MutableConvertibleValuesMap<Object> impl
     @Override
     public Optional<GeneratedFile> visitGeneratedFile(String path) {
         return outputVisitor.visitGeneratedFile(path);
+    }
+
+    @Override
+    public void finish() {
+        outputVisitor.finish();
     }
 
     /**
@@ -156,5 +209,61 @@ public class JavaVisitorContext extends MutableConvertibleValuesMap<Object> impl
      */
     public Types getTypes() {
         return types;
+    }
+
+    @Override
+    public MutableConvertibleValues<Object> put(CharSequence key, @Nullable Object value) {
+        visitorAttributes.put(key, value);
+        return this;
+    }
+
+    @Override
+    public MutableConvertibleValues<Object> remove(CharSequence key) {
+        visitorAttributes.remove(key);
+        return this;
+    }
+
+    @Override
+    public MutableConvertibleValues<Object> clear() {
+        visitorAttributes.clear();
+        return this;
+    }
+
+    @Override
+    public Set<String> names() {
+        return visitorAttributes.names();
+    }
+
+    @Override
+    public Collection<Object> values() {
+        return visitorAttributes.values();
+    }
+
+    @Override
+    public <T> Optional<T> get(CharSequence name, ArgumentConversionContext<T> conversionContext) {
+        return visitorAttributes.get(name, conversionContext);
+    }
+
+    private void populateClassElements(@Nonnull String[] stereotypes, PackageElement packageElement, List<ClassElement> classElements) {
+        final List<? extends Element> enclosedElements = packageElement.getEnclosedElements();
+
+        for (Element enclosedElement : enclosedElements) {
+            if (enclosedElement instanceof TypeElement) {
+                final AnnotationMetadata annotationMetadata = annotationUtils.getAnnotationMetadata(enclosedElement);
+                if (Arrays.stream(stereotypes).anyMatch(annotationMetadata::hasStereotype)) {
+                    JavaClassElement classElement = new JavaClassElement(
+                            (TypeElement) enclosedElement,
+                            annotationMetadata,
+                            this
+                    );
+
+                    if (!classElement.isAbstract()) {
+                        classElements.add(classElement);
+                    }
+                }
+            } else if (enclosedElement instanceof PackageElement) {
+                populateClassElements(stereotypes, (PackageElement) enclosedElement, classElements);
+            }
+        }
     }
 }

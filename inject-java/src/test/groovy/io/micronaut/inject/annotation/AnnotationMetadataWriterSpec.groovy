@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,14 +15,17 @@
  */
 package io.micronaut.inject.annotation
 
+import io.micrometer.core.annotation.Timed
 import io.micronaut.aop.Around
 import io.micronaut.aop.introduction.StubIntroducer
 import io.micronaut.context.annotation.Primary
+import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.annotation.Type
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationClassValue
+import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.retry.annotation.Recoverable
 
@@ -37,6 +40,111 @@ import java.lang.annotation.Retention
  * @since 1.0
  */
 class AnnotationMetadataWriterSpec extends AbstractTypeElementSpec {
+
+    void "test write annotation metadata with primitive arrays"() {
+        given:
+        AnnotationMetadata toWrite = new DefaultAnnotationMetadata(
+                [
+                        "io.micrometer.core.annotation.Timed": [
+                                percentiles: [1.1d] as double[]
+                        ]
+
+                ], null, null, [
+                "io.micrometer.core.annotation.Timed": [
+                        percentiles: [1.1d] as double[]
+                ]
+
+        ], null
+        )
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.getValue(Timed.name, "percentiles", double[].class).get() == [1.1d] as double[]
+    }
+
+
+    void "test annotation metadata with instantiated member"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
+package test;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import io.micronaut.inject.annotation.*;
+import io.micronaut.core.annotation.*;
+
+@MyAnn(ToInstantiate.class)
+class Test {
+}
+
+class SomeType {}
+
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.TYPE})
+@interface MyAnn {
+    @InstantiatedMember
+    Class value();
+}
+
+''')
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.getValue("test.MyAnn", ToInstantiate).get() instanceof ToInstantiate
+    }
+
+    void "test annotation metadata with primitive arrays"() {
+        given:
+        AnnotationMetadata toWrite = buildTypeAnnotationMetadata('''\
+package test;
+
+import java.lang.annotation.Documented;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+
+import io.micronaut.inject.annotation.*;
+
+@MyAnn(doubleArray={1.1d})
+@io.micrometer.core.annotation.Timed(percentiles={1.1d})
+class Test {
+}
+
+
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.TYPE})
+@interface MyAnn {
+    double[] doubleArray() default {};
+    int[] intArray() default {};
+    short[] shortArray() default {};
+    boolean[] booleanArray() default {};
+}
+
+''')
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        metadata != null
+        metadata.getValue(Timed, "percentiles", double[].class).get() == [1.1d] as double[]
+        metadata.getValue("test.MyAnn", "doubleArray", double[].class).get() == [1.1d] as double[]
+    }
 
     void "test annotation metadata inherited stereotypes"() {
         given:
@@ -332,6 +440,44 @@ interface ITest {
         metadata.isTrue(Around, 'proxyTarget')
         metadata.isFalse(Around, 'lazy')
         metadata.getAnnotationNamesByStereotype(Around.name) == [Trace.name, SomeOther.name]
+    }
+
+    void "test repeatable annotations are combined"() {
+        AnnotationMetadata toWrite = buildMethodAnnotationMetadata('''\
+package test;
+
+import io.micronaut.inject.annotation.repeatable.*;
+import io.micronaut.context.annotation.*;
+
+@Property(name="prop1", value="value1")
+@Property(name="prop2", value="value2")
+@Property(name="prop3", value="value3")
+@javax.inject.Singleton
+class Test {
+
+    @Property(name="prop2", value="value2")    
+    @Property(name="prop3", value="value33")    
+    @Property(name="prop4", value="value4")    
+    void someMethod() {}
+}
+''', 'someMethod')
+
+        when:
+        def className = "test"
+        AnnotationMetadata metadata = writeAndLoadMetadata(className, toWrite)
+
+        then:
+        List<AnnotationValue<Property>> properties = metadata.getAnnotationValuesByType(Property)
+
+        then:
+        properties.size() == 5
+        properties[0].get("name", String).get() == "prop2"
+        properties[1].get("name", String).get() == "prop3"
+        properties[1].getValue(String).get() == "value33"
+        properties[2].get("name", String).get() == "prop4"
+        properties[3].get("name", String).get() == "prop1"
+        properties[4].get("name", String).get() == "prop3"
+        properties[4].getValue(String).get() == "value3"
     }
 
 }

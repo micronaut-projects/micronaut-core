@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,9 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.ssl;
 
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Primary;
 
@@ -28,6 +28,7 @@ import io.micronaut.context.annotation.Primary;
  */
 @ConfigurationProperties(SslConfiguration.PREFIX)
 @Primary
+@BootstrapContextCompatible
 public class DefaultSslConfiguration extends SslConfiguration {
 
     /**
@@ -69,6 +70,7 @@ public class DefaultSslConfiguration extends SslConfiguration {
     @SuppressWarnings("WeakerAccess")
     @Primary
     @ConfigurationProperties(KeyConfiguration.PREFIX)
+    @BootstrapContextCompatible
     public static class DefaultKeyConfiguration extends KeyConfiguration {
     }
 
@@ -78,6 +80,7 @@ public class DefaultSslConfiguration extends SslConfiguration {
     @SuppressWarnings("WeakerAccess")
     @Primary
     @ConfigurationProperties(KeyStoreConfiguration.PREFIX)
+    @BootstrapContextCompatible
     public static class DefaultKeyStoreConfiguration extends KeyStoreConfiguration {
 
     }
@@ -88,6 +91,7 @@ public class DefaultSslConfiguration extends SslConfiguration {
     @SuppressWarnings("WeakerAccess")
     @Primary
     @ConfigurationProperties(TrustStoreConfiguration.PREFIX)
+    @BootstrapContextCompatible
     public static class DefaultTrustStoreConfiguration extends TrustStoreConfiguration {
     }
 }

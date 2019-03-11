@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,10 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http;
 
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.OptionalValues;
 import io.micronaut.http.annotation.Produces;
@@ -252,6 +252,56 @@ public class MediaType implements CharSequence {
     public static final MediaType APPLICATION_OCTET_STREAM_TYPE = new MediaType(APPLICATION_OCTET_STREAM);
 
     /**
+     * GraphQL: application/graphql.
+     */
+    public static final String APPLICATION_GRAPHQL = "application/graphql";
+
+    /**
+     * GraphQL: application/graphql.
+     */
+    public static final MediaType APPLICATION_GRAPHQL_TYPE = new MediaType(APPLICATION_GRAPHQL);
+
+    /**
+     * Png Image: image/png.
+     */
+    public static final String IMAGE_PNG = "image/png";
+
+    /**
+     * Png Image: image/png.
+     */
+    public static final MediaType IMAGE_PNG_TYPE = new MediaType(IMAGE_PNG);
+
+    /**
+     * Jpeg Image: image/jpeg.
+     */
+    public static final String IMAGE_JPEG = "image/jpeg";
+
+    /**
+     * Jpeg Image: image/jpeg.
+     */
+    public static final MediaType IMAGE_JPEG_TYPE = new MediaType(IMAGE_JPEG);
+
+    /**
+     * Gif Image: image/gif.
+     */
+    public static final String IMAGE_GIF = "image/gif";
+
+    /**
+     * Gif Image: image/gif.
+     */
+    public static final MediaType IMAGE_GIF_TYPE = new MediaType(IMAGE_GIF);
+
+    /**
+     * Webp Image: image/webp.
+     */
+    public static final String IMAGE_WEBP = "image/webp";
+
+    /**
+     * Webp Image: image/webp.
+     */
+    public static final MediaType IMAGE_WEBP_TYPE = new MediaType(IMAGE_WEBP);
+
+    /**
      * Parameter {@code "charset"}.
      */
     public static final String CHARSET_PARAMETER = "charset";
@@ -286,8 +336,12 @@ public class MediaType implements CharSequence {
     private BigDecimal qualityNumberField;
 
     static {
-        ConversionService.SHARED.addConverter(CharSequence.class, MediaType.class, (Function<CharSequence, MediaType>) charSequence ->
-            new MediaType(charSequence.toString())
+        ConversionService.SHARED.addConverter(CharSequence.class, MediaType.class, (Function<CharSequence, MediaType>) charSequence -> {
+                    if (StringUtils.isNotEmpty(charSequence)) {
+                        return new MediaType(charSequence.toString());
+                    }
+                    return null;
+                }
         );
         textTypePatterns.add(Pattern.compile("^text/.*$"));
         textTypePatterns.add(Pattern.compile("^.*\\+json$"));
@@ -356,7 +410,7 @@ public class MediaType implements CharSequence {
         int i = withoutArgs.indexOf('/');
         if (i > -1) {
             this.type = withoutArgs.substring(0, i);
-            this.subtype = withoutArgs.substring(i + 1, withoutArgs.length());
+            this.subtype = withoutArgs.substring(i + 1);
         } else {
             throw new IllegalArgumentException("Invalid mime type: " + name);
         }
@@ -473,6 +527,9 @@ public class MediaType implements CharSequence {
      * @return Whether the content type is text based
      */
     public static boolean isTextBased(String contentType) {
+        if (StringUtils.isEmpty(contentType)) {
+            return false;
+        }
         MediaType mediaType = new MediaType(contentType);
         return mediaType.isTextBased();
     }
@@ -483,7 +540,7 @@ public class MediaType implements CharSequence {
             return name;
         } else {
             return name + ";" + parameters.entrySet().stream().map(Object::toString)
-                .collect(Collectors.joining(";"));
+                    .collect(Collectors.joining(";"));
         }
     }
 
@@ -556,6 +613,20 @@ public class MediaType implements CharSequence {
         return Optional.empty();
     }
 
+    /**
+     * Resolve the {@link MediaType} for the given file name. Defaults
+     * to text/plain.
+     *
+     * @param filename The file name
+     * @return The {@link MediaType}
+     */
+    public static MediaType forFilename(String filename) {
+        if (StringUtils.isNotEmpty(filename)) {
+            return forExtension(NameUtils.extension(filename)).orElse(MediaType.TEXT_PLAIN_TYPE);
+        }
+        return MediaType.TEXT_PLAIN_TYPE;
+    }
+
     @SuppressWarnings("MagicNumber")
     private static Map<String, String> getMediaTypeFileExtensions() {
         Map<String, String> extensions = mediaTypeFileExtensions;
@@ -593,9 +664,7 @@ public class MediaType implements CharSequence {
 
     @SuppressWarnings("MagicNumber")
     private static Map<String, String> loadMimeTypes() {
-        InputStream is = null;
-        try {
-            is = MediaType.class.getClassLoader().getResourceAsStream(MIME_TYPES_FILE_NAME);
+        try (InputStream is = MediaType.class.getClassLoader().getResourceAsStream(MIME_TYPES_FILE_NAME)) {
             BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.US_ASCII));
             Map<String, String> result = new LinkedHashMap<>(100);
             String line;
@@ -614,13 +683,6 @@ public class MediaType implements CharSequence {
         } catch (IOException ex) {
             if (LOG.isWarnEnabled()) {
                 LOG.warn("Failed to load mime types for file extension detection!");
-            }
-        } finally {
-            if (is != null) {
-                try {
-                    is.close();
-                } catch (IOException ignore) {
-                }
             }
         }
 

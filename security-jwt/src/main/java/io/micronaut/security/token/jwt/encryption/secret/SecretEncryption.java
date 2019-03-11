@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.token.jwt.encryption.secret;
 
 import com.nimbusds.jose.EncryptionMethod;
@@ -49,7 +48,7 @@ public class SecretEncryption extends AbstractEncryptionConfiguration {
         if (secretEncryptionConfiguration.getSecret() == null) {
             throw new ConfigurationException("Secret encryption Configuration 'secret' is required");
         }
-        if (supports(secretEncryptionConfiguration.getJweAlgorithm(), secretEncryptionConfiguration.getEncryptionMethod())) {
+        if (!supports(secretEncryptionConfiguration.getJweAlgorithm(), secretEncryptionConfiguration.getEncryptionMethod())) {
             StringBuilder sb = new StringBuilder();
             sb.append("Encryption Method: ");
             sb.append(secretEncryptionConfiguration.getEncryptionMethod().toString());

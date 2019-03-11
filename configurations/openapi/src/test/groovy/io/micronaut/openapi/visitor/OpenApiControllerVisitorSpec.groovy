@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017-2019 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.openapi.visitor
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
@@ -26,7 +41,7 @@ import io.swagger.v3.oas.annotations.enums.*;
 import io.micronaut.http.annotation.*;
 import io.micronaut.http.*;
 import com.fasterxml.jackson.core.*;
-import io.micronaut.http.hateos.*;
+import io.micronaut.http.hateoas.*;
 import java.util.List;
 import javax.validation.constraints.*;
 
@@ -520,6 +535,48 @@ class MyBean {}
         operation.parameters[2].name == 'content-type'
         operation.parameters[2].required
 
+
+    }
+
+
+    void "test URI template with query parameters is handled correctly"() {
+        given:
+        buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.swagger.v3.oas.annotations.*;
+import io.swagger.v3.oas.annotations.media.*;
+import io.swagger.v3.oas.annotations.enums.*;
+import io.micronaut.http.annotation.*;
+import java.util.List;
+import javax.validation.constraints.*;
+import javax.annotation.*;
+
+@Controller("/")
+class MyController {
+
+    @Get("/hello{?foo,bar}")
+    public String query(@Nullable String foo, @Nullable String bar) { 
+        return null;                               
+     }
+}
+
+@javax.inject.Singleton
+class MyBean {}
+''')
+        when:
+        Operation operation = AbstractOpenApiVisitor.testReference?.paths?.get("/hello")?.get
+
+        then:
+        operation != null
+        operation.operationId == 'query'
+        operation.parameters.size() == 2
+        operation.parameters[0].name == 'foo'
+        !operation.parameters[0].required
+        operation.parameters[0].in == 'query'
+        operation.parameters[1].name == 'bar'
+        !operation.parameters[1].required
+        operation.parameters[1].in == 'query'
 
     }
 }

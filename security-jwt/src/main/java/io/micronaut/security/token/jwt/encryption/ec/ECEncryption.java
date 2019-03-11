@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.token.jwt.encryption.ec;
 
 import com.nimbusds.jose.EncryptionMethod;
@@ -24,7 +23,8 @@ import com.nimbusds.jose.JWEEncrypter;
 import com.nimbusds.jose.crypto.ECDHDecrypter;
 import com.nimbusds.jose.crypto.ECDHEncrypter;
 import io.micronaut.security.token.jwt.encryption.AbstractEncryptionConfiguration;
-import javax.validation.constraints.NotNull;
+
+import javax.annotation.Nonnull;
 import java.security.interfaces.ECPrivateKey;
 import java.security.interfaces.ECPublicKey;
 
@@ -79,7 +79,7 @@ public class ECEncryption extends AbstractEncryptionConfiguration {
      * @return Instance of {@link ECDHEncrypter}
      * @throws JOSEException if the {@link ECDHEncrypter} cannot be intantiated
      */
-    protected JWEEncrypter buildEncrypterWithPublicKey(@NotNull ECPublicKey publicKey) throws JOSEException {
+    protected JWEEncrypter buildEncrypterWithPublicKey(@Nonnull ECPublicKey publicKey) throws JOSEException {
         return new ECDHEncrypter(publicKey);
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.annotation;
 
 import io.micronaut.core.util.StringUtils;
@@ -92,11 +91,11 @@ public class AnnotationUtil {
      * @param objects The objects
      * @return A unmodifiable, pooled set of strings
      */
-    @SuppressWarnings({"unused", "unchecked"})
+    @SuppressWarnings({"unused"})
     @UsedByGeneratedCode
     public static List<String> internListOf(Object... objects) {
         if (objects == null || objects.length == 0) {
-            return Collections.EMPTY_LIST;
+            return Collections.emptyList();
         }
 
         Integer hash = Arrays.hashCode(objects);
@@ -130,7 +129,7 @@ public class AnnotationUtil {
             if (value == Collections.EMPTY_MAP) {
                 String key = values[0].toString().intern();
                 return INTERN_MAP_POOL.computeIfAbsent(key, s ->
-                        Collections.singletonMap(s, Collections.EMPTY_MAP)
+                        Collections.singletonMap(s, Collections.emptyMap())
                 );
             } else {
                 return StringUtils.internMapOf(values);

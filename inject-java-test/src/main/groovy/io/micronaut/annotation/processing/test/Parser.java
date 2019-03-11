@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,160 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.annotation.processing.test;
 
-import com.google.common.collect.*;
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableListMultimap;
 import com.google.testing.compile.JavaFileObjects;
 import com.sun.source.tree.CompilationUnitTree;
 import com.sun.source.tree.ErroneousTree;
 import com.sun.source.tree.Tree;
-import com.sun.source.util.JavacTask;
 import com.sun.source.util.TreeScanner;
 import com.sun.source.util.Trees;
-import com.sun.tools.javac.api.JavacTool;
-import com.sun.tools.javac.util.Context;
-import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor;
-import io.micronaut.annotation.processing.PackageConfigurationInjectProcessor;
-import io.micronaut.annotation.processing.TypeElementVisitorProcessor;
 
-import javax.annotation.processing.Processor;
 import javax.lang.model.element.Element;
-import javax.tools.*;
+import javax.tools.Diagnostic;
+import javax.tools.JavaFileObject;
 import java.io.File;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Locale;
+import java.util.Collections;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static java.lang.Boolean.TRUE;
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static java.util.function.Predicate.isEqual;
-import static javax.tools.Diagnostic.Kind.ERROR;
+
 
 /** Methods to parse Java source files. */
 @SuppressWarnings("all")
 public final class Parser {
-    /**
-     * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method
-     * <b>does not</b> compile the sources.
-     */
-    public static Iterable<? extends Element> parseLines(String className, String... lines) {
-        return parse(JavaFileObjects.forSourceLines(className.replace('.', File.separatorChar) + ".java", lines));
-    }
-
-    /**
-     * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method
-     * <b>does not</b> compile the sources.
-     */
-    public static Iterable<? extends JavaFileObject> generate(String className, String code) {
-        return generate(JavaFileObjects.forSourceString(className, code));
-    }
-    /**
-     * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method
-     * <b>does not</b> compile the sources.
-     */
-    public static Iterable<? extends Element> parse(JavaFileObject... sources) {
-        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-        DiagnosticCollector<JavaFileObject> diagnosticCollector = new DiagnosticCollector<>();
-        InMemoryJavaFileManager fileManager =
-                new InMemoryJavaFileManager(
-                        compiler.getStandardFileManager(diagnosticCollector, Locale.getDefault(), UTF_8));
-        Context context = new Context();
-        JavacTask task =
-                ((JavacTool) compiler)
-                        .getTask(
-                                null, // explicitly use the default because old javac logs some output on stderr
-                                fileManager,
-                                diagnosticCollector,
-                                ImmutableSet.of(),
-                                ImmutableSet.of(),
-                                Arrays.asList(sources),
-                                context);
-        try {
-            task.parse();
-            return task.analyze();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-        finally {
-            List<Diagnostic<? extends JavaFileObject>> diagnostics = diagnosticCollector.getDiagnostics();
-            for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostics) {
-                System.out.println(diagnostic);
-                if (diagnostic.getKind() == Diagnostic.Kind.ERROR) {
-                    throw new RuntimeException(diagnostic.toString());
-                }
-            }
-        }
-    }
-
-    /**
-     * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method
-     * <b>does not</b> compile the sources.
-     */
-    public static Iterable<? extends JavaFileObject> generate(JavaFileObject... sources) {
-        JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-        DiagnosticCollector<JavaFileObject> diagnosticCollector = new DiagnosticCollector<>();
-        InMemoryJavaFileManager fileManager =
-                new InMemoryJavaFileManager(
-                        compiler.getStandardFileManager(diagnosticCollector, Locale.getDefault(), UTF_8));
-        Context context = new Context();
-        JavacTask task =
-                ((JavacTool) compiler)
-                        .getTask(
-                                null, // explicitly use the default because old javac logs some output on stderr
-                                fileManager,
-                                diagnosticCollector,
-                                ImmutableSet.of(),
-                                ImmutableSet.of(),
-                                Arrays.asList(sources),
-                                context);
-        try {
-
-            List<Processor> processors = new ArrayList<>();
-            processors.add(new TypeElementVisitorProcessor());
-            processors.add(new PackageConfigurationInjectProcessor());
-            processors.add(new BeanDefinitionInjectProcessor());
-            task.setProcessors(processors);
-            task.generate();
-
-            List<Diagnostic<? extends JavaFileObject>> diagnostics = diagnosticCollector.getDiagnostics();
-            StringBuilder error = new StringBuilder();
-            for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostics) {
-                if( diagnostic.getKind() == Diagnostic.Kind.ERROR ) {
-                    error.append(diagnostic);
-                }
-            }
-            if(error.length() > 0) {
-                throw new RuntimeException(error.toString());
-            }
-            return fileManager.getOutputFiles();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    }
-    /**
-     * Returns {@code true} if errors were found while parsing source files.
-     *
-     * <p>Normally, the parser reports error diagnostics, but in some cases there are no diagnostics;
-     * instead the parse tree contains {@linkplain ErroneousTree "erroneous"} nodes.
-     */
-    private static boolean foundParseErrors(
-            Iterable<? extends CompilationUnitTree> parsedCompilationUnits,
-            List<Diagnostic<? extends JavaFileObject>> diagnostics) {
-        return diagnostics.stream().map(Diagnostic::getKind).anyMatch(isEqual(ERROR))
-                || Iterables.any(parsedCompilationUnits, Parser::hasErrorNode);
-    }
-
-    /**
-     * Returns {@code true} if the tree contains at least one {@linkplain ErroneousTree "erroneous"}
-     * node.
-     */
-    public static boolean hasErrorNode(Tree tree) {
-        return isTrue(HAS_ERRONEOUS_NODE.scan(tree, false));
-    }
 
     private static final TreeScanner<Boolean, Boolean> HAS_ERRONEOUS_NODE =
             new TreeScanner<Boolean, Boolean>() {
@@ -177,7 +47,7 @@ public final class Parser {
 
                 @Override
                 public Boolean scan(Iterable<? extends Tree> nodes, Boolean p) {
-                    for (Tree node : firstNonNull(nodes, ImmutableList.<Tree>of())) {
+                    for (Tree node : firstNonNull(nodes, Collections.<Tree>emptyList())) {
                         if (isTrue(scan(node, p))) {
                             return true;
                         }
@@ -196,13 +66,51 @@ public final class Parser {
                 }
             };
 
-    private static boolean isTrue(Boolean p) {
-        return TRUE.equals(p);
+    /**
+     * Returns {@code true} if the tree contains at least one {@linkplain ErroneousTree "erroneous"}
+     * node.
+     */
+    public static boolean hasErrorNode(Tree tree) {
+        return isTrue(HAS_ERRONEOUS_NODE.scan(tree, false));
     }
 
-    private static ImmutableListMultimap<Diagnostic.Kind, Diagnostic<? extends JavaFileObject>>
-    sortDiagnosticsByKind(Iterable<Diagnostic<? extends JavaFileObject>> diagnostics) {
-        return Multimaps.index(diagnostics, input -> input.getKind());
+    /**
+     * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method
+     * <b>does not</b> compile the sources.
+     */
+    public static Iterable<? extends Element> parse(JavaFileObject... sources) {
+        JavaParser javaParser = new JavaParser();
+        return javaParser.parse(sources);
+    }
+
+    /**
+     * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method
+     * <b>does not</b> compile the sources.
+     */
+    public static Iterable<? extends Element> parseLines(String className, String... lines) {
+        return parse(JavaFileObjects.forSourceLines(className.replace('.', File.separatorChar) + ".java", lines));
+    }
+
+    /**
+     * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method
+     * <b>does not</b> compile the sources.
+     */
+    public static Iterable<? extends JavaFileObject> generate(String className, String code) {
+        return generate(JavaFileObjects.forSourceString(className, code));
+    }
+
+    /**
+     * Parses {@code sources} into {@linkplain CompilationUnitTree compilation units}. This method
+     * <b>does not</b> compile the sources.
+     *
+     * @param sources The sources
+     */
+    public static Iterable<? extends JavaFileObject> generate(JavaFileObject... sources) {
+        return new JavaParser().generate(sources);
+    }
+
+    private static boolean isTrue(Boolean p) {
+        return TRUE.equals(p);
     }
 
     /**
@@ -216,6 +124,7 @@ public final class Parser {
      * {@link Trees}.
      */
     public static final class ParseResult {
+
 
         private final ImmutableListMultimap<Diagnostic.Kind, Diagnostic<? extends JavaFileObject>>
                 diagnostics;
@@ -231,8 +140,7 @@ public final class Parser {
             this.diagnostics = diagnostics;
         }
 
-        public ImmutableListMultimap<Diagnostic.Kind, Diagnostic<? extends JavaFileObject>>
-        diagnosticsByKind() {
+        public ImmutableListMultimap<Diagnostic.Kind, Diagnostic<? extends JavaFileObject>> diagnosticsByKind() {
             return diagnostics;
         }
 
@@ -243,5 +151,6 @@ public final class Parser {
         public Trees trees() {
             return trees;
         }
+
     }
 }

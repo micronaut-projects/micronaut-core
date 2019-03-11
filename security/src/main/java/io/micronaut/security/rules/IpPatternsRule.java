@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,15 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.security.rules;
 
 import io.micronaut.http.HttpRequest;
 import io.micronaut.security.config.SecurityConfiguration;
 import io.micronaut.security.config.SecurityConfigurationProperties;
+import io.micronaut.security.token.RolesFinder;
 import io.micronaut.security.token.config.TokenConfiguration;
 import io.micronaut.web.router.RouteMatch;
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.List;
 import java.util.Map;
@@ -45,10 +46,11 @@ public class IpPatternsRule extends AbstractSecurityRule {
     private final List<Pattern> patternList;
 
     /**
-     *
+     * @deprecated use {@link IpPatternsRule( RolesFinder , SecurityConfiguration )} instead.
      * @param tokenConfiguration Token Configuration
      * @param securityConfiguration Security Configuration
      */
+    @Deprecated
     public IpPatternsRule(TokenConfiguration tokenConfiguration,
                           SecurityConfiguration securityConfiguration) {
         super(tokenConfiguration);
@@ -56,6 +58,21 @@ public class IpPatternsRule extends AbstractSecurityRule {
                         .stream()
                         .map(Pattern::compile)
                         .collect(Collectors.toList());
+    }
+
+    /**
+     *
+     * @param rolesFinder Roles Parser
+     * @param securityConfiguration Security Configuration
+     */
+    @Inject
+    public IpPatternsRule(RolesFinder rolesFinder,
+                          SecurityConfiguration securityConfiguration) {
+        super(rolesFinder);
+        this.patternList = securityConfiguration.getIpPatterns()
+                .stream()
+                .map(Pattern::compile)
+                .collect(Collectors.toList());
     }
 
     @Override

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,12 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.views.handlebars;
 
-import com.github.jknack.handlebars.Handlebars;
 import io.micronaut.context.annotation.ConfigurationProperties;
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.views.ViewsConfigurationProperties;
 
@@ -28,7 +25,6 @@ import io.micronaut.views.ViewsConfigurationProperties;
  * @author Sergio del Amo
  * @since 1.0
  */
-@Requires(classes = Handlebars.class)
 @ConfigurationProperties(HandlebarsViewsRendererConfigurationProperties.PREFIX)
 public class HandlebarsViewsRendererConfigurationProperties implements HandlebarsViewsRendererConfiguration {
 

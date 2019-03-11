@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.views.thymeleaf;
 
-import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.views.ViewUtils;
 import io.micronaut.views.ViewsConfiguration;
 import io.micronaut.views.ViewsRenderer;
 import io.micronaut.views.exceptions.ViewRenderingException;
@@ -30,9 +30,12 @@ import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.context.IContext;
 import org.thymeleaf.exceptions.TemplateEngineException;
+import org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.HashMap;
 import java.util.Locale;
@@ -48,15 +51,11 @@ import java.util.Map;
  * @since 1.0
  */
 @Produces(MediaType.TEXT_HTML)
-@Requires(property = ThymeleafViewsRendererConfigurationProperties.PREFIX + ".enabled", notEquals = "false")
-@Requires(classes = TemplateEngine.class)
 @Singleton
 public class ThymeleafViewsRenderer implements ViewsRenderer {
 
-    protected final ClassLoaderTemplateResolver templateResolver;
-
+    protected final AbstractConfigurableTemplateResolver templateResolver;
     protected final TemplateEngine engine;
-
     protected ResourceLoader resourceLoader;
 
     /**
@@ -64,6 +63,7 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
      * @param thConfiguration    Thymeleaf template renderer configuration
      * @param resourceLoader     The resource loader
      */
+    @Deprecated
     public ThymeleafViewsRenderer(ViewsConfiguration viewsConfiguration,
                                   ThymeleafViewsRendererConfiguration thConfiguration,
                                   ClassPathResourceLoader resourceLoader) {
@@ -72,8 +72,24 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
         this.engine = initializeTemplateEngine();
     }
 
+    /**
+     * @param templateResolver   The template resolver
+     * @param templateEngine     The template engine
+     * @param resourceLoader     The resource loader
+     */
+    @Inject
+    public ThymeleafViewsRenderer(AbstractConfigurableTemplateResolver templateResolver,
+                                  TemplateEngine templateEngine,
+                                  ClassPathResourceLoader resourceLoader) {
+        this.templateResolver = templateResolver;
+        this.resourceLoader = resourceLoader;
+        this.engine = templateEngine;
+    }
+
     @Override
-    public Writable render(String viewName, @Nullable Object data) {
+    @Nonnull
+    public Writable render(@Nonnull String viewName, @Nullable Object data) {
+        ArgumentUtils.requireNonNull("viewName", viewName);
         return (writer) -> {
             final IContext context = new Context(Locale.US, variables(data));
             try {
@@ -85,7 +101,7 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
     }
 
     @Override
-    public boolean exists(String viewName) {
+    public boolean exists(@Nonnull String viewName) {
         String location = viewLocation(viewName);
         return resourceLoader.getResourceAsStream(location).isPresent();
     }
@@ -100,10 +116,7 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
                                                                    ThymeleafViewsRendererConfiguration thConfiguration) {
         ClassLoaderTemplateResolver templateResolver = new ClassLoaderTemplateResolver();
 
-        String sb = viewsConfiguration.getFolder() +
-                FILE_SEPARATOR;
-        templateResolver.setPrefix(sb);
-
+        templateResolver.setPrefix(normalizeFolder(viewsConfiguration.getFolder()));
         templateResolver.setCharacterEncoding(thConfiguration.getCharacterEncoding());
         templateResolver.setTemplateMode(thConfiguration.getTemplateMode());
         templateResolver.setSuffix(thConfiguration.getSuffix());
@@ -127,18 +140,8 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
     }
 
     private String viewLocation(final String name) {
-        final StringBuilder sb = new StringBuilder();
-        String prefix = templateResolver.getPrefix();
-        if (prefix != null) {
-            sb.append(prefix);
-            if (!prefix.endsWith(FILE_SEPARATOR)) {
-                sb.append(FILE_SEPARATOR);
-            }
-        }
-        sb.append(name.replace("/", FILE_SEPARATOR));
-        if (templateResolver.getSuffix() != null) {
-            sb.append(templateResolver.getSuffix());
-        }
-        return sb.toString();
+        return templateResolver.getPrefix() +
+                ViewUtils.normalizeFile(name, templateResolver.getSuffix()) +
+                templateResolver.getSuffix();
     }
 }

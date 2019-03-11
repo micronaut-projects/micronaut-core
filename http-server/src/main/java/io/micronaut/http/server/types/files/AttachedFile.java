@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.server.types.files;
 
 import io.micronaut.http.HttpHeaders;
@@ -25,15 +24,26 @@ import java.io.File;
  * Used as the return value of a route execution to indicate the given file should be downloaded by the client
  * instead of displayed.
  *
+ * @deprecated Use {@link SystemFile instead}. This class conflates the source of the data with the type of
+ * response being sent. This assumes the file should be sent as an attachment while {@link StreamedFile} does not.
+ * The {@link SystemFile} class now behaves the same as {@link StreamedFile} by defaulting to inline with a method
+ * to call to set it to be attached.
+ *
+ * <code>new AttachedFile(file, name) -> new SystemFile(file).attach(name)</code>
+ * <code>new AttachedFile(file) -> new SystemFile(file).attach(file.getName())</code>
+ *
+ *
  * @author James Kleeh
  * @since 1.0
  */
+@Deprecated
 public class AttachedFile extends SystemFileCustomizableResponseType {
 
     private static final String HEADER_VALUE = "attachment; filename=\"%s\"";
 
     private final String filename;
     private final String attachmentName;
+    private boolean inline;
 
     /**
      * @param file The file
@@ -52,9 +62,21 @@ public class AttachedFile extends SystemFileCustomizableResponseType {
         this.attachmentName = filename;
     }
 
+    /**
+     * If called, the file will not be sent as an attachment.
+     *
+     * @return The same AttachedFile instance
+     */
+    public AttachedFile inline() {
+        this.inline = true;
+        return this;
+    }
+
     @Override
     public void process(MutableHttpResponse response) {
-        response.header(HttpHeaders.CONTENT_DISPOSITION, String.format(HEADER_VALUE, attachmentName));
+        if (!inline) {
+            response.header(HttpHeaders.CONTENT_DISPOSITION, String.format(HEADER_VALUE, attachmentName));
+        }
     }
 
     @Override

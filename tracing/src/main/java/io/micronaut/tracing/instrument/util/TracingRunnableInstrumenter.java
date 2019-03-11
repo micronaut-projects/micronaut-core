@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,14 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.tracing.instrument.util;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
 import io.micronaut.scheduling.instrument.RunnableInstrumenter;
+import io.opentracing.Scope;
+import io.opentracing.Span;
 import io.opentracing.Tracer;
 
 import javax.inject.Singleton;
+import java.util.Optional;
 import java.util.function.Function;
 
 /**
@@ -31,7 +34,7 @@ import java.util.function.Function;
  */
 @Singleton
 @Requires(beans = Tracer.class)
-public class TracingRunnableInstrumenter implements Function<Runnable, Runnable>, RunnableInstrumenter {
+public class TracingRunnableInstrumenter implements Function<Runnable, Runnable>, RunnableInstrumenter, ReactiveInstrumenter {
 
     private final Tracer tracer;
 
@@ -52,5 +55,35 @@ public class TracingRunnableInstrumenter implements Function<Runnable, Runnable>
     @Override
     public Runnable instrument(Runnable command) {
         return apply(command);
+    }
+
+    @Override
+    public Optional<RunnableInstrumenter> newInstrumentation() {
+        Scope active = tracer.scopeManager().active();
+        Span activeSpan;
+        if (active != null) {
+            activeSpan = active.span();
+        } else {
+            activeSpan = tracer.activeSpan();
+        }
+        if (activeSpan != null) {
+            return Optional.of(new RunnableInstrumenter() {
+                @Override
+                public Runnable instrument(Runnable command) {
+                    return () -> {
+                        Scope scope;
+                        scope = tracer.scopeManager().activate(activeSpan, false);
+                        try {
+                            command.run();
+                        } finally {
+                            if (scope != null) {
+                                scope.close();
+                            }
+                        }
+                    };
+                }
+            });
+        }
+        return Optional.empty();
     }
 }

@@ -67,5 +67,31 @@ function highlightMenu() {
     }
 }
 
+function copyText(element) {
+    var range, selection;
+
+    if (document.body.createTextRange) {
+        range = document.body.createTextRange();
+        range.moveToElementText(element);
+        range.select();
+
+    } else if (window.getSelection) {
+        selection = window.getSelection();
+        range = document.createRange();
+        range.selectNodeContents(element);
+        selection.removeAllRanges();
+        selection.addRange(range);
+    }
+    try {
+        document.execCommand('copy');
+    }
+    catch (err) {
+        console.error('unable to copy text');
+    }
+}
+function copyToClipboard(el) {
+    copyText(el.parentNode.previousElementSibling);
+}
+
 goToLocation();
 highlightMenu();

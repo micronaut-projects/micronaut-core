@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.util;
 
 import javax.annotation.Nullable;
@@ -62,6 +61,31 @@ public class ArrayUtils {
     }
 
     /**
+     * Concatenate two byte arrays.
+     *
+     * @param a   The first array
+     * @param b   The second array
+     * @return The concatenated array
+     */
+    public static byte[] concat(byte[] a, byte... b) {
+        int aLen = a.length;
+        int bLen = b.length;
+
+        if (bLen == 0) {
+            return a;
+        }
+        if (aLen == 0) {
+            return b;
+        }
+
+        byte[] c = new byte[aLen + bLen];
+        System.arraycopy(a, 0, c, 0, aLen);
+        System.arraycopy(b, 0, c, aLen, bLen);
+
+        return c;
+    }
+
+    /**
      * Whether the given array is empty.
      *
      * @param array The array
@@ -102,9 +126,8 @@ public class ArrayUtils {
     public static String toString(String delimiter, @Nullable Object[] array) {
         if (isEmpty(array)) {
             return "";
-        } else {
-            List<Object> list = Arrays.asList(array);
-            return CollectionUtils.toString(delimiter, list);
         }
+        List<Object> list = Arrays.asList(array);
+        return CollectionUtils.toString(delimiter, list);
     }
 }

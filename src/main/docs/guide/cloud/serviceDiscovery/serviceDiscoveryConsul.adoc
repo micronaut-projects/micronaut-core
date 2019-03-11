@@ -4,10 +4,10 @@ https://www.consul.io[Consul] is a popular Service Discovery and Distributed Con
 
 The quickest way to start using Consul is via Docker:
 
-. Starting Consul with Docker
+. Starting Consul with Docker. Currently only v1.2.x is supported.
 [source,bash]
 ----
-docker run -p 8500:8500 consul
+docker run -p 8500:8500 consul:1.2.4
 ----
 
 Alternatively you can https://www.consul.io/docs/install/index.html[install and run a local Consul instance].
@@ -130,3 +130,37 @@ consul:
 ----
 
 With this configuration option in place Consul will assume responsibility of invoking the Micronaut applications <<healthEndpoint, Health Endpoint>>.
+
+== Controlling IP/Host Registration
+
+Occasionally, depending on the deployment environment you may wish to expose the IP address and not the host name, since by default Micronaut will register with Consul with either the value of the `HOST` environment variable or the value configured via `micronaut.server.host`.
+
+You can use the `consul.client.registration.prefer-ip-address` setting to indicate you would prefer to register with the IP address.
+
+Micronaut will by default perform an IP lookup to try and figure out the IP address, however you can use the `consul.client.registration.ip-addr` setting to specify the IP address of the service directly.
+
+.Consul HTTP Check Configuration
+[source,yaml]
+----
+consul:
+  client:
+    registration:
+        ip-addr: <your base container ip>
+        prefer-ip-address: true
+----
+
+This will tell Consul to register the IP that other instances can use to access your service and not the NAT IP it is running under (or 127.0.0.1).
+
+If you use HTTP health checks (see the previous section) then Consul will use the configured IP address to check the Micronaut `/health` endpoint.
+
+.Consul HTTP Check Configuration
+[source,yaml]
+----
+consul:
+  client:
+    registration:
+        ip-addr: <your base container ip>
+        prefer-ip-address: true
+        check:
+            http: true
+----

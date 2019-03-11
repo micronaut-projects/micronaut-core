@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.type;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -33,7 +32,7 @@ import java.util.*;
  * @since 1.0
  */
 @Internal
-class DefaultArgument<T> implements Argument<T> {
+public class DefaultArgument<T> implements Argument<T> {
 
     private final Class<T> type;
     private final String name;
@@ -41,14 +40,13 @@ class DefaultArgument<T> implements Argument<T> {
     private final Argument[] typeParameterArray;
     private final AnnotationMetadata annotationMetadata;
 
-
     /**
      * @param type               The type
      * @param name               The name
      * @param annotationMetadata The annotation metadata
      * @param genericTypes       The generic types
      */
-    DefaultArgument(Class<T> type, String name, AnnotationMetadata annotationMetadata, Argument... genericTypes) {
+    public DefaultArgument(Class<T> type, String name, AnnotationMetadata annotationMetadata, Argument... genericTypes) {
         this.type = type;
         this.name = name;
         this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
@@ -60,8 +58,23 @@ class DefaultArgument<T> implements Argument<T> {
      * @param type               The type
      * @param name               The name
      * @param annotationMetadata The annotation metadata
+     * @param typeParameters     The map of parameters
+     * @param typeParameterArray The array of arguments
      */
-    DefaultArgument(Type type, String name, AnnotationMetadata annotationMetadata) {
+    public DefaultArgument(Class<T> type, String name, AnnotationMetadata annotationMetadata, Map<String, Argument<?>> typeParameters, Argument[] typeParameterArray) {
+        this.type = type;
+        this.name = name;
+        this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
+        this.typeParameters = typeParameters;
+        this.typeParameterArray = typeParameterArray;
+    }
+
+    /**
+     * @param type               The type
+     * @param name               The name
+     * @param annotationMetadata The annotation metadata
+     */
+    public DefaultArgument(Type type, String name, AnnotationMetadata annotationMetadata) {
         this.annotationMetadata = annotationMetadata != null ? annotationMetadata : AnnotationMetadata.EMPTY_METADATA;
         if (type == null) {
             type = getClass().getGenericSuperclass();

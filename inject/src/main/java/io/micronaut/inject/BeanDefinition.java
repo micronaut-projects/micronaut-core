@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.inject;
 
 import io.micronaut.context.BeanContext;
@@ -24,6 +23,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Modifier;
 import java.util.Collection;
@@ -191,6 +191,30 @@ public interface BeanDefinition<T> extends AnnotationMetadataDelegate, Named, Be
             return Collections.emptyList();
         }
         return getTypeArguments(type.getName());
+    }
+
+    /**
+     * Returns the type parameters as a class array for the given type.
+     * @param type The type
+     * @return The type parameters
+     */
+    default @Nonnull Class[] getTypeParameters(@Nullable Class<?> type) {
+        if (type == null) {
+            return ReflectionUtils.EMPTY_CLASS_ARRAY;
+        } else {
+            final List<Argument<?>> typeArguments = getTypeArguments(type);
+            return typeArguments.stream().map(Argument::getType).toArray(Class[]::new);
+        }
+    }
+
+    /**
+     *
+     * Returns the type parameters as a class array for the bean type.
+     *
+     * @return The type parameters for the bean type as a class array.
+     */
+    default @Nonnull Class[] getTypeParameters() {
+        return getTypeParameters(getBeanType());
     }
 
     /**

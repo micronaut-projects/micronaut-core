@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.context;
 
 import io.micronaut.context.env.Environment;
@@ -22,14 +21,9 @@ import io.micronaut.context.env.SystemPropertiesPropertySource;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.util.StringUtils;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Implementation of {@link ApplicationContextBuilder}.
@@ -37,7 +31,7 @@ import java.util.Map;
  * @author graemerocher
  * @since 1.0
  */
-public class DefaultApplicationContextBuilder implements ApplicationContextBuilder {
+public class DefaultApplicationContextBuilder implements ApplicationContextBuilder, ApplicationContextConfiguration {
     private List<Object> singletons = new ArrayList<>();
     private List<String> environments = new ArrayList<>();
     private List<String> packages = new ArrayList<>();
@@ -46,6 +40,7 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     private ClassPathResourceLoader classPathResourceLoader;
     private Collection<String> configurationIncludes = new HashSet<>();
     private Collection<String> configurationExcludes = new HashSet<>();
+    private Boolean deduceEnvironments = null;
 
     /**
      * Default constructor.
@@ -58,6 +53,21 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
         if (beans != null) {
             singletons.addAll(Arrays.asList(beans));
         }
+        return this;
+    }
+
+    @Override
+    public @Nonnull ClassPathResourceLoader getResourceLoader() {
+        if (classPathResourceLoader == null) {
+            return ClassPathResourceLoader.defaultLoader(getClassLoader());
+        } else {
+            return classPathResourceLoader;
+        }
+    }
+
+    @Override
+    public ApplicationContextBuilder deduceEnvironment(@Nullable Boolean deduceEnvironments) {
+        this.deduceEnvironments = deduceEnvironments;
         return this;
     }
 
@@ -94,6 +104,16 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     }
 
     @Override
+    public Optional<Boolean> getDeduceEnvironments() {
+        return Optional.ofNullable(deduceEnvironments);
+    }
+
+    @Override
+    public @Nonnull List<String> getEnvironments() {
+        return environments;
+    }
+
+    @Override
     public ApplicationContextBuilder mainClass(Class mainClass) {
         if (mainClass != null) {
             ClassLoader classLoader = mainClass.getClassLoader();
@@ -117,10 +137,8 @@ public class DefaultApplicationContextBuilder implements ApplicationContextBuild
     @Override
     @SuppressWarnings("MagicNumber")
     public ApplicationContext build() {
-        ClassLoader classLoader = ApplicationContext.class.getClassLoader();
         DefaultApplicationContext applicationContext = new DefaultApplicationContext(
-            classPathResourceLoader != null ? classPathResourceLoader : ClassPathResourceLoader.defaultLoader(classLoader),
-            environments.toArray(new String[0])
+            this
         );
 
         Environment environment = applicationContext.getEnvironment();

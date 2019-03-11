@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.discovery.eureka.registration;
 
 import io.micronaut.context.annotation.Requires;
@@ -36,6 +35,8 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import javax.inject.Singleton;
+import java.util.Map;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
@@ -183,7 +184,11 @@ public class EurekaAutoRegistration extends DiscoveryServiceAutoRegistration {
             }
 
             ConvertibleValues<String> instanceMetadata = instance.getMetadata();
-            instanceInfo.getMetadata().putAll(instanceMetadata.asMap(String.class, String.class));
+            Properties properties = instanceMetadata.asProperties();
+            Map<String, String> targetMetadata = instanceInfo.getMetadata();
+            for (Map.Entry<Object, Object> entry : properties.entrySet()) {
+                targetMetadata.put(entry.getKey().toString(), entry.getValue().toString());
+            }
             customizeInstanceInfo(instanceInfo);
             validateApplicationName(instanceInfo.getApp());
 

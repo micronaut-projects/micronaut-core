@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package io.micronaut.discovery.consul
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.env.Environment
 import io.micronaut.discovery.config.ConfigurationClient
 import io.micronaut.discovery.consul.client.v1.ConsulClient
 import io.micronaut.runtime.server.EmbeddedServer
@@ -43,6 +44,13 @@ class MockConfigurationDiscoverySpec extends Specification {
     @Shared
     ConsulClient client = someContext.getBean(ConsulClient)
 
+    def setup() {
+        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, "true")
+    }
+
+    def cleanup() {
+        System.setProperty(Environment.BOOTSTRAP_CONTEXT_PROPERTY, "")
+    }
     void 'test read application configuration from Consul'() {
         given:
         System.setProperty("some.consul.value", "other") // consul should override

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,122 +13,66 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http.hateos;
 
 import io.micronaut.http.MediaType;
 
 import java.net.URI;
-import java.util.Optional;
 
 /**
- * Default implementation of {@link Link}.
+ * Deprecated. Please use io.micronaut.http.hateoas.DefaultLink
  *
  * @author Graeme Rocher
  * @since 1.0
  */
-class DefaultLink implements Link, Link.Builder {
-
-    final URI href;
-    private boolean templated;
-    private URI profile;
-    private URI deprecation;
-    private String title;
-    private String hreflang;
-    private MediaType type;
-    private String name;
+@Deprecated
+class DefaultLink extends io.micronaut.http.hateoas.DefaultLink implements Link.Builder {
 
     /**
      * @param uri The URI
+     * @deprecated Use {@link io.micronaut.http.hateoas.DefaultLink} instead
      */
-    DefaultLink(URI uri) {
-        this.href = uri;
+    protected DefaultLink(URI uri) {
+        super(uri);
     }
 
     @Override
-    public URI getHref() {
-        return href;
+    public Link.Builder templated(boolean templated) {
+        return (Link.Builder) super.templated(templated);
     }
 
     @Override
-    public Builder templated(boolean templated) {
-        this.templated = templated;
-        return this;
+    public Link.Builder profile(URI profile) {
+        return (Link.Builder) super.profile(profile);
     }
 
     @Override
-    public Builder profile(URI profile) {
-        this.profile = profile;
-        return this;
+    public Link.Builder deprecation(URI deprecation) {
+        return (Link.Builder) super.deprecation(deprecation);
     }
 
     @Override
-    public Builder deprecation(URI deprecation) {
-        this.deprecation = deprecation;
-        return this;
+    public Link.Builder title(String title) {
+        return (Link.Builder) super.title(title);
     }
 
     @Override
-    public Builder title(String title) {
-        this.title = title;
-        return this;
+    public Link.Builder name(String name) {
+        return (Link.Builder) super.name(name);
     }
 
     @Override
-    public Builder name(String name) {
-        this.name = name;
-        return this;
+    public Link.Builder hreflang(String hreflang) {
+        return (Link.Builder) super.hreflang(hreflang);
     }
 
     @Override
-    public Builder hreflang(String hreflang) {
-        this.hreflang = hreflang;
-        return this;
-    }
-
-    @Override
-    public Builder type(MediaType mediaType) {
-        this.type = mediaType;
-        return this;
-    }
-
-    @Override
-    public boolean isTemplated() {
-        return templated;
-    }
-
-    @Override
-    public Optional<MediaType> getType() {
-        return type == null ? Optional.empty() : Optional.of(type);
-    }
-
-    @Override
-    public Optional<URI> getDeprecation() {
-        return deprecation == null ? Optional.empty() : Optional.of(deprecation);
-    }
-
-    @Override
-    public Optional<URI> getProfile() {
-        return profile == null ? Optional.empty() : Optional.of(profile);
-    }
-
-    @Override
-    public Optional<String> getName() {
-        return name == null ? Optional.empty() : Optional.of(name);
-    }
-
-    @Override
-    public Optional<String> getTitle() {
-        return title == null ? Optional.empty() : Optional.of(title);
-    }
-
-    @Override
-    public Optional<String> getHreflang() {
-        return hreflang == null ? Optional.empty() : Optional.of(hreflang);
+    public Link.Builder type(MediaType mediaType) {
+        return (Link.Builder) super.type(mediaType);
     }
 
     @Override
     public Link build() {
-        return this;
+        return (Link) super.build();
     }
 }

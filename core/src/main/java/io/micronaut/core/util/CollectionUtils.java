@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.util;
 
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -86,20 +85,22 @@ public class CollectionUtils {
         }
         if (iterableType.equals(Set.class)) {
             return Optional.of(new HashSet<>(collection));
-        } else if (iterableType.equals(Queue.class)) {
+        }
+        if (iterableType.equals(Queue.class)) {
             return Optional.of(new LinkedList<>(collection));
-        } else if (iterableType.equals(List.class)) {
+        }
+        if (iterableType.equals(List.class)) {
             return Optional.of(new ArrayList<>(collection));
-        } else if (!iterableType.isInterface()) {
+        }
+        if (!iterableType.isInterface()) {
             try {
                 Constructor<? extends Iterable<T>> constructor = iterableType.getConstructor(Collection.class);
                 return Optional.of(constructor.newInstance(collection));
             } catch (Throwable e) {
                 return Optional.empty();
             }
-        } else {
-            return Optional.empty();
         }
+        return Optional.empty();
     }
 
     /**
@@ -212,22 +213,44 @@ public class CollectionUtils {
     public static <T> List<T> iterableToList(Iterable<T> iterable) {
         if (iterable == null) {
             return Collections.emptyList();
-        } else {
-            if (iterable instanceof List) {
-                return (List<T>) iterable;
-            } else {
-                Iterator<T> i = iterable.iterator();
-                if (i.hasNext()) {
-                    List<T> list = new ArrayList<>();
-                    while (i.hasNext()) {
-                        list.add(i.next());
-                    }
-                    return list;
-                } else {
-                    return Collections.emptyList();
-                }
-            }
         }
+        if (iterable instanceof List) {
+            return (List<T>) iterable;
+        }
+        Iterator<T> i = iterable.iterator();
+        if (i.hasNext()) {
+            List<T> list = new ArrayList<>();
+            while (i.hasNext()) {
+                list.add(i.next());
+            }
+            return list;
+        }
+        return Collections.emptyList();
+    }
+
+    /**
+     * Converts an {@link Iterable} to a {@link Set}.
+     *
+     * @param iterable The iterable
+     * @param <T>      The generic type
+     * @return The set
+     */
+    public static <T> Set<T> iterableToSet(Iterable<T> iterable) {
+        if (iterable == null) {
+            return Collections.emptySet();
+        }
+        if (iterable instanceof Set) {
+            return (Set<T>) iterable;
+        }
+        Iterator<T> i = iterable.iterator();
+        if (i.hasNext()) {
+            Set<T> list = new HashSet<>();
+            while (i.hasNext()) {
+                list.add(i.next());
+            }
+            return list;
+        }
+        return Collections.emptySet();
     }
 
     /**

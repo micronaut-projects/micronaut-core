@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,7 @@ class GoogleComputeInstanceResolverSpec extends Specification {
     void "test building google compute metadata"() {
         given:
         Environment environment = Mock(Environment)
+        environment.getActiveNames() >> ['foo']
 
         GoogleComputeInstanceMetadataResolver resolver = buildResolver()
         Optional<ComputeInstanceMetadata> computeInstanceMetadata = resolver.resolve(environment)
@@ -79,7 +80,7 @@ class GoogleComputeInstanceResolverSpec extends Specification {
     void "test metadata caching"() {
         given:
         Environment environment = Mock(Environment)
-
+        environment.getActiveNames() >> ['foo']
         GoogleComputeInstanceMetadataResolver resolver = buildResolver()
         Optional<ComputeInstanceMetadata> computeInstanceMetadata = resolver.resolve(environment)
 

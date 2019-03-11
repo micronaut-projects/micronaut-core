@@ -224,6 +224,25 @@ enum PetType {
 <1> The `@Schema` annotation is used to customize the name of the schema
 <2> Properties can be customized too.
 
+=== Schemas and Meta Annotations
+
+If you don't have control of the source code and don't want to have to annotation each parameter with `@Schema` then it can be convenient to instead use a meta annotation.
+
+For example if the aforementioned `Pet` class cannot be annotated with `@Schema` you can define a meta annotation:
+
+.Swagger Meta Annotation
+[source,java]
+----
+@Documented
+@Retention(RUNTIME)
+@Target({ElementType.PARAMETER, ElementType.FIELD})
+@Schema(name="MyPet", description="Pet description")
+@interface MyAnn {
+}
+----
+
+Then whenever `Pet` is used as a parameter you can annotate the parameter with `@MyAnn`.
+
 === Schemas and Generics
 
 If a method return type includes generics then these will included when calculating the schema name. For example the following:

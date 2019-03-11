@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.http;
 
 import io.micronaut.http.cookie.Cookies;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.security.Principal;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -37,41 +39,63 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     /**
      * @return The {@link Cookies} instance
      */
-    Cookies getCookies();
+    @Nonnull Cookies getCookies();
 
     /**
      * @return The HTTP parameters contained with the URI query string
      */
-    HttpParameters getParameters();
+    @Nonnull HttpParameters getParameters();
 
     /**
      * @return The request method
      */
-    HttpMethod getMethod();
+    @Nonnull HttpMethod getMethod();
 
     /**
      * @return The full request URI
      */
-    URI getUri();
+    @Nonnull URI getUri();
+
+    /**
+     * The user principal stored within the request.
+     *
+     * @return The principal
+     * @since 1.0.4
+     */
+    default @Nonnull Optional<Principal> getUserPrincipal() {
+        return getAttribute(HttpAttributes.PRINCIPAL, Principal.class);
+    }
+
+    /**
+     * The user principal stored within the request.
+     *
+     * @param principalType The principal type
+     * @return The principal
+     * @param <T> The principal type
+     * @since 1.0.4
+     */
+    default @Nonnull <T extends Principal> Optional<T> getUserPrincipal(Class<T> principalType) {
+        return getAttribute(HttpAttributes.PRINCIPAL, principalType);
+    }
 
     /**
      * @return Get the path without any parameters
      */
-    default String getPath() {
+    default @Nonnull String getPath() {
         return getUri().getPath();
     }
 
     /**
      * @return Obtain the remote address
      */
-    default InetSocketAddress getRemoteAddress() {
+    default @Nonnull InetSocketAddress getRemoteAddress() {
         return getServerAddress();
     }
 
     /**
      * @return Obtain the server address
      */
-    default InetSocketAddress getServerAddress() {
+    default @Nonnull InetSocketAddress getServerAddress() {
         String host = getUri().getHost();
         int port = getUri().getPort();
         return new InetSocketAddress(host != null ? host : "localhost", port > -1 ? port : 80);
@@ -80,7 +104,8 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     /**
      * @return The server host name
      */
-    default String getServerName() {
+    default @Nullable
+    String getServerName() {
         return getUri().getHost();
     }
 

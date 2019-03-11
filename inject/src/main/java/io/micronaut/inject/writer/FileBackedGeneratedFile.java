@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.inject.writer;
 
 import io.micronaut.core.annotation.Internal;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -39,6 +34,7 @@ import java.nio.file.Files;
  */
 @Internal
 class FileBackedGeneratedFile implements GeneratedFile {
+
     private final File file;
 
     /**
@@ -61,19 +57,19 @@ class FileBackedGeneratedFile implements GeneratedFile {
     @Override
     public InputStream openInputStream() throws IOException {
         file.getParentFile().mkdirs();
-        return new FileInputStream(file);
+        return Files.newInputStream(file.toPath());
     }
 
     @Override
     public OutputStream openOutputStream() throws IOException {
         file.getParentFile().mkdirs();
-        return new FileOutputStream(file);
+        return Files.newOutputStream(file.toPath());
     }
 
     @Override
     public Reader openReader() throws IOException {
         file.getParentFile().mkdirs();
-        return new FileReader(file);
+        return Files.newBufferedReader(file.toPath());
     }
 
     @Override
@@ -87,6 +83,6 @@ class FileBackedGeneratedFile implements GeneratedFile {
     @Override
     public Writer openWriter() throws IOException {
         file.getParentFile().mkdirs();
-        return new FileWriter(file);
+        return Files.newBufferedWriter(file.toPath());
     }
 }

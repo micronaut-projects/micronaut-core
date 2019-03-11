@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.discovery.aws.parameterstore;
 
 import io.micronaut.configuration.aws.AWSClientConfiguration;
+import io.micronaut.context.annotation.BootstrapContextCompatible;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 
 /**
@@ -27,16 +28,18 @@ import io.micronaut.core.util.Toggleable;
  */
 @Requires(classes = {com.amazonaws.ClientConfiguration.class, AWSClientConfiguration.class})
 @Requires(env = Environment.AMAZON_EC2)
-@Requires(property = AWSParameterStoreConfiguration.ENABLED, value = "true", defaultValue = "false")
+@Requires(property = AWSParameterStoreConfiguration.ENABLED, value = StringUtils.TRUE, defaultValue = StringUtils.FALSE)
 @ConfigurationProperties(AWSParameterStoreConfiguration.CONFIGURATION_PREFIX)
+@BootstrapContextCompatible
 public class AWSParameterStoreConfiguration extends AWSClientConfiguration implements Toggleable  {
 
     /**
      * Constant for whether AWS parameter store is enabled or not.
      */
     public static final String ENABLED = "aws.client.system-manager.parameterstore.enabled";
+
     /**
-     * The perfix for configuration.
+     * The prefix for configuration.
      */
     public static final String CONFIGURATION_PREFIX = "system-manager.parameterstore";
 

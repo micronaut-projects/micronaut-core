@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.annotation;
 
 import io.micronaut.core.convert.ArgumentConversionContext;
@@ -52,13 +51,12 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
      * @param annotationName The annotation name
      * @param values         The values
      */
-    @SuppressWarnings("unchecked")
     @UsedByGeneratedCode
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values) {
         this.annotationName = annotationName.intern();
         this.convertibleValues = newConvertibleValues(values);
         this.values = values;
-        this.defaultValues = Collections.EMPTY_MAP;
+        this.defaultValues = Collections.emptyMap();
     }
 
     /**
@@ -66,13 +64,12 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
      * @param values         The values
      * @param defaultValues The default values
      */
-    @SuppressWarnings("unchecked")
     @UsedByGeneratedCode
     public AnnotationValue(String annotationName, Map<CharSequence, Object> values, Map<String, Object> defaultValues) {
         this.annotationName = annotationName.intern();
         this.convertibleValues = newConvertibleValues(values);
         this.values = values;
-        this.defaultValues = defaultValues != null ? defaultValues : Collections.EMPTY_MAP;
+        this.defaultValues = defaultValues != null ? defaultValues : Collections.emptyMap();
     }
 
     /**
@@ -83,8 +80,8 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
     public AnnotationValue(String annotationName) {
         this.annotationName = annotationName.intern();
         this.convertibleValues = ConvertibleValues.EMPTY;
-        this.values = Collections.EMPTY_MAP;
-        this.defaultValues = Collections.EMPTY_MAP;
+        this.values = Collections.emptyMap();
+        this.defaultValues = Collections.emptyMap();
     }
 
     /**
@@ -97,7 +94,7 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
         Map<String, Object> existing = convertibleValues.asMap();
         this.values = new HashMap<>(existing.size());
         this.values.putAll(existing);
-        this.defaultValues = Collections.EMPTY_MAP;
+        this.defaultValues = Collections.emptyMap();
     }
 
     /**
@@ -270,7 +267,7 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
 
     @Override
     public int hashCode() {
-        return AnnotationUtil.calculateHashCode(getValues());
+        return 31 * annotationName.hashCode() + AnnotationUtil.calculateHashCode(getValues());
     }
 
     @Override
@@ -286,6 +283,10 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
         }
 
         AnnotationValue other = AnnotationValue.class.cast(obj);
+
+        if (!annotationName.equals(other.getAnnotationName())) {
+            return false;
+        }
 
         Map<CharSequence, Object> otherValues = other.getValues();
         Map<CharSequence, Object> values = getValues();
@@ -310,9 +311,10 @@ public class AnnotationValue<A extends Annotation> implements ValueResolver<Char
      * Start building a new annotation for the given name.
      *
      * @param annotationName The annotation name
+     * @param <T> The annotation type
      * @return The builder
      */
-    public static AnnotationValueBuilder<?> builder(String annotationName) {
+    public static <T extends Annotation> AnnotationValueBuilder<T> builder(String annotationName) {
         return new AnnotationValueBuilder<>(annotationName);
     }
 

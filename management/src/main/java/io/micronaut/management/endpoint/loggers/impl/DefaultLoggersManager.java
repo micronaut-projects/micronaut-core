@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.management.endpoint.loggers.impl;
 
 import io.micronaut.context.annotation.Requires;
@@ -40,7 +39,7 @@ public class DefaultLoggersManager implements LoggersManager<Map<String, Object>
 
     @Override
     public Publisher<Map<String, Object>> getLoggers(LoggingSystem loggingSystem) {
-        Map<String, Object> data = new HashMap<>(2);
+        Map<String, Object> data = new LinkedHashMap<>(2);
 
         data.put(LEVELS, getLogLevels());
         data.put(LOGGERS, getLoggerData(loggingSystem.getLoggers()));
@@ -69,7 +68,9 @@ public class DefaultLoggersManager implements LoggersManager<Map<String, Object>
                 .stream()
                 .collect(Collectors.toMap(
                         LoggerConfiguration::getName,
-                        LoggerConfiguration::getData));
+                        LoggerConfiguration::getData,
+                        (l1, l2) -> l1,
+                        LinkedHashMap::new));
     }
 
     /**

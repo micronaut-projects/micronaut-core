@@ -1,7 +1,25 @@
+/*
+ * Copyright 2017-2019 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package io.micronaut.inject.annotation.repeatable
 
+import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.core.convert.value.ConvertibleValues
 import io.micronaut.inject.AbstractTypeElementSpec
 import io.micronaut.inject.BeanDefinition
@@ -42,6 +60,40 @@ class Test {
         someOther.properties()[0].value() == 'value2'
     }
 
+
+    void "test repeatable annotations are combined"() {
+        AnnotationMetadata metadata = buildMethodAnnotationMetadata('''\
+package test;
+
+import io.micronaut.inject.annotation.repeatable.*;
+import io.micronaut.context.annotation.*;
+
+@Property(name="prop1", value="value1")
+@Property(name="prop2", value="value2")
+@Property(name="prop3", value="value3")
+@javax.inject.Singleton
+class Test {
+
+    @Property(name="prop2", value="value2")    
+    @Property(name="prop3", value="value33")    
+    @Property(name="prop4", value="value4")    
+    void someMethod() {}
+}
+''', 'someMethod')
+
+        when:
+        List<AnnotationValue<Property>> properties = metadata.getAnnotationValuesByType(Property)
+
+        then:
+        properties.size() == 5
+        properties[0].get("name", String).get() == "prop2"
+        properties[1].get("name", String).get() == "prop3"
+        properties[1].getValue(String).get() == "value33"
+        properties[2].get("name", String).get() == "prop4"
+        properties[3].get("name", String).get() == "prop1"
+        properties[4].get("name", String).get() == "prop3"
+        properties[4].getValue(String).get() == "value3"
+    }
 
 
     void "test repeatable annotation resolve all values with single @Requires"() {
@@ -126,8 +178,8 @@ class Test {
         !definition.getAnnotationMetadata().hasAnnotation(Requirements.class)
 
         requirements != null
-        requirements.size() == 3
-        requires.size() == 3
+        requirements.size() == 2
+        requires.size() == 2
     }
 
     void "test repeatable annotation resolve inherited from meta annotations - reverse"() {
@@ -156,8 +208,8 @@ class Test {
         !definition.getAnnotationMetadata().hasAnnotation(Requirements.class)
 
         requirements != null
-        requirements.size() == 3
-        requires.size() == 3
+        requirements.size() == 2
+        requires.size() == 2
     }
 
 

@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2018 original authors
+ * Copyright 2017-2019 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,16 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package io.micronaut.core.io.scan;
 
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 
 import java.io.Serializable;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.Map;
 
 /**
  * <p>Extended version of {@link ClassPathAnnotationScanner} that temporarily caches the result of scan.</p>
@@ -34,10 +32,8 @@ import java.util.concurrent.TimeUnit;
 public class CachingClassPathAnnotationScanner extends ClassPathAnnotationScanner {
 
     private static final int CACHE_MAX = 5;
-    private final Cache<CacheKey, List<Class>> initializedObjectsByType = Caffeine.newBuilder()
-                                                                                  .maximumSize(CACHE_MAX)
-                                                                                  .expireAfterAccess(2, TimeUnit.MINUTES)
-                                                                                  .build();
+    private final Map<CacheKey, List<Class>> initializedObjectsByType = new ConcurrentLinkedHashMap.Builder<CacheKey, List<Class>>()
+                                                                                                   .maximumWeightedCapacity(CACHE_MAX).build();
 
     /**
      * Constructor.
@@ -56,7 +52,7 @@ public class CachingClassPathAnnotationScanner extends ClassPathAnnotationScanne
 
     @Override
     protected List<Class> doScan(String annotation, String pkg) {
-        return initializedObjectsByType.get(new CacheKey(annotation, pkg), (key) -> super.doScan(annotation, pkg));
+        return initializedObjectsByType.computeIfAbsent(new CacheKey(annotation, pkg), (key) -> super.doScan(annotation, pkg));
     }
 
     /**
