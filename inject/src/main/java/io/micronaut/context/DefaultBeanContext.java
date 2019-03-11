@@ -1481,7 +1481,7 @@ public class DefaultBeanContext implements BeanContext {
 
 
             Collection<BeanDefinition> parallelDefinitions = new ArrayList<>();
-            parallelBeans.forEach(beanDefinitionReference -> ForkJoinPool.commonPool().execute(() -> {
+            parallelBeans.forEach(beanDefinitionReference -> {
                 try {
                     if (isRunning()) {
                         synchronized (singletonObjects) {
@@ -1495,7 +1495,7 @@ public class DefaultBeanContext implements BeanContext {
                         stop();
                     }
                 }
-            }));
+            });
 
             filterProxiedTypes((Collection) parallelDefinitions, true, false);
             filterReplacedBeans((Collection) parallelDefinitions);
