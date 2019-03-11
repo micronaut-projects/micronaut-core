@@ -15,6 +15,8 @@
  */
 package io.micronaut.security.token.jwt.endpoints;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.jwk.JWKSet;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
@@ -25,6 +27,8 @@ import io.micronaut.security.rules.SecurityRule;
 import io.reactivex.Flowable;
 import io.reactivex.Single;
 import net.minidev.json.JSONObject;
+
+import java.util.ArrayList;
 import java.util.Collection;
 
 /**
@@ -39,13 +43,16 @@ import java.util.Collection;
 public class KeysController {
 
     private final Collection<JwkProvider> jwkProviders;
+    private final ObjectMapper objectMapper;
+    private static final JSONObject EMPTY_KEYS = new JSONObject().appendField("keys", new ArrayList<>());
 
     /**
      * Instantiates a {@link io.micronaut.security.token.jwt.endpoints.KeysController}.
      * @param jwkProviders a collection of JSON Web Key providers.
      */
-    public KeysController(Collection<JwkProvider> jwkProviders) {
+    public KeysController(Collection<JwkProvider> jwkProviders, ObjectMapper objectMapper) {
         this.jwkProviders = jwkProviders;
+        this.objectMapper = objectMapper.copy().setSerializationInclusion(JsonInclude.Include.ALWAYS);
     }
 
     /**
@@ -53,11 +60,16 @@ public class KeysController {
      * @return a JSON Web Key Set (JWKS) payload.
      */
     @Get
-    public Single<JSONObject> keys() {
+    public Single<String> keys() {
+        if (jwkProviders.isEmpty()) {
+            return Single.just(objectMapper)
+                    .map(om -> om.writeValueAsString(EMPTY_KEYS));
+        }
         return Flowable.fromIterable(jwkProviders)
                 .flatMapIterable(JwkProvider::retrieveJsonWebKeys)
                 .toList()
                 .map(JWKSet::new)
-                .map(JWKSet::toJSONObject);
+                .map(JWKSet::toJSONObject)
+                .map(objectMapper::writeValueAsString);
     }
 }
