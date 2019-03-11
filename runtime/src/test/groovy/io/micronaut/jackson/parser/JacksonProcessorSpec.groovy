@@ -15,13 +15,12 @@
  */
 package io.micronaut.jackson.parser
 
-import com.fasterxml.jackson.annotation.JsonTypeInfo
+
 import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.core.io.JsonEOFException
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ArrayNode
-import groovy.transform.ToString
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import org.reactivestreams.Subscriber
