@@ -65,6 +65,7 @@ public class JacksonConfiguration {
     private Map<JsonParser.Feature, Boolean> parser = Collections.emptyMap();
     private Map<JsonGenerator.Feature, Boolean> generator = Collections.emptyMap();
     private JsonInclude.Include serializationInclusion = JsonInclude.Include.NON_EMPTY;
+    private ObjectMapper.DefaultTyping defaultTyping = null;
     private PropertyNamingStrategy propertyNamingStrategy = null;
 
     /**
@@ -108,6 +109,13 @@ public class JacksonConfiguration {
      */
     public JsonInclude.Include getSerializationInclusion() {
         return serializationInclusion;
+    }
+
+    /**
+     * @return The global defaultTyping using for Polymorphic handling
+     */
+    public ObjectMapper.DefaultTyping getDefaultTyping() {
+        return defaultTyping;
     }
 
     /**
@@ -271,6 +279,15 @@ public class JacksonConfiguration {
         if (serializationInclusion != null) {
             this.serializationInclusion = serializationInclusion;
         }
+    }
+
+    /**
+     * Sets the global defaultTyping using for Polymorphic handling.
+     *
+     * @param defaultTyping The defaultTyping
+     */
+    public void setDefaultTyping(ObjectMapper.DefaultTyping defaultTyping) {
+        this.defaultTyping = defaultTyping;
     }
 
     /**
