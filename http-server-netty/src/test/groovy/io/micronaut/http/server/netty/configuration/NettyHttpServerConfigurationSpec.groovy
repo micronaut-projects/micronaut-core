@@ -18,15 +18,19 @@ package io.micronaut.http.server.netty.configuration
 import io.micronaut.http.server.HttpServerConfiguration
 import io.netty.channel.ChannelOption
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.context.env.PropertySource
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.server.cors.CorsOriginConfiguration
 import io.micronaut.http.server.netty.NettyHttpServer
+import io.micronaut.http.server.netty.NioEventLoopGroupFactory
 import spock.lang.Specification
 import spock.lang.Unroll
 
 import java.time.Duration
+
+import javax.annotation.Nonnull
 
 /**
  * @author Graeme Rocher
@@ -57,6 +61,52 @@ class NettyHttpServerConfigurationSpec extends Specification {
         'idle-timeout'       | 'idleTimeout'      | '-1s' | Duration.ofSeconds(-1)
     }
 
+    void "test netty server do not use native transport"() {
+        given:
+        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        beanContext.environment.addPropertySource(PropertySource.of("test",
+              ['micronaut.server.netty.use-native-transport': false]
+
+        ))
+        beanContext.start()
+
+        when:
+        NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
+        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
+        server.start()
+
+        then:
+        config.useNativeTransport == false
+        server.eventLoopGroupFactory.class == NioEventLoopGroupFactory
+
+        cleanup:
+        server.stop()
+        beanContext.close()
+    }
+
+    void "test netty server use native transport"() {
+        given:
+        ApplicationContext beanContext = new DefaultApplicationContext("test")
+        beanContext.environment.addPropertySource(PropertySource.of("test",
+              ['micronaut.server.netty.use-native-transport': true]
+
+        ))
+        beanContext.start()
+
+        when:
+        NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
+        NettyHttpServer server = beanContext.getBean(NettyHttpServer)
+        server.start()
+
+        then:
+        config.useNativeTransport == true;
+        server.eventLoopGroupFactory.class == NioEventLoopGroupFactory
+
+        cleanup:
+        server.stop()
+        beanContext.close()
+    }
+
     void "test netty server configuration"() {
         given:
         ApplicationContext beanContext = new DefaultApplicationContext("test")
@@ -74,6 +124,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
         NettyHttpServerConfiguration config = beanContext.getBean(NettyHttpServerConfiguration)
 
         then:
+        config.useNativeTransport == false;
         config.maxRequestSize == 2097152
         config.multipart.maxFileSize == 2048
         config.childOptions.size() == 1
@@ -138,4 +189,5 @@ class NettyHttpServerConfigurationSpec extends Specification {
         cleanup:
         beanContext.close()
     }
+
 }
