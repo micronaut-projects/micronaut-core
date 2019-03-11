@@ -51,14 +51,15 @@ import javax.inject.Singleton;
 @Singleton
 class MyService {
 
-    @Value(\"\${fooBar:baz}\")
+    @Value(\"Hello \${userName:John}\")
     private String property;
 }
 
 """)
+
         then:
-            def e = thrown(RuntimeException)
-            e.message.contains("Value 'fooBar' is not valid. Please use kebab-case notation.")
+        def e = thrown(RuntimeException)
+        e.message.contains("Value 'userName' is not valid. Please use kebab-case notation.")
     }
 
     void "test wrong property name in @Controller"() {

@@ -107,7 +107,7 @@ public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<O
     }
 
     private void checkValidPropertyName(String value, Element element, VisitorContext context) {
-        if (value.startsWith("${")) {
+        if (value.contains("${")) {
             List<PropertyPlaceholderResolver.Placeholder> properties = resolver.resolvePropertyNames(value);
 
             for (PropertyPlaceholderResolver.Placeholder property : properties) {
