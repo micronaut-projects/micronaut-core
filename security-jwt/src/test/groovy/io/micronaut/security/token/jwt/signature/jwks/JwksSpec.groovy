@@ -227,8 +227,8 @@ class JwksSpec extends Specification {
         }
 
         @Override
-        JWK retrieveJsonWebKey() {
-            return jwk
+        List<JWK> retrieveJsonWebKeys() {
+            [jwk]
         }
 
         @Override

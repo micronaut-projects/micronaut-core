@@ -15,6 +15,7 @@
  */
 package io.micronaut.jackson.parser
 
+
 import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.core.io.JsonEOFException
 import com.fasterxml.jackson.databind.JsonNode
@@ -102,7 +103,6 @@ class JacksonProcessorSpec extends Specification {
         foo.name == "Fred"
         foo.age == 10
     }
-
 
     void "test publish JSON array async"() {
 
