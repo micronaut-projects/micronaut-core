@@ -61,6 +61,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -1087,14 +1088,26 @@ public class DefaultBeanContext implements BeanContext {
             List<BeanDefinitionReference> processedBeans) {
 
         if (CollectionUtils.isNotEmpty(contextScopeBeans)) {
-            filterReplacedBeans((Collection) contextScopeBeans);
+            final Collection<BeanDefinition> contextBeans = new ArrayList<>();
+
             for (BeanDefinitionReference contextScopeBean : contextScopeBeans) {
                 try {
-                    loadContextScopeBean(contextScopeBean);
+                    loadContextScopeBean(contextScopeBean, contextBeans::add);
                 } catch (Throwable e) {
                     throw new BeanInstantiationException("Bean definition [" + contextScopeBean.getName() + "] could not be loaded: " + e.getMessage(), e);
                 }
             }
+            filterProxiedTypes((Collection) contextBeans, true, false);
+            filterReplacedBeans((Collection) contextBeans);
+
+            for (BeanDefinition contextScopeDefinition: contextBeans) {
+                try {
+                    loadContextScopeBean(contextScopeDefinition);
+                } catch (Throwable e) {
+                    throw new BeanInstantiationException("Bean definition [" + contextScopeDefinition.getName() + "] could not be loaded: " + e.getMessage(), e);
+                }
+            }
+            contextBeans.clear();
         }
 
         if (!processedBeans.isEmpty()) {
@@ -1466,13 +1479,13 @@ public class DefaultBeanContext implements BeanContext {
                     .filter(bd -> bd.getAnnotationMetadata().hasDeclaredStereotype(Parallel.class) && bd.isEnabled(this))
                     .collect(Collectors.toList());
 
-            filterReplacedBeans((Collection) parallelBeans);
 
+            Collection<BeanDefinition> parallelDefinitions = new ArrayList<>();
             parallelBeans.forEach(beanDefinitionReference -> ForkJoinPool.commonPool().execute(() -> {
                 try {
                     if (isRunning()) {
                         synchronized (singletonObjects) {
-                            loadContextScopeBean(beanDefinitionReference);
+                            loadContextScopeBean(beanDefinitionReference, parallelDefinitions::add);
                         }
                     }
                 } catch (Throwable e) {
@@ -1483,6 +1496,27 @@ public class DefaultBeanContext implements BeanContext {
                     }
                 }
             }));
+
+            filterProxiedTypes((Collection) parallelDefinitions, true, false);
+            filterReplacedBeans((Collection) parallelDefinitions);
+
+            parallelDefinitions.forEach(beanDefinition -> ForkJoinPool.commonPool().execute(() -> {
+                try {
+                    if (isRunning()) {
+                        synchronized (singletonObjects) {
+                            loadContextScopeBean(beanDefinition);
+                        }
+                    }
+                } catch (Throwable e) {
+                    LOG.error("Parallel Bean definition [" + beanDefinition.getName() + "] could not be loaded: " + e.getMessage(), e);
+                    Boolean shutdownOnError = beanDefinition.getAnnotationMetadata().getValue(Parallel.class, "shutdownOnError", Boolean.class).orElse(true);
+                    if (shutdownOnError) {
+                        stop();
+                    }
+                }
+            }));
+            parallelDefinitions.clear();
+
         }).start();
     }
 
@@ -1591,28 +1625,35 @@ public class DefaultBeanContext implements BeanContext {
     }
 
     private void loadContextScopeBean(BeanDefinitionReference contextScopeBean) {
+        loadContextScopeBean(contextScopeBean, this::loadContextScopeBean);
+    }
+
+    private void loadContextScopeBean(BeanDefinitionReference contextScopeBean, Consumer<BeanDefinition<T>> beanDefinitionConsumer) {
         if (contextScopeBean.isEnabled(this)) {
             BeanDefinition beanDefinition = contextScopeBean.load(this);
             if (beanDefinition.isEnabled(this)) {
-
-                if (beanDefinition.isIterable()) {
-                    Collection<BeanDefinition> beanCandidates = findBeanCandidates(beanDefinition.getBeanType(), null);
-                    for (BeanDefinition beanCandidate : beanCandidates) {
-                        DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(this, beanDefinition);
-
-                        createAndRegisterSingleton(
-                                resolutionContext,
-                                beanCandidate,
-                                beanCandidate.getBeanType(),
-                                null
-                        );
-                    }
-
-                } else {
-
-                    createAndRegisterSingleton(new DefaultBeanResolutionContext(this, beanDefinition), beanDefinition, beanDefinition.getBeanType(), null);
-                }
+                beanDefinitionConsumer.accept(beanDefinition);
             }
+        }
+    }
+
+    private void loadContextScopeBean(BeanDefinition beanDefinition) {
+        if (beanDefinition.isIterable()) {
+            Collection<BeanDefinition> beanCandidates = findBeanCandidates(beanDefinition.getBeanType(), null);
+            for (BeanDefinition beanCandidate : beanCandidates) {
+                DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(this, beanDefinition);
+
+                createAndRegisterSingleton(
+                        resolutionContext,
+                        beanCandidate,
+                        beanCandidate.getBeanType(),
+                        null
+                );
+            }
+
+        } else {
+
+            createAndRegisterSingleton(new DefaultBeanResolutionContext(this, beanDefinition), beanDefinition, beanDefinition.getBeanType(), null);
         }
     }
 
