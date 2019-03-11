@@ -1481,7 +1481,7 @@ public class DefaultBeanContext implements BeanContext {
 
 
             Collection<BeanDefinition> parallelDefinitions = new ArrayList<>();
-            parallelBeans.forEach(beanDefinitionReference -> ForkJoinPool.commonPool().execute(() -> {
+            parallelBeans.forEach(beanDefinitionReference -> {
                 try {
                     if (isRunning()) {
                         synchronized (singletonObjects) {
@@ -1495,7 +1495,7 @@ public class DefaultBeanContext implements BeanContext {
                         stop();
                     }
                 }
-            }));
+            });
 
             filterProxiedTypes((Collection) parallelDefinitions, true, false);
             filterReplacedBeans((Collection) parallelDefinitions);
@@ -1628,7 +1628,7 @@ public class DefaultBeanContext implements BeanContext {
         loadContextScopeBean(contextScopeBean, this::loadContextScopeBean);
     }
 
-    private void loadContextScopeBean(BeanDefinitionReference contextScopeBean, Consumer<BeanDefinition<T>> beanDefinitionConsumer) {
+    private void loadContextScopeBean(BeanDefinitionReference contextScopeBean, Consumer<BeanDefinition> beanDefinitionConsumer) {
         if (contextScopeBean.isEnabled(this)) {
             BeanDefinition beanDefinition = contextScopeBean.load(this);
             if (beanDefinition.isEnabled(this)) {
