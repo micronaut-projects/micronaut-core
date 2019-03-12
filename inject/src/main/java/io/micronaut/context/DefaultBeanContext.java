@@ -76,6 +76,7 @@ import java.util.stream.Stream;
 public class DefaultBeanContext implements BeanContext {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultBeanContext.class);
+    protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
     private static final Logger EVENT_LOGGER = LoggerFactory.getLogger(ApplicationEventPublisher.class);
     private static final Qualifier PROXY_TARGET_QUALIFIER = Qualifiers.byType(ProxyTarget.class);
     private static final String SCOPED_PROXY_ANN = "io.micronaut.runtime.context.scope.ScopedProxy";
@@ -232,6 +233,10 @@ public class DefaultBeanContext implements BeanContext {
                 int sysId = System.identityHashCode(bean);
                 if (processed.contains(sysId)) {
                     continue;
+                }
+
+                if (LOG_LIFECYCLE.isDebugEnabled()) {
+                    LOG_LIFECYCLE.debug("Destroying bean [{}] with identifier [{}]", bean, beanRegistration.identifier);
                 }
 
                 processed.add(sysId);
@@ -718,6 +723,10 @@ public class DefaultBeanContext implements BeanContext {
                 @SuppressWarnings("unchecked") BeanRegistration<T> beanRegistration = singletonObjects.get(beanKey);
                 bean = beanRegistration.bean;
                 if (bean != null) {
+                    if (LOG_LIFECYCLE.isDebugEnabled()) {
+                        LOG_LIFECYCLE.debug("Destroying bean [{}] with identifier [{}]", bean, beanKey);
+                    }
+
                     singletonObjects.remove(beanKey);
                     BeanKey<?> concreteKey = new BeanKey<>(bean.getClass(), null);
                     singletonObjects.remove(concreteKey);
@@ -1451,8 +1460,8 @@ public class DefaultBeanContext implements BeanContext {
         if (beanDefinition instanceof ValidatedBeanDefinition) {
             bean = ((ValidatedBeanDefinition<T>) beanDefinition).validate(resolutionContext, bean);
         }
-        if (LOG.isDebugEnabled()) {
-            LOG.debug("Created bean [{}] from definition [{}] with qualifier [{}]", bean, beanDefinition, qualifier);
+        if (LOG_LIFECYCLE.isDebugEnabled()) {
+            LOG_LIFECYCLE.debug("Created bean [{}] from definition [{}] with qualifier [{}]", bean, beanDefinition, qualifier);
         }
         return bean;
     }
