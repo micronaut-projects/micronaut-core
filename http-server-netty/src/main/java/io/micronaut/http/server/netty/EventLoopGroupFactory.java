@@ -13,9 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty;
 
-import java.util.OptionalInt;
+package io.micronaut.http.server.netty;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
@@ -23,12 +22,14 @@ import java.util.concurrent.ThreadFactory;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 
+import javax.annotation.Nullable;
+
 /**
  * Factory for EventLoopGroup.
  * 
  * @author croudet
  */
-interface EventLoopGroupFactory {
+public interface EventLoopGroupFactory {
 
     /**
      * Creates an EventLoopGroup.
@@ -38,7 +39,7 @@ interface EventLoopGroupFactory {
      * @param ioRatio  The io ratio.
      * @return An EventLoopGroup.
      */
-    EventLoopGroup createEventLoopGroup(int threads, Executor executor, OptionalInt ioRatio);
+    EventLoopGroup createEventLoopGroup(int threads, Executor executor, @Nullable Integer ioRatio);
 
     /**
      * Creates an EventLoopGroup.
@@ -47,7 +48,7 @@ interface EventLoopGroupFactory {
      * @param ioRatio The io ratio.
      * @return An EventLoopGroup.
      */
-    EventLoopGroup createEventLoopGroup(int threads, OptionalInt ioRatio);
+    EventLoopGroup createEventLoopGroup(int threads, @Nullable Integer ioRatio);
 
     /**
      * Creates an EventLoopGroup.
@@ -57,7 +58,7 @@ interface EventLoopGroupFactory {
      * @param ioRatio       The io ratio.
      * @return An EventLoopGroup.
      */
-    EventLoopGroup createEventLoopGroup(int threads, ThreadFactory threadFactory, OptionalInt ioRatio);
+    EventLoopGroup createEventLoopGroup(int threads, ThreadFactory threadFactory, @Nullable Integer ioRatio);
 
     /**
      * Creates a default EventLoopGroup.
@@ -65,7 +66,7 @@ interface EventLoopGroupFactory {
      * @param ioRatio The io ratio.
      * @return An EventLoopGroup.
      */
-    EventLoopGroup createEventLoopGroup(OptionalInt ioRatio);
+    EventLoopGroup createEventLoopGroup(@Nullable Integer ioRatio);
 
     /**
      * Returns the server channel class.

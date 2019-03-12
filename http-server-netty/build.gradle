@@ -13,6 +13,8 @@ dependencies {
     testCompile dependencyModuleVersion("groovy", "groovy-templates")
     testCompile dependencyVersion("rxjava2")
     testCompile dependencyVersion("reactor")
+    testCompile(dependencyModuleVersion("netty", "netty-transport-native-epoll") + ":linux-x86_64")
+    testCompile(dependencyModuleVersion("netty", "netty-transport-native-kqueue") + ":osx-x86_64")
 }
 
 //tasks.withType(Test) {

@@ -13,20 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.server.netty;
 
-import java.util.OptionalInt;
+package io.micronaut.http.server.netty;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
+import javax.annotation.Nullable;
 import javax.inject.Singleton;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.StringUtils;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.kqueue.KQueue;
 import io.netty.channel.kqueue.KQueueEventLoopGroup;
 import io.netty.channel.kqueue.KQueueServerSocketChannel;
@@ -43,8 +42,10 @@ import io.netty.channel.socket.ServerSocketChannel;
 @Internal
 class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
 
-    private static KQueueEventLoopGroup setIoRatio(KQueueEventLoopGroup group, OptionalInt ioRatio) {
-        ioRatio.ifPresent(group::setIoRatio);
+    private static KQueueEventLoopGroup withIoRatio(KQueueEventLoopGroup group, @Nullable Integer ioRatio) {
+        if (ioRatio != null) {
+            group.setIoRatio(ioRatio);
+        }
         return group;
     }
 
@@ -56,8 +57,8 @@ class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
      * @return A KQueueEventLoopGroup.
      */
     @Override
-    public EventLoopGroup createEventLoopGroup(int threads, OptionalInt ioRatio) {
-        return setIoRatio(new KQueueEventLoopGroup(threads), ioRatio);
+    public EventLoopGroup createEventLoopGroup(int threads, @Nullable Integer ioRatio) {
+        return withIoRatio(new KQueueEventLoopGroup(threads), ioRatio);
     }
 
     /**
@@ -69,8 +70,8 @@ class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
      * @return A KQueueEventLoopGroup.
      */
     @Override
-    public EventLoopGroup createEventLoopGroup(int threads, ThreadFactory threadFactory, OptionalInt ioRatio) {
-        return setIoRatio(new KQueueEventLoopGroup(threads, threadFactory), ioRatio);
+    public EventLoopGroup createEventLoopGroup(int threads, ThreadFactory threadFactory, @Nullable Integer ioRatio) {
+        return withIoRatio(new KQueueEventLoopGroup(threads, threadFactory), ioRatio);
     }
 
     /**
@@ -82,8 +83,8 @@ class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
      * @return A KQueueEventLoopGroup.
      */
     @Override
-    public EventLoopGroup createEventLoopGroup(int threads, Executor executor, OptionalInt ioRatio) {
-        return setIoRatio(new KQueueEventLoopGroup(threads, executor), ioRatio);
+    public EventLoopGroup createEventLoopGroup(int threads, Executor executor, @Nullable Integer ioRatio) {
+        return withIoRatio(new KQueueEventLoopGroup(threads, executor), ioRatio);
     }
 
     /**
@@ -93,8 +94,8 @@ class KQueueEventLoopGroupFactory implements EventLoopGroupFactory {
      * @return A KQueueEventLoopGroup.
      */
     @Override
-    public EventLoopGroup createEventLoopGroup(OptionalInt ioRatio) {
-        return setIoRatio(new KQueueEventLoopGroup(), ioRatio);
+    public EventLoopGroup createEventLoopGroup(@Nullable Integer ioRatio) {
+        return withIoRatio(new KQueueEventLoopGroup(), ioRatio);
     }
 
     /**
