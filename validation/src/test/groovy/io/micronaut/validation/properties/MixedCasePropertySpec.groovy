@@ -195,4 +195,69 @@ class MyService {
         def e = thrown(RuntimeException)
         e.message.contains("Value 'someValue2' is not valid property placeholder. Please use kebab-case notation, for example 'some-value2'.")
     }
+
+    void "test that escaping : works with right property name"() {
+        when:
+        buildTypeElement("""
+package test;
+
+import io.micronaut.context.annotation.Value;
+import javax.inject.Singleton;
+
+@Singleton
+class MyService {
+
+    @Value(\"\${server-address:`http://localhost:8080`}\")
+    private String serverAddress;
+}
+
+""")
+
+        then:
+        notThrown(Exception)
+    }
+
+    void "test that escaping : works with wrong property name"() {
+        when:
+        buildTypeElement("""
+package test;
+
+import io.micronaut.context.annotation.Value;
+import javax.inject.Singleton;
+
+@Singleton
+class MyService {
+
+    @Value(\"\${serverAddress:`http://localhost:8080`}\")
+    private String serverAddress;
+}
+
+""")
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Value 'serverAddress' is not valid property placeholder. Please use kebab-case notation, for example 'server-address'.")
+    }
+
+    void "test that escaping : works with more than one property"() {
+        when:
+        buildTypeElement("""
+package test;
+
+import io.micronaut.context.annotation.Value;
+import javax.inject.Singleton;
+
+@Singleton
+class MyService {
+
+    @Value(\"\${some-value:anotherThing:`this:goes:together`}\")
+    private String serverAddress;
+}
+
+""")
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Value 'some-value:anotherThing' is not valid property placeholder. Please use kebab-case notation, for example 'some-value:another-thing'.")
+    }
 }

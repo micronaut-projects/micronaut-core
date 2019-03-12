@@ -101,16 +101,23 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
                         if (e > -1) {
                             String expr = restOfString.substring(0, e).trim();
 
-                            int j = expr.indexOf(COLON);
-                            if (j == -1) {
-                                placeholders.add(new DefaultPlaceholder(expr, null));
+                            Matcher matcher = ESCAPE_SEQUENCE.matcher(expr);
+                            if (matcher.find()) {
+                                String defaultValue = matcher.group(2);
+                                expr = matcher.group(1);
+                                placeholders.add(new DefaultPlaceholder(expr, defaultValue));
                             } else {
-                                String defaultValue = expr.substring(j + 1);
-                                expr = expr.substring(0, j);
+                                int j = expr.indexOf(COLON);
+                                if (j == -1) {
+                                    placeholders.add(new DefaultPlaceholder(expr, null));
+                                } else {
+                                    String defaultValue = expr.substring(j + 1);
+                                    expr = expr.substring(0, j);
 
-                                List<Placeholder> phs = resolvePropertyNames(PREFIX + defaultValue + SUFFIX);
-                                for (Placeholder ph : phs) {
-                                    placeholders.add(new DefaultPlaceholder(expr, defaultValue, ph));
+                                    List<Placeholder> phs = resolvePropertyNames(getPrefix() + defaultValue + SUFFIX);
+                                    for (Placeholder ph : phs) {
+                                        placeholders.add(new DefaultPlaceholder(expr, defaultValue, ph));
+                                    }
                                 }
                             }
 
