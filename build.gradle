@@ -128,6 +128,12 @@ ext {
                     group:'io.micronaut.configuration',
                     name:'micronaut-aws-common'
             ],
+            'micronaut.gcp': [
+                    version:micronautGcpVersion,
+                    group:'io.micronaut.gcp',
+                    name:'micronaut-gcp-common',
+                    modules:['micronaut-gcp-tracing']
+            ],
             'micronaut.elasticsearch': [
                 version:micronautElasticsearch,
                 group:'io.micronaut.configuration',
