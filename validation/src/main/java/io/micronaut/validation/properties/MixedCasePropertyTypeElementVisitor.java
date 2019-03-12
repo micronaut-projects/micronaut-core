@@ -111,8 +111,11 @@ public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<O
             List<PropertyPlaceholderResolver.Placeholder> properties = resolver.resolvePropertyNames(value);
 
             for (PropertyPlaceholderResolver.Placeholder property : properties) {
-                if (!NameUtils.isValidHyphenatedPropertyName(property.getProperty())) {
-                    emitError(property.getProperty(), element, context);
+                String propertyName = property.getProperty();
+
+                if (!NameUtils.isEnvironmentName(propertyName) &&
+                    !NameUtils.isValidHyphenatedPropertyName(propertyName)) {
+                    emitError(propertyName, element, context);
                 }
             }
         }

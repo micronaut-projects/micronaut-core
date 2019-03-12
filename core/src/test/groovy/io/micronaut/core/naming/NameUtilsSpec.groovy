@@ -230,4 +230,19 @@ class NameUtilsSpec extends Specification {
         "1foo.2bar"      | true
         "1foo.2bar-3baz" | true
     }
+
+    @Unroll
+    void "test is valid environment name #value"() {
+        expect:
+        NameUtils.isEnvironmentName(value) == result
+
+        where:
+        value         | result
+        "FOO_BAR"     | true
+        "COM_FOO_BAR" | true
+        "foo_BAR"     | false
+        "FOOBAR"      | true
+        "Foo_BAR"     | false
+        "FOO-BAR"     | false
+    }
 }

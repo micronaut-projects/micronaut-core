@@ -152,4 +152,25 @@ interface Engine {
         def e = thrown(RuntimeException)
         e.message.contains("Value 'vehicleCylinders' is not valid property placeholder. Please use kebab-case notation, for example 'vehicle-cylinders'.")
     }
+
+    void "test that environment-style variables are supported"() {
+        when:
+        buildTypeElement("""
+package test;
+
+import io.micronaut.context.annotation.Value;
+import javax.inject.Singleton;
+
+@Singleton
+class MyService {
+
+    @Value(\"Hello \${USER_NAME}\")
+    private String msg;
+}
+
+""")
+
+        then:
+        notThrown(Exception)
+    }
 }

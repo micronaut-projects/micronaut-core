@@ -477,13 +477,23 @@ public class NameUtils {
     }
 
     /**
-     * Checks whether the string is a valid hyphenated (kebab-case) property name
+     * Checks whether the string is a valid hyphenated (kebab-case) property name.
      *
      * @param str The string to check
      * @return Whether is valid kebab-case or not
      */
     public static boolean isValidHyphenatedPropertyName(String str) {
         return NameUtils.hyphenate(str).equals(str);
+    }
+
+    /**
+     * Checks whether the string is a valid environment-style property name.
+     *
+     * @param str The string to check
+     * @return Whether is valid environment-style property name or not
+     */
+    public static boolean isEnvironmentName(String str) {
+        return NameUtils.environmentName(str).equals(str);
     }
 
 }
