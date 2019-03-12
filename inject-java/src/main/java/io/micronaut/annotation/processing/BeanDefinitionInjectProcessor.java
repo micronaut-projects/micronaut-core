@@ -107,7 +107,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
     private JavaConfigurationMetadataBuilder metadataBuilder;
     private Map<String, AnnBeanElementVisitor> beanDefinitionWriters;
     private Set<String> processed = new HashSet<>();
-    private boolean executed = false;
 
     @Override
     public final synchronized void init(ProcessingEnvironment processingEnv) {
@@ -118,10 +117,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
     @Override
     public final boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
-        if (executed) {
-            return false;
-        }
-        executed = true;
 
         annotations = annotations
                 .stream()
@@ -188,13 +183,6 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                     });
                 });
 
-                try {
-                    classWriterOutputVisitor.finish();
-                } catch (Exception e) {
-                    String message = e.getMessage();
-                    error("Error occurred writing META-INF files: %s", message != null ? message : e);
-                }
-
                 if (metadataBuilder.hasMetadata()) {
                     ServiceLoader<ConfigurationMetadataWriter> writers = ServiceLoader.load(ConfigurationMetadataWriter.class, getClass().getClassLoader());
 
@@ -210,13 +198,36 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         warning("Unable to load ConfigurationMetadataWriter due to : %s", e.getMessage());
                     }
                 }
-
                 AnnotationUtils.invalidateCache();
             }
         }
-        AnnotationUtils.invalidateCache();
-        AbstractAnnotationMetadataBuilder.clearMutated();
+
+        /*
+        Since the underlying Filer expects us to write only once into a file we need to make sure it happens in the last
+        processing round.
+        */
+        if (roundEnv.processingOver()) {
+            try {
+                writeBeanDefinitionsToMetaInf();
+            } finally {
+                AnnotationUtils.invalidateCache();
+                AbstractAnnotationMetadataBuilder.clearMutated();
+            }
+        }
+
         return false;
+    }
+
+    /**
+     * Writes {@link io.micronaut.inject.BeanDefinitionReference} into /META-INF/services/io.micronaut.inject.BeanDefinitionReference.
+     */
+    private void writeBeanDefinitionsToMetaInf() {
+        try {
+            classWriterOutputVisitor.finish();
+        } catch (Exception e) {
+            String message = e.getMessage();
+            error("Error occurred writing META-INF files: %s", message != null ? message : e);
+        }
     }
 
     private void processBeanDefinitions(TypeElement beanClassElement, BeanDefinitionVisitor beanDefinitionWriter) {
