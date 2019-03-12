@@ -18,20 +18,13 @@ package io.micronaut.security.token.jwt.signature.jwks;
 import com.nimbusds.jose.Algorithm;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.JWSVerifier;
-import com.nimbusds.jose.crypto.ECDSAVerifier;
-import com.nimbusds.jose.crypto.RSASSAVerifier;
-import com.nimbusds.jose.jwk.ECKey;
 import com.nimbusds.jose.jwk.JWK;
 import com.nimbusds.jose.jwk.JWKMatcher;
 import com.nimbusds.jose.jwk.JWKSelector;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.KeyType;
-import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.SignedJWT;
 import io.micronaut.context.annotation.EachBean;
-import io.micronaut.core.util.functional.ThrowingFunction;
-import io.micronaut.core.util.functional.ThrowingSupplier;
 import io.micronaut.security.token.jwt.signature.SignatureConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +53,8 @@ public class JwksSignature implements SignatureConfiguration {
 
     private static final Logger LOG = LoggerFactory.getLogger(JwksSignature.class);
 
+    private final JwkValidator jwkValidator;
+
     @Nullable
     private JWKSet jwkSet;
 
@@ -73,13 +68,15 @@ public class JwksSignature implements SignatureConfiguration {
      *
      * @param jwksSignatureConfiguration JSON Web Key Set configuration.
      */
-    public JwksSignature(JwksSignatureConfiguration jwksSignatureConfiguration) {
+    public JwksSignature(JwksSignatureConfiguration jwksSignatureConfiguration,
+                         JwkValidator jwkValidator) {
         this.url = jwksSignatureConfiguration.getUrl();
         if (LOG.isDebugEnabled()) {
             LOG.debug("JWT validation URL: {}", url);
         }
         this.jwkSet = loadJwkSet(url);
         this.keyType = jwksSignatureConfiguration.getKeyType();
+        this.jwkValidator = jwkValidator;
     }
 
     private Optional<JWKSet> getJWKSet() {
@@ -185,44 +182,6 @@ public class JwksSignature implements SignatureConfiguration {
     }
 
     /**
-     *
-     * @param jwk A JSON Web Key.
-     * @return a JWSVerifier for a JWK.
-     */
-    protected Optional<JWSVerifier> getVerifier(JWK jwk) {
-        if (jwk instanceof RSAKey) {
-            RSAKey rsaKey = (RSAKey) jwk;
-            return getVerifier(rsaKey::toRSAPublicKey, RSASSAVerifier::new);
-        } else if (jwk instanceof ECKey) {
-            ECKey ecKey = (ECKey) jwk;
-            return getVerifier(ecKey::toECPublicKey, ECDSAVerifier::new);
-        }
-        return Optional.empty();
-    }
-
-    private <T, R extends JWSVerifier> Optional<R> getVerifier(ThrowingSupplier<T, JOSEException> supplier, ThrowingFunction<T, R, JOSEException> consumer) {
-        T publicKey = null;
-        try {
-            publicKey = supplier.get();
-        } catch (JOSEException e) {
-            if (LOG.isErrorEnabled()) {
-                LOG.error("JOSEException when retrieving public key", e);
-            }
-        }
-        if (publicKey != null) {
-            try {
-                return Optional.of(consumer.apply(publicKey));
-            } catch (JOSEException e) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("JOSEException when instantiating the verifier", e);
-                }
-            }
-        }
-
-        return Optional.empty();
-    }
-
-    /**
      * returns true if any JWK match is able to verify the JWT signature.
      *
      * @param matches A List of JSON Web key matches.
@@ -230,20 +189,8 @@ public class JwksSignature implements SignatureConfiguration {
      * @return true if the JWT signature could be verified.
      */
     protected boolean verify(List<JWK> matches, SignedJWT jwt) {
-        return matches.stream()
-                .map(this::getVerifier)
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .anyMatch(verifier -> {
-                    try {
-                        return jwt.verify(verifier);
-                    } catch (JOSEException e) {
-                        if (LOG.isErrorEnabled()) {
-                            LOG.error("JOSEException when verifying jwt", e);
-                        }
-                        return false;
-                    }
-                });
+        return matches.stream().anyMatch(jwk -> jwkValidator.validate(jwt, jwk));
+
     }
 
     /**
