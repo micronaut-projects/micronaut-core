@@ -173,4 +173,26 @@ class MyService {
         then:
         notThrown(Exception)
     }
+
+    void "test that with defaults the last value is not checked"() {
+        when:
+        buildTypeElement("""
+package test;
+
+import io.micronaut.context.annotation.Value;
+import javax.inject.Singleton;
+
+@Singleton
+class MyService {
+
+    @Value(\"\${some-value:another-thing:someValue2:doesntMaTTeR}\")
+    private String property;
+}
+
+""")
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Value 'someValue2' is not valid property placeholder. Please use kebab-case notation, for example 'some-value2'.")
+    }
 }

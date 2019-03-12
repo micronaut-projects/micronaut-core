@@ -18,8 +18,11 @@ package io.micronaut.validation.properties;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
+import io.micronaut.context.env.PropertyPlaceholderResolver.Placeholder;
+import io.micronaut.context.env.PropertySourcePropertyResolver;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.naming.NameUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
@@ -42,7 +45,7 @@ import java.util.Set;
  */
 public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<Object, Object> {
 
-    private final PropertyPlaceholderResolver resolver = new DefaultPropertyPlaceholderResolver(null);
+    private final PropertyPlaceholderResolver resolver = new DefaultPropertyPlaceholderResolver(new PropertySourcePropertyResolver());
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
@@ -108,22 +111,38 @@ public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<O
 
     private void checkValidPropertyName(String value, Element element, VisitorContext context) {
         if (value.contains("${")) {
-            List<PropertyPlaceholderResolver.Placeholder> properties = resolver.resolvePropertyNames(value);
+            List<Placeholder> properties = resolver.resolvePropertyNames(value);
 
-            for (PropertyPlaceholderResolver.Placeholder property : properties) {
+            for (Placeholder property : properties) {
                 String propertyName = property.getProperty();
 
-                if (!NameUtils.isEnvironmentName(propertyName) &&
-                    !NameUtils.isValidHyphenatedPropertyName(propertyName)) {
+                if (!isValidPropertyName(propertyName)) {
                     emitError(propertyName, element, context);
+                }
+
+                Optional<Placeholder> placeholder = property.getPlaceholderValue();
+                while (placeholder.isPresent()) {
+                    String propValue = placeholder.get().getProperty();
+                    String defaultValue = placeholder.get().getDefaultValue().orElse("");
+
+                    if (!StringUtils.isEmpty(defaultValue) && !isValidPropertyName(propValue)) {
+                        emitError(propValue, element, context);
+                    }
+
+                    placeholder = placeholder.get().getPlaceholderValue();
                 }
             }
         }
     }
 
+    private boolean isValidPropertyName(String value) {
+        return NameUtils.isEnvironmentName(value) ||
+                NameUtils.isValidHyphenatedPropertyName(value);
+    }
+
     private void emitError(String value, Element element, VisitorContext context) {
         String kebabCaseValue = NameUtils.hyphenate(value);
         context.fail("Value '" + value + "' is not valid property placeholder. " +
-                "Please use kebab-case notation, for example '" +  kebabCaseValue + "'.", element);
+                "Please use kebab-case notation, for example '" + kebabCaseValue + "'.", element);
     }
 }
