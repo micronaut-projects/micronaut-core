@@ -16,6 +16,7 @@
 package io.micronaut.core.type;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 
@@ -30,15 +31,16 @@ public interface TypeVariableResolver {
     /**
      * @return Obtain a map of the type parameters for the argument
      */
-    Map<String, Argument<?>> getTypeVariables();
+    default Map<String, Argument<?>> getTypeVariables() {
+        return Collections.emptyMap();
+    }
 
     /**
      * @return The type parameters as an array
      */
-    @SuppressWarnings("ToArrayCallWithZeroLengthArrayArgument")
     default Argument[] getTypeParameters() {
         Collection<Argument<?>> values = getTypeVariables().values();
-        return values.toArray(new Argument[0]);
+        return values.toArray(Argument.ZERO_ARGUMENTS);
     }
 
     /**
