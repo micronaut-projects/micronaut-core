@@ -37,7 +37,7 @@ class MyService {
 """)
         then:
         def e = thrown(RuntimeException)
-        e.message.contains("Value 'fooBar' is not valid. Please use kebab-case notation.")
+        e.message.contains("Value 'fooBar' is not valid property placeholder. Please use kebab-case notation, for example 'foo-bar'.")
     }
 
     void "test wrong property name in @Value"() {
@@ -59,7 +59,7 @@ class MyService {
 
         then:
         def e = thrown(RuntimeException)
-        e.message.contains("Value 'userName' is not valid. Please use kebab-case notation.")
+        e.message.contains("Value 'userName' is not valid property placeholder. Please use kebab-case notation, for example 'user-name'.")
     }
 
     void "test more than one property in @Value"() {
@@ -81,7 +81,7 @@ class MyService {
 
         then:
         def e = thrown(RuntimeException)
-        e.message.contains("Value 'lastName' is not valid. Please use kebab-case notation.")
+        e.message.contains("Value 'lastName' is not valid property placeholder. Please use kebab-case notation, for example 'last-name'.")
     }
 
     void "test wrong property name in @Controller"() {
@@ -100,7 +100,7 @@ class MyController {
 
         then:
         def e = thrown(RuntimeException)
-        e.message.contains("Value 'controllerPath' is not valid. Please use kebab-case notation.")
+        e.message.contains("Value 'controllerPath' is not valid property placeholder. Please use kebab-case notation, for example 'controller-path'.")
     }
 
     void "test wrong property name in @Controller with 'produces' property"() {
@@ -119,7 +119,7 @@ class MyController {
 
         then:
         def e = thrown(RuntimeException)
-        e.message.contains("Value 'app.myWrongValue' is not valid. Please use kebab-case notation.")
+        e.message.contains("Value 'app.myWrongValue' is not valid property placeholder. Please use kebab-case notation, for example 'app.my-wrong-value'.")
     }
 
     void "test wrong property name in @Named in a constructor"() {
@@ -150,6 +150,6 @@ interface Engine {
 
         then:
         def e = thrown(RuntimeException)
-        e.message.contains("Value 'vehicleCylinders' is not valid. Please use kebab-case notation.")
+        e.message.contains("Value 'vehicleCylinders' is not valid property placeholder. Please use kebab-case notation, for example 'vehicle-cylinders'.")
     }
 }

@@ -119,6 +119,8 @@ public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<O
     }
 
     private void emitError(String value, Element element, VisitorContext context) {
-        context.fail("Value '" + value + "' is not valid. Please use kebab-case notation.", element);
+        String kebabCaseValue = NameUtils.hyphenate(value);
+        context.fail("Value '" + value + "' is not valid property placeholder. " +
+                "Please use kebab-case notation, for example '" +  kebabCaseValue + "'.", element);
     }
 }
