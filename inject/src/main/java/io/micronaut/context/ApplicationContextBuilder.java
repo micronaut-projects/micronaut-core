@@ -16,7 +16,9 @@
 package io.micronaut.context;
 
 import io.micronaut.context.env.PropertySource;
+import io.micronaut.core.util.ArgumentUtils;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.util.Map;
 
@@ -34,7 +36,7 @@ public interface ApplicationContextBuilder {
      * @param beans The beans
      * @return This builder
      */
-    ApplicationContextBuilder singletons(Object... beans);
+    @Nonnull ApplicationContextBuilder singletons(@Nullable Object... beans);
 
     /**
      * Whether to deduce environments.
@@ -42,7 +44,7 @@ public interface ApplicationContextBuilder {
      * @param deduceEnvironment The boolean
      * @return This builder
      */
-    ApplicationContextBuilder deduceEnvironment(@Nullable Boolean deduceEnvironment);
+    @Nonnull ApplicationContextBuilder deduceEnvironment(@Nullable Boolean deduceEnvironment);
 
     /**
      * The environments to use.
@@ -50,7 +52,7 @@ public interface ApplicationContextBuilder {
      * @param environments The environments
      * @return This builder
      */
-    ApplicationContextBuilder environments(@Nullable String... environments);
+    @Nonnull ApplicationContextBuilder environments(@Nullable String... environments);
 
     /**
      * The packages to include for package scanning.
@@ -58,7 +60,7 @@ public interface ApplicationContextBuilder {
      * @param packages The packages
      * @return This builder
      */
-    ApplicationContextBuilder packages(@Nullable String... packages);
+    @Nonnull ApplicationContextBuilder packages(@Nullable String... packages);
 
     /**
      * Properties to override from the environment.
@@ -66,7 +68,7 @@ public interface ApplicationContextBuilder {
      * @param properties The properties
      * @return This builder
      */
-    ApplicationContextBuilder properties(@Nullable Map<String, Object> properties);
+    @Nonnull ApplicationContextBuilder properties(@Nullable Map<String, Object> properties);
 
 
     /**
@@ -75,7 +77,7 @@ public interface ApplicationContextBuilder {
      * @param propertySources The property sources to include
      * @return This builder
      */
-    ApplicationContextBuilder propertySources(@Nullable PropertySource... propertySources);
+    @Nonnull ApplicationContextBuilder propertySources(@Nullable PropertySource... propertySources);
 
     /**
      * The main class used by this application.
@@ -83,7 +85,7 @@ public interface ApplicationContextBuilder {
      * @param mainClass The main class
      * @return This builder
      */
-    ApplicationContextBuilder mainClass(Class mainClass);
+    @Nonnull ApplicationContextBuilder mainClass(@Nullable Class mainClass);
 
     /**
      * The class loader to be used.
@@ -91,14 +93,14 @@ public interface ApplicationContextBuilder {
      * @param classLoader The classloader
      * @return This builder
      */
-    ApplicationContextBuilder classLoader(ClassLoader classLoader);
+    @Nonnull ApplicationContextBuilder classLoader(@Nullable ClassLoader classLoader);
 
     /**
      * Builds the {@link ApplicationContext}, but does not start it.
      *
      * @return The built, but not running {@link ApplicationContext}
      */
-    ApplicationContext build();
+    @Nonnull ApplicationContext build();
 
 
 
@@ -108,7 +110,7 @@ public interface ApplicationContextBuilder {
      * @param configurations The configurations to include
      * @return This application
      */
-    ApplicationContextBuilder include(@Nullable String... configurations);
+    @Nonnull ApplicationContextBuilder include(@Nullable String... configurations);
 
     /**
      * Allow customizing the configurations that will be loaded.
@@ -116,14 +118,14 @@ public interface ApplicationContextBuilder {
      * @param configurations The configurations to exclude
      * @return This application
      */
-    ApplicationContextBuilder exclude(@Nullable String... configurations);
+    @Nonnull ApplicationContextBuilder exclude(@Nullable String... configurations);
 
     /**
      * Starts the {@link ApplicationContext}.
      *
      * @return The running {@link ApplicationContext}
      */
-    default ApplicationContext start() {
+    default @Nonnull ApplicationContext start() {
         return build().start();
     }
 
@@ -132,10 +134,11 @@ public interface ApplicationContextBuilder {
      * Run the {@link ApplicationContext} with the given type. Returning an instance of the type.
      *
      * @param type         The type of the bean to run
-     * @param <T>          The type, a subclass of {@link ApplicationContextLifeCycle}
+     * @param <T>          The type, a subclass of {@link AutoCloseable}. The close method of the implementation should shutdown the context.
      * @return The running bean
      */
-    default <T extends AutoCloseable> T run(Class<T> type) {
+    default @Nonnull <T extends AutoCloseable> T run(@Nonnull Class<T> type) {
+        ArgumentUtils.requireNonNull("type", type);
         ApplicationContext applicationContext = start();
         T bean = applicationContext.getBean(type);
         if (bean instanceof LifeCycle) {
