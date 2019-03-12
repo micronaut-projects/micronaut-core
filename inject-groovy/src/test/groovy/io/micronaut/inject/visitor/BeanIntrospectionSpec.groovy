@@ -257,8 +257,6 @@ class Test {
         bi.getConstructorArguments().length == 3
         bi.getConstructorArguments()[0].name == 'name'
         bi.getConstructorArguments()[0].type == String
-        bi.getIndexedProperties(Id).size() == 1
-        bi.getIndexedProperties(Id).first().name == 'id'
 
 
         when:

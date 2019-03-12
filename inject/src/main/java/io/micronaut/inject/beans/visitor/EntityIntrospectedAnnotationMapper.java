@@ -28,7 +28,7 @@ import java.util.Collections;
 import java.util.List;
 
 /**
- * An annotation mapper that improves introspection for JPA.
+ * An annotation mapper that improves introspection for JPA entities.
  *
  * @author graemerocher
  * @since 1.1
@@ -44,33 +44,7 @@ public class EntityIntrospectedAnnotationMapper implements NamedAnnotationMapper
     public List<AnnotationValue<?>> map(AnnotationValue<Annotation> annotation, VisitorContext visitorContext) {
         final AnnotationValueBuilder<Introspected> builder = AnnotationValue.builder(Introspected.class)
                 // don't bother with transients properties
-                .member("excludedAnnotations", "javax.persistence.Transient")
-                // following are indexed for fast lookups
-                .member("indexed",
-                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
-                                .member("annotation", "javax.persistence.Id").build(),
-                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
-                                .member("annotation", "javax.persistence.Version").build(),
-                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
-                                .member("annotation", "javax.persistence.GeneratedValue").build(),
-                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
-                                .member("annotation", "javax.persistence.Basic").build(),
-                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
-                                .member("annotation", "javax.persistence.Embedded").build(),
-                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
-                                .member("annotation", "javax.persistence.OneToMany").build(),
-                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
-                                .member("annotation", "javax.persistence.OneToOne").build(),
-                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
-                                .member("annotation", "javax.persistence.ManyToOne").build(),
-                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
-                                .member("annotation", "javax.persistence.ElementCollection").build(),
-                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
-                                .member("annotation", "javax.persistence.Enumerated").build(),
-                        AnnotationValue.builder(Introspected.IndexedAnnotation.class)
-                                .member("annotation", "javax.persistence.Column")
-                                .member("member", "name").build()
-                );
+                .member("excludedAnnotations", "javax.persistence.Transient");
         return Collections.singletonList(
                 builder.build()
         );
