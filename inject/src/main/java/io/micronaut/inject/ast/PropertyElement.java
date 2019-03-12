@@ -37,7 +37,9 @@ public interface PropertyElement extends TypedElement, MemberElement {
      *
      * @return True if the property is read only.
      */
-    boolean isReadOnly();
+    default boolean isReadOnly() {
+        return !getWriteMethod().isPresent();
+    }
 
     /**
      * @return The name of the method used to write the property
