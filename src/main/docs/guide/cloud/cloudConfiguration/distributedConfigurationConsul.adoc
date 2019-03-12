@@ -38,7 +38,7 @@ consul:
         defaultZone: "${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}"
 ----
 
-Once you have enabled distributed configuration you need to store the configuration you wish the share in Consul's Key/Value store.
+Once you have enabled distributed configuration you need to store the configuration you wish to share in Consul's Key/Value store.
 
 There are a number of different ways to do that.
 
