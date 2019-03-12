@@ -106,6 +106,7 @@ httpServer:
     freemarker: Apache Freemarker
     csp: CSP Header Support
   openapi: OpenAPI / Swagger Support
+  graphql: GraphQL Support
 httpClient:
   title: The HTTP Client
   lowLevelHttpClient:

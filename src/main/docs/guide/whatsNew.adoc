@@ -20,6 +20,7 @@ Micronaut is now modular with parts of Micronaut being shifted into sub-projects
 * https://micronaut-projects.github.io/micronaut-flyway/latest/guide/index.html[Micronaut Flyway]
 * https://micronaut-projects.github.io/micronaut-liquibase/latest/guide/index.html[Micronaut Liquibase]
 * https://micronaut-projects.github.io/micronaut-elasticsearch/latest/guide/index.html[Micronaut Elasticsearch]
+* https://micronaut-projects.github.io/micronaut-graphql/latest/guide/index.html[Micronaut GraphQL]
 
 === File Watch and Server Restart
 
@@ -64,6 +65,12 @@ mn create-app hellorabbit --features rabbitmq
 ====
 
 See the https://micronaut-projects.github.io/micronaut-rabbitmq/latest/guide/[Micronaut RabbitMQ] documentation for more information.
+
+=== GraphQL Support
+
+Support for creating https://graphql.org/[GraphQL] + Micronaut applications has been added.
+
+See the https://micronaut-projects.github.io/micronaut-graphql/latest/guide/[Micronaut GraphQL] documentation for more information.
 
 === Compile Time Bean Introspection
 
