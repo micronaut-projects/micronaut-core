@@ -15,17 +15,15 @@
  */
 package io.micronaut.http.server.netty;
 
-import java.util.OptionalInt;
-
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
+import javax.annotation.Nullable;
 import javax.inject.Singleton;
 
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.kqueue.KQueueEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -40,8 +38,10 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 @Requires(missingBeans = { EpollEventLoopGroupFactory.class, KQueueEventLoopGroupFactory.class })
 class NioEventLoopGroupFactory implements EventLoopGroupFactory {
 
-    private static NioEventLoopGroup setIoRatio(NioEventLoopGroup group, OptionalInt ioRatio) {
-        ioRatio.ifPresent(group::setIoRatio);
+    private static NioEventLoopGroup withIoRatio(NioEventLoopGroup group, @Nullable Integer ioRatio) {
+        if (ioRatio != null) {
+            group.setIoRatio(ioRatio);
+        }
         return group;
     }
 
@@ -53,8 +53,8 @@ class NioEventLoopGroupFactory implements EventLoopGroupFactory {
      * @return A NioEventLoopGroup.
      */
     @Override
-    public EventLoopGroup createEventLoopGroup(int threads, OptionalInt ioRatio) {
-        return setIoRatio(new NioEventLoopGroup(threads), ioRatio);
+    public EventLoopGroup createEventLoopGroup(int threads, @Nullable Integer ioRatio) {
+        return withIoRatio(new NioEventLoopGroup(threads), ioRatio);
     }
 
     /**
@@ -66,8 +66,8 @@ class NioEventLoopGroupFactory implements EventLoopGroupFactory {
      * @return A NioEventLoopGroup.
      */
     @Override
-    public EventLoopGroup createEventLoopGroup(int threads, ThreadFactory threadFactory, OptionalInt ioRatio) {
-        return setIoRatio(new NioEventLoopGroup(threads, threadFactory), ioRatio);
+    public EventLoopGroup createEventLoopGroup(int threads, ThreadFactory threadFactory, @Nullable Integer ioRatio) {
+        return withIoRatio(new NioEventLoopGroup(threads, threadFactory), ioRatio);
     }
 
     /**
@@ -79,8 +79,8 @@ class NioEventLoopGroupFactory implements EventLoopGroupFactory {
      * @return A NioEventLoopGroup.
      */
     @Override
-    public EventLoopGroup createEventLoopGroup(int threads, Executor executor, OptionalInt ioRatio) {
-        return setIoRatio(new NioEventLoopGroup(threads, executor), ioRatio);
+    public EventLoopGroup createEventLoopGroup(int threads, Executor executor, @Nullable Integer ioRatio) {
+        return withIoRatio(new NioEventLoopGroup(threads, executor), ioRatio);
     }
 
     /**
@@ -90,8 +90,8 @@ class NioEventLoopGroupFactory implements EventLoopGroupFactory {
      * @return A NioEventLoopGroup.
      */
     @Override
-    public EventLoopGroup createEventLoopGroup(OptionalInt ioRatio) {
-        return setIoRatio(new NioEventLoopGroup(), ioRatio);
+    public EventLoopGroup createEventLoopGroup(@Nullable Integer ioRatio) {
+        return withIoRatio(new NioEventLoopGroup(), ioRatio);
     }
 
     /**

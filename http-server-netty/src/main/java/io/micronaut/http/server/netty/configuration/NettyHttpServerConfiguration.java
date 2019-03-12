@@ -385,11 +385,11 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
         /**
          * @return The I/O ratio to use
          */
-        public OptionalInt getIoRatio() {
+        public Optional<Integer> getIoRatio() {
             if (ioRatio != null) {
-                return OptionalInt.of(ioRatio);
+                return Optional.of(ioRatio);
             }
-            return OptionalInt.empty();
+            return Optional.empty();
         }
 
         /**

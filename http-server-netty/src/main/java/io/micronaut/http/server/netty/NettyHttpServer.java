@@ -470,21 +470,22 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
     private EventLoopGroup newEventLoopGroup(NettyHttpServerConfiguration.EventLoopConfig config) {
         if (config != null) {
             Optional<ExecutorService> executorService = config.getExecutorName().flatMap(name -> beanLocator.findBean(ExecutorService.class, Qualifiers.byName(name)));
-            EventLoopGroup group = executorService.map(service ->
-                eventLoopGroupFactory.createEventLoopGroup(config.getNumOfThreads(), service, config.getIoRatio())
+            int threads = config.getNumOfThreads();
+            Integer ioRatio = config.getIoRatio().orElse(null);
+            return executorService.map(service ->
+                eventLoopGroupFactory.createEventLoopGroup(threads, service, ioRatio)
             ).orElseGet(() -> {
                 if (threadFactory != null) {
-                    return eventLoopGroupFactory.createEventLoopGroup(config.getNumOfThreads(), threadFactory, config.getIoRatio());
+                    return eventLoopGroupFactory.createEventLoopGroup(threads, threadFactory, ioRatio);
                 } else {
-                    return eventLoopGroupFactory.createEventLoopGroup(config.getNumOfThreads(), config.getIoRatio());
+                    return eventLoopGroupFactory.createEventLoopGroup(threads, ioRatio);
                 }
             });
-            return group;
         } else {
             if (threadFactory != null) {
-                return eventLoopGroupFactory.createEventLoopGroup(NettyThreadFactory.DEFAULT_EVENT_LOOP_THREADS, threadFactory, OptionalInt.empty());
+                return eventLoopGroupFactory.createEventLoopGroup(NettyThreadFactory.DEFAULT_EVENT_LOOP_THREADS, threadFactory, null);
             } else {
-                return eventLoopGroupFactory.createEventLoopGroup(OptionalInt.empty());
+                return eventLoopGroupFactory.createEventLoopGroup(null);
             }
         }
     }

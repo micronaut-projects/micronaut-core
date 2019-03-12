@@ -15,11 +15,10 @@
  */
 package io.micronaut.http.server.netty;
 
-import java.util.OptionalInt;
-
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadFactory;
 
+import javax.annotation.Nullable;
 import javax.inject.Singleton;
 
 import io.micronaut.context.annotation.Requires;
@@ -42,8 +41,10 @@ import io.netty.channel.epoll.EpollServerSocketChannel;
 @Internal
 class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
 
-    private static EpollEventLoopGroup setIoRatio(EpollEventLoopGroup group, OptionalInt ioRatio) {
-        ioRatio.ifPresent(group::setIoRatio);
+    private static EpollEventLoopGroup withIoRatio(EpollEventLoopGroup group, @Nullable Integer ioRatio) {
+        if (ioRatio != null) {
+            group.setIoRatio(ioRatio);
+        }
         return group;
     }
     
@@ -55,8 +56,8 @@ class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
      * @return An EpollEventLoopGroup.
      */
     @Override
-    public EventLoopGroup createEventLoopGroup(int threads, OptionalInt ioRatio) {
-        return setIoRatio(new EpollEventLoopGroup(threads), ioRatio);
+    public EventLoopGroup createEventLoopGroup(int threads, @Nullable Integer ioRatio) {
+        return withIoRatio(new EpollEventLoopGroup(threads), ioRatio);
     }
 
     /**
@@ -68,8 +69,8 @@ class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
      * @return An EpollEventLoopGroup.
      */
     @Override
-    public EventLoopGroup createEventLoopGroup(int threads, ThreadFactory threadFactory, OptionalInt ioRatio) {
-        return setIoRatio(new EpollEventLoopGroup(threads, threadFactory), ioRatio);
+    public EventLoopGroup createEventLoopGroup(int threads, ThreadFactory threadFactory, @Nullable Integer ioRatio) {
+        return withIoRatio(new EpollEventLoopGroup(threads, threadFactory), ioRatio);
     }
 
     /**
@@ -81,8 +82,8 @@ class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
      * @return An EpollEventLoopGroup.
      */
     @Override
-    public EventLoopGroup createEventLoopGroup(int threads, Executor executor, OptionalInt ioRatio) {
-        return setIoRatio(new EpollEventLoopGroup(threads, executor), ioRatio);
+    public EventLoopGroup createEventLoopGroup(int threads, Executor executor, @Nullable Integer ioRatio) {
+        return withIoRatio(new EpollEventLoopGroup(threads, executor), ioRatio);
     }
 
     /**
@@ -92,8 +93,8 @@ class EpollEventLoopGroupFactory implements EventLoopGroupFactory {
      * @return An EpollEventLoopGroup.
      */
     @Override
-    public EventLoopGroup createEventLoopGroup(OptionalInt ioRatio) {
-        return setIoRatio(new EpollEventLoopGroup(), ioRatio);
+    public EventLoopGroup createEventLoopGroup(@Nullable Integer ioRatio) {
+        return withIoRatio(new EpollEventLoopGroup(), ioRatio);
     }
 
     /**
