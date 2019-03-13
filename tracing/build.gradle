@@ -37,3 +37,10 @@ dependencies {
     testCompile dependencyVersion("brave.opentracing")
 
 }
+
+tasks.withType(Test) {
+    testLogging {
+        showStandardStreams = true
+        exceptionFormat = 'full'
+    }
+}
