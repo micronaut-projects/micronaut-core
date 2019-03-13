@@ -34,6 +34,7 @@ import spock.lang.Specification
 
 import javax.annotation.PostConstruct
 import javax.inject.Inject
+import java.text.SimpleDateFormat
 
 import static io.micronaut.http.HttpResponse.ok
 
@@ -99,7 +100,7 @@ class RefreshEventSpec extends Specification {
 
         @PostConstruct
         void init() {
-            forecast = "Scattered Clouds ${new Date()}" // <2>
+            forecast = "Scattered Clouds ${new SimpleDateFormat("dd/MMM/yy HH:mm:ss.SSS").format(new Date())}" // <2>
         }
 
         String latestForecast() {
