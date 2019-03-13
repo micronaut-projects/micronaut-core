@@ -122,5 +122,12 @@ public interface PropertyPlaceholderResolver {
          * @return The default value
          */
         Optional<String> getDefaultValue();
+
+        /**
+         * An optional placeholder.
+         *
+         * @return An optional placeholder
+         */
+        Optional<Placeholder> getPlaceholderValue();
     }
 }
