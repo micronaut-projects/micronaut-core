@@ -3,6 +3,8 @@ dependencies {
     compile project(":http-netty")
 
     compileOnly project(":inject-java")
+    compileOnly dependencyModuleVersion("netty", "netty-transport-native-epoll")
+    compileOnly dependencyModuleVersion("netty", "netty-transport-native-kqueue")
 
     testCompile project(":inject-groovy")
     testCompile project(":inject-java")
@@ -11,6 +13,8 @@ dependencies {
     testCompile dependencyModuleVersion("groovy", "groovy-templates")
     testCompile dependencyVersion("rxjava2")
     testCompile dependencyVersion("reactor")
+    testCompile(dependencyModuleVersion("netty", "netty-transport-native-epoll") + ":linux-x86_64")
+    testCompile(dependencyModuleVersion("netty", "netty-transport-native-kqueue") + ":osx-x86_64")
 }
 
 //tasks.withType(Test) {
