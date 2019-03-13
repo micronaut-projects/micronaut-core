@@ -15,42 +15,44 @@
  */
 package io.micronaut.http.server.netty.ssl;
 
+import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.http.ssl.*;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.util.SelfSignedCertificate;
 
 import javax.inject.Singleton;
 import javax.net.ssl.SSLException;
-import java.security.cert.CertificateException;
 import java.util.Arrays;
 import java.util.Optional;
 
+import static io.micronaut.core.util.StringUtils.FALSE;
+import static io.micronaut.core.util.StringUtils.TRUE;
+
 /**
- * The Netty implementation of {@link SslBuilder} that generates an {@link SslContext} to create a server handler
- * with to support SSL.
- *
- * @author James Kleeh
- * @since 1.0
+ * The Netty implementation of {@link SslBuilder} that generates an {@link SslContext} to create a server handle with
+ * SSL support via user configuration.
  */
+@Requires(property = SslConfiguration.PREFIX + ".enabled", value = TRUE, defaultValue = FALSE)
+@Requires(property = SslConfiguration.PREFIX + ".build-self-signed", value = FALSE, defaultValue = FALSE)
 @Singleton
 @Internal
-public class NettyServerSslBuilder extends SslBuilder<SslContext> {
+public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implements ServerSslBuilder {
 
     /**
      * @param ssl              The SSL configuration
      * @param resourceResolver The resource resolver
      */
-    public NettyServerSslBuilder(ServerSslConfiguration ssl, ResourceResolver resourceResolver) {
+    public CertificateProvidedSslBuilder(ServerSslConfiguration ssl, ResourceResolver resourceResolver) {
         super(ssl, resourceResolver);
     }
 
     /**
      * @return The SSL configuration
      */
+    @Override
     public ServerSslConfiguration getSslConfiguration() {
         return (ServerSslConfiguration) ssl;
     }
@@ -58,17 +60,6 @@ public class NettyServerSslBuilder extends SslBuilder<SslContext> {
     @SuppressWarnings("Duplicates")
     @Override
     public Optional<SslContext> build() {
-        if (!ssl.isEnabled()) {
-            return Optional.empty();
-        }
-        if (ssl.buildSelfSigned()) {
-            try {
-                SelfSignedCertificate ssc = new SelfSignedCertificate();
-                return Optional.of(SslContextBuilder.forServer(ssc.certificate(), ssc.privateKey()).build());
-            } catch (CertificateException | SSLException e) {
-                throw new SslConfigurationException("Encountered an error while building a self signed certificate", e);
-            }
-        }
         SslContextBuilder sslBuilder = SslContextBuilder
             .forServer(getKeyManagerFactory())
             .trustManager(getTrustManagerFactory());
