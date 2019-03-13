@@ -117,8 +117,11 @@ public class LoadedVisitor implements Ordered {
      *
      * @param element            The element to visit
      * @param annotationMetadata The annotation data for the node
+     *
+     * @return The element if one was created or null
      */
-    public @Nullable io.micronaut.inject.ast.Element visit(Element element, AnnotationMetadata annotationMetadata) {
+    public @Nullable io.micronaut.inject.ast.Element visit(
+            Element element, AnnotationMetadata annotationMetadata) {
         if (element instanceof VariableElement) {
             final JavaFieldElement e = new JavaFieldElement(
                     (VariableElement) element,
