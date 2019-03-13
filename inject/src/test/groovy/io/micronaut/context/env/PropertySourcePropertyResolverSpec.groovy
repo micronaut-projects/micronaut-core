@@ -155,13 +155,13 @@ class PropertySourcePropertyResolverSpec extends Specification {
     void "test resolve placeholders for lists of map"() {
         given:
         def values = [
-                'foo.bar' : '10',
-                'foo.bar.list' : [
+                'foo.bar'     : '10',
+                'foo.bar.list': [
                         [
-                                'foo' : '${foo.bar}'
+                                'foo': '${foo.bar}'
                         ],
                         [
-                                'bar' : 'baz'
+                                'bar': 'baz'
                         ]
                 ]
         ]
@@ -307,4 +307,27 @@ class PropertySourcePropertyResolverSpec extends Specification {
         applicationContext.getProperty('micronaut.security.enabled', Boolean).get() == true
 
     }
+
+    void "test propertylists with 3 entries or more"() {
+        given:
+        def values = new HashMap();
+        values.put('foo[0]', 'bar')
+        values.put('foo[1]', 'baz')
+        values.put('foo[2]', 'foo')
+        values.put('foo[3]', 'baar')
+        values.put('foo[4]', 'baaz')
+        values.put('foo[5]', 'fooo')
+
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+        def applicationContext = ApplicationContext.run(['micronaut.security.enabled': true])
+
+        expect:
+
+        applicationContext.getProperty("foo", List).get().get(0) == 'bar'
+
+    }
+
+
 }
