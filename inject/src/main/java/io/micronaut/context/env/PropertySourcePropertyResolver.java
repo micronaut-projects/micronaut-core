@@ -26,6 +26,7 @@ import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
@@ -185,10 +186,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     }
 
     @Override
-    public <T> Optional<T> getProperty(@Nullable String name, ArgumentConversionContext<T> conversionContext) {
+    public <T> Optional<T> getProperty(@Nonnull String name, @Nonnull ArgumentConversionContext<T> conversionContext) {
         if (StringUtils.isEmpty(name)) {
             return Optional.empty();
         } else {
+            ArgumentUtils.requireNonNull("conversionContext", conversionContext);
             Class<T> requiredType = conversionContext.getArgument().getType();
             boolean cacheableType = requiredType == Boolean.class || requiredType == String.class;
             String cacheName = name + '|' + requiredType.getSimpleName();

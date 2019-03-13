@@ -17,6 +17,8 @@ package io.micronaut.context;
 
 import io.micronaut.core.reflect.InstantiationUtils;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.Optional;
 import java.util.stream.Stream;
@@ -40,7 +42,7 @@ public interface BeanLocator {
      *                                                                for the given type
      * @see io.micronaut.inject.qualifiers.Qualifiers
      */
-    <T> T getBean(Class<T> beanType, Qualifier<T> qualifier);
+    @Nonnull <T> T getBean(@Nonnull Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * Finds a Bean for the given type and qualifier.
@@ -53,7 +55,7 @@ public interface BeanLocator {
      *                                                                for the given type
      * @see io.micronaut.inject.qualifiers.Qualifiers
      */
-    <T> Optional<T> findBean(Class<T> beanType, Qualifier<T> qualifier);
+    @Nonnull <T> Optional<T> findBean(@Nonnull Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * Get all beans of the given type.
@@ -62,7 +64,7 @@ public interface BeanLocator {
      * @param <T>      The bean type parameter
      * @return The found beans
      */
-    <T> Collection<T> getBeansOfType(Class<T> beanType);
+    @Nonnull <T> Collection<T> getBeansOfType(@Nonnull Class<T> beanType);
 
     /**
      * Get all beans of the given type.
@@ -72,7 +74,7 @@ public interface BeanLocator {
      * @param <T>       The bean type parameter
      * @return The found beans
      */
-    <T> Collection<T> getBeansOfType(Class<T> beanType, Qualifier<T> qualifier);
+    @Nonnull <T> Collection<T> getBeansOfType(@Nonnull Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * Obtain a stream of beans of the given type.
@@ -83,7 +85,7 @@ public interface BeanLocator {
      * @return A stream of instances
      * @see io.micronaut.inject.qualifiers.Qualifiers
      */
-    <T> Stream<T> streamOfType(Class<T> beanType, Qualifier<T> qualifier);
+    @Nonnull <T> Stream<T> streamOfType(@Nonnull Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * Resolves the proxy target for a given bean type. If the bean has no proxy then the original bean is returned.
@@ -93,7 +95,7 @@ public interface BeanLocator {
      * @param <T>       The generic type
      * @return The proxied instance
      */
-    <T> T getProxyTargetBean(Class<T> beanType, Qualifier<T> qualifier);
+    @Nonnull <T> T getProxyTargetBean(@Nonnull Class<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
      * Obtain a stream of beans of the given type.
@@ -102,7 +104,7 @@ public interface BeanLocator {
      * @param <T>      The bean concrete type
      * @return A stream
      */
-    default <T> Stream<T> streamOfType(Class<T> beanType) {
+    default @Nonnull <T> Stream<T> streamOfType(@Nonnull Class<T> beanType) {
         return streamOfType(beanType, null);
     }
 
@@ -114,8 +116,9 @@ public interface BeanLocator {
      * @return An instanceof said bean
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
      *                                                                for the given type
+     * @throws io.micronaut.context.exceptions.NoSuchBeanException If the bean doesn't exist
      */
-    default <T> T getBean(Class<T> beanType) {
+    default @Nonnull <T> T getBean(@Nonnull Class<T> beanType) {
         return getBean(beanType, null);
     }
 
@@ -128,7 +131,7 @@ public interface BeanLocator {
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
      *                                                                for the given type
      */
-    default <T> Optional<T> findBean(Class<T> beanType) {
+    default @Nonnull <T> Optional<T> findBean(@Nonnull Class<T> beanType) {
         return findBean(beanType, null);
     }
 
@@ -142,7 +145,7 @@ public interface BeanLocator {
      * @throws io.micronaut.context.exceptions.NonUniqueBeanException When multiple possible bean definitions exist
      *                                                                for the given type
      */
-    default <T> Optional<T> findOrInstantiateBean(Class<T> beanType) {
+    default @Nonnull <T> Optional<T> findOrInstantiateBean(@Nonnull Class<T> beanType) {
         Optional<T> bean = findBean(beanType, null);
         if (bean.isPresent()) {
             return bean;
