@@ -78,8 +78,7 @@ Micronaut still allows specifying the latter in configuration, but normalizes th
 
 |`MYAPP_MYSTUFF` | `myapp.mystuff`, `myapp-mystuff` | Environment Variable
 
-|`MY_APP_MY_STUFF` | `my-app.my-stuff`, `my.app.my.stuff`, `my.app.my-stuff`, `my-app-my-stuff` | Environment Variable
-
+|`MY_APP_MY_STUFF` | `my.app-my-stuff`, `my.app.my.stuff`, `my.app.my-stuff`, `my.app-my.stuff`, `my-app.my.stuff`, `my-app.my-stuff`, `my-app-my.stuff`, `my-app-my-stuff`  | Environment Variable
 |===
 
 Environment variables are given special treatment to allow the definition of environment variables to be more flexible.
