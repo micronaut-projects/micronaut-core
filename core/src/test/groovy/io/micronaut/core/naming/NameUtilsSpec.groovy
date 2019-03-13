@@ -38,6 +38,7 @@ class NameUtilsSpec extends Specification {
         "foo1-bar"  | true
         "1foo1-bar" | false
         "Foo1Bar"   | false
+        "foo"       | true
     }
 
     void "test simple name"() {
@@ -204,5 +205,44 @@ class NameUtilsSpec extends Specification {
         "getFoo" | true
         "getfoo" | false
         "a"      | false
+    }
+
+    @Unroll
+    void "test is valid hypenated property name #name"() {
+        expect:
+        NameUtils.isValidHyphenatedPropertyName(name) == result
+
+        where:
+        name             | result
+        "foo-bar"        | true
+        "foobar"         | true
+        "foo1-bar"       | true
+        "Foo-bar"        | false
+        "foo1-bar"       | true
+        "1foo1-bar"      | true
+        "Foo1Bar"        | false
+        "fooBar"         | false
+        "Foo"            | false
+        "foo.bar"        | true
+        "foo.bar-baz"    | true
+        "foo-bar.baz"    | true
+        "fooBar.baz"     | false
+        "1foo.2bar"      | true
+        "1foo.2bar-3baz" | true
+    }
+
+    @Unroll
+    void "test is valid environment name #value"() {
+        expect:
+        NameUtils.isEnvironmentName(value) == result
+
+        where:
+        value         | result
+        "FOO_BAR"     | true
+        "COM_FOO_BAR" | true
+        "foo_BAR"     | false
+        "FOOBAR"      | true
+        "Foo_BAR"     | false
+        "FOO-BAR"     | false
     }
 }
