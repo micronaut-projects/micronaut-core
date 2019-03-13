@@ -290,7 +290,7 @@ public class NettyHttpServerConfiguration extends HttpServerConfiguration {
     }
 
     /**
-     * Sets whether to use netty's native transport (epoll or kqueue) if available . Default value ({@value #DEFAULT_USE_NATIVE_TRANSPORT_IF_AVAILABLE}).
+     * Sets whether to use netty's native transport (epoll or kqueue) if available . Default value ({@value #DEFAULT_USE_NATIVE_TRANSPORT}).
      * @param useNativeTransport True if netty's native transport should be use if available.
      */
     public void setUseNativeTransport(boolean useNativeTransport) {
