@@ -27,7 +27,7 @@ import java.lang.annotation.Target;
  * @author graemerocher
  * @since 1.1.0
  */
-@Target({ElementType.TYPE, ElementType.METHOD})
+@Target({ElementType.TYPE, ElementType.METHOD, ElementType.FIELD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Version {
 
