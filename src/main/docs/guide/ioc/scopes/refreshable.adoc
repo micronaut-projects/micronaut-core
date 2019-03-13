@@ -5,7 +5,7 @@ The api:runtime.context.scope.Refreshable[] scope is a custom scope that allows 
 
 The following example, illustrates the `@Refreshable` scope behavior.
 
-snippet::io.micronaut.docs.inject.scope.RefreshEventSpec[tags="weatherService",indent=0]
+snippet::io.micronaut.docs.inject.scope.RefreshEventSpec[tags="weatherService",indent="0"]
 
 
 <1> The `WeatherService` is annotated with `@Refreshable` scope which stores an instance until a refresh event is triggered
@@ -15,4 +15,4 @@ If you invoke the `latestForecast()` twice, you will see identical responses suc
 
 When the `/refresh` endpoint is invoked or a api:runtime.context.scope.refresh.RefreshEvent[] is published then the instance is invalidated and a new instance is created the next time the object is requested. For example:
 
-snippet::io.micronaut.docs.inject.scope.RefreshEventSpec[tags="publishEvent",indent=0]
+snippet::io.micronaut.docs.inject.scope.RefreshEventSpec[tags="publishEvent",indent="0"]
