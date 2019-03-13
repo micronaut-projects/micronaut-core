@@ -21,6 +21,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.util.Toggleable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.helpers.NOPLogger;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -51,13 +52,29 @@ public class ClassUtils {
     public static final int EMPTY_OBJECT_ARRAY_HASH_CODE = Arrays.hashCode(ArrayUtils.EMPTY_OBJECT_ARRAY);
     public static final Map<String, Class> COMMON_CLASS_MAP = new HashMap<>(34);
     public static final Map<String, Class> BASIC_TYPE_MAP = new HashMap<>(18);
+
+    /**
+     * Default extension for class files.
+     */
     public static final String CLASS_EXTENSION = ".class";
+
+    /**
+     * A logger that should be used for any reflection access.
+     */
+    public static final Logger REFLECTION_LOGGER;
 
     static final List<ClassLoadingReporter> CLASS_LOADING_REPORTERS;
     static final boolean CLASS_LOADING_REPORTER_ENABLED;
 
     private static final boolean ENABLE_CLASS_LOADER_LOGGING = Boolean.getBoolean(PROPERTY_MICRONAUT_CLASSLOADER_LOGGING);
 
+    static {
+        if (ENABLE_CLASS_LOADER_LOGGING) {
+            REFLECTION_LOGGER = LoggerFactory.getLogger(ClassUtils.class);
+        } else {
+            REFLECTION_LOGGER = NOPLogger.NOP_LOGGER;
+        }
+    }
     @SuppressWarnings("unchecked")
     private static final Map<String, Class> PRIMITIVE_TYPE_MAP = CollectionUtils.mapOf(
         "int", Integer.TYPE,
@@ -252,7 +269,6 @@ public class ClassUtils {
      * @return An optional of the class
      */
     public static Optional<Class> forName(String name, @Nullable ClassLoader classLoader) {
-        final Logger logger = ENABLE_CLASS_LOADER_LOGGING ? LoggerFactory.getLogger(ClassUtils.class) : null;
         try {
             if (classLoader == null) {
                 classLoader = Thread.currentThread().getContextClassLoader();
@@ -265,20 +281,20 @@ public class ClassUtils {
             if (commonType.isPresent()) {
                 return commonType;
             } else {
-                if (logger != null && logger.isDebugEnabled()) {
-                    logger.debug("Attempting to dynamically load class {}", name);
+                if (REFLECTION_LOGGER.isDebugEnabled()) {
+                    REFLECTION_LOGGER.debug("Attempting to dynamically load class {}", name);
                 }
                 Class<?> type = Class.forName(name, true, classLoader);
                 ClassLoadingReporter.reportPresent(type);
-                if (logger != null && logger.isDebugEnabled()) {
-                    logger.debug("Successfully loaded class {}", name);
+                if (REFLECTION_LOGGER.isDebugEnabled()) {
+                    REFLECTION_LOGGER.debug("Successfully loaded class {}", name);
                 }
                 return Optional.of(type);
             }
         } catch (ClassNotFoundException | NoClassDefFoundError e) {
             ClassLoadingReporter.reportMissing(name);
-            if (logger != null && logger.isDebugEnabled()) {
-                logger.debug("Class {} is not present", name);
+            if (REFLECTION_LOGGER.isDebugEnabled()) {
+                REFLECTION_LOGGER.debug("Class {} is not present", name);
             }
             return Optional.empty();
         }
