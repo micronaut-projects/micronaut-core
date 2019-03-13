@@ -19,6 +19,7 @@ import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Internal
+import io.micronaut.inject.ast.Element
 import io.micronaut.inject.visitor.TypeElementVisitor
 import org.codehaus.groovy.ast.AnnotatedNode
 import org.codehaus.groovy.ast.ClassHelper
@@ -30,6 +31,8 @@ import org.codehaus.groovy.ast.MethodNode
 import org.codehaus.groovy.ast.PropertyNode
 import org.codehaus.groovy.ast.Variable
 import org.codehaus.groovy.control.SourceUnit
+
+import javax.annotation.Nullable
 
 /**
  * Used to store a reference to an underlying {@link TypeElementVisitor} and
@@ -119,27 +122,35 @@ class LoadedVisitor {
      * @param annotationMetadata The annotation data for the node
      * @param visitorContext the Groovy visitor context
      */
-    void visit(AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata, GroovyVisitorContext visitorContext) {
+    @Nullable Element visit(AnnotatedNode annotatedNode, AnnotationMetadata annotationMetadata, GroovyVisitorContext visitorContext) {
         switch (annotatedNode.getClass()) {
             case FieldNode:
             case PropertyNode:
-                visitor.visitField(new GroovyFieldElement(sourceUnit, (Variable) annotatedNode,  annotatedNode, annotationMetadata), visitorContext)
-                break
+                def e = new GroovyFieldElement(sourceUnit, (Variable) annotatedNode,  annotatedNode, annotationMetadata)
+                visitor.visitField(e, visitorContext)
+                return e
             case ConstructorNode:
-                visitor.visitConstructor(new GroovyConstructorElement(sourceUnit, (ConstructorNode) annotatedNode, annotationMetadata), visitorContext)
-                break
+                def e = new GroovyConstructorElement(sourceUnit, (ConstructorNode) annotatedNode, annotationMetadata)
+                visitor.visitConstructor(e, visitorContext)
+                return e
             case MethodNode:
-                visitor.visitMethod(new GroovyMethodElement(sourceUnit, (MethodNode) annotatedNode, annotationMetadata), visitorContext)
-                break
+                def e = new GroovyMethodElement(sourceUnit, (MethodNode) annotatedNode, annotationMetadata)
+                visitor.visitMethod(e, visitorContext)
+                return e
             case ClassNode:
                 ClassNode cn = (ClassNode) annotatedNode
                 if (cn.isEnum()) {
-
+                    def e = new GroovyEnumElement(sourceUnit, cn, annotationMetadata)
+                    visitor.visitClass(e, visitorContext)
+                    return e
                 } else {
-                    visitor.visitClass(new GroovyClassElement(sourceUnit, cn, annotationMetadata), visitorContext)
+                    def e = new GroovyClassElement(sourceUnit, cn, annotationMetadata)
+                    visitor.visitClass(e, visitorContext)
+                    return e
                 }
-                break
         }
+
+        return null
     }
 
     void start(GroovyVisitorContext visitorContext) {

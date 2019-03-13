@@ -45,7 +45,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Internal
 public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Introspected, Object> {
 
+    /**
+     * The position of the visitor.
+     */
+    public static final int POSITION = -100;
+
     private Map<String, BeanIntrospectionWriter> writers = new LinkedHashMap<>(10);
+
+    @Override
+    public int getOrder() {
+        // lower precedence, all others to mutate metadata as necessary
+        return POSITION;
+    }
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
