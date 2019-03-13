@@ -17,12 +17,11 @@ package io.micronaut.docs.server.intro
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.env.Environment
+import io.micronaut.runtime.server.EmbeddedServer
+
 
 // tag::imports[]
 
-import io.micronaut.http.HttpRequest
-import io.micronaut.http.client.HttpClient
-import io.micronaut.runtime.server.EmbeddedServer
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -30,37 +29,35 @@ import spock.lang.Specification
 // end::imports[]
 
 /**
- * @author Graeme Rocher
+ * @author graemerocher
  * @since 1.0
  */
-// tag::classinit[]
-class HelloControllerSpec extends Specification {
-    // end::classinit[]
-    @Shared
-    @AutoCleanup
-    EmbeddedServer embeddedServer =
-            ApplicationContext.run(EmbeddedServer.class,
-                    [
-                        "spec.name": HelloControllerSpec.simpleName
-                    ]
-                    , Environment.TEST)
+//tag::class-init[]
+class HelloClientSpec extends Specification {
+//end::class-init[]
 
+    @Shared @AutoCleanup EmbeddedServer embeddedServer =
+            ApplicationContext.run(EmbeddedServer, [
+                    'spec.name': 'HelloControllerSpec',
+                    'spec.lang': 'java',
+            ], Environment.TEST)
     /*
-// tag::embeddedServer[]
-    @Shared
-    @AutoCleanup
-    EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer) // <1>
-// end::embeddedServer[]
-    */
-    // tag::class[]
-    @Shared
-    @AutoCleanup
-    HttpClient client = HttpClient.create(embeddedServer.URL) // <2>
+//tag::embeddedServer[]
+    @Shared @AutoCleanup EmbeddedServer embeddedServer =
+        ApplicationContext.run(EmbeddedServer) // <1>
+//end::embeddedServer[]
+     */
+
+//tag::class-end[]
+    @Shared HelloClient client = embeddedServer
+                                        .applicationContext
+                                        .getBean(HelloClient) // <2>
+
 
     void "test hello world response"() {
         expect:
-            client.toBlocking() // <3>
-                    .retrieve(HttpRequest.GET('/hello')) == "Hello World" // <4>
+        client.hello().blockingGet() == "Hello World" // <3>
     }
+
 }
-// end::class[]
+// end::class-end[]
