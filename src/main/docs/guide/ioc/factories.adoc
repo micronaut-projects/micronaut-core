@@ -4,18 +4,7 @@ A factory is a class annotated with the link:{api}/io/micronaut/context/annotati
 
 The return types of methods annotated with `@Bean` are the bean types. This is best illustrated by an example:
 
-[source,groovy]
-----
-import io.micronaut.context.annotation.*
-import javax.inject.*
-
-
-include::{testsdir}/factories/CrankShaft.groovy[tags=class, indent=0]
-
-include::{testsdir}/factories/V8Engine.groovy[tags=class, indent=0]
-
-include::{testsdir}/factories/EngineFactory.groovy[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.factories.CrankShaft,io.micronaut.docs.factories.V8Engine,io.micronaut.docs.factories.EngineFactory[tags="class",indent=0]
 
 In this case, the `V8Engine` is built by the `EngineFactory` class' `v8Engine` method. Note that you can inject parameters into the method and these parameters will be resolved as beans.
 

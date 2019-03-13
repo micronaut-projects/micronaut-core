@@ -2,16 +2,7 @@ Micronaut implements the http://javax-inject.github.io/javax-inject/[JSR-330 (ja
 
 The following is a simple example:
 
-[source,groovy]
-----
-import javax.inject.*
-
-include::{testsdir}/intro/Engine.groovy[tags=class, indent=0]
-
-include::{testsdir}/intro/V8Engine.groovy[tags=class, indent=0]
-
-include::{testsdir}/intro/Vehicle.groovy[tags=class, indent=0]
-----
+snippet::io.micronaut.docs.inject.intro.Engine,io.micronaut.docs.inject.intro.V8Engine,io.micronaut.docs.inject.intro.Vehicle[tags="class",indent=0]
 
 <1> A common `Engine` interface is defined
 <2> A `V8Engine` implementation is defined and marked with `Singleton` scope
@@ -19,12 +10,8 @@ include::{testsdir}/intro/Vehicle.groovy[tags=class, indent=0]
 
 To perform dependency injection simply run the  link:{api}/io/micronaut/context/BeanContext.html[BeanContext] using the `run()` method and lookup a bean using `getBean(Class)`, as per the following example:
 
-[source,groovy]
-----
-import io.micronaut.context.*
-...
-include::{testsdir}/intro/VehicleSpec.groovy[tags=start, indent=0]
-----
+
+snippet::io.micronaut.docs.inject.intro.VehicleSpec[tags="start",indent="0"]
 
 Micronaut will automatically discover dependency injection metadata on the classpath and wire the beans together according to injection points you define.
 
