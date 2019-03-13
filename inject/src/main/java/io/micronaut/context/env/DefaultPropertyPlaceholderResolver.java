@@ -19,6 +19,9 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -81,6 +84,59 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
             return resolvePlaceholders(str, i);
         }
         return str;
+    }
+
+    @Override
+    public List<Placeholder> resolvePropertyNames(String str) {
+        try {
+            String prefix = getPrefix();
+            if (StringUtils.isNotEmpty(str)) {
+                int i = str.indexOf(prefix);
+
+                if (i != -1) {
+                    List<Placeholder> placeholders = new ArrayList<>(3);
+                    String restOfString = str.substring(i + 2);
+                    while (i != -1) {
+                        int e = restOfString.indexOf('}');
+                        if (e > -1) {
+                            String expr = restOfString.substring(0, e).trim();
+
+                            Matcher matcher = ESCAPE_SEQUENCE.matcher(expr);
+                            if (matcher.find()) {
+                                String defaultValue = matcher.group(2);
+                                expr = matcher.group(1);
+                                placeholders.add(new DefaultPlaceholder(expr, defaultValue));
+                            } else {
+                                int j = expr.indexOf(COLON);
+                                if (j == -1) {
+                                    placeholders.add(new DefaultPlaceholder(expr, null));
+                                } else {
+                                    String defaultValue = expr.substring(j + 1);
+                                    expr = expr.substring(0, j);
+
+                                    List<Placeholder> phs = resolvePropertyNames(getPrefix() + defaultValue + SUFFIX);
+                                    for (Placeholder ph : phs) {
+                                        placeholders.add(new DefaultPlaceholder(expr, defaultValue, ph));
+                                    }
+                                }
+                            }
+
+                            i = restOfString.indexOf(prefix);
+                            if (i != -1) {
+                                restOfString = restOfString.substring(i + 2);
+                            }
+                        } else {
+                            // incomplete place holder
+                            return Collections.emptyList();
+                        }
+                    }
+                    return placeholders;
+                }
+            }
+        } catch (Exception e) {
+            return Collections.emptyList();
+        }
+        return Collections.emptyList();
     }
 
     /**
