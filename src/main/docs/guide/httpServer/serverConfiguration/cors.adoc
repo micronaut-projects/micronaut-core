@@ -54,7 +54,7 @@ micronaut:
                 web:
                     allowedOrigins:
                         - http://foo.com
-                        - ^http(|s)://www\.google\.com$
+                        - ^http(|s):\/\/www\.google\.com$
 ----
 
 == Allowed Methods
