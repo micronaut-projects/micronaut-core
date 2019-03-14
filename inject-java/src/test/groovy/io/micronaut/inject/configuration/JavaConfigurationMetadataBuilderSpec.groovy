@@ -471,13 +471,13 @@ class GrandParentProperties {
         def types = JavacTypes.instance(context)
         def env = JavacProcessingEnvironment.instance(new Context())
         ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
-        AnnotationUtils annotationUtils = new AnnotationUtils(elements, env.messager, env.typeUtils, modelUtils, env.filer) {
+        AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, env.filer) {
         }
 
         JavaConfigurationMetadataBuilder builder = new JavaConfigurationMetadataBuilder(
                 elements,
                 types,
-                new AnnotationUtils(elements, env.messager, env.typeUtils, modelUtils, env.filer)
+                new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, env.filer) {}
         )
         builder
     }
