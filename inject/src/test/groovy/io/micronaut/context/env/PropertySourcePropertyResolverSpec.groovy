@@ -308,7 +308,7 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
     }
 
-    void "test propertylists with 3 entries or more"() {
+    void "test property lists with 3 entries or more"() {
         given:
         def values = new HashMap();
         values.put('foo[0]', 'bar')
@@ -321,11 +321,9 @@ class PropertySourcePropertyResolverSpec extends Specification {
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
                 PropertySource.of("test", values)
         )
-        def applicationContext = ApplicationContext.run(['micronaut.security.enabled': true])
 
         expect:
-
-        applicationContext.getProperty("foo", List).get().get(0) == 'bar'
+        resolver.getProperty("foo", List).get().get(0) == "bar"
 
     }
 
