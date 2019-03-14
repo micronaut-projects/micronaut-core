@@ -311,4 +311,28 @@ public class JwtTokenValidator implements TokenValidator {
         final JWTClaimsSet claimSet = jwt.getJWTClaimsSet();
         return new AuthenticationJWTClaimsSetAdapter(claimSet);
     }
+
+    /**
+     *
+     * @return List of Signature configurations which are used to attempt validation.
+     */
+    public List<SignatureConfiguration> getSignatureConfigurations() {
+        return signatureConfigurations;
+    }
+
+    /**
+     *
+     * @return List of Encryption configurations which are used to attempt validation.
+     */
+    public List<EncryptionConfiguration> getEncryptionConfigurations() {
+        return encryptionConfigurations;
+    }
+
+    /**
+     *
+     * @return Generic JWT Claims validators which should be used to validate any JWT.
+     */
+    public List<GenericJwtClaimsValidator> getGenericJwtClaimsValidators() {
+        return genericJwtClaimsValidators;
+    }
 }
