@@ -454,7 +454,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                                 if (v instanceof List) {
                                     list = (List) v;
                                 } else {
-                                    list = new ArrayList(number);
+                                    list = Arrays.stream(new int[number]).boxed().collect(Collectors.toList());
                                     entries.put(resolvedProperty, list);
                                 }
                                 list.add(number, value);
