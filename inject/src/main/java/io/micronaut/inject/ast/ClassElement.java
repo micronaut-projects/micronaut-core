@@ -40,6 +40,14 @@ public interface ClassElement extends TypedElement {
     boolean isAssignable(String type);
 
     /**
+     * Whether this element is an enum.
+     * @return True if it is an enum
+     */
+    default boolean isEnum() {
+        return this instanceof EnumElement;
+    }
+
+    /**
      * Find and return a single primary constructor. If more than constructor candidate exists, then return empty unless a
      * constructor is found that is annotated with either {@link io.micronaut.core.annotation.Creator} or {@link javax.inject.Inject}.
      *
