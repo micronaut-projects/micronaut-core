@@ -63,6 +63,15 @@ final class InMemoryJavaFileManager extends ForwardingJavaFileManager<JavaFileMa
                 "mem:///" + location.getName() + '/' + className.replace('.', '/') + kind.extension);
     }
 
+    /**
+     * Obtain the path for a file.
+     * @param name The name
+     * @return The path
+     */
+    public String getMetaInfPath(String name) {
+        return uriForFileObject(StandardLocation.CLASS_OUTPUT, "META-INF", name).getPath();
+    }
+
     @Override
     public boolean isSameFile(FileObject a, FileObject b) {
         /* This check is less strict than what is typically done by the normal compiler file managers

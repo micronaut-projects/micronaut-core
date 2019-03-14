@@ -69,12 +69,9 @@ public class ClassUtils {
     private static final boolean ENABLE_CLASS_LOADER_LOGGING = Boolean.getBoolean(PROPERTY_MICRONAUT_CLASSLOADER_LOGGING);
 
     static {
-        if (ENABLE_CLASS_LOADER_LOGGING) {
-            REFLECTION_LOGGER = LoggerFactory.getLogger(ClassUtils.class);
-        } else {
-            REFLECTION_LOGGER = NOPLogger.NOP_LOGGER;
-        }
+        REFLECTION_LOGGER = getLogger(ClassUtils.class);
     }
+
     @SuppressWarnings("unchecked")
     private static final Map<String, Class> PRIMITIVE_TYPE_MAP = CollectionUtils.mapOf(
         "int", Integer.TYPE,
@@ -160,6 +157,20 @@ public class ClassUtils {
             CLASS_LOADING_REPORTER_ENABLED = false;
         } else {
             CLASS_LOADING_REPORTER_ENABLED = reporterList.stream().anyMatch(Toggleable::isEnabled);
+        }
+    }
+
+    /**
+     * Special case {@code getLogger} method that should be used by classes that are used in the annotation processor.
+     *
+     * @param type The type
+     * @return The logger
+     */
+    public static @Nonnull Logger getLogger(@Nonnull Class type) {
+        if (ENABLE_CLASS_LOADER_LOGGING) {
+            return LoggerFactory.getLogger(type);
+        } else {
+            return NOPLogger.NOP_LOGGER;
         }
     }
 

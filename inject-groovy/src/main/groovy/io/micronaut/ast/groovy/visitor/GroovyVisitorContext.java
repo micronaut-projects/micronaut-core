@@ -24,6 +24,7 @@ import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.io.scan.ClassPathAnnotationScanner;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -46,6 +47,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.*;
 
 /**
@@ -68,6 +71,17 @@ public class GroovyVisitorContext implements VisitorContext {
         this.sourceUnit = sourceUnit;
         this.errorCollector = sourceUnit.getErrorCollector();
         this.attributes = VISITOR_ATTRIBUTES;
+    }
+
+    @Nonnull
+    @Override
+    public Iterable<URL> getClasspathResources(@Nonnull String path) {
+        try {
+            final Enumeration<URL> resources = sourceUnit.getClassLoader().getResources(path);
+            return CollectionUtils.enumerationToIterable(resources);
+        } catch (IOException e) {
+            return Collections.emptyList();
+        }
     }
 
     @Override

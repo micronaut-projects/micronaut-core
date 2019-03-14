@@ -4,6 +4,7 @@ dependencies {
     shadowCompile project(":inject")
     compile project(":inject")
     compileOnly project(":inject-java")
+    compileOnly project(":graal")
     testCompile project(":inject-groovy")
 }
 shadowJar {
