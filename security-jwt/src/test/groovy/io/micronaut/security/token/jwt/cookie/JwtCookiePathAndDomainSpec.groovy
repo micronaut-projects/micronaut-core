@@ -38,6 +38,7 @@ class JwtCookiePathAndDomainSpec extends Specification {
                     'micronaut.http.client.followRedirects': false,
                     'micronaut.security.enabled': true,
                     'micronaut.security.endpoints.login.enabled': true,
+                    'micronaut.security.endpoints.logout.enabled': true,
                     'micronaut.security.token.jwt.enabled': true,
                     'micronaut.security.token.jwt.bearer.enabled': false,
                     'micronaut.security.token.jwt.cookie.enabled': true,
@@ -76,13 +77,30 @@ class JwtCookiePathAndDomainSpec extends Specification {
 
         when:
         String sessionId = cookie.substring('JWT='.size(), cookie.indexOf(';'))
-        HttpRequest request = HttpRequest.GET('/').cookie(Cookie.of('JWT', sessionId).path("/"))
+        HttpRequest request = HttpRequest.GET('/').cookie(Cookie.of('JWT', sessionId))
         HttpResponse<String> rsp = client.toBlocking().exchange(request, String)
 
         then:
         rsp.status().code == 200
         rsp.body()
         rsp.body().contains('sherlock')
+
+        when:
+        HttpRequest logoutRequest = HttpRequest.POST('/logout', "").cookie(Cookie.of('JWT', sessionId))
+        HttpResponse<String> logoutRsp = client.toBlocking().exchange(logoutRequest, String)
+
+        then:
+        logoutRsp.status().code == 303
+
+        when:
+        String logoutCookie = logoutRsp.getHeaders().get('Set-Cookie')
+
+        then:
+        logoutCookie
+        logoutCookie.contains('JWT=')
+        logoutCookie.contains('Domain=example.com')
+        logoutCookie.contains('Path=/path;')
+        logoutCookie.contains('Max-Age=0;')
     }
 
 }
