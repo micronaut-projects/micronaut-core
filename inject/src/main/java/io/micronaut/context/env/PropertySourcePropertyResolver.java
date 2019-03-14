@@ -619,20 +619,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         switch (convention) {
             case ENVIRONMENT_VARIABLE:
                 String[] tokens = property.split("_");
-                List<String> properties = new ArrayList<>(tokens.length);
+                Set<String> properties = new HashSet<>(tokens.length);
 
-                StringBuilder path = new StringBuilder();
-                int len = tokens.length;
-                if (len > 1) {
-                    for (int i = 0; i < len; i++) {
-                        String token = tokens[i];
-                        if (i < (len - 1)) {
-                            path.append(token.toLowerCase(Locale.ENGLISH)).append('.');
-                            String[] subTokens = Arrays.copyOfRange(tokens, i + 1, len);
-                            properties.add(path + Arrays.stream(subTokens).map(s -> s.toLowerCase(Locale.ENGLISH)).collect(Collectors.joining("")));
-                        }
-                    }
-                    return properties;
+                if (tokens.length > 1) {
+                    properties.addAll(generatePropertiesCombinations(tokens, new StringBuilder(), '.'));
+                    properties.addAll(generatePropertiesCombinations(tokens, new StringBuilder(), '-'));
+                    return new ArrayList<>(properties);
                 } else {
                     return Collections.singletonList(property.toLowerCase(Locale.ENGLISH));
                 }
@@ -641,6 +633,26 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                         NameUtils.hyphenate(property, true)
                 );
         }
+    }
+
+    private List<String> generatePropertiesCombinations(String[] tokens, StringBuilder path, Character separator) {
+        Set<String> properties = new HashSet<>(tokens.length);
+        int len = tokens.length;
+        StringBuilder tmpPath = new StringBuilder(path.toString());
+        for (int i = 0; i < len; i++) {
+            String token = tokens[i];
+            if (i < (len - 1)) {
+                tmpPath.append(token.toLowerCase(Locale.ENGLISH)).append(separator);
+                String[] subTokens = Arrays.copyOfRange(tokens, i + 1, len);
+                properties.add(tmpPath + Arrays.stream(subTokens).map(s -> s.toLowerCase(Locale.ENGLISH)).collect(Collectors.joining(".")));
+                properties.add(tmpPath + Arrays.stream(subTokens).map(s -> s.toLowerCase(Locale.ENGLISH)).collect(Collectors.joining("-")));
+
+                properties.addAll(generatePropertiesCombinations(subTokens, tmpPath, '.'));
+                properties.addAll(generatePropertiesCombinations(subTokens, tmpPath, '-'));
+            }
+        }
+
+        return new ArrayList<>(properties);
     }
 
     private String trimIndex(String name) {
