@@ -3,5 +3,6 @@ dependencies {
     compile project(":inject")
     compile dependencyVersion("jackson")
     testCompile project(":inject-java")
+    testCompile project(":http")
     testCompile project(":inject-java-test")
 }

@@ -19,6 +19,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Executable;
+import io.micronaut.core.annotation.EntryPoint;
 
 import javax.inject.Named;
 import javax.inject.Singleton;
@@ -39,6 +40,7 @@ import java.lang.annotation.Target;
 @Target({ElementType.TYPE, ElementType.METHOD})
 @Singleton
 @Executable
+@EntryPoint
 public @interface FunctionBean {
 
     /**

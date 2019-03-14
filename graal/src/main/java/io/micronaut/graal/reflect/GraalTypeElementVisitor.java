@@ -20,23 +20,24 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
-import io.micronaut.core.annotation.Creator;
-import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.Introspected;
-import io.micronaut.core.annotation.TypeHint;
+import io.micronaut.core.annotation.*;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
+import org.reactivestreams.Publisher;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.Writer;
 import java.net.URL;
 import java.util.*;
+import java.util.concurrent.Future;
 
 /**
  * Generates the GraalVM reflect.json file at compilation time.
@@ -96,11 +97,45 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     }
 
     @Override
+    public void visitMethod(MethodElement element, VisitorContext context) {
+        if (!isSubclass) {
+            if (element.hasDeclaredStereotype(EntryPoint.class)) {
+                final ClassElement returnType = element.getReturnType();
+                possiblyReflectOnType(returnType);
+                final ParameterElement[] parameters = element.getParameters();
+                for (ParameterElement parameter : parameters) {
+                    possiblyReflectOnType(parameter.getType());
+                }
+            }
+        }
+    }
+
+    @Override
     public void visitConstructor(ConstructorElement element, VisitorContext context) {
         if (!isSubclass) {
             if (element.hasAnnotation(Creator.class)) {
                 beans.add(element.getDeclaringType().getName());
             }
+        }
+    }
+
+    private void possiblyReflectOnType(ClassElement type) {
+        if (type == null || type.isPrimitive() || type.isAbstract()) {
+            return;
+        }
+
+        boolean isWrapperType = type.isAssignable(Iterable.class) ||
+                                type.isAssignable(Publisher.class) ||
+                                type.isAssignable(Map.class) ||
+                                type.isAssignable(Optional.class) ||
+                                type.isAssignable(Future.class);
+        if (!isWrapperType) {
+            beans.add(type.getName());
+        }
+        
+        final Map<String, ClassElement> typeArguments = type.getTypeArguments();
+        for (ClassElement value : typeArguments.values()) {
+            possiblyReflectOnType(value);
         }
     }
 
