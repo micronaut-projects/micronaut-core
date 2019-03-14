@@ -25,6 +25,7 @@ import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.StringConvention;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -32,7 +33,6 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
 import io.micronaut.core.value.PropertyResolver;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -50,7 +50,7 @@ import java.util.stream.Collectors;
  */
 public class PropertySourcePropertyResolver implements PropertyResolver {
 
-    private static final Logger LOG = LoggerFactory.getLogger(PropertySourcePropertyResolver.class);
+    private static final Logger LOG = ClassUtils.getLogger(PropertySourcePropertyResolver.class);
     private static final Pattern RANDOM_PATTERN = Pattern.compile("\\$\\{\\s?random\\.(\\S+?)\\}");
 
     protected final ConversionService<?> conversionService;

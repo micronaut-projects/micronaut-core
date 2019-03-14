@@ -29,9 +29,36 @@ import java.lang.annotation.Target;
  */
 @Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
+@Experimental
 public @interface TypeHint {
     /**
      * @return The types to provide a hint
      */
-    Class[] value();
+    Class[] value() default {};
+
+    /**
+     * The access type the type requires ie. whether only classloading or full reflective access is necessary.
+     * @return The access type
+     * @since 1.1
+     */
+    AccessType accessType() default AccessType.CLASS_LOADING;
+
+    /**
+     * @return The type names
+     */
+    String[] typeNames() default {};
+
+    /**
+     * The access type.
+     */
+    enum AccessType {
+        /**
+         * Full reflection of all public members required.
+         */
+        REFLECTION_PUBLIC,
+        /**
+         * Only classloading access required.
+         */
+        CLASS_LOADING
+    }
 }

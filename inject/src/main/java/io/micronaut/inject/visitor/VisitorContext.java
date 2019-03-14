@@ -24,6 +24,8 @@ import io.micronaut.inject.writer.GeneratedFile;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.net.URL;
+import java.util.Collections;
 import java.util.Optional;
 
 /**
@@ -46,10 +48,8 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     /**
      * Allows printing informational messages.
      *
-     * @deprecated Use {@link #info(String, Element)} with a null element
      * @param message The message
      */
-    @Deprecated
     void info(String message);
 
     /**
@@ -86,6 +86,17 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      */
     @Experimental
     Optional<GeneratedFile> visitGeneratedFile(String path);
+
+    /**
+     * Obtain a set of resources from the user classpath.
+     *
+     * @param path The path
+     * @return An iterable of resources
+     */
+    @Experimental
+    default @Nonnull Iterable<URL> getClasspathResources(@Nonnull String path) {
+        return Collections.emptyList();
+    }
 
     /**
      * This method will lookup another class element by name. If it cannot be found an empty optional will be returned.

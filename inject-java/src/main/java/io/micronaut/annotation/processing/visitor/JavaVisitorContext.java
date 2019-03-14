@@ -22,7 +22,9 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -32,14 +34,20 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
+import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.PackageElement;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
+import javax.tools.FileObject;
+import javax.tools.JavaFileManager;
+import javax.tools.StandardLocation;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.lang.reflect.Method;
+import java.net.URL;
 import java.util.*;
 
 /**
@@ -58,9 +66,13 @@ public class JavaVisitorContext implements VisitorContext {
     private final ModelUtils modelUtils;
     private final AnnotationProcessingOutputVisitor outputVisitor;
     private final MutableConvertibleValues<Object> visitorAttributes;
+    private final ProcessingEnvironment processingEnv;
+    private final Filer filer;
+    private @Nullable JavaFileManager standardFileManager;
 
     /**
      * The default constructor.
+     * @param processingEnv The processing environment
      * @param messager The messager
      * @param elements The elements
      * @param annotationUtils The annotation utils
@@ -70,6 +82,7 @@ public class JavaVisitorContext implements VisitorContext {
      * @param visitorAttributes The attributes
      */
     public JavaVisitorContext(
+            ProcessingEnvironment processingEnv,
             Messager messager,
             Elements elements,
             AnnotationUtils annotationUtils,
@@ -77,13 +90,46 @@ public class JavaVisitorContext implements VisitorContext {
             ModelUtils modelUtils,
             Filer filer,
             MutableConvertibleValues<Object> visitorAttributes) {
+        this.processingEnv = processingEnv;
         this.messager = messager;
         this.elements = elements;
         this.annotationUtils = annotationUtils;
         this.types = types;
         this.modelUtils = modelUtils;
+        this.filer = filer;
         this.outputVisitor = new AnnotationProcessingOutputVisitor(filer);
         this.visitorAttributes = visitorAttributes;
+
+        final Optional<Method> contextMethod = ReflectionUtils.getMethod(processingEnv.getClass(), "getContext");
+        if (contextMethod.isPresent()) {
+            final Object context = ReflectionUtils.invokeMethod(processingEnv, contextMethod.get());
+            if (context != null) {
+
+                final Optional<Method> getMethod = ReflectionUtils.getMethod(context.getClass(), "get", Class.class);
+                getMethod.ifPresent(method -> this.standardFileManager = ReflectionUtils.invokeMethod(context, method, JavaFileManager.class));
+            }
+        }
+    }
+
+    @Nonnull
+    @Override
+    public Iterable<URL> getClasspathResources(@Nonnull String path) {
+        // reflective hack required because no way to get the JavaFileManager
+        // from public processor API
+        if (standardFileManager != null) {
+            try {
+                final ClassLoader classLoader = standardFileManager
+                        .getClassLoader(StandardLocation.CLASS_PATH);
+
+                if (classLoader != null) {
+                    final Enumeration<URL> resources = classLoader.getResources(path);
+                    return CollectionUtils.enumerationToIterable(resources);
+                }
+            } catch (IOException e) {
+                // ignore
+            }
+        }
+        return Collections.emptyList();
     }
 
     @Override

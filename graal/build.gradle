@@ -1,5 +1,7 @@
 dependencies {
-    compileOnly project(":http-client")
     compileOnly project(":inject-java")
-    compile project(":runtime")
+    compile project(":inject")
+    compile dependencyVersion("jackson")
+    testCompile project(":inject-java")
+    testCompile project(":inject-java-test")
 }

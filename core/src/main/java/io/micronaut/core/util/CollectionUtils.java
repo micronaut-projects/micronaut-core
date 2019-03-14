@@ -21,6 +21,7 @@ import io.micronaut.core.convert.ConversionService;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.lang.reflect.Constructor;
+import java.net.URL;
 import java.util.*;
 
 /**
@@ -152,6 +153,32 @@ public class CollectionUtils {
             set.add(enumeration.nextElement());
         }
         return set;
+    }
+
+
+    /**
+     * Convert an {@link Enumeration} to a {@link Iterable}.
+     *
+     * @param enumeration The iterator
+     * @param <T>         The type
+     * @return The set
+     */
+    public static @Nonnull <T> Iterable<T> enumerationToIterable(@Nullable Enumeration<T> enumeration) {
+        if (enumeration == null) {
+            return Collections.emptyList();
+        }
+
+        return () -> new Iterator<T>() {
+            @Override
+            public boolean hasNext() {
+                return enumeration.hasMoreElements();
+            }
+
+            @Override
+            public T next() {
+                return enumeration.nextElement();
+            }
+        };
     }
 
     /**

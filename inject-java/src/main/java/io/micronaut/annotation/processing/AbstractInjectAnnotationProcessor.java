@@ -18,6 +18,7 @@ package io.micronaut.annotation.processing;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 
 import javax.annotation.processing.AbstractProcessor;
@@ -28,7 +29,13 @@ import javax.lang.model.SourceVersion;
 import javax.lang.model.element.Element;
 import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
-import javax.tools.Diagnostic;
+import javax.tools.*;
+import java.io.IOException;
+import java.lang.reflect.Method;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.Enumeration;
+import java.util.Optional;
 
 /**
  * Abstract annotation processor base class.
@@ -73,6 +80,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         this.typeUtils = processingEnv.getTypeUtils();
         this.modelUtils = new ModelUtils(elementUtils, typeUtils);
         this.annotationUtils = new AnnotationUtils(
+                processingEnv,
                 elementUtils,
                 messager,
                 typeUtils,
@@ -85,7 +93,9 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
                 typeUtils,
                 modelUtils
         );
+
         this.javaVisitorContext = new JavaVisitorContext(
+                processingEnv,
                 messager,
                 elementUtils,
                 annotationUtils,
