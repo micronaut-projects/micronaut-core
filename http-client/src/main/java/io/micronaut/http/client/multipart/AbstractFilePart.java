@@ -24,6 +24,7 @@ import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
+import java.nio.charset.Charset;
 
 /**
  * The base class used by a {@link FilePart}, {@link BytePart}, & {@link InputStreamPart} to build a Netty multipart
@@ -79,9 +80,9 @@ abstract class AbstractFilePart extends Part {
         MediaType mediaType = contentType;
         String contentType = mediaType.toString();
         String encoding = mediaType.isTextBased() ? null : "binary";
-
+        Charset charset = mediaType.getCharset().orElse(null);
         FileUpload fileUpload = factory.createFileUpload(request, name, filename, contentType,
-            encoding, null, getLength());
+            encoding, charset, getLength());
         try {
             setContent(fileUpload);
         } catch (IOException e) {
