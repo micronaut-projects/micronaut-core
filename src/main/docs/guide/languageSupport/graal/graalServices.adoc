@@ -10,10 +10,9 @@ $ mn create-app hello-world --features graal-native-image
 
 The `graal-native-image` feature adds four important items:
 
-1. A `MicronautSubstitutions.java` file needed to recompute Netty and Caffeine's use of `Unsafe`.
-2. The `svm` and `graal` dependencies to your `build.gradle` (or `pom.xml` if `--build maven` is used).
-3. A `Dockerfile` which can be used to construct the native image using Docker and a script `docker-build.sh` to run it.
-4. A `build-native-image.sh` script to build the native image without using Docker.
+1. The `svm` and `graal` dependencies to your `build.gradle` (or `pom.xml` if `--build maven` is used).
+2. A `Dockerfile` which can be used to construct the native image using Docker and a script `docker-build.sh` to run it.
+3. A `build-native-image.sh` script to build the native image without using Docker.
 
 
 ==== Building a Native Image Using Docker
@@ -63,30 +62,37 @@ $ ./build-native-image.sh
 
 === Understanding Micronaut and Graal
 
-Although Micronaut Dependency Injection does not use reflection, Micronaut does heavily rely on dynamic class loading. GraalVM needs to know ahead of time all the classes that are to be dynamically loaded.
+Micronaut itself does not rely on reflection or dynamic classloading so works automatically with GraalVM native, however certain third party libraries used by Micronaut may require additional input about uses of reflection.
 
-So before you can build a native image Micronaut needs to compute your application's classloading requirements. The `Dockerfile` and the `build-native-image.sh` do this automatically for you, but you can also run the logic to generate Graal's `reflect.json` file manually:
+Micronaut includes an annotation processor that helps to handle generating the `reflect.json` metadata:
 
-.Computing Class Loading Requirements
-[source,bash]
+dependency:micronaut-graal[scope="annotationProcessor"]
+
+This processor will generate a `reflect.json` file to a file called `META-INF/reflect.json` in your build classes directory (`target/classes` with Maven and typically `build/classes/java/main` with Gradle).
+
+TIP: If you wish to provide your own `reflect.json` you can add one to `src/main/graal/reflect.json`.
+
+
+=== Adding Additional Classes for Reflective Access
+
+To inform Micronaut of additional classes that should be included in the generated `reflect.json` file at compilation time you can either annotate a class with ann:core.annotation.Introspected[] or ann:core.annotation.TypeHint[].
+
+The former will generate a compile time introspection as well as allowing reflective access and the latter will only allow reflective access and is typically used on a module or `Application` class to include classes that are needed reflectively. For example, the following is taken from Micronaut's Jackson module:
+
+[source,java]
 ----
-$ ./gradlew assemble
-$ java -cp build/libs/hello-world-0.1-all.jar io.micronaut.graal.reflect.GraalClassLoadingAnalyzer
+@TypeHint(
+        value = {
+                PropertyNamingStrategy.UpperCamelCaseStrategy.class,
+                ArrayList.class,
+                LinkedHashMap.class,
+                HashSet.class
+        },
+        accessType = TypeHint.AccessType.CLASS_LOADING
+)
 ----
 
-The `GraalClassLoadingAnalyzer` will write out a `reflect.json` file computing the classloading requirements of the application.
-
-The default is to write this file to the `build` directory for Gradle and the `target` directory for Maven. You can alter the destination by specifying an argument:
-
-.Writing `reflect.json` to a custom location
-[source,bash]
-----
-$ java -cp build/libs/hello-world-0.1-all.jar io.micronaut.graal.reflect.GraalClassLoadingAnalyzer somelocation/myreflect.json
-----
-
-The generated `reflect.json` file contains the classes that were dynamically loaded by the application when started up. See https://github.com/oracle/graal/blob/master/substratevm/REFLECTION.md[GraalVM documentation] for information on the JSON format.
-
-TIP: If you wish you can use this file as a template and copy it to the source tree, making modifications as necessary and then altering the `Dockerfile` template or the `build-native-image.sh` script to point to the new location.
+=== Generating Native Images
 
 Once the `reflect.json` file is ready you can run the `native-image` command. The script runs the following `native-image` command:
 
@@ -95,7 +101,7 @@ Once the `reflect.json` file is ready you can run the `native-image` command. Th
 ----
 native-image --no-server \ # <1>
              --class-path build/libs/hello-world-0.1-all.jar \ # <2>
-             -H:ReflectionConfigurationFiles=build/reflect.json \ # <3>
+             -H:ReflectionConfigurationFiles=build/classes/java/main/META-INF/reflect.json \ # <3>
              -H:EnableURLProtocols=http \ # <4>
              -H:IncludeResources="logback.xml|application.yml" \ # <5>
              -H:Name=hello-world \ # <6>
