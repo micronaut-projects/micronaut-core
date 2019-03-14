@@ -251,6 +251,34 @@ public class JwtTokenValidator implements TokenValidator {
 
     /**
      * Validates JWT signature and Claims.
+     * @param token A JWT token
+     * @return empty if signature or claims verification failed, JWT otherwise.
+     */
+    public Optional<JWT> validateJwtSignatureAndClaims(String token) {
+        return validateJwtSignatureAndClaims(token, genericJwtClaimsValidators);
+    }
+
+    /**
+     *
+     * @param token A JWT token
+     * @return true if signature or claims verification passed
+     */
+    public boolean validate(String token) {
+        return validateJwtSignatureAndClaims(token).isPresent();
+    }
+
+    /**
+     *
+     * @param token A JWT token
+     * @param claimsValidators a Collection of claims Validators.
+     * @return true if signature or claims verification passed
+     */
+    public boolean validate(String token, Collection<? extends JwtClaimsValidator> claimsValidators) {
+        return validateJwtSignatureAndClaims(token, claimsValidators).isPresent();
+    }
+
+    /**
+     * Validates JWT signature and Claims.
      *
      * @param token A JWT token
      * @param claimsValidators a Collection of claims Validators.
