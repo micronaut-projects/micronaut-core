@@ -251,6 +251,34 @@ public class JwtTokenValidator implements TokenValidator {
 
     /**
      * Validates JWT signature and Claims.
+     * @param token A JWT token
+     * @return empty if signature or claims verification failed, JWT otherwise.
+     */
+    public Optional<JWT> validateJwtSignatureAndClaims(String token) {
+        return validateJwtSignatureAndClaims(token, genericJwtClaimsValidators);
+    }
+
+    /**
+     *
+     * @param token A JWT token
+     * @return true if signature or claims verification passed
+     */
+    public boolean validate(String token) {
+        return validateJwtSignatureAndClaims(token).isPresent();
+    }
+
+    /**
+     *
+     * @param token A JWT token
+     * @param claimsValidators a Collection of claims Validators.
+     * @return true if signature or claims verification passed
+     */
+    public boolean validate(String token, Collection<? extends JwtClaimsValidator> claimsValidators) {
+        return validateJwtSignatureAndClaims(token, claimsValidators).isPresent();
+    }
+
+    /**
+     * Validates JWT signature and Claims.
      *
      * @param token A JWT token
      * @param claimsValidators a Collection of claims Validators.
@@ -310,5 +338,29 @@ public class JwtTokenValidator implements TokenValidator {
     public Authentication createAuthentication(final JWT jwt) throws ParseException {
         final JWTClaimsSet claimSet = jwt.getJWTClaimsSet();
         return new AuthenticationJWTClaimsSetAdapter(claimSet);
+    }
+
+    /**
+     *
+     * @return List of Signature configurations which are used to attempt validation.
+     */
+    public List<SignatureConfiguration> getSignatureConfigurations() {
+        return signatureConfigurations;
+    }
+
+    /**
+     *
+     * @return List of Encryption configurations which are used to attempt validation.
+     */
+    public List<EncryptionConfiguration> getEncryptionConfigurations() {
+        return encryptionConfigurations;
+    }
+
+    /**
+     *
+     * @return Generic JWT Claims validators which should be used to validate any JWT.
+     */
+    public List<GenericJwtClaimsValidator> getGenericJwtClaimsValidators() {
+        return genericJwtClaimsValidators;
     }
 }

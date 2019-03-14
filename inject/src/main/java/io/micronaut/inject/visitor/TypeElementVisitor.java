@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.visitor;
 
+import io.micronaut.core.order.Ordered;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.FieldElement;
@@ -28,7 +29,7 @@ import io.micronaut.inject.ast.MethodElement;
  * @author James Kleeh
  * @since 1.0
  */
-public interface TypeElementVisitor<C, E> {
+public interface TypeElementVisitor<C, E> extends Ordered {
 
     /**
      * Executed when a class is encountered that matches the <C> generic.

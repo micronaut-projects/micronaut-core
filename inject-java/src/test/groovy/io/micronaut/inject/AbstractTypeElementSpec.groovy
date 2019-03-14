@@ -169,11 +169,12 @@ abstract class AbstractTypeElementSpec extends Specification {
         return metadata
     }
 
+    @CompileStatic
     private static JavaAnnotationMetadataBuilder newJavaAnnotationBuilder() {
         def env = JavacProcessingEnvironment.instance(new Context())
         def elements = JavacElements.instance(new Context())
         ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
-        AnnotationUtils annotationUtils = new AnnotationUtils(elements, env.messager, env.typeUtils, modelUtils, env.filer) {
+        AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, env.filer) {
         }
         JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils, env.typeUtils, modelUtils, env.filer)
         return builder

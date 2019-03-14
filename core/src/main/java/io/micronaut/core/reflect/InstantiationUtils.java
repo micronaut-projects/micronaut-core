@@ -15,13 +15,18 @@
  */
 package io.micronaut.core.reflect;
 
+import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.reflect.exception.InstantiationException;
+import io.micronaut.core.util.ArgumentUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import java.lang.reflect.Constructor;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Utility methods for instantiating objects.
@@ -53,32 +58,49 @@ public class InstantiationUtils {
     }
 
     /**
-     * Try to instantiate the given class.
+     * Try to instantiate the given class using the most optimal strategy first trying the {@link io.micronaut.core.beans.BeanIntrospector} and
+     * if no bean is present falling back to reflection.
      *
      * @param type The type
      * @param <T>  The generic type
      * @return The instantiated instance or {@link Optional#empty()}
      */
-    public static <T> Optional<T> tryInstantiate(Class<T> type) {
-        try {
-            T bean = type.newInstance();
-            if (type.isInstance(bean)) {
-                return Optional.of(bean);
+    public static @Nonnull <T> Optional<T> tryInstantiate(@Nonnull Class<T> type) {
+        ArgumentUtils.requireNonNull("type", type);
+        final Supplier<T> reflectionFallback = () -> {
+            final Logger logger = ClassUtils.REFLECTION_LOGGER;
+            if (logger.isDebugEnabled()) {
+                logger.debug("Cannot instantiate type [{}] without reflection. Attempting reflective instantiation", type);
             }
-            return Optional.empty();
-        } catch (Throwable e) {
             try {
-                Constructor<T> defaultConstructor = type.getDeclaredConstructor();
-                defaultConstructor.setAccessible(true);
-                return tryInstantiate(defaultConstructor);
-            } catch (Throwable e1) {
-                Logger log = LoggerFactory.getLogger(InstantiationUtils.class);
-                if (log.isDebugEnabled()) {
-                    log.debug("Tried, but could not instantiate type: " + type, e);
+                T bean = type.newInstance();
+                if (type.isInstance(bean)) {
+                    return bean;
                 }
-                return Optional.empty();
+                return null;
+            } catch (Throwable e) {
+                try {
+                    Constructor<T> defaultConstructor = type.getDeclaredConstructor();
+                    defaultConstructor.setAccessible(true);
+                    return tryInstantiate(defaultConstructor).orElse(null);
+                } catch (Throwable e1) {
+                    Logger log = LoggerFactory.getLogger(InstantiationUtils.class);
+                    if (log.isDebugEnabled()) {
+                        log.debug("Tried, but could not instantiate type: " + type, e);
+                    }
+                    return null;
+                }
             }
-        }
+        };
+        final T result = BeanIntrospector.SHARED.findIntrospection(type).map(introspection -> {
+            try {
+                return introspection.instantiate();
+            } catch (InstantiationException e) {
+                return reflectionFallback.get();
+            }
+        }).orElseGet(reflectionFallback);
+
+        return Optional.ofNullable(result);
     }
 
     /**
@@ -89,11 +111,11 @@ public class InstantiationUtils {
      * @param <T>  The generic type
      * @return The instantiated instance or {@link Optional#empty()}
      */
-    public static <T> Optional<T> tryInstantiate(Constructor<T> type, Object... args) {
+    public static @Nonnull <T> Optional<T> tryInstantiate(@Nonnull Constructor<T> type, Object... args) {
         try {
             return Optional.of(type.newInstance(args));
         } catch (Throwable e) {
-            Logger log = LoggerFactory.getLogger(InstantiationUtils.class);
+            Logger log = ClassUtils.REFLECTION_LOGGER;
             if (log.isDebugEnabled()) {
                 log.debug("Tried, but could not instantiate type: " + type, e);
             }
@@ -111,7 +133,17 @@ public class InstantiationUtils {
      */
     public static <T> T instantiate(Class<T> type) {
         try {
-            return type.newInstance();
+            return BeanIntrospector.SHARED.findIntrospection(type).map(BeanIntrospection::instantiate).orElseGet(() -> {
+                try {
+                    Logger log = ClassUtils.REFLECTION_LOGGER;
+                    if (log.isDebugEnabled()) {
+                        log.debug("Reflectively instantiating type: " + type);
+                    }
+                    return type.newInstance();
+                } catch (Throwable e) {
+                    throw new InstantiationException("Could not instantiate type [" + type.getName() + "]: " + e.getMessage(), e);
+                }
+            });
         } catch (Throwable e) {
             throw new InstantiationException("Could not instantiate type [" + type.getName() + "]: " + e.getMessage(), e);
         }

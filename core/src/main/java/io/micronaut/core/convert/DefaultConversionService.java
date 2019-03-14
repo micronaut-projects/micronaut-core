@@ -637,7 +637,7 @@ public class DefaultConversionService implements ConversionService<DefaultConver
                     list.add(converted.get());
                 }
             }
-            return Optional.of(list);
+            return CollectionUtils.convertCollection((Class) targetType, list);
         });
 
         // Optional handling

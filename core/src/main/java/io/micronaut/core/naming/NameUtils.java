@@ -442,8 +442,7 @@ public class NameUtils {
     }
 
     /**
-     * .
-     * The camel case version of the string with the first letter in lower case
+     * The camel case version of the string with the first letter in lower case.
      *
      * @param str                  The string
      * @param lowerCaseFirstLetter Whether the first letter is in upper case or lower case
@@ -475,6 +474,26 @@ public class NameUtils {
             return "";
         }
         return path.substring(lastSeparator + 1, index);
+    }
+
+    /**
+     * Checks whether the string is a valid hyphenated (kebab-case) property name.
+     *
+     * @param str The string to check
+     * @return Whether is valid kebab-case or not
+     */
+    public static boolean isValidHyphenatedPropertyName(String str) {
+        return NameUtils.hyphenate(str).equals(str);
+    }
+
+    /**
+     * Checks whether the string is a valid environment-style property name.
+     *
+     * @param str The string to check
+     * @return Whether is valid environment-style property name or not
+     */
+    public static boolean isEnvironmentName(String str) {
+        return NameUtils.environmentName(str).equals(str);
     }
 
 }

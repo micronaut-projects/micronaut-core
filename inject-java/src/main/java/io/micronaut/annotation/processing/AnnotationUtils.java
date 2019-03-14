@@ -25,6 +25,7 @@ import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
 
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.Messager;
+import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ExecutableElement;
@@ -55,10 +56,12 @@ public class AnnotationUtils {
     private final ModelUtils modelUtils;
     private final Filer filer;
     private final MutableConvertibleValues<Object> visitorAttributes;
+    private final ProcessingEnvironment processingEnv;
 
     /**
      * Default constructor.
      *
+     * @param processingEnv     The processing env
      * @param elementUtils      The elements
      * @param messager          The messager
      * @param types             The types
@@ -67,6 +70,7 @@ public class AnnotationUtils {
      * @param visitorAttributes The visitor attributes
      */
     protected AnnotationUtils(
+            ProcessingEnvironment processingEnv,
             Elements elementUtils,
             Messager messager,
             Types types,
@@ -79,11 +83,13 @@ public class AnnotationUtils {
         this.modelUtils = modelUtils;
         this.filer = filer;
         this.visitorAttributes = visitorAttributes;
+        this.processingEnv = processingEnv;
     }
 
     /**
      * Default constructor.
      *
+     * @param processingEnv     The processing env
      * @param elementUtils      The elements
      * @param messager          The messager
      * @param types             The types
@@ -91,12 +97,13 @@ public class AnnotationUtils {
      * @param filer             The filer
      */
     protected AnnotationUtils(
+            ProcessingEnvironment processingEnv,
             Elements elementUtils,
             Messager messager,
             Types types,
             ModelUtils modelUtils,
             Filer filer) {
-        this(elementUtils, messager, types, modelUtils, filer, new MutableConvertibleValuesMap<>());
+        this(processingEnv, elementUtils, messager, types, modelUtils, filer, new MutableConvertibleValuesMap<>());
     }
 
     /**
@@ -210,6 +217,7 @@ public class AnnotationUtils {
      */
     public JavaVisitorContext newVisitorContext() {
         return new JavaVisitorContext(
+                processingEnv,
                 messager,
                 elementUtils,
                 this,

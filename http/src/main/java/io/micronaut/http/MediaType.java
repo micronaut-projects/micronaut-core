@@ -15,6 +15,7 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
@@ -49,6 +50,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
+@TypeHint(value = MediaType[].class, accessType = TypeHint.AccessType.CLASS_LOADING)
 public class MediaType implements CharSequence {
 
     /**

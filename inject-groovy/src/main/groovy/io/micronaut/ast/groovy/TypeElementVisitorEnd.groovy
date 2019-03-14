@@ -20,6 +20,7 @@ import io.micronaut.ast.groovy.utils.AstAnnotationUtils
 import io.micronaut.ast.groovy.utils.AstMessageUtils
 import io.micronaut.ast.groovy.visitor.GroovyVisitorContext
 import io.micronaut.ast.groovy.visitor.LoadedVisitor
+import io.micronaut.core.order.OrderUtil
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.control.CompilePhase
@@ -42,7 +43,9 @@ class TypeElementVisitorEnd implements ASTTransformation {
         Map<String, LoadedVisitor> loadedVisitors = TypeElementVisitorTransform.loadedVisitors
 
         if (loadedVisitors != null) {
-            for(loadedVisitor in loadedVisitors.values()) {
+            List<LoadedVisitor> values = new ArrayList<>(loadedVisitors.values())
+            OrderUtil.reverseSort(values)
+            for(loadedVisitor in values) {
                 try {
                     loadedVisitor.finish(new GroovyVisitorContext(source))
                 } catch (Throwable e) {

@@ -74,13 +74,21 @@ class PropertySourcePropertyResolverSpec extends Specification {
         where:
         property                      | value | key                           | type   | expected
         'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2-access-token' | String | 'xxx'
-        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2.access.token' | String | 'xxx'
         'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2.access-token' | String | 'xxx'
-        'MY_APP_MY_STUFF'             | 'xxx' | 'my-app.my-stuff'             | String | 'xxx'
+        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2.access.token' | String | 'xxx'
+        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter.oauth2-access.token' | String | 'xxx'
+        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter-oauth2.access.token' | String | 'xxx'
+        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter-oauth2-access-token' | String | 'xxx'
+        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter-oauth2.access-token' | String | 'xxx'
+        'TWITTER_OAUTH2_ACCESS_TOKEN' | 'xxx' | 'twitter-oauth2-access.token' | String | 'xxx'
         'MY_APP_MY_STUFF'             | 'xxx' | 'my.app.my.stuff'             | String | 'xxx'
         'MY_APP_MY_STUFF'             | 'xxx' | 'my.app.my-stuff'             | String | 'xxx'
+        'MY_APP_MY_STUFF'             | 'xxx' | 'my.app-my.stuff'             | String | 'xxx'
+        'MY_APP_MY_STUFF'             | 'xxx' | 'my.app-my-stuff'             | String | 'xxx'
+        'MY_APP_MY_STUFF'             | 'xxx' | 'my-app.my.stuff'             | String | 'xxx'
+        'MY_APP_MY_STUFF'             | 'xxx' | 'my-app.my-stuff'             | String | 'xxx'
+        'MY_APP_MY_STUFF'             | 'xxx' | 'my-app-my.stuff'             | String | 'xxx'
         'MY_APP_MY_STUFF'             | 'xxx' | 'my-app-my-stuff'             | String | 'xxx'
-
     }
 
     @Unroll
@@ -147,13 +155,13 @@ class PropertySourcePropertyResolverSpec extends Specification {
     void "test resolve placeholders for lists of map"() {
         given:
         def values = [
-                'foo.bar' : '10',
-                'foo.bar.list' : [
+                'foo.bar'     : '10',
+                'foo.bar.list': [
                         [
-                                'foo' : '${foo.bar}'
+                                'foo': '${foo.bar}'
                         ],
                         [
-                                'bar' : 'baz'
+                                'bar': 'baz'
                         ]
                 ]
         ]
@@ -299,4 +307,26 @@ class PropertySourcePropertyResolverSpec extends Specification {
         applicationContext.getProperty('micronaut.security.enabled', Boolean).get() == true
 
     }
+
+    void "test property lists with 3 entries or more"() {
+        given:
+        def values = new HashMap()
+        values.put('foo[0]', 'bar')
+        values.put('foo[1]', 'baz')
+        values.put('foo[2]', 'foo')
+        values.put('foo[3]', 'baar')
+        values.put('foo[4]', 'baaz')
+        values.put('foo[5]', 'fooo')
+        values.put('foo[15]', 'fooo')
+
+        PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
+                PropertySource.of("test", values)
+        )
+
+        expect:
+        resolver.getProperty("foo", List).get().get(0) == "bar"
+
+    }
+
+
 }

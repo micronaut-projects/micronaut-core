@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.env;
 
+import io.micronaut.context.env.PropertyPlaceholderResolver.Placeholder;
+
 import javax.annotation.Nullable;
 import java.util.Optional;
 
@@ -28,16 +30,29 @@ class DefaultPlaceholder implements PropertyPlaceholderResolver.Placeholder {
 
     private final String property;
     private final String defaultValue;
+    private final Placeholder placeholder;
 
     /**
-     * Default constructor.
-     *
-     * @param property The property
+     * @param property     The property
      * @param defaultValue The default value
      */
     DefaultPlaceholder(String property, @Nullable String defaultValue) {
         this.property = property;
         this.defaultValue = defaultValue;
+        this.placeholder = null;
+    }
+
+    /**
+     * Default constructor.
+     *
+     * @param property     The property
+     * @param defaultValue The default value
+     * @param placeholder  Additional placeholders
+     */
+    DefaultPlaceholder(String property, @Nullable String defaultValue, @Nullable Placeholder placeholder) {
+        this.property = property;
+        this.defaultValue = defaultValue;
+        this.placeholder = placeholder;
     }
 
     @Override
@@ -48,5 +63,10 @@ class DefaultPlaceholder implements PropertyPlaceholderResolver.Placeholder {
     @Override
     public Optional<String> getDefaultValue() {
         return Optional.ofNullable(defaultValue);
+    }
+
+    @Override
+    public Optional<Placeholder> getPlaceholderValue() {
+        return Optional.ofNullable(placeholder);
     }
 }

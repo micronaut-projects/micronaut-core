@@ -73,6 +73,7 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
         this.typeUtils = processingEnv.getTypeUtils();
         this.modelUtils = new ModelUtils(elementUtils, typeUtils);
         this.annotationUtils = new AnnotationUtils(
+                processingEnv,
                 elementUtils,
                 messager,
                 typeUtils,
@@ -85,7 +86,9 @@ abstract class AbstractInjectAnnotationProcessor extends AbstractProcessor {
                 typeUtils,
                 modelUtils
         );
+
         this.javaVisitorContext = new JavaVisitorContext(
+                processingEnv,
                 messager,
                 elementUtils,
                 annotationUtils,
