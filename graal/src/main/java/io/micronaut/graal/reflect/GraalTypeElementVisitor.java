@@ -120,7 +120,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     }
 
     private void possiblyReflectOnType(ClassElement type) {
-        if (type == null || type.isPrimitive() || type.isAbstract()) {
+        if (type == null || type.isPrimitive() || type.isAbstract() || type.isEnum() || type.getName().startsWith("java.lang")) {
             return;
         }
 
