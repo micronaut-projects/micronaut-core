@@ -454,7 +454,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                                 if (v instanceof List) {
                                     list = (List) v;
                                 } else {
-                                    list = new ArrayList();
+                                    list = new ArrayList(10);
                                     entries.put(resolvedProperty, list);
                                 }
                                 list = fill(list, number, null);
