@@ -5,6 +5,7 @@ import io.micronaut.http.HttpRequest
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
+import io.micronaut.http.annotation.Put
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.client.RxHttpClient
@@ -69,6 +70,7 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         client.configuration == config
         result == 'created'
         tcBar.save() == 'created'
+        tcBar.update() == "updated"
 
         cleanup:
         firstApp.close()
@@ -109,13 +111,16 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         String index()
     }
 
-    @Client(id = "bar")
+    @Client("bar")
     static interface TestClientBar {
         @Post
         String save()
+
+        @Put("update")
+        String update()
     }
 
-    @Controller('/manual/http/service')
+    @Controller('manual/http/service')
     static class TestController {
         @Get
         String index() {
@@ -125,6 +130,11 @@ class ManualHttpServiceDefinitionSpec extends Specification {
         @Post
         String save() {
             return "created"
+        }
+
+        @Put("update")
+        String update() {
+            return "updated"
         }
     }
 }
