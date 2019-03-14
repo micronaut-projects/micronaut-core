@@ -13,39 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http.annotation;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+package io.micronaut.core.annotation;
 
-import io.micronaut.context.annotation.Executable;
-import io.micronaut.core.annotation.EntryPoint;
-
-import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * <p>A meta annotation for HTTP {@link Controller} actions.</p>
+ * EntryPoint is a meta-annotation used on other annotations to indicate that the annotated
+ * element is an entry point into the framework from the outside. This is useful to identify ingress points that may require reflection to proceed.
  *
- * @author Graeme Rocher
- * @since 1.0
+ * @since 1.1
+ * @author graemerocher
  */
-@Documented
-@Retention(RUNTIME)
 @Target({ElementType.ANNOTATION_TYPE})
-@Executable
-@EntryPoint
-public @interface HttpMethodMapping {
-
-    /**
-     * @deprecated Use {@link UriMapping#DEFAULT_URI} instead
-     */
-    @Deprecated
-    String DEFAULT_URI = UriMapping.DEFAULT_URI;
-
-    /**
-     * @return The URI of the action
-     */
-    String value() default UriMapping.DEFAULT_URI;
+@Retention(RetentionPolicy.RUNTIME)
+@Experimental
+public @interface EntryPoint {
 }
