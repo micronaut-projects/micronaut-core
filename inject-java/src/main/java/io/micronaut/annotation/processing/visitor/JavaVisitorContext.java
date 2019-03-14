@@ -65,8 +65,6 @@ public class JavaVisitorContext implements VisitorContext {
     private final ModelUtils modelUtils;
     private final AnnotationProcessingOutputVisitor outputVisitor;
     private final MutableConvertibleValues<Object> visitorAttributes;
-    private final ProcessingEnvironment processingEnv;
-    private final Filer filer;
     private @Nullable JavaFileManager standardFileManager;
 
     /**
@@ -89,13 +87,11 @@ public class JavaVisitorContext implements VisitorContext {
             ModelUtils modelUtils,
             Filer filer,
             MutableConvertibleValues<Object> visitorAttributes) {
-        this.processingEnv = processingEnv;
         this.messager = messager;
         this.elements = elements;
         this.annotationUtils = annotationUtils;
         this.types = types;
         this.modelUtils = modelUtils;
-        this.filer = filer;
         this.outputVisitor = new AnnotationProcessingOutputVisitor(filer);
         this.visitorAttributes = visitorAttributes;
 
