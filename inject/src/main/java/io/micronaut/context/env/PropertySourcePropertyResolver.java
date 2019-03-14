@@ -457,7 +457,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                                     list = new ArrayList(10);
                                     entries.put(resolvedProperty, list);
                                 }
-                                list = fill(list, number, null);
+                                fill(list, number, null);
                                 list.set(number, value);
                             } else {
                                 Map map;
@@ -664,12 +664,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         return name;
     }
 
-    private List fill(List list, Integer toIndex, Object value) {
+    private void fill(List list, Integer toIndex, Object value) {
         if (toIndex >= list.size()) {
             for (int i = list.size(); i <= toIndex; i++) {
                 list.add(i, value);
             }
         }
-        return list;
     }
 }
