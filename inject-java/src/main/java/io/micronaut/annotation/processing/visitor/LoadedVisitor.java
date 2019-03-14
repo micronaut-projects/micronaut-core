@@ -18,10 +18,12 @@ package io.micronaut.annotation.processing.visitor;
 import io.micronaut.annotation.processing.GenericUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.reflect.GenericTypeUtils;
 import io.micronaut.inject.processing.JavaModelUtils;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 
+import javax.annotation.Nullable;
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.lang.model.element.*;
 import javax.lang.model.type.TypeMirror;
@@ -37,7 +39,7 @@ import java.util.List;
  * @since 1.0
  */
 @Internal
-public class LoadedVisitor {
+public class LoadedVisitor implements Ordered {
 
     private final TypeElementVisitor visitor;
     private final String classAnnotation;
@@ -75,6 +77,11 @@ public class LoadedVisitor {
         }
     }
 
+    @Override
+    public int getOrder() {
+        return visitor.getOrder();
+    }
+
     /**
      * @return The visitor
      */
@@ -110,55 +117,69 @@ public class LoadedVisitor {
      *
      * @param element            The element to visit
      * @param annotationMetadata The annotation data for the node
+     *
+     * @return The element if one was created or null
      */
-    public void visit(Element element, AnnotationMetadata annotationMetadata) {
+    public @Nullable io.micronaut.inject.ast.Element visit(
+            Element element, AnnotationMetadata annotationMetadata) {
         if (element instanceof VariableElement) {
+            final JavaFieldElement e = new JavaFieldElement(
+                    (VariableElement) element,
+                    annotationMetadata,
+                    visitorContext);
             visitor.visitField(
-                    new JavaFieldElement(
-                            (VariableElement) element,
-                            annotationMetadata,
-                            visitorContext),
+                    e,
                     visitorContext
             );
+            return e;
         } else if (element instanceof ExecutableElement) {
             ExecutableElement executableElement = (ExecutableElement) element;
             if (executableElement.getSimpleName().toString().equals("<init>")) {
+                final JavaConstructorElement e = new JavaConstructorElement(
+                        executableElement,
+                        annotationMetadata, visitorContext);
                 visitor.visitConstructor(
-                        new JavaConstructorElement(
-                                executableElement,
-                                annotationMetadata, visitorContext),
+                        e,
                         visitorContext
                 );
+                return e;
             } else {
+                final JavaMethodElement e = new JavaMethodElement(
+                        executableElement,
+                        annotationMetadata, visitorContext);
                 visitor.visitMethod(
-                        new JavaMethodElement(
-                                executableElement,
-                                annotationMetadata, visitorContext),
+                        e,
                         visitorContext
                 );
+                return e;
             }
         } else if (element instanceof TypeElement) {
             TypeElement typeElement = (TypeElement) element;
             boolean isEnum = JavaModelUtils.resolveKind(typeElement, ElementKind.ENUM).isPresent();
             if (isEnum) {
+                final JavaEnumElement e = new JavaEnumElement(
+                        typeElement,
+                        annotationMetadata,
+                        visitorContext,
+                        Collections.emptyList());
                 visitor.visitClass(
-                        new JavaEnumElement(
-                                typeElement,
-                                annotationMetadata,
-                                visitorContext,
-                                Collections.emptyList()),
+                        e,
                         visitorContext
                 );
+                return e;
             } else {
+                final JavaClassElement e = new JavaClassElement(
+                        typeElement,
+                        annotationMetadata,
+                        visitorContext);
                 visitor.visitClass(
-                        new JavaClassElement(
-                                typeElement,
-                                annotationMetadata,
-                                visitorContext),
+                        e,
                         visitorContext
                 );
+                return e;
             }
         }
+        return null;
     }
 
     @Override

@@ -95,6 +95,14 @@ $ mn create-app my-app --features aws-api-gateway
 ----
 ====
 
+=== GraalVM Native Improvements
+
+Support for GraalVM Substrate (`nativeimage`) has been improved in a number of different ways.
+
+* *Framework Improvements* - Framework level dynamic classloading and reflection has been completely removed thus making it easier to get applications running on GraalVM `nativeimage` and reducing the number of customizations necessary.
+* *Build Time Reflection Data* - Thanks to the aforementioned feature, the older `GraalClassLoadingAnalyzer` runtime step has been removed and replaced by build time generation of `reflect.json` for classes that do require it (typically third party libraries).
+
+
 === AWS Lambda Custom Runtime + GraalVM Support
 
 Support for creating AWS API Gateway applications (see above) that are compiled into GraalVM native images and run using an AWS Lambda Custom Runtime has been added. This reduces cold starts on Lambda to 100-200ms.

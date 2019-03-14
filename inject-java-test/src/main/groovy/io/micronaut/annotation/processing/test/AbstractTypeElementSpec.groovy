@@ -34,6 +34,8 @@ import io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder
 import io.micronaut.inject.writer.BeanConfigurationWriter
 import spock.lang.Specification
 
+import javax.annotation.Nonnull
+import javax.annotation.Nullable
 import javax.lang.model.element.Element
 import javax.lang.model.element.ExecutableElement
 import javax.lang.model.element.TypeElement
@@ -59,6 +61,18 @@ abstract class AbstractTypeElementSpec extends Specification {
         JavaAnnotationMetadataBuilder builder = newJavaAnnotationBuilder()
         AnnotationMetadata metadata = element != null ? builder.build(element) : null
         return metadata
+    }
+
+    /**
+     * Reads a generated file
+     * @param filePath The file path
+     * @param className The class name
+     * @param code The code
+     * @return The reader
+     * @throws IOException
+     */
+    public @Nullable Reader readGenerated(@Nonnull String filePath, String className, String code) throws IOException {
+        return newJavaParser().readGenerated(filePath, className, code)
     }
 
     /**
@@ -209,7 +223,7 @@ abstract class AbstractTypeElementSpec extends Specification {
         def env = JavacProcessingEnvironment.instance(new Context())
         def elements = JavacElements.instance(new Context())
         ModelUtils modelUtils = new ModelUtils(elements, env.typeUtils) {}
-        AnnotationUtils annotationUtils = new AnnotationUtils(elements, env.messager, env.typeUtils, modelUtils, env.filer) {
+        AnnotationUtils annotationUtils = new AnnotationUtils(env, elements, env.messager, env.typeUtils, modelUtils, env.filer) {
         }
         JavaAnnotationMetadataBuilder builder = new JavaAnnotationMetadataBuilder(elements, env.messager, annotationUtils, env.typeUtils, modelUtils, env.filer)
         return builder

@@ -6,18 +6,9 @@ Once again Micronaut leverages JSR-330 and the link:{jeeapi}/javax/inject/Qualif
 
 To qualify by name you can use the link:{jeeapi}/javax/inject/Named.html[Named] annotation. For example, consider the following classes:
 
-[source,groovy]
-----
-import javax.inject.*
+snippet::io.micronaut.docs.inject.qualifiers.named.Engine,io.micronaut.docs.inject.qualifiers.named.V6Engine,io.micronaut.docs.inject.qualifiers.named.V8Engine,io.micronaut.docs.inject.qualifiers.named.Vehicle[tags="class",indent=0]
 
-include::{testsdir}/qualifiers/named/Engine.groovy[tags=class, indent=0]
 
-include::{testsdir}/qualifiers/named/V6Engine.groovy[tags=class, indent=0]
-
-include::{testsdir}/qualifiers/named/V8Engine.groovy[tags=class, indent=0]
-
-include::{testsdir}/qualifiers/named/Vehicle.groovy[tags=class, indent=0]
-----
 
 <1> The `Engine` interface defines the common contract
 <2> The `V6Engine` class is the first implementation

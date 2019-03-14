@@ -128,7 +128,14 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The {@link AnnotationMetadata}
      */
     public AnnotationMetadata buildForParent(T parent, T element) {
-        DefaultAnnotationMetadata annotationMetadata = new DefaultAnnotationMetadata();
+        final AnnotationMetadata existing = MUTATED_ANNOTATION_METADATA.get(element);
+        DefaultAnnotationMetadata annotationMetadata;
+        if (existing instanceof DefaultAnnotationMetadata) {
+            // ugly, but will have to do
+            annotationMetadata = (DefaultAnnotationMetadata) ((DefaultAnnotationMetadata) existing).clone();
+        } else {
+            annotationMetadata = new DefaultAnnotationMetadata();
+        }
         return buildInternal(parent, element, annotationMetadata, false);
     }
 

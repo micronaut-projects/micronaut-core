@@ -15,6 +15,7 @@
  */
 package io.micronaut.context;
 
+import javax.annotation.Nonnull;
 import java.io.Closeable;
 
 /**
@@ -39,7 +40,7 @@ public interface LifeCycle<T extends LifeCycle> extends Closeable, AutoCloseable
      *
      * @return This lifecycle component
      */
-    default T start() {
+    default @Nonnull T start() {
         return (T) this;
     }
 
@@ -48,7 +49,7 @@ public interface LifeCycle<T extends LifeCycle> extends Closeable, AutoCloseable
      *
      * @return This lifecycle component
      */
-    default T stop() {
+    default @Nonnull T stop() {
         return (T) this;
     }
 
@@ -65,7 +66,7 @@ public interface LifeCycle<T extends LifeCycle> extends Closeable, AutoCloseable
      *
      * @return This lifecycle component
      */
-    default T refresh() {
+    default @Nonnull T refresh() {
         stop();
         start();
         return (T) this;

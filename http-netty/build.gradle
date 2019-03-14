@@ -1,4 +1,6 @@
 dependencies {
+    compileOnly "com.oracle.substratevm:svm:$graalVersion"
+    compileOnly project(":graal")
     compile project(":buffer-netty")
     compile project(":http")
     compile project(":websocket")

@@ -25,13 +25,14 @@ import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.conventions.StringConvention;
+import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.MapPropertyResolver;
 import io.micronaut.core.value.PropertyResolver;
 import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -49,7 +50,7 @@ import java.util.stream.Collectors;
  */
 public class PropertySourcePropertyResolver implements PropertyResolver {
 
-    private static final Logger LOG = LoggerFactory.getLogger(PropertySourcePropertyResolver.class);
+    private static final Logger LOG = ClassUtils.getLogger(PropertySourcePropertyResolver.class);
     private static final Pattern RANDOM_PATTERN = Pattern.compile("\\$\\{\\s?random\\.(\\S+?)\\}");
 
     protected final ConversionService<?> conversionService;
@@ -185,10 +186,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
     }
 
     @Override
-    public <T> Optional<T> getProperty(@Nullable String name, ArgumentConversionContext<T> conversionContext) {
+    public <T> Optional<T> getProperty(@Nonnull String name, @Nonnull ArgumentConversionContext<T> conversionContext) {
         if (StringUtils.isEmpty(name)) {
             return Optional.empty();
         } else {
+            ArgumentUtils.requireNonNull("conversionContext", conversionContext);
             Class<T> requiredType = conversionContext.getArgument().getType();
             boolean cacheableType = requiredType == Boolean.class || requiredType == String.class;
             String cacheName = name + '|' + requiredType.getSimpleName();
@@ -452,10 +454,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                                 if (v instanceof List) {
                                     list = (List) v;
                                 } else {
-                                    list = new ArrayList(number);
+                                    list = new ArrayList(10);
                                     entries.put(resolvedProperty, list);
                                 }
-                                list.add(number, value);
+                                fill(list, number, null);
+                                list.set(number, value);
                             } else {
                                 Map map;
                                 if (v instanceof Map) {
@@ -617,20 +620,12 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         switch (convention) {
             case ENVIRONMENT_VARIABLE:
                 String[] tokens = property.split("_");
-                List<String> properties = new ArrayList<>(tokens.length);
+                Set<String> properties = new HashSet<>(tokens.length);
 
-                StringBuilder path = new StringBuilder();
-                int len = tokens.length;
-                if (len > 1) {
-                    for (int i = 0; i < len; i++) {
-                        String token = tokens[i];
-                        if (i < (len - 1)) {
-                            path.append(token.toLowerCase(Locale.ENGLISH)).append('.');
-                            String[] subTokens = Arrays.copyOfRange(tokens, i + 1, len);
-                            properties.add(path + Arrays.stream(subTokens).map(s -> s.toLowerCase(Locale.ENGLISH)).collect(Collectors.joining("")));
-                        }
-                    }
-                    return properties;
+                if (tokens.length > 1) {
+                    properties.addAll(generatePropertiesCombinations(tokens, new StringBuilder(), '.'));
+                    properties.addAll(generatePropertiesCombinations(tokens, new StringBuilder(), '-'));
+                    return new ArrayList<>(properties);
                 } else {
                     return Collections.singletonList(property.toLowerCase(Locale.ENGLISH));
                 }
@@ -641,11 +636,39 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
         }
     }
 
+    private List<String> generatePropertiesCombinations(String[] tokens, StringBuilder path, Character separator) {
+        Set<String> properties = new HashSet<>(tokens.length);
+        int len = tokens.length;
+        StringBuilder tmpPath = new StringBuilder(path.toString());
+        for (int i = 0; i < len; i++) {
+            String token = tokens[i];
+            if (i < (len - 1)) {
+                tmpPath.append(token.toLowerCase(Locale.ENGLISH)).append(separator);
+                String[] subTokens = Arrays.copyOfRange(tokens, i + 1, len);
+                properties.add(tmpPath + Arrays.stream(subTokens).map(s -> s.toLowerCase(Locale.ENGLISH)).collect(Collectors.joining(".")));
+                properties.add(tmpPath + Arrays.stream(subTokens).map(s -> s.toLowerCase(Locale.ENGLISH)).collect(Collectors.joining("-")));
+
+                properties.addAll(generatePropertiesCombinations(subTokens, tmpPath, '.'));
+                properties.addAll(generatePropertiesCombinations(subTokens, tmpPath, '-'));
+            }
+        }
+
+        return new ArrayList<>(properties);
+    }
+
     private String trimIndex(String name) {
         int i = name.indexOf('[');
         if (i > -1 && name.endsWith("]")) {
             name = name.substring(0, i);
         }
         return name;
+    }
+
+    private void fill(List list, Integer toIndex, Object value) {
+        if (toIndex >= list.size()) {
+            for (int i = list.size(); i <= toIndex; i++) {
+                list.add(i, value);
+            }
+        }
     }
 }

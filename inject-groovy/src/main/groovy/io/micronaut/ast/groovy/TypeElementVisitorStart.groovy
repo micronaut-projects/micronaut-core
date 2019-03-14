@@ -22,6 +22,7 @@ import io.micronaut.ast.groovy.visitor.LoadedVisitor
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.io.service.ServiceDefinition
 import io.micronaut.core.io.service.SoftServiceLoader
+import io.micronaut.core.order.OrderUtil
 import io.micronaut.core.reflect.InstantiationUtils
 import io.micronaut.core.util.StringUtils
 import io.micronaut.core.version.VersionUtils
@@ -90,7 +91,9 @@ class TypeElementVisitorStart implements ASTTransformation {
 
 
             def visitorContext = new GroovyVisitorContext(source)
-            for(loadedVisitor in loadedVisitors.values()) {
+            List<LoadedVisitor> values = new ArrayList<>(loadedVisitors.values())
+            OrderUtil.reverseSort(values)
+            for(loadedVisitor in (values)) {
                 try {
                     loadedVisitor.start(visitorContext)
                 } catch (Throwable e) {

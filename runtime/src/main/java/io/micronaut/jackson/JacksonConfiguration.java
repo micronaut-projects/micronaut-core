@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.*;
 import com.fasterxml.jackson.databind.type.TypeFactory;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -37,6 +38,14 @@ import java.util.*;
  * @since 1.0
  */
 @ConfigurationProperties("jackson")
+@TypeHint(
+        value = {
+                PropertyNamingStrategy.UpperCamelCaseStrategy.class,
+                ArrayList.class,
+                LinkedHashMap.class,
+                HashSet.class
+        },
+        accessType = TypeHint.AccessType.CLASS_LOADING)
 public class JacksonConfiguration {
 
     /**

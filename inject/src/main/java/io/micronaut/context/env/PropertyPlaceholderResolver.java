@@ -18,6 +18,7 @@ package io.micronaut.context.env;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.util.StringUtils;
 
+import javax.annotation.Nonnull;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -42,7 +43,7 @@ public interface PropertyPlaceholderResolver {
     /**
      * @return The prefix used
      */
-    default String getPrefix() {
+    default @Nonnull String getPrefix() {
         return DefaultPropertyPlaceholderResolver.PREFIX;
     }
 
@@ -53,7 +54,7 @@ public interface PropertyPlaceholderResolver {
      * @return The optional string or {@link Optional#empty()} if resolution was not possible
      * @throws ConfigurationException If the placeholders could not be resolved
      */
-    default String resolveRequiredPlaceholders(String str) throws ConfigurationException {
+    default @Nonnull String resolveRequiredPlaceholders(String str) throws ConfigurationException {
         return resolvePlaceholders(str).orElseThrow(() -> new ConfigurationException("Unable to resolve placeholders for property: " + str));
     }
 
@@ -121,5 +122,12 @@ public interface PropertyPlaceholderResolver {
          * @return The default value
          */
         Optional<String> getDefaultValue();
+
+        /**
+         * An optional placeholder.
+         *
+         * @return An optional placeholder
+         */
+        Optional<Placeholder> getPlaceholderValue();
     }
 }

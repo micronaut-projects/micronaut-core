@@ -2,6 +2,7 @@ dependencies {
     compile project(":router")
     compile project(":runtime")
     compileOnly project(":inject-java")
+    compileOnly project(":graal")
 
     testCompile project(":http-client")
     testCompile project(":inject-groovy")
