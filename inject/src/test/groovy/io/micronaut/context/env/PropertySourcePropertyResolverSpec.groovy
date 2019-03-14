@@ -310,13 +310,14 @@ class PropertySourcePropertyResolverSpec extends Specification {
 
     void "test property lists with 3 entries or more"() {
         given:
-        def values = new HashMap();
+        def values = new HashMap()
         values.put('foo[0]', 'bar')
         values.put('foo[1]', 'baz')
         values.put('foo[2]', 'foo')
         values.put('foo[3]', 'baar')
         values.put('foo[4]', 'baaz')
         values.put('foo[5]', 'fooo')
+        values.put('foo[15]', 'fooo')
 
         PropertySourcePropertyResolver resolver = new PropertySourcePropertyResolver(
                 PropertySource.of("test", values)
