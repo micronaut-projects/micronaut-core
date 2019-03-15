@@ -17,6 +17,7 @@ package io.micronaut.management.health.indicator;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.health.HealthStatus;
 
 import java.util.Map;
@@ -27,6 +28,7 @@ import java.util.Map;
  * @author graemerocher
  * @since 1.0
  */
+@Introspected
 class DefaultHealthResult implements HealthResult {
     private final String name;
     private final HealthStatus healthStatus;
