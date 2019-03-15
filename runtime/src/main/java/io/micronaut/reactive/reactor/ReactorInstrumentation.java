@@ -18,6 +18,7 @@ package io.micronaut.reactive.reactor;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.env.Environment;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.context.exceptions.BeanContextException;
@@ -29,7 +30,6 @@ import io.micronaut.scheduling.TaskExecutors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
-import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
 
 import javax.annotation.PostConstruct;
@@ -37,7 +37,6 @@ import java.util.Collection;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadFactory;
-import java.util.function.Supplier;
 
 /**
  * Instruments Reactor such that the thread factory used by Micronaut is used and instrumentations can be applied to the {@link java.util.concurrent.ScheduledExecutorService}.
@@ -57,6 +56,7 @@ class ReactorInstrumentation {
      * @param beanContext   The bean context
      * @param threadFactory The factory to create new threads on-demand
      */
+    @SuppressWarnings("unchecked")
     @PostConstruct
     void init(BeanContext beanContext, ThreadFactory threadFactory) {
         try {
@@ -64,46 +64,16 @@ class ReactorInstrumentation {
             Collection<BeanCreatedEventListener> schedulerCreateListeners =
                     beanContext.getBeansOfType(BeanCreatedEventListener.class, Qualifiers.byTypeArguments(ScheduledExecutorService.class));
 
-            Schedulers.setFactory(
-                    new Schedulers.Factory() {
-                        @SuppressWarnings("unchecked")
-                        @Override
-                        public ScheduledExecutorService decorateExecutorService(String schedulerType, Supplier<? extends ScheduledExecutorService> actual) {
-                            ScheduledExecutorService scheduledExecutorService = actual.get();
-                            for (BeanCreatedEventListener schedulerCreateListener : schedulerCreateListeners) {
-                                Object newBean = schedulerCreateListener.onCreated(new BeanCreatedEvent(beanContext, beanDefinition, BeanIdentifier.of("reactor-" + schedulerType), scheduledExecutorService));
-                                if (!(newBean instanceof ScheduledExecutorService)) {
-                                    throw new BeanContextException("Bean creation listener [" + schedulerCreateListener + "] should return ScheduledExecutorService, but returned " + newBean);
-                                }
-                                scheduledExecutorService = (ScheduledExecutorService) newBean;
-                            }
-                            return scheduledExecutorService;
-                        }
-
-                        @Override
-                        public Scheduler newElastic(int ttlSeconds, ThreadFactory threadFactory) {
-                            return Schedulers.Factory.super.newElastic(
-                                    ttlSeconds,
-                                    threadFactory
-                            );
-                        }
-
-                        @Override
-                        public Scheduler newParallel(int parallelism, ThreadFactory threadFactory) {
-                            return Schedulers.Factory.super.newParallel(
-                                    parallelism,
-                                    threadFactory
-                            );
-                        }
-
-                        @Override
-                        public Scheduler newSingle(ThreadFactory threadFactory) {
-                            return Schedulers.Factory.super.newSingle(
-                                    threadFactory
-                            );
-                        }
+            Schedulers.addExecutorServiceDecorator(Environment.MICRONAUT, (scheduler, scheduledExecutorService) -> {
+                for (BeanCreatedEventListener schedulerCreateListener : schedulerCreateListeners) {
+                    Object newBean = schedulerCreateListener.onCreated(new BeanCreatedEvent(beanContext, beanDefinition, BeanIdentifier.of("reactor-" + scheduler.getClass().getSimpleName()), scheduledExecutorService));
+                    if (!(newBean instanceof ScheduledExecutorService)) {
+                        throw new BeanContextException("Bean creation listener [" + schedulerCreateListener + "] should return ScheduledExecutorService, but returned " + newBean);
                     }
-            );
+                    scheduledExecutorService = (ScheduledExecutorService) newBean;
+                }
+                return scheduledExecutorService;
+            });
         } catch (Exception e) {
             if (LOG.isErrorEnabled()) {
                 LOG.error("Could not instrument Reactor for Tracing: " + e.getMessage(), e);
