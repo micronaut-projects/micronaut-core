@@ -22,6 +22,7 @@ import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.annotation.AnnotationMetadataWriter;
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
@@ -212,6 +213,10 @@ public class ExecutableMethodWriter extends AbstractAnnotationMetadataWriter imp
                 argumentAnnotationMetadata,
                 genericTypes,
                 loadTypeMethods);
+
+            for (AnnotationMetadata value : argumentAnnotationMetadata.values()) {
+                DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, value);
+            }
             // now invoke super(..) if no arg constructor
             invokeConstructor(
                 executorMethodConstructor,

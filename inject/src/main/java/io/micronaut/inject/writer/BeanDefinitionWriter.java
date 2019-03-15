@@ -1421,6 +1421,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                                                    int injectInstanceIndex,
                                                    Method addMethodInjectionPointMethod) {
 
+        DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, annotationMetadata);
         boolean hasArguments = argumentTypes != null && !argumentTypes.isEmpty();
         int argCount = hasArguments ? argumentTypes.size() : 0;
         Type declaringTypeRef = getTypeReference(declaringType);
@@ -1442,6 +1443,9 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
                     argumentMetadata,
                     genericTypes,
                     loadTypeMethods);
+            for (AnnotationMetadata value : argumentMetadata.values()) {
+                DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, value);
+            }
         } else {
             constructorVisitor.visitInsn(ACONST_NULL);
         }
@@ -1925,6 +1929,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             Map<String, AnnotationMetadata> argumentAnnotationMetadata,
             Map<String, Map<String, Object>> genericTypes) {
         if (constructorVisitor == null) {
+            DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, constructorMetadata);
             Optional<AnnotationMetadata> argumentQualifier = argumentAnnotationMetadata != null ? argumentAnnotationMetadata.values().stream().filter(this::isArgumentType).findFirst() : Optional.empty();
             boolean isParametrized = argumentQualifier.isPresent();
             if (isParametrized) {
@@ -1981,7 +1986,18 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             if (argumentTypes == null || argumentTypes.isEmpty()) {
                 defaultConstructor.visitInsn(ACONST_NULL);
             } else {
-                pushBuildArgumentsForMethod(beanDefinitionType, classWriter, defaultConstructorVisitor, argumentTypes, argumentAnnotationMetadata, genericTypes, loadTypeMethods);
+                pushBuildArgumentsForMethod(
+                        beanDefinitionType,
+                        classWriter,
+                        defaultConstructorVisitor,
+                        argumentTypes,
+                        argumentAnnotationMetadata,
+                        genericTypes,
+                        loadTypeMethods
+                );
+                for (AnnotationMetadata value : argumentAnnotationMetadata.values()) {
+                    DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, value);
+                }
             }
 
             defaultConstructorVisitor.invokeConstructor(
