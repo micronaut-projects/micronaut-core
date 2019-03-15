@@ -1213,7 +1213,11 @@ public interface RouteBuilder {
         }
 
         /**
-         * Normalizes a URI, ensuring the first character starts with a /.
+         * Normalizes a URI.
+         *
+         * Ensures the string:
+         * 1) Does not end with a /
+         * 2) Starts with a /
          *
          * @param uri The URI
          * @return The normalized URI or null
@@ -1221,11 +1225,11 @@ public interface RouteBuilder {
         default String normalizeUri(@Nullable String uri) {
             if (uri != null) {
                 int len = uri.length();
-                if (len == 1 && uri.charAt(0) == '/') {
-                    return "";
+                if (len > 0 && uri.charAt(0) != '/') {
+                    uri = '/' + uri;
                 }
                 if (len > 0 && uri.charAt(uri.length() - 1) == '/') {
-                    return uri.substring(0, uri.length() - 1);
+                    uri = uri.substring(0, uri.length() - 1);
                 }
                 if (len > 0) {
                     return uri;
