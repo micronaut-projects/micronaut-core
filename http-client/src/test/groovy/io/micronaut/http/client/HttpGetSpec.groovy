@@ -398,6 +398,31 @@ class HttpGetSpec extends Specification {
         client.formatDateTimeQuery(dt) == dt.toString()
     }
 
+    void "test controller slash concatenation"() {
+        given:
+        BlockingHttpClient client = HttpClient.create(embeddedServer.getURL()).toBlocking()
+
+        expect:
+        client.retrieve("/noslash/slash") == "slash"
+        client.retrieve("/noslash/slash/") == "slash"
+        client.retrieve("/noslash/noslash") == "noslash"
+        client.retrieve("/noslash/noslash/") == "noslash"
+        client.retrieve("/slash/slash") == "slash"
+        client.retrieve("/slash/slash/") == "slash"
+        client.retrieve("/slash/noslash") == "noslash"
+        client.retrieve("/slash/noslash/") == "noslash"
+
+        client.retrieve("/ending-slash/slash") == "slash"
+        client.retrieve("/ending-slash/slash/") == "slash"
+        client.retrieve("/ending-slash/noslash") == "noslash"
+        client.retrieve("/ending-slash/noslash/") == "noslash"
+
+        client.retrieve("/noslash") == "noslash"
+        client.retrieve("/noslash/") == "noslash"
+        client.retrieve("/slash") == "slash"
+        client.retrieve("/slash/") == "slash"
+    }
+
     @Controller("/get")
     static class GetController {
 
@@ -464,6 +489,64 @@ class HttpGetSpec extends Specification {
         @Get("/dateTimeQuery")
         String formatDateTimeQuery(@QueryValue @Format('yyyy-MM-dd') LocalDate myDate) {
             return myDate.toString()
+        }
+    }
+
+
+    @Controller("noslash")
+    static class NoSlashController {
+
+        @Get("/slash")
+        String slash() {
+            "slash"
+        }
+
+        @Get("noslash")
+        String noSlash() {
+            "noslash"
+        }
+    }
+
+
+    @Controller("/slash")
+    static class SlashController {
+
+        @Get("/slash")
+        String slash() {
+            "slash"
+        }
+
+        @Get("noslash")
+        String noSlash() {
+            "noslash"
+        }
+    }
+
+    @Controller("/ending-slash/")
+    static class EndingSlashController {
+
+        @Get("/slash/")
+        String slash() {
+            "slash"
+        }
+
+        @Get("noslash/")
+        String noSlash() {
+            "noslash"
+        }
+    }
+
+    @Controller
+    static class SlashRootController {
+
+        @Get("/slash")
+        String slash() {
+            "slash"
+        }
+
+        @Get("noslash")
+        String noSlash() {
+            "noslash"
         }
     }
 
