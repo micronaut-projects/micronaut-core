@@ -163,7 +163,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         @javax.inject.Named(TaskExecutors.IO) ExecutorService ioExecutor,
         @javax.inject.Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
         ExecutorSelector executorSelector,
-        ServerSslBuilder serverSslBuilder,
+        Optional<ServerSslBuilder> serverSslBuilder,
         List<ChannelOutboundHandler> outboundHandlers,
         EventLoopGroupFactory eventLoopGroupFactory
     ) {
@@ -175,7 +175,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         this.beanLocator = applicationContext;
         this.environment = applicationContext.getEnvironment();
         this.serverConfiguration = serverConfiguration;
-        this.sslConfiguration = serverSslBuilder.getSslConfiguration();
         this.router = router;
         this.ioExecutor = ioExecutor;
         Optional<Integer> configPort = serverConfiguration.getPort();
@@ -189,14 +188,25 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             }
         }
 
-        int port = sslConfiguration.isEnabled() ? sslConfiguration.getPort() : specifiedPort;
+        int port = specifiedPort;
+        if (serverSslBuilder.isPresent()) {
+            ServerSslBuilder sslBuilder = serverSslBuilder.get();
+            this.sslConfiguration = sslBuilder.getSslConfiguration();
+            this.sslContext = sslBuilder.build().orElse(null);
+            if (this.sslConfiguration.isEnabled()) {
+                port = sslConfiguration.getPort();
+            }
+        } else {
+            this.sslConfiguration = null;
+            this.sslContext = null;
+        }
+
         this.serverPort = port == -1 ? SocketUtils.findAvailableTcpPort() : port;
         this.executorSelector = executorSelector;
         OrderUtil.sort(outboundHandlers);
         this.outboundHandlers = outboundHandlers;
         this.requestArgumentSatisfier = requestArgumentSatisfier;
         this.staticResourceResolver = resourceResolver;
-        this.sslContext = serverSslBuilder.build().orElse(null);
         this.threadFactory = threadFactory;
         this.webSocketBeanRegistry = WebSocketBeanRegistry.forServer(applicationContext);
         this.eventLoopGroupFactory = eventLoopGroupFactory;
@@ -322,7 +332,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
     @Override
     public String getScheme() {
-        return sslConfiguration.isEnabled() ? "https" : "http";
+        return (sslConfiguration != null && sslConfiguration.isEnabled()) ? "https" : "http";
     }
 
     @Override
