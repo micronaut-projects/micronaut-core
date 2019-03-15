@@ -28,5 +28,8 @@ import java.lang.annotation.*;
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE})
 public @interface Indexes {
+    /**
+     * @return A group of indexes
+     */
     Indexed[] value() default {};
 }
