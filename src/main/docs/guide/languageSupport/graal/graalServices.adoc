@@ -13,7 +13,20 @@ The `graal-native-image` feature adds four important items:
 1. The `svm` and `graal` dependencies to your `build.gradle` (or `pom.xml` if `--build maven` is used).
 2. A `Dockerfile` which can be used to construct the native image using Docker and a script `docker-build.sh` to run it.
 3. A `build-native-image.sh` script to build the native image without using Docker.
+4. A `native-image.properties` configuration file to `src/main/resources/META-INF/native-image` simplify building the image.
 
+The `native-image.properties` file that is generated looks something like:
+
+[source,properties]
+----
+Args = -H:IncludeResources=logback.xml|application.yml \ # <1>
+       -H:Name=example \ # <2>
+       -H:Class=example.Application # <3>
+----
+
+<1> The `-H:IncludeResources` argument allows you to tweak which static resources to include.
+<2> The `-H:Name` argument specifies the name of the native image that will be generated.
+<3> The `-H:Class` argument specifies the entry point of your application (the class that defines a `static void main` method.
 
 ==== Building a Native Image Using Docker
 
@@ -64,13 +77,13 @@ $ ./build-native-image.sh
 
 Micronaut itself does not rely on reflection or dynamic classloading so works automatically with GraalVM native, however certain third party libraries used by Micronaut may require additional input about uses of reflection.
 
-Micronaut includes an annotation processor that helps to handle generating the `reflect.json` metadata:
+Micronaut includes an annotation processor that helps to handle generating the `reflection-config.json` metadata that is automatically picked up by the `nativeimage` tool:
 
 dependency:micronaut-graal[scope="annotationProcessor"]
 
-This processor will generate a `reflect.json` file to a file called `META-INF/reflect.json` in your build classes directory (`target/classes` with Maven and typically `build/classes/java/main` with Gradle).
+This processor will generate a `reflection-config.json` file to a file to the `META-INF/native-image` directory in your build classes directory (`target/classes` with Maven and typically `build/classes/java/main` with Gradle) and a `native-image.properties` file to read this configuration for all classes annotated with either ann:core.annotation.Introspected[] or ann:core.annotation.TypeHint[].
 
-TIP: If you wish to provide your own `reflect.json` you can add one to `src/main/graal/reflect.json`.
+TIP: If you wish to provide your own `reflect.json` you can add one to `src/main/graal/reflect.json` and it will be automatically picked up.
 
 
 === Adding Additional Classes for Reflective Access
@@ -82,47 +95,33 @@ The former will generate a compile time introspection as well as allowing reflec
 [source,java]
 ----
 @TypeHint(
-        value = {
+        value = { // <1>
                 PropertyNamingStrategy.UpperCamelCaseStrategy.class,
                 ArrayList.class,
                 LinkedHashMap.class,
                 HashSet.class
         },
-        accessType = TypeHint.AccessType.CLASS_LOADING
+        accessType = TypeHint.AccessType.CLASS_LOADING // <2>
 )
 ----
 
+<1> The `value` member is used to specify which classes require reflection.
+<2> The `accessType` member specifies if only classloading access is needed or whether full reflection on all public members is needed.
+
 === Generating Native Images
 
-Once the `reflect.json` file is ready you can run the `native-image` command. The script runs the following `native-image` command:
+GraalVM's `native-image` command is used to generate native images. You can use this command manually to generate your native image. An example can be seen below.
 
 .The `native-image` command
 [source,bash]
 ----
 native-image --no-server \ # <1>
              --class-path build/libs/hello-world-0.1-all.jar \ # <2>
-             -H:ReflectionConfigurationFiles=build/classes/java/main/META-INF/reflect.json \ # <3>
-             -H:EnableURLProtocols=http \ # <4>
-             -H:IncludeResources="logback.xml|application.yml" \ # <5>
-             -H:Name=hello-world \ # <6>
-             -H:Class=hello.world.Application \ # <7>
-             -H:+ReportUnsupportedElementsAtRuntime \ # <8>
-             -H:+AllowVMInspection \
-             --allow-incomplete-classpath \ # <9>
-             --rerun-class-initialization-at-runtime='sun.security.jca.JCAUtil$CachedSecureRandomHolder,javax.net.ssl.SSLContext' \
-             --delay-class-initialization-to-runtime=io.netty.handler.codec.http.HttpObjectEncoder,io.netty.handler.codec.http.websocketx.WebSocket00FrameEncoder,io.netty.handler.ssl.util.ThreadLocalInsecureRandom,com.sun.jndi.dns.DnsClient # <10>
+             -H:ReflectionConfigurationFiles=reflect.json  # <3>
 ----
 <1> Do not start a background server to generate the native image
 <2> The `class-path` argument is used to refer to the Micronaut shaded JAR
-<3> The `-H:ReflectionConfigurationFiles` option points GraalVM to the `reflect.json` file (or files) needed to run the application. Multiple comma-separated files can be specified.
-<4> Micronaut uses the JVM's default URL connection classes. The `-H:EnableURLProtocols` allows using them in GraalVM `nativeimage`.
-<5> The `-H:IncludeResources` argument specifies a regex to dictate which static resources should be included in the image.
-<6> The `-H:Name` argument specifies the name of the native image to be built
-<7> The `-H:Class` argument specifies the Java main class that is the entry point of the application.
-<8> The `-H:+ReportUnsupportedElementsAtRuntime` tells GraalVM to report any `ClassNotFoundException` errors at runtime instead of at build time.
-<9> The `--allow-incomplete-classpath` tells GraalVM to report missing classes only at runtime instead of at native image generation time.
-<10> The `--delay-class-initialization-to-runtime` specifies which classes static initializers should be delayed until runtime. GraalVM by default runs static initializers at build time. That is undesirable in certain cases (particularly with Netty).
-
+<3> The `-H:ReflectionConfigurationFiles` option points GraalVM to any additional `reflect.json` files needed to run the application. Multiple comma-separated files can be specified.
 
 Once the image has been built you can run the application using the native image name:
 
