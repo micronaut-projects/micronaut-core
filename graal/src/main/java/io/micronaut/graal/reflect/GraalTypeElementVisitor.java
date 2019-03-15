@@ -34,8 +34,8 @@ import org.reactivestreams.Publisher;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.io.Writer;
-import java.net.URL;
 import java.util.*;
 import java.util.concurrent.Future;
 
@@ -51,6 +51,10 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     /**
      * Beans are those requiring full reflective access to all public members.
      */
+    protected static Set<String> packages = new HashSet<>();
+    /**
+     * Beans are those requiring full reflective access to all public members.
+     */
     protected static Set<String> beans = new HashSet<>();
 
     /**
@@ -62,6 +66,9 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
      * Arrays requiring reflective instantiation.
      */
     protected static Set<String> arrays = new HashSet<>();
+
+    private static final String REFLECTION_CONFIG_JSON = "reflection-config.json";
+    private static final String NATIVE_IMAGE_PROPERTIES = "native-image.properties";
 
     private static final String BASE_REFLECT_JSON = "src/main/graal/reflect.json";
 
@@ -75,12 +82,14 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
-        if (!isSubclass) {
+        if (!isSubclass && !element.hasStereotype(Deprecated.class)) {
             if (element.hasAnnotation(Introspected.class)) {
+                packages.add(element.getPackageName());
                 beans.add(element.getName());
                 final String[] introspectedClasses = element.getValue(Introspected.class, "classes", String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
                 Collections.addAll(beans, introspectedClasses);
             } else if (element.hasAnnotation(TypeHint.class)) {
+                packages.add(element.getPackageName());
                 final String[] introspectedClasses = element.getValue(TypeHint.class, String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
                 final TypeHint.AccessType accessType = element.getValue(TypeHint.class, "accessType", TypeHint.AccessType.class)
                         .orElse(TypeHint.AccessType.REFLECTION_PUBLIC);
@@ -114,7 +123,9 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     public void visitConstructor(ConstructorElement element, VisitorContext context) {
         if (!isSubclass) {
             if (element.hasAnnotation(Creator.class)) {
-                beans.add(element.getDeclaringType().getName());
+                final ClassElement declaringType = element.getDeclaringType();
+                packages.add(declaringType.getPackageName());
+                beans.add(declaringType.getName());
             }
         }
     }
@@ -168,45 +179,44 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 json = new ArrayList<>();
             }
 
-
-            final Iterable<URL> resources = visitorContext.getClasspathResources("META-INF/reflect.json");
-            for (URL resource : resources) {
-                try {
-                    final List<Map> list = mapper.readValue(resource, new TypeReference<List<Map>>() {
-                    });
-
-                    if (list != null) {
-                        for (Map map : list) {
-                            if (map != null) {
-                                final Object n = map.get(NAME);
-                                if (n != null) {
-                                    final Object o = map.get(ALL_PUBLIC_METHODS);
-                                    if (o instanceof Boolean) {
-                                        if (((Boolean) o)) {
-                                            beans.add(n.toString());
-                                        } else {
-                                            classes.add(n.toString());
-                                        }
-                                    } else {
-                                        classes.add(n.toString());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } catch (Throwable e) {
-                    visitorContext.warn("Couldn't include reflect.json from library dependency: " + resource, null);
-                }
-            }
-
             if (CollectionUtils.isEmpty(beans) && CollectionUtils.isEmpty(classes) && CollectionUtils.isEmpty(arrays)) {
                 return;
             }
 
             try {
-                final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile("reflect.json");
-                generatedFile.ifPresent(generatedFile1 -> {
 
+                String basePackage = packages.stream()
+                        .distinct()
+                        .min(Comparator.comparingInt(String::length)).orElse("io.micronaut");
+
+                String module;
+                if (basePackage.startsWith("io.micronaut.")) {
+                    module = basePackage.substring("io.micronaut.".length()).replace('.', '-');
+                    basePackage = "io.micronaut";
+                } else {
+                    if (basePackage.contains(".")) {
+                        final int i = basePackage.lastIndexOf('.');
+                        module = basePackage.substring(i + 1);
+                        basePackage = basePackage.substring(0, i - 1);
+                    } else {
+                        module = basePackage;
+                    }
+                }
+
+                String path = "native-image/" + basePackage + "/" + module + "/";
+                String reflectFile = path + REFLECTION_CONFIG_JSON;
+                String propsFile = path + NATIVE_IMAGE_PROPERTIES;
+
+                visitorContext.visitMetaInfFile(propsFile).ifPresent(gf -> {
+                    visitorContext.info("Writing " + NATIVE_IMAGE_PROPERTIES + " file to destination: " + gf.getName());
+                    try (PrintWriter w = new PrintWriter (gf.openWriter())) {
+                        w.println("Args = -H:ReflectionConfigurationResources=${.}/reflection-config.json");
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                });
+                final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(reflectFile);
+                generatedFile.ifPresent(gf -> {
 
                     for (String aClass : classes) {
                         json.add(CollectionUtils.mapOf(
@@ -230,12 +240,12 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                         ));
                     }
 
-                    try (Writer w = generatedFile1.openWriter()) {
-                        visitorContext.info("Writing reflect.json file to destination: " + generatedFile1.getName());
+                    try (Writer w = gf.openWriter()) {
+                        visitorContext.info("Writing " + REFLECTION_CONFIG_JSON + " file to destination: " + gf.getName());
 
                         writer.writeValue(w, json);
                     } catch (IOException e) {
-                        visitorContext.fail("Error writing reflect.json: " + e.getMessage(), null);
+                        visitorContext.fail("Error writing " + REFLECTION_CONFIG_JSON + ": " + e.getMessage(), null);
                     }
                 });
             } finally {
