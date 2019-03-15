@@ -163,6 +163,9 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
                                 try {
                                     fileSystem = FileSystems.getFileSystem(uri);
                                 } catch (FileSystemNotFoundException e) {
+                                    //no-op
+                                }
+                                if (fileSystem == null || !fileSystem.isOpen()) {
                                     fileSystem = FileSystems.newFileSystem(uri, Collections.emptyMap(), classLoader);
                                 }
 
