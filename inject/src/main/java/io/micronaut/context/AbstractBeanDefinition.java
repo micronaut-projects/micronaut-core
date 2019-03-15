@@ -1636,11 +1636,23 @@ public class AbstractBeanDefinition<T> extends AbstractBeanContextConditional im
     }
 
     private boolean isInnerConfiguration(Class argumentType) {
-        return isConfigurationProperties() &&
+        return isConfigurationProperties &&
+                argumentType.getName().indexOf('$') > -1 &&
                 !argumentType.isEnum() &&
+                !argumentType.isPrimitive() &&
                 Modifier.isPublic(argumentType.getModifiers()) && Modifier.isStatic(argumentType.getModifiers()) &&
-                Arrays.asList(getBeanType().getClasses()).contains(argumentType) &&
-                argumentType.getName().indexOf('$') > -1;
+                isInnerOfAnySuperclass(argumentType);
+    }
+
+    private boolean isInnerOfAnySuperclass(Class argumentType) {
+        Class beanType = getBeanType();
+        while (beanType != null) {
+            if ((beanType.getName() + "$" + argumentType.getSimpleName()).equals(argumentType.getName())) {
+                return true;
+            }
+            beanType = beanType.getSuperclass();
+        }
+        return false;
     }
 
     private <B, X extends RuntimeException> B resolveBeanWithGenericsFromMethodArgument(BeanResolutionContext resolutionContext, MethodInjectionPoint injectionPoint, Argument argument, BeanResolver<B> beanResolver) throws X {
