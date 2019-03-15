@@ -39,6 +39,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import kotlin.KotlinVersion;
 
+import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.*;
@@ -145,12 +146,15 @@ public class RequiresCondition implements Condition {
             return;
         }
 
-
         if (!matchesConfiguration(context, requirements)) {
             return;
         }
 
         if (!matchesSdk(context, requirements)) {
+            return;
+        }
+
+        if (!matchesPresenceOfFiles(context, requirements)) {
             return;
         }
 
@@ -531,6 +535,20 @@ public class RequiresCondition implements Condition {
                         context.fail("Existing bean [" + existing.getName() + "] of type [" + type + "] registered in context");
                         return false;
                     }
+                }
+            }
+        }
+        return true;
+    }
+
+    private boolean matchesPresenceOfFiles(ConditionContext context, AnnotationValue<Requires> requirements) {
+        String[] filePaths = requirements.get("files", String[].class).orElse(null);
+        if (ArrayUtils.isNotEmpty(filePaths)) {
+            for (String filePath : filePaths) {
+                File file = new File(filePath);
+                if (!file.exists()) {
+                    context.fail("File [" + filePath + "] does not exist");
+                    return false;
                 }
             }
         }

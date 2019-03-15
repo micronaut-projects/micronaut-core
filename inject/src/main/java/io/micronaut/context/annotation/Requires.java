@@ -181,6 +181,13 @@ public @interface Requires {
     String missingProperty() default "";
 
     /**
+     * Expresses the given file paths should exist for the bean configuration to load.
+     *
+     * @return The file paths
+     */
+    String[] files() default {};
+
+    /**
      * Used to express a required SDK version.
      */
     enum Sdk {

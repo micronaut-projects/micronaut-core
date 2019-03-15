@@ -41,6 +41,7 @@ dependencies {
     compileOnly dependencyVersion("validation")
 
     testCompile dependencyVersion("validation")
+    testCompile project(":inject-groovy")
     testCompile "com.github.stefanbirkner:system-rules:$systemRulesVersion"
 
 }
