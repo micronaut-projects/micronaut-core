@@ -197,7 +197,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                     if (basePackage.contains(".")) {
                         final int i = basePackage.lastIndexOf('.');
                         module = basePackage.substring(i + 1);
-                        basePackage = basePackage.substring(0, i - 1);
+                        basePackage = basePackage.substring(0, i);
                     } else {
                         module = basePackage;
                     }
