@@ -16,24 +16,23 @@
 package io.micronaut.http.client
 
 import groovy.transform.EqualsAndHashCode
-import io.micronaut.http.annotation.QueryValue
-import io.micronaut.http.client.annotation.Client
-import io.micronaut.http.client.multipart.MultipartBody
-import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
-import io.micronaut.http.annotation.Body
-import io.micronaut.http.annotation.Controller
-import io.micronaut.http.annotation.Header
+import io.micronaut.http.annotation.*
+import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientException
+import io.micronaut.http.client.multipart.MultipartBody
+import io.micronaut.http.multipart.CompletedFileUpload
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.http.annotation.Post
+import io.reactivex.Flowable
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+
+import java.nio.charset.StandardCharsets
 
 /**
  * @author Graeme Rocher
@@ -264,6 +263,23 @@ class HttpPostSpec extends Specification {
         body == "a,b"
     }
 
+    void "test multipart request with custom charset for part"() {
+        when:
+        BlockingHttpClient blockingHttpClient = client.toBlocking()
+        String body = blockingHttpClient.retrieve(
+                HttpRequest.POST("/post/multipartCharset", MultipartBody.builder()
+                        .addPart("file", "test.csv", new MediaType("text/csv; charset=ISO-8859-1"), "micronaut,rocks".getBytes(StandardCharsets.ISO_8859_1))
+                        .build()
+                )
+                        .contentType(MediaType.MULTIPART_FORM_DATA_TYPE)
+                        .accept(MediaType.TEXT_PLAIN_TYPE),
+                String
+        )
+
+        then:
+        body == StandardCharsets.ISO_8859_1.toString()
+    }
+
     void "test url encoded request with a string body"() {
         when:
         BlockingHttpClient blockingHttpClient = client.toBlocking()
@@ -346,6 +362,13 @@ class HttpPostSpec extends Specification {
                 produces = MediaType.TEXT_PLAIN)
         String multipleParams(@Body Params data) {
             return data.param.join(",")
+        }
+
+        @Post(uri = "/multipartCharset",
+                consumes = MediaType.MULTIPART_FORM_DATA,
+                produces = MediaType.TEXT_PLAIN)
+        String multipartCharset(@Body CompletedFileUpload file) {
+            return file.fileUpload.getCharset()
         }
     }
 
