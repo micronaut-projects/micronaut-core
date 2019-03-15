@@ -8,7 +8,7 @@ class GraalTypeElementVisitorSpec extends AbstractTypeElementSpec {
     void "test write reflect.json for @Introspected"() {
 
         given:
-        Reader reader = readGenerated("reflect.json", 'test.Test', '''
+        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.Introspected;
@@ -39,7 +39,7 @@ class Test {
     void "test write reflect.json for @Introspected with classes"() {
 
         given:
-        Reader reader = readGenerated("reflect.json", 'test.Test', '''
+        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.Introspected;
@@ -71,7 +71,7 @@ class Bar {}
     void "test write reflect.json for @TypeHint with classes"() {
 
         given:
-        Reader reader = readGenerated("reflect.json", 'test.Test', '''
+        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.Test', '''
 package test;
 
 import io.micronaut.core.annotation.TypeHint;
@@ -102,7 +102,7 @@ class Bar {}
     void "test write reflect.json for controller methods"() {
 
         given:
-        Reader reader = readGenerated("reflect.json", 'test.Test', '''
+        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.Test', '''
 package test;
 
 import io.micronaut.http.annotation.*;
