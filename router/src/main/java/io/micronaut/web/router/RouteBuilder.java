@@ -1229,7 +1229,7 @@ public interface RouteBuilder {
                 if (len > 0 && uri.charAt(0) != '/') {
                     uri = '/' + uri;
                 }
-                if (len > 0 && uri.charAt(uri.length() - 1) == '/') {
+                if (len > 1 && uri.charAt(uri.length() - 1) == '/') {
                     uri = uri.substring(0, uri.length() - 1);
                 }
                 if (len > 0) {
