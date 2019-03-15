@@ -899,6 +899,28 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
     }
 
     /**
+     * Contributes defaults to the given target.
+     *
+     * <p>WARNING: for internal use only be the framework</p>
+     * @param target The target
+     * @param source The source
+     */
+    @Internal
+    public static void contributeDefaults(AnnotationMetadata target, AnnotationMetadata source) {
+        if (target instanceof DefaultAnnotationMetadata && source instanceof DefaultAnnotationMetadata) {
+            final Map<String, Map<CharSequence, Object>> existingDefaults = ((DefaultAnnotationMetadata) target).annotationDefaultValues;
+            if (existingDefaults != null) {
+                final Map<String, Map<CharSequence, Object>> additionalDefaults = ((DefaultAnnotationMetadata) source).annotationDefaultValues;
+                if (additionalDefaults != null) {
+                    existingDefaults.putAll(
+                            additionalDefaults
+                    );
+                }
+            }
+        }
+    }
+
+    /**
      * <p>Sets a member of the given {@link AnnotationMetadata} return a new annotation metadata instance without
      * mutating the existing.</p>
      *

@@ -18,6 +18,7 @@ package io.micronaut.reactive.rxjava2;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.scheduling.instrument.ReactiveInstrumenter;
 import io.micronaut.scheduling.instrument.RunnableInstrumenter;
@@ -46,6 +47,15 @@ import java.util.List;
 @Context
 @Requires(classes = Flowable.class)
 @Internal
+@TypeHint(
+    value = {
+            Completable.class,
+            Single.class,
+            Flowable.class,
+            Maybe.class,
+            Observable.class
+    }
+)
 class RxJava2Instrumentation implements Function<Runnable, Runnable>, AutoCloseable {
 
     private final List<RunnableInstrumenter> instrumenters;
