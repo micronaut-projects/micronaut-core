@@ -201,15 +201,21 @@ class PropertySourcePropertyResolverSpec extends Specification {
         Map<String, Object> parameters = [foo: "bar"]
         PropertyResolver propertyResolver = new MapPropertyResolver(parameters)
         DefaultPropertyPlaceholderResolver propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(propertyResolver)
+        List<DefaultPropertyPlaceholderResolver.Segment> segments = propertyPlaceholderResolver.buildSegments("Hello \${foo} \${bar:test}!")
 
         expect:
         propertyPlaceholderResolver.resolvePlaceholders(template).get() == "Hello bar!"
-        propertyPlaceholderResolver.resolvePropertyNames(template).size() == 1
-        propertyPlaceholderResolver.resolvePropertyNames(template).first().property == 'foo'
-
-        propertyPlaceholderResolver.resolvePropertyNames("Hello \${foo} \${bar:test}!").first().property == 'foo'
-        propertyPlaceholderResolver.resolvePropertyNames("Hello \${foo} \${bar:test}!")[1].property == 'bar'
-        propertyPlaceholderResolver.resolvePropertyNames("Hello \${foo} \${bar:test}!")[1].defaultValue.get() == 'test'
+        segments.size() == 5
+        segments[0] instanceof DefaultPropertyPlaceholderResolver.RawSegment
+        segments[1] instanceof DefaultPropertyPlaceholderResolver.PlaceholderSegment
+        segments[2] instanceof DefaultPropertyPlaceholderResolver.RawSegment
+        segments[3] instanceof DefaultPropertyPlaceholderResolver.PlaceholderSegment
+        segments[4] instanceof DefaultPropertyPlaceholderResolver.RawSegment
+        segments[0].getValue(String.class) == "Hello "
+        segments[1].getValue(String.class) == "bar"
+        segments[2].getValue(String.class) == " "
+        segments[3].getValue(String.class) == "test"
+        segments[4].getValue(String.class) == "!"
     }
 
     void "test random placeholders for properties"() {

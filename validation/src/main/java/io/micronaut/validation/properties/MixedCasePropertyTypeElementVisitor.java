@@ -18,12 +18,11 @@ package io.micronaut.validation.properties;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
-import io.micronaut.context.env.PropertyPlaceholderResolver;
-import io.micronaut.context.env.PropertyPlaceholderResolver.Placeholder;
+import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.*;
 import io.micronaut.context.env.PropertySourcePropertyResolver;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.convert.DefaultConversionService;
 import io.micronaut.core.naming.NameUtils;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
@@ -33,10 +32,10 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Stream;
 
 /**
  * Visitor to check that only kebab-case values are used as values in annotations.
@@ -46,7 +45,9 @@ import java.util.Set;
  */
 public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<Object, Object> {
 
-    private final PropertyPlaceholderResolver resolver = new DefaultPropertyPlaceholderResolver(new PropertySourcePropertyResolver());
+    private boolean skipValidation = false;
+    private final DefaultPropertyPlaceholderResolver resolver = new DefaultPropertyPlaceholderResolver(new PropertySourcePropertyResolver(), new DefaultConversionService());
+
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
@@ -55,15 +56,7 @@ public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<O
 
     @Override
     public void visitField(FieldElement element, VisitorContext context) {
-        AnnotationValue<Property> propertyAnnotation = element.getAnnotation(Property.class);
-        if (propertyAnnotation != null) {
-            String propertyName = propertyAnnotation.getRequiredValue("name", String.class);
-            if (!NameUtils.isValidHyphenatedPropertyName(propertyName)) {
-                emitError(propertyName, element, context);
-            }
-        } else {
-            visitElement(element, context);
-        }
+        visitElement(element, context);
     }
 
     @Override
@@ -78,8 +71,25 @@ public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<O
         visitElement(element, context);
     }
 
+    @Override
+    public void start(VisitorContext visitorContext) {
+        String prop = System.getProperty("micronaut.configuration.validation");
+        skipValidation = prop != null && prop.equals("false");
+    }
+
     private void visitElement(Element element, VisitorContext context) {
-        List<String> annotationNames = element.getAnnotationNamesByStereotype(Executable.class);
+        if (skipValidation) {
+            return;
+        }
+        AnnotationValue<Property> propertyAnnotation = element.getAnnotation(Property.class);
+        if (propertyAnnotation != null) {
+            String propertyName = propertyAnnotation.getRequiredValue("name", String.class);
+            if (!NameUtils.isValidHyphenatedPropertyName(propertyName)) {
+                emitError(propertyName, element, context);
+            }
+        }
+
+        Set<String> annotationNames = element.getAnnotationNames();
 
         for (String annotationName : annotationNames) {
             AnnotationValue annotationValue = element.getAnnotation(annotationName);
@@ -111,29 +121,17 @@ public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<O
     }
 
     private void checkValidPropertyName(String value, Element element, VisitorContext context) {
-        if (value.contains("${")) {
-            List<Placeholder> properties = resolver.resolvePropertyNames(value);
-
-            for (Placeholder property : properties) {
-                String propertyName = property.getProperty();
-
-                if (!isValidPropertyName(propertyName)) {
-                    emitError(propertyName, element, context);
-                }
-
-                Optional<Placeholder> placeholder = property.getPlaceholderValue();
-                while (placeholder.isPresent()) {
-                    String propValue = placeholder.get().getProperty();
-                    String defaultValue = placeholder.get().getDefaultValue().orElse("");
-
-                    if (!StringUtils.isEmpty(defaultValue) && !isValidPropertyName(propValue)) {
-                        emitError(propValue, element, context);
+        resolver.buildSegments(value)
+                .stream()
+                .filter(PlaceholderSegment.class::isInstance)
+                .map(PlaceholderSegment.class::cast)
+                .flatMap(placeholder -> (Stream<String>)placeholder.getExpressions().stream())
+                .forEach((String propertyName) -> {
+                    if (!isValidPropertyName(propertyName)) {
+                        emitError(propertyName, element, context);
                     }
+                });
 
-                    placeholder = placeholder.get().getPlaceholderValue();
-                }
-            }
-        }
     }
 
     private boolean isValidPropertyName(String value) {
