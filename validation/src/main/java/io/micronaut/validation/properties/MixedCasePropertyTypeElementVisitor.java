@@ -15,7 +15,6 @@
  */
 package io.micronaut.validation.properties;
 
-import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver.*;
@@ -35,7 +34,6 @@ import io.micronaut.inject.visitor.VisitorContext;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Stream;
 
 /**
  * Visitor to check that only kebab-case values are used as values in annotations.
@@ -47,7 +45,6 @@ public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<O
 
     private boolean skipValidation = false;
     private final DefaultPropertyPlaceholderResolver resolver = new DefaultPropertyPlaceholderResolver(new PropertySourcePropertyResolver(), new DefaultConversionService());
-
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
@@ -92,6 +89,10 @@ public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<O
         Set<String> annotationNames = element.getAnnotationNames();
 
         for (String annotationName : annotationNames) {
+            if (!annotationName.startsWith("io.micronaut.")) {
+                // only process Micronaut annotations
+                continue;
+            }
             AnnotationValue annotationValue = element.getAnnotation(annotationName);
 
             Map<String, Object> values = annotationValue.getValues();
@@ -125,7 +126,7 @@ public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<O
                 .stream()
                 .filter(PlaceholderSegment.class::isInstance)
                 .map(PlaceholderSegment.class::cast)
-                .flatMap(placeholder -> (Stream<String>)placeholder.getExpressions().stream())
+                .flatMap(placeholder -> placeholder.getExpressions().stream())
                 .forEach((String propertyName) -> {
                     if (!isValidPropertyName(propertyName)) {
                         emitError(propertyName, element, context);
