@@ -21,11 +21,11 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
 
+import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -65,6 +65,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
 
     /**
      * @param environment The property resolver for the environment
+     * @param conversionService The conversion service
      */
     public DefaultPropertyPlaceholderResolver(PropertyResolver environment, ConversionService conversionService) {
         this.environment = environment;
@@ -100,12 +101,18 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     public <T> T resolveRequiredPlaceholder(String str, Class<T> type) throws ConfigurationException {
         List<Segment> segments = buildSegments(str);
         if (segments.size() == 1) {
-            return (T)segments.get(0).getValue(type);
+            return segments.get(0).getValue(type);
         } else {
             throw new ConfigurationException("Cannot convert a multi segment placeholder to a specified type");
         }
     }
 
+    /**
+     * Split a placeholder value into logic segments.
+     *
+     * @param str The placeholder
+     * @return The list of segments
+     */
     public List<Segment> buildSegments(String str) {
         List<Segment> segments = new ArrayList<>();
         String value = str;
@@ -139,7 +146,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     /**
      * Resolves a replacement for the given expression. Returning true if the replacement was resolved.
      *
-     * @deprecated No longer used. See {@link PlaceholderSegment#getValue(Class)}
+     * @deprecated No longer used internally. See {@link #resolveExpression(String, String, Class)}
      * @param builder The builder
      * @param str The full string
      * @param expr The current expression
@@ -154,43 +161,131 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
         return false;
     }
 
-    public interface Segment<T> {
-
-        T getValue(Class<T> type) throws ConfigurationException;
+    /**
+     * Resolves a single expression.
+     *
+     * @param context The context of the expression
+     * @param expression The expression
+     * @param type The class
+     * @param <T> The type the expression should be converted to
+     * @return The resolved and converted expression
+     */
+    @Nullable
+    protected <T> T resolveExpression(String context, String expression, Class<T> type) {
+        if (environment.containsProperty(expression)) {
+            return environment.getProperty(expression, type)
+                    .orElseThrow(() ->
+                            new ConfigurationException("Could not resolve expression: [" + expression + "] in placeholder ${" + context + "}"));
+        }
+        if (NameUtils.isEnvironmentName(expression)) {
+            String envVar = System.getenv(expression);
+            if (StringUtils.isNotEmpty(envVar)) {
+                return conversionService.convert(envVar, type)
+                        .orElseThrow(() ->
+                                new ConfigurationException("Could not resolve expression: [" + expression + "] in placeholder ${" + context + "}"));
+            }
+        }
+        return null;
     }
 
-    public class RawSegment<T> implements Segment<T> {
+    /**
+     * A segment of placeholder resolution.
+     *
+     * @author James Kleeh
+     * @since 1.1.0
+     */
+    public interface Segment {
+
+        /**
+         * Returns the value of a given segment converted to
+         * the provided type.
+         *
+         * @param type The class
+         * @param <T> The type to convert the value to
+         * @return The converted value
+         * @throws ConfigurationException If any error occurs
+         */
+       <T> T getValue(Class<T> type) throws ConfigurationException;
+    }
+
+    /**
+     * A segment that represents static text.
+     *
+     * @author James Kleeh
+     * @since 1.1.0
+     */
+    public class RawSegment implements Segment {
 
         private final String text;
 
+        /**
+         * Default constructor.
+         *
+         * @param text The static text
+         */
         RawSegment(String text) {
             this.text = text;
         }
 
         @Override
-        public T getValue(Class<T> type) throws ConfigurationException {
+        public <T> T getValue(Class<T> type) throws ConfigurationException {
             return conversionService.convert(text, type)
                     .orElseThrow(() ->
                             new ConfigurationException("Could not convert: [" + text + "] to the required type: [" + type.getName() + "]"));
         }
     }
 
-    public class PlaceholderSegment<T> implements Segment<T> {
+    /**
+     * A segment that represents one or more expressions
+     * that should be searched for in the environment.
+     *
+     * @author James Kleeh
+     * @since 1.1.0
+     */
+    public class PlaceholderSegment implements Segment {
 
         private final String placeholder;
         private final List<String> expressions = new ArrayList<>();
         private String defaultValue;
 
+        /**
+         * Default constructor.
+         *
+         * @param placeholder The placeholder value without
+         *                    any prefix or suffix
+         */
         PlaceholderSegment(String placeholder) {
             this.placeholder = placeholder;
-            resolveExpression(placeholder);
+            findExpressions(placeholder);
         }
 
+        /**
+         * @return The list of expressions that may be looked
+         * up in the environment
+         */
         public List<String> getExpressions() {
             return Collections.unmodifiableList(expressions);
         }
 
-        private void resolveExpression(String placeholder) {
+        @Override
+        public <T> T getValue(Class<T> type) throws ConfigurationException {
+            for (String expression: expressions) {
+                T value = resolveExpression(placeholder, expression, type);
+                if (value != null) {
+                    return value;
+                }
+            }
+            if (defaultValue != null) {
+                return conversionService.convert(defaultValue, type)
+                        .orElseThrow(() ->
+                                new ConfigurationException(String.format("Could not convert default value [%s] in placeholder ${%s}", defaultValue, placeholder)));
+            } else {
+                throw new ConfigurationException("Could not resolve placeholder ${" + placeholder + "}");
+            }
+
+        }
+
+        private void findExpressions(String placeholder) {
             String defaultValue = null;
             String expression;
             Matcher matcher = ESCAPE_SEQUENCE.matcher(placeholder);
@@ -214,38 +309,11 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
 
             if (defaultValue != null) {
                 if (!escaped && (ESCAPE_SEQUENCE.matcher(defaultValue).find() || defaultValue.indexOf(COLON) > -1)) {
-                    resolveExpression(defaultValue);
+                    findExpressions(defaultValue);
                 } else {
                     this.defaultValue = defaultValue;
                 }
             }
-        }
-
-        @Override
-        public T getValue(Class<T> type) throws ConfigurationException {
-            for (String expression: expressions) {
-                if (environment.containsProperty(expression)) {
-                    return environment.getProperty(expression, type)
-                            .orElseThrow(() ->
-                                    new ConfigurationException("Could not resolve expression: [" + expression + "] in placeholder ${" + placeholder + "}"));
-                }
-                if (NameUtils.isEnvironmentName(expression)) {
-                    String envVar = System.getenv(expression);
-                    if (StringUtils.isNotEmpty(envVar)) {
-                        return conversionService.convert(envVar, type)
-                                .orElseThrow(() ->
-                                        new ConfigurationException("Could not resolve expression: [" + expression + "] in placeholder ${" + placeholder + "}"));
-                    }
-                }
-            }
-            if (defaultValue != null) {
-                return conversionService.convert(defaultValue, type)
-                        .orElseThrow(() ->
-                                new ConfigurationException(String.format("Could not convert default value [%s] in placeholder ${%s}", defaultValue, placeholder)));
-            } else {
-                throw new ConfigurationException("Could not resolve placeholder ${" + placeholder + "}");
-            }
-
         }
     }
 }

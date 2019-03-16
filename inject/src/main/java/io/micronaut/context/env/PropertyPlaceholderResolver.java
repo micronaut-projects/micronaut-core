@@ -13,16 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env;
 
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.util.StringUtils;
 
 import javax.annotation.Nonnull;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -59,6 +55,16 @@ public interface PropertyPlaceholderResolver {
         return resolvePlaceholders(str).orElseThrow(() -> new ConfigurationException("Unable to resolve placeholders for property: " + str));
     }
 
+    /**
+     * Resolves the value of a single placeholder.
+     *
+     * @param str The string containing the placeholder
+     * @param type The class of the type
+     * @param <T> The type the value should be converted to
+     * @return The resolved value
+     * @throws ConfigurationException If multiple placeholders are found or
+     * if the placeholder could not be converted to the requested type
+     */
     default @Nonnull <T> T resolveRequiredPlaceholder(String str, Class<T> type) throws ConfigurationException {
         throw new ConfigurationException("Unsupported operation");
     }

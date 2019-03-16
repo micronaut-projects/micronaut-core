@@ -72,7 +72,7 @@ public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<O
 
     @Override
     public void start(VisitorContext visitorContext) {
-        String prop = System.getProperty("micronaut.config.inject.validation");
+        String prop = System.getProperty("micronaut.configuration.validation");
         skipValidation = prop != null && prop.equals("false");
     }
 
