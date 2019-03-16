@@ -54,6 +54,9 @@ class TraceInterceptorSpec extends Specification {
         reporter.spans[0].tags().get("method") == 'methodThree'
         reporter.spans[1].name() == 'my-trace'
         reporter.spans[1].tags().get('foo.bar') == 'test'
+
+        cleanup:
+        applicationContext.close()
     }
 
     void "test trace compelable future"() {
@@ -73,6 +76,9 @@ class TraceInterceptorSpec extends Specification {
         reporter.spans[0].tags().get("class") == 'TracedService'
         reporter.spans[0].tags().get("method") == 'futureTrace'
         reporter.spans[0].tags().get("foo") == "bar"
+
+        cleanup:
+        applicationContext.close()
     }
 
     void "test trace mono"() {
@@ -94,6 +100,9 @@ class TraceInterceptorSpec extends Specification {
             reporter.spans[0].tags().get("foo") == "bar"
             reporter.spans[0].name() == 'trace-mono'
         }
+
+        cleanup:
+        applicationContext.close()
     }
 
     ApplicationContext buildContext() {

@@ -47,8 +47,6 @@ class HttpClientSenderSpec extends Specification {
         EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
-
-
         when:
         PollingConditions conditions = new PollingConditions(timeout: 10)
         // mock Zipkin server
