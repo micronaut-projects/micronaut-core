@@ -56,6 +56,8 @@ class HystrixSpec extends Specification {
         reporter.spans[0].tags().get("foo") == "bar"
         reporter.spans[0].name() == 'my-other-command'
 
+        cleanup:
+        applicationContext.close()
     }
 
     static class TracedHystrixService {
