@@ -16,7 +16,6 @@
 package io.micronaut.core.io.service;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.reflect.InstantiationUtils;
 
 import java.util.Optional;
 import java.util.ServiceConfigurationError;
