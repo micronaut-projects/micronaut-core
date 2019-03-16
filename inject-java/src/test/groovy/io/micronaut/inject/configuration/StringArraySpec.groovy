@@ -1,12 +1,10 @@
 package io.micronaut.inject.configuration
 
-import groovy.transform.NotYetImplemented
 import io.micronaut.context.ApplicationContext
 import spock.lang.Specification
 
 class StringArraySpec extends Specification {
 
-    @NotYetImplemented
     void "test a list property can bind to a string[]"() {
         ApplicationContext ctx = ApplicationContext.run([
                 "value.list": ["one", "two"]
