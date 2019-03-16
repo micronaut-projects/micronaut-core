@@ -15,6 +15,7 @@
  */
 package io.micronaut.validation.properties;
 
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.env.DefaultPropertyPlaceholderResolver;
 import io.micronaut.context.env.PropertyPlaceholderResolver;
@@ -78,7 +79,7 @@ public class MixedCasePropertyTypeElementVisitor implements TypeElementVisitor<O
     }
 
     private void visitElement(Element element, VisitorContext context) {
-        Set<String> annotationNames = element.getAnnotationNames();
+        List<String> annotationNames = element.getAnnotationNamesByStereotype(Executable.class);
 
         for (String annotationName : annotationNames) {
             AnnotationValue annotationValue = element.getAnnotation(annotationName);
