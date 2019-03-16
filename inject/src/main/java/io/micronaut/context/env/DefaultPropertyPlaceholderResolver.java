@@ -16,6 +16,8 @@
 package io.micronaut.context.env;
 
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.value.PropertyResolver;
 
@@ -23,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -45,17 +48,27 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     public static final String SUFFIX = "}";
 
     private static final Pattern ESCAPE_SEQUENCE = Pattern.compile("(.+)?:`([^`]+?)`");
-    private static final Pattern ENVIRONMENT_VAR_SEQUENCE = Pattern.compile("^[\\p{Lu}_{0-9}]+");
     private static final char COLON = ':';
 
     private final PropertyResolver environment;
+    private final ConversionService<?> conversionService;
     private final String prefix;
 
     /**
      * @param environment The property resolver for the environment
+     * @deprecated Use {@link #DefaultPropertyPlaceholderResolver(PropertyResolver, ConversionService)} instead
      */
+    @Deprecated
     public DefaultPropertyPlaceholderResolver(PropertyResolver environment) {
+        this(environment, ConversionService.SHARED);
+    }
+
+    /**
+     * @param environment The property resolver for the environment
+     */
+    public DefaultPropertyPlaceholderResolver(PropertyResolver environment, ConversionService conversionService) {
         this.environment = environment;
+        this.conversionService = conversionService;
         this.prefix = PREFIX;
     }
 
@@ -67,11 +80,7 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
     @Override
     public Optional<String> resolvePlaceholders(String str) {
         try {
-            int i = str.indexOf(prefix);
-            if (i > -1) {
-                return Optional.of(resolvePlaceholders(str, i));
-            }
-            return Optional.of(str);
+            return Optional.of(resolveRequiredPlaceholders(str));
         } catch (ConfigurationException e) {
             return Optional.empty();
         }
@@ -79,74 +88,64 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
 
     @Override
     public String resolveRequiredPlaceholders(String str) throws ConfigurationException {
-        int i = str.indexOf(prefix);
-        if (i > -1) {
-            return resolvePlaceholders(str, i);
+        List<Segment> segments = buildSegments(str);
+        StringBuilder value = new StringBuilder();
+        for (Segment segment: segments) {
+            value.append(segment.getValue(String.class));
         }
-        return str;
+        return value.toString();
     }
 
     @Override
-    public List<Placeholder> resolvePropertyNames(String str) {
-        try {
-            String prefix = getPrefix();
-            if (StringUtils.isNotEmpty(str)) {
-                int i = str.indexOf(prefix);
-
-                if (i != -1) {
-                    List<Placeholder> placeholders = new ArrayList<>(3);
-                    String restOfString = str.substring(i + 2);
-                    while (i != -1) {
-                        int e = restOfString.indexOf('}');
-                        if (e > -1) {
-                            String expr = restOfString.substring(0, e).trim();
-
-                            Matcher matcher = ESCAPE_SEQUENCE.matcher(expr);
-                            if (matcher.find()) {
-                                String defaultValue = matcher.group(2);
-                                expr = matcher.group(1);
-                                placeholders.add(new DefaultPlaceholder(expr, defaultValue));
-                            } else {
-                                int j = expr.indexOf(COLON);
-                                if (j == -1) {
-                                    placeholders.add(new DefaultPlaceholder(expr, null));
-                                } else {
-                                    String defaultValue = expr.substring(j + 1);
-                                    expr = expr.substring(0, j);
-
-                                    List<Placeholder> phs = resolvePropertyNames(getPrefix() + defaultValue + SUFFIX);
-                                    for (Placeholder ph : phs) {
-                                        placeholders.add(new DefaultPlaceholder(expr, defaultValue, ph));
-                                    }
-                                }
-                            }
-
-                            i = restOfString.indexOf(prefix);
-                            if (i != -1) {
-                                restOfString = restOfString.substring(i + 2);
-                            }
-                        } else {
-                            // incomplete place holder
-                            return Collections.emptyList();
-                        }
-                    }
-                    return placeholders;
-                }
-            }
-        } catch (Exception e) {
-            return Collections.emptyList();
+    public <T> T resolveRequiredPlaceholder(String str, Class<T> type) throws ConfigurationException {
+        List<Segment> segments = buildSegments(str);
+        if (segments.size() == 1) {
+            return (T)segments.get(0).getValue(type);
+        } else {
+            throw new ConfigurationException("Cannot convert a multi segment placeholder to a specified type");
         }
-        return Collections.emptyList();
+    }
+
+    public List<Segment> buildSegments(String str) {
+        List<Segment> segments = new ArrayList<>();
+        String value = str;
+        int i = value.indexOf(PREFIX);
+        while (i > -1) {
+            //the text before the prefix
+            if (i > 0) {
+                String rawSegment = value.substring(0, i);
+                segments.add(new RawSegment(rawSegment));
+            }
+            //everything after the prefix
+            value = value.substring(i + PREFIX.length());
+            int suffixIdx = value.indexOf(SUFFIX);
+            if (suffixIdx > -1) {
+                String expr = value.substring(0, suffixIdx).trim();
+                segments.add(new PlaceholderSegment(expr));
+                if (value.length() > suffixIdx) {
+                    value = value.substring(suffixIdx + SUFFIX.length());
+                }
+            } else {
+                throw new ConfigurationException("Incomplete placeholder definitions detected: " + str);
+            }
+            i = value.indexOf(PREFIX);
+        }
+        if (value.length() > 0) {
+            segments.add(new RawSegment(value));
+        }
+        return segments;
     }
 
     /**
      * Resolves a replacement for the given expression. Returning true if the replacement was resolved.
      *
+     * @deprecated No longer used. See {@link PlaceholderSegment#getValue(Class)}
      * @param builder The builder
      * @param str The full string
      * @param expr The current expression
      * @return True if a placeholder was resolved
      */
+    @Deprecated
     protected boolean resolveReplacement(StringBuilder builder, String str, String expr) {
         if (environment.containsProperty(expr)) {
             builder.append(environment.getProperty(expr, String.class).orElseThrow(() -> new ConfigurationException("Could not resolve placeholder ${" + expr + "} in value: " + str)));
@@ -155,66 +154,98 @@ public class DefaultPropertyPlaceholderResolver implements PropertyPlaceholderRe
         return false;
     }
 
-    private String resolvePlaceholders(String str, int startIndex) {
-        StringBuilder builder = new StringBuilder(str.substring(0, startIndex));
-        String restOfString = str.substring(startIndex + 2);
-        int i = restOfString.indexOf('}');
-        if (i > -1) {
-            String expr = restOfString.substring(0, i).trim();
-            if (restOfString.length() > i) {
-                restOfString = restOfString.substring(i + 1);
-            }
-            resolveExpression(builder, str, expr);
+    public interface Segment<T> {
 
-            i = restOfString.indexOf(prefix);
-            if (i > -1) {
-                builder.append(resolvePlaceholders(restOfString, i));
-            } else {
-                builder.append(restOfString);
-            }
-        } else {
-            throw new ConfigurationException("Incomplete placeholder definitions detected: " + str);
-        }
-        return builder.toString();
+        T getValue(Class<T> type) throws ConfigurationException;
     }
 
-    private void resolveExpression(StringBuilder builder, String str, String expr) {
-        String defaultValue = null;
-        Matcher matcher = ESCAPE_SEQUENCE.matcher(expr);
+    public class RawSegment<T> implements Segment<T> {
 
-        boolean escaped = false;
-        if (matcher.find()) {
-            defaultValue = matcher.group(2);
-            expr = matcher.group(1);
-            escaped = true;
-        } else {
-            int j = expr.indexOf(COLON);
-            if (j > -1) {
-                defaultValue = expr.substring(j + 1);
-                expr = expr.substring(0, j);
-            }
+        private final String text;
+
+        RawSegment(String text) {
+            this.text = text;
         }
 
-        if (resolveReplacement(builder, str, expr)) {
-            return;
+        @Override
+        public T getValue(Class<T> type) throws ConfigurationException {
+            return conversionService.convert(text, type)
+                    .orElseThrow(() ->
+                            new ConfigurationException("Could not convert: [" + text + "] to the required type: [" + type.getName() + "]"));
         }
-        if (ENVIRONMENT_VAR_SEQUENCE.matcher(expr).matches()) {
-            String v = System.getenv(expr);
-            if (StringUtils.isNotEmpty(v)) {
-                builder.append(v);
-                return;
-            }
+    }
+
+    public class PlaceholderSegment<T> implements Segment<T> {
+
+        private final String placeholder;
+        private final List<String> expressions = new ArrayList<>();
+        private String defaultValue;
+
+        PlaceholderSegment(String placeholder) {
+            this.placeholder = placeholder;
+            resolveExpression(placeholder);
         }
-        if (defaultValue != null) {
-            if (!escaped && (ESCAPE_SEQUENCE.matcher(defaultValue).find() || defaultValue.indexOf(COLON) > -1)) {
-                StringBuilder resolved = new StringBuilder();
-                resolveExpression(resolved, expr, defaultValue);
-                builder.append(resolved);
+
+        public List<String> getExpressions() {
+            return Collections.unmodifiableList(expressions);
+        }
+
+        private void resolveExpression(String placeholder) {
+            String defaultValue = null;
+            String expression;
+            Matcher matcher = ESCAPE_SEQUENCE.matcher(placeholder);
+
+            boolean escaped = false;
+            if (matcher.find()) {
+                defaultValue = matcher.group(2);
+                expression = matcher.group(1);
+                escaped = true;
             } else {
-                builder.append(defaultValue);
+                int j = placeholder.indexOf(COLON);
+                if (j > -1) {
+                    defaultValue = placeholder.substring(j + 1);
+                    expression = placeholder.substring(0, j);
+                } else {
+                    expression = placeholder;
+                }
             }
-            return;
+
+            expressions.add(expression);
+
+            if (defaultValue != null) {
+                if (!escaped && (ESCAPE_SEQUENCE.matcher(defaultValue).find() || defaultValue.indexOf(COLON) > -1)) {
+                    resolveExpression(defaultValue);
+                } else {
+                    this.defaultValue = defaultValue;
+                }
+            }
         }
-        throw new ConfigurationException("Could not resolve placeholder ${" + expr + "} in value: " + str);
+
+        @Override
+        public T getValue(Class<T> type) throws ConfigurationException {
+            for (String expression: expressions) {
+                if (environment.containsProperty(expression)) {
+                    return environment.getProperty(expression, type)
+                            .orElseThrow(() ->
+                                    new ConfigurationException("Could not resolve expression: [" + expression + "] in placeholder ${" + placeholder + "}"));
+                }
+                if (NameUtils.isEnvironmentName(expression)) {
+                    String envVar = System.getenv(expression);
+                    if (StringUtils.isNotEmpty(envVar)) {
+                        return conversionService.convert(envVar, type)
+                                .orElseThrow(() ->
+                                        new ConfigurationException("Could not resolve expression: [" + expression + "] in placeholder ${" + placeholder + "}"));
+                    }
+                }
+            }
+            if (defaultValue != null) {
+                return conversionService.convert(defaultValue, type)
+                        .orElseThrow(() ->
+                                new ConfigurationException(String.format("Could not convert default value [%s] in placeholder ${%s}", defaultValue, placeholder)));
+            } else {
+                throw new ConfigurationException("Could not resolve placeholder ${" + placeholder + "}");
+            }
+
+        }
     }
 }
