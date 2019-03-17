@@ -13,23 +13,25 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.http.server.netty.ssl;
 
-package io.micronaut.core.annotation;
+import io.micronaut.http.ssl.ServerSslConfiguration;
+import io.netty.handler.ssl.SslContext;
 
-import java.lang.annotation.*;
+import java.util.Optional;
 
 /**
- * Allows {@link Indexed} to be repeatable.
- *
- * @author graemerocher
- * @since 1.1
+ * Interface that allows for different builder instances to be able to create
+ * an the SSLContext supplied later to the micronaut http server.
  */
-@Documented
-@Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.TYPE})
-public @interface Indexes {
+public interface ServerSslBuilder {
     /**
-     * @return A group of indexes
+     * @return The SSL configuration
      */
-    Indexed[] value() default {};
+    ServerSslConfiguration getSslConfiguration();
+
+    /**
+     * @return Builds the SSL configuration wrapped inside an optional
+     */
+    Optional<SslContext> build();
 }

@@ -41,6 +41,7 @@ public class BearerAccessRefreshToken extends AccessRefreshToken {
      * @param expiresIn Access Token expiration
      * @param accessToken JWT token
      * @param refreshToken  JWT token
+     * @param tokenType Type of token
      */
     public BearerAccessRefreshToken(String username,
                                     Collection<String> roles,

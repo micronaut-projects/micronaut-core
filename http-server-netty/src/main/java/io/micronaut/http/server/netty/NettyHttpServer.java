@@ -15,12 +15,11 @@
  */
 package io.micronaut.http.server.netty;
 
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.socket.SocketUtils;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.order.OrderUtil;
@@ -30,6 +29,7 @@ import io.micronaut.discovery.event.ServiceShutdownEvent;
 import io.micronaut.discovery.event.ServiceStartedEvent;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.netty.channel.NettyThreadFactory;
+import io.micronaut.http.netty.stream.HttpStreamsServerHandler;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
@@ -37,7 +37,7 @@ import io.micronaut.http.server.exceptions.ServerStartupException;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.decoders.HttpRequestDecoder;
 import io.micronaut.http.server.netty.encoders.HttpResponseEncoder;
-import io.micronaut.http.server.netty.ssl.NettyServerSslBuilder;
+import io.micronaut.http.server.netty.ssl.ServerSslBuilder;
 import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandlerRegistry;
 import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
 import io.micronaut.http.ssl.ServerSslConfiguration;
@@ -53,16 +53,9 @@ import io.micronaut.web.router.Router;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelHandler;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.ChannelOutboundHandler;
-import io.netty.channel.ChannelPipeline;
-import io.netty.channel.EventLoopGroup;
+import io.netty.channel.*;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerKeepAliveHandler;
 import io.netty.handler.codec.http.multipart.DiskFileUpload;
@@ -81,16 +74,11 @@ import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.io.File;
 import java.lang.reflect.Field;
-import java.net.BindException;
-import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
+import java.net.*;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.OptionalInt;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -158,7 +146,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
      * @param ioExecutor                              The IO executor
      * @param threadFactory                           The thread factory
      * @param executorSelector                        The executor selector
-     * @param nettyServerSslBuilder                   The Netty Server SSL builder
+     * @param serverSslBuilder                        The Netty Server SSL builder
      * @param outboundHandlers                        The outbound handlers
      * @param eventLoopGroupFactory                   The EventLoopGroupFactory
      */
@@ -175,7 +163,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         @javax.inject.Named(TaskExecutors.IO) ExecutorService ioExecutor,
         @javax.inject.Named(NettyThreadFactory.NAME) ThreadFactory threadFactory,
         ExecutorSelector executorSelector,
-        NettyServerSslBuilder nettyServerSslBuilder,
+        Optional<ServerSslBuilder> serverSslBuilder,
         List<ChannelOutboundHandler> outboundHandlers,
         EventLoopGroupFactory eventLoopGroupFactory
     ) {
@@ -187,7 +175,6 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
         this.beanLocator = applicationContext;
         this.environment = applicationContext.getEnvironment();
         this.serverConfiguration = serverConfiguration;
-        this.sslConfiguration = nettyServerSslBuilder.getSslConfiguration();
         this.router = router;
         this.ioExecutor = ioExecutor;
         Optional<Integer> configPort = serverConfiguration.getPort();
@@ -201,14 +188,25 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
             }
         }
 
-        int port = sslConfiguration.isEnabled() ? sslConfiguration.getPort() : specifiedPort;
+        int port = specifiedPort;
+        if (serverSslBuilder.isPresent()) {
+            ServerSslBuilder sslBuilder = serverSslBuilder.get();
+            this.sslConfiguration = sslBuilder.getSslConfiguration();
+            this.sslContext = sslBuilder.build().orElse(null);
+            if (this.sslConfiguration.isEnabled()) {
+                port = sslConfiguration.getPort();
+            }
+        } else {
+            this.sslConfiguration = null;
+            this.sslContext = null;
+        }
+
         this.serverPort = port == -1 ? SocketUtils.findAvailableTcpPort() : port;
         this.executorSelector = executorSelector;
         OrderUtil.sort(outboundHandlers);
         this.outboundHandlers = outboundHandlers;
         this.requestArgumentSatisfier = requestArgumentSatisfier;
         this.staticResourceResolver = resourceResolver;
-        this.sslContext = nettyServerSslBuilder.build().orElse(null);
         this.threadFactory = threadFactory;
         this.webSocketBeanRegistry = WebSocketBeanRegistry.forServer(applicationContext);
         this.eventLoopGroupFactory = eventLoopGroupFactory;
@@ -334,7 +332,7 @@ public class NettyHttpServer implements EmbeddedServer, WebSocketSessionReposito
 
     @Override
     public String getScheme() {
-        return sslConfiguration.isEnabled() ? "https" : "http";
+        return (sslConfiguration != null && sslConfiguration.isEnabled()) ? "https" : "http";
     }
 
     @Override

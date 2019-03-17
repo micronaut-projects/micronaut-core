@@ -21,7 +21,6 @@ import io.micronaut.core.convert.ConversionService;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.lang.reflect.Constructor;
-import java.net.URL;
 import java.util.*;
 
 /**
