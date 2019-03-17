@@ -1,9 +1,9 @@
 package io.micronaut.docs.http.server.exception
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.BeanContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.env.Environment
-import io.micronaut.context.exceptions.BeanInstantiationException
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
@@ -74,15 +74,15 @@ class SimpleControllerSpec extends Specification {
     @Controller("/v2/simple")
     static class MethodErrorController {
 
-        final AnotherService anotherService
+        final BeanContext beanContext
 
-        MethodErrorController(AnotherService anotherService) {
-            this.anotherService = anotherService
+        MethodErrorController(BeanContext beanContext) {
+            this.beanContext = beanContext
         }
 
         @Get("/")
         HttpResponse index() {
-            anotherService.error()
+            beanContext.getBean(ThrowsAnErrorService)
             return HttpResponse.ok()
         }
 
@@ -102,12 +102,4 @@ class SimpleControllerSpec extends Specification {
         }
     }
 
-    @Requires(property = 'spec.name', value = 'SimpleControllerSpec')
-    @Singleton
-    static class AnotherService {
-
-        String error() {
-            throw new BeanInstantiationException("Custom BeanInstantiationException")
-        }
-    }
 }

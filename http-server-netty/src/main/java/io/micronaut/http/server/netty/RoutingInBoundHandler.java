@@ -251,10 +251,12 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 errorRoute = router.route(statusException.getStatus()).orElse(null);
             }
         } else if (cause instanceof BeanInstantiationException && declaringType != null) {
-            // Set the declaringType to null if BeanInstantiationException occurs for the same Controller
-            // so we do not look for local handler in the controller to break infinite loop.
+            // If the controller could not be instantiated, don't look for a local error route
             Optional<Class> rootBeanType = ((BeanInstantiationException) cause).getRootBeanType().map(BeanType::getBeanType);
             if (rootBeanType.isPresent() && declaringType == rootBeanType.get()) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Failed to instantiate [{}]. Skipping lookup of a local error route", declaringType.getName());
+                }
                 declaringType = null;
             }
         }
