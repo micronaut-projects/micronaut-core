@@ -95,7 +95,7 @@ public class BeanInstantiationException extends BeanContextException {
 
     /**
      * @param resolutionContext The resolution context
-     * @return BeanType The reference of root bean throwing the exception
+     * @return The reference of the root bean throwing the exception
      */
     private BeanType resolveRootBeanDefinition(BeanResolutionContext resolutionContext) {
         BeanType rootBeanType = null;
