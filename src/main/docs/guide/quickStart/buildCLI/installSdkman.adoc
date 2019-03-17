@@ -23,10 +23,10 @@ You can find more information about SDKMAN usage on the http://sdkman.io/usage.h
 
 For Mac platforms, you can use HOMEBREW to install like so:
 
-[source,bash]
-====
+[source,bash,subs="attributes"]
+----
 $ brew install micronaut {version}
-====
+----
 
 
 You should now be able to run the Micronaut CLI.
