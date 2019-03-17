@@ -21,13 +21,21 @@ $ sdk install micronaut {version}
 
 You can find more information about SDKMAN usage on the http://sdkman.io/usage.html[SDKMAN Docs]
 
-For Mac platforms, you can use HOMEBREW to install like so:
+For Mac platforms, you can use https://brew.sh/[Homebrew] to install the CLI:
+
+Before updating make sure you have latest updates.
+
+[source,bash]
+----
+$ brew update
+----
+
+Then run the following:
 
 [source,bash,subs="attributes"]
 ----
 $ brew install micronaut {version}
 ----
-
 
 You should now be able to run the Micronaut CLI.
 
