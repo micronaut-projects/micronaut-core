@@ -1497,10 +1497,8 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
 
         private void populateTypeArguments(ClassNode typeElement, Map<String, Map<String, Object>> typeArguments) {
             ClassNode current = typeElement
+            ClassNode last = null
             while (current != null) {
-
-                ClassNode[] interfaces = current.getUnresolvedInterfaces()
-                populateTypeArgumentsForInterfaces(typeArguments, interfaces)
 
                 if (current != ClassHelper.OBJECT_TYPE) {
                     GenericsType[] superArguments = current.redirect().getGenericsTypes()
@@ -1515,34 +1513,50 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
                                 }
                             }
                         }
+                        if (last != null) {
+                            carryForwardTypeArguments(last, typeArguments, arguments)
+                        }
                         typeArguments.put(current.name, arguments)
                     }
                 }
-                current = current.getUnresolvedSuperClass();
+
+                populateTypeArgumentsForInterfaces(typeArguments, current)
+
+                last = current
+                current = current.getUnresolvedSuperClass()
             }
         }
 
-        private void populateTypeArgumentsForInterfaces(Map<String, Map<String, Object>> typeArguments, ClassNode[] interfaces) {
-            for (ClassNode anInterface : interfaces) {
+        private void populateTypeArgumentsForInterfaces(Map<String, Map<String, Object>> typeArguments, ClassNode current) {
+            for (ClassNode anInterface : current.getInterfaces()) {
                 String name = anInterface.name
                 if (!typeArguments.containsKey(name)) {
-                    genericsSpecToArguments(anInterface, typeArguments, name)
-                    populateTypeArgumentsForInterfaces(typeArguments, anInterface.getInterfaces())
+
+                    Map<String, ClassNode> genericSpec = AstGenericUtils.createGenericsSpec(anInterface)
+
+                    if (genericSpec) {
+                        Map<String, Object> types = [:]
+                        for (entry in genericSpec) {
+                            types[entry.key] = AstGenericUtils.resolveTypeReference(entry.value, genericSpec)
+                        }
+                        carryForwardTypeArguments(current, typeArguments, types)
+                        typeArguments.put(name, types)
+                    }
+
+                    populateTypeArgumentsForInterfaces(typeArguments, anInterface)
                 }
 
             }
         }
 
-        private void genericsSpecToArguments(ClassNode node, Map<String, Map<String, Object>> typeArguments, String name) {
-            Map<String, ClassNode> genericSpec = AstGenericUtils.createGenericsSpec(node)
-
-            if (genericSpec) {
-
-                Map<String, Object> types = [:]
-                for (entry in genericSpec) {
-                    types[entry.key] = AstGenericUtils.resolveTypeReference(entry.value, genericSpec)
-                }
-                typeArguments.put(name, types)
+        private void carryForwardTypeArguments(ClassNode child, Map<String, Map<String, Object>> typeArguments, Map<String, Object> types) {
+            String childName = child.name
+            if (typeArguments.containsKey(childName)) {
+                typeArguments.get(childName).forEach({ arg, type ->
+                    if (types.containsKey(arg)) {
+                        types.put(arg, type)
+                    }
+                })
             }
         }
 
