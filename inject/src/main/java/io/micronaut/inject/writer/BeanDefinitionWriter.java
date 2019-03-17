@@ -1242,6 +1242,7 @@ public class BeanDefinitionWriter extends AbstractClassFileWriter implements Bea
             String fieldName,
             Method methodToInvoke,
             boolean isValueOptional) {
+        DefaultAnnotationMetadata.contributeDefaults(this.annotationMetadata, annotationMetadata);
         // ready this
         GeneratorAdapter constructorVisitor = this.constructorVisitor;
 
