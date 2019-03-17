@@ -58,7 +58,7 @@ import static io.micronaut.views.csp.CspConfiguration.FILTER_PATH;
  * @author Arul Dhesiaseelan
  * @since 1.1.0
  */
-@Filter("${" + FILTER_PATH + ":" + DEFAULT_FILTER_PATH +"}")
+@Filter("${" + FILTER_PATH + ":" + DEFAULT_FILTER_PATH + "}")
 public class CspFilter implements HttpServerFilter {
 
     public static final String CSP_HEADER = "Content-Security-Policy";

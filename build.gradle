@@ -531,7 +531,7 @@ subprojects { Project subproject ->
                 configFile = rootProject.file('config/checkstyle/checkstyle.xml')
 
                 // Per submodule
-                maxErrors = 5
+                maxErrors = 0
                 maxWarnings = 10
 
                 showViolations = true

@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.context.BeanLocator;
+import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.publisher.Publishers;
@@ -64,6 +65,7 @@ import io.micronaut.http.server.netty.types.NettyCustomizableResponseTypeHandler
 import io.micronaut.http.server.netty.types.files.NettyStreamedFileCustomizableResponseType;
 import io.micronaut.http.server.netty.types.files.NettySystemFileCustomizableResponseType;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
+import io.micronaut.inject.BeanType;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.http.codec.TextPlainCodec;
@@ -248,6 +250,15 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             if (errorRoute == null) {
                 // handle error with a method that is global with bad request
                 errorRoute = router.route(statusException.getStatus()).orElse(null);
+            }
+        } else if (cause instanceof BeanInstantiationException && declaringType != null) {
+            // If the controller could not be instantiated, don't look for a local error route
+            Optional<Class> rootBeanType = ((BeanInstantiationException) cause).getRootBeanType().map(BeanType::getBeanType);
+            if (rootBeanType.isPresent() && declaringType == rootBeanType.get()) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Failed to instantiate [{}]. Skipping lookup of a local error route", declaringType.getName());
+                }
+                declaringType = null;
             }
         }
 
