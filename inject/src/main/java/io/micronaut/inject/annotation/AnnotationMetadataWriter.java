@@ -77,6 +77,14 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
             )
     );
 
+    private static final org.objectweb.asm.commons.Method METHOD_REGISTER_ANNOTATION_TYPE = org.objectweb.asm.commons.Method.getMethod(
+            ReflectionUtils.getRequiredInternalMethod(
+                    DefaultAnnotationMetadata.class,
+                    "registerAnnotationType",
+                    AnnotationClassValue.class
+            )
+    );
+
     private static final org.objectweb.asm.commons.Method CONSTRUCTOR_ANNOTATION_METADATA = org.objectweb.asm.commons.Method.getMethod(
             ReflectionUtils.getRequiredInternalConstructor(
                     DefaultAnnotationMetadata.class,
@@ -293,8 +301,15 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
 
             for (Map.Entry<String, Map<CharSequence, Object>> entry : annotationDefaultValues.entrySet()) {
                 final Map<CharSequence, Object> annotationValues = entry.getValue();
-
+                final boolean typeOnly = CollectionUtils.isEmpty(annotationValues);
                 String annotationName = entry.getKey();
+
+                // skip already registered
+                if (typeOnly && AnnotationMetadataSupport.getRegisteredAnnotationType(annotationName).isPresent()) {
+                    continue;
+                }
+
+
                 Label falseCondition = new Label();
 
                 staticInit.push(annotationName);
@@ -304,12 +319,13 @@ public class AnnotationMetadataWriter extends AbstractClassFileWriter {
                 staticInit.visitLabel(new Label());
 
                 invokeLoadClassValueMethod(owningType, classWriter, staticInit, loadTypeMethods, new AnnotationClassValue(annotationName));
-                if (CollectionUtils.isNotEmpty(annotationValues)) {
+
+                if (!typeOnly) {
                     pushAnnotationAttributes(owningType, classWriter, staticInit, annotationValues, loadTypeMethods);
+                    staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_ANNOTATION_DEFAULTS);
                 } else {
-                    staticInit.visitInsn(ACONST_NULL);
+                    staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_ANNOTATION_TYPE);
                 }
-                staticInit.invokeStatic(TYPE_DEFAULT_ANNOTATION_METADATA, METHOD_REGISTER_ANNOTATION_DEFAULTS);
                 staticInit.visitLabel(falseCondition);
             }
             staticInit.visitInsn(RETURN);
