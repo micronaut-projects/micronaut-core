@@ -101,6 +101,7 @@ class GradleBuildTokens extends BuildTokens {
         String buildDependencies = buildPlugins.findAll({!it.startsWith("apply")}).join(ln)
         buildPlugins = buildPlugins.findAll({it.startsWith("apply")}).join(ln)
 
+        tokens.put("jarPath", "build/libs/$appname-*.jar")
         tokens.put("jvmArgs", jvmArgs)
         tokens.put("buildPlugins", buildPlugins)
         tokens.put("dependencies", dependencies)
