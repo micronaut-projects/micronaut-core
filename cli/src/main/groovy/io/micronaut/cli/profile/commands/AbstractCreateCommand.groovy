@@ -433,9 +433,9 @@ abstract class AbstractCreateCommand extends ArgumentCompletingCommand implement
 
         BuildTokens buildTokens
         if (build == "gradle") {
-            buildTokens = new GradleBuildTokens(sourceLanguage, testFramework)
+            buildTokens = new GradleBuildTokens(appname, sourceLanguage, testFramework)
         } else if (build == "maven") {
-            buildTokens = new MavenBuildTokens(sourceLanguage, testFramework)
+            buildTokens = new MavenBuildTokens(appname, sourceLanguage, testFramework)
         } else {
             return
         }
