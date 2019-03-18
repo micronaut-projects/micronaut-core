@@ -260,12 +260,13 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
 
 
                         AbstractChannelPoolHandler channelPoolHandler = newPoolHandler(key);
+                        final Long acquireTimeoutMillis = connectionPoolConfiguration.getAcquireTimeout().map(Duration::toMillis).orElse(-1L);
                         return new FixedChannelPool(
                                 newBootstrap,
                                 channelPoolHandler,
                                 ChannelHealthChecker.ACTIVE,
-                                null,
-                                connectionPoolConfiguration.getAcquireTimeout().map(Duration::toMillis).orElse(-1L),
+                                acquireTimeoutMillis > -1 ? FixedChannelPool.AcquireTimeoutAction.FAIL : null,
+                                acquireTimeoutMillis,
                                 maxConnections,
                                 connectionPoolConfiguration.getMaxPendingAcquires()
 
