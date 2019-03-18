@@ -44,11 +44,16 @@ public class JwtCookieClearerLogoutHandler implements LogoutHandler {
 
     @Override
     public HttpResponse logout(HttpRequest<?> request) {
-        Optional<Cookie> cookie = request.getCookies().findCookie(jwtCookieConfiguration.getCookieName());
+        Optional<Cookie> maybeCookie = request.getCookies().findCookie(jwtCookieConfiguration.getCookieName());
         try {
             URI location = new URI(jwtCookieConfiguration.getLogoutTargetUrl());
-            if (cookie.isPresent()) {
-                return HttpResponse.seeOther(location).cookie(cookie.get().maxAge(0));
+            if (maybeCookie.isPresent()) {
+                Cookie requestCookie = maybeCookie.get();
+                String domain = jwtCookieConfiguration.getCookieDomain().orElse(null);
+                String path = jwtCookieConfiguration.getCookiePath().orElse(null);
+                Cookie responseCookie = Cookie.of(requestCookie.getName(), "");
+                responseCookie.maxAge(0).domain(domain).path(path);
+                return HttpResponse.seeOther(location).cookie(responseCookie);
             }
             return HttpResponse.seeOther(location);
         } catch (URISyntaxException var5) {

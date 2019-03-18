@@ -369,6 +369,7 @@ public class ConsulConfiguration extends DiscoveryClientConfiguration {
          * Configuration for the HTTP check. See https://www.consul.io/api/agent/check.html.
          */
         @ConfigurationProperties("check")
+        @BootstrapContextCompatible
         public static class CheckConfiguration implements Toggleable {
 
             /**
