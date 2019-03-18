@@ -15,6 +15,11 @@
  */
 package io.micronaut.cache;
 
+import io.reactivex.Flowable;
+import org.reactivestreams.Publisher;
+
+import java.util.Optional;
+
 /**
  * <p>Base cache interface implemented by both {@link SyncCache} and {@link AsyncCache}.</p>
  *
@@ -34,4 +39,11 @@ public interface Cache<C> {
      * @return The native cache implementation
      */
     C getNativeCache();
+
+    /**
+     * @return The cache information.
+     */
+    default Publisher<CacheInfo> getCacheInfo() {
+        return Flowable.empty();
+    }
 }

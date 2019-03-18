@@ -16,8 +16,12 @@
 
 package io.micronaut.management.endpoint.caches;
 
+import io.micronaut.cache.Cache;
+import io.micronaut.cache.CacheInfo;
 import io.micronaut.cache.CacheManager;
 import io.micronaut.cache.SyncCache;
+import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.management.endpoint.annotation.Delete;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.management.endpoint.annotation.Read;
@@ -27,11 +31,15 @@ import io.reactivex.Maybe;
 import io.reactivex.Single;
 
 import javax.validation.constraints.NotBlank;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Exposes an {@link Endpoint} to manage caches.
  *
  * @author Marcel Overdijk
+ * @author graemerocher
  * @since 1.1.0
  */
 @Endpoint(id = CachesEndpoint.NAME, defaultEnabled = false)
@@ -42,17 +50,13 @@ public class CachesEndpoint {
      */
     public static final String NAME = "caches";
 
-    private final CacheManager<?> cacheManager;
-    private final CacheDataCollector cacheDataCollector;
+    private final CacheManager<Object> cacheManager;
 
     /**
      * @param cacheManager       The {@link CacheManager}
-     * @param cacheDataCollector The {@link CacheDataCollector}
      */
-    public CachesEndpoint(CacheManager cacheManager,
-                          CacheDataCollector cacheDataCollector) {
+    public CachesEndpoint(CacheManager<Object> cacheManager) {
         this.cacheManager = cacheManager;
-        this.cacheDataCollector = cacheDataCollector;
     }
 
     /**
@@ -61,8 +65,15 @@ public class CachesEndpoint {
      * @return The caches as a {@link Single}
      */
     @Read
-    public Single getCaches() {
-        return Single.fromPublisher(cacheDataCollector.getData(getSyncCaches()));
+    public Single<Map<String, Object>> getCaches() {
+        return Flowable.fromIterable(cacheManager.getCacheNames())
+                       .flatMapMaybe(n -> Flowable.fromPublisher(cacheManager.getCache(n).getCacheInfo()).firstElement())
+                       .reduce(new HashMap<>(), (seed, info) -> {
+                           seed.put(info.getName(), info.get());
+                           return seed;
+                       }).map(objectObjectHashMap -> Collections.singletonMap(
+                           NAME, objectObjectHashMap
+                       ));
     }
 
     /**
@@ -72,44 +83,54 @@ public class CachesEndpoint {
      * @return The cache as a {@link Single}
      */
     @Read
-    public Maybe getCache(@NotBlank @Selector String name) {
-        return getSyncCache(name).map(cacheDataCollector::getData);
+    public Maybe<Map<String, Object>> getCache(@NotBlank @Selector String name) {
+        try {
+            final Cache<Object> cache = cacheManager.getCache(name);
+            return Flowable.fromPublisher(cache.getCacheInfo())
+                           .map(CacheInfo::get)
+                           .singleElement();
+        } catch (ConfigurationException e) {
+            // no cache exists
+            return Maybe.empty();
+        }
     }
 
     /**
      * Invalidates all the caches.
+     *
+     * @return A maybe that emits a boolean.
      */
     @Delete
-    public void invalidateCaches() {
-        //noinspection ResultOfMethodCallIgnored
-        getSyncCaches().forEach(SyncCache::invalidateAll);
+    public Maybe<Boolean> invalidateCaches() {
+        return Flowable.fromIterable(cacheManager.getCacheNames())
+                .map(cacheManager::getCache)
+                .flatMap(c ->
+                        Publishers.fromCompletableFuture(() -> c.async().invalidateAll())
+                ).reduce((aBoolean, aBoolean2) -> aBoolean && aBoolean2);
     }
 
     /**
      * Invalidates the cache.
      *
      * @param name The name of the cache to invalidate
+     * @return A maybe that emits a boolean if the operation was successful
      */
     @Delete
-    public void invalidateCache(@NotBlank @Selector String name) {
-        //noinspection ResultOfMethodCallIgnored
-        getSyncCache(name).subscribe(SyncCache::invalidateAll);
+    public Maybe<Boolean> invalidateCache(@NotBlank @Selector String name) {
+        try {
+            final SyncCache<Object> cache = cacheManager.getCache(name);
+            return Maybe.create(emitter -> cache.async().invalidateAll().whenComplete((aBoolean, throwable) -> {
+                if (throwable != null) {
+                    emitter.onError(throwable);
+                } else {
+                    emitter.onSuccess(aBoolean);
+                    emitter.onComplete();
+                }
+            }));
+        } catch (ConfigurationException e) {
+            // no cache
+            return Maybe.empty();
+        }
     }
 
-    private Flowable<SyncCache> getSyncCaches() {
-        return getCacheNames()
-                .map(cacheManager::getCache);
-    }
-
-    private Maybe<? extends SyncCache<?>> getSyncCache(String name) {
-        return getCacheNames()
-                .filter(name::equals)
-                .map(cacheManager::getCache)
-                .firstElement();
-    }
-
-    private Flowable<String> getCacheNames() {
-        return Flowable.fromIterable(cacheManager.getCacheNames())
-                .sorted();
-    }
 }
