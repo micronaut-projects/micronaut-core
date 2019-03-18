@@ -31,6 +31,7 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassGenerationException;
 
+import javax.validation.Constraint;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -72,6 +73,12 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
             final Set<String> excludedAnnotations = CollectionUtils.setOf(introspected.get("excludedAnnotations", String[].class, StringUtils.EMPTY_STRING_ARRAY));
             final Set<String> includedAnnotations = CollectionUtils.setOf(introspected.get("includedAnnotations", String[].class, StringUtils.EMPTY_STRING_ARRAY));
             final Set<AnnotationValue> indexedAnnotations = CollectionUtils.setOf(introspected.get("indexed", AnnotationValue[].class, new AnnotationValue[0]));
+
+            indexedAnnotations.add(
+                    AnnotationValue.builder(Introspected.IndexedAnnotation.class)
+                        .member("annotation", Constraint.class)
+                        .build()
+            );
 
             if (ArrayUtils.isNotEmpty(classes)) {
                 AtomicInteger index = new AtomicInteger(0);
