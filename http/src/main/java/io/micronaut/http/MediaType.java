@@ -15,7 +15,6 @@
  */
 package io.micronaut.http;
 
-import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.annotation.TypeHint;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.naming.NameUtils;
