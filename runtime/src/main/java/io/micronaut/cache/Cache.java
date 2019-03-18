@@ -18,8 +18,6 @@ package io.micronaut.cache;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 
-import java.util.Optional;
-
 /**
  * <p>Base cache interface implemented by both {@link SyncCache} and {@link AsyncCache}.</p>
  *
