@@ -20,6 +20,7 @@ import io.micronaut.context.condition.Condition;
 import io.micronaut.context.condition.ConditionContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.value.PropertyResolver;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 
@@ -30,6 +31,7 @@ import java.util.Optional;
  *
  * @author James Kleeh
  */
+@Introspected
 public class EndpointEnabledCondition implements Condition {
 
     @Override
