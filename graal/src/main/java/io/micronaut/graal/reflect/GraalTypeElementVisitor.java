@@ -21,12 +21,10 @@ import com.fasterxml.jackson.core.util.DefaultPrettyPrinter;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.ObjectWriter;
 import io.micronaut.core.annotation.*;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
-import io.micronaut.inject.ast.ClassElement;
-import io.micronaut.inject.ast.ConstructorElement;
-import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.ast.*;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
@@ -38,6 +36,8 @@ import java.io.PrintWriter;
 import java.io.Writer;
 import java.util.*;
 import java.util.concurrent.Future;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Generates the GraalVM reflect.json file at compilation time.
@@ -47,6 +47,10 @@ import java.util.concurrent.Future;
  */
 @Experimental
 public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Object> {
+    /**
+     * The position of the visitor.
+     */
+    public static final int POSITION = -200;
 
     /**
      * Beans are those requiring full reflective access to all public members.
@@ -60,13 +64,14 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     /**
      * Classes only require classloading access.
      */
-    protected static Set<String> classes = new HashSet<>();
+    protected static Map<String, Map<String, Object>> classes = new HashMap<>();
 
     /**
      * Arrays requiring reflective instantiation.
      */
     protected static Set<String> arrays = new HashSet<>();
 
+    private static final TypeHint.AccessType[] DEFAULT_ACCESS_TYPE = {TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS};
     private static final String REFLECTION_CONFIG_JSON = "reflection-config.json";
     private static final String NATIVE_IMAGE_PROPERTIES = "native-image.properties";
 
@@ -74,11 +79,18 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
     private static final String ALL_PUBLIC_METHODS = "allPublicMethods";
 
+    private static final String ALL_PUBLIC_FIELDS = "allPublicFields";
+
     private static final String NAME = "name";
 
     private static final String ALL_DECLARED_CONSTRUCTORS = "allDeclaredConstructors";
 
     private boolean isSubclass = getClass() != GraalTypeElementVisitor.class;
+
+    @Override
+    public int getOrder() {
+        return POSITION; // allow mutation of metadata
+    }
 
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
@@ -91,11 +103,14 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
             } else if (element.hasAnnotation(TypeHint.class)) {
                 packages.add(element.getPackageName());
                 final String[] introspectedClasses = element.getValue(TypeHint.class, String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
-                final TypeHint.AccessType accessType = element.getValue(TypeHint.class, "accessType", TypeHint.AccessType.class)
-                        .orElse(TypeHint.AccessType.REFLECTION_PUBLIC);
+                final TypeHint typeHint = element.synthesize(TypeHint.class);
+                TypeHint.AccessType[] accessTypes = DEFAULT_ACCESS_TYPE;
 
-                processClasses(accessType, introspectedClasses);
-                processClasses(accessType, element.getValue(
+                if (typeHint != null) {
+                    accessTypes = typeHint.accessType();
+                }
+                processClasses(accessTypes, introspectedClasses);
+                processClasses(accessTypes, element.getValue(
                         TypeHint.class,
                         "typeNames",
                         String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY
@@ -106,6 +121,22 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     }
 
     @Override
+    public void visitField(FieldElement element, VisitorContext context) {
+        if (element.hasStereotype(ReflectiveAccess.class)) {
+            final ClassElement dt = element.getDeclaringType();
+            packages.add(dt.getPackageName());
+            final Map<String, Object> json = resolveClassData(dt.getName());
+            final List<Map<String, Object>> fields = (List<Map<String, Object>>)
+                    json.computeIfAbsent("fields", (Function<String, List<Map<String, Object>>>) s -> new ArrayList<>());
+
+            fields.add(Collections.singletonMap(
+                    "name", element.getName()
+            ));
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
         if (!isSubclass) {
             if (element.hasDeclaredStereotype(EntryPoint.class)) {
@@ -115,6 +146,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 for (ParameterElement parameter : parameters) {
                     possiblyReflectOnType(parameter.getType());
                 }
+            } else if (element.hasDeclaredStereotype(ReflectiveAccess.class)) {
+                processMethodElement(element);
             }
         }
     }
@@ -126,8 +159,31 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 final ClassElement declaringType = element.getDeclaringType();
                 packages.add(declaringType.getPackageName());
                 beans.add(declaringType.getName());
+            } else if (element.hasAnnotation(ReflectiveAccess.class)) {
+                processMethodElement(element);
             }
         }
+    }
+
+    private void processMethodElement(MethodElement element) {
+        final String methodName = element.getName();
+        packages.add(element.getDeclaringType().getPackageName());
+        final Map<String, Object> json = resolveClassData(element.getDeclaringType().getName());
+        final List<Map<String, Object>> methods = (List<Map<String, Object>>)
+                json.computeIfAbsent("methods", (Function<String, List<Map<String, Object>>>) s -> new ArrayList<>());
+        final List<String> params = Arrays.stream(element.getParameters())
+                .map(ParameterElement::getType)
+                .filter(Objects::nonNull)
+                .map(classElement -> {
+                    if (classElement.isArray()) {
+                        return classElement.getName() + "[]";
+                    }
+                    return classElement.getName();
+                }).collect(Collectors.toList());
+        methods.add(CollectionUtils.mapOf(
+                "name", methodName,
+                "parameterTypes", params
+        ));
     }
 
     private void possiblyReflectOnType(ClassElement type) {
@@ -150,11 +206,17 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         }
     }
 
-    private void processClasses(TypeHint.AccessType accessType, String... introspectedClasses) {
-        if (accessType == TypeHint.AccessType.CLASS_LOADING) {
-            Collections.addAll(classes, introspectedClasses);
-        } else {
-            Collections.addAll(beans, introspectedClasses);
+    private void processClasses(TypeHint.AccessType[] accessType, String... introspectedClasses) {
+        for (String introspectedClass : introspectedClasses) {
+
+            for (TypeHint.AccessType type : accessType) {
+                if (type == TypeHint.AccessType.ALL_PUBLIC) {
+                    Collections.addAll(beans, introspectedClasses);
+                    return;
+                }
+                Map<String, Object> json = resolveClassData(introspectedClass);
+                json.put(NameUtils.camelCase(type.name().toLowerCase()), true);
+            }
         }
     }
 
@@ -218,11 +280,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(reflectFile);
                 generatedFile.ifPresent(gf -> {
 
-                    for (String aClass : classes) {
-                        json.add(CollectionUtils.mapOf(
-                                NAME, aClass,
-                                ALL_DECLARED_CONSTRUCTORS, true
-                        ));
+                    for (Map<String, Object> value : classes.values()) {
+                        json.add(value);
                     }
 
                     for (String array : arrays) {
@@ -236,7 +295,8 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                         json.add(CollectionUtils.mapOf(
                                 NAME, bean,
                                 ALL_PUBLIC_METHODS, true,
-                                ALL_DECLARED_CONSTRUCTORS, true
+                                ALL_DECLARED_CONSTRUCTORS, true,
+                                ALL_PUBLIC_FIELDS, true
                         ));
                     }
 
@@ -254,5 +314,13 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 arrays.clear();
             }
         }
+    }
+
+    private Map<String, Object> resolveClassData(String introspectedClass) {
+        return classes.computeIfAbsent(introspectedClass, s -> {
+            final HashMap<String, Object> map = new HashMap<>(5);
+            map.put(NAME, s);
+            return map;
+        });
     }
 }

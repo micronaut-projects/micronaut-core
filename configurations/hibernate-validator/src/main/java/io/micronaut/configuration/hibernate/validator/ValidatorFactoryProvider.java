@@ -44,7 +44,7 @@ import java.util.Properties;
  */
 @Factory
 @Requires(classes = HibernateValidator.class)
-@TypeHint(value = HibernateValidator.class, accessType = TypeHint.AccessType.CLASS_LOADING)
+@TypeHint(value = HibernateValidator.class)
 public class ValidatorFactoryProvider {
 
     @Inject

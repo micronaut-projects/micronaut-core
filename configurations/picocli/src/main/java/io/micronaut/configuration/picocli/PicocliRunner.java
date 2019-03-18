@@ -17,9 +17,15 @@ package io.micronaut.configuration.picocli;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.Environment;
+import io.micronaut.core.annotation.TypeHint;
 import picocli.CommandLine;
 import picocli.CommandLine.*;
 
+import java.lang.reflect.Executable;
+import java.lang.reflect.Parameter;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.ResourceBundle;
 import java.util.concurrent.Callable;
 
 /**
@@ -29,6 +35,11 @@ import java.util.concurrent.Callable;
  * @author Remko Popma
  * @since 1.0
  */
+@TypeHint(
+    value = {System.class, Executable.class, Parameter.class, ResourceBundle.class, Path.class, Paths.class},
+    typeNames = "picocli.CommandLine$AutoHelpMixin",
+    accessType = {TypeHint.AccessType.ALL_DECLARED_FIELDS, TypeHint.AccessType.ALL_PUBLIC_METHODS}
+)
 public class PicocliRunner {
     /**
      * Instantiates a new {@link ApplicationContext} for the {@link Environment#CLI} environment,
