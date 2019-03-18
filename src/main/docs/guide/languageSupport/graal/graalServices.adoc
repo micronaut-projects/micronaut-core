@@ -12,8 +12,7 @@ The `graal-native-image` feature adds four important items:
 
 1. The `svm` and `graal` dependencies to your `build.gradle` (or `pom.xml` if `--build maven` is used).
 2. A `Dockerfile` which can be used to construct the native image using Docker and a script `docker-build.sh` to run it.
-3. A `build-native-image.sh` script to build the native image without using Docker.
-4. A `native-image.properties` configuration file to `src/main/resources/META-INF/native-image` simplify building the image.
+3. A `native-image.properties` configuration file to `src/main/resources/META-INF/native-image` simplify building the image.
 
 The `native-image.properties` file that is generated looks something like:
 
@@ -66,10 +65,18 @@ $ sdk install java 1.0.0-rc-13-grl
 $ sdk use java 1.0.0-rc-13-grl
 ----
 
-.Creating native image
+.Creating native image with Gradle
 [source,bash]
 ----
-$ ./build-native-image.sh
+$ ./gradlew assemble
+$ native-image -cp build/libs/hello-world-0.1-all.jar
+----
+
+.Creating native image with Maven
+[source,bash]
+----
+$ ./mvnw package
+$ native-image -cp target/hello-world-0.1.jar
 ----
 
 
@@ -77,11 +84,28 @@ $ ./build-native-image.sh
 
 Micronaut itself does not rely on reflection or dynamic classloading so works automatically with GraalVM native, however certain third party libraries used by Micronaut may require additional input about uses of reflection.
 
-Micronaut includes an annotation processor that helps to handle generating the `reflection-config.json` metadata that is automatically picked up by the `nativeimage` tool:
+Micronaut includes an annotation processor that helps to handle generating the `reflection-config.json` metadata that is automatically picked up by the `native-image` tool:
 
 dependency:micronaut-graal[scope="annotationProcessor"]
 
 This processor will generate a `reflection-config.json` file to a file to the `META-INF/native-image` directory in your build classes directory (`target/classes` with Maven and typically `build/classes/java/main` with Gradle) and a `native-image.properties` file to read this configuration for all classes annotated with either ann:core.annotation.Introspected[] or ann:core.annotation.TypeHint[].
+
+For example the following class:
+
+[source,java]
+----
+package example;
+import io.micronaut.core.annotation.*;
+
+@Introspected
+class Test {
+    ...
+}
+----
+
+The above example will result in the public methods and declared constructors of `example.Test` being included in `reflection-config.json`.
+
+If you have more advanced requirements and only wish to include certain fields or methods, you can use ann:core.annotation.ReflectiveAccess[] instead which can be present on any constructor, field or method to include only the specific field, constructor or method.
 
 TIP: If you wish to provide your own `reflect.json` you can add one to `src/main/graal/reflect.json` and it will be automatically picked up.
 
@@ -101,7 +125,7 @@ The former will generate a compile time introspection as well as allowing reflec
                 LinkedHashMap.class,
                 HashSet.class
         },
-        accessType = TypeHint.AccessType.CLASS_LOADING // <2>
+        accessType = TypeHint.AccessType.ALL_DECLARED_CONSTRUCTORS // <2>
 )
 ----
 
