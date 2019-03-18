@@ -28,14 +28,12 @@ import io.micronaut.inject.ast.*;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
-import org.reactivestreams.Publisher;
 
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Writer;
 import java.util.*;
-import java.util.concurrent.Future;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -125,7 +123,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         if (element.hasStereotype(ReflectiveAccess.class)) {
             final ClassElement dt = element.getDeclaringType();
             packages.add(dt.getPackageName());
-            final Map<String, Object> json = resolveClassData(dt.getName());
+            final Map<String, Object> json = resolveClassData(resolveName(dt));
             final List<Map<String, Object>> fields = (List<Map<String, Object>>)
                     json.computeIfAbsent("fields", (Function<String, List<Map<String, Object>>>) s -> new ArrayList<>());
 
@@ -135,18 +133,18 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         }
     }
 
+    private String resolveName(ClassElement classElement) {
+        if (classElement.isArray()) {
+            return classElement.getName() + "[]";
+        }
+        return classElement.getName();
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
         if (!isSubclass) {
-            if (element.hasDeclaredStereotype(EntryPoint.class)) {
-                final ClassElement returnType = element.getReturnType();
-                possiblyReflectOnType(returnType);
-                final ParameterElement[] parameters = element.getParameters();
-                for (ParameterElement parameter : parameters) {
-                    possiblyReflectOnType(parameter.getType());
-                }
-            } else if (element.hasDeclaredStereotype(ReflectiveAccess.class)) {
+            if (element.hasDeclaredStereotype(ReflectiveAccess.class)) {
                 processMethodElement(element);
             }
         }
@@ -158,7 +156,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
             if (element.hasAnnotation(Creator.class)) {
                 final ClassElement declaringType = element.getDeclaringType();
                 packages.add(declaringType.getPackageName());
-                beans.add(declaringType.getName());
+                beans.add(resolveName(declaringType));
             } else if (element.hasAnnotation(ReflectiveAccess.class)) {
                 processMethodElement(element);
             }
@@ -174,36 +172,11 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         final List<String> params = Arrays.stream(element.getParameters())
                 .map(ParameterElement::getType)
                 .filter(Objects::nonNull)
-                .map(classElement -> {
-                    if (classElement.isArray()) {
-                        return classElement.getName() + "[]";
-                    }
-                    return classElement.getName();
-                }).collect(Collectors.toList());
+                .map(this::resolveName).collect(Collectors.toList());
         methods.add(CollectionUtils.mapOf(
                 "name", methodName,
                 "parameterTypes", params
         ));
-    }
-
-    private void possiblyReflectOnType(ClassElement type) {
-        if (type == null || type.isPrimitive() || type.isAbstract() || type.isEnum() || type.getName().startsWith("java.lang")) {
-            return;
-        }
-
-        boolean isWrapperType = type.isAssignable(Iterable.class) ||
-                                type.isAssignable(Publisher.class) ||
-                                type.isAssignable(Map.class) ||
-                                type.isAssignable(Optional.class) ||
-                                type.isAssignable(Future.class);
-        if (!isWrapperType) {
-            beans.add(type.getName());
-        }
-        
-        final Map<String, ClassElement> typeArguments = type.getTypeArguments();
-        for (ClassElement value : typeArguments.values()) {
-            possiblyReflectOnType(value);
-        }
     }
 
     private void processClasses(TypeHint.AccessType[] accessType, String... introspectedClasses) {
@@ -279,7 +252,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 });
                 final Optional<GeneratedFile> generatedFile = visitorContext.visitMetaInfFile(reflectFile);
                 generatedFile.ifPresent(gf -> {
-
                     for (Map<String, Object> value : classes.values()) {
                         json.add(value);
                     }
