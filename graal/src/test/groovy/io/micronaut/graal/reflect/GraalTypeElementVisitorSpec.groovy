@@ -198,43 +198,5 @@ class Test {
         cleanup:
         reader.close()
     }
-
-
-    void "test write reflect.json for controller methods"() {
-
-        given:
-        Reader reader = readGenerated("native-image/test/test/reflection-config.json", 'test.Test', '''
-package test;
-
-import io.micronaut.http.annotation.*;
-
-@Controller("/")
-class Test {
-
-    @Get("/bar")
-    Bar getBar() {
-        return null;
-    }
     
-}
-
-class Bar {}
-
-''')
-
-        when:
-        def json = new JsonSlurper().parse(reader)
-        json = json.sort { it.name }
-
-        def entry = json?.find { it.name == 'test.Bar'}
-
-        then:
-        entry
-        entry.name == 'test.Bar'
-        entry.allPublicMethods
-        entry.allDeclaredConstructors
-
-        cleanup:
-        reader.close()
-    }
 }
