@@ -17,6 +17,7 @@ package io.micronaut.security.token.jwt.render;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
 
 /**
  * Stores the combination of access and refresh tokens.
@@ -24,6 +25,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
  * @author Sergio del Amo
  * @since 1.0
  */
+@Introspected
 public class AccessRefreshToken {
 
     @JsonProperty("access_token")
