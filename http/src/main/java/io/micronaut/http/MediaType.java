@@ -50,7 +50,7 @@ import java.util.stream.Collectors;
  * @author Graeme Rocher
  * @since 1.0
  */
-@TypeHint(value = MediaType[].class, accessType = TypeHint.AccessType.CLASS_LOADING)
+@TypeHint(value = MediaType[].class)
 public class MediaType implements CharSequence {
 
     /**

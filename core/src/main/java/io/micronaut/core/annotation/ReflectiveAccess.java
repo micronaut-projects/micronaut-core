@@ -13,35 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.cache;
+package io.micronaut.core.annotation;
 
-import io.reactivex.Flowable;
-import org.reactivestreams.Publisher;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 
 /**
- * <p>Base cache interface implemented by both {@link SyncCache} and {@link AsyncCache}.</p>
+ * Descriptive annotation that can be used to declare a field, method, constructor etc for reflective access.
  *
- * @param <C> The native cache implementation
- *
- * @author Graeme Rocher
- * @since 1.0
+ * @author graemerocher
+ * @since 1.1
  */
-public interface Cache<C> {
+@Target({ElementType.FIELD, ElementType.METHOD, ElementType.CONSTRUCTOR})
+@Retention(RetentionPolicy.RUNTIME)
+@Experimental
+public @interface ReflectiveAccess {
 
-    /**
-     * @return The name of the cache
-     */
-    String getName();
 
-    /**
-     * @return The native cache implementation
-     */
-    C getNativeCache();
-
-    /**
-     * @return The cache information.
-     */
-    default Publisher<CacheInfo> getCacheInfo() {
-        return Flowable.empty();
-    }
 }
