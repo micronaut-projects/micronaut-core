@@ -42,7 +42,7 @@
     <module name="RegexpHeader">
         <!-- Requires a licence copyright notice in each file. -->
         <property name="headerFile"
-                  value="config/HEADER"/>
+                  value="config/checkstyle/HEADER"/>
     </module>
 
     <property name="fileExtensions" value="java, properties, xml"/>
