@@ -37,6 +37,7 @@ import static io.micronaut.core.util.StringUtils.TRUE;
  */
 @Requires(property = SslConfiguration.PREFIX + ".enabled", value = TRUE, defaultValue = FALSE)
 @Requires(property = SslConfiguration.PREFIX + ".build-self-signed", value = FALSE, defaultValue = FALSE)
+@Requires(property = SslConfiguration.PREFIX + ".acme.enabled", value = FALSE, defaultValue = FALSE)
 @Singleton
 @Internal
 public class CertificateProvidedSslBuilder extends SslBuilder<SslContext> implements ServerSslBuilder {
