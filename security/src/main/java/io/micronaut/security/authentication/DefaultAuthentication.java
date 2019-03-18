@@ -17,6 +17,7 @@ package io.micronaut.security.authentication;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import io.micronaut.core.annotation.Introspected;
 
 import javax.annotation.concurrent.Immutable;
 import java.util.HashMap;
@@ -29,6 +30,7 @@ import java.util.Map;
  * @since 1.0.1
  */
 @Immutable
+@Introspected
 public class DefaultAuthentication implements Authentication {
 
     private final String name;
