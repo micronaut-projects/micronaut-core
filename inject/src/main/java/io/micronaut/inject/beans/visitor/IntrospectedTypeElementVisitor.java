@@ -31,7 +31,6 @@ import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ClassGenerationException;
 
-import javax.validation.Constraint;
 import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -50,6 +49,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
      * The position of the visitor.
      */
     public static final int POSITION = -100;
+
+    private static final String JAVAX_VALIDATION_CONSTRAINT = "javax.validation.Constraint";
 
     private Map<String, BeanIntrospectionWriter> writers = new LinkedHashMap<>(10);
 
@@ -76,7 +77,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
 
             indexedAnnotations.add(
                     AnnotationValue.builder(Introspected.IndexedAnnotation.class)
-                        .member("annotation", Constraint.class)
+                        .member("annotation", new AnnotationClassValue<>(JAVAX_VALIDATION_CONSTRAINT))
                         .build()
             );
 
