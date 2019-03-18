@@ -214,7 +214,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 json = new ArrayList<>();
             }
 
-            if (CollectionUtils.isEmpty(beans) && CollectionUtils.isEmpty(classes) && CollectionUtils.isEmpty(arrays)) {
+            if (CollectionUtils.isEmpty(beans) && CollectionUtils.isEmpty(classes) && CollectionUtils.isEmpty(arrays) && CollectionUtils.isEmpty(json)) {
                 return;
             }
 
