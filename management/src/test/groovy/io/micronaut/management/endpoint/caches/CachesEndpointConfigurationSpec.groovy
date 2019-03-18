@@ -16,8 +16,7 @@
 package io.micronaut.management.endpoint.caches
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.management.endpoint.caches.impl.DefaultCacheData
-import io.micronaut.management.endpoint.caches.impl.RxJavaCacheDataCollector
+
 import spock.lang.Specification
 
 /**
@@ -32,8 +31,6 @@ class CachesEndpointConfigurationSpec extends Specification {
 
         expect:
         !context.containsBean(CachesEndpoint)
-        !context.containsBean(DefaultCacheData)
-        !context.containsBean(RxJavaCacheDataCollector)
 
         cleanup:
         context.close()
@@ -45,8 +42,6 @@ class CachesEndpointConfigurationSpec extends Specification {
 
         expect:
         context.containsBean(CachesEndpoint)
-        context.containsBean(DefaultCacheData)
-        context.containsBean(RxJavaCacheDataCollector)
 
         cleanup:
         context.close()

@@ -14,10 +14,27 @@
  * limitations under the License.
  */
 
+package io.micronaut.cache;
+
+import io.micronaut.core.async.annotation.SingleResult;
+import io.micronaut.core.naming.Named;
+
+import javax.annotation.Nonnull;
+import java.util.Map;
+
 /**
- * Implementations for the cache endpoint
+ * Provides information about the state of the cache.
  *
- * @author Marcel Overdijk
- * @since 1.1.0
+ * @author graemerocher
+ * @since 1.1
  */
-package io.micronaut.management.endpoint.caches.impl;
+public interface CacheInfo extends Named {
+
+    /**
+     * A publisher that emits a single result containing the cache data.
+     * @return Cache data
+     */
+    @Nonnull
+    @SingleResult
+    Map<String, Object> get();
+}
