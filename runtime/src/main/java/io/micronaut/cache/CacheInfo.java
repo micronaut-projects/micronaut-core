@@ -13,35 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.cache;
 
-import io.reactivex.Flowable;
-import org.reactivestreams.Publisher;
+import io.micronaut.core.async.annotation.SingleResult;
+import io.micronaut.core.naming.Named;
+
+import javax.annotation.Nonnull;
+import java.util.Map;
 
 /**
- * <p>Base cache interface implemented by both {@link SyncCache} and {@link AsyncCache}.</p>
+ * Provides information about the state of the cache.
  *
- * @param <C> The native cache implementation
- *
- * @author Graeme Rocher
- * @since 1.0
+ * @author graemerocher
+ * @since 1.1
  */
-public interface Cache<C> {
+public interface CacheInfo extends Named {
 
     /**
-     * @return The name of the cache
+     * A publisher that emits a single result containing the cache data.
+     * @return Cache data
      */
-    String getName();
-
-    /**
-     * @return The native cache implementation
-     */
-    C getNativeCache();
-
-    /**
-     * @return The cache information.
-     */
-    default Publisher<CacheInfo> getCacheInfo() {
-        return Flowable.empty();
-    }
+    @Nonnull
+    @SingleResult
+    Map<String, Object> get();
 }

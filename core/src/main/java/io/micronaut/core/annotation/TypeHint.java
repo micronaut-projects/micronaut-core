@@ -37,11 +37,10 @@ public @interface TypeHint {
     Class[] value() default {};
 
     /**
-     * The access type the type requires ie. whether only classloading or full reflective access is necessary.
+     * Describes the access.
      * @return The access type
-     * @since 1.1
      */
-    AccessType accessType() default AccessType.CLASS_LOADING;
+    AccessType[] accessType() default AccessType.ALL_DECLARED_CONSTRUCTORS;
 
     /**
      * @return The type names
@@ -53,12 +52,32 @@ public @interface TypeHint {
      */
     enum AccessType {
         /**
-         * Full reflection of all public members required.
+         * All public members.
          */
-        REFLECTION_PUBLIC,
+        ALL_PUBLIC,
         /**
-         * Only classloading access required.
+         * All declared constructors require access.
          */
-        CLASS_LOADING
+        ALL_DECLARED_CONSTRUCTORS,
+        /**
+         * All public constructors require access.
+         */
+        ALL_PUBLIC_CONSTRUCTORS,
+        /**
+         * All declared methods require access.
+         */
+        ALL_DECLARED_METHODS,
+        /**
+         * All declared fields require access.
+         */
+        ALL_DECLARED_FIELDS,
+        /**
+         * All public methods require access.
+         */
+        ALL_PUBLIC_METHODS,
+        /**
+         * All public fields require access.
+         */
+        ALL_PUBLIC_FIELDS
     }
 }
