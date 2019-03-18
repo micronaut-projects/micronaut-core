@@ -198,5 +198,5 @@ class Test {
         cleanup:
         reader.close()
     }
-    
+
 }
