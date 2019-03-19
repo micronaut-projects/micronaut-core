@@ -20,6 +20,7 @@ import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Parameter;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.discovery.StaticServiceInstanceList;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -30,7 +31,11 @@ import io.micronaut.scheduling.TaskScheduler;
 import io.reactivex.Flowable;
 
 import java.net.URI;
-import java.util.*;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
@@ -108,7 +113,7 @@ public class ServiceHttpClientFactory {
                 return httpClient.exchange(HttpRequest.GET(healthCheckURI)).onErrorResumeNext(throwable -> {
                     if (throwable instanceof HttpClientResponseException) {
                         HttpClientResponseException responseException = (HttpClientResponseException) throwable;
-                        HttpResponse response = responseException.getResponse();
+                        HttpResponse<ByteBuffer> response = (HttpResponse<ByteBuffer>) responseException.getResponse();
                         //noinspection unchecked
                         return Flowable.just(response);
                     }
