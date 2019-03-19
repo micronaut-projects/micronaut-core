@@ -54,10 +54,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
      * Beans are those requiring full reflective access to all public members.
      */
     protected static Set<String> packages = new HashSet<>();
-    /**
-     * Beans are those requiring full reflective access to all public members.
-     */
-    protected static Set<String> beans = new HashSet<>();
 
     /**
      * Classes only require classloading access.
@@ -95,9 +91,12 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         if (!isSubclass && !element.hasStereotype(Deprecated.class)) {
             if (element.hasAnnotation(Introspected.class)) {
                 packages.add(element.getPackageName());
-                beans.add(element.getName());
+                final String beanName = element.getName();
+                addBean(beanName);
                 final String[] introspectedClasses = element.getValue(Introspected.class, "classes", String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
-                Collections.addAll(beans, introspectedClasses);
+                for (String introspectedClass : introspectedClasses) {
+                    addBean(introspectedClass);
+                }
             } else if (element.hasAnnotation(TypeHint.class)) {
                 packages.add(element.getPackageName());
                 final String[] introspectedClasses = element.getValue(TypeHint.class, String[].class).orElse(StringUtils.EMPTY_STRING_ARRAY);
@@ -116,6 +115,14 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 );
             }
         }
+    }
+
+    private void addBean(String beanName) {
+        resolveClassData(beanName).putAll(CollectionUtils.mapOf(
+                ALL_PUBLIC_METHODS, true,
+                ALL_DECLARED_CONSTRUCTORS, true,
+                ALL_PUBLIC_FIELDS, true
+        ));
     }
 
     @Override
@@ -156,7 +163,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
             if (element.hasAnnotation(Creator.class)) {
                 final ClassElement declaringType = element.getDeclaringType();
                 packages.add(declaringType.getPackageName());
-                beans.add(resolveName(declaringType));
+                addBean(declaringType.getName());
             } else if (element.hasAnnotation(ReflectiveAccess.class)) {
                 processMethodElement(element);
             }
@@ -184,7 +191,9 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
 
             for (TypeHint.AccessType type : accessType) {
                 if (type == TypeHint.AccessType.ALL_PUBLIC) {
-                    Collections.addAll(beans, introspectedClasses);
+                    for (String aClass : introspectedClasses) {
+                        addBean(aClass);
+                    }
                     return;
                 }
                 Map<String, Object> json = resolveClassData(introspectedClass);
@@ -214,7 +223,7 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                 json = new ArrayList<>();
             }
 
-            if (CollectionUtils.isEmpty(beans) && CollectionUtils.isEmpty(classes) && CollectionUtils.isEmpty(arrays) && CollectionUtils.isEmpty(json)) {
+            if (CollectionUtils.isEmpty(classes) && CollectionUtils.isEmpty(arrays) && CollectionUtils.isEmpty(json)) {
                 return;
             }
 
@@ -263,15 +272,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                         ));
                     }
 
-                    for (String bean : beans) {
-                        json.add(CollectionUtils.mapOf(
-                                NAME, bean,
-                                ALL_PUBLIC_METHODS, true,
-                                ALL_DECLARED_CONSTRUCTORS, true,
-                                ALL_PUBLIC_FIELDS, true
-                        ));
-                    }
-
                     try (Writer w = gf.openWriter()) {
                         visitorContext.info("Writing " + REFLECTION_CONFIG_JSON + " file to destination: " + gf.getName());
 
@@ -281,7 +281,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                     }
                 });
             } finally {
-                beans.clear();
                 classes.clear();
                 arrays.clear();
             }

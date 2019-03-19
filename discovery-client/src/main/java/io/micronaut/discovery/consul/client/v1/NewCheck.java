@@ -20,6 +20,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.convert.ConversionService;
 
 import java.time.Duration;
@@ -185,6 +186,7 @@ public abstract class NewCheck implements Check {
     /**
      * @param name The name
      */
+    @ReflectiveAccess
     protected void setName(String name) {
         this.name = name;
     }
@@ -200,6 +202,7 @@ public abstract class NewCheck implements Check {
      * @param ID The id
      */
     @JsonProperty("ID")
+    @ReflectiveAccess
     void setID(@SuppressWarnings("ParameterName") String ID) {
         this.ID = ID;
     }
@@ -207,6 +210,7 @@ public abstract class NewCheck implements Check {
     /**
      * @param status The status
      */
+    @ReflectiveAccess
     protected void setStatus(String status) {
         this.status = Status.valueOf(status.toUpperCase());
     }
@@ -214,6 +218,7 @@ public abstract class NewCheck implements Check {
     /**
      * @param notes The notes
      */
+    @ReflectiveAccess
     protected void setNotes(String notes) {
         this.notes = notes;
     }
