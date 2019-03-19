@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.security.filters;
 
 import io.micronaut.http.HttpAttributes;
@@ -21,15 +22,11 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Filter;
 import io.micronaut.http.filter.OncePerRequestHttpServerFilter;
 import io.micronaut.http.filter.ServerFilterChain;
-import io.micronaut.security.authentication.Authentication;
 import io.micronaut.security.handlers.RejectionHandler;
 import io.micronaut.security.rules.SecurityRule;
 import io.micronaut.security.rules.SecurityRuleResult;
 import io.micronaut.web.router.RouteMatch;
-import io.micronaut.web.router.RouteMatchUtils;
 import io.reactivex.Flowable;
-import io.reactivex.Maybe;
-import io.reactivex.functions.Function;
 import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +34,6 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import java.util.Collection;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
@@ -96,65 +92,71 @@ public class SecurityFilter extends OncePerRequestHttpServerFilter {
     protected Publisher<MutableHttpResponse<?>> doFilterOnce(HttpRequest<?> request, ServerFilterChain chain) {
         String method = request.getMethod().toString();
         String path = request.getPath();
+        RouteMatch routeMatch = request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class).orElse(null);
 
-        Maybe<Authentication> authentication = Flowable.fromIterable(authenticationFetchers)
+        return Flowable.fromIterable(authenticationFetchers)
             .flatMap(authenticationFetcher -> authenticationFetcher.fetchAuthentication(request))
-            .firstElement();
-
-        return authentication.toFlowable().flatMap((Function<Authentication, Publisher<MutableHttpResponse<?>>>) authentication1 -> {
-            request.setAttribute(AUTHENTICATION, authentication1);
-            Map<String, Object> attributes = authentication1.getAttributes();
-            Optional<RouteMatch> routeMatch = RouteMatchUtils.findRouteMatchAtRequest(request);
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Attributes: {}", attributes
-                    .entrySet()
-                    .stream()
-                    .map((entry) -> entry.getKey() + "=>" + entry.getValue().toString())
-                    .collect(Collectors.joining(", ")));
-            }
-            for (SecurityRule rule : securityRules) {
-                SecurityRuleResult result = rule.check(request, routeMatch.orElse(null), attributes);
-                if (result == SecurityRuleResult.REJECTED) {
+            .firstElement()
+            .doOnEvent((authentication, throwable) -> {
+                if (authentication != null) {
+                    request.setAttribute(AUTHENTICATION, authentication);
+                    Map<String, Object> attributes = authentication.getAttributes();
                     if (LOG.isDebugEnabled()) {
-                        LOG.debug("Unauthorized request {} {}. The rule provider {} rejected the request.", method, path, rule.getClass().getName());
+                        LOG.debug("Attributes: {}", attributes
+                                .entrySet()
+                                .stream()
+                                .map((entry) -> entry.getKey() + "=>" + entry.getValue().toString())
+                                .collect(Collectors.joining(", ")));
                     }
-                    return rejectionHandler.reject(request, true);
-                }
-                if (result == SecurityRuleResult.ALLOWED) {
+                } else {
+                    request.setAttribute(AUTHENTICATION, null);
                     if (LOG.isDebugEnabled()) {
-                        LOG.debug("Authorized request {} {}. The rule provider {} authorized the request.", method, path, rule.getClass().getName());
+                        LOG.debug("Failure to authenticate request. {} {}.", method, path);
                     }
-                    return chain.proceed(request);
                 }
-            }
+            })
+            .toFlowable()
+            .flatMap(authentication -> checkRules(request, chain, routeMatch, authentication.getAttributes(), true))
+            .switchIfEmpty(Flowable.defer(() -> checkRules(request, chain, routeMatch, null, false)));
+    }
 
-            //no rule found for the given request, reject
-            return rejectionHandler.reject(request, true);
-        }).switchIfEmpty(Flowable.just(securityRules).flatMap(securityRules -> {
-            request.setAttribute(AUTHENTICATION, null);
-            Optional<RouteMatch> routeMatch = RouteMatchUtils.findRouteMatchAtRequest(request);
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Failure to authenticate request. {} {}.", method, path);
-            }
-
-            for (SecurityRule rule : securityRules) {
-                SecurityRuleResult result = rule.check(request, routeMatch.orElse(null), null);
-                if (result == SecurityRuleResult.REJECTED) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Unauthorized request {} {}. The rule provider {} rejected the request.", method, path, rule.getClass().getName());
-                    }
-                    return rejectionHandler.reject(request, false);
+    /**
+     * Check the security rules against the provided arguments.
+     *
+     * @param request The request
+     * @param chain The server chain
+     * @param routeMatch The route match
+     * @param attributes The authentication attributes
+     * @param forbidden Whether a rejection should be forbidden
+     * @return A response publisher
+     */
+    protected Publisher<MutableHttpResponse<?>> checkRules(HttpRequest<?> request,
+                                                           ServerFilterChain chain,
+                                                           @Nullable RouteMatch routeMatch,
+                                                           @Nullable Map<String, Object> attributes,
+                                                           boolean forbidden) {
+        String method = request.getMethod().toString();
+        String path = request.getPath();
+        for (SecurityRule rule : securityRules) {
+            SecurityRuleResult result = rule.check(request, routeMatch, attributes);
+            if (result == SecurityRuleResult.REJECTED) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Unauthorized request {} {}. The rule provider {} rejected the request.", method, path, rule.getClass().getName());
                 }
-                if (result == SecurityRuleResult.ALLOWED) {
-                    if (LOG.isDebugEnabled()) {
-                        LOG.debug("Authorized request {} {}. The rule provider {} authorized the request.", method, path, rule.getClass().getName());
-                    }
-                    return chain.proceed(request);
-                }
+                return rejectionHandler.reject(request, forbidden);
             }
+            if (result == SecurityRuleResult.ALLOWED) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("Authorized request {} {}. The rule provider {} authorized the request.", method, path, rule.getClass().getName());
+                }
+                return chain.proceed(request);
+            }
+        }
 
-            //no rule found for the given request, reject
-            return rejectionHandler.reject(request, false);
-        }));
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Authorized request {} {}. No rule provider authorized or rejected the request.", method, path);
+        }
+        //no rule found for the given request, reject
+        return rejectionHandler.reject(request, forbidden);
     }
 }
