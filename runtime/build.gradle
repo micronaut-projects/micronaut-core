@@ -45,7 +45,7 @@ dependencies {
     testCompile project(":inject-java-test")
     testCompile project(":inject-groovy")
     testCompile dependencyModuleVersion("gorm", "grails-datastore-gorm")
-    testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    //testCompile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
 }
 
 

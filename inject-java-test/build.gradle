@@ -5,7 +5,7 @@ dependencies {
     compile(dependencyVersion("spock")) {
         exclude module:'groovy-all'
     }
-    compile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
+    //compile files(org.gradle.internal.jvm.Jvm.current().toolsJar)
     testCompile dependencyVersion("validation")
     testCompile "javax.persistence:javax.persistence-api:2.2"
     testCompile project(":runtime")
