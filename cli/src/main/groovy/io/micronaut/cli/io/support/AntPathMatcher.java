@@ -447,7 +447,7 @@ public class AntPathMatcher {
         private final Map<String, String> uriTemplateVariables;
 
         /**
-         * Construct a new instance of the <code>AntPatchStringMatcher</code>.
+         * Construct a new instance of the <code>AntPathStringMatcher</code>.
          *
          * @param pattern              The pattern
          * @param str                  The string
