@@ -59,6 +59,7 @@ public class JwtTokenValidator implements TokenValidator {
     protected final List<SignatureConfiguration> signatureConfigurations = new ArrayList<>();
     protected final List<EncryptionConfiguration> encryptionConfigurations = new ArrayList<>();
     protected final List<GenericJwtClaimsValidator> genericJwtClaimsValidators = new ArrayList<>();
+    protected final JwtAuthenticationFactory jwtAuthenticationFactory;
 
     /**
      * Constructor.
@@ -66,21 +67,24 @@ public class JwtTokenValidator implements TokenValidator {
      * @param signatureConfigurations List of Signature configurations which are used to attempt validation.
      * @param encryptionConfigurations List of Encryption configurations which are used to attempt validation.
      * @param genericJwtClaimsValidators Generic JWT Claims validators which should be used to validate any JWT.
+     * @param jwtAuthenticationFactory Utility to generate an Authentication given a JWT.
      */
     @Inject
     public JwtTokenValidator(Collection<SignatureConfiguration> signatureConfigurations,
                              Collection<EncryptionConfiguration> encryptionConfigurations,
-                             Collection<GenericJwtClaimsValidator> genericJwtClaimsValidators) {
+                             Collection<GenericJwtClaimsValidator> genericJwtClaimsValidators,
+                             JwtAuthenticationFactory jwtAuthenticationFactory) {
         this.signatureConfigurations.addAll(signatureConfigurations);
         this.encryptionConfigurations.addAll(encryptionConfigurations);
         this.genericJwtClaimsValidators.addAll(genericJwtClaimsValidators);
+        this.jwtAuthenticationFactory = jwtAuthenticationFactory;
     }
 
     /**
      *
      * Deprecated Constructor.
      *
-     * @deprecated Use {@link JwtTokenValidator#JwtTokenValidator(Collection, Collection, Collection)} instead.
+     * @deprecated Use {@link JwtTokenValidator#JwtTokenValidator(Collection, Collection, Collection, JwtAuthenticationFactory)} instead.
      * @param signatureConfigurations List of Signature configurations which are used to attempt validation.
      * @param encryptionConfigurations List of Encryption configurations which are used to attempt validation.
      */
@@ -89,7 +93,8 @@ public class JwtTokenValidator implements TokenValidator {
                              Collection<EncryptionConfiguration> encryptionConfigurations) {
         this(signatureConfigurations,
                 encryptionConfigurations,
-                Collections.singleton(new ExpirationJwtClaimsValidator()));
+                Collections.singleton(new ExpirationJwtClaimsValidator()),
+                new DefaultJwtAuthenticationFactory());
     }
 
 
@@ -237,13 +242,7 @@ public class JwtTokenValidator implements TokenValidator {
     public Optional<Authentication> authenticationIfValidJwtSignatureAndClaims(String token, Collection<? extends JwtClaimsValidator> claimsValidators) {
         Optional<JWT> jwt = validateJwtSignatureAndClaims(token, claimsValidators);
         if (jwt.isPresent()) {
-            try {
-                return Optional.of(createAuthentication(jwt.get()));
-            } catch (ParseException e) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("ParseException creating authentication", e.getMessage());
-                }
-            }
+            return jwtAuthenticationFactory.createAuthentication(jwt.get());
         }
         return Optional.empty();
 
@@ -329,16 +328,6 @@ public class JwtTokenValidator implements TokenValidator {
         return Optional.empty();
     }
 
-    /**
-     *
-     * @param jwt a JWT token
-     * @return {@link Authentication} based on the JWT.
-     * @throws ParseException it may throw a ParseException while retrieving the JWT claims
-     */
-    public Authentication createAuthentication(final JWT jwt) throws ParseException {
-        final JWTClaimsSet claimSet = jwt.getJWTClaimsSet();
-        return new AuthenticationJWTClaimsSetAdapter(claimSet);
-    }
 
     /**
      *
