@@ -8,7 +8,7 @@ To get started creating a Microservice that can be compiled into a native image,
 $ mn create-app hello-world --features graal-native-image
 ----
 
-The `graal-native-image` feature adds four important items:
+The `graal-native-image` feature adds three important items:
 
 1. The `svm` and `graal` dependencies to your `build.gradle` (or `pom.xml` if `--build maven` is used).
 2. A `Dockerfile` which can be used to construct the native image using Docker and a script `docker-build.sh` to run it.
@@ -58,25 +58,25 @@ With this approach you need to have installed only Docker as it downloads the re
 
 To build your native image without using Docker you need to install GraalVM SDK via the https://www.graalvm.org/docs/getting-started/[Getting Started] instructions or using SDKman:
 
-.Installing GraalVM 1.0.0-rc13 with SDKman
+.Installing GraalVM 1.0.0-rc14 with SDKman
 [source,bash]
 ----
-$ sdk install java 1.0.0-rc-13-grl
-$ sdk use java 1.0.0-rc-13-grl
+$ sdk install java 1.0.0-rc-14-grl
+$ sdk use java 1.0.0-rc-14-grl
 ----
 
 .Creating native image with Gradle
 [source,bash]
 ----
 $ ./gradlew assemble
-$ native-image -cp build/libs/hello-world-0.1-all.jar
+$ native-image --no-server -cp build/libs/hello-world-0.1-all.jar
 ----
 
 .Creating native image with Maven
 [source,bash]
 ----
 $ ./mvnw package
-$ native-image -cp target/hello-world-0.1.jar
+$ native-image --no-server -cp target/hello-world-0.1.jar
 ----
 
 
