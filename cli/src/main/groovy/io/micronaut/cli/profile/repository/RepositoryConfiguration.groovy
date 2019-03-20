@@ -78,11 +78,11 @@ class RepositoryConfiguration {
 
     @Override
     boolean equals(Object obj) {
-        if (this == obj) {
-            return true;
-        }
         if (obj == null) {
-            return false;
+            return false
+        }
+        if (this.is(obj)) {
+            return true
         }
         String name = null
         if (obj instanceof org.springframework.boot.cli.compiler.grape.RepositoryConfiguration) {
