@@ -25,7 +25,10 @@ import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.ResourceResolver;
+import io.micronaut.core.io.file.FileSystemResourceLoader;
+import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
@@ -51,15 +54,12 @@ import java.util.*;
 public class RequiresCondition implements Condition {
 
     private final AnnotationMetadata annotationMetadata;
-    private final ResourceResolver resolver;
-
 
     /**
      * @param annotationMetadata The annotation metadata
      */
     public RequiresCondition(AnnotationMetadata annotationMetadata) {
         this.annotationMetadata = annotationMetadata;
-        this.resolver = new ResourceResolver();
     }
 
     @Override
@@ -547,6 +547,19 @@ public class RequiresCondition implements Condition {
     private boolean matchesPresenceOfResources(ConditionContext context, AnnotationValue<Requires> requirements) {
         final String[] resourcePaths = requirements.get("resources", String[].class).orElse(null);
         if (ArrayUtils.isNotEmpty(resourcePaths)) {
+            final BeanContext beanContext = context.getBeanContext();
+            ResourceResolver resolver;
+            final List<ResourceLoader> resourceLoaders;
+            if (beanContext instanceof ApplicationContext) {
+                ResourceLoader resourceLoader = ((ApplicationContext) beanContext).getEnvironment();
+                resourceLoaders = Arrays.asList(resourceLoader, FileSystemResourceLoader.defaultLoader());
+            } else {
+                resourceLoaders = Arrays.asList(
+                        ClassPathResourceLoader.defaultLoader(beanContext.getClassLoader()),
+                        FileSystemResourceLoader.defaultLoader()
+                );
+            }
+            resolver = new ResourceResolver(resourceLoaders);
             for (String resourcePath : resourcePaths) {
                 if (!resolver.getResource(resourcePath).isPresent()) {
                     context.fail("Resource [" + resourcePath + "] does not exist");
