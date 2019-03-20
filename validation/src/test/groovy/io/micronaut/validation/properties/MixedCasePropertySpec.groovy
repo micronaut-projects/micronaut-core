@@ -251,7 +251,7 @@ import javax.inject.Singleton;
 class MyService {
 
     @Value(\"\${some-value:anotherThing:`this:goes:together`}\")
-    private String serverAddress;
+    private String foo;
 }
 
 """)
@@ -259,5 +259,69 @@ class MyService {
         then:
         def e = thrown(RuntimeException)
         e.message.contains("Value 'some-value:anotherThing' is not valid property placeholder. Please use kebab-case notation, for example 'some-value:another-thing'.")
+    }
+
+    void "test that escaping : works with more than one property when all property names are correct"() {
+        when:
+        buildTypeElement("""
+package test;
+
+import io.micronaut.context.annotation.Value;
+import javax.inject.Singleton;
+
+@Singleton
+class MyService {
+
+    @Value(\"\${some-value:another-thing:foo-bar:`this:goes:together`}\")
+    private String foo;
+}
+
+""")
+
+        then:
+        notThrown(Exception)
+    }
+
+    void "test that escaping : works with the last property name"() {
+        when:
+        buildTypeElement("""
+package test;
+
+import io.micronaut.context.annotation.Value;
+import javax.inject.Singleton;
+
+@Singleton
+class MyService {
+
+    @Value(\"\${some-value:another-thing:fooBar:`this:goes:together`}\")
+    private String foo;
+}
+
+""")
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Value 'some-value:another-thing:fooBar' is not valid property placeholder. Please use kebab-case notation, for example 'some-value:another-thing:foo-bar'.")
+    }
+
+    void "test that escaping : works with more than one property when all property names are correct and default value is not checked"() {
+        when:
+        buildTypeElement("""
+package test;
+
+import io.micronaut.context.annotation.Value;
+import javax.inject.Singleton;
+
+@Singleton
+class MyService {
+
+    @Value(\"\${some-value:another-thing:foo-bar:`this:goes:together:AndDoesNtMATtteR`}\")
+    private String foo;
+}
+
+""")
+
+        then:
+        notThrown(Exception)
     }
 }
