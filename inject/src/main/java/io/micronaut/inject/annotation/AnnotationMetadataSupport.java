@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.*;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
@@ -79,6 +80,10 @@ class AnnotationMetadataSupport {
                 Context.class,
                 EachBean.class,
                 EachProperty.class,
+                Configuration.class,
+                ConfigurationProperties.class,
+                ConfigurationBuilder.class,
+                Introspected.class,
                 Parameter.class,
                 Replaces.class,
                 Requirements.class,
@@ -117,6 +122,20 @@ class AnnotationMetadataSupport {
                 return Optional.empty();
             });
         }
+    }
+
+    /**
+     * Gets a registered annotation type.
+     *
+     * @param name The name of the annotation type
+     * @return The annotation
+     */
+    static Optional<Class<? extends Annotation>> getRegisteredAnnotationType(String name) {
+        final Class<? extends Annotation> type = ANNOTATION_TYPES.get(name);
+        if (type != null) {
+            return Optional.of(type);
+        }
+        return Optional.empty();
     }
 
     /**
@@ -170,7 +189,7 @@ class AnnotationMetadataSupport {
      * @param annotationClassValue the annotation class value
      */
     @SuppressWarnings("unchecked")
-    private static void registerAnnotationType(AnnotationClassValue<?> annotationClassValue) {
+    static void registerAnnotationType(AnnotationClassValue<?> annotationClassValue) {
         final String name = annotationClassValue.getName();
         if (!ANNOTATION_TYPES.containsKey(name)) {
             annotationClassValue.getType().ifPresent((Consumer<Class<?>>) aClass -> {

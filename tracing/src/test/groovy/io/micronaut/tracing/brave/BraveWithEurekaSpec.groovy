@@ -39,5 +39,8 @@ class BraveWithEurekaSpec extends Specification {
 
         expect:
         ctx.getBean(Router).route(HttpMethod.POST, '/api/v2/spans').isPresent()
+
+        cleanup:
+        ctx.close()
     }
 }

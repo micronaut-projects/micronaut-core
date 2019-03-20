@@ -40,6 +40,9 @@ public class NameUtils {
     private static final Pattern SERVICE_ID_REGEX = Pattern.compile("[\\p{javaLowerCase}\\d-]+");
     private static final String PREFIX_GET = "get";
     private static final String PREFIX_SET = "set";
+    private static final Pattern ENVIRONMENT_VAR_SEQUENCE = Pattern.compile("^[\\p{Lu}_{0-9}]+");
+    private static final Pattern KEBAB_CASE_SEQUENCE = Pattern.compile("^(([a-z0-9])+(\\-|\\.)?)*([a-z0-9])+$");
+
 
     /**
      * Checks whether the given name is a valid service identifier.
@@ -483,7 +486,7 @@ public class NameUtils {
      * @return Whether is valid kebab-case or not
      */
     public static boolean isValidHyphenatedPropertyName(String str) {
-        return NameUtils.hyphenate(str).equals(str);
+        return KEBAB_CASE_SEQUENCE.matcher(str).matches();
     }
 
     /**
@@ -493,7 +496,7 @@ public class NameUtils {
      * @return Whether is valid environment-style property name or not
      */
     public static boolean isEnvironmentName(String str) {
-        return NameUtils.environmentName(str).equals(str);
+        return ENVIRONMENT_VAR_SEQUENCE.matcher(str).matches();
     }
 
 }

@@ -15,6 +15,8 @@
  */
 package io.micronaut.security.authentication;
 
+import io.micronaut.core.annotation.Introspected;
+
 import javax.validation.constraints.NotBlank;
 import javax.validation.constraints.NotNull;
 import java.io.Serializable;
@@ -24,6 +26,7 @@ import java.io.Serializable;
  * @author Sergio del Amo
  * @since 1.0
  */
+@Introspected
 public class UsernamePasswordCredentials implements Serializable, AuthenticationRequest<String, String> {
 
     @NotBlank

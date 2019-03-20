@@ -50,6 +50,8 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
      */
     public static final int POSITION = -100;
 
+    private static final String JAVAX_VALIDATION_CONSTRAINT = "javax.validation.Constraint";
+
     private Map<String, BeanIntrospectionWriter> writers = new LinkedHashMap<>(10);
 
     @Override
@@ -71,7 +73,21 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
             final Set<String> excludes = CollectionUtils.setOf(introspected.get("excludes", String[].class, StringUtils.EMPTY_STRING_ARRAY));
             final Set<String> excludedAnnotations = CollectionUtils.setOf(introspected.get("excludedAnnotations", String[].class, StringUtils.EMPTY_STRING_ARRAY));
             final Set<String> includedAnnotations = CollectionUtils.setOf(introspected.get("includedAnnotations", String[].class, StringUtils.EMPTY_STRING_ARRAY));
-            final Set<AnnotationValue> indexedAnnotations = CollectionUtils.setOf(introspected.get("indexed", AnnotationValue[].class, new AnnotationValue[0]));
+            final Set<AnnotationValue> indexedAnnotations;
+
+            final Set<AnnotationValue> toIndex = CollectionUtils.setOf(introspected.get("indexed", AnnotationValue[].class, new AnnotationValue[0]));
+
+            final AnnotationValue constraintIndex = AnnotationValue.builder(Introspected.IndexedAnnotation.class)
+                    .member("annotation", new AnnotationClassValue<>(JAVAX_VALIDATION_CONSTRAINT))
+                    .build();
+            if (CollectionUtils.isEmpty(toIndex)) {
+                indexedAnnotations = Collections.singleton(constraintIndex);
+            } else {
+                toIndex.add(
+                        constraintIndex
+                );
+                indexedAnnotations = toIndex;
+            }
 
             if (ArrayUtils.isNotEmpty(classes)) {
                 AtomicInteger index = new AtomicInteger(0);

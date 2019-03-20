@@ -1819,8 +1819,8 @@ public class DefaultBeanContext implements BeanContext {
             }
 
             if (!isProxy && isScopedProxyDefinition && !registeredScope.isPresent()) {
-                final List<String> scopeHierarchy = definition.getAnnotationNamesByStereotype(Scope.class);
-                for (String scope : scopeHierarchy) {
+                final List<Class<? extends Annotation>> scopeHierarchy = definition.getAnnotationTypesByStereotype(Scope.class);
+                for (Class<? extends Annotation> scope : scopeHierarchy) {
                     registeredScope = customScopeRegistry.findScope(scope);
                     if (registeredScope.isPresent()) {
                         break;

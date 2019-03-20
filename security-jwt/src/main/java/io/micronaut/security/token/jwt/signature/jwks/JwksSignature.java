@@ -67,6 +67,7 @@ public class JwksSignature implements SignatureConfiguration {
     /**
      *
      * @param jwksSignatureConfiguration JSON Web Key Set configuration.
+     * @param jwkValidator JWK Validator to be used.
      */
     public JwksSignature(JwksSignatureConfiguration jwksSignatureConfiguration,
                          JwkValidator jwkValidator) {

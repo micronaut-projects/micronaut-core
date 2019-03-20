@@ -39,6 +39,12 @@
         <property name="basedir" value="${basedir}"/>
     -->
 
+    <module name="RegexpHeader">
+        <!-- Requires a licence copyright notice in each file. -->
+        <property name="headerFile"
+                  value="config/checkstyle/HEADER"/>
+    </module>
+
     <property name="fileExtensions" value="java, properties, xml"/>
 
     <!-- Checks that a package-info.java file exists for each package.     -->

@@ -19,11 +19,12 @@ import io.micronaut.cli.profile.Feature
 import io.micronaut.cli.profile.Profile
 
 abstract class BuildTokens {
-    final String sourceLanguage, testFramework
+    final String sourceLanguage, testFramework, appname
 
-    BuildTokens(String sourceLanguage, String testFramework) {
+    BuildTokens(String appname, String sourceLanguage, String testFramework) {
         this.sourceLanguage = sourceLanguage
         this.testFramework = testFramework
+        this.appname = appname
     }
 
     abstract Map getTokens(Profile profile, List<Feature> features)

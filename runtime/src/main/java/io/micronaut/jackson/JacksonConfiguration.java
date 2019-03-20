@@ -44,8 +44,7 @@ import java.util.*;
                 ArrayList.class,
                 LinkedHashMap.class,
                 HashSet.class
-        },
-        accessType = TypeHint.AccessType.CLASS_LOADING)
+        })
 public class JacksonConfiguration {
 
     /**

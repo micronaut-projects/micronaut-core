@@ -16,6 +16,7 @@
 package io.micronaut.cache.interceptor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.util.ArrayUtils;
 
 /**
@@ -28,6 +29,7 @@ import io.micronaut.core.util.ArrayUtils;
  * @author Graeme Rocher
  * @since 1.0
  */
+@Introspected
 public class DefaultCacheKeyGenerator implements CacheKeyGenerator {
 
     @Override

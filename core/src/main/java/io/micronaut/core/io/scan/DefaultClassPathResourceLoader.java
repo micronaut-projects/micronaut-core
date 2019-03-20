@@ -155,7 +155,7 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
                 try {
                     URI uri = url.toURI();
                     Path pathObject;
-                    synchronized (this) {
+                    synchronized (DefaultClassPathResourceLoader.class) {
 
                         if (uri.getScheme().equals("jar")) {
                             FileSystem fileSystem = null;

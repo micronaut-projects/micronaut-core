@@ -13,15 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package io.micronaut.context.env;
 
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.util.StringUtils;
 
 import javax.annotation.Nonnull;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -59,75 +56,16 @@ public interface PropertyPlaceholderResolver {
     }
 
     /**
-     * Resolves all the property names defined in the given place holder string.
+     * Resolves the value of a single placeholder.
      *
-     * @param str The string
-     * @return a list of property names
+     * @param str The string containing the placeholder
+     * @param type The class of the type
+     * @param <T> The type the value should be converted to
+     * @return The resolved value
+     * @throws ConfigurationException If multiple placeholders are found or
+     * if the placeholder could not be converted to the requested type
      */
-    default List<Placeholder> resolvePropertyNames(String str) {
-        try {
-            String prefix = getPrefix();
-            if (StringUtils.isNotEmpty(str)) {
-                int i = str.indexOf(prefix);
-
-                if (i != -1) {
-                    List<Placeholder> placeholders = new ArrayList<>(3);
-                    String restOfString = str.substring(i + 2);
-                    while (i != -1) {
-                        int e = restOfString.indexOf('}');
-                        if (e > -1) {
-                            String expr = restOfString.substring(0, e).trim();
-                            int j = expr.indexOf(':');
-
-                            if (j == -1) {
-                                placeholders.add(new DefaultPlaceholder(expr, null));
-                            } else {
-                                String defaultValue = expr.substring(j + 1);
-                                expr = expr.substring(0, j);
-                                placeholders.add(new DefaultPlaceholder(expr, defaultValue));
-                            }
-
-                            i = restOfString.indexOf(prefix);
-                            if (i != -1) {
-                                restOfString = restOfString.substring(i + 2);
-                            }
-                        } else {
-                            // incomplete place holder
-                            return Collections.emptyList();
-                        }
-                    }
-                    return placeholders;
-                }
-            }
-        } catch (Exception e) {
-            return Collections.emptyList();
-        }
-        return Collections.emptyList();
-    }
-
-    /**
-     * A place holder definition.
-     */
-    interface Placeholder {
-        /**
-         * The property.
-         *
-         * @return The property
-         */
-        String getProperty();
-
-        /**
-         * The default value.
-         *
-         * @return The default value
-         */
-        Optional<String> getDefaultValue();
-
-        /**
-         * An optional placeholder.
-         *
-         * @return An optional placeholder
-         */
-        Optional<Placeholder> getPlaceholderValue();
+    default @Nonnull <T> T resolveRequiredPlaceholder(String str, Class<T> type) throws ConfigurationException {
+        throw new ConfigurationException("Unsupported operation");
     }
 }

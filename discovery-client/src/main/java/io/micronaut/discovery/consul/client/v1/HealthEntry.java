@@ -19,6 +19,7 @@ import com.fasterxml.jackson.databind.PropertyNamingStrategy;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonNaming;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
 
 import java.util.Collections;
 import java.util.List;
@@ -62,6 +63,7 @@ public class HealthEntry {
      * @param checks The list of checks
      */
     @JsonDeserialize(contentAs = CheckEntry.class)
+    @ReflectiveAccess
     void setChecks(List<Check> checks) {
         this.checks = checks;
     }
@@ -69,6 +71,7 @@ public class HealthEntry {
     /**
      * @param node The node
      */
+    @ReflectiveAccess
     protected void setNode(NodeEntry node) {
         this.node = node;
     }
@@ -76,6 +79,7 @@ public class HealthEntry {
     /**
      * @param service The service
      */
+    @ReflectiveAccess
     protected void setService(ServiceEntry service) {
         this.service = service;
     }

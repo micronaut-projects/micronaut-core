@@ -158,6 +158,7 @@ class MavenBuildTokens extends BuildTokens {
         }
 
 
+        tokens.put("jarPath", "target/$appname-*.jar" )
         tokens.put("arguments", prettyPrint(jvmArgsWriter.toString(), 12))
         tokens.put("dependencies", prettyPrint(dependenciesWriter.toString(), 4))
         tokens.put("repositories", prettyPrint(repositoriesWriter.toString(), 4))

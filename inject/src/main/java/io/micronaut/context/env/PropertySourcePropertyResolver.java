@@ -71,7 +71,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
      */
     public PropertySourcePropertyResolver(ConversionService<?> conversionService) {
         this.conversionService = conversionService;
-        this.propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(this);
+        this.propertyPlaceholderResolver = new DefaultPropertyPlaceholderResolver(this, conversionService);
     }
 
     /**

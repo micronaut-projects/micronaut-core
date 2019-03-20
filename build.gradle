@@ -23,7 +23,7 @@ buildscript {
 }
 
 plugins {
-    id 'com.github.hierynomus.license' version '0.14.0' apply false
+    id 'com.github.hierynomus.license' version '0.15.0' apply false
 }
 
 apply plugin: "io.sdkman.vendors"
@@ -531,7 +531,7 @@ subprojects { Project subproject ->
                 configFile = rootProject.file('config/checkstyle/checkstyle.xml')
 
                 // Per submodule
-                maxErrors = 5
+                maxErrors = 0
                 maxWarnings = 10
 
                 showViolations = true

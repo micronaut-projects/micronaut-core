@@ -129,7 +129,7 @@ package test;
 
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
-
+import io.micronaut.context.annotation.Value;
 import javax.inject.Named;
 
 @Controller()
@@ -137,7 +137,7 @@ class VehicleController {
 
     private final Engine engine;
 
-    public VehicleController(@Named(\"\${vehicleCylinders}\") Engine engine) {
+    public VehicleController(@Value(\"\${vehicleCylinders}\") Engine engine) {
         this.engine = engine;
     }
 }

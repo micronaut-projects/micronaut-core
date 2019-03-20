@@ -42,13 +42,15 @@ import java.util.Collection;
 @Secured(SecurityRule.IS_ANONYMOUS)
 public class KeysController {
 
+    private static final JSONObject EMPTY_KEYS = new JSONObject().appendField("keys", new ArrayList<>());
+
     private final Collection<JwkProvider> jwkProviders;
     private final ObjectMapper objectMapper;
-    private static final JSONObject EMPTY_KEYS = new JSONObject().appendField("keys", new ArrayList<>());
 
     /**
      * Instantiates a {@link io.micronaut.security.token.jwt.endpoints.KeysController}.
      * @param jwkProviders a collection of JSON Web Key providers.
+     * @param objectMapper Jackson ObjectMapper used to do serialization.
      */
     public KeysController(Collection<JwkProvider> jwkProviders, ObjectMapper objectMapper) {
         this.jwkProviders = jwkProviders;

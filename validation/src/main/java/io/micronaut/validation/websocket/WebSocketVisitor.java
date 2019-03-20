@@ -44,9 +44,13 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
     private static final String ON_ERROR = "io.micronaut.websocket.annotation.OnError";
 
     private Map<String, UriMatchTemplate> uriCache = new HashMap<>(3);
+    private boolean skipValidation = false;
 
     @Override
     public void visitMethod(MethodElement element, VisitorContext context) {
+        if (skipValidation) {
+            return;
+        }
         String uri = element.getValue(WEB_SOCKET_COMPONENT, String.class).orElse("/ws");
         UriMatchTemplate template = uriCache.computeIfAbsent(uri, UriMatchTemplate::of);
         List<String> variables = template.getVariableNames();
@@ -89,6 +93,12 @@ public class WebSocketVisitor implements TypeElementVisitor<WebSocketComponent, 
             }
         }
 
+    }
+
+    @Override
+    public void start(VisitorContext visitorContext) {
+        String prop = System.getProperty("micronaut.websocket.validation");
+        skipValidation = prop != null && prop.equals("false");
     }
 
     private boolean isInvalidParameter(List<String> variables, ParameterElement parameter, String... validTypes) {

@@ -1643,8 +1643,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             TypeElement current = typeElement;
             while (current != null) {
 
-                List<? extends TypeMirror> interfaces = current.getInterfaces();
-                populateTypeArgumentsForInterfaces(typeArguments, interfaces);
+                populateTypeArgumentsForInterfaces(typeArguments, current);
                 TypeMirror superclass = current.getSuperclass();
 
                 if (superclass.getKind() == TypeKind.NONE) {
@@ -1657,12 +1656,15 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
                         Element te = dt.asElement();
                         if (te instanceof TypeElement) {
+                            TypeElement child = current;
                             current = (TypeElement) te;
                             if (CollectionUtils.isNotEmpty(superArguments)) {
                                 Map<String, Object> types = genericUtils.resolveBoundTypes(dt);
                                 String name = current.getQualifiedName().toString();
+                                carryForwardArguments(child, typeArguments, types);
                                 typeArguments.put(name, types);
                             }
+
                         } else {
                             break;
                         }
@@ -1673,8 +1675,8 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             }
         }
 
-        private void populateTypeArgumentsForInterfaces(Map<String, Map<String, Object>> typeArguments, List<? extends TypeMirror> interfaces) {
-            for (TypeMirror anInterface : interfaces) {
+        private void populateTypeArgumentsForInterfaces(Map<String, Map<String, Object>> typeArguments, TypeElement child) {
+            for (TypeMirror anInterface : child.getInterfaces()) {
                 if (anInterface instanceof DeclaredType) {
                     DeclaredType declaredType = (DeclaredType) anInterface;
                     Element element = declaredType.asElement();
@@ -1683,11 +1685,24 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
                         String name = te.getQualifiedName().toString();
                         if (!typeArguments.containsKey(name)) {
                             Map<String, Object> types = genericUtils.resolveBoundTypes(declaredType);
+                            carryForwardArguments(child, typeArguments, types);
                             typeArguments.put(name, types);
                         }
-                        populateTypeArgumentsForInterfaces(typeArguments, te.getInterfaces());
+                        populateTypeArgumentsForInterfaces(typeArguments, te);
                     }
                 }
+            }
+        }
+
+        private void carryForwardArguments(TypeElement child, Map<String, Map<String, Object>> typeArguments, Map<String, Object> types) {
+            String childName = child.getQualifiedName().toString();
+            //carry forward type arguments from the child
+            if (typeArguments.containsKey(childName)) {
+                typeArguments.get(childName).forEach((arg, type) -> {
+                    if (types.containsKey(arg)) {
+                        types.put(arg, type);
+                    }
+                });
             }
         }
 

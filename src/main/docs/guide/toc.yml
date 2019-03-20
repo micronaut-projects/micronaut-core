@@ -6,6 +6,7 @@ quickStart:
   buildCLI:
     title: Build/Install the CLI
     installSdkman: Install with Sdkman
+    installHomebrew: Install with Homebrew
     installWindows: Install through Binary on Windows
     buildSource: Building from Source
   creatingServer: Creating a Server Application
@@ -218,6 +219,7 @@ management:
     refreshEndpoint: The Refresh Endpoint
     routesEndpoint: The Routes Endpoint
     loggersEndpoint: The Loggers Endpoint
+    cachesEndpoint: The Caches Endpoint
     stopEndpoint: The Server Stop Endpoint
 security:
   title: Security
