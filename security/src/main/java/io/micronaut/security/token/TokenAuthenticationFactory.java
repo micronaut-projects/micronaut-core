@@ -25,6 +25,7 @@ import java.util.Optional;
  *
  * @author Sergio del Amo
  * @since 1.1.0
+ * @param <T> The type of the token
  */
 public interface TokenAuthenticationFactory<T> {
     /**
