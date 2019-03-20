@@ -181,6 +181,18 @@ public @interface Requires {
     String missingProperty() default "";
 
     /**
+     * Expresses the given resources should exist for the bean configuration to load.
+     * Resources can be anything that {@link io.micronaut.core.io.ResourceResolver} can read, eg:
+     * <pre>
+     *  file:/path/to/file.txt
+     *  classpath:com/mycompany/file.txt
+     * </pre>
+     *
+     * @return The file paths
+     */
+    String[] resources() default {};
+
+    /**
      * Used to express a required SDK version.
      */
     enum Sdk {
