@@ -14,23 +14,23 @@
  * limitations under the License.
  */
 
-package io.micronaut.security.token.jwt.validator;
+package io.micronaut.security.token;
 
 import io.micronaut.security.authentication.Authentication;
 
 import java.util.Optional;
 
 /**
- * Creates an {@link Authentication} object from a Json Web Token.
+ * Creates an {@link Authentication} object from a token.
  *
  * @author Sergio del Amo
  * @since 1.1.0
  */
-public interface AuthenticationWithJwtGenerator {
+public interface TokenAuthenticationFactory<T> {
     /**
      *
-     * @param token JSON Web Token
-     * @return An Authentication object if JWT could be parsed from token.
+     * @param token The token
+     * @return An Authentication object.
      */
-    Optional<Authentication> createAuthentication(String token);
+    Optional<Authentication> createAuthentication(T token);
 }

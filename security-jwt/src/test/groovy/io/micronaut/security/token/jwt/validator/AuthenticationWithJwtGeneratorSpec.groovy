@@ -14,7 +14,7 @@ class AuthenticationWithJwtGeneratorSpec extends Specification implements Config
 
     void "AuthenticationWithJwtGenerator bean exists"() {
         expect:
-        applicationContext.containsBean(DefaultAuthenticationWithJwtGenerator)
-        applicationContext.containsBean(AuthenticationWithJwtGenerator)
+        applicationContext.containsBean(DefaultJwtAuthenticationFactory)
+        applicationContext.containsBean(JwtAuthenticationFactory)
     }
 }

@@ -59,7 +59,7 @@ public class JwtTokenValidator implements TokenValidator {
     protected final List<SignatureConfiguration> signatureConfigurations = new ArrayList<>();
     protected final List<EncryptionConfiguration> encryptionConfigurations = new ArrayList<>();
     protected final List<GenericJwtClaimsValidator> genericJwtClaimsValidators = new ArrayList<>();
-    protected final AuthenticationWithJwtGenerator authenticationWithJwtGenerator;
+    protected final JwtAuthenticationFactory jwtAuthenticationFactory;
 
     /**
      * Constructor.
@@ -67,24 +67,24 @@ public class JwtTokenValidator implements TokenValidator {
      * @param signatureConfigurations List of Signature configurations which are used to attempt validation.
      * @param encryptionConfigurations List of Encryption configurations which are used to attempt validation.
      * @param genericJwtClaimsValidators Generic JWT Claims validators which should be used to validate any JWT.
-     * @param authenticationWithJwtGenerator Utility to generate an Authentication given a JWT.
+     * @param jwtAuthenticationFactory Utility to generate an Authentication given a JWT.
      */
     @Inject
     public JwtTokenValidator(Collection<SignatureConfiguration> signatureConfigurations,
                              Collection<EncryptionConfiguration> encryptionConfigurations,
                              Collection<GenericJwtClaimsValidator> genericJwtClaimsValidators,
-                             AuthenticationWithJwtGenerator authenticationWithJwtGenerator) {
+                             JwtAuthenticationFactory jwtAuthenticationFactory) {
         this.signatureConfigurations.addAll(signatureConfigurations);
         this.encryptionConfigurations.addAll(encryptionConfigurations);
         this.genericJwtClaimsValidators.addAll(genericJwtClaimsValidators);
-        this.authenticationWithJwtGenerator = authenticationWithJwtGenerator;
+        this.jwtAuthenticationFactory = jwtAuthenticationFactory;
     }
 
     /**
      *
      * Deprecated Constructor.
      *
-     * @deprecated Use {@link JwtTokenValidator#JwtTokenValidator(Collection, Collection, Collection, AuthenticationWithJwtGenerator)} instead.
+     * @deprecated Use {@link JwtTokenValidator#JwtTokenValidator(Collection, Collection, Collection, JwtAuthenticationFactory)} instead.
      * @param signatureConfigurations List of Signature configurations which are used to attempt validation.
      * @param encryptionConfigurations List of Encryption configurations which are used to attempt validation.
      */
@@ -94,7 +94,7 @@ public class JwtTokenValidator implements TokenValidator {
         this(signatureConfigurations,
                 encryptionConfigurations,
                 Collections.singleton(new ExpirationJwtClaimsValidator()),
-                new DefaultAuthenticationWithJwtGenerator());
+                new DefaultJwtAuthenticationFactory());
     }
 
 
@@ -242,7 +242,7 @@ public class JwtTokenValidator implements TokenValidator {
     public Optional<Authentication> authenticationIfValidJwtSignatureAndClaims(String token, Collection<? extends JwtClaimsValidator> claimsValidators) {
         Optional<JWT> jwt = validateJwtSignatureAndClaims(token, claimsValidators);
         if (jwt.isPresent()) {
-            return authenticationWithJwtGenerator.createAuthentication(token);
+            return jwtAuthenticationFactory.createAuthentication(jwt.get());
         }
         return Optional.empty();
 

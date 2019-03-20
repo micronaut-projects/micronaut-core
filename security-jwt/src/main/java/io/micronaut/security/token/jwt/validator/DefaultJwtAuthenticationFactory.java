@@ -18,7 +18,6 @@ package io.micronaut.security.token.jwt.validator;
 
 import com.nimbusds.jwt.JWT;
 import com.nimbusds.jwt.JWTClaimsSet;
-import com.nimbusds.jwt.JWTParser;
 import io.micronaut.security.authentication.Authentication;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,30 +33,20 @@ import java.util.Optional;
  * @since 1.1.0
  */
 @Singleton
-public class DefaultAuthenticationWithJwtGenerator implements AuthenticationWithJwtGenerator {
+public class DefaultJwtAuthenticationFactory implements JwtAuthenticationFactory {
 
-    private static final Logger LOG = LoggerFactory.getLogger(DefaultAuthenticationWithJwtGenerator.class);
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultJwtAuthenticationFactory.class);
 
     @Override
-    public Optional<Authentication> createAuthentication(String token) {
+    public Optional<Authentication> createAuthentication(JWT token) {
         try {
-            return Optional.of(createAuthentication(JWTParser.parse(token)));
+            final JWTClaimsSet claimSet = token.getJWTClaimsSet();
+            return Optional.of(new AuthenticationJWTClaimsSetAdapter(claimSet));
         } catch (ParseException e) {
             if (LOG.isErrorEnabled()) {
-                LOG.error("parse exception generating a JWT object and claims from token {}", token);
+                LOG.error("ParseException creating authentication", e.getMessage());
             }
         }
         return Optional.empty();
-    }
-
-    /**
-     *
-     * @param jwt A JSON Web Token
-     * @return An Authentication object
-     * @throws ParseException If the payload of the JWT doesn't represent a valid JSON object and a JWT claims set.
-     */
-    public Authentication createAuthentication(JWT jwt) throws ParseException {
-        final JWTClaimsSet claimSet = jwt.getJWTClaimsSet();
-        return new AuthenticationJWTClaimsSetAdapter(claimSet);
     }
 }
