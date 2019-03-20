@@ -9,23 +9,38 @@ import javax.inject.Singleton
 class RequiresSpec extends Specification {
 
     void "requirements for existing files are checked"() {
+        given:
+        File tmpFile = new File("/tmp/foo.txt")
+        tmpFile.text = "bar"
+        tmpFile.deleteOnExit()
+
         when:
         ApplicationContext ctx = ApplicationContext.run()
 
         then:
-        ctx.containsBean(ShouldAlsoLoad)
         ctx.containsBean(ShouldLoadBean)
+        ctx.containsBean(ShouldLoadAsWell)
+        ctx.containsBean(ShouldAlsoLoad)
         !ctx.containsBean(ShouldNotLoad)
+        !ctx.containsBean(ShouldNotLoadEither)
     }
 
-    @Requires(files = "/tmp")
+    @Requires(resources = "file:/tmp/foo.txt")
     @Singleton
     static class ShouldLoadBean {}
+
+    @Requires(resources = "classpath:logback.xml")
+    @Singleton
+    static class ShouldLoadAsWell{}
 
     @Singleton
     static class ShouldAlsoLoad {}
 
-    @Requires(files = "/this/does/not/exist.txt")
+    @Requires(resources = "file:/this/does/not/exist.txt")
     @Singleton
     static class ShouldNotLoad {}
+
+    @Requires(resources = "classpath:/this/does/not/exist.txt")
+    @Singleton
+    static class ShouldNotLoadEither {}
 }

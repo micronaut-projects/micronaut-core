@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.io.ResourceResolver;
 import io.micronaut.core.reflect.ClassLoadingReporter;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.InstantiationUtils;
@@ -39,7 +40,6 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import kotlin.KotlinVersion;
 
-import java.io.File;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.*;
@@ -51,12 +51,15 @@ import java.util.*;
 public class RequiresCondition implements Condition {
 
     private final AnnotationMetadata annotationMetadata;
+    private final ResourceResolver resolver;
+
 
     /**
      * @param annotationMetadata The annotation metadata
      */
     public RequiresCondition(AnnotationMetadata annotationMetadata) {
         this.annotationMetadata = annotationMetadata;
+        this.resolver = new ResourceResolver();
     }
 
     @Override
@@ -154,7 +157,7 @@ public class RequiresCondition implements Condition {
             return;
         }
 
-        if (!matchesPresenceOfFiles(context, requirements)) {
+        if (!matchesPresenceOfResources(context, requirements)) {
             return;
         }
 
@@ -541,13 +544,12 @@ public class RequiresCondition implements Condition {
         return true;
     }
 
-    private boolean matchesPresenceOfFiles(ConditionContext context, AnnotationValue<Requires> requirements) {
-        String[] filePaths = requirements.get("files", String[].class).orElse(null);
-        if (ArrayUtils.isNotEmpty(filePaths)) {
-            for (String filePath : filePaths) {
-                File file = new File(filePath);
-                if (!file.exists()) {
-                    context.fail("File [" + filePath + "] does not exist");
+    private boolean matchesPresenceOfResources(ConditionContext context, AnnotationValue<Requires> requirements) {
+        final String[] resourcePaths = requirements.get("resources", String[].class).orElse(null);
+        if (ArrayUtils.isNotEmpty(resourcePaths)) {
+            for (String resourcePath : resourcePaths) {
+                if (!resolver.getResource(resourcePath).isPresent()) {
+                    context.fail("Resource [" + resourcePath + "] does not exist");
                     return false;
                 }
             }

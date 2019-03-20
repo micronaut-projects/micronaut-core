@@ -83,7 +83,10 @@ The link:{api}/io/micronaut/context/annotation/Requires.html[@Requires] annotati
 |`@Requires(missingProperty="data-source.url")`
 
 |Requires the presence of one of more files in the file system
-|`@Requires(files="/path/to/file")`
+|`@Requires(resources="file:/path/to/file")`
+
+|Requires the presence of one of more classpath resources
+|`@Requires(resources="classpath:myFile.properties")`
 |===
 
 === Additional Notes on Property Requirements.
