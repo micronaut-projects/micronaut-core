@@ -103,6 +103,9 @@ Support for GraalVM Substrate (`nativeimage`) has been improved in a number of d
 * *Build Time Reflection Data* - Thanks to the aforementioned feature, the older `GraalClassLoadingAnalyzer` runtime step has been removed and replaced by build time generation of `reflection-config.json` for classes that do require it (typically third party libraries).
 * *Simplified Image Generation* - You can now generate a native image with just `native-image --class-path myjar.jar` without any additional flags. Since Micronaut now computes the appropriate GraalVM configuration at compilation time.
 
+=== Google Cloud Platform (GCP) Support
+
+A new https://micronaut-projects.github.io/micronaut-gcp/latest/guide/[Google Cloud Configuration] is available that adds general support for GCP and integration with Stackdriver Trace for distributed tracing.
 
 === AWS Lambda Custom Runtime + GraalVM Support
 
