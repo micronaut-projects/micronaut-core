@@ -16,9 +16,11 @@
 package io.micronaut.configuration.hibernate.validator;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.inject.DisposableBeanDefinition;
+import io.micronaut.validation.validator.constraints.DefaultConstraintValidatorRegistry;
 
 import javax.inject.Singleton;
 import javax.validation.ConstraintValidator;
@@ -32,6 +34,7 @@ import javax.validation.ConstraintValidatorFactory;
  * @since 1.1.0
  */
 @Singleton
+@Replaces(DefaultConstraintValidatorRegistry.class)
 public class DefaultConstraintValidatorFactory implements ConstraintValidatorFactory {
 
     private final BeanContext beanContext;
