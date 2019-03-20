@@ -81,6 +81,12 @@ The link:{api}/io/micronaut/context/annotation/Requires.html[@Requires] annotati
 
 |Require a property to not be part of the configuration
 |`@Requires(missingProperty="data-source.url")`
+
+|Requires the presence of one of more files in the file system
+|`@Requires(resources="file:/path/to/file")`
+
+|Requires the presence of one of more classpath resources
+|`@Requires(resources="classpath:myFile.properties")`
 |===
 
 === Additional Notes on Property Requirements.
