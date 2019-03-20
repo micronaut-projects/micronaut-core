@@ -17,6 +17,10 @@ package io.micronaut.security.token.jwt.validator;
 
 import com.nimbusds.jwt.JWTClaimsSet;
 import io.micronaut.security.authentication.Authentication;
+import io.reactivex.annotations.NonNull;
+import io.reactivex.annotations.Nullable;
+
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -25,23 +29,26 @@ import java.util.Map;
  * @since 1.0
  */
 public class AuthenticationJWTClaimsSetAdapter implements Authentication {
+    @Nullable
     private JWTClaimsSet claimSet;
 
     /**
      *
      * @param claimSet JSON Web Token (JWT) claims set.
      */
-    public AuthenticationJWTClaimsSetAdapter(JWTClaimsSet claimSet) {
+    public AuthenticationJWTClaimsSetAdapter(@Nullable JWTClaimsSet claimSet) {
         this.claimSet = claimSet;
     }
 
     @Override
+    @NonNull
     public Map<String, Object> getAttributes() {
-        return claimSet.getClaims();
+        return claimSet == null ? new HashMap<>() : claimSet.getClaims();
     }
 
     @Override
+    @Nullable
     public String getName() {
-        return claimSet.getSubject();
+        return claimSet == null ? null : claimSet.getSubject();
     }
 }
