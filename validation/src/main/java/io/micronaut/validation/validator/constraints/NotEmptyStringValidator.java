@@ -1,6 +1,7 @@
 package io.micronaut.validation.validator.constraints;
 
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.util.StringUtils;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -8,13 +9,13 @@ import javax.inject.Singleton;
 import javax.validation.constraints.NotEmpty;
 
 /**
- * {@link NotEmpty} validator for short arrays.
+ * {@link NotEmpty} validator for char sequences.
  *
  * @author graemerocher
  * @since 1.2
  */
 @Singleton
-public class NotEmptyShortArrayValidator implements ConstraintValidator<NotEmpty, short[]> {
+public class NotEmptyStringValidator implements ConstraintValidator<NotEmpty, CharSequence> {
 
     @Nonnull
     @Override
@@ -23,7 +24,7 @@ public class NotEmptyShortArrayValidator implements ConstraintValidator<NotEmpty
     }
 
     @Override
-    public boolean isValid(@Nullable short[] value, @Nonnull AnnotationValue<NotEmpty> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
-        return value != null && value.length > 0;
+    public boolean isValid(@Nullable CharSequence value, @Nonnull AnnotationValue<NotEmpty> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+        return StringUtils.isNotEmpty(value);
     }
 }
