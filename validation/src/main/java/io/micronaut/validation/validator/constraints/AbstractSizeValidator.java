@@ -1,6 +1,6 @@
 package io.micronaut.validation.validator.constraints;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -15,14 +15,20 @@ import javax.validation.constraints.Size;
  */
 public abstract class AbstractSizeValidator<T> implements ConstraintValidator<Size, T> {
 
+    @Nonnull
     @Override
-    public boolean isValid(@Nullable T value, @Nonnull AnnotationMetadata annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    public final Class<Size> getAnnotationType() {
+        return Size.class;
+    }
+
+    @Override
+    public final boolean isValid(@Nullable T value, @Nonnull AnnotationValue<Size> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         if (value == null) {
             return true; // null considered valid according to spec
         }
         final int len = getSize(value);
-        final int max = annotationMetadata.getValue(Size.class, "max", Integer.class).orElse(Integer.MAX_VALUE);
-        final int min = annotationMetadata.getValue(Size.class, "min", Integer.class).orElse(0);
+        final int max = annotationMetadata.get("max", Integer.class).orElse(Integer.MAX_VALUE);
+        final int min = annotationMetadata.get("min", Integer.class).orElse(0);
         return len <= max && len >= min;
     }
 

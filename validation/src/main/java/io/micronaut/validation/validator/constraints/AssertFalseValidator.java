@@ -1,6 +1,6 @@
 package io.micronaut.validation.validator.constraints;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -15,8 +15,17 @@ import javax.validation.constraints.AssertFalse;
  */
 @Singleton
 public class AssertFalseValidator implements ConstraintValidator<AssertFalse, Boolean> {
+    @Nonnull
     @Override
-    public boolean isValid(@Nullable Boolean value, @Nonnull AnnotationMetadata annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    public Class<AssertFalse> getAnnotationType() {
+        return AssertFalse.class;
+    }
+
+    @Override
+    public boolean isValid(
+            @Nullable Boolean value,
+            @Nonnull AnnotationValue<AssertFalse> annotationMetadata,
+            @Nonnull ConstraintValidatorContext context) {
         return value == null || !value;
     }
 }

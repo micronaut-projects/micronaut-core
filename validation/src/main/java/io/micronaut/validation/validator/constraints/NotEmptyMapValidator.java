@@ -1,6 +1,6 @@
 package io.micronaut.validation.validator.constraints;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.util.CollectionUtils;
 
 import javax.annotation.Nonnull;
@@ -16,9 +16,16 @@ import java.util.Map;
  * @since 1.2
  */
 @Singleton
-public class NotEmptyValidator implements ConstraintValidator<NotEmpty, Map> {
+public class NotEmptyMapValidator implements ConstraintValidator<NotEmpty, Map> {
+
+    @Nonnull
     @Override
-    public boolean isValid(@Nullable Map value, @Nonnull AnnotationMetadata annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    public final Class<NotEmpty> getAnnotationType() {
+        return NotEmpty.class;
+    }
+
+    @Override
+    public boolean isValid(@Nullable Map value, @Nonnull AnnotationValue<NotEmpty> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         return CollectionUtils.isNotEmpty(value);
     }
 }
