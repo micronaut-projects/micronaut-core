@@ -99,6 +99,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
             "io.micronaut.context.annotation.Bean",
             "io.micronaut.context.annotation.Replaces",
             "io.micronaut.context.annotation.Value",
+            "io.micronaut.context.annotation.Property",
             "io.micronaut.context.annotation.Executable"
     };
     private static final String AROUND_TYPE = "io.micronaut.aop.Around";
@@ -1384,7 +1385,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
         public Object visitConfigurationProperty(VariableElement field, AnnotationMetadata fieldAnnotationMetadata) {
             Optional<ExecutableElement> setterMethod = modelUtils.findSetterMethodFor(field);
             boolean isInjected = fieldAnnotationMetadata.hasStereotype(Inject.class);
-            boolean isValue = fieldAnnotationMetadata.hasStereotype(Value.class);
+            boolean isValue = fieldAnnotationMetadata.hasStereotype(Value.class) || fieldAnnotationMetadata.hasStereotype(Property.class);
 
             boolean isMethodInjected = isInjected || (setterMethod.isPresent() && annotationUtils.hasStereotype(setterMethod.get(), Inject.class));
             if (!(isMethodInjected || isValue)) {

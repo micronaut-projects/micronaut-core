@@ -46,6 +46,16 @@ class PropertyAnnotationSpec extends Specification {
         fieldInjectedBean.values == ['one':'one', 'one.two':'two']
         fieldInjectedBean.defaultInject == ['one':'one', 'one.two':'two']
     }
+
+    void "test a class with only a property annotation is a bean and injected"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                'my.int':10,
+        )
+
+        expect:
+        ctx.getBean(PropertyOnly).integer == 10
+    }
 }
 
 import io.micronaut.context.annotation.Property
@@ -185,4 +195,9 @@ class MethodPropertyInject {
                             @Nullable String nullable) {
         this.nullable = nullable
     }
+}
+
+
+class PropertyOnly {
+    @Property(name = "my.int") int integer
 }
