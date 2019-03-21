@@ -48,4 +48,14 @@ class PropertyAnnotationSpec extends Specification {
         fieldInjectedBean.values == ['one':'one', 'one.two':'two']
         fieldInjectedBean.defaultInject == ['one':'one', 'one.two':'two']
     }
+
+    void "test a class with only a property annotation is a bean and injected"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run(
+                'my.int':10,
+        )
+
+        expect:
+        ctx.getBean(PropertyOnlyInject).integer == 10
+    }
 }
