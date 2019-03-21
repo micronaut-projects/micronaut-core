@@ -1,6 +1,6 @@
 package io.micronaut.validation.validator.constraints;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Indexed;
 
 import javax.annotation.Nonnull;
@@ -22,6 +22,12 @@ import java.lang.annotation.Annotation;
 public interface ConstraintValidator<A extends Annotation, T> {
 
     /**
+     * The annotation type validated.
+     * @return The annotation type
+     */
+    @Nonnull Class<A> getAnnotationType();
+
+    /**
      * Implements the validation logic.
      *
      * <p>Implementations should be thread-safe and immutable.</p>
@@ -34,7 +40,7 @@ public interface ConstraintValidator<A extends Annotation, T> {
      */
     boolean isValid(
             @Nullable T value,
-            @Nonnull AnnotationMetadata annotationMetadata,
+            @Nonnull AnnotationValue<A> annotationMetadata,
             @Nonnull ConstraintValidatorContext context);
 
     /**
@@ -50,6 +56,6 @@ public interface ConstraintValidator<A extends Annotation, T> {
     default boolean isValid(
             @Nullable T value,
             @Nonnull ConstraintValidatorContext context) {
-        return isValid(value, AnnotationMetadata.EMPTY_METADATA, context);
+        return isValid(value, new AnnotationValue<>(getAnnotationType().getName()), context);
     }
 }

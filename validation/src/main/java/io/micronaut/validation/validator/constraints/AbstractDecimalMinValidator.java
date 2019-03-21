@@ -1,6 +1,6 @@
 package io.micronaut.validation.validator.constraints;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ConversionService;
 
 import javax.annotation.Nonnull;
@@ -18,20 +18,26 @@ import java.math.BigDecimal;
  */
 public abstract class AbstractDecimalMinValidator<T> implements ConstraintValidator<DecimalMin, T> {
 
+    @Nonnull
     @Override
-    public final boolean isValid(@Nullable T value, @Nonnull AnnotationMetadata annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    public final Class<DecimalMin> getAnnotationType() {
+        return DecimalMin.class;
+    }
+
+    @Override
+    public final boolean isValid(@Nullable T value, @Nonnull AnnotationValue<DecimalMin> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         if (value == null) {
             // null considered valid according to spec
             return true;
         }
 
-        final BigDecimal bigDecimal = annotationMetadata.getValue(DecimalMin.class, String.class)
+        final BigDecimal bigDecimal = annotationMetadata.getValue(String.class)
                 .map(s ->
                         ConversionService.SHARED.convert(s, BigDecimal.class)
                                 .orElseThrow(() -> new ValidationException(s + " does not represent a valid BigDecimal format.")))
                 .orElseThrow(() -> new ValidationException("null does not represent a valid BigDecimal format."));
 
-        final boolean inclusive = annotationMetadata.getValue(DecimalMin.class, "inclusive", boolean.class).orElse(true);
+        final boolean inclusive = annotationMetadata.get("inclusive", boolean.class).orElse(true);
 
 
         int result;

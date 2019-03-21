@@ -2,7 +2,7 @@ package io.micronaut.validation.validator.constraints
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
-import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationValue
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Unroll
@@ -38,157 +38,157 @@ class ConstraintsSpec extends AbstractTypeElementSpec {
 
         where:
         constraint     | value                                | isValid | metadata
-        AssertTrue     | null                                 | true    | AnnotationMetadata.EMPTY_METADATA
-        AssertTrue     | true                                 | true    | AnnotationMetadata.EMPTY_METADATA
-        AssertTrue     | false                                | false   | AnnotationMetadata.EMPTY_METADATA
-        AssertFalse    | null                                 | true    | AnnotationMetadata.EMPTY_METADATA
-        AssertFalse    | true                                 | false   | AnnotationMetadata.EMPTY_METADATA
-        AssertFalse    | false                                | true    | AnnotationMetadata.EMPTY_METADATA
-        NotNull        | null                                 | false   | AnnotationMetadata.EMPTY_METADATA
-        NotNull        | ""                                   | true    | AnnotationMetadata.EMPTY_METADATA
-        Null           | null                                 | true    | AnnotationMetadata.EMPTY_METADATA
-        Null           | ""                                   | false   | AnnotationMetadata.EMPTY_METADATA
-        NotBlank       | ""                                   | false   | AnnotationMetadata.EMPTY_METADATA
-        NotBlank       | null                                 | false   | AnnotationMetadata.EMPTY_METADATA
-        NotBlank       | "  "                                 | false   | AnnotationMetadata.EMPTY_METADATA
-        NotBlank       | "foo"                                | true    | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | ""                                   | false   | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | []                                   | false   | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | null                                 | false   | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | [] as String[]                       | false   | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | [] as int[]                          | false   | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | [1] as int[]                         | true    | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | [1] as short[]                       | true    | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | [] as short[]                        | false   | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | [] as byte[]                         | false   | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | [1] as byte[]                        | true    | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | [] as long[]                         | false   | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | [1] as long[]                        | true    | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | [] as double[]                       | false   | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | [1] as double[]                      | true    | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | [] as float[]                        | false   | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | [1] as float[]                       | true    | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | [] as char[]                         | false   | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | [1] as char[]                        | true    | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | [:]                                  | false   | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | [foo: 'bar']                         | true    | AnnotationMetadata.EMPTY_METADATA
-        NotEmpty       | [1]                                  | true    | AnnotationMetadata.EMPTY_METADATA
-        Negative       | -1                                   | true    | AnnotationMetadata.EMPTY_METADATA
-        Negative       | -100                                 | true    | AnnotationMetadata.EMPTY_METADATA
-        Negative       | -100 as double                       | true    | AnnotationMetadata.EMPTY_METADATA
-        Negative       | -100 as long                         | true    | AnnotationMetadata.EMPTY_METADATA
-        Negative       | -100 as float                        | true    | AnnotationMetadata.EMPTY_METADATA
-        Negative       | -100 as short                        | true    | AnnotationMetadata.EMPTY_METADATA
-        Negative       | -100 as byte                         | true    | AnnotationMetadata.EMPTY_METADATA
-        Negative       | new BigInteger("-100")               | true    | AnnotationMetadata.EMPTY_METADATA
-        Negative       | new BigDecimal("-100")               | true    | AnnotationMetadata.EMPTY_METADATA
-        Negative       | new BigInteger("100")                | false   | AnnotationMetadata.EMPTY_METADATA
-        Negative       | new BigDecimal("100")                | false   | AnnotationMetadata.EMPTY_METADATA
-        Negative       | 0                                    | false   | AnnotationMetadata.EMPTY_METADATA
-        NegativeOrZero | -1                                   | true    | AnnotationMetadata.EMPTY_METADATA
-        NegativeOrZero | -100                                 | true    | AnnotationMetadata.EMPTY_METADATA
-        NegativeOrZero | -100 as double                       | true    | AnnotationMetadata.EMPTY_METADATA
-        NegativeOrZero | -100 as long                         | true    | AnnotationMetadata.EMPTY_METADATA
-        NegativeOrZero | -100 as float                        | true    | AnnotationMetadata.EMPTY_METADATA
-        NegativeOrZero | -100 as short                        | true    | AnnotationMetadata.EMPTY_METADATA
-        NegativeOrZero | -100 as byte                         | true    | AnnotationMetadata.EMPTY_METADATA
-        NegativeOrZero | new BigInteger("-100")               | true    | AnnotationMetadata.EMPTY_METADATA
-        NegativeOrZero | new BigDecimal("-100")               | true    | AnnotationMetadata.EMPTY_METADATA
-        NegativeOrZero | new BigInteger("100")                | false   | AnnotationMetadata.EMPTY_METADATA
-        NegativeOrZero | new BigDecimal("100")                | false   | AnnotationMetadata.EMPTY_METADATA
-        NegativeOrZero | 0                                    | true    | AnnotationMetadata.EMPTY_METADATA
+        AssertTrue     | null                                 | true    | new AnnotationValue<>(constraint.getName())
+        AssertTrue     | true                                 | true    | new AnnotationValue<>(constraint.getName())
+        AssertTrue     | false                                | false   | new AnnotationValue<>(constraint.getName())
+        AssertFalse    | null                                 | true    | new AnnotationValue<>(constraint.getName())
+        AssertFalse    | true                                 | false   | new AnnotationValue<>(constraint.getName())
+        AssertFalse    | false                                | true    | new AnnotationValue<>(constraint.getName())
+        NotNull        | null                                 | false   | new AnnotationValue<>(constraint.getName())
+        NotNull        | ""                                   | true    | new AnnotationValue<>(constraint.getName())
+        Null           | null                                 | true    | new AnnotationValue<>(constraint.getName())
+        Null           | ""                                   | false   | new AnnotationValue<>(constraint.getName())
+        NotBlank       | ""                                   | false   | new AnnotationValue<>(constraint.getName())
+        NotBlank       | null                                 | false   | new AnnotationValue<>(constraint.getName())
+        NotBlank       | "  "                                 | false   | new AnnotationValue<>(constraint.getName())
+        NotBlank       | "foo"                                | true    | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | ""                                   | false   | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | []                                   | false   | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | null                                 | false   | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | [] as String[]                       | false   | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | [] as int[]                          | false   | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | [1] as int[]                         | true    | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | [1] as short[]                       | true    | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | [] as short[]                        | false   | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | [] as byte[]                         | false   | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | [1] as byte[]                        | true    | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | [] as long[]                         | false   | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | [1] as long[]                        | true    | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | [] as double[]                       | false   | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | [1] as double[]                      | true    | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | [] as float[]                        | false   | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | [1] as float[]                       | true    | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | [] as char[]                         | false   | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | [1] as char[]                        | true    | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | [:]                                  | false   | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | [foo: 'bar']                         | true    | new AnnotationValue<>(constraint.getName())
+        NotEmpty       | [1]                                  | true    | new AnnotationValue<>(constraint.getName())
+        Negative       | -1                                   | true    | new AnnotationValue<>(constraint.getName())
+        Negative       | -100                                 | true    | new AnnotationValue<>(constraint.getName())
+        Negative       | -100 as double                       | true    | new AnnotationValue<>(constraint.getName())
+        Negative       | -100 as long                         | true    | new AnnotationValue<>(constraint.getName())
+        Negative       | -100 as float                        | true    | new AnnotationValue<>(constraint.getName())
+        Negative       | -100 as short                        | true    | new AnnotationValue<>(constraint.getName())
+        Negative       | -100 as byte                         | true    | new AnnotationValue<>(constraint.getName())
+        Negative       | new BigInteger("-100")               | true    | new AnnotationValue<>(constraint.getName())
+        Negative       | new BigDecimal("-100")               | true    | new AnnotationValue<>(constraint.getName())
+        Negative       | new BigInteger("100")                | false   | new AnnotationValue<>(constraint.getName())
+        Negative       | new BigDecimal("100")                | false   | new AnnotationValue<>(constraint.getName())
+        Negative       | 0                                    | false   | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero | -1                                   | true    | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero | -100                                 | true    | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero | -100 as double                       | true    | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero | -100 as long                         | true    | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero | -100 as float                        | true    | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero | -100 as short                        | true    | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero | -100 as byte                         | true    | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero | new BigInteger("-100")               | true    | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero | new BigDecimal("-100")               | true    | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero | new BigInteger("100")                | false   | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero | new BigDecimal("100")                | false   | new AnnotationValue<>(constraint.getName())
+        NegativeOrZero | 0                                    | true    | new AnnotationValue<>(constraint.getName())
         // Positive
-        Positive       | 1                                    | true    | AnnotationMetadata.EMPTY_METADATA
-        Positive       | 100                                  | true    | AnnotationMetadata.EMPTY_METADATA
-        Positive       | 100 as double                        | true    | AnnotationMetadata.EMPTY_METADATA
-        Positive       | 100 as long                          | true    | AnnotationMetadata.EMPTY_METADATA
-        Positive       | 100 as float                         | true    | AnnotationMetadata.EMPTY_METADATA
-        Positive       | 100 as short                         | true    | AnnotationMetadata.EMPTY_METADATA
-        Positive       | 100 as byte                          | true    | AnnotationMetadata.EMPTY_METADATA
-        Positive       | new BigInteger("100")                | true    | AnnotationMetadata.EMPTY_METADATA
-        Positive       | new BigDecimal("100")                | true    | AnnotationMetadata.EMPTY_METADATA
-        Positive       | new BigInteger("-100")               | false   | AnnotationMetadata.EMPTY_METADATA
-        Positive       | new BigDecimal("-100")               | false   | AnnotationMetadata.EMPTY_METADATA
-        Positive       | 0                                    | false   | AnnotationMetadata.EMPTY_METADATA
-        Positive       | -100 as double                       | false   | AnnotationMetadata.EMPTY_METADATA
-        Positive       | -100 as long                         | false   | AnnotationMetadata.EMPTY_METADATA
-        Positive       | -100 as float                        | false   | AnnotationMetadata.EMPTY_METADATA
-        Positive       | -100 as short                        | false   | AnnotationMetadata.EMPTY_METADATA
-        Positive       | -100 as byte                         | false   | AnnotationMetadata.EMPTY_METADATA
+        Positive       | 1                                    | true    | new AnnotationValue<>(constraint.getName())
+        Positive       | 100                                  | true    | new AnnotationValue<>(constraint.getName())
+        Positive       | 100 as double                        | true    | new AnnotationValue<>(constraint.getName())
+        Positive       | 100 as long                          | true    | new AnnotationValue<>(constraint.getName())
+        Positive       | 100 as float                         | true    | new AnnotationValue<>(constraint.getName())
+        Positive       | 100 as short                         | true    | new AnnotationValue<>(constraint.getName())
+        Positive       | 100 as byte                          | true    | new AnnotationValue<>(constraint.getName())
+        Positive       | new BigInteger("100")                | true    | new AnnotationValue<>(constraint.getName())
+        Positive       | new BigDecimal("100")                | true    | new AnnotationValue<>(constraint.getName())
+        Positive       | new BigInteger("-100")               | false   | new AnnotationValue<>(constraint.getName())
+        Positive       | new BigDecimal("-100")               | false   | new AnnotationValue<>(constraint.getName())
+        Positive       | 0                                    | false   | new AnnotationValue<>(constraint.getName())
+        Positive       | -100 as double                       | false   | new AnnotationValue<>(constraint.getName())
+        Positive       | -100 as long                         | false   | new AnnotationValue<>(constraint.getName())
+        Positive       | -100 as float                        | false   | new AnnotationValue<>(constraint.getName())
+        Positive       | -100 as short                        | false   | new AnnotationValue<>(constraint.getName())
+        Positive       | -100 as byte                         | false   | new AnnotationValue<>(constraint.getName())
         // PositiveOrZero
-        PositiveOrZero | 1                                    | true    | AnnotationMetadata.EMPTY_METADATA
-        PositiveOrZero | null                                 | true    | AnnotationMetadata.EMPTY_METADATA
-        PositiveOrZero | 0                                    | true    | AnnotationMetadata.EMPTY_METADATA
-        PositiveOrZero | -1                                   | false   | AnnotationMetadata.EMPTY_METADATA
-        PositiveOrZero | 100                                  | true    | AnnotationMetadata.EMPTY_METADATA
-        PositiveOrZero | 100 as double                        | true    | AnnotationMetadata.EMPTY_METADATA
-        PositiveOrZero | 100 as long                          | true    | AnnotationMetadata.EMPTY_METADATA
-        PositiveOrZero | 100 as float                         | true    | AnnotationMetadata.EMPTY_METADATA
-        PositiveOrZero | 100 as short                         | true    | AnnotationMetadata.EMPTY_METADATA
-        PositiveOrZero | 100 as byte                          | true    | AnnotationMetadata.EMPTY_METADATA
-        PositiveOrZero | new BigInteger("100")                | true    | AnnotationMetadata.EMPTY_METADATA
-        PositiveOrZero | new BigDecimal("100")                | true    | AnnotationMetadata.EMPTY_METADATA
-        PositiveOrZero | new BigInteger("-100")               | false   | AnnotationMetadata.EMPTY_METADATA
-        PositiveOrZero | new BigDecimal("-100")               | false   | AnnotationMetadata.EMPTY_METADATA
-        PositiveOrZero | -100 as double                       | false   | AnnotationMetadata.EMPTY_METADATA
-        PositiveOrZero | -100 as long                         | false   | AnnotationMetadata.EMPTY_METADATA
-        PositiveOrZero | -100 as float                        | false   | AnnotationMetadata.EMPTY_METADATA
-        PositiveOrZero | -100 as short                        | false   | AnnotationMetadata.EMPTY_METADATA
-        PositiveOrZero | -100 as byte                         | false   | AnnotationMetadata.EMPTY_METADATA
+        PositiveOrZero | 1                                    | true    | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | null                                 | true    | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | 0                                    | true    | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | -1                                   | false   | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | 100                                  | true    | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | 100 as double                        | true    | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | 100 as long                          | true    | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | 100 as float                         | true    | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | 100 as short                         | true    | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | 100 as byte                          | true    | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | new BigInteger("100")                | true    | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | new BigDecimal("100")                | true    | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | new BigInteger("-100")               | false   | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | new BigDecimal("-100")               | false   | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | -100 as double                       | false   | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | -100 as long                         | false   | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | -100 as float                        | false   | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | -100 as short                        | false   | new AnnotationValue<>(constraint.getName())
+        PositiveOrZero | -100 as byte                         | false   | new AnnotationValue<>(constraint.getName())
         // Max
-        Max            | 10                                   | false   | constraintMetadata("@Max(5)")
-        Max            | 5                                    | false   | constraintMetadata("@Max(5)")
-        Max            | new BigInteger("10")                 | false   | constraintMetadata("@Max(5)")
-        Max            | 5                                    | false   | constraintMetadata("@Max(5)")
-        Max            | 0                                    | true    | constraintMetadata("@Max(5)")
-        Max            | null                                 | true    | constraintMetadata("@Max(5)")
+        Max            | 10                                   | false   | constraintMetadata(constraint,"@Max(5)")
+        Max            | 5                                    | false   | constraintMetadata(constraint,"@Max(5)")
+        Max            | new BigInteger("10")                 | false   | constraintMetadata(constraint,"@Max(5)")
+        Max            | 5                                    | false   | constraintMetadata(constraint,"@Max(5)")
+        Max            | 0                                    | true    | constraintMetadata(constraint,"@Max(5)")
+        Max            | null                                 | true    | constraintMetadata(constraint,"@Max(5)")
         // Min
-        Min            | 10                                   | true    | constraintMetadata("@Min(5)")
-        Min            | 5                                    | true    | constraintMetadata("@Min(5)")
-        Min            | new BigInteger("10")                 | true    | constraintMetadata("@Min(5)")
-        Min            | 5                                    | true    | constraintMetadata("@Min(5)")
-        Min            | 0                                    | false   | constraintMetadata("@Min(5)")
-        Min            | null                                 | true    | constraintMetadata("@Max(5)")
+        Min            | 10                                   | true    | constraintMetadata(constraint,"@Min(5)")
+        Min            | 5                                    | true    | constraintMetadata(constraint,"@Min(5)")
+        Min            | new BigInteger("10")                 | true    | constraintMetadata(constraint,"@Min(5)")
+        Min            | 5                                    | true    | constraintMetadata(constraint,"@Min(5)")
+        Min            | 0                                    | false   | constraintMetadata(constraint,"@Min(5)")
+        Min            | null                                 | true    | constraintMetadata(constraint,"@Max(5)")
         // Size
-        Size           | null                                 | true    | constraintMetadata("@Size(min=2, max=5)")
-        Size           | "test"                               | true    | constraintMetadata("@Size(min=2, max=5)")
-        Size           | "t"                                  | false   | constraintMetadata("@Size(min=2, max=5)")
-        Size           | "te"                                 | true    | constraintMetadata("@Size(min=2, max=5)")
-        Size           | "test1"                              | true    | constraintMetadata("@Size(min=2, max=5)")
-        Size           | "test12"                             | false   | constraintMetadata("@Size(min=2, max=5)")
+        Size           | null                                 | true    | constraintMetadata(constraint,"@Size(min=2, max=5)")
+        Size           | "test"                               | true    | constraintMetadata(constraint,"@Size(min=2, max=5)")
+        Size           | "t"                                  | false   | constraintMetadata(constraint,"@Size(min=2, max=5)")
+        Size           | "te"                                 | true    | constraintMetadata(constraint,"@Size(min=2, max=5)")
+        Size           | "test1"                              | true    | constraintMetadata(constraint,"@Size(min=2, max=5)")
+        Size           | "test12"                             | false   | constraintMetadata(constraint,"@Size(min=2, max=5)")
         // Size Collection
-        Size           | [1, 2, 3]                            | true    | constraintMetadata("@Size(min=2, max=5)")
-        Size           | [1]                                  | false   | constraintMetadata("@Size(min=2, max=5)")
-        Size           | [1, 2]                               | true    | constraintMetadata("@Size(min=2, max=5)")
-        Size           | [1, 2, 3, 4, 5]                      | true    | constraintMetadata("@Size(min=2, max=5)")
-        Size           | [1, 2, 3, 4, 5, 6]                   | false   | constraintMetadata("@Size(min=2, max=5)")
+        Size           | [1, 2, 3]                            | true    | constraintMetadata(constraint,"@Size(min=2, max=5)")
+        Size           | [1]                                  | false   | constraintMetadata(constraint,"@Size(min=2, max=5)")
+        Size           | [1, 2]                               | true    | constraintMetadata(constraint,"@Size(min=2, max=5)")
+        Size           | [1, 2, 3, 4, 5]                      | true    | constraintMetadata(constraint,"@Size(min=2, max=5)")
+        Size           | [1, 2, 3, 4, 5, 6]                   | false   | constraintMetadata(constraint,"@Size(min=2, max=5)")
         // Size Map
-        Size           | [a: 1, b: 2, c: 3]                   | true    | constraintMetadata("@Size(min=2, max=5)")
-        Size           | [a: 1]                               | false   | constraintMetadata("@Size(min=2, max=5)")
-        Size           | [a: 1, b: 2]                         | true    | constraintMetadata("@Size(min=2, max=5)")
-        Size           | [a: 1, b: 2, c: 3, d: 4, e: 5]       | true    | constraintMetadata("@Size(min=2, max=5)")
-        Size           | [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6] | false   | constraintMetadata("@Size(min=2, max=5)")
+        Size           | [a: 1, b: 2, c: 3]                   | true    | constraintMetadata(constraint,"@Size(min=2, max=5)")
+        Size           | [a: 1]                               | false   | constraintMetadata(constraint,"@Size(min=2, max=5)")
+        Size           | [a: 1, b: 2]                         | true    | constraintMetadata(constraint,"@Size(min=2, max=5)")
+        Size           | [a: 1, b: 2, c: 3, d: 4, e: 5]       | true    | constraintMetadata(constraint,"@Size(min=2, max=5)")
+        Size           | [a: 1, b: 2, c: 3, d: 4, e: 5, f: 6] | false   | constraintMetadata(constraint,"@Size(min=2, max=5)")
         // DecimalMax
-        DecimalMax     | null                                 | true    | constraintMetadata("@DecimalMax(\"5\")")
-        DecimalMax     | 10                                   | false   | constraintMetadata("@DecimalMax(\"5\")")
-        DecimalMax     | new BigDecimal("10")                 | false   | constraintMetadata("@DecimalMax(\"5\")")
-        DecimalMax     | 5                                    | true    | constraintMetadata("@DecimalMax(\"5\")")
-        DecimalMax     | "10"                                 | false   | constraintMetadata("@DecimalMax(\"5\")")
-        DecimalMax     | "5"                                  | true    | constraintMetadata("@DecimalMax(\"5\")")
-        DecimalMax     | "5"                                  | false   | constraintMetadata("@DecimalMax(value=\"5\",inclusive=false)")
+        DecimalMax     | null                                 | true    | constraintMetadata(constraint,"@DecimalMax(\"5\")")
+        DecimalMax     | 10                                   | false   | constraintMetadata(constraint,"@DecimalMax(\"5\")")
+        DecimalMax     | new BigDecimal("10")                 | false   | constraintMetadata(constraint,"@DecimalMax(\"5\")")
+        DecimalMax     | 5                                    | true    | constraintMetadata(constraint,"@DecimalMax(\"5\")")
+        DecimalMax     | "10"                                 | false   | constraintMetadata(constraint,"@DecimalMax(\"5\")")
+        DecimalMax     | "5"                                  | true    | constraintMetadata(constraint,"@DecimalMax(\"5\")")
+        DecimalMax     | "5"                                  | false   | constraintMetadata(constraint,"@DecimalMax(value=\"5\",inclusive=false)")
         // DecimalMin
-        DecimalMin     | null                                 | true    | constraintMetadata("@DecimalMin(\"5\")")
-        DecimalMin     | 10                                   | true    | constraintMetadata("@DecimalMin(\"5\")")
-        DecimalMin     | 3                                    | false   | constraintMetadata("@DecimalMin(\"5\")")
-        DecimalMin     | new BigDecimal("10")                 | true    | constraintMetadata("@DecimalMin(\"5\")")
-        DecimalMin     | 5                                    | true    | constraintMetadata("@DecimalMin(\"5\")")
-        DecimalMin     | "10"                                 | true    | constraintMetadata("@DecimalMin(\"5\")")
-        DecimalMin     | "3"                                  | false   | constraintMetadata("@DecimalMin(\"5\")")
-        DecimalMin     | "5"                                  | false   | constraintMetadata("@DecimalMin(value=\"5\",inclusive=false)")
+        DecimalMin     | null                                 | true    | constraintMetadata(constraint,"@DecimalMin(\"5\")")
+        DecimalMin     | 10                                   | true    | constraintMetadata(constraint,"@DecimalMin(\"5\")")
+        DecimalMin     | 3                                    | false   | constraintMetadata(constraint,"@DecimalMin(\"5\")")
+        DecimalMin     | new BigDecimal("10")                 | true    | constraintMetadata(constraint,"@DecimalMin(\"5\")")
+        DecimalMin     | 5                                    | true    | constraintMetadata(constraint,"@DecimalMin(\"5\")")
+        DecimalMin     | "10"                                 | true    | constraintMetadata(constraint,"@DecimalMin(\"5\")")
+        DecimalMin     | "3"                                  | false   | constraintMetadata(constraint,"@DecimalMin(\"5\")")
+        DecimalMin     | "5"                                  | false   | constraintMetadata(constraint,"@DecimalMin(value=\"5\",inclusive=false)")
 
     }
 
-    private AnnotationMetadata constraintMetadata(String ann) {
-        buildAnnotationMetadata(ann, "javax.validation.constraints")
+    private AnnotationValue constraintMetadata(Class annotation, String ann) {
+        buildAnnotationMetadata(ann, "javax.validation.constraints").getAnnotation(annotation)
     }
 }
