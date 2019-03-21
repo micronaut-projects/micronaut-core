@@ -1,6 +1,6 @@
 package io.micronaut.validation.validator.constraints;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -18,12 +18,19 @@ import java.math.BigInteger;
  */
 @Singleton
 public class MaxNumberValidator implements ConstraintValidator<Max, Number> {
+
+    @Nonnull
     @Override
-    public boolean isValid(@Nullable Number value, @Nonnull AnnotationMetadata annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    public final Class<Max> getAnnotationType() {
+        return Max.class;
+    }
+
+    @Override
+    public boolean isValid(@Nullable Number value, @Nonnull AnnotationValue<Max> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         if (value == null) {
             return true; // nulls are allowed according to spec
         }
-        final Long max = annotationMetadata.getValue(Max.class, Long.class).orElseThrow(() ->
+        final Long max = annotationMetadata.getValue(Long.class).orElseThrow(() ->
                 new ValidationException("@Max annotation specified without value")
         );
 
@@ -34,4 +41,5 @@ public class MaxNumberValidator implements ConstraintValidator<Max, Number> {
         }
         return value.longValue() < max;
     }
+
 }
