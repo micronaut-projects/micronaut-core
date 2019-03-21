@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.event.ApplicationEventPublisher;
+import io.micronaut.context.exceptions.ApplicationStoppingException;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.inject.BeanIdentifier;
 import org.jetbrains.annotations.NotNull;
@@ -234,4 +235,6 @@ public interface BeanContext extends
     static @Nonnull BeanContext build(ClassLoader classLoader) {
         return new DefaultBeanContext(classLoader);
     }
+
+    default void assertRunning() throws ApplicationStoppingException { if (!isRunning()) { throw new ApplicationStoppingException(); }}
 }

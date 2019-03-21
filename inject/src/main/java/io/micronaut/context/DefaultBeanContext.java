@@ -169,7 +169,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public boolean isRunning() {
-        return running.get() && !initializing.get();
+        return running.get() && !initializing.get() && !terminating.get();
     }
 
     /**
