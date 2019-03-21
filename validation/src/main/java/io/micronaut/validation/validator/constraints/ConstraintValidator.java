@@ -1,7 +1,7 @@
 package io.micronaut.validation.validator.constraints;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.inject.ast.Element;
+import io.micronaut.core.annotation.Indexed;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -18,6 +18,7 @@ import java.lang.annotation.Annotation;
  */
 @Immutable
 @ThreadSafe
+@Indexed(ConstraintValidator.class)
 public interface ConstraintValidator<A extends Annotation, T> {
 
     /**

@@ -15,8 +15,8 @@ class ConstraintValidatorRegistrySpec extends Specification {
 
     void "test find constraint validators"() {
         expect:
-        reg.find(NotBlank, String)
-        reg.find(NotBlank, String).is(reg.find(NotBlank, StringBuffer))
-        reg.find(NotBlank, String).is(reg.find(NotBlank, CharSequence))
+        reg.getConstraintValidator(NotBlank, String)
+        reg.getConstraintValidator(NotBlank, String).is(reg.getConstraintValidator(NotBlank, StringBuffer))
+        reg.getConstraintValidator(NotBlank, String).is(reg.getConstraintValidator(NotBlank, CharSequence))
     }
 }
