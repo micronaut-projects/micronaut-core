@@ -156,7 +156,7 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
                     String value = keyValue.getValue();
                     boolean isFolder = key.endsWith("/") && value == null;
                     boolean isCommonConfigKey = key.substring(1).startsWith(commonPrefix);
-                    boolean isApplicationSpecificConfigKey = hasApplicationSpecificConfig && key.startsWith(applicationPrefix);
+                    boolean isApplicationSpecificConfigKey = hasApplicationSpecificConfig && key.substring(1).startsWith(applicationPrefix);
                     boolean validKey = isCommonConfigKey || isApplicationSpecificConfigKey;
                     if (!isFolder && validKey) {
 
