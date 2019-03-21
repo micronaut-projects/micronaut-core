@@ -64,6 +64,28 @@ abstract class AbstractTypeElementSpec extends Specification {
     }
 
     /**
+     * @param annotationExpression the annotation expression
+     * @param packages the packages to import
+     * @return The metadata
+     */
+    @CompileStatic
+    AnnotationMetadata buildAnnotationMetadata(String annotationExpression, String... packages) {
+
+        List<String> packageList = ["io.micronaut.core.annotation",
+                                    "io.micronaut.inject.annotation"]
+        packageList.addAll(Arrays.asList(packages))
+        packageList = packageList.unique()
+        return buildTypeAnnotationMetadata("""
+${packageList.collect() { "import ${it}.*;" }.join(System.getProperty('line.separator'))}
+
+${annotationExpression}
+class Test {
+
+}
+""")
+    }
+
+    /**
      * Reads a generated file
      * @param filePath The file path
      * @param className The class name
