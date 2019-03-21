@@ -1,6 +1,6 @@
 package io.micronaut.validation.validator.constraints;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -15,8 +15,14 @@ import javax.validation.constraints.NotEmpty;
  */
 @Singleton
 public class NotEmptyByteArrayValidator implements ConstraintValidator<NotEmpty, byte[]> {
+    @Nonnull
     @Override
-    public boolean isValid(@Nullable byte[] value, @Nonnull AnnotationMetadata annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    public final Class<NotEmpty> getAnnotationType() {
+        return NotEmpty.class;
+    }
+
+    @Override
+    public boolean isValid(@Nullable byte[] value, @Nonnull AnnotationValue<NotEmpty> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         return value != null && value.length > 0;
     }
 }

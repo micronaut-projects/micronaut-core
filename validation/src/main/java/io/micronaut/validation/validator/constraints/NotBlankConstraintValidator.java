@@ -1,6 +1,6 @@
 package io.micronaut.validation.validator.constraints;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.util.StringUtils;
 
 import javax.annotation.Nonnull;
@@ -16,8 +16,14 @@ import javax.validation.constraints.NotBlank;
  */
 @Singleton
 public class NotBlankConstraintValidator implements ConstraintValidator<NotBlank, CharSequence> {
+    @Nonnull
     @Override
-    public boolean isValid(@Nullable CharSequence value, @Nonnull AnnotationMetadata element, @Nullable ConstraintValidatorContext context) {
+    public final Class<NotBlank> getAnnotationType() {
+        return NotBlank.class;
+    }
+
+    @Override
+    public boolean isValid(@Nullable CharSequence value, @Nonnull AnnotationValue<NotBlank> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         return StringUtils.isNotEmpty(value) && value.toString().trim().length() > 0;
     }
 }

@@ -1,6 +1,6 @@
 package io.micronaut.validation.validator.constraints;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -15,8 +15,15 @@ import javax.validation.constraints.NotNull;
  */
 @Singleton
 public class NotNullValidator implements ConstraintValidator<NotNull, Object> {
+
+    @Nonnull
     @Override
-    public boolean isValid(@Nullable Object value, @Nonnull AnnotationMetadata annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    public final Class<NotNull> getAnnotationType() {
+        return NotNull.class;
+    }
+
+    @Override
+    public boolean isValid(@Nullable Object value, @Nonnull AnnotationValue<NotNull> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         return value != null;
     }
 }

@@ -1,6 +1,6 @@
 package io.micronaut.validation.validator.constraints;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -15,8 +15,15 @@ import javax.validation.constraints.Negative;
  */
 @Singleton
 public class NegativeNumberValidator implements ConstraintValidator<Negative, Number> {
+
+    @Nonnull
     @Override
-    public boolean isValid(@Nullable Number value, @Nonnull AnnotationMetadata annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    public final Class<Negative> getAnnotationType() {
+        return Negative.class;
+    }
+
+    @Override
+    public boolean isValid(@Nullable Number value, @Nonnull AnnotationValue<Negative> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         // null is allowed according to spec
         return value == null || value.intValue() < 0;
     }
