@@ -133,6 +133,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Override
     protected @Nonnull List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
+
         if (resolvedBeanReferences != null) {
             return resolvedBeanReferences;
         }
@@ -148,6 +149,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
      */
     @Deprecated
     protected @Nonnull DefaultEnvironment createEnvironment(@Nonnull String... environmentNames) {
+        assertRunning();
         return createEnvironment(() -> Arrays.asList(environmentNames));
     }
 
@@ -209,6 +211,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
     @Nonnull
     @Override
     public Map<String, Object> getProperties(@Nullable String name, @Nullable StringConvention keyFormat) {
+        assertRunning();
         return getEnvironment().getProperties(name, keyFormat);
     }
 
@@ -237,6 +240,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Override
     protected <T> Collection<BeanDefinition<T>> findBeanCandidates(Class<T> beanType, BeanDefinition<?> filter) {
+
         Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(beanType, filter);
         if (!candidates.isEmpty()) {
 
@@ -360,11 +364,13 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Override
     public Optional<String> resolvePlaceholders(String str) {
+        assertRunning();
         return getEnvironment().getPlaceholderResolver().resolvePlaceholders(str);
     }
 
     @Override
     public String resolveRequiredPlaceholders(String str) throws ConfigurationException {
+        assertRunning();
         return getEnvironment().getPlaceholderResolver().resolveRequiredPlaceholders(str);
     }
 
@@ -574,7 +580,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
         @Override
         protected synchronized List<PropertySource> readPropertySourceList(String name) {
-
             if (isRuntimeConfigured) {
                 if (LOG.isInfoEnabled()) {
                     LOG.info("Reading Startup environment from bootstrap.yml");
@@ -629,7 +634,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             for (String pkg : bootstrapEnvironment.getPackages()) {
                 addPackage(pkg);
             }
-
             return bootstrapEnvironment;
         }
     }
