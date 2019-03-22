@@ -292,8 +292,8 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     private void populateTypeHierarchy(Element element, List<Element> hierarchy) {
-        while (JavaModelUtils.resolveKind(element, ElementKind.CLASS).isPresent()) {
-
+        final boolean isInterface = JavaModelUtils.resolveKind(element, ElementKind.INTERFACE).isPresent();
+        if (isInterface) {
             TypeElement typeElement = (TypeElement) element;
             List<? extends TypeMirror> interfaces = typeElement.getInterfaces();
             for (TypeMirror anInterface : interfaces) {
@@ -303,17 +303,30 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
                     populateTypeHierarchy(interfaceElement, hierarchy);
                 }
             }
-            TypeMirror superMirror = typeElement.getSuperclass();
-            if (superMirror instanceof DeclaredType) {
-                DeclaredType type = (DeclaredType) superMirror;
-                if (type.toString().equals(Object.class.getName())) {
-                    break;
-                } else {
-                    element = type.asElement();
-                    hierarchy.add(element);
+        } else  {
+            while (JavaModelUtils.resolveKind(element, ElementKind.CLASS).isPresent()) {
+
+                TypeElement typeElement = (TypeElement) element;
+                List<? extends TypeMirror> interfaces = typeElement.getInterfaces();
+                for (TypeMirror anInterface : interfaces) {
+                    if (anInterface instanceof DeclaredType) {
+                        Element interfaceElement = ((DeclaredType) anInterface).asElement();
+                        hierarchy.add(interfaceElement);
+                        populateTypeHierarchy(interfaceElement, hierarchy);
+                    }
                 }
-            } else {
-                break;
+                TypeMirror superMirror = typeElement.getSuperclass();
+                if (superMirror instanceof DeclaredType) {
+                    DeclaredType type = (DeclaredType) superMirror;
+                    if (type.toString().equals(Object.class.getName())) {
+                        break;
+                    } else {
+                        element = type.asElement();
+                        hierarchy.add(element);
+                    }
+                } else {
+                    break;
+                }
             }
         }
     }

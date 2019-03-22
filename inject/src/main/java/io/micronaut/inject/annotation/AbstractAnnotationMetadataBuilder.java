@@ -522,7 +522,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     private AnnotationMetadata buildInternal(T parent, T element, DefaultAnnotationMetadata annotationMetadata, boolean inheritTypeAnnotations) {
         List<T> hierarchy = buildHierarchy(element, inheritTypeAnnotations);
         if (parent != null) {
-            hierarchy.add(0, parent);
+            final List<T> parentHierarchy = buildHierarchy(parent, inheritTypeAnnotations);
+            hierarchy.addAll(0, parentHierarchy);
         }
         Collections.reverse(hierarchy);
         for (T currentElement : hierarchy) {

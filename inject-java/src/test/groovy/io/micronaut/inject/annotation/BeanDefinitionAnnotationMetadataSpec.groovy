@@ -211,4 +211,41 @@ interface Foo {
         definition.hasStereotype(Singleton)
         definition.hasDeclaredAnnotation(Bean)
     }
+
+
+    void "test factory bean definition inherits returned objects metadata with inheritance"() {
+        given:
+        ClassLoader classLoader = buildClassLoader("test.Test", '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import java.util.concurrent.*;
+import javax.inject.*;
+
+@Factory
+class Test {
+
+    @Bean
+    public Foo foo() {
+        return null;
+    }
+}
+
+
+interface Foo extends Bar {
+
+}
+
+@Singleton
+interface Bar {
+}
+
+
+''')
+        BeanDefinition definition = classLoader.loadClass('test.$Test$FooDefinition').newInstance()
+        expect:
+        definition != null
+        definition.hasStereotype(Singleton)
+        definition.hasDeclaredAnnotation(Bean)
+    }
 }
