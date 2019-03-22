@@ -140,6 +140,26 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
+     * Build the meta data for the given method element excluding any class metadata.
+     *
+     * @param parent  The parent element
+     * @param element The element
+     * @param inheritTypeAnnotations Whether to inherit annotations from type as stereotypes
+     * @return The {@link AnnotationMetadata}
+     */
+    public AnnotationMetadata buildForParent(T parent, T element, boolean inheritTypeAnnotations) {
+        final AnnotationMetadata existing = MUTATED_ANNOTATION_METADATA.get(element);
+        DefaultAnnotationMetadata annotationMetadata;
+        if (existing instanceof DefaultAnnotationMetadata) {
+            // ugly, but will have to do
+            annotationMetadata = (DefaultAnnotationMetadata) ((DefaultAnnotationMetadata) existing).clone();
+        } else {
+            annotationMetadata = new DefaultAnnotationMetadata();
+        }
+        return buildInternal(parent, element, annotationMetadata, inheritTypeAnnotations);
+    }
+
+    /**
      * Get the type of the given annotation.
      *
      * @param annotationMirror The annotation

@@ -18,6 +18,7 @@ package io.micronaut.inject.annotation
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.EachBean
 import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Primary
 import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
@@ -176,6 +177,8 @@ class Test {
         BeanDefinition definition = classLoader.loadClass('test.$Test$ExecutorServiceDefinition').newInstance()
         expect:
         definition != null
+        definition.hasStereotype(Factory) // inherits the factory annotations as stereotypes
+        !definition.hasDeclaredAnnotation(Factory)
         !definition.hasDeclaredAnnotation(Singleton)
         definition.hasDeclaredAnnotation(Bean)
         definition.hasDeclaredAnnotation(EachBean)
