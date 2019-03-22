@@ -299,6 +299,23 @@ class HttpPostSpec extends Specification {
         context.getBean(PostClient).call() == "0"
     }
 
+    void "test simple post request url encoded"() {
+        given:
+        def toSend = new Book(title: "The Stand", pages: 1000)
+        when:
+        BlockingHttpClient blockingHttpClient = client.toBlocking()
+        Book book = blockingHttpClient.retrieve(
+                HttpRequest.POST("/post/query/url-encoded", toSend)
+                        .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE)
+                        .accept(MediaType.APPLICATION_JSON_TYPE),
+
+                Book
+        )
+
+        then:
+        book == toSend
+    }
+
     @Controller('/post')
     static class PostController {
 
@@ -316,6 +333,13 @@ class HttpPostSpec extends Specification {
             assert title == book.title
             return book
         }
+
+        @Post(uri = '/query/url-encoded', consumes = MediaType.APPLICATION_FORM_URLENCODED)
+        Book simpleUrlEncoded(@Body Book book, String title) {
+            assert title == book.title
+            return book
+        }
+
 
         @Post('/queryNoBody')
         Book simple(@QueryValue("title") String title) {
