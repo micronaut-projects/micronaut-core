@@ -16,13 +16,6 @@ import javax.validation.constraints.NotEmpty;
  */
 @Singleton
 public class NotEmptyObjectArrayValidator implements ConstraintValidator<NotEmpty, Object[]> {
-
-    @Nonnull
-    @Override
-    public Class<NotEmpty> getAnnotationType() {
-        return NotEmpty.class;
-    }
-
     @Override
     public boolean isValid(@Nullable Object[] value, @Nonnull AnnotationValue<NotEmpty> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         return ArrayUtils.isNotEmpty(value);

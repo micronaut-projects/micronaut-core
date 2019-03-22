@@ -15,12 +15,6 @@ import javax.validation.constraints.AssertFalse;
  */
 @Singleton
 public class AssertFalseValidator implements ConstraintValidator<AssertFalse, Boolean> {
-    @Nonnull
-    @Override
-    public Class<AssertFalse> getAnnotationType() {
-        return AssertFalse.class;
-    }
-
     @Override
     public boolean isValid(
             @Nullable Boolean value,

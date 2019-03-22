@@ -10,9 +10,9 @@ import javax.inject.Singleton;
  * @since 1.2
  */
 @Singleton
-public class SizeCharArrayValidator extends AbstractSizeValidator<char[]> {
+public class SizeCharArrayValidator implements SizeValidator<char[]> {
     @Override
-    protected int getSize(@Nonnull char[] value) {
+    public int getSize(@Nonnull char[] value) {
         return value.length;
     }
 }

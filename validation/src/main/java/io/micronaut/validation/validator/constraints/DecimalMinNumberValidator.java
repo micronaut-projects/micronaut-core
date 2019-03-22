@@ -8,9 +8,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 
 @Singleton
-public class DecimalMinNumberValidator extends AbstractDecimalMinValidator<Number> {
+public class DecimalMinNumberValidator implements DecimalMinValidator<Number> {
     @Override
-    protected int doComparison(@Nonnull Number value, @Nonnull BigDecimal bigDecimal) {
+    public int doComparison(@Nonnull Number value, @Nonnull BigDecimal bigDecimal) {
         return compareNumber(value, bigDecimal);
     }
 

@@ -19,12 +19,6 @@ import java.math.BigInteger;
 @Singleton
 public class MaxNumberValidator implements ConstraintValidator<Max, Number> {
 
-    @Nonnull
-    @Override
-    public final Class<Max> getAnnotationType() {
-        return Max.class;
-    }
-
     @Override
     public boolean isValid(@Nullable Number value, @Nonnull AnnotationValue<Max> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         if (value == null) {
