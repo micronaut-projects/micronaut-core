@@ -5,9 +5,9 @@ import javax.inject.Singleton;
 
 
 @Singleton
-public class SizeByteArrayValidator extends AbstractSizeValidator<byte[]> {
+public class SizeByteArrayValidator implements SizeValidator<byte[]> {
     @Override
-    protected int getSize(@Nonnull byte[] value) {
+    public int getSize(@Nonnull byte[] value) {
         return value.length;
     }
 }

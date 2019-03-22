@@ -15,13 +15,6 @@ import javax.validation.constraints.NotNull;
  */
 @Singleton
 public class NotNullValidator implements ConstraintValidator<NotNull, Object> {
-
-    @Nonnull
-    @Override
-    public final Class<NotNull> getAnnotationType() {
-        return NotNull.class;
-    }
-
     @Override
     public boolean isValid(@Nullable Object value, @Nonnull AnnotationValue<NotNull> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         return value != null;

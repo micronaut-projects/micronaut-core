@@ -24,12 +24,6 @@ public class PatternValidator implements ConstraintValidator<Pattern, CharSequen
     private static final Pattern.Flag[] ZERO_FLAGS = new Pattern.Flag[0];
     private static final Map<PatternKey, java.util.regex.Pattern> COMPUTED_PATTERNS = new ConcurrentHashMap<>(10);
 
-    @Nonnull
-    @Override
-    public final Class<Pattern> getAnnotationType() {
-        return Pattern.class;
-    }
-
     @Override
     public boolean isValid(@Nullable CharSequence value, @Nonnull AnnotationValue<Pattern> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         if (value == null) {

@@ -11,9 +11,9 @@ import java.util.Collection;
  * @since 1.2
  */
 @Singleton
-public class SizeCollectionValidator extends AbstractSizeValidator<Collection> {
+public class SizeCollectionValidator implements SizeValidator<Collection> {
     @Override
-    protected int getSize(@Nonnull Collection value) {
+    public int getSize(@Nonnull Collection value) {
         return value.size();
     }
 }

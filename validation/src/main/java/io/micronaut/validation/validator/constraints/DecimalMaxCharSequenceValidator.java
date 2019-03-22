@@ -11,9 +11,9 @@ import java.math.BigDecimal;
  * @since 1.2
  */
 @Singleton
-public class DecimalMaxCharSequenceValidator extends AbstractDecimalMaxValidator<CharSequence> {
+public class DecimalMaxCharSequenceValidator implements DecimalMaxValidator<CharSequence> {
     @Override
-    protected int doComparison(@Nonnull CharSequence value, @Nonnull BigDecimal bigDecimal) {
+    public int doComparison(@Nonnull CharSequence value, @Nonnull BigDecimal bigDecimal) {
         return new BigDecimal(value.toString()).compareTo(bigDecimal);
     }
 }
