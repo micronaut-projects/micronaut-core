@@ -642,10 +642,13 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                 || ByteBuf.class.isAssignableFrom(javaType));
     }
 
-    private Subscriber<Object> buildSubscriber(NettyHttpRequest request,
+    private Subscriber<Object> buildSubscriber(NettyHttpRequest<?> request,
                                                ChannelHandlerContext context,
                                                RouteMatch<?> finalRoute) {
         return new CompletionAwareSubscriber<Object>() {
+            Boolean alwaysAddContent = request.getContentType()
+                    .map(type -> type.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE))
+                    .orElse(false);
             RouteMatch<?> routeMatch = finalRoute;
             AtomicBoolean executed = new AtomicBoolean(false);
             AtomicLong pressureRequested = new AtomicLong(0);
@@ -828,6 +831,10 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                                 }
                             }
 
+                            if (alwaysAddContent) {
+                                request.addContent(data);
+                            }
+
                             if (!executed || !chunkedProcessing) {
                                 s.request(1);
                             }
@@ -841,7 +848,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         s.request(1);
                     }
                 } else {
-                    request.setBody(message);
+                    ((NettyHttpRequest) request).setBody(message);
                     s.request(1);
                 }
             }
