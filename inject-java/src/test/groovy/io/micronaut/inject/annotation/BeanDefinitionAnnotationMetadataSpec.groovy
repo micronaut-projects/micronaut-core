@@ -180,4 +180,35 @@ class Test {
         definition.hasDeclaredAnnotation(Bean)
         definition.hasDeclaredAnnotation(EachBean)
     }
+
+    void "test factory bean definition inherits returned objects metadata"() {
+        given:
+        ClassLoader classLoader = buildClassLoader("test.Test", '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import java.util.concurrent.*;
+import javax.inject.*;
+
+@Factory
+class Test {
+
+    @Bean
+    public Foo foo() {
+        return null;
+    }
+}
+
+@Singleton
+interface Foo {
+
+}
+
+''')
+        BeanDefinition definition = classLoader.loadClass('test.$Test$FooDefinition').newInstance()
+        expect:
+        definition != null
+        definition.hasStereotype(Singleton)
+        definition.hasDeclaredAnnotation(Bean)
+    }
 }
