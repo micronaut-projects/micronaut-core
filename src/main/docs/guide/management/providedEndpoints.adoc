@@ -8,10 +8,6 @@ When the `management` dependency is added to your project, the following built-i
 | `/beans`
 |Returns information about the loaded bean definitions in the application (see <<beansEndpoint, BeansEndpoint>>)
 
-|api:management.endpoint.caches.CachesEndpoint[]
-| `/caches`
-|Returns information about the caches and permits invalidating them (see <<cachesEndpoint, CachesEndpoint>>)
-
 |api:management.endpoint.health.HealthEndpoint[]
 | `/health`
 |Returns information about the "health" of the application (see <<healthEndpoint, HealthEndpoint>>)
@@ -43,6 +39,10 @@ In addition, the following built-in endpoint(s) are provided by the `management`
 .Disabled Endpoints
 |===
 |Endpoint|URI|Description
+
+|api:management.endpoint.caches.CachesEndpoint[]
+| `/caches`
+|Returns information about the caches and permits invalidating them (see <<cachesEndpoint, CachesEndpoint>>)
 
 |api:management.endpoint.stop.ServerStopEndpoint[]
 | `/stop`
