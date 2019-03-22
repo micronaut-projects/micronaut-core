@@ -15,11 +15,7 @@
  */
 package io.micronaut.docs.config.builder
 
-import io.micronaut.context.annotation.Bean
-import io.micronaut.context.annotation.Factory
-
 // tag::imports[]
-import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
 
 import javax.inject.Singleton
@@ -33,7 +29,6 @@ import javax.inject.Singleton
 @Factory
 class EngineFactory {
 
-    @Bean
     @Singleton
     EngineImpl buildEngine(EngineConfig engineConfig) {
         engineConfig.builder.build(engineConfig.crankShaft, engineConfig.sparkPlug)

@@ -15,7 +15,6 @@
  */
 package io.micronaut.scheduling.executor;
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.scheduling.TaskExecutors;
@@ -37,7 +36,6 @@ public class IOExecutorServiceConfig {
      * @return The default thread pool configurations
      */
     @Singleton
-    @Bean
     @Named(TaskExecutors.IO)
     ExecutorConfiguration configuration() {
         return UserExecutorConfiguration.of(ExecutorType.CACHED);

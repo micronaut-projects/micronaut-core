@@ -29,7 +29,6 @@ import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
-import io.micronaut.http.bind.binders.RequestAttributeAnnotationBinder;
 import io.micronaut.http.bind.binders.*;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;

@@ -20,6 +20,7 @@ import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Parameter
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Prototype
 import io.micronaut.context.exceptions.BeanInstantiationException
 import spock.lang.Specification
 
@@ -121,7 +122,6 @@ class ParametrizedFactorySpec extends Specification  {
             name = name.toUpperCase()
         }
 
-        @Bean
         @Singleton
         B get() {
             assert postConstructCalled : "post construct should have been called"
@@ -131,7 +131,7 @@ class ParametrizedFactorySpec extends Specification  {
             return new B(name: name )
         }
 
-        @Bean
+        @Prototype
         C buildC(B b, @Parameter int count) {
             return new C(b, count)
         }
