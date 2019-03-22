@@ -261,7 +261,7 @@ public class DefaultConstraintValidators {
     @Singleton
     @Bean
     @Named("notNullValidator")
-    public ConstraintValidator<NotBlank, Object> notNullValidator() {
+    public ConstraintValidator<NotNull, Object> notNullValidator() {
         return (value, annotationMetadata, context) -> value != null;
     }
 
