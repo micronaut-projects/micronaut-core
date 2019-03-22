@@ -27,12 +27,6 @@ import java.lang.annotation.Annotation;
 public interface ConstraintValidator<A extends Annotation, T> extends javax.validation.ConstraintValidator<A, T> {
 
     /**
-     * The annotation type validated.
-     * @return The annotation type
-     */
-    @Nonnull Class<A> getAnnotationType();
-
-    /**
      * Implements the validation logic.
      *
      * <p>Implementations should be thread-safe and immutable.</p>

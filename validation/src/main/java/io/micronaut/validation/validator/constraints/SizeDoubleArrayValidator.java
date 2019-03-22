@@ -11,9 +11,9 @@ import javax.inject.Singleton;
  */
 
 @Singleton
-public class SizeDoubleArrayValidator extends AbstractSizeValidator<double[]> {
+public class SizeDoubleArrayValidator implements SizeValidator<double[]> {
     @Override
-    protected int getSize(@Nonnull double[] value) {
+    public int getSize(@Nonnull double[] value) {
         return value.length;
     }
 }

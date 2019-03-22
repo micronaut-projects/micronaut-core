@@ -11,9 +11,9 @@ import java.util.Map;
  * @since 1.2
  */
 @Singleton
-public class SizeMapValidator extends AbstractSizeValidator<Map> {
+public class SizeMapValidator implements SizeValidator<Map> {
     @Override
-    protected final int getSize(@Nonnull Map value) {
+    public final int getSize(@Nonnull Map value) {
         return value.size();
     }
 }
