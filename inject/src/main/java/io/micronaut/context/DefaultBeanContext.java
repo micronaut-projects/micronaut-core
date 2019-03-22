@@ -299,6 +299,7 @@ public class DefaultBeanContext implements BeanContext {
     @SuppressWarnings("unchecked")
     @Override
     public Collection<BeanRegistration<?>> getActiveBeanRegistrations(Qualifier<?> qualifier) {
+        assertRunning();
         if (qualifier == null) {
             return Collections.emptyList();
         }
@@ -316,6 +317,7 @@ public class DefaultBeanContext implements BeanContext {
     @SuppressWarnings("unchecked")
     @Override
     public <T> Collection<BeanRegistration<T>> getActiveBeanRegistrations(Class<T> beanType) {
+        assertRunning();
         if (beanType == null) {
             return Collections.emptyList();
         }
@@ -342,6 +344,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public <T> Optional<BeanRegistration<T>> findBeanRegistration(T bean) {
+        assertRunning();
         for (BeanRegistration beanRegistration : singletonObjects.values()) {
             if (bean == beanRegistration.getBean()) {
                 return Optional.of(beanRegistration);
@@ -486,6 +489,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public Optional<BeanConfiguration> findBeanConfiguration(String configurationName) {
+        assertRunning();
         BeanConfiguration configuration = this.beanConfigurations.get(configurationName);
         if (configuration != null) {
             return Optional.of(configuration);
@@ -496,6 +500,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public <T> Optional<BeanDefinition<T>> findBeanDefinition(Class<T> beanType, Qualifier<T> qualifier) {
+        assertRunning();
         if (Object.class == beanType) {
             // optimization for object resolve
             return Optional.empty();
@@ -524,12 +529,14 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public <T> Collection<BeanDefinition<T>> getBeanDefinitions(Class<T> beanType) {
+        assertRunning();
         Collection<BeanDefinition<T>> candidates = findBeanCandidatesInternal(beanType);
         return Collections.unmodifiableCollection(candidates);
     }
 
     @Override
     public <T> Collection<BeanDefinition<T>> getBeanDefinitions(Class<T> beanType, Qualifier<T> qualifier) {
+        assertRunning();
         Collection<BeanDefinition<T>> candidates = findBeanCandidatesInternal(beanType);
         if (qualifier != null) {
             candidates = qualifier.reduce(beanType, new ArrayList<>(candidates).stream()).collect(Collectors.toList());
@@ -539,6 +546,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public <T> boolean containsBean(@Nonnull Class<T> beanType, Qualifier<T> qualifier) {
+        assertRunning();
         ArgumentUtils.requireNonNull("beanType", beanType);
         BeanKey<T> beanKey = new BeanKey<>(beanType, qualifier);
         if (containsBeanCache.containsKey(beanKey)) {
@@ -554,31 +562,37 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public <T> T getBean(Class<T> beanType, Qualifier<T> qualifier) {
+        assertRunning();
         return getBeanInternal(null, beanType, qualifier, true, true);
     }
 
     @Override
     public <T> T getBean(Class<T> beanType) {
+        assertRunning();
         return getBeanInternal(null, beanType, null, true, true);
     }
 
     @Override
     public <T> Optional<T> findBean(Class<T> beanType, Qualifier<T> qualifier) {
+        assertRunning();
         return findBean(null, beanType, qualifier);
     }
 
     @Override
     public <T> Collection<T> getBeansOfType(Class<T> beanType) {
+        assertRunning();
         return getBeansOfType(null, beanType);
     }
 
     @Override
     public <T> Collection<T> getBeansOfType(Class<T> beanType, Qualifier<T> qualifier) {
+        assertRunning();
         return getBeansOfTypeInternal(null, beanType, qualifier);
     }
 
     @Override
     public <T> Stream<T> streamOfType(Class<T> beanType, Qualifier<T> qualifier) {
+        assertRunning();
         return streamOfType(null, beanType, qualifier);
     }
 
@@ -854,6 +868,7 @@ public class DefaultBeanContext implements BeanContext {
     @SuppressWarnings("unchecked")
     @Override
     public @Nonnull <T> T getProxyTargetBean(@Nonnull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+        assertRunning();
         ArgumentUtils.requireNonNull("beanType", beanType);
         Qualifier<T> proxyQualifier = qualifier != null ? Qualifiers.byQualifiers(qualifier, PROXY_TARGET_QUALIFIER) : PROXY_TARGET_QUALIFIER;
         BeanDefinition<T> definition = getProxyTargetBeanDefinition(beanType, qualifier);
@@ -871,6 +886,7 @@ public class DefaultBeanContext implements BeanContext {
     @Override
     @SuppressWarnings("unchecked")
     public @Nonnull <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(@Nonnull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+        assertRunning();
         ArgumentUtils.requireNonNull("beanType", beanType);
         Qualifier<T> proxyQualifier = qualifier != null ? Qualifiers.byQualifiers(qualifier, PROXY_TARGET_QUALIFIER) : PROXY_TARGET_QUALIFIER;
         BeanKey key = new BeanKey(beanType, proxyQualifier);
@@ -890,6 +906,7 @@ public class DefaultBeanContext implements BeanContext {
     @SuppressWarnings("unchecked")
     @Override
     public @Nonnull Collection<BeanDefinition<?>> getBeanDefinitions(@Nullable Qualifier<Object> qualifier) {
+        assertRunning();
         if (qualifier == null) {
             return Collections.emptyList();
         }
@@ -920,6 +937,7 @@ public class DefaultBeanContext implements BeanContext {
     @SuppressWarnings("unchecked")
     @Override
     public @Nonnull Collection<BeanDefinition<?>> getAllBeanDefinitions() {
+        assertRunning();
         if (LOG.isDebugEnabled()) {
             LOG.debug("Finding all bean definitions");
         }
@@ -939,6 +957,7 @@ public class DefaultBeanContext implements BeanContext {
     @SuppressWarnings("unchecked")
     @Override
     public @Nonnull Collection<BeanDefinitionReference<?>> getBeanDefinitionReferences() {
+        assertRunning();
         if (!beanDefinitionsClasses.isEmpty()) {
             final List refs = beanDefinitionsClasses.stream().filter(ref -> ref.isEnabled(this))
                     .collect(Collectors.toList());
