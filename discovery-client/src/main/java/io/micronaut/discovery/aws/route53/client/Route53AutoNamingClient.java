@@ -28,7 +28,6 @@ import io.micronaut.discovery.aws.route53.AWSServiceDiscoveryResolver;
 import io.micronaut.discovery.aws.route53.Route53ClientDiscoveryConfiguration;
 import io.micronaut.discovery.aws.route53.Route53DiscoveryConfiguration;
 import io.micronaut.discovery.aws.route53.registration.EC2ServiceInstance;
-import io.micronaut.http.client.annotation.Client;
 import io.reactivex.Flowable;
 import org.reactivestreams.Publisher;
 import javax.inject.Singleton;
