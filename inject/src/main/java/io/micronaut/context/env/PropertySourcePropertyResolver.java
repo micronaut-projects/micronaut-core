@@ -339,7 +339,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver {
                 if (value != null) {
                     String key = entry.getKey().substring(prefix.length());
                     key = keyConvention.format(key);
-                    properties.put(key, resolvePlaceHoldersIfNecessary(value.toString()));
+                    properties.put(key, resolvePlaceHoldersIfNecessary(value));
                 }
             });
 
