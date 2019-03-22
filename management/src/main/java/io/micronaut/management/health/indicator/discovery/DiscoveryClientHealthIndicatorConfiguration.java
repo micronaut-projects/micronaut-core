@@ -32,9 +32,9 @@ import static io.micronaut.management.health.indicator.discovery.DiscoveryClient
 @Requires(property = PREFIX + ".enabled", value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
 public class DiscoveryClientHealthIndicatorConfiguration implements Toggleable {
 
-    static final String PREFIX = "discoveryClient.indicator";
+    static final String PREFIX = "discovery-client.indicator";
 
-    private boolean enabled;
+    private boolean enabled = true;
 
     /**
      * @return {@code true} If health indicator should be enabled.
