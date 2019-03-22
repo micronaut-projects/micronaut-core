@@ -46,7 +46,6 @@ import java.util.concurrent.Future;
  * @since 1.0
  */
 @Singleton
-@Client(id = Route53ClientDiscoveryConfiguration.SERVICE_ID, path = "/", configuration = Route53ClientDiscoveryConfiguration.class)
 @Requires(classes = {AWSServiceDiscoveryAsync.class, AWSClientConfiguration.class})
 @Requires(env = Environment.AMAZON_EC2)
 @Requires(beans = Route53DiscoveryConfiguration.class)
