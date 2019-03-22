@@ -28,7 +28,7 @@ import java.util.Set;
  * @author graemerocher
  * @since 1.2
  */
-public interface Validator {
+public interface Validator extends javax.validation.Validator {
 
     /**
      * Validates all constraints on {@code object}.
@@ -91,4 +91,6 @@ public interface Validator {
                                                            @Nullable Object value,
                                                            @Nullable Class<?>... groups);
 
+    @Override
+    ExecutableMethodValidator forExecutables();
 }

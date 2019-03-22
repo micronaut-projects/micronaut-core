@@ -17,7 +17,7 @@ import java.util.Map;
 
 /**
  * A factory bean that contains implementation for many of the default validations.
- * This approach is preferred as it generates less classes and smaller byte code then defining a
+ * This approach is preferred as it generates less classes and smaller byte code than defining a
  * validator class for each case.
  *
  * @author graemerocher
@@ -420,6 +420,139 @@ public class DefaultConstraintValidators {
     public ConstraintValidator<NotEmpty, Map> notEmptyMapValidator() {
         return (value, annotationMetadata, context) -> CollectionUtils.isNotEmpty(value);
     }
+
+    /**
+     * The {@link Size} validator for byte[].
+     *
+     * @return The validator
+     */
+    @Singleton
+    @Bean
+    @Named("sizeByteArrayValidator")
+    public SizeValidator<byte[]> sizeByteArrayValidator() {
+        return value -> value.length;
+    }
+
+    /**
+     * The {@link Size} validator for char[].
+     *
+     * @return The validator
+     */
+    @Singleton
+    @Bean
+    @Named("sizeCharArrayValidator")
+    public SizeValidator<char[]> sizeCharArrayValidator() {
+        return value -> value.length;
+    }
+
+    /**
+     * The {@link Size} validator for boolean[].
+     *
+     * @return The validator
+     */
+    @Singleton
+    @Bean
+    @Named("sizeBooleanArrayValidator")
+    public SizeValidator<boolean[]> sizeBooleanArrayValidator() {
+        return value -> value.length;
+    }
+
+    /**
+     * The {@link Size} validator for double[].
+     *
+     * @return The validator
+     */
+    @Singleton
+    @Bean
+    @Named("sizeDoubleArrayValidator")
+    public SizeValidator<double[]> sizeDoubleArrayValidator() {
+        return value -> value.length;
+    }
+
+    /**
+     * The {@link Size} validator for float[].
+     *
+     * @return The validator
+     */
+    @Singleton
+    @Bean
+    @Named("sizeFloatArrayValidator")
+    public SizeValidator<float[]> sizeFloatArrayValidator() {
+        return value -> value.length;
+    }
+
+    /**
+     * The {@link Size} validator for int[].
+     *
+     * @return The validator
+     */
+    @Singleton
+    @Bean
+    @Named("sizeIntArrayValidator")
+    public SizeValidator<int[]> sizeIntArrayValidator() {
+        return value -> value.length;
+    }
+
+    /**
+     * The {@link Size} validator for long[].
+     *
+     * @return The validator
+     */
+    @Singleton
+    @Bean
+    @Named("sizeLongArrayValidator")
+    public SizeValidator<long[]> sizeLongArrayValidator() {
+        return value -> value.length;
+    }
+
+    /**
+     * The {@link Size} validator for short[].
+     *
+     * @return The validator
+     */
+    @Singleton
+    @Bean
+    @Named("sizeShortArrayValidator")
+    public SizeValidator<short[]> sizeShortArrayValidator() {
+        return value -> value.length;
+    }
+
+    /**
+     * The {@link Size} validator for CharSequence.
+     *
+     * @return The validator
+     */
+    @Singleton
+    @Bean
+    @Named("sizeCharSequenceValidator")
+    public SizeValidator<CharSequence> sizeCharSequenceValidator() {
+        return CharSequence::length;
+    }
+
+    /**
+     * The {@link Size} validator for Collection.
+     *
+     * @return The validator
+     */
+    @Singleton
+    @Bean
+    @Named("sizeCollectionValidator")
+    public SizeValidator<Collection> sizeCollectionValidator() {
+        return Collection::size;
+    }
+
+    /**
+     * The {@link Size} validator for Map.
+     *
+     * @return The validator
+     */
+    @Singleton
+    @Bean
+    @Named("sizeMapValidator")
+    public SizeValidator<Map> sizeMapValidator() {
+        return Map::size;
+    }
+
 
     /**
      * Performs the comparision for number.
