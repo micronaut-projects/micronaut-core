@@ -86,7 +86,7 @@ public class DefaultBeanContext implements BeanContext {
 
     protected final AtomicBoolean running = new AtomicBoolean(false);
     protected final AtomicBoolean initializing = new AtomicBoolean(false);
-    protected final AtomicBoolean terminating = new AtomicBoolean(false);
+    protected volatile Boolean terminating = false;
 
     final Map<BeanKey, BeanRegistration> singletonObjects = new ConcurrentHashMap<>(100);
     final Map<BeanKey, Object> scopedProxies = new ConcurrentHashMap<>(20);
@@ -169,7 +169,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public boolean isRunning() {
-        return running.get() && !initializing.get() && !terminating.get();
+        return running.get() && !initializing.get() && !terminating;
     }
 
     /**
@@ -204,8 +204,6 @@ public class DefaultBeanContext implements BeanContext {
             }
             // start thread for parallel beans
             processParallelBeans();
-            running.set(true);
-            initializing.set(false);
         }
         return this;
     }
@@ -217,12 +215,13 @@ public class DefaultBeanContext implements BeanContext {
      */
     @Override
     public synchronized BeanContext stop() {
-        if (terminating.compareAndSet(false, true)) {
+        if (!terminating) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Stopping BeanContext");
             }
             publishEvent(new ShutdownEvent(this));
 
+            terminating = true;
             // need to sort registered singletons so that beans with that require other beans appear first
             List<BeanRegistration> objects = topologicalSort(singletonObjects.values());
 
@@ -264,7 +263,7 @@ public class DefaultBeanContext implements BeanContext {
                 }
             }
 
-            terminating.set(false);
+            terminating = false;
             running.set(false);
             ClassLoadingReporter.finish();
         }
@@ -2213,6 +2212,8 @@ public class DefaultBeanContext implements BeanContext {
         beanDefinitionsClasses.forEach(this::indexBeanDefinitionIfNecessary);
         disabled.clear();
 
+        running.set(true);
+        initializing.set(false);
         initializeEventListeners();
         initializeContext(contextScopeBeans, processedBeans);
     }
