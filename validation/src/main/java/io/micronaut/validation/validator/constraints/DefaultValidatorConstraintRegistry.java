@@ -27,7 +27,7 @@ class DefaultValidatorConstraintRegistry implements ConstraintValidatorRegistry 
     final Collection<ValidatorBeanType> constraintValidators = new ArrayList<>();
 
     DefaultValidatorConstraintRegistry() {
-        constraintValidators.add(new ValidatorBeanType(new NotBlankConstraintValidator()));
+//        constraintValidators.add(new ValidatorBeanType(new NotBlankConstraintValidator()));
     }
 
     @SuppressWarnings("unchecked")
