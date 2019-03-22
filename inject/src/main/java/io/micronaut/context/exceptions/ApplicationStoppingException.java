@@ -16,20 +16,25 @@
 package io.micronaut.context.exceptions;
 
 /**
- * An exception that occurs loading the context.
+ * thrown if service is in the processing of shutting down
  *
- * @author Graeme Rocher
+ * @author Ryan Vanderwerf
  * @since 1.0
  */
 public class ApplicationStoppingException extends RuntimeException {
 
     /**
+     * thrown if service is in the processing of shutting down
+     *
      * @param cause   The throwable
      */
     public ApplicationStoppingException(Throwable cause) {
         super("Application is not running or is shutting down.", cause);
     }
 
+    /**
+     * thrown if service is in the processing of shutting down
+     */
     public ApplicationStoppingException() {
         super("Application is not running or is shutting down.");
     }
