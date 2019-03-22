@@ -26,8 +26,6 @@ import io.micronaut.context.env.Environment;
 import io.micronaut.context.env.EnvironmentPropertySource;
 import io.micronaut.context.env.PropertySource;
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.async.publisher.Publishers;
-import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.discovery.aws.route53.Route53ClientDiscoveryConfiguration;
 import io.micronaut.discovery.client.ClientUtil;
 import io.micronaut.discovery.config.ConfigurationClient;
@@ -60,17 +58,7 @@ import java.util.concurrent.Future;
 @Requires(beans = AWSParameterStoreConfiguration.class)
 @BootstrapContextCompatible
 public class AWSParameterStoreConfigClient implements ConfigurationClient {
-
-    private static class ParametersWithBasePath {
-        private final String basePath;
-        private final List<Parameter> parameters;
-
-        public ParametersWithBasePath(String basePath, List<Parameter> parameters) {
-            this.basePath = basePath;
-            this.parameters = parameters;
-        }
-    }
-
+    
     private static final Logger LOG = LoggerFactory.getLogger(AWSParameterStoreConfiguration.class);
     private final int PRIORITY_TOP = 150;
     private final int PRIORITY_DOWN = 100;
@@ -369,6 +357,19 @@ public class AWSParameterStoreConfigClient implements ConfigurationClient {
             return;
         }
         LOG.info("Only nested parameters can contain value which is not key-pair. See {}", param.getName());
+    }
+    
+    /**
+     * Simple container class to hold the list of parameters and a base path which was used to collect them.
+     */
+    private static class ParametersWithBasePath {
+        private final String basePath;
+        private final List<Parameter> parameters;
+
+        public ParametersWithBasePath(String basePath, List<Parameter> parameters) {
+            this.basePath = basePath;
+            this.parameters = parameters;
+        }
     }
 
 }
