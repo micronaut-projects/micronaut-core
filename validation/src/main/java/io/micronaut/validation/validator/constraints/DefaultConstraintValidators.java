@@ -12,6 +12,12 @@ import javax.validation.ValidationException;
 import javax.validation.constraints.*;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.time.*;
+import java.time.chrono.HijrahDate;
+import java.time.chrono.JapaneseDate;
+import java.time.chrono.MinguoDate;
+import java.time.chrono.ThaiBuddhistDate;
+import java.time.temporal.TemporalAccessor;
 import java.util.Collection;
 import java.util.Map;
 
@@ -553,6 +559,119 @@ public class DefaultConstraintValidators {
         return Map::size;
     }
 
+
+    /**
+     * The {@link Past} validator for temporal accessor.
+     *
+     * @return The validator
+     */
+    @Singleton
+    @Bean
+    @Named("pastTemporalAccessorConstraintValidator")
+    public ConstraintValidator<Past, TemporalAccessor> pastTemporalAccessorConstraintValidator() {
+        return (value, annotationMetadata, context) -> {
+            if (value == null) {
+                // null is valid according to spec
+                return true;
+            }
+            Comparable comparable = getNow(value, context.getClockProvider().getClock());
+            return comparable.compareTo(value) > 0;
+        };
+    }
+
+    /**
+     * The {@link PastOrPresent} validator for temporal accessor.
+     *
+     * @return The validator
+     */
+    @Singleton
+    @Bean
+    @Named("pastOrPresentTemporalAccessorConstraintValidator")
+    public ConstraintValidator<PastOrPresent, TemporalAccessor> pastOrPresentTemporalAccessorConstraintValidator() {
+        return (value, annotationMetadata, context) -> {
+            if (value == null) {
+                // null is valid according to spec
+                return true;
+            }
+            Comparable comparable = getNow(value, context.getClockProvider().getClock());
+            return comparable.compareTo(value) >= 0;
+        };
+    }
+
+    /**
+     * The {@link Future} validator for temporal accessor.
+     *
+     * @return The validator
+     */
+    @Singleton
+    @Bean
+    @Named("futureTemporalAccessorConstraintValidator")
+    public ConstraintValidator<Future, TemporalAccessor> futureTemporalAccessorConstraintValidator() {
+        return (value, annotationMetadata, context) -> {
+            if (value == null) {
+                // null is valid according to spec
+                return true;
+            }
+            Comparable comparable = getNow(value, context.getClockProvider().getClock());
+            return comparable.compareTo(value) < 0;
+        };
+    }
+
+    /**
+     * The {@link FutureOrPresent} validator for temporal accessor.
+     *
+     * @return The validator
+     */
+    @Singleton
+    @Bean
+    @Named("futureOrPresentTemporalAccessorConstraintValidator")
+    public ConstraintValidator<FutureOrPresent, TemporalAccessor> futureOrPresentTemporalAccessorConstraintValidator() {
+        return (value, annotationMetadata, context) -> {
+            if (value == null) {
+                // null is valid according to spec
+                return true;
+            }
+            Comparable comparable = getNow(value, context.getClockProvider().getClock());
+            return comparable.compareTo(value) <= 0;
+        };
+    }
+
+    private Comparable<? extends TemporalAccessor> getNow(TemporalAccessor value, Clock clock) {
+        if (!(value instanceof Comparable)) {
+            throw new IllegalArgumentException("TemporalAccessor value must be comparable");
+        }
+
+        if (value instanceof LocalDateTime) {
+            return LocalDateTime.now(clock);
+        } else if (value instanceof Instant) {
+            return Instant.now(clock);
+        } else if (value instanceof ZonedDateTime) {
+            return ZonedDateTime.now(clock);
+        } else if (value instanceof OffsetDateTime) {
+            return OffsetDateTime.now(clock);
+        } else if (value instanceof LocalDate) {
+            return LocalDate.now(clock);
+        } else if (value instanceof LocalTime) {
+            return LocalTime.now(clock);
+        } else if (value instanceof OffsetTime) {
+            return OffsetTime.now(clock);
+        } else if (value instanceof MonthDay) {
+            return MonthDay.now(clock);
+        } else if (value instanceof Year) {
+            return Year.now(clock);
+        } else if (value instanceof YearMonth) {
+            return YearMonth.now(clock);
+        } else if (value instanceof HijrahDate) {
+            return HijrahDate.now(clock);
+        } else if (value instanceof JapaneseDate) {
+            return JapaneseDate.now(clock);
+        } else if (value instanceof ThaiBuddhistDate) {
+            return ThaiBuddhistDate.now(clock);
+        } else if (value instanceof MinguoDate) {
+            return MinguoDate.now(clock);
+        }
+        throw new IllegalArgumentException("TemporalAccessor value type not supported: " + value.getClass());
+    }
 
     /**
      * Performs the comparision for number.
