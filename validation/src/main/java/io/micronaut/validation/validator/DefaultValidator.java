@@ -15,6 +15,7 @@ import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.validation.*;
+import javax.validation.metadata.BeanDescriptor;
 import javax.validation.metadata.ConstraintDescriptor;
 import java.lang.annotation.Annotation;
 import java.util.*;
@@ -29,17 +30,21 @@ import java.util.*;
 public class DefaultValidator implements Validator {
 
     private final ConstraintValidatorRegistry constraintValidatorRegistry;
+    private final ClockProvider clockProvider;
 
     /**
      * Default constructor.
      *
      * @param constraintValidatorRegistry The validator registry.
+     * @param clockProvider The clock provider
      */
     @Inject
-    public DefaultValidator(
-            @Nonnull ConstraintValidatorRegistry constraintValidatorRegistry) {
+    protected DefaultValidator(
+            @Nonnull ConstraintValidatorRegistry constraintValidatorRegistry,
+            @Nonnull ClockProvider clockProvider) {
         ArgumentUtils.requireNonNull("constraintValidatorRegistry", constraintValidatorRegistry);
         this.constraintValidatorRegistry = constraintValidatorRegistry;
+        this.clockProvider = clockProvider;
     }
 
     @Nonnull
@@ -129,6 +134,21 @@ public class DefaultValidator implements Validator {
         return Collections.unmodifiableSet(overallViolations);
     }
 
+    @Override
+    public BeanDescriptor getConstraintsForClass(Class<?> clazz) {
+        throw new UnsupportedOperationException("BeanDescriptor metadata not supported by this implementation");
+    }
+
+    @Override
+    public <T> T unwrap(Class<T> type) {
+        throw new UnsupportedOperationException("Validator unwrapping not supported by this implementation");
+    }
+
+    @Override
+    public ExecutableMethodValidator forExecutables() {
+        return null; // TODO
+    }
+
     private <T> void validateConstrainedPropertyInternal(
             BeanIntrospection<T> introspection,
             @Nonnull T object,
@@ -191,6 +211,12 @@ public class DefaultValidator implements Validator {
         }
 
         private DefaultConstraintValidatorContext() {
+        }
+
+        @Nonnull
+        @Override
+        public ClockProvider getClockProvider() {
+            return clockProvider;
         }
     }
 
