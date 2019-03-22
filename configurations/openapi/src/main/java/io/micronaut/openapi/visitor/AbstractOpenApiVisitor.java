@@ -84,10 +84,6 @@ abstract class AbstractOpenApiVisitor  {
     static OpenAPI testReference;
 
     /**
-     * Stores the current in progress type.
-     */
-    private List<String> inProgressSchemas = new ArrayList<>(10);
-    /**
      * The JSON mapper.
      */
     ObjectMapper jsonMapper = Json.mapper().enable(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY);
@@ -95,6 +91,11 @@ abstract class AbstractOpenApiVisitor  {
      * The YAML mapper.
      */
     ObjectMapper yamlMapper = Yaml.mapper();
+
+    /**
+     * Stores the current in progress type.
+     */
+    private List<String> inProgressSchemas = new ArrayList<>(10);
 
     /**
      * Convert the given map to a JSON node.
