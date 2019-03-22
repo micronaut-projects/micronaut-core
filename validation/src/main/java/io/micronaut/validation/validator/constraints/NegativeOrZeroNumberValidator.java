@@ -15,12 +15,6 @@ import javax.validation.constraints.NegativeOrZero;
  */
 @Singleton
 public class NegativeOrZeroNumberValidator implements ConstraintValidator<NegativeOrZero, Number> {
-    @Nonnull
-    @Override
-    public final Class<NegativeOrZero> getAnnotationType() {
-        return NegativeOrZero.class;
-    }
-
     @Override
     public boolean isValid(@Nullable Number value, @Nonnull AnnotationValue<NegativeOrZero> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         // null is allowed according to spec

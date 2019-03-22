@@ -18,13 +18,6 @@ import java.math.BigInteger;
  */
 @Singleton
 public class MinNumberValidator implements ConstraintValidator<Min, Number> {
-
-    @Nonnull
-    @Override
-    public final Class<Min> getAnnotationType() {
-        return Min.class;
-    }
-
     @Override
     public boolean isValid(@Nullable Number value, @Nonnull AnnotationValue<Min> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         if (value == null) {

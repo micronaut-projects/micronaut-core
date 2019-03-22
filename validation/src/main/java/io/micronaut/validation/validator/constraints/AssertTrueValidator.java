@@ -14,12 +14,6 @@ import javax.validation.constraints.AssertTrue;
  */
 @Singleton
 public final class AssertTrueValidator implements ConstraintValidator<AssertTrue, Boolean> {
-    @Nonnull
-    @Override
-    public Class<AssertTrue> getAnnotationType() {
-        return AssertTrue.class;
-    }
-
     @Override
     public boolean isValid(
             @Nullable Boolean value,
