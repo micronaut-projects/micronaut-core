@@ -436,7 +436,6 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public <T> BeanContext registerSingleton(@Nonnull Class<T> type, @Nonnull T singleton, Qualifier<T> qualifier, boolean inject) {
-        assertRunning();
         ArgumentUtils.requireNonNull("type", type);
         ArgumentUtils.requireNonNull("singleton", singleton);
         BeanKey<T> beanKey = new BeanKey<>(type, qualifier);
