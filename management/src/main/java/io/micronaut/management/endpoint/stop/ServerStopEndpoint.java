@@ -23,7 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * <p>Exposes an {@link Endpoint} to stor the server.</p>
+ * <p>Exposes an {@link Endpoint} to stop the server.</p>
  *
  * @author James Kleeh
  * @since 1.0
