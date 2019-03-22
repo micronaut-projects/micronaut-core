@@ -40,6 +40,7 @@ import java.util.stream.Stream;
  * @since 1.0
  */
 @Requires(beans = DiscoveryClient.class)
+@Requires(beans = DiscoveryClientHealthIndicatorConfiguration.class)
 @Singleton
 public class DiscoveryClientHealthIndicator implements HealthIndicator {
 
