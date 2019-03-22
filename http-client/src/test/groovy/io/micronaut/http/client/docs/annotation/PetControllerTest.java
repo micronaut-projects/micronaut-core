@@ -22,6 +22,8 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 
+import javax.validation.ConstraintViolationException;
+
 import static org.junit.Assert.assertEquals;
 
 /**
@@ -56,8 +58,8 @@ public class PetControllerTest {
         PetClient client = embeddedServer.getApplicationContext().getBean(PetClient.class);
 
         // tag::error[]
-        thrown.expect(HttpClientResponseException.class);
-        thrown.expectMessage("age: must be greater than or equal to 1");
+        thrown.expect(ConstraintViolationException.class);
+        thrown.expectMessage("save.age: must be greater than or equal to 1");
         client.save("Fred", -1).blockingGet();
         // end::error[]
 
