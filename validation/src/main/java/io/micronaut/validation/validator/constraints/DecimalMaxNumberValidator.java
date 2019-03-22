@@ -5,9 +5,9 @@ import javax.inject.Singleton;
 import java.math.BigDecimal;
 
 @Singleton
-public class DecimalMaxNumberValidator extends AbstractDecimalMaxValidator<Number> {
+public class DecimalMaxNumberValidator implements DecimalMaxValidator<Number> {
     @Override
-    protected final int doComparison(@Nonnull Number value, @Nonnull BigDecimal bigDecimal) {
+    public final int doComparison(@Nonnull Number value, @Nonnull BigDecimal bigDecimal) {
         return DecimalMinNumberValidator.compareNumber(value, bigDecimal);
     }
 }

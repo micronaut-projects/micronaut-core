@@ -16,16 +16,10 @@ import java.math.BigDecimal;
  * @author graemerocher
  * @since 1.2
  */
-public abstract class AbstractDecimalMaxValidator<T> implements ConstraintValidator<DecimalMax, T> {
-
-    @Nonnull
-    @Override
-    public Class<DecimalMax> getAnnotationType() {
-        return DecimalMax.class;
-    }
+public interface DecimalMaxValidator<T> extends ConstraintValidator<DecimalMax, T> {
 
     @Override
-    public final boolean isValid(@Nullable T value, @Nonnull AnnotationValue<DecimalMax> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    default boolean isValid(@Nullable T value, @Nonnull AnnotationValue<DecimalMax> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         if (value == null) {
             // null considered valid according to spec
             return true;
@@ -56,5 +50,5 @@ public abstract class AbstractDecimalMaxValidator<T> implements ConstraintValida
      * @param bigDecimal The big decimal
      * @return The result
      */
-    protected abstract int doComparison(@Nonnull T value, @Nonnull BigDecimal bigDecimal);
+    int doComparison(@Nonnull T value, @Nonnull BigDecimal bigDecimal);
 }

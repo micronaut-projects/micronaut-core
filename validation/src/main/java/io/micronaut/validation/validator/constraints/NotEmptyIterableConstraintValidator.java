@@ -15,13 +15,6 @@ import javax.validation.constraints.NotEmpty;
  */
 @Singleton
 public class NotEmptyIterableConstraintValidator implements ConstraintValidator<NotEmpty, Iterable> {
-
-    @Nonnull
-    @Override
-    public final Class<NotEmpty> getAnnotationType() {
-        return NotEmpty.class;
-    }
-
     @Override
     public boolean isValid(@Nullable Iterable value, @Nonnull AnnotationValue<NotEmpty> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         return value != null && value.iterator().hasNext();

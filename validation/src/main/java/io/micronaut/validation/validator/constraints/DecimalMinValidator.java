@@ -16,16 +16,11 @@ import java.math.BigDecimal;
  * @since 1.2
  * @author graemerocher
  */
-public abstract class AbstractDecimalMinValidator<T> implements ConstraintValidator<DecimalMin, T> {
-
-    @Nonnull
-    @Override
-    public final Class<DecimalMin> getAnnotationType() {
-        return DecimalMin.class;
-    }
+@FunctionalInterface
+public interface DecimalMinValidator<T> extends ConstraintValidator<DecimalMin, T> {
 
     @Override
-    public final boolean isValid(@Nullable T value, @Nonnull AnnotationValue<DecimalMin> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    default boolean isValid(@Nullable T value, @Nonnull AnnotationValue<DecimalMin> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         if (value == null) {
             // null considered valid according to spec
             return true;
@@ -55,5 +50,5 @@ public abstract class AbstractDecimalMinValidator<T> implements ConstraintValida
      * @param bigDecimal The big decimal
      * @return The result
      */
-    protected abstract int doComparison(@Nonnull T value, @Nonnull BigDecimal bigDecimal);
+    int doComparison(@Nonnull T value, @Nonnull BigDecimal bigDecimal);
 }

@@ -14,15 +14,10 @@ import java.math.BigDecimal;
  * @author graemerocher
  * @since 1.2
  */
-public abstract class AbstractDigitsValidator<T> implements ConstraintValidator<Digits, T> {
-    @Nonnull
+@FunctionalInterface
+public interface DigitsValidator<T> extends ConstraintValidator<Digits, T> {
     @Override
-    public final Class<Digits> getAnnotationType() {
-        return Digits.class;
-    }
-
-    @Override
-    public final boolean isValid(@Nullable T value, @Nonnull AnnotationValue<Digits> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    default boolean isValid(@Nullable T value, @Nonnull AnnotationValue<Digits> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         if (value == null) {
             // null valid according to spec
             return true;
@@ -56,5 +51,5 @@ public abstract class AbstractDigitsValidator<T> implements ConstraintValidator<
      * @param value The value
      * @return The big decimal
      */
-    protected abstract BigDecimal getBigDecimal(@Nonnull T value);
+    BigDecimal getBigDecimal(@Nonnull T value);
 }

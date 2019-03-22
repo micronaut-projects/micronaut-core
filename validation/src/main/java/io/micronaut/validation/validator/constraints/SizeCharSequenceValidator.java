@@ -10,9 +10,9 @@ import javax.inject.Singleton;
  * @since 1.2
  */
 @Singleton
-public class SizeCharSequenceValidator extends AbstractSizeValidator<CharSequence> {
+public class SizeCharSequenceValidator implements SizeValidator<CharSequence> {
     @Override
-    protected final int getSize(@Nonnull CharSequence value) {
+    public final int getSize(@Nonnull CharSequence value) {
         return value.length();
     }
 }

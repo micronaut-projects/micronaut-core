@@ -5,9 +5,9 @@ import javax.inject.Singleton;
 import java.math.BigDecimal;
 
 @Singleton
-public class DecimalMinCharSequenceValidator extends AbstractDecimalMinValidator<CharSequence> {
+public class DecimalMinCharSequenceValidator implements DecimalMinValidator<CharSequence> {
     @Override
-    protected int doComparison(@Nonnull CharSequence value, @Nonnull BigDecimal bigDecimal) {
+    public int doComparison(@Nonnull CharSequence value, @Nonnull BigDecimal bigDecimal) {
         return new BigDecimal(value.toString()).compareTo(bigDecimal);
     }
 }
