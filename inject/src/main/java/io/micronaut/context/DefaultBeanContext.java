@@ -285,6 +285,7 @@ public class DefaultBeanContext implements BeanContext {
     @SuppressWarnings({"SuspiciousMethodCalls", "unchecked"})
     @Override
     public <T> Optional<T> refreshBean(BeanIdentifier identifier) {
+        assertRunning();
         if (identifier != null) {
             BeanRegistration beanRegistration = singletonObjects.get(identifier);
             if (beanRegistration != null) {
@@ -435,6 +436,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public <T> BeanContext registerSingleton(@Nonnull Class<T> type, @Nonnull T singleton, Qualifier<T> qualifier, boolean inject) {
+        assertRunning();
         ArgumentUtils.requireNonNull("type", type);
         ArgumentUtils.requireNonNull("singleton", singleton);
         BeanKey<T> beanKey = new BeanKey<>(type, qualifier);
@@ -596,6 +598,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public @Nonnull <T> T inject(@Nonnull T instance) {
+        assertRunning();
         Objects.requireNonNull(instance, "Instance cannot be null");
 
         Collection<BeanDefinition> candidates = findBeanCandidatesForInstance(instance);
@@ -622,11 +625,13 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public @Nonnull <T> T createBean(@Nonnull Class<T> beanType, @Nullable Qualifier<T> qualifier) {
+        assertRunning();
         return createBean(null, beanType, qualifier);
     }
 
     @Override
     public @Nonnull <T> T createBean(@Nonnull Class<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable Map<String, Object> argumentValues) {
+        assertRunning();
         ArgumentUtils.requireNonNull("beanType", beanType);
 
         Optional<BeanDefinition<T>> candidate = findConcreteCandidate(beanType, qualifier, true, false);
@@ -642,6 +647,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public @Nonnull <T> T createBean(@Nonnull Class<T> beanType, @Nullable Qualifier<T> qualifier, @Nullable Object... args) {
+        assertRunning();
         ArgumentUtils.requireNonNull("beanType", beanType);
         Optional<BeanDefinition<T>> candidate = findConcreteCandidate(beanType, qualifier, true, false);
         if (candidate.isPresent()) {
@@ -722,6 +728,7 @@ public class DefaultBeanContext implements BeanContext {
 
     @Override
     public @Nullable <T> T destroyBean(@Nonnull Class<T> beanType) {
+        assertRunning();
         ArgumentUtils.requireNonNull("beanType", beanType);
         T bean = null;
         BeanKey<T> beanKey = new BeanKey<>(beanType, null);
@@ -1565,6 +1572,12 @@ public class DefaultBeanContext implements BeanContext {
             parallelDefinitions.clear();
 
         }).start();
+    }
+
+    protected void assertRunning() {
+        if (!isRunning()) {
+            throw new BeanContextNotAvailableException();
+        }
     }
 
     private <T> void filterReplacedBeans(Collection<? extends BeanType<T>> candidates) {
