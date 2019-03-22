@@ -1573,6 +1573,9 @@ public class DefaultBeanContext implements BeanContext {
         }).start();
     }
 
+    /**
+     * Make sure the context is running to avoid race conditions.
+     */
     protected void assertRunning() {
         if (!isRunning()) {
             throw new BeanContextNotAvailableException();
