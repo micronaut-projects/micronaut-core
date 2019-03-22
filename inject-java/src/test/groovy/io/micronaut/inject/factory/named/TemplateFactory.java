@@ -15,21 +15,21 @@
  */
 package io.micronaut.inject.factory.named;
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Prototype;
 
 import javax.inject.Named;
 
 @Factory
 public class TemplateFactory {
 
-    @Bean
+    @Prototype
     @Named("csw-test-template")
     public Template cswTemplate() {
         return new CSWTestTemplate();
     }
 
-    @Bean
+    @Prototype
     @Named("ias-test-template")
     public Template iasTemplate() {
         return new IASTestTemplate();

@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty.converters;
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.TypeConverter;
@@ -42,7 +41,6 @@ public class ByteBufConverters {
      * @return A converter that converts bytebufs to strings
      */
     @Singleton
-    @Bean
     TypeConverter<ByteBuf, CharSequence> byteBufCharSequenceTypeConverter() {
         return (object, targetType, context) -> Optional.of(object.toString(context.getCharset()));
     }
@@ -51,7 +49,6 @@ public class ByteBufConverters {
      * @return A converter that converts composite bytebufs to strings
      */
     @Singleton
-    @Bean
     TypeConverter<CompositeByteBuf, CharSequence> compositeByteBufCharSequenceTypeConverter() {
         return (object, targetType, context) -> Optional.of(object.toString(context.getCharset()));
     }
@@ -60,7 +57,6 @@ public class ByteBufConverters {
      * @return A converter that converts bytebufs to byte arrays
      */
     @Singleton
-    @Bean
     TypeConverter<ByteBuf, byte[]> byteBufToArrayTypeConverter() {
         return (object, targetType, context) -> Optional.of(ByteBufUtil.getBytes(object));
     }
@@ -69,7 +65,6 @@ public class ByteBufConverters {
      * @return A converter that converts bytebufs to byte arrays
      */
     @Singleton
-    @Bean
     TypeConverter<byte[], ByteBuf> byteArrayToByteBuffTypeConverter() {
         return (object, targetType, context) -> Optional.of(Unpooled.wrappedBuffer(object));
     }
@@ -78,7 +73,6 @@ public class ByteBufConverters {
      * @return A converter that converts composite bytebufs to byte arrays
      */
     @Singleton
-    @Bean
     TypeConverter<CompositeByteBuf, byte[]> compositeByteBufTypeConverter() {
         return (object, targetType, context) -> Optional.of(ByteBufUtil.getBytes(object));
     }

@@ -15,8 +15,8 @@
  */
 package io.micronaut.inject.factory.beanwithfactory;
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Prototype;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
@@ -60,7 +60,7 @@ public class BFactory  {
         name = name.toUpperCase();
     }
 
-    @Bean
+    @Prototype
     public B get() {
         getCalled = true;
         B b = new B();

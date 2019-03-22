@@ -16,7 +16,6 @@
 package io.micronaut.inject.annotation;
 
 import io.micronaut.core.annotation.*;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.TypeConverter;
 import io.micronaut.core.convert.value.ConvertibleValues;
