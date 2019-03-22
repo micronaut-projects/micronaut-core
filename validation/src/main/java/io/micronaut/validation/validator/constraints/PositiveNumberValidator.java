@@ -15,12 +15,6 @@ import javax.validation.constraints.Positive;
  */
 @Singleton
 public class PositiveNumberValidator implements ConstraintValidator<Positive, Number> {
-    @Nonnull
-    @Override
-    public final Class<Positive> getAnnotationType() {
-        return Positive.class;
-    }
-
     @Override
     public boolean isValid(@Nullable Number value, @Nonnull AnnotationValue<Positive> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         // null is allowed according to spec

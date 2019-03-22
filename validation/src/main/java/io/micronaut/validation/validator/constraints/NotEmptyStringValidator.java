@@ -16,13 +16,6 @@ import javax.validation.constraints.NotEmpty;
  */
 @Singleton
 public class NotEmptyStringValidator implements ConstraintValidator<NotEmpty, CharSequence> {
-
-    @Nonnull
-    @Override
-    public final Class<NotEmpty> getAnnotationType() {
-        return NotEmpty.class;
-    }
-
     @Override
     public boolean isValid(@Nullable CharSequence value, @Nonnull AnnotationValue<NotEmpty> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         return StringUtils.isNotEmpty(value);
