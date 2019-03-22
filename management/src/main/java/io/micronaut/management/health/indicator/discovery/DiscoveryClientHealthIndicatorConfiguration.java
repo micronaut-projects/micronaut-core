@@ -18,6 +18,9 @@ package io.micronaut.management.health.indicator.discovery;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.Toggleable;
+
+import static io.micronaut.management.health.indicator.discovery.DiscoveryClientHealthIndicatorConfiguration.PREFIX;
 
 /**
  * Enables the user to enable or disable the health indicator.
@@ -25,33 +28,28 @@ import io.micronaut.core.util.StringUtils;
  * @author rvanderwerf
  * @since 1.1.0
  */
-@ConfigurationProperties(DiscoveryClientHealthIndicatorConfiguration.PREFIX)
-@Requires(property = DiscoveryClientHealthIndicatorConfiguration.PREFIX + ".enabled", value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
-public class DiscoveryClientHealthIndicatorConfiguration {
+@ConfigurationProperties(PREFIX)
+@Requires(property = PREFIX + ".enabled", value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
+public class DiscoveryClientHealthIndicatorConfiguration implements Toggleable {
 
     static final String PREFIX = "discoveryClient.indicator";
 
-    /**
-     * The default enable value.
-     */
-    private static final boolean DEFAULT_ENABLED = false;
+    private boolean enabled;
 
     /**
-     * The enable value.
+     * @return {@code true} If health indicator should be enabled.
      */
-    private boolean enabled = DEFAULT_ENABLED;
-
-    /**
-     * @param enabled Enables the client health indicator to be enabled.
-     */
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
+    @Override
+    public boolean isEnabled() {
+        return enabled;
     }
 
     /**
-     * @return {@code true} Enables the client health indicator to be enabled.
+     * If health indicator should be enabled.
+     *
+     * @param enabled True If health indicator should be enabled.
      */
-    public boolean isEnabled() {
-        return enabled;
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
     }
 }
