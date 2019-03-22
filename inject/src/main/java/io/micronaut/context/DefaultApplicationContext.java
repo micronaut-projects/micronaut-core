@@ -133,7 +133,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Override
     protected @Nonnull List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
-
         if (resolvedBeanReferences != null) {
             return resolvedBeanReferences;
         }
@@ -238,7 +237,6 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
     @Override
     protected <T> Collection<BeanDefinition<T>> findBeanCandidates(Class<T> beanType, BeanDefinition<?> filter) {
-
         Collection<BeanDefinition<T>> candidates = super.findBeanCandidates(beanType, filter);
         if (!candidates.isEmpty()) {
 
@@ -576,6 +574,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
 
         @Override
         protected synchronized List<PropertySource> readPropertySourceList(String name) {
+
             if (isRuntimeConfigured) {
                 if (LOG.isInfoEnabled()) {
                     LOG.info("Reading Startup environment from bootstrap.yml");
@@ -630,6 +629,7 @@ public class DefaultApplicationContext extends DefaultBeanContext implements App
             for (String pkg : bootstrapEnvironment.getPackages()) {
                 addPackage(pkg);
             }
+
             return bootstrapEnvironment;
         }
     }
