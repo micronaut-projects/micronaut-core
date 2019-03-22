@@ -17,13 +17,6 @@ import java.util.Map;
  */
 @Singleton
 public class NotEmptyMapValidator implements ConstraintValidator<NotEmpty, Map> {
-
-    @Nonnull
-    @Override
-    public final Class<NotEmpty> getAnnotationType() {
-        return NotEmpty.class;
-    }
-
     @Override
     public boolean isValid(@Nullable Map value, @Nonnull AnnotationValue<NotEmpty> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         return CollectionUtils.isNotEmpty(value);
