@@ -93,6 +93,11 @@ abstract class AbstractOpenApiVisitor  {
     ObjectMapper yamlMapper = Yaml.mapper();
 
     /**
+     * Stores the current in progress type.
+     */
+    private List<String> inProgressSchemas = new ArrayList<>(10);
+
+    /**
      * Convert the given map to a JSON node.
      *
      * @param values The values
@@ -520,14 +525,19 @@ abstract class AbstractOpenApiVisitor  {
             VisitorContext context,
             Element type,
             @Nullable Element definingElement) {
-        AnnotationValue<io.swagger.v3.oas.annotations.media.Schema> schemaValue = definingElement != null ? definingElement.getAnnotation(io.swagger.v3.oas.annotations.media.Schema.class) : null;
+        // To break the recursion
+        if (inProgressSchemas.contains(type.getSimpleName())) {
+            return null;
+        }
+        AnnotationValue<io.swagger.v3.oas.annotations.media.Schema> schemaValue = definingElement != null ? definingElement.getDeclaredAnnotation(io.swagger.v3.oas.annotations.media.Schema.class) : null;
         if (schemaValue == null) {
-            schemaValue = type.getAnnotation(io.swagger.v3.oas.annotations.media.Schema.class);
+            schemaValue = type.getDeclaredAnnotation(io.swagger.v3.oas.annotations.media.Schema.class);
         }
         Schema schema;
         Map<String, Schema> schemas = resolveSchemas(openAPI);
         if (schemaValue != null) {
             String schemaName = schemaValue.get("name", String.class).orElse(computeDefaultSchemaName(definingElement, type));
+            inProgressSchemas.add(schemaName);
             schema = schemas.get(schemaName);
             if (schema == null) {
                 JsonNode schemaJson = toJson(schemaValue.getValues(), context);
@@ -537,7 +547,7 @@ abstract class AbstractOpenApiVisitor  {
                     if (schema != null) {
                         if (schema instanceof ComposedSchema) {
                             final Optional<String[]> allOf = schemaValue.get("allOf", String[].class);
-                            if (allOf.isPresent()) {
+                            if (allOf.isPresent() && allOf.get().length > 0) {
                                 final String[] names = allOf.get();
                                 List<Schema> schemaList = namesToSchemas(mediaType, openAPI, context, names);
 
@@ -545,14 +555,14 @@ abstract class AbstractOpenApiVisitor  {
                             }
 
                             final Optional<String[]> anyOf = schemaValue.get("anyOf", String[].class);
-                            if (anyOf.isPresent()) {
+                            if (anyOf.isPresent() && anyOf.get().length > 0) {
                                 final String[] names = anyOf.get();
                                 List<Schema> schemaList = namesToSchemas(mediaType, openAPI, context, names);
                                 ((ComposedSchema) schema).anyOf(schemaList);
                             }
 
                             final Optional<String[]> oneof = schemaValue.get("oneOf", String[].class);
-                            if (oneof.isPresent()) {
+                            if (oneof.isPresent() && oneof.get().length > 0) {
                                 final String[] names = oneof.get();
                                 List<Schema> schemaList = namesToSchemas(mediaType, openAPI, context, names);
                                 ((ComposedSchema) schema).oneOf(schemaList);
@@ -571,6 +581,8 @@ abstract class AbstractOpenApiVisitor  {
                     }
                 } catch (JsonProcessingException e) {
                     context.warn("Error reading Swagger Parameter for element [" + type + "]: " + e.getMessage(), type);
+                } finally {
+                    inProgressSchemas.remove(schemaName);
                 }
             }
         } else {
@@ -610,7 +622,6 @@ abstract class AbstractOpenApiVisitor  {
                                     if (parentSchema != null) {
                                         ((ComposedSchema) schema).allOf(Collections.singletonList(parentSchema));
                                     }
-
                                     superType = superElement.getSuperType();
                                 }
                             }

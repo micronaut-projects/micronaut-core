@@ -18,6 +18,7 @@ package io.micronaut.inject.annotation
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.EachBean
 import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Primary
 import io.micronaut.context.annotation.Requirements
 import io.micronaut.context.annotation.Requires
@@ -176,8 +177,78 @@ class Test {
         BeanDefinition definition = classLoader.loadClass('test.$Test$ExecutorServiceDefinition').newInstance()
         expect:
         definition != null
+        definition.hasStereotype(Factory) // inherits the factory annotations as stereotypes
+        !definition.hasDeclaredAnnotation(Factory)
         !definition.hasDeclaredAnnotation(Singleton)
         definition.hasDeclaredAnnotation(Bean)
         definition.hasDeclaredAnnotation(EachBean)
+    }
+
+    void "test factory bean definition inherits returned objects metadata"() {
+        given:
+        ClassLoader classLoader = buildClassLoader("test.Test", '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import java.util.concurrent.*;
+import javax.inject.*;
+
+@Factory
+class Test {
+
+    @Bean
+    public Foo foo() {
+        return null;
+    }
+}
+
+@Singleton
+interface Foo {
+
+}
+
+''')
+        BeanDefinition definition = classLoader.loadClass('test.$Test$FooDefinition').newInstance()
+        expect:
+        definition != null
+        definition.hasStereotype(Singleton)
+        definition.hasDeclaredAnnotation(Bean)
+    }
+
+
+    void "test factory bean definition inherits returned objects metadata with inheritance"() {
+        given:
+        ClassLoader classLoader = buildClassLoader("test.Test", '''
+package test;
+
+import io.micronaut.context.annotation.*;
+import java.util.concurrent.*;
+import javax.inject.*;
+
+@Factory
+class Test {
+
+    @Bean
+    public Foo foo() {
+        return null;
+    }
+}
+
+
+interface Foo extends Bar {
+
+}
+
+@Singleton
+interface Bar {
+}
+
+
+''')
+        BeanDefinition definition = classLoader.loadClass('test.$Test$FooDefinition').newInstance()
+        expect:
+        definition != null
+        definition.hasStereotype(Singleton)
+        definition.hasDeclaredAnnotation(Bean)
     }
 }

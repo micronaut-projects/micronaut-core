@@ -503,7 +503,7 @@ class InjectTransform implements ASTTransformation, CompilationUnitAware {
             ClassNode declaringClass = methodNode.declaringClass
             AnnotationMetadata methodAnnotationMetadata = AstAnnotationUtils.getAnnotationMetadata(sourceUnit, methodNode)
             if (isFactoryClass && !isConstructor && methodAnnotationMetadata.hasDeclaredStereotype(Bean, Scope)) {
-                methodAnnotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit).buildForMethod(methodNode)
+                methodAnnotationMetadata = new GroovyAnnotationMetadataBuilder(sourceUnit).buildForParent(methodNode.returnType, methodNode, true)
                 if (annotationMetadata.hasDeclaredStereotype(Around)) {
                     visitExecutableMethod(declaringClass, methodNode, methodAnnotationMetadata, methodName, methodNode.isPublic())
                 }
