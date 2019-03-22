@@ -16,26 +16,27 @@
 package io.micronaut.context.exceptions;
 
 /**
- * thrown if service is in the processing of shutting down
+ * An exception that occurs if a bean context is attempted to be used
+ * before it has been started or after it has been shut down.
  *
  * @author Ryan Vanderwerf
- * @since 1.0
+ * @since 1.1.0
  */
-public class ApplicationStoppingException extends RuntimeException {
+public class BeanContextNotAvailableException extends BeanContextException {
 
     /**
      * thrown if service is in the processing of shutting down
      *
      * @param cause   The throwable
      */
-    public ApplicationStoppingException(Throwable cause) {
-        super("Application is not running or is shutting down.", cause);
+    public BeanContextNotAvailableException(Throwable cause) {
+        super("Bean context is not running or has been shut down.", cause);
     }
 
     /**
      * thrown if service is in the processing of shutting down
      */
-    public ApplicationStoppingException() {
-        super("Application is not running or is shutting down.");
+    public BeanContextNotAvailableException() {
+        super("Bean context is not running or has been shut down.");
     }
 }
