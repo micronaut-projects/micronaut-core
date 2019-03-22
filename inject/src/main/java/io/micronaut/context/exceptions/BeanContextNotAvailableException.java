@@ -25,7 +25,7 @@ package io.micronaut.context.exceptions;
 public class BeanContextNotAvailableException extends BeanContextException {
 
     /**
-     * Thrown if service is in the processing of shutting down or not running.
+     * Creates the exception with the default message.
      *
      * @param cause   The throwable
      */
@@ -34,7 +34,7 @@ public class BeanContextNotAvailableException extends BeanContextException {
     }
 
     /**
-     * Thrown if service is in the processing of shutting down or not running.
+     * Creates the exception with the default message.
      */
     public BeanContextNotAvailableException() {
         super("Bean context is not running or has been shut down.");
