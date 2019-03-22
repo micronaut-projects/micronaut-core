@@ -15,7 +15,6 @@
  */
 package io.micronaut.tracing.brave.sender;
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.client.LoadBalancerResolver;

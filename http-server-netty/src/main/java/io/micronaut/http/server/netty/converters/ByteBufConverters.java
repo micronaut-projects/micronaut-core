@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.netty.converters;
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.TypeConverter;

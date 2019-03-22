@@ -17,7 +17,6 @@ package io.micronaut.tracing.brave.instrument.http;
 
 import brave.Tracing;
 import brave.http.*;
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpAttributes;
