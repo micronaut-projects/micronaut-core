@@ -16,14 +16,10 @@
 
 package io.micronaut.validation.validator;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import javax.validation.ConstraintViolation;
-import java.util.Set;
-
 /**
- * Interface that implements a subset of the {@code javax.validation} specification without the parts that
- * depend on reflection.
+ * Extended version of the {@link javax.validation.Valid} interface for Micronaut's implementation.
+ *
+ * <p>The {@link #getConstraintsForClass(Class)} method is not supported by the implementation.</p>
  *
  * @author graemerocher
  * @since 1.2
@@ -31,66 +27,9 @@ import java.util.Set;
 public interface Validator extends javax.validation.Validator {
 
     /**
-     * Validates all constraints on {@code object}.
-     *
-     * @param object object to validate
-     * @param groups the group or list of groups targeted for validation (defaults to
-     *        {@link javax.validation.groups.Default})
-     * @param <T> the type of the object to validate
-     * @return constraint violations or an empty set if none
-     * @throws IllegalArgumentException if object is {@code null}
-     *         or if {@code null} is passed to the varargs groups
-     * @throws javax.validation.ValidationException if a non recoverable error happens
-     *         during the validation process
+     * Overridden variation that returns a {@link ExecutableMethodValidator}.
+     * @return The validator
      */
-    @Nonnull <T> Set<ConstraintViolation<T>> validate(@Nullable T object, @Nullable Class<?>... groups);
-
-    /**
-     * Validates all constraints placed on the property of {@code object}
-     * named {@code propertyName}.
-     *
-     * @param object object to validate
-     * @param propertyName property to validate (i.e. field and getter constraints)
-     * @param groups the group or list of groups targeted for validation (defaults to
-     *        {@link javax.validation.groups.Default})
-     * @param <T> the type of the object to validate
-     * @return constraint violations or an empty set if none
-     * @throws IllegalArgumentException if {@code object} is {@code null},
-     *         if {@code propertyName} is {@code null}, empty or not a valid object property
-     *         or if {@code null} is passed to the varargs groups
-     * @throws javax.validation.ValidationException if a non recoverable error happens
-     *         during the validation process
-     */
-    @Nonnull <T> Set<ConstraintViolation<T>> validateProperty(@Nullable T object,
-                                                              @Nonnull String propertyName,
-                                                              @Nullable Class<?>... groups);
-
-    /**
-     * Validates all constraints placed on the property named {@code propertyName}
-     * of the class {@code beanType} would the property value be {@code value}.
-     * <p>
-     * {@link ConstraintViolation} objects return {@code null} for
-     * {@link ConstraintViolation#getRootBean()} and
-     * {@link ConstraintViolation#getLeafBean()}.
-     *
-     * @param beanType the bean type
-     * @param propertyName property to validate
-     * @param value property value to validate
-     * @param groups the group or list of groups targeted for validation (defaults to
-     *        {@link javax.validation.groups.Default}).
-     * @param <T> the type of the object to validate
-     * @return constraint violations or an empty set if none
-     * @throws IllegalArgumentException if {@code beanType} is {@code null},
-     *         if {@code propertyName} is {@code null}, empty or not a valid object property
-     *         or if {@code null} is passed to the varargs groups
-     * @throws javax.validation.ValidationException if a non recoverable error happens
-     *         during the validation process
-     */
-    @Nonnull <T> Set<ConstraintViolation<T>> validateValue(@Nonnull Class<T> beanType,
-                                                           @Nonnull String propertyName,
-                                                           @Nullable Object value,
-                                                           @Nullable Class<?>... groups);
-
     @Override
     ExecutableMethodValidator forExecutables();
 }

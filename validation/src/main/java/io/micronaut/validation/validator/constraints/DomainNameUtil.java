@@ -94,11 +94,7 @@ public final class DomainNameUtil {
             return false;
         }
 
-        if (asciiString.length() > MAX_DOMAIN_PART_LENGTH) {
-            return false;
-        }
-
-        return true;
+        return asciiString.length() <= MAX_DOMAIN_PART_LENGTH;
     }
 
 }
