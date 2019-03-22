@@ -13,16 +13,10 @@ import javax.validation.constraints.Size;
  * @author graemerocher
  * @since 1.2
  */
-public abstract class AbstractSizeValidator<T> implements ConstraintValidator<Size, T> {
-
-    @Nonnull
+@FunctionalInterface
+public interface SizeValidator<T> extends ConstraintValidator<Size, T> {
     @Override
-    public final Class<Size> getAnnotationType() {
-        return Size.class;
-    }
-
-    @Override
-    public final boolean isValid(@Nullable T value, @Nonnull AnnotationValue<Size> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
+    default boolean isValid(@Nullable T value, @Nonnull AnnotationValue<Size> annotationMetadata, @Nonnull ConstraintValidatorContext context) {
         if (value == null) {
             return true; // null considered valid according to spec
         }
@@ -37,5 +31,5 @@ public abstract class AbstractSizeValidator<T> implements ConstraintValidator<Si
      * @param value The value
      * @return The size
      */
-    protected abstract int getSize(@Nonnull T value);
+    int getSize(@Nonnull T value);
 }

@@ -10,9 +10,9 @@ import javax.inject.Singleton;
  * @since 1.2
  */
 @Singleton
-public class SizeFloatArrayValidator extends AbstractSizeValidator<float[]> {
+public class SizeFloatArrayValidator implements SizeValidator<float[]> {
     @Override
-    protected int getSize(@Nonnull float[] value) {
+    public int getSize(@Nonnull float[] value) {
         return value.length;
     }
 }

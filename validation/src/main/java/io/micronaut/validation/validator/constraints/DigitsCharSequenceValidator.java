@@ -11,9 +11,9 @@ import java.math.BigDecimal;
  * @since 1.2
  */
 @Singleton
-public class DigitsCharSequenceValidator extends AbstractDigitsValidator<CharSequence> {
+public class DigitsCharSequenceValidator implements DigitsValidator<CharSequence> {
     @Override
-    protected BigDecimal getBigDecimal(@Nonnull CharSequence value) {
+    public BigDecimal getBigDecimal(@Nonnull CharSequence value) {
         return new BigDecimal(value.toString());
     }
 }

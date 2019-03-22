@@ -11,10 +11,10 @@ import java.math.BigDecimal;
  * @since 1.2
  */
 @Singleton
-public class DigitsNumberValidator extends AbstractDigitsValidator<Number> {
+public class DigitsNumberValidator implements DigitsValidator<Number> {
 
     @Override
-    protected BigDecimal getBigDecimal(@Nonnull Number value) {
+    public BigDecimal getBigDecimal(@Nonnull Number value) {
         if (value instanceof BigDecimal) {
             return (BigDecimal) value;
         }
