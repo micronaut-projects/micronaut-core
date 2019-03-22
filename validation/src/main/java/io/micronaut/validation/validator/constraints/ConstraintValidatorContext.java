@@ -5,7 +5,7 @@ import javax.validation.ClockProvider;
 import java.time.Clock;
 
 /**
- * The constrain validation context object.
+ * Subset of the {@link javax.validation.ConstraintValidatorContext} interface without the unnecessary parts.
  *
  * @author graemerocher
  * @since 1.2
