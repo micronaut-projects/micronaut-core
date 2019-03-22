@@ -74,7 +74,6 @@ public class ResourceLoaderFactory {
      * @return The class path resource loader
      */
     @Singleton
-    @Bean
     @BootstrapContextCompatible
     protected @Nonnull ClassPathResourceLoader getClassPathResourceLoader() {
         return new DefaultClassPathResourceLoader(classLoader);

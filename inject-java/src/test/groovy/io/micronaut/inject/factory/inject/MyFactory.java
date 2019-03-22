@@ -15,8 +15,8 @@
  */
 package io.micronaut.inject.factory.inject;
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Prototype;
 
 import javax.inject.Inject;
 
@@ -27,7 +27,7 @@ public class MyFactory {
     MyService myService;
 
 
-    @Bean
+    @Prototype
     MyService myService() {
         return new MyService();
     }

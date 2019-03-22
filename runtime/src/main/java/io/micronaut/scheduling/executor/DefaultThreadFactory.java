@@ -35,7 +35,6 @@ public class DefaultThreadFactory {
     /**
      * @return The default thread factory
      */
-    @Bean
     @Singleton
     @Primary
     ThreadFactory threadFactory() {

@@ -37,7 +37,6 @@ public class IOExecutorServiceConfig {
      * @return The default thread pool configurations
      */
     @Singleton
-    @Bean
     @Named(TaskExecutors.IO)
     ExecutorConfiguration configuration() {
         return UserExecutorConfiguration.of(ExecutorType.CACHED);

@@ -15,6 +15,8 @@
  */
 package io.micronaut.runtime.context.scope;
 
+import io.micronaut.context.annotation.Bean;
+
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;

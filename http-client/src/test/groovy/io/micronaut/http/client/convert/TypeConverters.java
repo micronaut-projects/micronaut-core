@@ -24,7 +24,6 @@ import javax.inject.Singleton;
 @Factory
 public class TypeConverters {
 
-    @Bean
     @Singleton
     public TypeConverter<String, Bar> stringToBarConverter() {
         return TypeConverter.of(
@@ -34,7 +33,6 @@ public class TypeConverters {
         );
     }
 
-    @Bean
     @Singleton
     public TypeConverter<String, Foo> stringToFooConverter() {
         return TypeConverter.of(

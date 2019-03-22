@@ -44,7 +44,6 @@ public class AWSLambdaAsyncClientFactory {
      * The client returned from a builder.
      * @return client object
      */
-    @Bean
     @Refreshable
     @Requires(beans = AWSLambdaConfiguration.class)
     AWSLambdaAsync awsLambdaAsyncClient() {

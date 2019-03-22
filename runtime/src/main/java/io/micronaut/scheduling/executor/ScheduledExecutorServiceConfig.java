@@ -38,7 +38,6 @@ public class ScheduledExecutorServiceConfig {
      * @return The executor configurations
      */
     @Singleton
-    @Bean
     @Named(TaskExecutors.SCHEDULED)
     ExecutorConfiguration configuration() {
         return UserExecutorConfiguration.of(ExecutorType.SCHEDULED);

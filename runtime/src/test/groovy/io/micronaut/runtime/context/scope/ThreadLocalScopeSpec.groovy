@@ -243,7 +243,7 @@ class A2Impl implements IA2 {
 
 @Factory
 class  IA2Factory {
-    @Bean
+
     @ThreadLocal
     IA2 a() {
         return new A2Impl()

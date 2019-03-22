@@ -68,7 +68,6 @@ public class ValidatorFactoryProvider {
      * @return validator factory
      */
     @Singleton
-    @Bean
     @Requires(classes = HibernateValidator.class)
     ValidatorFactory validatorFactory(Optional<Environment> environment) {
         Configuration validatorConfiguration = Validation.byDefaultProvider()

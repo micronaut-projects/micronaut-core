@@ -61,7 +61,6 @@ public class NettyThreadFactory {
      *
      * @return The thread factory
      */
-    @Bean
     @Singleton
     @Named(NAME)
     ThreadFactory nettyThreadFactory() {

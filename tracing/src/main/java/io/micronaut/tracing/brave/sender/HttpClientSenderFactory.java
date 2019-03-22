@@ -49,7 +49,6 @@ public class HttpClientSenderFactory {
      * @param loadBalancerResolver A resolver capable of resolving references to services into a concrete loadbalance
      * @return The {@link Sender}
      */
-    @Bean
     @Singleton
     @Requires(missingBeans = Sender.class)
     Sender zipkinSender(Provider<LoadBalancerResolver> loadBalancerResolver) {

@@ -41,7 +41,6 @@ public class MediaTypeCodecRegistryFactory {
      */
     @Singleton
     @Primary
-    @Bean
     @BootstrapContextCompatible
     MediaTypeCodecRegistry mediaTypeCodecRegistry(List<MediaTypeCodec> codecs) {
         return MediaTypeCodecRegistry.of(codecs);
