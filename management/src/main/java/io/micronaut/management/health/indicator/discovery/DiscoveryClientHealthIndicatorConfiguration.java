@@ -24,12 +24,14 @@ import static io.micronaut.management.health.indicator.discovery.DiscoveryClient
 
 /**
  * Enables the user to enable or disable the health indicator.
- *
+ * 
+ * The default value is true. If you want to disable the indicator add the
+ * configuration value discovery-client.indicator.enabled = false
  * @author rvanderwerf
  * @since 1.1.0
  */
 @ConfigurationProperties(PREFIX)
-@Requires(property = PREFIX + ".enabled", value = StringUtils.TRUE, defaultValue = StringUtils.TRUE)
+@Requires(property = PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 public class DiscoveryClientHealthIndicatorConfiguration implements Toggleable {
 
     static final String PREFIX = "discovery-client.indicator";
@@ -37,7 +39,8 @@ public class DiscoveryClientHealthIndicatorConfiguration implements Toggleable {
     private boolean enabled = true;
 
     /**
-     * @return {@code true} If health indicator should be enabled.
+     * Health indicator is enabled. Default is true.
+     * @return {@code true} If health indicator should be enabled. Default is true.
      */
     @Override
     public boolean isEnabled() {
@@ -45,9 +48,9 @@ public class DiscoveryClientHealthIndicatorConfiguration implements Toggleable {
     }
 
     /**
-     * If health indicator should be enabled.
+     * If health indicator should be enabled. Default is true.
      *
-     * @param enabled True If health indicator should be enabled.
+     * @param enabled True If health indicator should be enabled. Default is true.
      */
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
