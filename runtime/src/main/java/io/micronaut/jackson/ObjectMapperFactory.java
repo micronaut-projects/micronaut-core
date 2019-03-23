@@ -74,7 +74,6 @@ public class ObjectMapperFactory {
      * @param jsonFactory          The JSON factory
      * @return The {@link ObjectMapper}
      */
-    @Bean
     @Singleton
     @Primary
     @BootstrapContextCompatible

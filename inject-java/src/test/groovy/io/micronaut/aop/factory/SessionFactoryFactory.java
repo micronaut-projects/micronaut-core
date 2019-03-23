@@ -15,8 +15,8 @@
  */
 package io.micronaut.aop.factory;
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Prototype;
 import org.hibernate.SessionFactory;
 import org.hibernate.engine.spi.SessionFactoryDelegatingImpl;
 import io.micronaut.aop.simple.Mutating;
@@ -29,7 +29,7 @@ import io.micronaut.aop.simple.Mutating;
 public class SessionFactoryFactory {
 
     @Mutating("name")
-    @Bean
+    @Prototype
     SessionFactory sessionFactory() {
         return new SessionFactoryDelegatingImpl(null);
     }

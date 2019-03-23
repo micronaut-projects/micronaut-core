@@ -16,8 +16,8 @@
 package io.micronaut.inject.value
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Prototype
 import io.micronaut.context.annotation.Value
 import spock.lang.Specification
 
@@ -58,12 +58,13 @@ class FactoryWithValueSpec extends Specification {
 
     @Factory
     static class MyFactory {
-        @Bean
+
+        @Prototype
         A newA(@Value('${foo.bar}') int port) {
             return new A(port)
         }
 
-        @Bean
+        @Prototype
         B newB(A a, @Value('${foo.bar}') int port) {
             return new B(a, port)
         }

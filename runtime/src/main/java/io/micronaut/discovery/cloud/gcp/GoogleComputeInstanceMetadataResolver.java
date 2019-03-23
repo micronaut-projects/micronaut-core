@@ -35,7 +35,6 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.*;
-import static io.micronaut.discovery.cloud.ComputeInstanceMetadataResolverUtils.readMetadataUrl;
 
 /**
  * Resolves {@link ComputeInstanceMetadata} for Google Cloud Platform.

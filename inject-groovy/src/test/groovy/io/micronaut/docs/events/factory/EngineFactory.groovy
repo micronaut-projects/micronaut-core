@@ -37,7 +37,6 @@ class EngineFactory {
         engine = new V8Engine(rodLength: rodLength) // <2>
     }
 
-    @Bean
     @Singleton
     Engine v8Engine() {
         return engine // <3>

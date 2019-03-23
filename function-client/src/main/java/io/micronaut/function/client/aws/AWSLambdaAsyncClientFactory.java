@@ -17,7 +17,6 @@ package io.micronaut.function.client.aws;
 
 import com.amazonaws.services.lambda.AWSLambdaAsync;
 import com.amazonaws.services.lambda.AWSLambdaAsyncClientBuilder;
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.runtime.context.scope.Refreshable;
@@ -44,7 +43,6 @@ public class AWSLambdaAsyncClientFactory {
      * The client returned from a builder.
      * @return client object
      */
-    @Bean
     @Refreshable
     @Requires(beans = AWSLambdaConfiguration.class)
     AWSLambdaAsync awsLambdaAsyncClient() {

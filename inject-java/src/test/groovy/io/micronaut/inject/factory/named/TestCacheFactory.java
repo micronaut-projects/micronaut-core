@@ -38,14 +38,12 @@ public class TestCacheFactory {
             .expireAfterWrite(30, TimeUnit.DAYS)
             .build();
 
-    @Bean
     @Singleton
     @Named("orgRepositoryCache")
     public Cache<String, Flowable<String>> orgRepositoryCache() {
         return orgRepoCache;
     }
 
-    @Bean
     @Singleton
     @Named("repositoryCache")
     public Cache<String, Maybe<String>> repositoryCache() {

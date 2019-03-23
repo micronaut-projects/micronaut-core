@@ -68,7 +68,7 @@ This behaviour is more efficient as only one instance of the bean is required, h
 The semantics of AOP advice when applied to <<factories,Bean Factories>> differs to regular beans, with the following rules applying:
 
 1. AOP advice applied at the class level of a ann:context.annotation.Factory[] bean will apply the advice to the factory itself and not to any beans defined with the ann:context.annotation.Bean[] annotation.
-2. AOP advice applied on a method annotated with ann:context.annotation.Bean[] will apply the AOP advice to the bean that the factory produces.
+2. AOP advice applied on a method annotated with a bean scope will apply the AOP advice to the bean that the factory produces.
 
 Consider the following two examples:
 
@@ -79,7 +79,7 @@ Consider the following two examples:
 @Factory
 class MyFactory {
 
-    @Bean
+    @Prototype
     MyBean myBean() {
         return new MyBean();
     }
@@ -96,7 +96,7 @@ Now consider this example:
 @Factory
 class MyFactory {
 
-    @Bean
+    @Prototype
     @Cacheable("my-cache")
     MyBean myBean() {
         return new MyBean();
