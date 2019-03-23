@@ -42,7 +42,6 @@ class ClientSpecificLoggerSpec extends Specification {
 
     )
 
-    @AutoCleanup
     @Shared
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 

@@ -39,7 +39,6 @@ class MaxResponseSizeSpec extends Specification {
     )
 
     @Shared
-    @AutoCleanup
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     @Shared
