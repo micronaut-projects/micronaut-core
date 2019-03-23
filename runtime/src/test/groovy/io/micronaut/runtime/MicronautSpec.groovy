@@ -16,8 +16,8 @@
 package io.micronaut.runtime
 
 import io.micronaut.context.ApplicationContext
-import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Prototype
 import spock.lang.Specification
 
 /**
@@ -42,7 +42,7 @@ class MicronautSpec extends Specification {
             Micronaut.run(Application, args)
         }
 
-        @Bean
+        @Prototype
         A a() { new A() }
     }
 

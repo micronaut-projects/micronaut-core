@@ -16,9 +16,9 @@
 package io.micronaut.aop.factory
 
 import io.micronaut.aop.interceptors.Mutating
-import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Primary
+import io.micronaut.context.annotation.Prototype
 
 import javax.inject.Named
 
@@ -28,14 +28,15 @@ import javax.inject.Named
  */
 @Factory
 class ConcreteClassFactory {
-    @Bean
+
+    @Prototype
     @Mutating("name")
     @Primary
     ConcreteClass concreteClass() {
         return new ConcreteClass(new AnotherClass())
     }
 
-    @Bean
+    @Prototype
     @Mutating("name")
     @Named("another")
     ConcreteClass anotherImpl() {

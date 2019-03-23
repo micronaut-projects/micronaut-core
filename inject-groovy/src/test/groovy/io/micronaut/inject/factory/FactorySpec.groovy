@@ -19,6 +19,7 @@ import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Prototype
 import spock.lang.Specification
 
 import javax.annotation.PostConstruct
@@ -90,7 +91,6 @@ class FactorySpec extends Specification {
             name = name.toUpperCase()
         }
 
-        @Bean
         @Singleton
         B get() {
             assert postConstructCalled : "post construct should have been called"
@@ -100,7 +100,7 @@ class FactorySpec extends Specification {
             return new B(name: name )
         }
 
-        @Bean
+        @Prototype
         C buildC(B b) {
             return new C(b:b)
         }

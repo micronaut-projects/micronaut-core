@@ -15,7 +15,6 @@
  */
 package io.micronaut.scheduling.executor;
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Primary;
 
@@ -35,7 +34,6 @@ public class DefaultThreadFactory {
     /**
      * @return The default thread factory
      */
-    @Bean
     @Singleton
     @Primary
     ThreadFactory threadFactory() {

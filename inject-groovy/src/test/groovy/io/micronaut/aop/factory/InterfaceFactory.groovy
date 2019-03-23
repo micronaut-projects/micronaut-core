@@ -16,9 +16,9 @@
 package io.micronaut.aop.factory
 
 import io.micronaut.aop.interceptors.Mutating
-import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
 import io.micronaut.context.annotation.Primary
+import io.micronaut.context.annotation.Prototype
 
 import javax.inject.Named
 
@@ -29,14 +29,14 @@ import javax.inject.Named
 @Factory
 class InterfaceFactory {
 
-    @Bean
+    @Prototype
     @Mutating("name")
     @Primary
     InterfaceClass interfaceClass() {
         return new InterfaceImpl()
     }
 
-    @Bean
+    @Prototype
     @Mutating("name")
     @Named("another")
     InterfaceClass anotherImpl() {

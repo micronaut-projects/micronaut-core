@@ -28,7 +28,6 @@ import javax.inject.Singleton
 @Factory
 internal class EngineFactory {
 
-    @Bean
     @Singleton
     fun v8Engine(crankShaft: CrankShaft): Engine {
         return V8Engine(crankShaft)
