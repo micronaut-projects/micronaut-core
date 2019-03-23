@@ -185,7 +185,7 @@ public class DefaultValidator implements Validator {
                     final String messageTemplate = (String) annotationValue.get("message", String.class)
                             .orElse("{" + annotationValue.getAnnotationName() +  ".message}");
                     overallViolations.add(
-                            new DefaultConstraintViolation<>(
+                            new BeanConstraintViolation<>(
                                     object,
                                     (Class<T>) object.getClass(),
                                     propertyValue,
@@ -299,7 +299,7 @@ public class DefaultValidator implements Validator {
      *
      * @param <T> The bean type.
      */
-    private final class DefaultConstraintViolation<T> implements ConstraintViolation<T> {
+    private final class BeanConstraintViolation<T> implements ConstraintViolation<T> {
 
         private final T rootBean;
         private final Object invalidValue;
@@ -308,7 +308,7 @@ public class DefaultValidator implements Validator {
         private final Path path;
         private final Class<T> rootBeanClass;
 
-        private DefaultConstraintViolation(
+        private BeanConstraintViolation(
                 @Nullable T rootBean,
                 @Nullable Class<T> rootBeanClass,
                 Object invalidValue,
