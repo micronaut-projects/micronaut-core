@@ -40,7 +40,6 @@ class HeadersSpec extends Specification {
     )
 
     @Shared
-    @AutoCleanup
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test send and receive header"() {

@@ -44,7 +44,6 @@ class ReadTimeoutSpec extends Specification {
     )
 
     @Shared
-    @AutoCleanup
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     @Shared
@@ -84,6 +83,7 @@ class ReadTimeoutSpec extends Specification {
         result == result2
 
         cleanup:
+        client.close()
         clientContext.close()
     }
 
@@ -101,7 +101,7 @@ class ReadTimeoutSpec extends Specification {
         result == 'success'
 
         cleanup:
-        server.stop()
+        client.close()
         clientContext.close()
     }
 
