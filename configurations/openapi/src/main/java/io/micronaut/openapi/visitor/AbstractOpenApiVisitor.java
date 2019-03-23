@@ -54,10 +54,7 @@ import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.PathItem;
 import io.swagger.v3.oas.models.Paths;
-import io.swagger.v3.oas.models.media.ArraySchema;
-import io.swagger.v3.oas.models.media.ComposedSchema;
-import io.swagger.v3.oas.models.media.ObjectSchema;
-import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.media.*;
 import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.reactivestreams.Publisher;
 
@@ -315,6 +312,18 @@ abstract class AbstractOpenApiVisitor  {
                     schema = getPrimitiveType(typeName);
                 } else if (primitiveType != null) {
                     schema = primitiveType.createProperty();
+                } else if (type.isAssignable(Map.class.getName())) {
+                    schema = new MapSchema();
+                    if (type.getTypeArguments().isEmpty()) {
+                        schema.setAdditionalProperties(true);
+                    } else {
+                        Element valueType = type.getTypeArguments().get("V");
+                        Schema additionalPropertiesSchema = getPrimitiveType(valueType.getName());
+                        if (additionalPropertiesSchema == null) {
+                            additionalPropertiesSchema = getSchemaDefinition(mediaType, openAPI, context, valueType, definingElement);
+                        }
+                        schema.setAdditionalProperties(additionalPropertiesSchema);
+                    }
                 } else if (type.isIterable()) {
                     Optional<ClassElement> componentType = type.getFirstTypeArgument();
                     if (componentType.isPresent()) {
