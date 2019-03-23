@@ -2125,6 +2125,10 @@ public class DefaultBeanContext implements BeanContext {
                 if (!beanDefinition.isIterable()) {
                     BeanKey primaryBeanKey = new BeanKey<>(createdType, null);
                     singletonObjects.put(primaryBeanKey, registration);
+                    if (qualifier != null) {
+                        BeanKey qualifiedKey = new BeanKey<>(beanType, qualifier);
+                        singletonObjects.put(qualifiedKey, registration);
+                    }
                 } else {
                     if (beanDefinition.isPrimary()) {
                         BeanKey primaryBeanKey = new BeanKey<>(beanType, null);
@@ -2212,7 +2216,10 @@ public class DefaultBeanContext implements BeanContext {
 
     @NotNull
     private Collection<BeanDefinitionReference> resolveTypeIndex(Class<?> indexedType) {
-        return beanIndex.computeIfAbsent(indexedType, aClass -> new ArrayList<>(20));
+        return beanIndex.computeIfAbsent(indexedType, aClass -> {
+            indexedTypes.add(indexedType);
+            return new ArrayList<>(20);
+        });
     }
 
     @SuppressWarnings("unchecked")
