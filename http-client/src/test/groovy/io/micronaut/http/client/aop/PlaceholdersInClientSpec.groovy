@@ -37,7 +37,6 @@ class PlaceholdersInClientSpec extends Specification {
     )
 
     @Shared
-    @AutoCleanup
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test placeholder in @Client value"() {

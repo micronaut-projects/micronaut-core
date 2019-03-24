@@ -43,7 +43,6 @@ class DataStreamSpec extends Specification {
     @AutoCleanup
     ApplicationContext context = ApplicationContext.run()
 
-    @AutoCleanup
     @Shared
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 

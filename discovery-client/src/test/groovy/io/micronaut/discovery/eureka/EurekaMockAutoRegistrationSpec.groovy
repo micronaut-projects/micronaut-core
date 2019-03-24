@@ -138,6 +138,11 @@ class EurekaMockAutoRegistrationSpec extends Specification {
             instanceInfo.status == InstanceInfo.Status.UP
         }
 
+        when:"test validation"
+        eurekaClient.register("", null)
+
+        then:"Invalid arguments thrown"
+        thrown(ConstraintViolationException)
 
         when: "The application is stopped"
         application?.stop()
@@ -146,12 +151,6 @@ class EurekaMockAutoRegistrationSpec extends Specification {
         conditions.eventually {
             MockEurekaServer.instances[NameUtils.hyphenate(serviceId)].size() == 0
         }
-
-        when:"test validation"
-        eurekaClient.register("", null)
-
-        then:"Invalid arguments thrown"
-        thrown(ConstraintViolationException)
 
         cleanup:
         eurekaServer?.stop()
