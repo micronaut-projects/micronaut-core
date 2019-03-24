@@ -32,7 +32,6 @@ class UploadBrowserSpec extends GebSpec {
             ], Environment.TEST)
 
     @Shared
-    @AutoCleanup
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     @Requires({sys['geb.env']})
