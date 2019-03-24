@@ -50,8 +50,8 @@ class HelloControllerSpec() {
 
     @AfterTest
     fun teardown() {
-        server?.close()
         client?.close()
+        server?.close()
     }
 
     @Test

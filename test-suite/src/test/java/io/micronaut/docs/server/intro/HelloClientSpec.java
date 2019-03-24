@@ -31,7 +31,7 @@ public class HelloClientSpec  {
                 , Environment.TEST);
         /*
 // tag::embeddedServer[]
-        server = ApplicationContext.run(EmbeddedServer) // <1>
+        server = ApplicationContext.run(EmbeddedServer.class) // <1>
 // end::embeddedServer[]
         */
         // tag::class-end[]
@@ -39,6 +39,7 @@ public class HelloClientSpec  {
                 .getApplicationContext()
                 .getBean(HelloClient.class);// <2>
     }
+
     @AfterClass
     public static void stopServer() {
         if (server != null) {

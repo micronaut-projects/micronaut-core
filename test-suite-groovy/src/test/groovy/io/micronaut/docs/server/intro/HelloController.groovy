@@ -27,6 +27,7 @@ import io.micronaut.http.annotation.Get
 // tag::class[]
 @Controller('/hello') // <1>
 class HelloController {
+
     @Get(produces = MediaType.TEXT_PLAIN) // <2>
     String index() {
         'Hello World' // <3>
