@@ -20,6 +20,7 @@ import io.micronaut.configuration.jmx.context.DynamicMBeanFactory;
 import io.micronaut.configuration.jmx.context.NameGenerator;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.event.ShutdownEvent;
 import io.micronaut.context.event.StartupEvent;
 import io.micronaut.context.processor.ExecutableMethodProcessor;
 import io.micronaut.core.async.SupplierUtil;
@@ -28,6 +29,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.runtime.event.annotation.EventListener;
+import io.micronaut.runtime.server.event.ServerShutdownEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +38,7 @@ import javax.inject.Singleton;
 import javax.management.*;
 import java.util.*;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * Registers endpoint methods with JMX.
@@ -44,12 +47,13 @@ import java.util.function.Supplier;
  * @since 1.0
  */
 @Singleton
-@Requires(property = JmxConfiguration.PREFIX + ".registerEndpoints", defaultValue = StringUtils.TRUE)
+@Requires(property = JmxConfiguration.PREFIX + ".register-endpoints", notEquals = StringUtils.FALSE)
 public class EndpointMethodJmxProcessor implements ExecutableMethodProcessor<Endpoint> {
 
     private static final Logger LOG = LoggerFactory.getLogger(EndpointMethodJmxProcessor.class);
 
     private final Map<BeanDefinition, List<ExecutableMethod>> methods = new HashMap<>(5);
+    private final List<MBeanDefinition> mBeanDefinitions = new ArrayList<>(5);
 
     private final MBeanServer mBeanServer;
     private final NameGenerator nameGenerator;
@@ -91,20 +95,54 @@ public class EndpointMethodJmxProcessor implements ExecutableMethodProcessor<End
     @EventListener
     void onStartup(StartupEvent event) {
 
-        for (Map.Entry<BeanDefinition, List<ExecutableMethod>> entry: methods.entrySet()) {
+        mBeanDefinitions.addAll(methods.entrySet().stream().map(entry -> {
             BeanDefinition beanDefinition = entry.getKey();
+            try {
+                return new MBeanDefinition(beanDefinition, entry.getValue());
+            } catch (JMException e) {
+                LOG.error("Failed to generate an MBean name for the endpoint " + beanDefinition.getBeanType().getName(), e);
+            }
+            return null;
+        }).filter(Objects::nonNull).collect(Collectors.toList()));
+
+        for (MBeanDefinition mBeanDefinition: mBeanDefinitions) {
+            BeanDefinition beanDefinition = mBeanDefinition.beanDefinition;
 
             try {
                 Supplier<Object> instanceSupplier = SupplierUtil.memoized(() -> {
                     return beanContext.getBean(beanDefinition.getBeanType());
                 });
 
-                Object mBean = mBeanFactory.createMBean(beanDefinition, entry.getValue(), instanceSupplier);
-
-                mBeanServer.registerMBean(mBean, nameGenerator.generate(beanDefinition));
+                Object mBean = mBeanFactory.createMBean(beanDefinition, mBeanDefinition.methods, instanceSupplier);
+                mBeanServer.registerMBean(mBean, mBeanDefinition.objectName);
             } catch (JMException e) {
                 LOG.error("Failed to register an MBean for the endpoint " + beanDefinition.getBeanType().getName(), e);
             }
+        }
+    }
+
+    @EventListener
+    void onShutdown(ShutdownEvent event) {
+        for (MBeanDefinition mBeanDefinition: mBeanDefinitions) {
+            BeanDefinition beanDefinition = mBeanDefinition.beanDefinition;
+            try {
+                mBeanServer.unregisterMBean(mBeanDefinition.objectName);
+            } catch (JMException e) {
+                LOG.error("Failed to unregister an MBean for the endpoint " + beanDefinition.getBeanType().getName(), e);
+            }
+
+        }
+    }
+
+    private class MBeanDefinition {
+        ObjectName objectName;
+        BeanDefinition beanDefinition;
+        List<ExecutableMethod> methods;
+
+        MBeanDefinition(BeanDefinition beanDefinition, List<ExecutableMethod> methods) throws JMException {
+            this.objectName = nameGenerator.generate(beanDefinition);
+            this.beanDefinition = beanDefinition;
+            this.methods = methods;
         }
     }
 }
