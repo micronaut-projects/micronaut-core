@@ -19,6 +19,8 @@ package io.micronaut.views.thymeleaf;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.views.ViewsConfiguration;
 import org.thymeleaf.TemplateEngine;
+import org.thymeleaf.context.IEngineContextFactory;
+import org.thymeleaf.linkbuilder.ILinkBuilder;
 import org.thymeleaf.templateresolver.AbstractConfigurableTemplateResolver;
 import org.thymeleaf.templateresolver.ClassLoaderTemplateResolver;
 import org.thymeleaf.templateresolver.ITemplateResolver;
@@ -63,11 +65,16 @@ public class ThymeleafFactory {
      * Constructs the template engine.
      *
      * @param templateResolver The template resolver
+     * @param engineContextFactory The engine context factory
+     * @param linkBuilder The link builder
      * @return The template engine
      */
     @Singleton
-    public TemplateEngine templateEngine(ITemplateResolver templateResolver) {
+    public TemplateEngine templateEngine(ITemplateResolver templateResolver,
+            IEngineContextFactory engineContextFactory, ILinkBuilder linkBuilder) {
         TemplateEngine engine = new TemplateEngine();
+        engine.setEngineContextFactory(engineContextFactory);
+        engine.setLinkBuilder(linkBuilder);
         engine.setTemplateResolver(templateResolver);
         return engine;
     }

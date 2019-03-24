@@ -198,4 +198,36 @@ class ThymeleafViewRendererSpec extends Specification {
         e.response.getBody(String).get().contains("<h1>I'm sorry, <span>sdelamo</span>! You've reached a dead end. Status: <span></span>. Exception: <span>global</span></h1>")
         
     }
+
+    def "invoking /views/relative-link renders thymeleaf template with relative link"() {
+        when:
+            HttpResponse<String> rsp = client.toBlocking().exchange('/views/relative-link', String)
+
+        then:
+            noExceptionThrown()
+            rsp.status() == HttpStatus.OK
+
+        when:
+            String body = rsp.body()
+
+        then:
+            body
+            rsp.body().contains("<a href=\"/views/relative-link/to-resolve\">Relative Link</a>")
+    }
+
+    def "invoking /views/relative-link/ renders thymeleaf template with relative link"() {
+        when:
+            HttpResponse<String> rsp = client.toBlocking().exchange('/views/relative-link/', String)
+
+        then:
+            noExceptionThrown()
+            rsp.status() == HttpStatus.OK
+
+        when:
+            String body = rsp.body()
+
+        then:
+            body
+            rsp.body().contains("<a href=\"/views/relative-link/to-resolve\">Relative Link</a>")
+    }
 }
