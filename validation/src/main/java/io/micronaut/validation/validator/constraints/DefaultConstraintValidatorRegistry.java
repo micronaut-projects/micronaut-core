@@ -22,7 +22,7 @@ import java.util.Optional;
 @Singleton
 @Requires(missingBeans = ConstraintValidatorRegistry.class)
 @Primary
-public class BeanContextConstraintValidatorRegistry implements ConstraintValidatorRegistry {
+public class DefaultConstraintValidatorRegistry implements ConstraintValidatorRegistry {
 
     private final BeanContext beanContext;
 
@@ -31,7 +31,7 @@ public class BeanContextConstraintValidatorRegistry implements ConstraintValidat
      *
      * @param beanContext The bean context
      */
-    protected BeanContextConstraintValidatorRegistry(BeanContext beanContext) {
+    protected DefaultConstraintValidatorRegistry(BeanContext beanContext) {
         this.beanContext = beanContext;
     }
 

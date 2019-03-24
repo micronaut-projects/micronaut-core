@@ -41,7 +41,7 @@ public interface BeanMap<T> extends Map<String, Object> {
      * @param <B> type Generic
      * @return The bean map
      */
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "deprecation"})
     static @Nonnull <B> BeanMap<B> of(@Nonnull B bean) {
         ArgumentUtils.requireNonNull("bean", bean);
         return BeanIntrospector.SHARED.findIntrospection(bean.getClass())
