@@ -47,7 +47,6 @@ class ClientScopeSpec extends Specification {
             'micronaut.http.clients.myService.url': "http://localhost:$port"
     )
 
-    @AutoCleanup
     @Shared
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
