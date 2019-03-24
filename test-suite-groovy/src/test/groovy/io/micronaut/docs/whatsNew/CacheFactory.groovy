@@ -15,7 +15,6 @@ import javax.inject.Singleton
 class CacheFactory {
 
     @Singleton
-    @Bean
     CacheManager cacheManager() {
         CacheManager cacheManager = Caching.cachingProvider.cacheManager
         cacheManager.createCache("my-cache", new MutableConfiguration())

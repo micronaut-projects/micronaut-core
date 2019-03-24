@@ -19,6 +19,7 @@ import io.micronaut.context.BeanContext
 import io.micronaut.context.DefaultBeanContext
 import io.micronaut.context.annotation.Bean
 import io.micronaut.context.annotation.Factory
+import io.micronaut.context.annotation.Prototype
 import io.micronaut.context.event.BeanInitializedEventListener
 import io.micronaut.context.event.BeanInitializingEvent
 import spock.lang.Specification
@@ -83,7 +84,7 @@ class BeanInitializingWithFactorySpec extends Specification {
             name = name.toUpperCase()
         }
 
-        @Bean
+        @Prototype
         B get() {
             getCalled = true
             return new B(name: name )

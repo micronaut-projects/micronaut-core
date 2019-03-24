@@ -15,8 +15,8 @@
  */
 package io.micronaut.inject.factory.factorydefinition;
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Prototype;
 
 import javax.annotation.PostConstruct;
 import javax.inject.Inject;
@@ -69,7 +69,7 @@ public class BFactory {
         return b;
     }
 
-    @Bean
+    @Prototype
     public C buildC(B b) {
         C c = new C();
         c.setB(b);

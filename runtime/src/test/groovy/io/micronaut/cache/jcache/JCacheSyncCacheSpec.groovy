@@ -138,7 +138,6 @@ class JCacheSyncCacheSpec extends Specification {
     static class CacheFactory {
 
         @Singleton
-        @Bean
         @Requires(property = JCacheManager.JCACHE_ENABLED, value = "true")
         CacheManager cacheManager() {
             def cacheManager = Caching.getCachingProvider().cacheManager
