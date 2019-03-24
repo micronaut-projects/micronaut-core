@@ -14,10 +14,10 @@ import static java.util.regex.Pattern.CASE_INSENSITIVE;
 /**
  * Provides Email validation. Largely based off the Hibernate validator implementation.
  *
- * @author graemerocher
  * @author Emmanuel Bernard
  * @author Hardy Ferentschik
  * @author Guillaume Smet
+ * @author graemerocher
  */
 @Singleton
 public class EmailValidator extends AbstractPatternValidator<Email> {

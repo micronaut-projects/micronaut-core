@@ -51,6 +51,13 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
     public static final int POSITION = -100;
 
     private static final String JAVAX_VALIDATION_CONSTRAINT = "javax.validation.Constraint";
+    private static final AnnotationValue<Introspected.IndexedAnnotation> ANN_CONSTRAINT = AnnotationValue.builder(Introspected.IndexedAnnotation.class)
+            .member("annotation", new AnnotationClassValue<>(JAVAX_VALIDATION_CONSTRAINT))
+            .build();
+    private static final String JAVAX_VALIDATION_VALID = "javax.validation.Valid";
+    private static final AnnotationValue<Introspected.IndexedAnnotation> ANN_VALID = AnnotationValue.builder(Introspected.IndexedAnnotation.class)
+            .member("annotation", new AnnotationClassValue<>(JAVAX_VALIDATION_VALID))
+            .build();
 
     private Map<String, BeanIntrospectionWriter> writers = new LinkedHashMap<>(10);
 
@@ -77,14 +84,17 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Intros
 
             final Set<AnnotationValue> toIndex = CollectionUtils.setOf(introspected.get("indexed", AnnotationValue[].class, new AnnotationValue[0]));
 
-            final AnnotationValue constraintIndex = AnnotationValue.builder(Introspected.IndexedAnnotation.class)
-                    .member("annotation", new AnnotationClassValue<>(JAVAX_VALIDATION_CONSTRAINT))
-                    .build();
             if (CollectionUtils.isEmpty(toIndex)) {
-                indexedAnnotations = Collections.singleton(constraintIndex);
+                indexedAnnotations = CollectionUtils.setOf(
+                        ANN_CONSTRAINT,
+                        ANN_VALID
+                );
             } else {
-                toIndex.add(
-                        constraintIndex
+                toIndex.addAll(
+                    CollectionUtils.setOf(
+                            ANN_CONSTRAINT,
+                            ANN_VALID
+                    )
                 );
                 indexedAnnotations = toIndex;
             }
