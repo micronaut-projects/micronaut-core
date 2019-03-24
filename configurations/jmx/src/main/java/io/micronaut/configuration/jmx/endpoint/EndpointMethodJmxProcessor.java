@@ -29,7 +29,6 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.management.endpoint.annotation.Endpoint;
 import io.micronaut.runtime.event.annotation.EventListener;
-import io.micronaut.runtime.server.event.ServerShutdownEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -104,6 +103,7 @@ public class EndpointMethodJmxProcessor implements ExecutableMethodProcessor<End
             }
             return null;
         }).filter(Objects::nonNull).collect(Collectors.toList()));
+        methods.clear();
 
         for (MBeanDefinition mBeanDefinition: mBeanDefinitions) {
             BeanDefinition beanDefinition = mBeanDefinition.beanDefinition;
@@ -121,6 +121,11 @@ public class EndpointMethodJmxProcessor implements ExecutableMethodProcessor<End
         }
     }
 
+    /**
+     * Un-registers the management beans.
+     *
+     * @param event The shutdown event
+     */
     @EventListener
     void onShutdown(ShutdownEvent event) {
         for (MBeanDefinition mBeanDefinition: mBeanDefinitions) {
