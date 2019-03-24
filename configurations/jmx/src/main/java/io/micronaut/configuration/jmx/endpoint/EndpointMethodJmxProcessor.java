@@ -37,7 +37,6 @@ import javax.inject.Singleton;
 import javax.management.*;
 import java.util.*;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 
 /**
  * Registers endpoint methods with JMX.
