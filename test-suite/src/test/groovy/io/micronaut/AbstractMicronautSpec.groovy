@@ -34,7 +34,7 @@ abstract class AbstractMicronautSpec extends Specification {
     @Shared @AutoCleanup ApplicationContext context = ApplicationContext.run(
             getConfiguration() << [(SPEC_NAME_PROPERTY):getClass().simpleName]
     )
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
     @Shared @AutoCleanup HttpClient client = context.createBean(HttpClient, embeddedServer.getURL())
 
 
