@@ -19,11 +19,206 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.swagger.v3.oas.annotations.enums.ParameterIn
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.PathItem
+import io.swagger.v3.oas.models.media.MapSchema
 import io.swagger.v3.oas.models.media.Schema
 
 class OpenApiPojoControllerSpec extends AbstractTypeElementSpec {
     def setup() {
         System.setProperty(AbstractOpenApiVisitor.ATTR_TEST_MODE, "true")
+    }
+
+    void "test build OpenAPI for Dictionaries, HashMaps and Associative Arrays" () {
+        given:"An API definition"
+        when:
+        buildBeanDefinition('test.MyBean', '''
+package test;
+
+import io.reactivex.*;
+import io.micronaut.http.annotation.*;
+import java.util.List;
+import java.util.Map;
+import io.swagger.v3.oas.annotations.media.*;
+
+/**
+ * @author graemerocher
+ * @since 1.0
+ */
+
+@Controller("/pets")
+interface PetOperations<T extends Pet> {
+
+    /**
+     * List the pets
+     *
+     * @return a list of pet names
+     */
+    @Get("/")
+    List<T> list();
+    
+    @Get("/random")
+    T random();
+
+    @Get("/vendor/{name}")
+    List<T> byVendor(String name);
+
+    /**
+     * Find a pet by a slug
+     *
+     * @param slug The slug name
+     * @return A pet or 404
+     */
+    @Get("/{slug}")
+    T find(String slug);
+
+    @Post("/")
+    T save(@Body T pet);
+}
+
+class Pet {
+    private int age;
+    private String name;
+    private Map freeForm;
+    private Map<String, String> dictionariesPlain;
+    private Map<String, Tag> tags;
+
+    public void setAge(int a) {
+        age = a;
+    }
+
+    /**
+     * The Pet Age
+     * 
+     * @return The Pet Age
+     */
+    public int getAge() {
+        return age;
+    }
+
+    public void setName(String n) {
+        name = n;
+    }
+
+    /**
+     * The Pet Name
+     * 
+     * @return The Pet Name
+     */
+    public String getName() {
+        return name;
+    }
+
+    /**
+     * A free-form object
+     * 
+     * @return A free-form object
+     */
+    public Map getFreeForm() {
+        return freeForm;
+    }
+
+    public void setFreeForm(Map freeForm) {
+        this.freeForm = freeForm;
+    }
+
+    /**
+     * A string-to-string dictionary
+     * 
+     * @return A string-to-string dictionary
+     */
+    public Map<String, String> getDictionariesPlain() {
+        return dictionariesPlain;
+    }
+
+    public void setDictionariesPlain(Map<String, String> dictionariesPlain) {
+        this.dictionariesPlain = dictionariesPlain;
+    }
+
+    /**
+     * A string-to-object dictionary
+     * 
+     * @return A string-to-object dictionary
+     */
+    public Map<String, Tag> getTags() {
+        return tags;
+    }
+
+    public void setTags(Map<String, Tag> tags) {
+        this.tags = tags;
+    }
+}
+
+class Tag {
+    private String name;
+    private String description;
+
+    public Tag(String name, String description) {
+        this.name = name;
+        this.description = description;
+    }
+
+    /**
+     * The Tag Name
+     * 
+     * @return The Tag Name
+     */
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    /**
+     * The Tag Description
+     * 
+     * @return The Tag Description
+     */
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+}
+
+@javax.inject.Singleton
+class MyBean {}
+''')
+        then:"the state is correct"
+        AbstractOpenApiVisitor.testReference != null
+
+        when:"The OpenAPI is retrieved"
+        OpenAPI openAPI = AbstractOpenApiVisitor.testReference
+        Schema petSchema = openAPI.components.schemas['Pet']
+        Schema tagSchema = openAPI.components.schemas['Tag']
+
+        then:"the components are valid"
+        petSchema.type == 'object'
+        petSchema.properties.size() == 5
+
+        petSchema.properties['age'].type == 'integer'
+        petSchema.properties['age'].description == 'The Pet Age'
+
+        petSchema.properties['name'].type == 'string'
+        petSchema.properties['name'].description == 'The Pet Name'
+
+        ((MapSchema)petSchema.properties['freeForm']).type == "object"
+        ((MapSchema)petSchema.properties['freeForm']).description == "A free-form object"
+        ((MapSchema) petSchema.properties['freeForm']).getAdditionalProperties() == true
+
+        ((MapSchema) petSchema.properties['dictionariesPlain']).type == "object"
+        ((MapSchema) petSchema.properties['dictionariesPlain']).description == "A string-to-string dictionary"
+        ((Schema)((MapSchema) petSchema.properties['dictionariesPlain']).getAdditionalProperties()).getType() == "string"
+
+        ((MapSchema) petSchema.properties['tags']).type == "object"
+        ((MapSchema) petSchema.properties['tags']).description == "A string-to-object dictionary"
+        ((Schema)((MapSchema) petSchema.properties['tags']).getAdditionalProperties()).$ref == "#/components/schemas/Tag"
+
+        tagSchema.properties['name'].type == "string"
+        tagSchema.properties['name'].description == "The Tag Name"
+        tagSchema.properties['description'].type == "string"
     }
 
     void "test build OpenAPI doc for POJO type with javax.constraints"() {

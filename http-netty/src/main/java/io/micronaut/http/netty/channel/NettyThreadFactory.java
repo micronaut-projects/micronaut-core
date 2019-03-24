@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.netty.channel;
 
-import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.annotation.TypeHint;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -61,7 +60,6 @@ public class NettyThreadFactory {
      *
      * @return The thread factory
      */
-    @Bean
     @Singleton
     @Named(NAME)
     ThreadFactory nettyThreadFactory() {

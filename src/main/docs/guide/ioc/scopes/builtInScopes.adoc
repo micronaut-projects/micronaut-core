@@ -16,6 +16,8 @@
 |`@Refreshable` scope is a custom scope that allows a bean's state to be refreshed via the `/refresh` endpoint.
 |===
 
+NOTE: The link:{api}/io/micronaut/context/annotation/Prototype.html[@Prototype] annotation is a synonym for link:{api}/io/micronaut/context/annotation/Bean.html[@Bean] because the default scope is prototype.
+
 Additional scopes can be added by defining a `@Singleton` bean that implements the link:{api}/io/micronaut/context/scope/CustomScope.html[CustomScope] interface.
 
 Note that with Micronaut when starting a api:context.ApplicationContext[] by default `@Singleton` scoped beans are created lazily and on demand. This is by design and to optimize startup time.

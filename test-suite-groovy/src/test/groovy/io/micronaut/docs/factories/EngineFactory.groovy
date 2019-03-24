@@ -28,7 +28,6 @@ import javax.inject.Singleton
 @Factory
 class EngineFactory {
 
-    @Bean
     @Singleton
     Engine v8Engine(CrankShaft crankShaft) {
         new V8Engine(crankShaft)
