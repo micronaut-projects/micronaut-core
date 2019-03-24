@@ -7,6 +7,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import javax.validation.ElementKind
 import javax.validation.Valid
 import javax.validation.constraints.Max
 import javax.validation.constraints.Min
@@ -43,6 +44,74 @@ class ValidatorSpec extends Specification {
 
     }
 
+    void "test cascade to bean"() {
+        given:
+        Book b = new Book(title: "The Stand", pages: 1000, primaryAuthor: new Author(age: 150), authors: [new Author(name: "Stephen King", age: 50)])
+        def violations = validator.validate(b).sort { it.propertyPath.iterator().next().name }
+
+        def v1 = violations.find { it.propertyPath.toString() == 'primaryAuthor.age'}
+        def v2 = violations.find { it.propertyPath.toString() == 'primaryAuthor.name'}
+        expect:
+        violations.size() == 2
+        v1.messageTemplate == '{javax.validation.constraints.Max.message}'
+        v1.propertyPath.toString() == 'primaryAuthor.age'
+        v1.invalidValue == 150
+        v1.rootBean.is(b)
+        v1.leafBean instanceof Author
+        v2.messageTemplate == '{javax.validation.constraints.NotBlank.message}'
+        v2.propertyPath.toString() == 'primaryAuthor.name'
+    }
+
+    void "test cascade to bean - no cycle"() {
+        given:
+        Book b = new Book(
+                title: "The Stand",
+                pages: 1000,
+                primaryAuthor: new Author(age: 150),
+                authors: [new Author(name: "Stephen King", age: 50)]
+        )
+        b.primaryAuthor.favouriteBook = b // create cycle
+        def violations = validator.validate(b).sort { it.propertyPath.iterator().next().name }
+
+        def v1 = violations.find { it.propertyPath.toString() == 'primaryAuthor.age'}
+        def v2 = violations.find { it.propertyPath.toString() == 'primaryAuthor.name'}
+
+        expect:
+        violations.size() == 2
+        v1.messageTemplate == '{javax.validation.constraints.Max.message}'
+        v1.propertyPath.toString() == 'primaryAuthor.age'
+        v1.invalidValue == 150
+        v1.rootBean.is(b)
+        v1.leafBean instanceof Author
+        v2.messageTemplate == '{javax.validation.constraints.NotBlank.message}'
+        v2.propertyPath.toString() == 'primaryAuthor.name'
+    }
+
+    void "test cascade to list - no cycle"() {
+        given:
+        Book b = new Book(
+                title: "The Stand",
+                pages: 1000,
+                primaryAuthor: new Author(age: 50, name: "Stephen King"),
+                authors: [new Author(age: 150)]
+        )
+        b.authors[0].favouriteBook = b // create cycle
+        def violations = validator.validate(b).sort { it.propertyPath.iterator().next().name }
+
+        def v1 = violations.find { it.propertyPath.toString() == 'authors[0].age'}
+        def v2 = violations.find { it.propertyPath.toString() == 'authors[0].name'}
+
+        expect:
+        violations.size() == 2
+        v1.messageTemplate == '{javax.validation.constraints.Max.message}'
+        v1.invalidValue == 150
+        v1.propertyPath.last().isInIterable()
+        v1.propertyPath.last().index == 0
+        v1.propertyPath.last().kind == ElementKind.CONTAINER_ELEMENT
+        v1.rootBean.is(b)
+        v1.leafBean instanceof Author
+        v2.messageTemplate == '{javax.validation.constraints.NotBlank.message}'
+    }
 
 }
 
@@ -65,6 +134,11 @@ class Book {
 
 @Introspected
 class Author {
+    @NotBlank
+    String name
     @Max(100l)
     Integer age
+
+    @Valid
+    Book favouriteBook
 }

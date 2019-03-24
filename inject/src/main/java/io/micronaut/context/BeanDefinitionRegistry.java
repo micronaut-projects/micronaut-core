@@ -149,7 +149,8 @@ public interface BeanDefinitionRegistry {
     @Nonnull Collection<BeanDefinitionReference<?>> getBeanDefinitionReferences();
 
     /**
-     * Find active {@link javax.inject.Singleton} beans for the given qualifier.
+     * Find active {@link javax.inject.Singleton} beans for the given qualifier. Note that
+     * this method can return multiple registrations for a given singleton bean instance since each bean may have multiple qualifiers.
      *
      * @param qualifier The qualifier
      * @return The beans
@@ -157,7 +158,8 @@ public interface BeanDefinitionRegistry {
     @Nonnull Collection<BeanRegistration<?>> getActiveBeanRegistrations(@Nonnull Qualifier<?> qualifier);
 
     /**
-     * Find active {@link javax.inject.Singleton} beans for the given bean type.
+     * Find active {@link javax.inject.Singleton} beans for the given bean type. Note that
+     * this method can return multiple registrations for a given singleton bean instance since each bean may have multiple qualifiers.
      *
      * @param beanType The bean type
      * @param <T>      The concrete type
@@ -166,7 +168,8 @@ public interface BeanDefinitionRegistry {
     @Nonnull <T> Collection<BeanRegistration<T>> getActiveBeanRegistrations(@Nonnull Class<T> beanType);
 
     /**
-     * Find and if necessary initialize {@link javax.inject.Singleton} beans for the given bean type, returning all the active registrations.
+     * Find and if necessary initialize {@link javax.inject.Singleton} beans for the given bean type, returning all the active registrations. Note that
+     * this method can return multiple registrations for a given singleton bean instance since each bean may have multiple qualifiers.
      *
      * @param beanType The bean type
      * @param <T>      The concrete type
