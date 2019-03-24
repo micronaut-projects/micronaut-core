@@ -129,7 +129,7 @@ public class ViewsFilter implements HttpServerFilter {
                             String view = modelAndView.getView().orElse(optionalView.get());
                             if (viewsRenderer.exists(view)) {
 
-                                Writable writable = viewsRenderer.render(view, model);
+                                Writable writable = viewsRenderer.render(view, model, request);
                                 response.contentType(type);
                                 ((MutableHttpResponse<Object>) response).body(writable);
                                 return Flowable.just(response);
