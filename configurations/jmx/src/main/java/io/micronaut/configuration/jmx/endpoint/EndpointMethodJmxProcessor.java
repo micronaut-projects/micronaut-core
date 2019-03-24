@@ -51,8 +51,7 @@ public class EndpointMethodJmxProcessor implements ExecutableMethodProcessor<End
 
     private static final Logger LOG = LoggerFactory.getLogger(EndpointMethodJmxProcessor.class);
 
-    private final Map<BeanDefinition, List<ExecutableMethod>> methods = new HashMap<>(5);
-    private final List<MBeanDefinition> mBeanDefinitions = new ArrayList<>(5);
+    private final Map<BeanDefinition, MBeanDefinition> mBeanDefinitions = new HashMap<>(5);
 
     private final MBeanServer mBeanServer;
     private final NameGenerator nameGenerator;
@@ -77,11 +76,17 @@ public class EndpointMethodJmxProcessor implements ExecutableMethodProcessor<End
 
     @Override
     public void process(BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
-        methods.compute(beanDefinition, (key, value) -> {
+        mBeanDefinitions.compute(beanDefinition, (key, value) -> {
             if (value == null) {
-                value = new ArrayList<>(1);
+                try {
+                    value = new MBeanDefinition(key, new ArrayList<>());
+                } catch (JMException e) {
+                    LOG.error("Failed to generate an MBean name for the endpoint " + beanDefinition.getBeanType().getName(), e);
+                }
             }
-            value.add(method);
+            if (value != null) {
+                value.methods.add(method);
+            }
             return value;
         });
     }
@@ -93,19 +98,7 @@ public class EndpointMethodJmxProcessor implements ExecutableMethodProcessor<End
      */
     @EventListener
     void onStartup(StartupEvent event) {
-
-        mBeanDefinitions.addAll(methods.entrySet().stream().map(entry -> {
-            BeanDefinition beanDefinition = entry.getKey();
-            try {
-                return new MBeanDefinition(beanDefinition, entry.getValue());
-            } catch (JMException e) {
-                LOG.error("Failed to generate an MBean name for the endpoint " + beanDefinition.getBeanType().getName(), e);
-            }
-            return null;
-        }).filter(Objects::nonNull).collect(Collectors.toList()));
-        methods.clear();
-
-        for (MBeanDefinition mBeanDefinition: mBeanDefinitions) {
+        for (MBeanDefinition mBeanDefinition: mBeanDefinitions.values()) {
             BeanDefinition beanDefinition = mBeanDefinition.beanDefinition;
 
             try {
@@ -128,17 +121,19 @@ public class EndpointMethodJmxProcessor implements ExecutableMethodProcessor<End
      */
     @EventListener
     void onShutdown(ShutdownEvent event) {
-        for (MBeanDefinition mBeanDefinition: mBeanDefinitions) {
+        for (MBeanDefinition mBeanDefinition: mBeanDefinitions.values()) {
             BeanDefinition beanDefinition = mBeanDefinition.beanDefinition;
             try {
                 mBeanServer.unregisterMBean(mBeanDefinition.objectName);
             } catch (JMException e) {
                 LOG.error("Failed to unregister an MBean for the endpoint " + beanDefinition.getBeanType().getName(), e);
             }
-
         }
     }
 
+    /**
+     * Internal cache.
+     */
     private class MBeanDefinition {
         ObjectName objectName;
         BeanDefinition beanDefinition;
