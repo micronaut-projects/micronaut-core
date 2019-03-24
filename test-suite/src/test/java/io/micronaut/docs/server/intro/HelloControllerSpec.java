@@ -48,7 +48,7 @@ public class HelloControllerSpec {
                 , Environment.TEST);
         /*
 // tag::embeddedServer[]
-        server = ApplicationContext.run(EmbeddedServer) // <1>
+        server = ApplicationContext.run(EmbeddedServer.class) // <1>
 // end::embeddedServer[]
         */
         // tag::class[]
@@ -59,11 +59,11 @@ public class HelloControllerSpec {
 
     @AfterClass
     public static void stopServer() {
-        if (server != null) {
-            server.stop();
-        }
         if (client != null) {
             client.stop();
+        }
+        if (server != null) {
+            server.stop();
         }
     }
 
