@@ -9,7 +9,7 @@ class DiscoveryClientHealthIndicatorConfigurationSpec extends Specification {
 
     void 'test that the health indicator configuration is not available when disabled via config'() {
         given:
-        ApplicationContext context = ApplicationContext.run(['endpoints.health.discovery-client.indicator': false])
+        ApplicationContext context = ApplicationContext.run(['endpoints.health.discovery-client.enabled': false])
 
         expect:
         !context.containsBean(DiscoveryClientHealthIndicatorConfiguration)
