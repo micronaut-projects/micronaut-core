@@ -29,8 +29,7 @@ import io.micronaut.http.annotation.Produces
 @Controller("/hello") // <1>
 class HelloController {
 
-    @Produces(MediaType.TEXT_PLAIN)
-    @Get // <2>
+    @Get(produces = [MediaType.TEXT_PLAIN]) // <2>
     fun index(): String {
         return "Hello World" // <3>
     }

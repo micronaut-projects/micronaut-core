@@ -41,7 +41,6 @@ class BlockingFallbackSpec extends Specification {
     ApplicationContext context = ApplicationContext.run()
 
     @Shared
-    @AutoCleanup
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test that fallback is called when an exception happens invoking the server"() {

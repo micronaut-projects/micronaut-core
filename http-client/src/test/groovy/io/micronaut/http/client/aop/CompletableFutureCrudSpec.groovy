@@ -41,7 +41,6 @@ class CompletableFutureCrudSpec extends Specification {
     ApplicationContext context = ApplicationContext.run()
 
     @Shared
-    @AutoCleanup
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test it is possible to implement CRUD operations with CompletableFuture"() {

@@ -69,7 +69,6 @@ class TenantPropagationHttpClientFilterPathSpec extends Specification {
         matches
 
         cleanup:
-        context.stop()
         context.close()
     }
 
@@ -121,7 +120,6 @@ class TenantPropagationHttpClientFilterPathSpec extends Specification {
         !matches
 
         cleanup:
-        context.stop()
         context.close()
     }
 }

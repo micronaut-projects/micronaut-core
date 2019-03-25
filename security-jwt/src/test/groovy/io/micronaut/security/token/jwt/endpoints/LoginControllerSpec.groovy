@@ -47,7 +47,6 @@ class LoginControllerSpec extends Specification {
             ], Environment.TEST)
 
     @Shared
-    @AutoCleanup
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     @Shared

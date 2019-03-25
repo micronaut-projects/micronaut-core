@@ -54,7 +54,6 @@ class JwtCookieAuthenticationSpec extends GebSpec {
             ], Environment.TEST)
 
     @Shared
-    @AutoCleanup
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     @Shared

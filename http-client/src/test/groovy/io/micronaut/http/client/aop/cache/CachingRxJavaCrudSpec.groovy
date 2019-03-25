@@ -50,7 +50,6 @@ class CachingRxJavaCrudSpec extends Specification {
     )
 
     @Shared
-    @AutoCleanup
     EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     void "test it is possible to implement CRUD operations with RxJava"() {

@@ -73,7 +73,6 @@ class TokenPropagationHttpClientFilterPathSpec extends Specification {
 
         cleanup:
         context.stop()
-        context.close()
     }
 
     void "you can customize TokenPropagationHttpClientFilter pattern with micronaut.security.token.propagation.path"() {
@@ -127,6 +126,5 @@ class TokenPropagationHttpClientFilterPathSpec extends Specification {
 
         cleanup:
         context.stop()
-        context.close()
     }
 }
