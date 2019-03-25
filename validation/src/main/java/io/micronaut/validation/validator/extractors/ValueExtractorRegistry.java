@@ -29,7 +29,7 @@ public interface ValueExtractorRegistry {
      * @return The extractor
      */
     @Nonnull
-    <T> Optional<ValueExtractor<T>> findConcreteExtractor(
+    <T> Optional<ValueExtractor<T>> findUnwrapValueExtractor(
             @Nonnull Class<T> targetType);
 
     /**

@@ -7,6 +7,7 @@ import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import javax.validation.ConstraintViolation
 import javax.validation.ElementKind
 import javax.validation.Valid
 import javax.validation.constraints.Max
@@ -113,6 +114,30 @@ class ValidatorSpec extends Specification {
         v2.messageTemplate == '{javax.validation.constraints.NotBlank.message}'
     }
 
+
+    void "test cascade to array elements"() {
+        given:
+        ArrayTest arrayTest = new ArrayTest(integers: [30, 10, 60] as int[])
+        def violations = validator.validate(arrayTest)
+
+        expect:
+        violations.size() == 2
+        violations.find { it.invalidValue == 30 && it.propertyPath.toList()[-1].index == 0 }
+        violations.find { it.invalidValue == 60 && it.propertyPath.toList()[-1].index == 2 }
+    }
+
+
+    void "test cascade to array elements null"() {
+        given:
+        ArrayTest arrayTest = new ArrayTest(integers: null)
+        def violations = validator.validate(arrayTest)
+
+        expect:
+        violations.size() == 1
+        violations.first().messageTemplate == '{javax.validation.constraints.NotNull.message}'
+        violations.first().propertyPath.toString() == 'integers'
+    }
+
 }
 
 @Introspected
@@ -141,4 +166,12 @@ class Author {
 
     @Valid
     Book favouriteBook
+}
+
+@Introspected
+class ArrayTest {
+    @Valid
+    @Max(20l)
+    @NotNull
+    int[] integers
 }

@@ -28,7 +28,7 @@ public class DefaultValueExtractors {
      * @return The value extractor.
      */
     @Singleton
-    public ValueExtractor<Optional> optionalValueExtractor() {
+    public UnwrapByDefaultValueExtractor<Optional> optionalValueExtractor() {
         return (originalValue, receiver) -> receiver.value(null, originalValue.orElse(null));
     }
 
@@ -38,7 +38,7 @@ public class DefaultValueExtractors {
      * @return The value extractor
      */
     @Singleton
-    public ValueExtractor<OptionalInt> optionalIntValueExtractor() {
+    public UnwrapByDefaultValueExtractor<OptionalInt> optionalIntValueExtractor() {
         return (originalValue, receiver) ->
                 receiver.value(null, originalValue.isPresent() ? originalValue.getAsInt() : null);
     }
@@ -49,7 +49,7 @@ public class DefaultValueExtractors {
      * @return The value extractor
      */
     @Singleton
-    public ValueExtractor<OptionalLong> optionalLongValueExtractor() {
+    public UnwrapByDefaultValueExtractor<OptionalLong> optionalLongValueExtractor() {
         return (originalValue, receiver) ->
                 receiver.value(null, originalValue.isPresent() ? originalValue.getAsLong() : null);
     }
@@ -60,7 +60,7 @@ public class DefaultValueExtractors {
      * @return The value extractor
      */
     @Singleton
-    public ValueExtractor<OptionalDouble> optionalDoubleValueExtractor() {
+    public UnwrapByDefaultValueExtractor<OptionalDouble> optionalDoubleValueExtractor() {
         return (originalValue, receiver) ->
                 receiver.value(null, originalValue.isPresent() ? originalValue.getAsDouble() : null);
     }
@@ -100,10 +100,101 @@ public class DefaultValueExtractors {
 
     /**
      * Value extractor for Object[].
-     * @return The object[] instructor
+     * @return The object[] extractor
      */
     @Singleton
     public ValueExtractor<Object[]> objectArrayValueExtractor() {
+        return (originalValue, receiver) -> {
+            for (int i = 0; i < originalValue.length; i++) {
+                receiver.indexedValue(LIST_ELEMENT_NODE_NAME, i, originalValue[i]);
+            }
+        };
+    }
+
+    /**
+     * Value extractor for int[].
+     * @return The int[] extractor
+     */
+    @Singleton
+    public ValueExtractor<int[]> intArrayValueExtractor() {
+        return (originalValue, receiver) -> {
+            for (int i = 0; i < originalValue.length; i++) {
+                receiver.indexedValue(LIST_ELEMENT_NODE_NAME, i, originalValue[i]);
+            }
+        };
+    }
+
+    /**
+     * Value extractor for byte[].
+     * @return The byte[] extractor
+     */
+    @Singleton
+    public ValueExtractor<byte[]> byteArrayValueExtractor() {
+        return (originalValue, receiver) -> {
+            for (int i = 0; i < originalValue.length; i++) {
+                receiver.indexedValue(LIST_ELEMENT_NODE_NAME, i, originalValue[i]);
+            }
+        };
+    }
+
+    /**
+     * Value extractor for char[].
+     * @return The char[] extractor
+     */
+    @Singleton
+    public ValueExtractor<char[]> charArrayValueExtractor() {
+        return (originalValue, receiver) -> {
+            for (int i = 0; i < originalValue.length; i++) {
+                receiver.indexedValue(LIST_ELEMENT_NODE_NAME, i, originalValue[i]);
+            }
+        };
+    }
+
+    /**
+     * Value extractor for boolean[].
+     * @return The boolean[] extractor
+     */
+    @Singleton
+    public ValueExtractor<boolean[]> booleanArrayValueExtractor() {
+        return (originalValue, receiver) -> {
+            for (int i = 0; i < originalValue.length; i++) {
+                receiver.indexedValue(LIST_ELEMENT_NODE_NAME, i, originalValue[i]);
+            }
+        };
+    }
+
+    /**
+     * Value extractor for double[].
+     * @return The double[] extractor
+     */
+    @Singleton
+    public ValueExtractor<double[]> doubleArrayValueExtractor() {
+        return (originalValue, receiver) -> {
+            for (int i = 0; i < originalValue.length; i++) {
+                receiver.indexedValue(LIST_ELEMENT_NODE_NAME, i, originalValue[i]);
+            }
+        };
+    }
+
+    /**
+     * Value extractor for float[].
+     * @return The float[] extractor
+     */
+    @Singleton
+    public ValueExtractor<float[]> floatArrayValueExtractor() {
+        return (originalValue, receiver) -> {
+            for (int i = 0; i < originalValue.length; i++) {
+                receiver.indexedValue(LIST_ELEMENT_NODE_NAME, i, originalValue[i]);
+            }
+        };
+    }
+
+    /**
+     * Value extractor for short[].
+     * @return The short[] extractor
+     */
+    @Singleton
+    public ValueExtractor<short[]> shortArrayValueExtractor() {
         return (originalValue, receiver) -> {
             for (int i = 0; i < originalValue.length; i++) {
                 receiver.indexedValue(LIST_ELEMENT_NODE_NAME, i, originalValue[i]);

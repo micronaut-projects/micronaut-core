@@ -16,6 +16,11 @@
 
 package io.micronaut.validation.validator;
 
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import javax.validation.ConstraintViolation;
+import java.util.Set;
+
 /**
  * Extended version of the {@link javax.validation.Valid} interface for Micronaut's implementation.
  *
@@ -31,5 +36,14 @@ public interface Validator extends javax.validation.Validator {
      * @return The validator
      */
     @Override
-    ExecutableMethodValidator forExecutables();
+    @Nonnull ExecutableMethodValidator forExecutables();
+
+    @Override
+    @Nonnull <T> Set<ConstraintViolation<T>> validate(@Nonnull T object, Class<?>... groups);
+
+    @Override
+    @Nonnull <T> Set<ConstraintViolation<T>> validateProperty(@Nonnull T object, @Nonnull String propertyName, Class<?>... groups);
+
+    @Override
+    @Nonnull <T> Set<ConstraintViolation<T>> validateValue(@Nonnull Class<T> beanType, @Nonnull String propertyName, @Nullable Object value, Class<?>... groups);
 }
