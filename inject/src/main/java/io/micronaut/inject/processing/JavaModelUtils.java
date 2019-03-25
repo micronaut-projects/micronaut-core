@@ -83,6 +83,16 @@ public class JavaModelUtils {
     }
 
     /**
+     * Whether the given element is an enum.
+     *
+     * @param element The element
+     * @return True if it is
+     */
+    public static boolean isEnum(Element element) {
+        return resolveKind(element, ElementKind.ENUM).isPresent();
+    }
+
+    /**
      * Whether the given element is a class or interface.
      *
      * @param element The element

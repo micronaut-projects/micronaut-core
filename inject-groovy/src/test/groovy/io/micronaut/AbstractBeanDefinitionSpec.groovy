@@ -17,6 +17,10 @@ package io.micronaut
 
 import groovy.transform.CompileStatic
 import io.micronaut.ast.groovy.utils.ExtendedParameter
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.DefaultApplicationContext
+import io.micronaut.core.io.scan.ClassPathResourceLoader
+import io.micronaut.inject.BeanDefinitionReference
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.MethodNode
@@ -47,7 +51,7 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
         return (BeanDefinition)classLoader.loadClass(beanFullName).newInstance()
     }
 
-    ClassLoader buildClassLoader(String classStr) {
+    InMemoryByteCodeGroovyClassLoader buildClassLoader(String classStr) {
         def classLoader = new InMemoryByteCodeGroovyClassLoader()
         classLoader.parseClass(classStr)
         return classLoader
@@ -105,5 +109,23 @@ abstract class AbstractBeanDefinitionSpec extends Specification {
 
         AnnotationMetadata metadata = (AnnotationMetadata) classLoader.loadClass(className).newInstance()
         return metadata
+    }
+
+
+
+    protected ApplicationContext buildContext(String className, String cls) {
+        InMemoryByteCodeGroovyClassLoader classLoader = buildClassLoader(cls)
+
+        return new DefaultApplicationContext(
+                ClassPathResourceLoader.defaultLoader(classLoader),"test") {
+            @Override
+            protected List<BeanDefinitionReference> resolveBeanDefinitionReferences() {
+                return classLoader.generatedClasses.keySet().findAll {
+                    it.endsWith("DefinitionClass")
+                }.collect {
+                    classLoader.loadClass(it).newInstance()
+                }
+            }
+        }.start()
     }
 }
