@@ -85,7 +85,7 @@ public class ModelUtils {
      * @return The {@link TypeElement}
      */
     @Nullable final TypeElement classElementFor(Element element) {
-        while (element != null && !(JavaModelUtils.isClass(element) || JavaModelUtils.isInterface(element))) {
+        while (element != null && !(JavaModelUtils.isClassOrInterface(element) || JavaModelUtils.isEnum(element))) {
             element = element.getEnclosingElement();
         }
         if (element instanceof  TypeElement) {
