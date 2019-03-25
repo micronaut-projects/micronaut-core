@@ -22,19 +22,6 @@ class DiscoveryClientHealthIndicatorConfigurationSpec extends Specification {
         context.close()
     }
 
-    void 'test that the health indicator configuration is available when enabled via config'() {
-        given:
-        ApplicationContext context = ApplicationContext.run(['endpoints.loggers.enabled': true])
-
-        expect:
-        context.containsBean(DiscoveryClientHealthIndicatorConfiguration)
-        context.containsBean(DiscoveryClientHealthIndicator)
-
-        cleanup:
-        context.close()
-    }
-
-
     void 'test that the health indicator configuration is available when no entry is in config'() {
         given:
         ApplicationContext context = ApplicationContext.run()
