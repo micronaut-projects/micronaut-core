@@ -130,7 +130,21 @@ class ExecutorServiceConfigSpec extends Specification {
         then:
         executorServices.size() == 4
         moreConfigs.size() == 4
-        configs.size() == 4
+        configs.size() == 2
+
+        when:
+        if(invalidateCache) {
+            ctx.invalidateCaches()
+        }
+
+        def secondResolveExecutors = ctx.getBeansOfType(ExecutorService.class)
+        def secondResolveExecutorConfig = ctx.getBeansOfType(ExecutorConfiguration.class)
+
+        then:
+        secondResolveExecutors.size() == executorServices.size()
+        secondResolveExecutorConfig.size() == moreConfigs.size()
+        executorServices.containsAll(secondResolveExecutors)
+        moreConfigs.containsAll(secondResolveExecutorConfig)
 
         where:
         invalidateCache | environment
@@ -167,7 +181,7 @@ class ExecutorServiceConfigSpec extends Specification {
         then:
         executorServices.size() == 3
         moreConfigs.size() == 3
-        configs.size() == 3
+        configs.size() == 2
 
         where:
         invalidateCache | environment
