@@ -1292,9 +1292,9 @@ public class DefaultBeanContext implements BeanContext {
             if (filter != null) {
                 candidateStream = candidateStream.filter(candidate -> !candidate.equals(filter));
             }
-            List<BeanDefinition<T>> candidates = candidateStream
+            Set<BeanDefinition<T>> candidates = candidateStream
                     .filter(candidate -> candidate.isEnabled(this))
-                    .collect(Collectors.toList());
+                    .collect(Collectors.toSet());
 
             if (!candidates.isEmpty()) {
                 filterReplacedBeans(candidates);
