@@ -170,8 +170,8 @@ public class DefaultValidator implements Validator {
     }
 
     @Override
-    public ExecutableMethodValidator forExecutables() {
-        return null; // TODO
+    @Nonnull public ExecutableMethodValidator forExecutables() {
+        throw new UnsupportedOperationException("Not yet implemented");
     }
 
 
