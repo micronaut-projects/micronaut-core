@@ -33,9 +33,9 @@ import spock.lang.Specification
  * @author Graeme Rocher
  * @since 1.0
  */
-// tag::classinit[]
+// tag::class-init[]
 class HelloControllerSpec extends Specification {
-    // end::classinit[]
+    // end::class-init[]
     @Shared
     @AutoCleanup
     EmbeddedServer embeddedServer =

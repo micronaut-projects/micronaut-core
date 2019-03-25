@@ -27,14 +27,14 @@ import kotlin.test.assertEquals
 
 // end::imports[]
 
-// tag::classinit[]
+// tag::class-init[]
 class HelloControllerSpec() {
     lateinit var server: EmbeddedServer
     lateinit var client: HttpClient
 
     @BeforeTest
     fun setup() {
-        // end::classinit[]
+        // end::class-init[]
         server = ApplicationContext.run(EmbeddedServer::class.java, mapOf("spec.name" to HelloControllerSpec::class.simpleName), Environment.TEST)
 
         /*
