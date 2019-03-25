@@ -131,7 +131,7 @@ public class HttpSessionConfiguration extends SessionConfiguration {
     }
 
     /**
-     * @param cookiePath Set the cookie path to use. Default value ({@value DEFAULT_COOKIEPATH}).
+     * @param cookiePath Set the cookie path to use. Default value ({@value #DEFAULT_COOKIEPATH}).
      */
     public void setCookiePath(String cookiePath) {
         this.cookiePath = cookiePath;

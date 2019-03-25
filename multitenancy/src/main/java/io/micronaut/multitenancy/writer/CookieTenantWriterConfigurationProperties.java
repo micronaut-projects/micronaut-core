@@ -165,7 +165,7 @@ public class CookieTenantWriterConfigurationProperties implements CookieTenantWr
     }
 
     /**
-     * Sets the path of the cookie. Default value ({@value DEFAULT_COOKIEPATH}.
+     * Sets the path of the cookie. Default value ({@value #DEFAULT_COOKIEPATH}.
      * @param cookiePath The path of the cookie.
      */
     public void setCookiePath(@Nullable String cookiePath) {
@@ -173,7 +173,7 @@ public class CookieTenantWriterConfigurationProperties implements CookieTenantWr
     }
 
     /**
-     * Whether the Cookie can only be accessed via HTTP. Default value ({@value DEFAULT_HTTPONLY}.
+     * Whether the Cookie can only be accessed via HTTP. Default value ({@value #DEFAULT_HTTPONLY}.
      * @param cookieHttpOnly Whether the Cookie can only be accessed via HTTP.
      */
     public void setCookieHttpOnly(boolean cookieHttpOnly) {
@@ -181,7 +181,7 @@ public class CookieTenantWriterConfigurationProperties implements CookieTenantWr
     }
 
     /**
-     * Sets whether the cookie is secured. Default value ({@value DEFAULT_SECURE}.
+     * Sets whether the cookie is secured. Default value ({@value #DEFAULT_SECURE}.
      * @param cookieSecure True if the cookie is secure
      */
     public void setCookieSecure(boolean cookieSecure) {
