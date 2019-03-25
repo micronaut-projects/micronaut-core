@@ -2,7 +2,7 @@ As mentioned previously, Micronaut includes both an <<httpServer,HTTP server>> a
 
 .Testing Hello World
 
-snippet::io.micronaut.docs.server.intro.HelloControllerSpec[tags="imports,classinit,embeddedServer,class",indent=0]
+snippet::io.micronaut.docs.server.intro.HelloControllerSpec[tags="imports,class-init,embeddedServer,class",indent=0]
 
 <1> The api:runtime.server.EmbeddedServer[] is configured as a shared test field
 <2> A api:http.client.HttpClient[] instance shared field is also defined

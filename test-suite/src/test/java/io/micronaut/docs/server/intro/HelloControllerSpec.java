@@ -32,14 +32,14 @@ import static org.junit.Assert.assertEquals;
 
 // end::imports[]
 
-// tag::classinit[]
+// tag::class-init[]
 public class HelloControllerSpec {
     private static EmbeddedServer server;
     private static HttpClient client;
 
     @BeforeClass
     public static void setupServer() {
-        // end::classinit[]
+        // end::class-init[]
         server = ApplicationContext.run(EmbeddedServer.class,
                 new HashMap<String, Object>() {{
                     put("spec.name", HelloControllerSpec.class.getSimpleName());
@@ -48,7 +48,7 @@ public class HelloControllerSpec {
                 , Environment.TEST);
         /*
 // tag::embeddedServer[]
-        server = ApplicationContext.run(EmbeddedServer) // <1>
+        server = ApplicationContext.run(EmbeddedServer.class) // <1>
 // end::embeddedServer[]
         */
         // tag::class[]
@@ -59,11 +59,11 @@ public class HelloControllerSpec {
 
     @AfterClass
     public static void stopServer() {
-        if (server != null) {
-            server.stop();
-        }
         if (client != null) {
             client.stop();
+        }
+        if (server != null) {
+            server.stop();
         }
     }
 

@@ -74,7 +74,7 @@ class ThirdPartyClientFilterSpec extends Specification {
             'bintray.token': token,
             'bintray.organization': 'grails',
     )
-    @Shared @AutoCleanup EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
+    @Shared EmbeddedServer embeddedServer = context.getBean(EmbeddedServer).start()
 
     def "a client filter is applied to the request and adds the authorization header"() {
         given:
