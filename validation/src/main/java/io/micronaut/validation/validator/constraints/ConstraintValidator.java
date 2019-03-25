@@ -27,6 +27,11 @@ import java.lang.annotation.Annotation;
 public interface ConstraintValidator<A extends Annotation, T> extends javax.validation.ConstraintValidator<A, T> {
 
     /**
+     * A constraint validator that just returns the object as being valid.
+     */
+    ConstraintValidator VALID = (value, annotationMetadata, context) -> true;
+
+    /**
      * Implements the validation logic.
      *
      * <p>Implementations should be thread-safe and immutable.</p>

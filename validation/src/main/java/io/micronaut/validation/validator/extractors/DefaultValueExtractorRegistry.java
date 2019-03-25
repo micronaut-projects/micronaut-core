@@ -7,6 +7,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 
 import javax.annotation.Nonnull;
 import javax.inject.Singleton;
+import javax.validation.valueextraction.UnwrapByDefault;
 import javax.validation.valueextraction.ValueExtractor;
 import java.util.Optional;
 import java.util.Set;
@@ -22,7 +23,7 @@ import java.util.stream.Collectors;
 @Internal
 class DefaultValueExtractorRegistry implements ValueExtractorRegistry {
 
-    private final Set<Class> concreteExtractorTypes;
+    private final Set<Class> unwrapByDefaultTypes;
     private final BeanContext beanContext;
 
     /**
@@ -32,9 +33,11 @@ class DefaultValueExtractorRegistry implements ValueExtractorRegistry {
     DefaultValueExtractorRegistry(@Nonnull BeanContext beanContext) {
         ArgumentUtils.requireNonNull("beanContext", beanContext);
         this.beanContext = beanContext;
-        this.concreteExtractorTypes = beanContext.getBeanDefinitions(ValueExtractor.class)
+        this.unwrapByDefaultTypes = beanContext.getBeanDefinitions(ValueExtractor.class)
                                            .stream()
-                                           .filter(bd -> !bd.getTypeArguments(ValueExtractor.class).isEmpty())
+                                           .filter(bd ->
+                                                   (UnwrapByDefaultValueExtractor.class.isAssignableFrom(bd.getBeanType()) || bd.hasStereotype(UnwrapByDefault.class)) &&
+                                                   !bd.getTypeArguments(ValueExtractor.class).isEmpty())
                                            .map(bd -> bd.getTypeParameters(ValueExtractor.class)[0])
                                            .collect(Collectors.toSet());
     }
@@ -43,20 +46,16 @@ class DefaultValueExtractorRegistry implements ValueExtractorRegistry {
     @Override
     public <T> Optional<ValueExtractor<T>> findValueExtractor(@Nonnull Class<T> targetType) {
         ArgumentUtils.requireNonNull("targetType", targetType);
-        final Class extractorType = concreteExtractorTypes.stream().filter(t -> t == targetType || t.isAssignableFrom(targetType)).findFirst().orElse(null);
-        if (extractorType != null) {
-            final Optional result = beanContext.findBean(ValueExtractor.class, Qualifiers.byTypeArguments(targetType));
-            return result;
-        }
-        return Optional.empty();
+        final Optional result = beanContext.findBean(ValueExtractor.class, Qualifiers.byTypeArguments(targetType));
+        return result;
     }
 
     @SuppressWarnings("unchecked")
     @Nonnull
     @Override
-    public <T> Optional<ValueExtractor<T>> findConcreteExtractor(@Nonnull Class<T> targetType) {
+    public <T> Optional<ValueExtractor<T>> findUnwrapValueExtractor(@Nonnull Class<T> targetType) {
         ArgumentUtils.requireNonNull("targetType", targetType);
-        if (concreteExtractorTypes.contains(targetType)) {
+        if (unwrapByDefaultTypes.contains(targetType)) {
             final Optional result = beanContext.findBean(ValueExtractor.class, Qualifiers.byTypeArguments(targetType));
             return result;
         }
