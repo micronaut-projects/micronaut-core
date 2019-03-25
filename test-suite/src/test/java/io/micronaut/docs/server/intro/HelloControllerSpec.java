@@ -32,14 +32,14 @@ import static org.junit.Assert.assertEquals;
 
 // end::imports[]
 
-// tag::classinit[]
+// tag::class-init[]
 public class HelloControllerSpec {
     private static EmbeddedServer server;
     private static HttpClient client;
 
     @BeforeClass
     public static void setupServer() {
-        // end::classinit[]
+        // end::class-init[]
         server = ApplicationContext.run(EmbeddedServer.class,
                 new HashMap<String, Object>() {{
                     put("spec.name", HelloControllerSpec.class.getSimpleName());
