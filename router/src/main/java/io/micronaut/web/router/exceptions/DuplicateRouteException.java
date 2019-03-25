@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 public class DuplicateRouteException extends RoutingException {
 
     private final String uri;
+    private final List<UriRouteMatch<Object, Object>> uriRoutes;
 
     /**
      * @param uri The URI
@@ -37,6 +38,7 @@ public class DuplicateRouteException extends RoutingException {
     public DuplicateRouteException(String uri, List<UriRouteMatch<Object, Object>> uriRoutes) {
         super(buildMessage(uri, uriRoutes));
         this.uri = uri;
+        this.uriRoutes = uriRoutes;
     }
 
     /**
@@ -44,6 +46,14 @@ public class DuplicateRouteException extends RoutingException {
      */
     public String getUri() {
         return uri;
+    }
+
+    /**
+     *
+     * @return The routes which caused this exception
+     */
+    public List<UriRouteMatch<Object, Object>> getUriRoutes() {
+        return this.uriRoutes;
     }
 
     private static String buildMessage(String uri, List<UriRouteMatch<Object, Object>> uriRoutes) {
