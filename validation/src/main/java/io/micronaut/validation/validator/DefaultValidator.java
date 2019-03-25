@@ -170,7 +170,14 @@ public class DefaultValidator implements Validator {
 
 
         final HashSet overallViolations = new HashSet<>(5);
-        validatePropertyInternal(null, null, new DefaultConstraintValidatorContext(), overallViolations, beanProperty, value);
+        final DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext();
+        try {
+            context.addPropertyNode(propertyName);
+            validatePropertyInternal(null, null, context, overallViolations, beanProperty, value);
+        } finally {
+            context.removeLast();
+        }
+
         return Collections.unmodifiableSet(overallViolations);
     }
 

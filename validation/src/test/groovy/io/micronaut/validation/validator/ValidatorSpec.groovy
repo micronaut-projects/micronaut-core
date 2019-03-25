@@ -45,6 +45,29 @@ class ValidatorSpec extends Specification {
 
     }
 
+
+    void "test validate bean property"() {
+        given:
+        Book b = new Book(title: "", pages: 50)
+        def violations = validator.validateProperty(b, "title").sort { it.propertyPath.iterator().next().name }
+
+        expect:
+        violations.size() == 1
+        violations[0].invalidValue == ''
+        violations[0].propertyPath.iterator().next().name == 'title'
+
+    }
+
+    void "test validate value"() {
+        given:
+        def violations = validator.validateValue(Book, "title", "").sort { it.propertyPath.iterator().next().name }
+
+        expect:
+        violations.size() == 1
+        violations[0].invalidValue == ''
+        violations[0].propertyPath.iterator().next().name == 'title'
+    }
+
     void "test cascade to bean"() {
         given:
         Book b = new Book(title: "The Stand", pages: 1000, primaryAuthor: new Author(age: 150), authors: [new Author(name: "Stephen King", age: 50)])
