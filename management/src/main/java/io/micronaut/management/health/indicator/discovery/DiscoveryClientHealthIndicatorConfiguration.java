@@ -34,7 +34,7 @@ import static io.micronaut.management.health.indicator.discovery.DiscoveryClient
 @Requires(property = PREFIX + ".enabled", notEquals = StringUtils.FALSE)
 public class DiscoveryClientHealthIndicatorConfiguration implements Toggleable {
 
-    static final String PREFIX = "discovery-client.indicator";
+    static final String PREFIX = "endpoints.health.discovery-client.indicator";
 
     private boolean enabled = true;
 

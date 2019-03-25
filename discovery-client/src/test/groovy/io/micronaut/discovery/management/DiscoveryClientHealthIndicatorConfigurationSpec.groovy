@@ -5,14 +5,11 @@ import io.micronaut.management.health.indicator.discovery.DiscoveryClientHealthI
 import io.micronaut.management.health.indicator.discovery.DiscoveryClientHealthIndicatorConfiguration
 import spock.lang.Specification
 
-/**
- * Tests that the configuration for turning off DiscoveryClientHealthIndicatorConfiguration is working or not
- */
 class DiscoveryClientHealthIndicatorConfigurationSpec extends Specification {
 
     void 'test that the health indicator configuration is not available when disabled via config'() {
         given:
-        ApplicationContext context = ApplicationContext.run(['discovery-client.indicator.enabled': false])
+        ApplicationContext context = ApplicationContext.run(['endpoints.health.discovery-client.indicator': false])
 
         expect:
         !context.containsBean(DiscoveryClientHealthIndicatorConfiguration)
@@ -33,6 +30,5 @@ class DiscoveryClientHealthIndicatorConfigurationSpec extends Specification {
         cleanup:
         context.close()
     }
-
 
 }
