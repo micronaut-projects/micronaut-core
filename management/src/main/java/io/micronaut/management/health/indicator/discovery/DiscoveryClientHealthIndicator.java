@@ -39,7 +39,7 @@ import java.util.stream.Stream;
  * @author graemerocher
  * @since 1.0
  */
-@Requires(beans = DiscoveryClient.class)
+@Requires(beans = {DiscoveryClient.class, DiscoveryClientHealthIndicatorConfiguration.class})
 @Singleton
 public class DiscoveryClientHealthIndicator implements HealthIndicator {
 
