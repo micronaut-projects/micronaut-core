@@ -66,7 +66,9 @@ micronaut:
             default-version: 3 <1>
 ----
 
-A route will *not* be matched under the following conditions:
+<1> Sets the default version
+
+A route will *not* be matched if the following conditions are met:
 
 * The default version is configured
 * No version is found in the request
