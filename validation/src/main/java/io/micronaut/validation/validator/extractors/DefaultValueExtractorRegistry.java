@@ -57,12 +57,12 @@ class DefaultValueExtractorRegistry implements ValueExtractorRegistry {
                                            .collect(Collectors.toSet());
     }
 
+    @SuppressWarnings("unchecked")
     @Nonnull
     @Override
     public <T> Optional<ValueExtractor<T>> findValueExtractor(@Nonnull Class<T> targetType) {
         ArgumentUtils.requireNonNull("targetType", targetType);
-        final Optional result = beanContext.findBean(ValueExtractor.class, Qualifiers.byTypeArguments(targetType));
-        return result;
+        return (Optional) beanContext.findBean(ValueExtractor.class, Qualifiers.byTypeArguments(targetType));
     }
 
     @SuppressWarnings("unchecked")
@@ -71,8 +71,7 @@ class DefaultValueExtractorRegistry implements ValueExtractorRegistry {
     public <T> Optional<ValueExtractor<T>> findUnwrapValueExtractor(@Nonnull Class<T> targetType) {
         ArgumentUtils.requireNonNull("targetType", targetType);
         if (unwrapByDefaultTypes.contains(targetType)) {
-            final Optional result = beanContext.findBean(ValueExtractor.class, Qualifiers.byTypeArguments(targetType));
-            return result;
+            return (Optional) beanContext.findBean(ValueExtractor.class, Qualifiers.byTypeArguments(targetType));
         }
         return Optional.empty();
     }
