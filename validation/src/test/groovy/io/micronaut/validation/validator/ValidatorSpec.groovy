@@ -1,12 +1,14 @@
 package io.micronaut.validation.validator
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Executable
 import io.micronaut.core.annotation.Introspected
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 import spock.lang.Unroll
 
+import javax.inject.Singleton
 import javax.validation.ConstraintViolation
 import javax.validation.ElementKind
 import javax.validation.Valid
@@ -161,6 +163,35 @@ class ValidatorSpec extends Specification {
         violations.first().propertyPath.toString() == 'integers'
     }
 
+    void "test executable validator"() {
+        given:
+        BookService bookService = applicationContext.getBean(BookService)
+        def constraintViolations = validator.forExecutables().validateParameters(
+                bookService,
+                BookService.getDeclaredMethod("saveBook", String, int.class),
+                ["", 50] as Object[]
+        ).toList().sort({ it.propertyPath.toString() })
+
+        expect:
+        constraintViolations[0].invalidValue == 50
+        constraintViolations[0].propertyPath.toString() == 'saveBook.pages'
+        constraintViolations.size() == 2
+    }
+
+    void "test executable validator - cascade to array"() {
+        given:
+        BookService bookService = applicationContext.getBean(BookService)
+        def constraintViolations = validator.forExecutables().validateParameters(
+                bookService,
+                BookService.getDeclaredMethod("saveIntArray", int[].class),
+                [[30, 10, 60] as int[]] as Object[]
+        ).toList().sort({ it.propertyPath.toString() })
+
+
+        expect:
+        constraintViolations.size() == 2
+//        constraintViolations[0].propertyPath.toString() == 'saveIntArray.integers[0]' TODO
+    }
 }
 
 @Introspected
@@ -197,4 +228,19 @@ class ArrayTest {
     @Max(20l)
     @NotNull
     int[] integers
+}
+
+@Singleton
+class BookService {
+    @Executable
+    Book saveBook(@NotBlank String title, @Min(100l) int pages) {
+        new Book(title: title, pages: pages)
+    }
+
+    @Executable
+    ArrayTest saveIntArray(@Valid
+                   @Max(20l)
+                   @NotNull int[] integers) {
+        new ArrayTest(integers: integers)
+    }
 }
