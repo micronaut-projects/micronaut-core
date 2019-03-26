@@ -332,12 +332,14 @@ abstract class AbstractOpenApiVisitor  {
                         schema = getPrimitiveType(Object.class.getName());
                     }
 
-                    if (schema != null) {
-                        schema = arraySchema(schema);
-                    } else if (componentType.isPresent()) {
+                    if (schema == null && componentType.isPresent()) {
                         ClassElement componentElement = componentType.get();
                         // we must have a POJO so let's create a component
                         schema = getSchemaDefinition(mediaType, openAPI, context, componentElement, definingElement);
+                    }
+
+                    if (schema != null) {
+                        schema = arraySchema(schema);
                     }
                 } else {
                     schema = getSchemaDefinition(mediaType, openAPI, context, type, definingElement);
@@ -347,7 +349,7 @@ abstract class AbstractOpenApiVisitor  {
 
             if (schema != null) {
                 boolean isStream = MediaType.TEXT_EVENT_STREAM.equals(mediaType) || MediaType.APPLICATION_JSON_STREAM.equals(mediaType);
-                if ((!isStream && isPublisher) || type.isIterable()) {
+                if ((!isStream && isPublisher)) {
                     schema = arraySchema(schema);
                 }
             }
