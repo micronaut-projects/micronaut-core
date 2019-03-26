@@ -4,12 +4,102 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.swagger.v3.oas.annotations.enums.ParameterIn
 import io.swagger.v3.oas.models.OpenAPI
 import io.swagger.v3.oas.models.PathItem
+import io.swagger.v3.oas.models.media.ArraySchema
 import io.swagger.v3.oas.models.media.MapSchema
 import io.swagger.v3.oas.models.media.Schema
 
 class OpenApiPojoControllerSpec extends AbstractTypeElementSpec {
     def setup() {
         System.setProperty(AbstractOpenApiVisitor.ATTR_TEST_MODE, "true")
+    }
+
+    void "test build OpenAPI for List"() {
+        given: "An API definition"
+        when:
+        buildBeanDefinition('test.MyBean','''
+package test;
+
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+
+import java.util.List;
+
+@Controller("/pets")
+interface PetOperations<T extends Pet> {
+
+    /**
+     * Find a pet by a slug
+     *
+     * @param slug The slug name
+     * @return A pet or 404
+     */
+    @Get("/{slug}")
+    T find(String slug);
+}
+
+class Pet {
+    private int age;
+    private String name;
+    private List<String> tags;
+
+    public void setAge(int a) {
+        age = a;
+    }
+
+    /**
+     * The Pet Age
+     *
+     * @return The Pet Age
+     */
+    public int getAge() {
+        return age;
+    }
+
+    public void setName(String n) {
+        name = n;
+    }
+
+    /**
+     * The Pet Name
+     *
+     * @return The Pet Name
+     */
+    public String getName() {
+        return name;
+    }
+
+
+    /**
+     * The Pet Tags
+     *  
+     * @return The Tag
+     */
+    public List<String> getTags() {
+        return tags;
+    }
+
+    public void setTags(List<String> tags) {
+        this.tags = tags;
+    }
+}
+
+@javax.inject.Singleton
+class MyBean {}
+''')
+        then:"the state is correct"
+        AbstractOpenApiVisitor.testReference != null
+
+        when:"The OpenAPI is retrieved"
+        OpenAPI openAPI = AbstractOpenApiVisitor.testReference
+        Schema petSchema = openAPI.components.schemas['Pet']
+
+        then:"the components are valid"
+        petSchema.type == 'object'
+        petSchema.properties.size() == 3
+
+        petSchema.properties["tags"].type == "array"
+        petSchema.properties["tags"].description == "The Pet Tags"
+        ((ArraySchema) petSchema.properties["tags"]).items.type == "string"
     }
 
     void "test build OpenAPI for Dictionaries, HashMaps and Associative Arrays" () {
