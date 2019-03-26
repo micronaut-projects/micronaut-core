@@ -51,6 +51,14 @@ public abstract class CompositeDiscoveryClient implements DiscoveryClient {
         return toString();
     }
 
+    /**
+     * The underlying clients.
+     * @return The clients
+     */
+    public DiscoveryClient[] getDiscoveryClients() {
+        return discoveryClients;
+    }
+
     @Override
     public Flowable<List<ServiceInstance>> getInstances(String serviceId) {
         serviceId = NameUtils.hyphenate(serviceId);
