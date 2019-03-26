@@ -1,5 +1,6 @@
 dependencies {
     compileOnly project(":inject-java")
+    compileOnly project(":graal")
     compile project(":runtime")
     compile project(":management")
     compile project(":http")
