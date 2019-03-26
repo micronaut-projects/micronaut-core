@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router.version
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
@@ -26,11 +27,14 @@ import io.micronaut.web.router.version.resolution.HeaderVersionResolver
 import io.micronaut.web.router.version.resolution.HeaderVersionResolverConfiguration
 import io.micronaut.web.router.version.resolution.ParameterVersionResolver
 import io.micronaut.web.router.version.resolution.ParameterVersionResolverConfiguration
+import spock.lang.Shared
 import spock.lang.Specification
 
 import java.util.stream.Collectors
 
 class DefaultVersionedUrlFilterSpec extends Specification {
+
+    @Shared ApplicationContext context
 
     List<UriRouteMatch<Object, Object>> routes
 
@@ -41,7 +45,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
             })]
 
     def setup() {
-        def context = new DefaultApplicationContext("test").start()
+        context = new DefaultApplicationContext("test").start()
         def controller = new VersionedController()
         context.registerSingleton(controller)
 
@@ -54,6 +58,10 @@ class DefaultVersionedUrlFilterSpec extends Specification {
             }
         })
         routes = router.find(HttpMethod.GET, "/versioned/hello").collect(Collectors.toList())
+    }
+
+    def cleanup() {
+        context.close()
     }
 
     def "should extract header version from request"() {

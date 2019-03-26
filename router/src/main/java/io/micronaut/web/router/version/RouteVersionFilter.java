@@ -78,12 +78,12 @@ public class RouteVersionFilter implements RouteMatchFilter {
 
         Optional<String> defaultVersion = versioningConfiguration.getDefaultVersion();
 
-        return (match) -> {
-            Optional<String> version = resolvingStrategies.stream()
-                    .map(strategy -> strategy.resolve(request).orElse(null))
-                    .filter(Objects::nonNull)
-                    .findFirst();
+        Optional<String> version = resolvingStrategies.stream()
+                .map(strategy -> strategy.resolve(request).orElse(null))
+                .filter(Objects::nonNull)
+                .findFirst();
 
+        return (match) -> {
             Optional<String> routeVersion = getVersion(match);
 
             if (routeVersion.isPresent()) {
@@ -101,15 +101,18 @@ public class RouteVersionFilter implements RouteMatchFilter {
                     return resolvedVersion.equals(routeVersion.get());
                 }
             } else {
-                if (LOG.isDebugEnabled()) {
-                    if (version.isPresent()) {
+                //route is not versioned but request is
+                if (version.isPresent()) {
+                    if (LOG.isDebugEnabled()) {
                         LOG.debug("Route does not specify a version but the version {} was resolved for request to URI {}", version.get(), request.getUri());
-                    } else {
+                    }
+                    return false;
+                } else {
+                    if (LOG.isDebugEnabled()) {
                         LOG.debug("Route does not specify a version and no version was resolved for request to URI {}", request.getUri());
                     }
+                    return true;
                 }
-                //route is not versioned but request is
-                return !version.isPresent();
             }
         };
     }
