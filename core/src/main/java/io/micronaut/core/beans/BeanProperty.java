@@ -16,12 +16,12 @@
 
 package io.micronaut.core.beans;
 
+import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
-import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 
@@ -44,7 +44,7 @@ import java.util.Optional;
  * @see BeanIntrospection
  */
 @Immutable
-public interface BeanProperty<B, T> extends Named, AnnotationMetadataDelegate {
+public interface BeanProperty<B, T> extends AnnotatedElement, AnnotationMetadataDelegate {
 
     /**
      * @return The declaring bean introspection.
