@@ -29,6 +29,7 @@ import java.util.Map;
  * support.
  *
  * @author Semyon Gashchenko
+ * @since 1.1.0
  */
 @Singleton
 public class LinkBuilder extends StandardLinkBuilder {
