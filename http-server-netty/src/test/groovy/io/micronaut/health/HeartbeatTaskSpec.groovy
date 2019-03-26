@@ -32,6 +32,7 @@ class HeartbeatTaskSpec extends Specification {
     void "test that by default a heartbeat is sent"() {
         when:
         EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
+                'micronaut.heartbeat.enabled':true,
                 'micronaut.heartbeat.initialDelay':'1ms',
                 'micronaut.heartbeat.interval':'10ms',
                 'micronaut.application.name':'test'
