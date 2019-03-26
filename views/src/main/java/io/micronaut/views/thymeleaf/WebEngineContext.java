@@ -28,6 +28,7 @@ import java.util.Map;
  * Implementation of the {@link org.thymeleaf.context.IEngineContext} interface for web processing.
  *
  * @author Semyon Gashchenko
+ * @since 1.1.0
  */
 public class WebEngineContext extends EngineContext {
 
