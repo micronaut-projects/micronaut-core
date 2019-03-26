@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
 <head>
     <title>Home</title>
 </head>
 <body>
-<p ></p>
+<p></p>
 <h1 th:if="${loggedIn}">username: <span th:text="${username}"></span></h1>
 <h1 th:unless="${loggedIn}">You are not logged in</h1>
 </body>
