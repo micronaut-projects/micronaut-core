@@ -34,6 +34,7 @@ import java.util.Set;
  * Implementation of the {@link IEngineContextFactory} interface for {@link WebContext} support.
  *
  * @author Semyon Gashchenko
+ * @since 1.1.0
  */
 @Singleton
 public class EngineContextFactory implements IEngineContextFactory {
