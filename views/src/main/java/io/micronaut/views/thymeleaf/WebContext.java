@@ -27,6 +27,7 @@ import java.util.Map;
  * org.thymeleaf.context.IWebContext} interfaces.
  *
  * @author Semyon Gashchenko
+ * @since 1.1.0
  */
 public class WebContext extends AbstractContext {
 
