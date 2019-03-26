@@ -71,7 +71,7 @@ public class TokenConfigurationProperties implements TokenConfiguration {
     }
 
     /**
-     * Name of the roles property. Default value {@value #DEFAULT_ROLES_NAME}.
+     * Name of the roles property. Default value {@value io.micronaut.security.token.config.TokenConfiguration#DEFAULT_ROLES_NAME}.
      * @param rolesName The roles name
      */
     public void setRolesName(String rolesName) {

@@ -82,7 +82,7 @@ public class SecuritySessionConfigurationProperties implements SecuritySessionCo
     }
 
     /**
-     * Decides whether the deprecated {@link SessionSecurityFilterOrderProvider} is loaded, instead of the new {@link io.micronaut.security.handlers.RedirectRejectionHandler}. Defaults to (#DEFAULT_LEGACYREJECTIONHANDLER).
+     * Decides whether the deprecated {@link SessionSecurityFilterOrderProvider} is loaded, instead of the new {@link io.micronaut.security.handlers.RedirectRejectionHandler}. Defaults to ({@value #DEFAULT_LEGACYREJECTIONHANDLER}).
      * @param legacyRejectionHandler whether the deprecated {@link SessionSecurityFilterOrderProvider} is loaded
      */
     public void setLegacyRejectionHandler(boolean legacyRejectionHandler) {
