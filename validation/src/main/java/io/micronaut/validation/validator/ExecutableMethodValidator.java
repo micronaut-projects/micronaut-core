@@ -21,6 +21,8 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.validation.ConstraintViolation;
 import javax.validation.executable.ExecutableValidator;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.util.Set;
 
 /**
@@ -45,4 +47,15 @@ public interface ExecutableMethodValidator extends ExecutableValidator  {
             @Nonnull ExecutableMethod method,
             @Nullable Object[] parameterValues, @Nullable Class<?>... groups);
 
+    @Override
+    @Nonnull <T> Set<ConstraintViolation<T>> validateParameters(@Nonnull T object, @Nonnull Method method, @Nonnull Object[] parameterValues, @Nullable Class<?>... groups);
+
+    @Override
+    @Nonnull <T> Set<ConstraintViolation<T>> validateReturnValue(@Nonnull T object, @Nonnull Method method, @Nullable Object returnValue, @Nullable Class<?>... groups);
+
+    @Override
+    @Nonnull <T> Set<ConstraintViolation<T>> validateConstructorParameters(@Nonnull Constructor<? extends T> constructor, @Nonnull Object[] parameterValues, @Nullable Class<?>... groups);
+
+    @Override
+    @Nonnull <T> Set<ConstraintViolation<T>> validateConstructorReturnValue(@Nonnull Constructor<? extends T> constructor, @Nonnull T createdObject, @Nullable Class<?>... groups);
 }
