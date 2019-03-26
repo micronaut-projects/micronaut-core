@@ -20,6 +20,7 @@ import io.micronaut.core.io.ResourceLoader;
 import io.micronaut.core.io.Writable;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.views.ViewUtils;
@@ -37,6 +38,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
+import java.io.Writer;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -91,12 +93,20 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
     public Writable render(@Nonnull String viewName, @Nullable Object data) {
         ArgumentUtils.requireNonNull("viewName", viewName);
         return (writer) -> {
-            final IContext context = new Context(Locale.US, variables(data));
-            try {
-                engine.process(viewName, context, writer);
-            } catch (TemplateEngineException e) {
-                throw new ViewRenderingException("Error rendering Thymeleaf view [" + viewName + "]: " + e.getMessage(), e);
-            }
+            IContext context = new Context(Locale.US, variables(data));
+            processView(viewName, writer, context);
+        };
+    }
+
+    @Override
+    @Nonnull
+    public Writable render(@Nonnull String viewName, @Nullable Object data,
+            @Nonnull HttpRequest<?> request) {
+        ArgumentUtils.requireNonNull("viewName", viewName);
+        ArgumentUtils.requireNonNull("request", request);
+        return (writer) -> {
+            IContext context = new WebContext(request, Locale.US, variables(data));
+            processView(viewName, writer, context);
         };
     }
 
@@ -128,7 +138,7 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
         return templateResolver;
     }
 
-    private Map<String, Object> variables(@Nullable Object data) {
+    private static Map<String, Object> variables(@Nullable Object data) {
         if (data == null) {
             return new HashMap<>();
         }
@@ -143,5 +153,13 @@ public class ThymeleafViewsRenderer implements ViewsRenderer {
         return templateResolver.getPrefix() +
                 ViewUtils.normalizeFile(name, templateResolver.getSuffix()) +
                 templateResolver.getSuffix();
+    }
+
+    private void processView(String viewName, Writer writer, IContext context) {
+        try {
+            engine.process(viewName, context, writer);
+        } catch (TemplateEngineException e) {
+            throw new ViewRenderingException("Error rendering Thymeleaf view [" + viewName + "]: " + e.getMessage(), e);
+        }
     }
 }
