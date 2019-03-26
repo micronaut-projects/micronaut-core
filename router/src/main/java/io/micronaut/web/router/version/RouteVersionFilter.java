@@ -22,10 +22,13 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.filter.RouteMatchFilter;
 import io.micronaut.web.router.version.resolution.RequestVersionResolver;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
 
@@ -39,7 +42,10 @@ import java.util.function.Predicate;
 @Requires(beans = RoutesVersioningConfiguration.class)
 public class RouteVersionFilter implements RouteMatchFilter {
 
+    private static final Logger LOG = LoggerFactory.getLogger(RouteVersionFilter.class);
+
     private final List<RequestVersionResolver> resolvingStrategies;
+    private final RoutesVersioningConfiguration versioningConfiguration;
 
     /**
      * Creates a {@link RouteVersionFilter} with a collection of {@link RequestVersionResolver}.
@@ -47,8 +53,10 @@ public class RouteVersionFilter implements RouteMatchFilter {
      * @param resolvingStrategies A list of {@link RequestVersionResolver} beans to extract version from HTTP request
      */
     @Inject
-    public RouteVersionFilter(List<RequestVersionResolver> resolvingStrategies) {
+    public RouteVersionFilter(List<RequestVersionResolver> resolvingStrategies,
+                              RoutesVersioningConfiguration versioningConfiguration) {
         this.resolvingStrategies = resolvingStrategies;
+        this.versioningConfiguration = versioningConfiguration;
     }
 
     /**
@@ -68,19 +76,48 @@ public class RouteVersionFilter implements RouteMatchFilter {
             return (match) -> true;
         }
 
-        return (match) -> resolvingStrategies.stream()
-                .map(strategy -> strategy.resolve(request))
-                .filter(Optional::isPresent)
-                .findFirst()
-                .flatMap(opt -> opt.map(v -> isVersionMatched(match, v)))
-                .orElse(true);
+        Optional<String> defaultVersion = versioningConfiguration.getDefaultVersion();
+
+        return (match) -> {
+            Optional<String> version = resolvingStrategies.stream()
+                    .map(strategy -> strategy.resolve(request).orElse(null))
+                    .filter(Objects::nonNull)
+                    .findFirst();
+
+            Optional<String> routeVersion = getVersion(match);
+
+            if (routeVersion.isPresent()) {
+                String resolvedVersion = version.orElse(defaultVersion.orElse(null));
+                //no version found and no default version configured
+                if (resolvedVersion == null) {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Route specifies a version {} and no version information resolved for request to URI {}", routeVersion.get(), request.getUri());
+                    }
+                    return true;
+                } else {
+                    if (LOG.isDebugEnabled()) {
+                        LOG.debug("Route specifies a version {} and the version {} was resolved for request to URI {}", routeVersion.get(), resolvedVersion, request.getUri());
+                    }
+                    return resolvedVersion.equals(routeVersion.get());
+                }
+            } else {
+                if (LOG.isDebugEnabled()) {
+                    if (version.isPresent()) {
+                        LOG.debug("Route does not specify a version but the version {} was resolved for request to URI {}", version.get(), request.getUri());
+                    } else {
+                        LOG.debug("Route does not specify a version and no version was resolved for request to URI {}", request.getUri());
+                    }
+                }
+                //route is not versioned but request is
+                return !version.isPresent();
+            }
+        };
     }
 
-    private <T, R> boolean isVersionMatched(UriRouteMatch<T, R> routeMatch, String version) {
-        return Optional.ofNullable(routeMatch.getExecutableMethod().getAnnotation(Version.class))
-                .flatMap(annotation -> annotation.getValue(String.class))
-                .filter(specifiedVersion -> specifiedVersion.equals(version))
-                .isPresent();
+    private <T, R> Optional<String> getVersion(UriRouteMatch<T, R> routeMatch) {
+        return Optional.ofNullable(
+                routeMatch.getExecutableMethod().getAnnotation(Version.class))
+                .flatMap(annotation -> annotation.getValue(String.class));
     }
 
 }
