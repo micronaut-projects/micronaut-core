@@ -18,6 +18,7 @@ package io.micronaut.views;
 
 import io.micronaut.core.beans.BeanMap;
 import io.micronaut.core.io.Writable;
+import io.micronaut.http.HttpRequest;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -52,6 +53,17 @@ public interface ViewsRenderer {
      * @return A writable where the view will be written to.
      */
     @Nonnull Writable render(@Nonnull String viewName, @Nullable Object data);
+
+    /**
+     * @param viewName view name to be render
+     * @param data     response body to render it with a view
+     * @param request  HTTP request
+     * @return A writable where the view will be written to.
+     */
+    default @Nonnull Writable render(@Nonnull String viewName, @Nullable Object data,
+            @Nonnull HttpRequest<?> request) {
+        return render(viewName, data);
+    }
 
     /**
      * @param viewName view name to be render
