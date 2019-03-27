@@ -525,6 +525,9 @@ abstract class AbstractOpenApiVisitor  {
                             valueMap.put(e.getKey(), v);
                         }
                     }
+                    if (schema.get$ref() != null) {
+                        valueMap.put("$ref", schema.get$ref());
+                    }
                 }
             }
         }
