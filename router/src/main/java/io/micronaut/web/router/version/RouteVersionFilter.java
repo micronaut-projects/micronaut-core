@@ -25,6 +25,7 @@ import io.micronaut.web.router.version.resolution.RequestVersionResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.List;
@@ -45,19 +46,23 @@ public class RouteVersionFilter implements RouteMatchFilter {
     private static final Logger LOG = LoggerFactory.getLogger(RouteVersionFilter.class);
 
     private final List<RequestVersionResolver> resolvingStrategies;
-    private final RoutesVersioningConfiguration versioningConfiguration;
+    private final DefaultVersionProvider defaultVersionProvider;
+    private final RoutesVersioningConfiguration routesVersioningConfiguration;
 
     /**
      * Creates a {@link RouteVersionFilter} with a collection of {@link RequestVersionResolver}.
      *
      * @param resolvingStrategies A list of {@link RequestVersionResolver} beans to extract version from HTTP request
-     * @param versioningConfiguration The versioning configuration
+     * @param routesVersioningConfiguration Routes Versioning Configuration
+     * @param defaultVersionProvider The Default Version Provider
      */
     @Inject
     public RouteVersionFilter(List<RequestVersionResolver> resolvingStrategies,
-                              RoutesVersioningConfiguration versioningConfiguration) {
+                              RoutesVersioningConfiguration routesVersioningConfiguration,
+                              @Nullable DefaultVersionProvider defaultVersionProvider) {
         this.resolvingStrategies = resolvingStrategies;
-        this.versioningConfiguration = versioningConfiguration;
+        this.defaultVersionProvider = defaultVersionProvider;
+        this.routesVersioningConfiguration = routesVersioningConfiguration;
     }
 
     /**
@@ -73,7 +78,7 @@ public class RouteVersionFilter implements RouteMatchFilter {
 
         ArgumentUtils.requireNonNull("request", request);
 
-        Optional<String> defaultVersion = versioningConfiguration.getDefaultVersion();
+        Optional<String> defaultVersion = defaultVersionProvider == null ? Optional.empty() : Optional.of(defaultVersionProvider.resolveDefaultVersion());
 
         Optional<String> version = resolvingStrategies.stream()
                 .map(strategy -> strategy.resolve(request).orElse(null))
@@ -83,9 +88,9 @@ public class RouteVersionFilter implements RouteMatchFilter {
         return (match) -> {
             Optional<String> routeVersion = getVersion(match);
 
-            if (resolvingStrategies == null || resolvingStrategies.isEmpty()) {
+            if (resolvingStrategies.isEmpty()) {
                 if (routeVersion.isPresent()) {
-                    return !versioningConfiguration.isRejectIfMissing();
+                    return !routesVersioningConfiguration.isRejectIfMissing();
                 } else {
                     return true;
                 }

@@ -427,6 +427,8 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                             }
 
                             mappedMirror.ifPresent(annMirror -> {
+                                final Map<? extends T, ?> defaultValues = readAnnotationDefaultValues(mappedAnnotationName, annMirror);
+                                processAnnotationDefaults(metadata, mappedAnnotationName, defaultValues);
                                 final ArrayList<String> parents = new ArrayList<>();
                                 processAnnotationStereotype(
                                         parents,
