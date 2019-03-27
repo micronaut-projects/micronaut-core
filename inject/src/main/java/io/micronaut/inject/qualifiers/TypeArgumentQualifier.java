@@ -102,20 +102,34 @@ public class TypeArgumentQualifier<T> implements Qualifier<T> {
      * @return Whether the types are compatible
      */
     protected boolean areTypesCompatible(List<Class> classes) {
-        if (classes.size() == 0) {
+        final Class[] typeArguments = this.typeArguments;
+        return areTypesCompatible(typeArguments, classes);
+    }
+
+    /**
+     * Are the given types compatible.
+     *
+     * @param typeArguments The type arguments
+     * @param classToCompare The classes to check for alignments
+     * @return True if they are
+     */
+    public static boolean areTypesCompatible(Class[] typeArguments, List<Class> classToCompare) {
+        if (classToCompare.size() == 0) {
             // in this case the type doesn't specify type arguments, so this is the equivalent of using Object
             return true;
-        } else if (classes.size() != typeArguments.length) {
-            return false;
         } else {
-            for (int i = 0; i < classes.size(); i++) {
-                Class left = classes.get(i);
-                Class right = typeArguments[i];
-                if (right == Object.class) {
-                    continue;
-                }
-                if (left != right && !left.isAssignableFrom(right)) {
-                    return false;
+            if (classToCompare.size() != typeArguments.length) {
+                return false;
+            } else {
+                for (int i = 0; i < classToCompare.size(); i++) {
+                    Class left = classToCompare.get(i);
+                    Class right = typeArguments[i];
+                    if (right == Object.class) {
+                        continue;
+                    }
+                    if (left != right && !left.isAssignableFrom(right)) {
+                        return false;
+                    }
                 }
             }
         }
