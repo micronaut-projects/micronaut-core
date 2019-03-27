@@ -15,16 +15,28 @@
  */
 package io.micronaut.validation.validator.constraints;
 
-import io.micronaut.context.annotation.Bean;
-import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.BeanContext;
+import io.micronaut.context.Qualifier;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.beans.BeanWrapper;
+import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.clhm.ConcurrentLinkedHashMap;
+import io.micronaut.inject.qualifiers.Qualifiers;
+import io.micronaut.inject.qualifiers.TypeArgumentQualifier;
 
 import javax.annotation.Nonnull;
-import javax.inject.Named;
+import javax.annotation.Nullable;
+import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.validation.ValidationException;
 import javax.validation.constraints.*;
+import java.lang.annotation.Annotation;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.time.*;
@@ -33,8 +45,7 @@ import java.time.chrono.JapaneseDate;
 import java.time.chrono.MinguoDate;
 import java.time.chrono.ThaiBuddhistDate;
 import java.time.temporal.TemporalAccessor;
-import java.util.Collection;
-import java.util.Map;
+import java.util.*;
 
 /**
  * A factory bean that contains implementation for many of the default validations.
@@ -44,121 +55,40 @@ import java.util.Map;
  * @author graemerocher
  * @since 1.2
  */
-@Factory
-public class DefaultConstraintValidators {
+@Singleton
+@Introspected
+public class DefaultConstraintValidators implements ConstraintValidatorRegistry {
 
-    /**
-     * The {@link AssertFalse} validator.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("assertFalseValidator")
-    public ConstraintValidator<AssertFalse, Boolean> assertFalseValidator() {
-        return (value, annotationMetadata, context) -> value == null || !value;
-    }
+    private final Map<DefaultConstraintValidators.Key, ConstraintValidator> validatorCache = new ConcurrentLinkedHashMap.Builder<DefaultConstraintValidators.Key, ConstraintValidator>().initialCapacity(10).maximumWeightedCapacity(40).build();
 
-    /**
-     * The {@link AssertTrue} validator.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("assertTrueValidator")
-    public ConstraintValidator<AssertTrue, Boolean> assertTrueValidator() {
-        return (value, annotationMetadata, context) -> value == null || value;
-    }
+    private final ConstraintValidator<AssertFalse, Boolean> assertFalseValidator =
+            (value, annotationMetadata, context) -> value == null || !value;
 
-    /**
-     * The {@link DecimalMax} validator for char sequences.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("decimalMaxValidatorCharSequence")
-    public DecimalMaxValidator<CharSequence> decimalMaxValidatorCharSequence() {
-        return (value, bigDecimal) -> new BigDecimal(value.toString()).compareTo(bigDecimal);
-    }
+    private final ConstraintValidator<AssertTrue, Boolean> assertTrueValidator =
+            (value, annotationMetadata, context) -> value == null || value;
 
-    /**
-     * The {@link DecimalMax} validator for number.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("decimalMaxValidatorNumber")
-    public DecimalMaxValidator<Number> decimalMaxValidatorNumber() {
-        return DefaultConstraintValidators::compareNumber;
-    }
+    private final DecimalMaxValidator<CharSequence> decimalMaxValidatorCharSequence =
+            (value, bigDecimal) -> new BigDecimal(value.toString()).compareTo(bigDecimal);
 
+    private final DecimalMaxValidator<Number> decimalMaxValidatorNumber = DefaultConstraintValidators::compareNumber;
 
-    /**
-     * The {@link DecimalMin} validator for char sequences.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("decimalMinValidatorCharSequence")
-    public DecimalMinValidator<CharSequence> decimalMinValidatorCharSequence() {
-        return (value, bigDecimal) -> new BigDecimal(value.toString()).compareTo(bigDecimal);
-    }
+    private final DecimalMinValidator<CharSequence> decimalMinValidatorCharSequence =
+            (value, bigDecimal) -> new BigDecimal(value.toString()).compareTo(bigDecimal);
 
-    /**
-     * The {@link DecimalMin} validator for number.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("decimalMinValidatorNumber")
-    public DecimalMinValidator<Number> decimalMinValidatorNumber() {
-        return DefaultConstraintValidators::compareNumber;
-    }
+    private final DecimalMinValidator<Number> decimalMinValidatorNumber = DefaultConstraintValidators::compareNumber;
 
-    /**
-     * The {@link Digits} validator for number.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("digitsValidatorNumber")
-    public DigitsValidator<Number> digitsValidatorNumber() {
-        return value -> {
+    private final DigitsValidator<Number> digitsValidatorNumber = (value) -> {
             if (value instanceof BigDecimal) {
                 return (BigDecimal) value;
             }
             return new BigDecimal(value.toString());
         };
-    }
 
-    /**
-     * The {@link Digits} validator for char sequence.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("digitsValidatorCharSequence")
-    public DigitsValidator<CharSequence> digitsValidatorCharSequence() {
-        return value -> new BigDecimal(value.toString());
-    }
+    private final DigitsValidator<CharSequence> digitsValidatorCharSequence =
+            value -> new BigDecimal(value.toString());
 
-    /**
-     * The {@link Max} validator for numbers.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("maxNumberValidator")
-    public ConstraintValidator<Max, Number> maxNumberValidator() {
-        return (value, annotationMetadata, context) -> {
+    private final ConstraintValidator<Max, Number> maxNumberValidator =
+            (value, annotationMetadata, context) -> {
             if (value == null) {
                 return true; // nulls are allowed according to spec
             }
@@ -173,18 +103,9 @@ public class DefaultConstraintValidators {
             }
             return value.longValue() < max;
         };
-    }
 
-    /**
-     * The {@link Min} validator for numbers.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("minNumberValidator")
-    public ConstraintValidator<Min, Number> minNumberValidator() {
-        return (value, annotationMetadata, context) -> {
+    private final ConstraintValidator<Min, Number> minNumberValidator =
+            (value, annotationMetadata, context) -> {
             if (value == null) {
                 return true; // nulls are allowed according to spec
             }
@@ -199,392 +120,100 @@ public class DefaultConstraintValidators {
             }
             return value.longValue() >= max;
         };
-    }
 
-    /**
-     * The {@link Negative} validator for numbers.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("negativeNumberValidator")
-    public ConstraintValidator<Negative, Number> negativeNumberValidator() {
-        return (value, annotationMetadata, context) -> {
+    private final ConstraintValidator<Negative, Number> negativeNumberValidator =
+            (value, annotationMetadata, context) -> {
             // null is allowed according to spec
             return value == null || value.intValue() < 0;
         };
-    }
 
-    /**
-     * The {@link NegativeOrZero} validator for numbers.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("negativeOrZeroNumberValidator")
-    public ConstraintValidator<NegativeOrZero, Number> negativeOrZeroNumberValidator() {
-        return (value, annotationMetadata, context) -> {
+    private final ConstraintValidator<NegativeOrZero, Number> negativeOrZeroNumberValidator =
+            (value, annotationMetadata, context) -> {
             // null is allowed according to spec
             return value == null || value.intValue() <= 0;
         };
-    }
 
-    /**
-     * The {@link Positive} validator for numbers.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("positiveNumberValidator")
-    public ConstraintValidator<Positive, Number> positiveNumberValidator() {
-        return (value, annotationMetadata, context) -> {
+    private final ConstraintValidator<Positive, Number> positiveNumberValidator =
+            (value, annotationMetadata, context) -> {
             // null is allowed according to spec
             return value == null || value.intValue() > 0;
         };
-    }
 
-    /**
-     * The {@link PositiveOrZero} validator for numbers.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("positiveOrZeroNumberValidator")
-    public ConstraintValidator<PositiveOrZero, Number> positiveOrZeroNumberValidator() {
-        return (value, annotationMetadata, context) -> {
+    private final ConstraintValidator<PositiveOrZero, Number> positiveOrZeroNumberValidator =
+            (value, annotationMetadata, context) -> {
             // null is allowed according to spec
             return value == null || value.intValue() >= 0;
         };
-    }
 
-    /**
-     * The {@link NotBlank} validator for char sequences.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("notBlankValidator")
-    public ConstraintValidator<NotBlank, CharSequence> notBlankValidator() {
-        return (value, annotationMetadata, context) ->
+    private final ConstraintValidator<NotBlank, CharSequence> notBlankValidator =
+            (value, annotationMetadata, context) ->
                 StringUtils.isNotEmpty(value) && value.toString().trim().length() > 0;
-    }
 
-    /**
-     * The {@link NotNull} validator.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("notNullValidator")
-    public ConstraintValidator<NotNull, Object> notNullValidator() {
-        return (value, annotationMetadata, context) -> value != null;
-    }
+    private final ConstraintValidator<NotNull, Object> notNullValidator =
+            (value, annotationMetadata, context) -> value != null;
 
-    /**
-     * The {@link Null} validator.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("nullValidator")
-    public ConstraintValidator<Null, Object> nullValidator() {
-        return (value, annotationMetadata, context) -> value == null;
-    }
+    private final ConstraintValidator<Null, Object> nullValidator =
+            (value, annotationMetadata, context) -> value == null;
 
-    /**
-     * The {@link NotEmpty} validator for byte[].
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("notEmptyByteArrayValidator")
-    public ConstraintValidator<NotEmpty, byte[]> notEmptyByteArrayValidator() {
-        return (value, annotationMetadata, context) -> value != null && value.length > 0;
-    }
+    private final ConstraintValidator<NotEmpty, byte[]> notEmptyByteArrayValidator =
+            (value, annotationMetadata, context) -> value != null && value.length > 0;
 
-    /**
-     * The {@link NotEmpty} validator for char[].
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("notEmptyCharArrayValidator")
-    public ConstraintValidator<NotEmpty, char[]> notEmptyCharArrayValidator() {
-        return (value, annotationMetadata, context) -> value != null && value.length > 0;
-    }
+    private final ConstraintValidator<NotEmpty, char[]> notEmptyCharArrayValidator =
+            (value, annotationMetadata, context) -> value != null && value.length > 0;
 
-    /**
-     * The {@link NotEmpty} validator for boolean[].
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("notEmptyBooleanArrayValidator")
-    public ConstraintValidator<NotEmpty, boolean[]> notEmptyBooleanArrayValidator() {
-        return (value, annotationMetadata, context) -> value != null && value.length > 0;
-    }
+    private final ConstraintValidator<NotEmpty, boolean[]> notEmptyBooleanArrayValidator =
+            (value, annotationMetadata, context) -> value != null && value.length > 0;
 
-    /**
-     * The {@link NotEmpty} validator for double[].
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("notEmptyDoubleArrayValidator")
-    public ConstraintValidator<NotEmpty, double[]> notEmptyDoubleArrayValidator() {
-        return (value, annotationMetadata, context) -> value != null && value.length > 0;
-    }
+    private final ConstraintValidator<NotEmpty, double[]> notEmptyDoubleArrayValidator =
+            (value, annotationMetadata, context) -> value != null && value.length > 0;
 
-    /**
-     * The {@link NotEmpty} validator for float[].
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("notEmptyFloatArrayValidator")
-    public ConstraintValidator<NotEmpty, float[]> notEmptyFloatArrayValidator() {
-        return (value, annotationMetadata, context) -> value != null && value.length > 0;
-    }
+    private final ConstraintValidator<NotEmpty, float[]> notEmptyFloatArrayValidator =
+            (value, annotationMetadata, context) -> value != null && value.length > 0;
 
-    /**
-     * The {@link NotEmpty} validator for int[].
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("notEmptyIntArrayValidator")
-    public ConstraintValidator<NotEmpty, int[]> notEmptyIntArrayValidator() {
-        return (value, annotationMetadata, context) -> value != null && value.length > 0;
-    }
+    private final ConstraintValidator<NotEmpty, int[]> notEmptyIntArrayValidator =
+            (value, annotationMetadata, context) -> value != null && value.length > 0;
 
-    /**
-     * The {@link NotEmpty} validator for long[].
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("notEmptyLongArrayValidator")
-    public ConstraintValidator<NotEmpty, long[]> notEmptyLongArrayValidator() {
-        return (value, annotationMetadata, context) -> value != null && value.length > 0;
-    }
+    private final ConstraintValidator<NotEmpty, long[]> notEmptyLongArrayValidator =
+            (value, annotationMetadata, context) -> value != null && value.length > 0;
 
-    /**
-     * The {@link NotEmpty} validator for Object[].
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("notEmptyObjectArrayValidator")
-    public ConstraintValidator<NotEmpty, Object[]> notEmptyObjectArrayValidator() {
-        return (value, annotationMetadata, context) -> value != null && value.length > 0;
-    }
+    private final ConstraintValidator<NotEmpty, Object[]> notEmptyObjectArrayValidator = (value, annotationMetadata, context) -> value != null && value.length > 0;
 
-    /**
-     * The {@link NotEmpty} validator for short[].
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("notEmptyShortArrayValidator")
-    public ConstraintValidator<NotEmpty, short[]> notEmptyShortArrayValidator() {
-        return (value, annotationMetadata, context) -> value != null && value.length > 0;
-    }
+    private final ConstraintValidator<NotEmpty, short[]> notEmptyShortArrayValidator =
+            (value, annotationMetadata, context) -> value != null && value.length > 0;
 
-    /**
-     * The {@link NotEmpty} validator for char sequence.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("notEmptyCharSequenceValidator")
-    public ConstraintValidator<NotEmpty, CharSequence> notEmptyCharSequenceValidator() {
-        return (value, annotationMetadata, context) -> StringUtils.isNotEmpty(value);
-    }
+    private final ConstraintValidator<NotEmpty, CharSequence> notEmptyCharSequenceValidator =
+            (value, annotationMetadata, context) -> StringUtils.isNotEmpty(value);
 
-    /**
-     * The {@link NotEmpty} validator for collection.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("notEmptyCollectionValidator")
-    public ConstraintValidator<NotEmpty, Collection> notEmptyCollectionValidator() {
-        return (value, annotationMetadata, context) -> CollectionUtils.isNotEmpty(value);
-    }
+    private final ConstraintValidator<NotEmpty, Collection> notEmptyCollectionValidator =
+            (value, annotationMetadata, context) -> CollectionUtils.isNotEmpty(value);
 
-    /**
-     * The {@link NotEmpty} validator for map.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("notEmptyMapValidator")
-    public ConstraintValidator<NotEmpty, Map> notEmptyMapValidator() {
-        return (value, annotationMetadata, context) -> CollectionUtils.isNotEmpty(value);
-    }
+    private final ConstraintValidator<NotEmpty, Map> notEmptyMapValidator =
+            (value, annotationMetadata, context) -> CollectionUtils.isNotEmpty(value);
 
-    /**
-     * The {@link Size} validator for byte[].
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("sizeByteArrayValidator")
-    public SizeValidator<byte[]> sizeByteArrayValidator() {
-        return value -> value.length;
-    }
+    private final SizeValidator<byte[]> sizeByteArrayValidator = value -> value.length;
 
-    /**
-     * The {@link Size} validator for char[].
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("sizeCharArrayValidator")
-    public SizeValidator<char[]> sizeCharArrayValidator() {
-        return value -> value.length;
-    }
+    private final SizeValidator<char[]> sizeCharArrayValidator = value -> value.length;
 
-    /**
-     * The {@link Size} validator for boolean[].
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("sizeBooleanArrayValidator")
-    public SizeValidator<boolean[]> sizeBooleanArrayValidator() {
-        return value -> value.length;
-    }
+    private final SizeValidator<boolean[]> sizeBooleanArrayValidator = value -> value.length;
 
-    /**
-     * The {@link Size} validator for double[].
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("sizeDoubleArrayValidator")
-    public SizeValidator<double[]> sizeDoubleArrayValidator() {
-        return value -> value.length;
-    }
+    private final SizeValidator<double[]> sizeDoubleArrayValidator = value -> value.length;
 
-    /**
-     * The {@link Size} validator for float[].
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("sizeFloatArrayValidator")
-    public SizeValidator<float[]> sizeFloatArrayValidator() {
-        return value -> value.length;
-    }
+    private final SizeValidator<float[]> sizeFloatArrayValidator = value -> value.length;
 
-    /**
-     * The {@link Size} validator for int[].
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("sizeIntArrayValidator")
-    public SizeValidator<int[]> sizeIntArrayValidator() {
-        return value -> value.length;
-    }
+    private final SizeValidator<int[]> sizeIntArrayValidator = value -> value.length;
 
-    /**
-     * The {@link Size} validator for long[].
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("sizeLongArrayValidator")
-    public SizeValidator<long[]> sizeLongArrayValidator() {
-        return value -> value.length;
-    }
+    private final SizeValidator<long[]> sizeLongArrayValidator = value -> value.length;
 
-    /**
-     * The {@link Size} validator for short[].
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("sizeShortArrayValidator")
-    public SizeValidator<short[]> sizeShortArrayValidator() {
-        return value -> value.length;
-    }
+    private final SizeValidator<short[]> sizeShortArrayValidator = value -> value.length;
 
-    /**
-     * The {@link Size} validator for CharSequence.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("sizeCharSequenceValidator")
-    public SizeValidator<CharSequence> sizeCharSequenceValidator() {
-        return CharSequence::length;
-    }
+    private final SizeValidator<CharSequence> sizeCharSequenceValidator = CharSequence::length;
 
-    /**
-     * The {@link Size} validator for Collection.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("sizeCollectionValidator")
-    public SizeValidator<Collection> sizeCollectionValidator() {
-        return Collection::size;
-    }
+    private final SizeValidator<Collection> sizeCollectionValidator = Collection::size;
 
-    /**
-     * The {@link Size} validator for Map.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("sizeMapValidator")
-    public SizeValidator<Map> sizeMapValidator() {
-        return Map::size;
-    }
+    private final SizeValidator<Map> sizeMapValidator = Map::size;
 
-
-    /**
-     * The {@link Past} validator for temporal accessor.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("pastTemporalAccessorConstraintValidator")
-    public ConstraintValidator<Past, TemporalAccessor> pastTemporalAccessorConstraintValidator() {
-        return (value, annotationMetadata, context) -> {
+    private final ConstraintValidator<Past, TemporalAccessor> pastTemporalAccessorConstraintValidator =
+            (value, annotationMetadata, context) -> {
             if (value == null) {
                 // null is valid according to spec
                 return true;
@@ -592,18 +221,9 @@ public class DefaultConstraintValidators {
             Comparable comparable = getNow(value, context.getClockProvider().getClock());
             return comparable.compareTo(value) > 0;
         };
-    }
 
-    /**
-     * The {@link PastOrPresent} validator for temporal accessor.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("pastOrPresentTemporalAccessorConstraintValidator")
-    public ConstraintValidator<PastOrPresent, TemporalAccessor> pastOrPresentTemporalAccessorConstraintValidator() {
-        return (value, annotationMetadata, context) -> {
+    private final ConstraintValidator<PastOrPresent, TemporalAccessor> pastOrPresentTemporalAccessorConstraintValidator =
+            (value, annotationMetadata, context) -> {
             if (value == null) {
                 // null is valid according to spec
                 return true;
@@ -611,18 +231,8 @@ public class DefaultConstraintValidators {
             Comparable comparable = getNow(value, context.getClockProvider().getClock());
             return comparable.compareTo(value) >= 0;
         };
-    }
 
-    /**
-     * The {@link Future} validator for temporal accessor.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("futureTemporalAccessorConstraintValidator")
-    public ConstraintValidator<Future, TemporalAccessor> futureTemporalAccessorConstraintValidator() {
-        return (value, annotationMetadata, context) -> {
+    private final ConstraintValidator<Future, TemporalAccessor> futureTemporalAccessorConstraintValidator = (value, annotationMetadata, context) -> {
             if (value == null) {
                 // null is valid according to spec
                 return true;
@@ -630,18 +240,8 @@ public class DefaultConstraintValidators {
             Comparable comparable = getNow(value, context.getClockProvider().getClock());
             return comparable.compareTo(value) < 0;
         };
-    }
 
-    /**
-     * The {@link FutureOrPresent} validator for temporal accessor.
-     *
-     * @return The validator
-     */
-    @Singleton
-    @Bean
-    @Named("futureOrPresentTemporalAccessorConstraintValidator")
-    public ConstraintValidator<FutureOrPresent, TemporalAccessor> futureOrPresentTemporalAccessorConstraintValidator() {
-        return (value, annotationMetadata, context) -> {
+    private final ConstraintValidator<FutureOrPresent, TemporalAccessor> futureOrPresentTemporalAccessorConstraintValidator = (value, annotationMetadata, context) -> {
             if (value == null) {
                 // null is valid according to spec
                 return true;
@@ -649,6 +249,509 @@ public class DefaultConstraintValidators {
             Comparable comparable = getNow(value, context.getClockProvider().getClock());
             return comparable.compareTo(value) <= 0;
         };
+
+    private final @Nullable BeanContext beanContext;
+    private final Map<Key, ConstraintValidator> localValidators;
+
+    /**
+     * Default constructor.
+     */
+    public DefaultConstraintValidators() {
+        this(null);
+    }
+
+    /**
+     * Constructor used for DI.
+     *
+     * @param beanContext The bean context
+     */
+    @Inject
+    protected DefaultConstraintValidators(@Nullable BeanContext beanContext) {
+        this.beanContext = beanContext;
+        final BeanWrapper<DefaultConstraintValidators> wrapper = BeanWrapper.getWrapper(this);
+        final Collection<BeanProperty<DefaultConstraintValidators, Object>> beanProperties = wrapper.getBeanProperties();
+        Map<Key, ConstraintValidator> validatorMap = new HashMap<>(beanProperties.size());
+        for (BeanProperty<DefaultConstraintValidators, Object> property : beanProperties) {
+            if (ConstraintValidator.class.isAssignableFrom(property.getType())) {
+                final Argument[] typeParameters = property.asArgument().getTypeParameters();
+                if (ArrayUtils.isNotEmpty(typeParameters)) {
+                    final int len = typeParameters.length;
+
+                    wrapper.getProperty(property.getName(), ConstraintValidator.class).ifPresent(constraintValidator -> {
+                        if (len == 2) {
+                            final Class targetType = ReflectionUtils.getWrapperType(typeParameters[1].getType());
+                            final Key key = new Key(typeParameters[0].getType(), targetType);
+                            validatorMap.put(key, constraintValidator);
+                        } else if (len == 1) {
+                            if (constraintValidator instanceof SizeValidator) {
+                                final Key key = new Key(Size.class, typeParameters[0].getType());
+                                validatorMap.put(key, constraintValidator);
+                            } else if (constraintValidator instanceof DigitsValidator) {
+                                final Key key = new Key(Digits.class, typeParameters[0].getType());
+                                validatorMap.put(key, constraintValidator);
+                            } else if (constraintValidator instanceof DecimalMaxValidator) {
+                                final Key key = new Key(DecimalMax.class, typeParameters[0].getType());
+                                validatorMap.put(key, constraintValidator);
+                            } else if (constraintValidator instanceof DecimalMinValidator) {
+                                final Key key = new Key(DecimalMin.class, typeParameters[0].getType());
+                                validatorMap.put(key, constraintValidator);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+        validatorMap.put(
+                new Key(Pattern.class, CharSequence.class),
+                new PatternValidator()
+        );
+        validatorMap.put(
+                new Key(Email.class, CharSequence.class),
+                new EmailValidator()
+        );
+        this.localValidators = validatorMap;
+    }
+
+    @SuppressWarnings("unchecked")
+    @Nonnull
+    @Override
+    public <A extends Annotation, T> Optional<ConstraintValidator<A, T>> findConstraintValidator(@Nonnull Class<A> constraintType, @Nonnull Class<T> targetType) {
+        ArgumentUtils.requireNonNull("constraintType", constraintType);
+        ArgumentUtils.requireNonNull("targetType", targetType);
+        final Key key = new Key(constraintType, targetType);
+        targetType = ReflectionUtils.getWrapperType(targetType);
+        ConstraintValidator constraintValidator = localValidators.get(key);
+        if (constraintValidator != null) {
+            return Optional.of(constraintValidator);
+        } else {
+            constraintValidator = validatorCache.get(key);
+            if (constraintValidator != null) {
+                return Optional.of(constraintValidator);
+            } else {
+                final Qualifier<ConstraintValidator> qualifier = Qualifiers.byTypeArguments(
+                        constraintType,
+                        ReflectionUtils.getWrapperType(targetType)
+                );
+                Class<T> finalTargetType = targetType;
+                final Optional<ConstraintValidator> local = localValidators.entrySet().stream().filter(entry -> {
+                            final Key k = entry.getKey();
+                            return TypeArgumentQualifier.areTypesCompatible(
+                                    new Class[]{constraintType, finalTargetType},
+                                    Arrays.asList(k.constraintType, k.targetType)
+                            );
+                        }
+                ).map(Map.Entry::getValue).findFirst();
+
+                if (local.isPresent()) {
+                    validatorCache.put(key, local.get());
+                    return (Optional) local;
+                } else {
+                    final ConstraintValidator cv = beanContext
+                            .findBean(ConstraintValidator.class, qualifier).orElse(ConstraintValidator.VALID);
+                    validatorCache.put(key, cv);
+                    if (cv != ConstraintValidator.VALID) {
+                        return Optional.of(cv);
+                    }
+                }
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * The {@link AssertFalse} validator.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<AssertFalse, Boolean> getAssertFalseValidator() {
+        return assertFalseValidator;
+    }
+
+    /**
+     * The {@link AssertTrue} validator.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<AssertTrue, Boolean> getAssertTrueValidator() {
+        return assertTrueValidator;
+    }
+
+    /**
+     * The {@link DecimalMax} validator for char sequences.
+     *
+     * @return The validator
+     */
+    public DecimalMaxValidator<CharSequence> getDecimalMaxValidatorCharSequence() {
+        return decimalMaxValidatorCharSequence;
+    }
+
+    /**
+     * The {@link DecimalMax} validator for number.
+     *
+     * @return The validator
+     */
+    public DecimalMaxValidator<Number> getDecimalMaxValidatorNumber() {
+        return decimalMaxValidatorNumber;
+    }
+
+    /**
+     * The {@link DecimalMin} validator for char sequences.
+     *
+     * @return The validator
+     */
+    public DecimalMinValidator<CharSequence> getDecimalMinValidatorCharSequence() {
+        return decimalMinValidatorCharSequence;
+    }
+
+    /**
+     * The {@link DecimalMin} validator for number.
+     *
+     * @return The validator
+     */
+    public DecimalMinValidator<Number> getDecimalMinValidatorNumber() {
+        return decimalMinValidatorNumber;
+    }
+
+    /**
+     * The {@link Digits} validator for number.
+     *
+     * @return The validator
+     */
+    public DigitsValidator<Number> getDigitsValidatorNumber() {
+        return digitsValidatorNumber;
+    }
+
+    /**
+     * The {@link Digits} validator for char sequence.
+     *
+     * @return The validator
+     */
+    public DigitsValidator<CharSequence> getDigitsValidatorCharSequence() {
+        return digitsValidatorCharSequence;
+    }
+
+    /**
+     * The {@link Max} validator for numbers.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<Max, Number> getMaxNumberValidator() {
+        return maxNumberValidator;
+    }
+
+    /**
+     * The {@link Min} validator for numbers.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<Min, Number> getMinNumberValidator() {
+        return minNumberValidator;
+    }
+
+    /**
+     * The {@link Negative} validator for numbers.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<Negative, Number> getNegativeNumberValidator() {
+        return negativeNumberValidator;
+    }
+
+    /**
+     * The {@link NegativeOrZero} validator for numbers.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<NegativeOrZero, Number> getNegativeOrZeroNumberValidator() {
+        return negativeOrZeroNumberValidator;
+    }
+
+    /**
+     * The {@link Positive} validator for numbers.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<Positive, Number> getPositiveNumberValidator() {
+        return positiveNumberValidator;
+    }
+
+    /**
+     * The {@link PositiveOrZero} validator for numbers.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<PositiveOrZero, Number> getPositiveOrZeroNumberValidator() {
+        return positiveOrZeroNumberValidator;
+    }
+
+    /**
+     * The {@link NotBlank} validator for char sequences.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<NotBlank, CharSequence> getNotBlankValidator() {
+        return notBlankValidator;
+    }
+
+    /**
+     * The {@link NotNull} validator.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<NotNull, Object> getNotNullValidator() {
+        return notNullValidator;
+    }
+
+    /**
+     * The {@link Null} validator.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<Null, Object> getNullValidator() {
+        return nullValidator;
+    }
+
+    /**
+     * The {@link NotEmpty} validator for byte[].
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<NotEmpty, byte[]> getNotEmptyByteArrayValidator() {
+        return notEmptyByteArrayValidator;
+    }
+
+    /**
+     * The {@link NotEmpty} validator for char[].
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<NotEmpty, char[]> getNotEmptyCharArrayValidator() {
+        return notEmptyCharArrayValidator;
+    }
+
+    /**
+     * The {@link NotEmpty} validator for boolean[].
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<NotEmpty, boolean[]> getNotEmptyBooleanArrayValidator() {
+        return notEmptyBooleanArrayValidator;
+    }
+
+    /**
+     * The {@link NotEmpty} validator for double[].
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<NotEmpty, double[]> getNotEmptyDoubleArrayValidator() {
+        return notEmptyDoubleArrayValidator;
+    }
+
+    /**
+     * The {@link NotEmpty} validator for float[].
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<NotEmpty, float[]> getNotEmptyFloatArrayValidator() {
+        return notEmptyFloatArrayValidator;
+    }
+
+    /**
+     * The {@link NotEmpty} validator for int[].
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<NotEmpty, int[]> getNotEmptyIntArrayValidator() {
+        return notEmptyIntArrayValidator;
+    }
+
+    /**
+     * The {@link NotEmpty} validator for long[].
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<NotEmpty, long[]> getNotEmptyLongArrayValidator() {
+        return notEmptyLongArrayValidator;
+    }
+
+    /**
+     * The {@link NotEmpty} validator for Object[].
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<NotEmpty, Object[]> getNotEmptyObjectArrayValidator() {
+        return notEmptyObjectArrayValidator;
+    }
+
+    /**
+     * The {@link NotEmpty} validator for short[].
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<NotEmpty, short[]> getNotEmptyShortArrayValidator() {
+        return notEmptyShortArrayValidator;
+    }
+
+    /**
+     * The {@link NotEmpty} validator for char sequence.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<NotEmpty, CharSequence> getNotEmptyCharSequenceValidator() {
+        return notEmptyCharSequenceValidator;
+    }
+
+    /**
+     * The {@link NotEmpty} validator for collection.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<NotEmpty, Collection> getNotEmptyCollectionValidator() {
+        return notEmptyCollectionValidator;
+    }
+
+    /**
+     * The {@link NotEmpty} validator for map.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<NotEmpty, Map> getNotEmptyMapValidator() {
+        return notEmptyMapValidator;
+    }
+
+    /**
+     * The {@link Size} validator for byte[].
+     *
+     * @return The validator
+     */
+    public SizeValidator<byte[]> getSizeByteArrayValidator() {
+        return sizeByteArrayValidator;
+    }
+
+    /**
+     * The {@link Size} validator for char[].
+     *
+     * @return The validator
+     */
+    public SizeValidator<char[]> getSizeCharArrayValidator() {
+        return sizeCharArrayValidator;
+    }
+
+    /**
+     * The {@link Size} validator for boolean[].
+     *
+     * @return The validator
+     */
+    public SizeValidator<boolean[]> getSizeBooleanArrayValidator() {
+        return sizeBooleanArrayValidator;
+    }
+
+    /**
+     * The {@link Size} validator for double[].
+     *
+     * @return The validator
+     */
+    public SizeValidator<double[]> getSizeDoubleArrayValidator() {
+        return sizeDoubleArrayValidator;
+    }
+
+    /**
+     * The {@link Size} validator for float[].
+     *
+     * @return The validator
+     */
+    public SizeValidator<float[]> getSizeFloatArrayValidator() {
+        return sizeFloatArrayValidator;
+    }
+
+    /**
+     * The {@link Size} validator for int[].
+     *
+     * @return The validator
+     */
+    public SizeValidator<int[]> getSizeIntArrayValidator() {
+        return sizeIntArrayValidator;
+    }
+
+    /**
+     * The {@link Size} validator for long[].
+     *
+     * @return The validator
+     */
+    public SizeValidator<long[]> getSizeLongArrayValidator() {
+        return sizeLongArrayValidator;
+    }
+
+    /**
+     * The {@link Size} validator for short[].
+     *
+     * @return The validator
+     */
+    public SizeValidator<short[]> getSizeShortArrayValidator() {
+        return sizeShortArrayValidator;
+    }
+
+    /**
+     * The {@link Size} validator for CharSequence.
+     *
+     * @return The validator
+     */
+    public SizeValidator<CharSequence> getSizeCharSequenceValidator() {
+        return sizeCharSequenceValidator;
+    }
+
+    /**
+     * The {@link Size} validator for Collection.
+     *
+     * @return The validator
+     */
+    public SizeValidator<Collection> getSizeCollectionValidator() {
+        return sizeCollectionValidator;
+    }
+
+    /**
+     * The {@link Size} validator for Map.
+     *
+     * @return The validator
+     */
+    public SizeValidator<Map> getSizeMapValidator() {
+        return sizeMapValidator;
+    }
+
+    /**
+     * The {@link Past} validator for temporal accessor.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<Past, TemporalAccessor> getPastTemporalAccessorConstraintValidator() {
+        return pastTemporalAccessorConstraintValidator;
+    }
+
+    /**
+     * The {@link PastOrPresent} validator for temporal accessor.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<PastOrPresent, TemporalAccessor> getPastOrPresentTemporalAccessorConstraintValidator() {
+        return pastOrPresentTemporalAccessorConstraintValidator;
+    }
+
+    /**
+     * The {@link Future} validator for temporal accessor.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<Future, TemporalAccessor> getFutureTemporalAccessorConstraintValidator() {
+        return futureTemporalAccessorConstraintValidator;
+    }
+
+    /**
+     * The {@link FutureOrPresent} validator for temporal accessor.
+     *
+     * @return The validator
+     */
+    public ConstraintValidator<FutureOrPresent, TemporalAccessor> getFutureOrPresentTemporalAccessorConstraintValidator() {
+        return futureOrPresentTemporalAccessorConstraintValidator;
     }
 
     private Comparable<? extends TemporalAccessor> getNow(TemporalAccessor value, Clock clock) {
@@ -705,4 +808,38 @@ public class DefaultConstraintValidators {
         }
         return result;
     }
+
+    /**
+     * Key for caching validators.
+     * @param <A> The annotation type
+     * @param <T> The target type.
+     */
+    private final class Key<A extends Annotation, T> {
+        final Class<A> constraintType;
+        final Class<T> targetType;
+
+        Key(@Nonnull Class<A> constraintType, @Nonnull Class<T> targetType) {
+            this.constraintType = constraintType;
+            this.targetType = targetType;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            Key<?, ?> key = (Key<?, ?>) o;
+            return constraintType.equals(key.constraintType) &&
+                    targetType.equals(key.targetType);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(constraintType, targetType);
+        }
+    }
+
 }
