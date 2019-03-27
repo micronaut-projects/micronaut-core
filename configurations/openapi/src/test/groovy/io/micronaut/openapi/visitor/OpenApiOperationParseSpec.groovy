@@ -8,6 +8,72 @@ class OpenApiOperationParseSpec extends AbstractTypeElementSpec {
         System.setProperty(AbstractOpenApiVisitor.ATTR_TEST_MODE, "true")
     }
 
+    void "test parse the OpenAPI @ApiResponse Content with @Schema annotation"() {
+        given:
+        buildBeanDefinition('test.MyBean','''
+package test;
+
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Post;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+
+@Schema(description = "Represents a pet")
+class Pet {
+    @Schema(description = "The pet name")
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+@Controller("/pet")
+interface PetOperations {
+    @Operation(summary = "Save Pet",
+            description = "Save Pet",
+            tags = "save-pet",
+            responses = {
+                    @ApiResponse(
+                            responseCode = "200",
+                            description = "Save Pet",
+                            content = @Content(mediaType = "application/json",
+                                    schema = @Schema(implementation = Pet.class))),
+                    @ApiResponse(
+                            responseCode = "404",
+                            description = "Page Not Found"
+                    )})
+    @Post
+    HttpResponse<Pet> save(@Body Pet pet);
+}
+
+
+@javax.inject.Singleton
+class MyBean {}
+''')
+
+        Operation operation = AbstractOpenApiVisitor.testReference?.paths?.get("/pet")?.post
+
+        expect:
+        operation
+        operation.summary == 'Save Pet'
+        operation.tags.size() == 1
+        operation.tags == ['save-pet']
+        operation.responses.size() == 2
+        operation.responses.'200'.content.size() == 1
+        operation.responses.'200'.content['application/json']
+        operation.responses.'200'.content['application/json'].schema
+        operation.responses.'200'.content['application/json'].schema.$ref == "#/components/schemas/Pet"
+    }
+
     void "test parse the OpenAPI @Operation annotation"() {
         given:
         buildBeanDefinition('test.MyBean', '''
