@@ -43,6 +43,7 @@ public class RoutesVersioningConfiguration implements Toggleable {
     private static final boolean DEFAULT_ENABLED = false;
     private boolean enabled = DEFAULT_ENABLED;
     private String defaultVersion;
+    private boolean rejectIfMissing = true;
 
     /**
      * @param enabled Enables the version based route matches filtering.
@@ -76,4 +77,19 @@ public class RoutesVersioningConfiguration implements Toggleable {
         this.defaultVersion = defaultVersion;
     }
 
+    /**
+     *
+     * @return true if a request which does not specify a version but the route is annotated with {@link io.micronaut.core.version.annotation.Version} should be rejected.
+     */
+    public boolean isRejectIfMissing() {
+        return rejectIfMissing;
+    }
+
+    /**
+     *
+     * @param rejectIfMissing Whether a request should be rejected if does not specify a version but the route is annotated with {@link io.micronaut.core.version.annotation.Version}.
+     */
+    public void setRejectIfMissing(boolean rejectIfMissing) {
+        this.rejectIfMissing = rejectIfMissing;
+    }
 }

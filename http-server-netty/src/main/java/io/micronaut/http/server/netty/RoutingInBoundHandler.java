@@ -28,6 +28,7 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.StreamUtils;
+import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
@@ -448,6 +449,7 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
             // if there is no route present try to locate a route that matches a different HTTP method
             Set<io.micronaut.http.HttpMethod> existingRouteMethods = router
                     .findAny(request.getUri().toString())
+                    .filter(u -> !u.getHttpMethod().equals(request.getMethod()))
                     .map(UriRouteMatch::getHttpMethod)
                     .collect(Collectors.toSet());
 
@@ -462,6 +464,23 @@ class RoutingInBoundHandler extends SimpleChannelInboundHandler<io.micronaut.htt
                         nettyHttpRequest,
                         HttpResponse.notAllowed(existingRouteMethods),
                         "Method [" + httpMethod + "] not allowed. Allowed methods: " + existingRouteMethods);
+                return;
+            }
+
+            Set<String> versionsValuesForRoutes = router.findAny(request.getUri().toString())
+                    .filter(u -> u.getHttpMethod().equals(request.getMethod()) && u.getAnnotation(Version.class) != null && u.getAnnotation(Version.class).getValue(String.class).isPresent())
+                    .map(urm -> urm.getAnnotation(Version.class).getValue(String.class).get())
+                    .collect(Collectors.toSet());
+            if (!versionsValuesForRoutes.isEmpty()) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("For request {} {} without Version there are route but they requires the request to supply a Version", request.getUri(), request.getMethod().toString());
+                }
+                handleStatusError(
+                        ctx,
+                        request,
+                        nettyHttpRequest,
+                        HttpResponse.badRequest(),
+                        "Missing required API version");
                 return;
             }
 
