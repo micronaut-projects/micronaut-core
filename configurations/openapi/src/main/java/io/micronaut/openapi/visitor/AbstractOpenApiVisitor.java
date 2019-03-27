@@ -163,8 +163,13 @@ abstract class AbstractOpenApiVisitor  {
 
             if (value instanceof AnnotationValue) {
                 AnnotationValue<?> av = (AnnotationValue<?>) value;
-                final Map<CharSequence, Object> valueMap = resolveAnnotationValues(context, av);
-                newValues.put(key, valueMap);
+                if (av.getAnnotationName().equals(io.swagger.v3.oas.annotations.media.ArraySchema.class.getName())) {
+                    final Map<CharSequence, Object> valueMap = resolveArraySchemaAnnotationValues(context, av);
+                    newValues.put("schema", valueMap);
+                } else {
+                    final Map<CharSequence, Object> valueMap = resolveAnnotationValues(context, av);
+                    newValues.put(key, valueMap);
+                }
             } else if (value instanceof AnnotationClassValue) {
                 AnnotationClassValue<?> acv = (AnnotationClassValue) value;
                 final Optional<? extends Class<?>> type = acv.getType();
@@ -252,6 +257,33 @@ abstract class AbstractOpenApiVisitor  {
             }
         }
         return newValues;
+    }
+
+    private Map<CharSequence, Object> resolveArraySchemaAnnotationValues(VisitorContext context, AnnotationValue<?> av) {
+        final Map<CharSequence, Object> arraySchemaMap = new HashMap<>(10);
+        av.get("schema", AnnotationValue.class).ifPresent(annotationValue -> {
+            Optional<String> impl = ((AnnotationValue<?>) annotationValue).get("implementation", String.class);
+            Optional<String> type = ((AnnotationValue<?>) annotationValue).get("type", String.class);
+            Optional<ClassElement> classElement = Optional.empty();
+            if (impl.isPresent()) {
+                classElement = context.getClassElement(impl.get());
+            } else if(type.isPresent()) {
+                PrimitiveType primitiveType = PrimitiveType.fromName(type.get());
+                if (primitiveType != null) {
+                    classElement = context.getClassElement(primitiveType.getKeyClass());
+                } else {
+                    classElement = context.getClassElement(type.get());
+                }
+            }
+            if (classElement.isPresent()) {
+                final OpenAPI openAPI = resolveOpenAPI(context);
+                final ArraySchema schema = arraySchema(resolveSchema(openAPI, null, classElement.get(), context, null));
+                schemaToValueMap(arraySchemaMap, schema);
+            } else {
+                arraySchemaMap.putAll(resolveAnnotationValues(context, av));
+            }
+        });
+        return arraySchemaMap;
     }
 
     private Map<CharSequence, Object> resolveAnnotationValues(VisitorContext context, AnnotationValue<?> av) {
@@ -509,6 +541,21 @@ abstract class AbstractOpenApiVisitor  {
         return mediaTypes;
     }
 
+    private void schemaToValueMap(Map<CharSequence, Object> valueMap, Schema schema) {
+        if (schema != null) {
+            final BeanMap<Schema> beanMap = BeanMap.of(schema);
+            for (Map.Entry<String, Object> e : beanMap.entrySet()) {
+                final Object v = e.getValue();
+                if (v != null) {
+                    valueMap.put(e.getKey(), v);
+                }
+            }
+            if (schema.get$ref() != null) {
+                valueMap.put("$ref", schema.get$ref());
+            }
+        }
+    }
+
     private void bindSchemaIfNeccessary(VisitorContext context, AnnotationValue<?> av, Map<CharSequence, Object> valueMap) {
         final Optional<String> impl = av.get("implementation", String.class);
         if (io.swagger.v3.oas.annotations.media.Schema.class.getName().equals(av.getAnnotationName()) && impl.isPresent()) {
@@ -517,18 +564,7 @@ abstract class AbstractOpenApiVisitor  {
             final OpenAPI openAPI = resolveOpenAPI(context);
             if (classElement.isPresent()) {
                 final Schema schema = resolveSchema(openAPI, null, classElement.get(), context, null);
-                if (schema != null) {
-                    final BeanMap<Schema> beanMap = BeanMap.of(schema);
-                    for (Map.Entry<String, Object> e : beanMap.entrySet()) {
-                        final Object v = e.getValue();
-                        if (v != null) {
-                            valueMap.put(e.getKey(), v);
-                        }
-                    }
-                    if (schema.get$ref() != null) {
-                        valueMap.put("$ref", schema.get$ref());
-                    }
-                }
+                schemaToValueMap(valueMap, schema);
             }
         }
     }
