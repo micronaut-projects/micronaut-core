@@ -51,6 +51,7 @@ public class RouteVersionFilter implements RouteMatchFilter {
      * Creates a {@link RouteVersionFilter} with a collection of {@link RequestVersionResolver}.
      *
      * @param resolvingStrategies A list of {@link RequestVersionResolver} beans to extract version from HTTP request
+     * @param versioningConfiguration The versioning configuration
      */
     @Inject
     public RouteVersionFilter(List<RequestVersionResolver> resolvingStrategies,
