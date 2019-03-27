@@ -173,9 +173,10 @@ class ValidatorSpec extends Specification {
         ).toList().sort({ it.propertyPath.toString() })
 
         expect:
+        constraintViolations.size() == 2
         constraintViolations[0].invalidValue == 50
         constraintViolations[0].propertyPath.toString() == 'saveBook.pages'
-        constraintViolations.size() == 2
+
     }
 
     void "test executable validator - cascade to array"() {
