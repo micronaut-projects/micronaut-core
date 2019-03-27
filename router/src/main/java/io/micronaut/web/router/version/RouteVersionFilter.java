@@ -25,6 +25,7 @@ import io.micronaut.web.router.version.resolution.RequestVersionResolver;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import java.util.List;
@@ -45,19 +46,19 @@ public class RouteVersionFilter implements RouteMatchFilter {
     private static final Logger LOG = LoggerFactory.getLogger(RouteVersionFilter.class);
 
     private final List<RequestVersionResolver> resolvingStrategies;
-    private final RoutesVersioningConfiguration versioningConfiguration;
+    private final DefaultVersionProvider defaultVersionProvider;
 
     /**
      * Creates a {@link RouteVersionFilter} with a collection of {@link RequestVersionResolver}.
      *
      * @param resolvingStrategies A list of {@link RequestVersionResolver} beans to extract version from HTTP request
-     * @param versioningConfiguration The versioning configuration
+     * @param defaultVersionProvider The Default Version Provider
      */
     @Inject
     public RouteVersionFilter(List<RequestVersionResolver> resolvingStrategies,
-                              RoutesVersioningConfiguration versioningConfiguration) {
+                              @Nullable DefaultVersionProvider defaultVersionProvider) {
         this.resolvingStrategies = resolvingStrategies;
-        this.versioningConfiguration = versioningConfiguration;
+        this.defaultVersionProvider = defaultVersionProvider;
     }
 
     /**
@@ -77,7 +78,7 @@ public class RouteVersionFilter implements RouteMatchFilter {
             return (match) -> true;
         }
 
-        Optional<String> defaultVersion = versioningConfiguration.getDefaultVersion();
+        Optional<String> defaultVersion = defaultVersionProvider == null ? Optional.empty() : Optional.of(defaultVersionProvider.resolveDefaultVersion());
 
         Optional<String> version = resolvingStrategies.stream()
                 .map(strategy -> strategy.resolve(request).orElse(null))
