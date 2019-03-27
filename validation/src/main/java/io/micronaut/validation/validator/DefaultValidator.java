@@ -96,7 +96,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                 return true;
             }
         };
-        this.executionHandleLocator = executionHandleLocator != null ? executionHandleLocator : new ExecutionHandleLocator() { };
+        this.executionHandleLocator = executionHandleLocator != null ? executionHandleLocator : new ExecutionHandleLocator() {
+        };
     }
 
     @Nonnull
@@ -206,17 +207,20 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
     }
 
     @Override
-    @Nonnull public ExecutableMethodValidator forExecutables() {
+    @Nonnull
+    public ExecutableMethodValidator forExecutables() {
         return this;
     }
 
 
     /**
      * looks up a bean introspection for the given object.
+     *
      * @param object The object, never null
      * @return The introspection or null
      */
-    protected @Nullable BeanIntrospection<Object> getBeanIntrospection(@Nonnull Object object) {
+    protected @Nullable
+    BeanIntrospection<Object> getBeanIntrospection(@Nonnull Object object) {
         //noinspection ConstantConditions
         if (object == null) {
             return null;
@@ -355,18 +359,15 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             Integer index,
             Object key,
             boolean isIterable) {
-        final Path.Node node = context.addPropertyNode(cascadeProperty.getName());
+        context.currentContainerNode = new DefaultPropertyNode(
+                cascadeProperty.getName(),
+                cascadeProperty.getType(),
+                index,
+                key,
+                ElementKind.CONTAINER_ELEMENT,
+                isIterable
+        );
         try {
-            if (canCascade(rootBean, context, iterableValue, node)) {
-                context.currentContainerNode = new DefaultPropertyNode(
-                        cascadeProperty.getName(),
-                        cascadeProperty.getType(),
-                        index,
-                        key,
-                        ElementKind.CONTAINER_ELEMENT,
-                        isIterable
-                );
-
                 cascadeToOne(
                         rootBean,
                         object,
@@ -376,9 +377,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                         cascadeProperty.getType(),
                         iterableValue
                 );
-            }
         } finally {
-            context.currentContainerNode = null;
+
             context.removeLast();
         }
     }
@@ -387,14 +387,13 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             DefaultConstraintValidatorContext context,
             @Nonnull T rootBean,
             Object object,
-            ExecutableMethod<Object, Object> method,
+            Path.Node node,
             Argument methodArgument,
             Object iterableValue,
             Set overallViolations,
             Integer index,
             Object key,
             boolean isIterable) {
-        final Path.Node node = context.addMethodNode(method.getName(), method.getArgumentTypes());
         try {
             if (canCascade(rootBean, context, iterableValue, node)) {
                 context.currentContainerNode = new DefaultPropertyNode(
@@ -419,7 +418,6 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             }
         } finally {
             context.currentContainerNode = null;
-            context.removeLast();
         }
     }
 
@@ -551,8 +549,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                 .getAnnotationMetadata()
                 .getAnnotationValuesByType(constraintType);
 
-        @SuppressWarnings("unchecked")
-        final Class<Object> targetType = propertyValue != null ? (Class<Object>) propertyValue.getClass() : propertyType;
+        @SuppressWarnings("unchecked") final Class<Object> targetType = propertyValue != null ? (Class<Object>) propertyValue.getClass() : propertyType;
         final ConstraintValidator<? extends Annotation, Object> validator = constraintValidatorRegistry
                 .findConstraintValidator(constraintType, targetType).orElse(null);
         if (validator != null) {
@@ -602,128 +599,128 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
         DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(object);
         Set overallViolations = new HashSet<>(5);
 
-        context.addMethodNode(method.getMethodName(), method.getArgumentTypes());
+        final Path.Node node = context.addMethodNode(method.getMethodName(), method.getArgumentTypes());
         try {
             for (int i = 0; i < argLen; i++) {
                 Argument argument = arguments[i];
-                try {
-                    context.addParameterNode(argument.getName(), i);
-                    final Class<?> parameterType = argument.getType();
-                    final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
-                    Object parameterValue = parameterValues[i];
+                final Class<?> parameterType = argument.getType();
+                final AnnotationMetadata annotationMetadata = argument.getAnnotationMetadata();
+                Object parameterValue = parameterValues[i];
 
-                    ValueExtractor<Object> valueExtractor = null;
-                    final boolean hasValue = parameterValue != null;
-                    if (hasValue) {
-                        //noinspection unchecked
-                        valueExtractor = (ValueExtractor<Object>) valueExtractorRegistry.findUnwrapValueExtractor(parameterType).orElse(null);
+                ValueExtractor<Object> valueExtractor = null;
+                final boolean hasValue = parameterValue != null;
+                if (hasValue) {
+                    //noinspection unchecked
+                    valueExtractor = (ValueExtractor<Object>) valueExtractorRegistry.findUnwrapValueExtractor(parameterType).orElse(null);
+                }
+
+                int finalIndex = i;
+                if (valueExtractor != null) {
+                    valueExtractor.extractValues(parameterValue, (SimpleValueReceiver) (nodeName, unwrappedValue) -> validateParameterInternal(
+                            object,
+                            parameterValues,
+                            context,
+                            overallViolations,
+                            argument.getName(),
+                            parameterType,
+                            finalIndex,
+                            annotationMetadata,
+                            unwrappedValue
+                    ));
+                } else {
+                    validateParameterInternal(
+                            object,
+                            parameterValues,
+                            context,
+                            overallViolations,
+                            argument.getName(),
+                            parameterType,
+                            finalIndex,
+                            annotationMetadata,
+                            parameterValue
+                    );
+                }
+
+                if (hasValue && annotationMetadata.hasStereotype(Valid.class)) {
+                    if (context.validatedObjects.contains(parameterValue)) {
+                        // already validated
+                        continue;
                     }
-
+                    // cascade to bean
+                    //noinspection unchecked
+                    valueExtractor = (ValueExtractor<Object>) valueExtractorRegistry.findValueExtractor(parameterType).orElse(null);
                     if (valueExtractor != null) {
-                        valueExtractor.extractValues(parameterValue, (SimpleValueReceiver) (nodeName, unwrappedValue) -> validateParameterInternal(
-                                object,
-                                parameterValues,
-                                context,
-                                overallViolations,
-                                parameterType,
-                                annotationMetadata,
-                                unwrappedValue
-                        ));
-                    } else {
-                        validateParameterInternal(
-                                object,
-                                parameterValues,
-                                context,
-                                overallViolations,
-                                parameterType,
-                                annotationMetadata,
-                                parameterValue
-                        );
-                    }
+                        valueExtractor.extractValues(parameterValue, new ValueExtractor.ValueReceiver() {
+                            @Override
+                            public void value(String nodeName, Object object1) {
+                            }
 
-                    if (hasValue && annotationMetadata.hasStereotype(Valid.class)) {
-                        if (context.validatedObjects.contains(parameterValue)) {
-                            // already validated
-                            continue;
-                        }
-                        // cascade to bean
-                        //noinspection unchecked
-                        valueExtractor = (ValueExtractor<Object>) valueExtractorRegistry.findValueExtractor(parameterType).orElse(null);
-                        if (valueExtractor != null) {
-                            valueExtractor.extractValues(parameterValue, new ValueExtractor.ValueReceiver() {
-                                @Override
-                                public void value(String nodeName, Object object1) {
+                            @Override
+                            public void iterableValue(String nodeName, Object iterableValue) {
+                                if (iterableValue != null && context.validatedObjects.contains(iterableValue)) {
+                                    return;
                                 }
-
-                                @Override
-                                public void iterableValue(String nodeName, Object iterableValue) {
-                                    if (iterableValue != null && context.validatedObjects.contains(iterableValue)) {
-                                        return;
-                                    }
-                                    cascadeToIterableValue(
-                                            context,
-                                            object,
-                                            parameterValue,
-                                            method,
-                                            argument,
-                                            iterableValue,
-                                            overallViolations,
-                                            null,
-                                            null,
-                                            true);
-                                }
-
-                                @Override
-                                public void indexedValue(String nodeName, int i, Object iterableValue) {
-                                    if (iterableValue != null && context.validatedObjects.contains(iterableValue)) {
-                                        return;
-                                    }
-                                    cascadeToIterableValue(
-                                            context,
-                                            object,
-                                            parameterValue,
-                                            method,
-                                            argument,
-                                            iterableValue,
-                                            overallViolations,
-                                            i,
-                                            null,
-                                            true);
-                                }
-
-                                @Override
-                                public void keyedValue(String nodeName, Object key, Object keyedValue) {
-                                    if (keyedValue != null && context.validatedObjects.contains(keyedValue)) {
-                                        return;
-                                    }
-                                    cascadeToIterableValue(
-                                            context,
-                                            object,
-                                            parameterValue,
-                                            method,
-                                            argument,
-                                            keyedValue,
-                                            overallViolations,
-                                            null,
-                                            key,
-                                            false);
-                                }
-                            });
-                        } else {
-                            final BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(parameterValue);
-                            if (beanIntrospection != null) {
-                                cascadeToOneIntrospection(
+                                cascadeToIterableValue(
                                         context,
                                         object,
                                         parameterValue,
-                                        beanIntrospection,
-                                        overallViolations
-                                );
+                                        node,
+                                        argument,
+                                        iterableValue,
+                                        overallViolations,
+                                        null,
+                                        null,
+                                        true);
                             }
+
+                            @Override
+                            public void indexedValue(String nodeName, int i, Object iterableValue) {
+                                if (iterableValue != null && context.validatedObjects.contains(iterableValue)) {
+                                    return;
+                                }
+                                cascadeToIterableValue(
+                                        context,
+                                        object,
+                                        parameterValue,
+                                        node,
+                                        argument,
+                                        iterableValue,
+                                        overallViolations,
+                                        i,
+                                        null,
+                                        true);
+                            }
+
+                            @Override
+                            public void keyedValue(String nodeName, Object key, Object keyedValue) {
+                                if (keyedValue != null && context.validatedObjects.contains(keyedValue)) {
+                                    return;
+                                }
+                                cascadeToIterableValue(
+                                        context,
+                                        object,
+                                        parameterValue,
+                                        node,
+                                        argument,
+                                        keyedValue,
+                                        overallViolations,
+                                        null,
+                                        key,
+                                        false);
+                            }
+                        });
+                    } else {
+                        final BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(parameterValue);
+                        if (beanIntrospection != null) {
+                            cascadeToOneIntrospection(
+                                    context,
+                                    object,
+                                    parameterValue,
+                                    beanIntrospection,
+                                    overallViolations
+                            );
                         }
                     }
-                } finally {
-                    context.removeLast();
                 }
             }
         } finally {
@@ -733,27 +730,41 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
     }
 
     @SuppressWarnings("unchecked")
-    private <T> void validateParameterInternal(@Nonnull T object, @Nonnull Object[] parameterValues, DefaultConstraintValidatorContext context, Set overallViolations, Class<?> parameterType, AnnotationMetadata annotationMetadata, Object parameterValue) {
-        final List<Class<? extends Annotation>> constraintTypes =
-                annotationMetadata.getAnnotationTypesByStereotype(Constraint.class);
-        for (Class<? extends Annotation> constraintType : constraintTypes) {
-            final ConstraintValidator constraintValidator = constraintValidatorRegistry
-                    .findConstraintValidator(constraintType, parameterType).orElse(null);
-            if (constraintValidator != null) {
-                final AnnotationValue<? extends Annotation> annotationValue =
-                        annotationMetadata.getAnnotation(constraintType);
-                if (annotationValue != null && !constraintValidator.isValid(parameterValue, annotationValue, context)) {
-                    final String messageTemplate = buildMessageTemplate(annotationValue);
-                    overallViolations.add(new DefaultConstraintViolation(
-                            object,
-                            object.getClass(),
-                            null,
-                            parameterValue,
-                            messageTemplate,
-                            messageTemplate,
-                            new PathImpl(context.currentPath), parameterValues));
+    private <T> void validateParameterInternal(
+            @Nonnull T object,
+            @Nonnull Object[] parameterValues,
+            @Nonnull DefaultConstraintValidatorContext context,
+            @Nonnull Set overallViolations,
+            @Nonnull String parameterName,
+            @Nonnull Class<?> parameterType,
+            int parameterIndex,
+            @Nonnull AnnotationMetadata annotationMetadata,
+            @Nullable Object parameterValue) {
+        try {
+            context.addParameterNode(parameterName, parameterIndex);
+            final List<Class<? extends Annotation>> constraintTypes =
+                    annotationMetadata.getAnnotationTypesByStereotype(Constraint.class);
+            for (Class<? extends Annotation> constraintType : constraintTypes) {
+                final ConstraintValidator constraintValidator = constraintValidatorRegistry
+                        .findConstraintValidator(constraintType, parameterType).orElse(null);
+                if (constraintValidator != null) {
+                    final AnnotationValue<? extends Annotation> annotationValue =
+                            annotationMetadata.getAnnotation(constraintType);
+                    if (annotationValue != null && !constraintValidator.isValid(parameterValue, annotationValue, context)) {
+                        final String messageTemplate = buildMessageTemplate(annotationValue);
+                        overallViolations.add(new DefaultConstraintViolation(
+                                object,
+                                object.getClass(),
+                                null,
+                                parameterValue,
+                                messageTemplate,
+                                messageTemplate,
+                                new PathImpl(context.currentPath), parameterValues));
+                    }
                 }
             }
+        } finally {
+            context.removeLast();
         }
     }
 
@@ -884,29 +895,28 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
         public String toString() {
             StringBuilder builder = new StringBuilder();
             final Iterator<Node> i = nodes.iterator();
-            boolean first = true;
             while (i.hasNext()) {
                 final Node node = i.next();
-                if (first) {
-                    first = false;
-                } else {
-                    if (node.getKind() == ElementKind.CONTAINER_ELEMENT) {
-                        final Integer index = node.getIndex();
-                        if (index != null) {
-                            builder.append('[').append(index).append(']');
+                builder.append(node.getName());
+                if (node.getKind() == ElementKind.CONTAINER_ELEMENT) {
+                    final Integer index = node.getIndex();
+                    if (index != null) {
+                        builder.append('[').append(index).append(']');
+                    } else {
+                        final Object key = node.getKey();
+                        if (key != null) {
+                            builder.append('[').append(key).append(']');
                         } else {
-                            final Object key = node.getKey();
-                            if (key != null) {
-                                builder.append('[').append(key).append(']');
-                            } else {
-                                builder.append("[]");
-                            }
+                            builder.append("[]");
                         }
-
                     }
+
+                }
+
+                if (i.hasNext()) {
                     builder.append('.');
                 }
-                builder.append(node.getName());
+
             }
             return builder.toString();
         }

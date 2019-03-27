@@ -131,9 +131,12 @@ class ValidatorSpec extends Specification {
         violations.size() == 2
         v1.messageTemplate == '{javax.validation.constraints.Max.message}'
         v1.invalidValue == 150
-        v1.propertyPath.last().isInIterable()
-        v1.propertyPath.last().index == 0
-        v1.propertyPath.last().kind == ElementKind.CONTAINER_ELEMENT
+        v1.propertyPath[0].kind == ElementKind.CONTAINER_ELEMENT
+        v1.propertyPath[0].isInIterable()
+        v1.propertyPath[0].index == 0
+        !v1.propertyPath[1].isInIterable()
+        v1.propertyPath[1].index == null
+        v1.propertyPath[1].kind == ElementKind.PROPERTY
         v1.rootBean.is(b)
         v1.leafBean instanceof Author
         v2.messageTemplate == '{javax.validation.constraints.NotBlank.message}'
@@ -147,8 +150,11 @@ class ValidatorSpec extends Specification {
 
         expect:
         violations.size() == 2
-        violations.find { it.invalidValue == 30 && it.propertyPath.toList()[-1].index == 0 }
-        violations.find { it.invalidValue == 60 && it.propertyPath.toList()[-1].index == 2 }
+        violations.find {
+            it.invalidValue == 30 &&
+                    it.propertyPath.toList()[0].index == 0 &&
+            it.propertyPath.toString() =='integers[0]'}
+        violations.find { it.invalidValue == 60 && it.propertyPath.toList()[0].index == 2 }
     }
 
 
@@ -191,7 +197,7 @@ class ValidatorSpec extends Specification {
 
         expect:
         constraintViolations.size() == 2
-//        constraintViolations[0].propertyPath.toString() == 'saveIntArray.integers[0]' TODO
+        constraintViolations[0].propertyPath.toString() == 'saveIntArray.integers[0]'
     }
 }
 
