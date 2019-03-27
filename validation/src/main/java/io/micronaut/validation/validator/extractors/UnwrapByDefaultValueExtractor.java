@@ -22,6 +22,8 @@ import javax.validation.valueextraction.ValueExtractor;
  *
  * @author graemerocher
  * @since 1.2
+ * @param <T> the extracted type
  */
+@SuppressWarnings("WeakerAccess")
 public interface UnwrapByDefaultValueExtractor<T> extends ValueExtractor<T> {
 }
