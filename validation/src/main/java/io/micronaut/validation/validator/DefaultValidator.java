@@ -29,6 +29,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.validation.validator.constraints.ConstraintValidator;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorContext;
 import io.micronaut.validation.validator.constraints.ConstraintValidatorRegistry;
+import io.micronaut.validation.validator.extractors.DefaultValueExtractors;
 import io.micronaut.validation.validator.extractors.SimpleValueReceiver;
 import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
 
@@ -73,16 +74,16 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
     @Inject
     protected DefaultValidator(
             @Nonnull ConstraintValidatorRegistry constraintValidatorRegistry,
-            @Nonnull ValueExtractorRegistry valueExtractorRegistry,
-            @Nonnull ClockProvider clockProvider,
+            @Nullable ValueExtractorRegistry valueExtractorRegistry,
+            @Nullable ClockProvider clockProvider,
             @Nullable TraversableResolver traversableResolver,
             @Nullable ExecutionHandleLocator executionHandleLocator) {
         ArgumentUtils.requireNonNull("constraintValidatorRegistry", constraintValidatorRegistry);
         ArgumentUtils.requireNonNull("valueExtractorRegistry", valueExtractorRegistry);
         ArgumentUtils.requireNonNull("clockProvider", clockProvider);
         this.constraintValidatorRegistry = constraintValidatorRegistry;
-        this.clockProvider = clockProvider;
-        this.valueExtractorRegistry = valueExtractorRegistry;
+        this.clockProvider = clockProvider == null ? new DefaultClockProvider() : clockProvider;
+        this.valueExtractorRegistry = valueExtractorRegistry == null ? new DefaultValueExtractors() : valueExtractorRegistry;
         this.traversableResolver = traversableResolver != null ? traversableResolver : new TraversableResolver() {
             @Override
             public boolean isReachable(Object object, Path.Node node, Class<?> rootType, Path path, ElementType elementType) {
