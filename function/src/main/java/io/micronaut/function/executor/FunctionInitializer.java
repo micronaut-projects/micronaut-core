@@ -86,7 +86,7 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
      * @param supplier The function that executes this function
      * @throws IOException If an error occurs
      */
-    protected void run(String[] args, Function<ParseContext, ?> supplier) throws IOException {
+    public void run(String[] args, Function<ParseContext, ?> supplier) throws IOException {
         ApplicationContext applicationContext = this.applicationContext;
         this.functionExitHandler = applicationContext.findBean(FunctionExitHandler.class).orElse(this.functionExitHandler);
         ParseContext context = new ParseContext(args);
