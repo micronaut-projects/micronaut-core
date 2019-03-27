@@ -1718,7 +1718,7 @@ public class DefaultHttpClient implements RxWebSocketClient, RxHttpClient, RxStr
             Emitter<io.micronaut.http.HttpResponse<O>> emitter,
             Argument<O> bodyType, Argument<E> errorType) {
         ChannelPipeline pipeline = channel.pipeline();
-        final boolean replace = pipeline.get(HANDLER_MICRONAUT_HTTP_RESPONSE_STREAM) != null;
+        final boolean replace = pipeline.get(HANDLER_MICRONAUT_FULL_HTTP_RESPONSE) != null;
         final SimpleChannelInboundHandler<FullHttpResponse> newHandler = new SimpleChannelInboundHandler<FullHttpResponse>(false) {
 
             AtomicBoolean complete = new AtomicBoolean(false);
