@@ -155,8 +155,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                     constrainedProperty.getType(),
                     propertyValue,
                     context,
-                    overallViolations
-            );
+                    overallViolations,
+                    null);
 
             //noinspection unchecked
             return Collections.unmodifiableSet(overallViolations);
@@ -187,7 +187,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
         final HashSet overallViolations = new HashSet<>(5);
         final DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext();
         try {
-            context.addPropertyNode(propertyName);
+            context.addPropertyNode(propertyName, null);
             validatePropertyInternal(null, null, context, overallViolations, beanProperty.getType(), beanProperty, value);
         } finally {
             context.removeLast();
@@ -247,8 +247,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                     constrainedProperty.getType(),
                     propertyValue,
                     context,
-                    overallViolations
-            );
+                    overallViolations,
+                    null);
         }
 
         // now handle cascading validation
@@ -318,7 +318,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
 
                 if (!opt.isPresent() && !context.validatedObjects.contains(propertyValue)) {
                     // maybe a bean
-                    final Path.Node node = context.addPropertyNode(cascadeProperty.getName());
+                    final Path.Node node = context.addPropertyNode(cascadeProperty.getName(), null);
 
                     try {
                         final boolean canCascade = canCascade(rootBean, context, propertyValue, node);
@@ -330,8 +330,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                                     overallViolations,
                                     cascadeProperty,
                                     cascadeProperty.getType(),
-                                    propertyValue
-                            );
+                                    propertyValue,
+                                    null);
                         }
                     } finally {
                         context.removeLast();
@@ -359,7 +359,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             Integer index,
             Object key,
             boolean isIterable) {
-        context.currentContainerNode = new DefaultPropertyNode(
+        final DefaultPropertyNode container = new DefaultPropertyNode(
                 cascadeProperty.getName(),
                 cascadeProperty.getType(),
                 index,
@@ -367,20 +367,16 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                 ElementKind.CONTAINER_ELEMENT,
                 isIterable
         );
-        try {
-                cascadeToOne(
-                        rootBean,
-                        object,
-                        context,
-                        overallViolations,
-                        cascadeProperty,
-                        cascadeProperty.getType(),
-                        iterableValue
-                );
-        } finally {
-
-            context.removeLast();
-        }
+        cascadeToOne(
+                rootBean,
+                object,
+                context,
+                overallViolations,
+                cascadeProperty,
+                cascadeProperty.getType(),
+                iterableValue,
+                container
+        );
     }
 
     private <T> void cascadeToIterableValue(
@@ -394,30 +390,26 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             Integer index,
             Object key,
             boolean isIterable) {
-        try {
-            if (canCascade(rootBean, context, iterableValue, node)) {
-                context.currentContainerNode = new DefaultPropertyNode(
-                        methodArgument.getName(),
-                        methodArgument.getClass(),
-                        index,
-                        key,
-                        ElementKind.CONTAINER_ELEMENT,
-                        isIterable
-                );
+        if (canCascade(rootBean, context, iterableValue, node)) {
+            DefaultPropertyNode currentContainerNode = new DefaultPropertyNode(
+                    methodArgument.getName(),
+                    methodArgument.getClass(),
+                    index,
+                    key,
+                    ElementKind.CONTAINER_ELEMENT,
+                    isIterable
+            );
 
-                cascadeToOne(
-                        rootBean,
-                        object,
-                        context,
-                        overallViolations,
-                        methodArgument,
-                        methodArgument.getType(),
-                        iterableValue
+            cascadeToOne(
+                    rootBean,
+                    object,
+                    context,
+                    overallViolations,
+                    methodArgument,
+                    methodArgument.getType(),
+                    iterableValue,
 
-                );
-            }
-        } finally {
-            context.currentContainerNode = null;
+                    currentContainerNode);
         }
     }
 
@@ -428,12 +420,28 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             Set overallViolations,
             AnnotatedElement cascadeProperty,
             Class propertyType,
-            Object propertyValue) {
+            Object propertyValue,
+            @Nullable DefaultPropertyNode container) {
 
         final BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(propertyValue);
 
         if (beanIntrospection != null) {
-            cascadeToOneIntrospection(context, rootBean, propertyValue, beanIntrospection, overallViolations);
+            if (container != null) {
+                context.addPropertyNode(container.getName(), container);
+            }
+            try {
+                cascadeToOneIntrospection(
+                        context,
+                        rootBean,
+                        propertyValue,
+                        beanIntrospection,
+                        overallViolations);
+            } finally {
+                if (container != null) {
+                    context.removeLast();
+                }
+
+            }
 
         } else {
             // try apply cascade rules to actual property
@@ -444,7 +452,8 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                     propertyType,
                     propertyValue,
                     context,
-                    overallViolations
+                    overallViolations,
+                    container
             );
         }
     }
@@ -475,9 +484,10 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             @Nonnull Class propertyType,
             @Nullable Object propertyValue,
             DefaultConstraintValidatorContext context,
-            Set<ConstraintViolation<Object>> overallViolations) {
+            Set<ConstraintViolation<Object>> overallViolations,
+            @Nullable DefaultPropertyNode container) {
         context.addPropertyNode(
-                constrainedProperty.getName()
+                constrainedProperty.getName(), container
         );
 
         validatePropertyInternal(
@@ -741,7 +751,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             @Nonnull AnnotationMetadata annotationMetadata,
             @Nullable Object parameterValue) {
         try {
-            context.addParameterNode(parameterName, parameterIndex);
+            context.addParameterNode(parameterName, parameterIndex, null);
             final List<Class<? extends Annotation>> constraintTypes =
                     annotationMetadata.getAnnotationTypesByStereotype(Constraint.class);
             for (Class<? extends Annotation> constraintType : constraintTypes) {
@@ -811,7 +821,6 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
     private final class DefaultConstraintValidatorContext implements ConstraintValidatorContext {
         Set<Object> validatedObjects = new HashSet<>(20);
         PathImpl currentPath = new PathImpl();
-        DefaultPropertyNode currentContainerNode;
 
         private <T> DefaultConstraintValidatorContext(T object) {
             validatedObjects.add(object);
@@ -826,11 +835,11 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             return clockProvider;
         }
 
-        Path.Node addPropertyNode(String name) {
+        Path.Node addPropertyNode(String name, @Nullable DefaultPropertyNode container) {
             final DefaultPropertyNode node;
-            if (currentContainerNode != null) {
+            if (container != null) {
                 node = new DefaultPropertyNode(
-                        name, currentContainerNode
+                        name, container
                 );
             } else {
                 node = new DefaultPropertyNode(name, null, null, null, ElementKind.PROPERTY, false);
@@ -850,11 +859,11 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             return methodNode;
         }
 
-        Path.Node addParameterNode(String name, int index) {
+        Path.Node addParameterNode(String name, int index, @Nullable DefaultPropertyNode container) {
             final DefaultParameterNode node;
-            if (currentContainerNode != null) {
+            if (container != null) {
                 node = new DefaultParameterNode(
-                        name, currentContainerNode, index
+                        name, container, index
                 );
             } else {
                 node = new DefaultParameterNode(
