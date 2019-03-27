@@ -22,20 +22,20 @@ import io.micronaut.http.server.netty.converters.DuplicateRouteHandler
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.web.router.UriRouteMatch
 import io.micronaut.web.router.exceptions.DuplicateRouteException
-
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
 
 import javax.inject.Singleton
 
-class VersionControllerSpec extends Specification {
+class NoVersionOnVersionedRouteControllerSpec extends Specification {
     @AutoCleanup
     @Shared
     EmbeddedServer embeddedServer = ApplicationContext.run(EmbeddedServer, [
-            'spec.name'                          : 'VersionControllerSpec',
+            'spec.name'                          : 'NoVersionOnVersionedRouteControllerSpec',
             "micronaut.router.versioning.enabled": "true"
     ])
+
 
     @AutoCleanup
     @Shared
@@ -45,7 +45,7 @@ class VersionControllerSpec extends Specification {
         httpClient.toBlocking()
     }
 
-    void "if I do not supply a version, and there are multiple versioned routes a DuplicateRouteException is thrown"() {
+    void "if I do not supply a version, and there is one versioned route"() {
         given:
         HttpRequest request = HttpRequest.GET("/versioned/hello")
 
@@ -55,12 +55,12 @@ class VersionControllerSpec extends Specification {
         when:
         client.exchange(request, String)
 
-        then: 'Handled by DuplicateRouteWithVersionExceptionHandler'
+        then:
         HttpClientResponseException e = thrown()
-        e.response.status() == HttpStatus.BAD_REQUEST
+        e.response.status == HttpStatus.BAD_REQUEST
     }
 
-    @Requires(property = "spec.name", value = "VersionControllerSpec")
+    @Requires(property = "spec.name", value = "NoVersionOnVersionedRouteControllerSpec")
     @Controller("/versioned")
     static class VersionedController {
 
@@ -70,12 +70,6 @@ class VersionControllerSpec extends Specification {
         String helloV1() {
             "helloV1"
         }
-
-        @Produces(MediaType.TEXT_PLAIN)
-        @Version("2")
-        @Get("/hello")
-        String helloV2() {
-            "helloV2"
-        }
     }
+
 }

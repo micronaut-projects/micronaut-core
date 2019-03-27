@@ -125,7 +125,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
     def "should return initial routes ignoring version"() {
         when:
         def strategies = []
-        def handler = new RouteVersionFilter(strategies, new RoutesVersioningConfiguration())
+        def handler = new RouteVersionFilter(strategies, new RoutesVersioningConfiguration(rejectIfMissing: false))
         def request = HttpRequest.GET("/versioned/hello")
 
         then:
