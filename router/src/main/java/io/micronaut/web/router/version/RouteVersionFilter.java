@@ -47,18 +47,22 @@ public class RouteVersionFilter implements RouteMatchFilter {
 
     private final List<RequestVersionResolver> resolvingStrategies;
     private final DefaultVersionProvider defaultVersionProvider;
+    private final RoutesVersioningConfiguration routesVersioningConfiguration;
 
     /**
      * Creates a {@link RouteVersionFilter} with a collection of {@link RequestVersionResolver}.
      *
      * @param resolvingStrategies A list of {@link RequestVersionResolver} beans to extract version from HTTP request
+     * @param routesVersioningConfiguration Routes Versioning Configuration
      * @param defaultVersionProvider The Default Version Provider
      */
     @Inject
     public RouteVersionFilter(List<RequestVersionResolver> resolvingStrategies,
+                              RoutesVersioningConfiguration routesVersioningConfiguration,
                               @Nullable DefaultVersionProvider defaultVersionProvider) {
         this.resolvingStrategies = resolvingStrategies;
         this.defaultVersionProvider = defaultVersionProvider;
+        this.routesVersioningConfiguration = routesVersioningConfiguration;
     }
 
     /**
@@ -74,10 +78,6 @@ public class RouteVersionFilter implements RouteMatchFilter {
 
         ArgumentUtils.requireNonNull("request", request);
 
-        if (resolvingStrategies == null || resolvingStrategies.isEmpty()) {
-            return (match) -> true;
-        }
-
         Optional<String> defaultVersion = defaultVersionProvider == null ? Optional.empty() : Optional.of(defaultVersionProvider.resolveDefaultVersion());
 
         Optional<String> version = resolvingStrategies.stream()
@@ -87,6 +87,14 @@ public class RouteVersionFilter implements RouteMatchFilter {
 
         return (match) -> {
             Optional<String> routeVersion = getVersion(match);
+
+            if (resolvingStrategies.isEmpty()) {
+                if (routeVersion.isPresent()) {
+                    return !routesVersioningConfiguration.isRejectIfMissing();
+                } else {
+                    return true;
+                }
+            }
 
             if (routeVersion.isPresent()) {
                 String resolvedVersion = version.orElse(defaultVersion.orElse(null));
