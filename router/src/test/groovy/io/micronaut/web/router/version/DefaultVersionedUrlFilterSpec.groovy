@@ -125,7 +125,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
     def "should return initial routes ignoring version"() {
         when:
         def strategies = []
-        def handler = new RouteVersionFilter(strategies, new RoutesVersioningConfiguration())
+        def handler = new RouteVersionFilter(strategies, null)
         def request = HttpRequest.GET("/versioned/hello")
 
         then:
@@ -134,7 +134,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
 
     def "should return initial versions due to header provided"() {
         when:
-        def handler = new RouteVersionFilter(strategies, new RoutesVersioningConfiguration())
+        def handler = new RouteVersionFilter(strategies, null)
         def request = HttpRequest.GET("/versioned/hello")
 
         then:
@@ -143,7 +143,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
 
     def "should return exact route for header version"() {
         when:
-        def handler = new RouteVersionFilter(strategies, new RoutesVersioningConfiguration())
+        def handler = new RouteVersionFilter(strategies, null)
         def request = HttpRequest.GET("/versioned/hello").header("API-VERSION", "1")
         def matches = routes.stream().filter(handler.filter(request)).collect(Collectors.toList())
 
@@ -154,7 +154,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
 
     def "should return duplicating routes for header version"() {
         when:
-        def handler = new RouteVersionFilter(strategies, new RoutesVersioningConfiguration())
+        def handler = new RouteVersionFilter(strategies, null)
         def request = HttpRequest.GET("/versioned/hello").header("API-VERSION", "2")
         def matches = routes.stream().filter(handler.filter(request)).collect(Collectors.toList())
 
@@ -177,7 +177,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
                         it
                     })
         ]
-        def handler = new RouteVersionFilter(strategies, new RoutesVersioningConfiguration())
+        def handler = new RouteVersionFilter(strategies, null)
         def request = HttpRequest.GET("/versioned/hello").header("API-VERSION", "2")
         def matches = routes.stream().filter(handler.filter(request)).collect(Collectors.toList())
         then:
@@ -186,7 +186,10 @@ class DefaultVersionedUrlFilterSpec extends Specification {
 
     void "test default version configuration"() {
         when:
-        def handler = new RouteVersionFilter(strategies, new RoutesVersioningConfiguration(defaultVersion: "2"))
+        DefaultVersionProvider defaultVersionProvider = Stub(DefaultVersionProvider) {
+            resolveDefaultVersion() >> '2'
+        }
+        def handler = new RouteVersionFilter(strategies, defaultVersionProvider)
         def request = HttpRequest.GET("/versioned/hello")
         def matches = routes.stream().filter(handler.filter(request)).collect(Collectors.toList())
 
