@@ -44,6 +44,11 @@ public final class ArgumentBeanType<T> implements BeanType<T>, Argument<T> {
     }
 
     @Override
+    public String getName() {
+        return argument.getName();
+    }
+
+    @Override
     public AnnotationMetadata getAnnotationMetadata() {
         return argument.getAnnotationMetadata();
     }
