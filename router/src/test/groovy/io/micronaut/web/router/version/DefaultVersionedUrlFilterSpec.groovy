@@ -15,21 +15,26 @@
  */
 package io.micronaut.web.router.version
 
+import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.web.router.DefaultRouteBuilder
 import io.micronaut.web.router.DefaultRouter
+import io.micronaut.web.router.RouteMatch
 import io.micronaut.web.router.UriRouteMatch
 import io.micronaut.web.router.version.resolution.HeaderVersionResolver
 import io.micronaut.web.router.version.resolution.HeaderVersionResolverConfiguration
 import io.micronaut.web.router.version.resolution.ParameterVersionResolver
 import io.micronaut.web.router.version.resolution.ParameterVersionResolverConfiguration
+import spock.lang.Shared
 import spock.lang.Specification
 
 import java.util.stream.Collectors
 
 class DefaultVersionedUrlFilterSpec extends Specification {
+
+    @Shared ApplicationContext context
 
     List<UriRouteMatch<Object, Object>> routes
 
@@ -40,7 +45,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
             })]
 
     def setup() {
-        def context = new DefaultApplicationContext("test").start()
+        context = new DefaultApplicationContext("test").start()
         def controller = new VersionedController()
         context.registerSingleton(controller)
 
@@ -53,6 +58,10 @@ class DefaultVersionedUrlFilterSpec extends Specification {
             }
         })
         routes = router.find(HttpMethod.GET, "/versioned/hello").collect(Collectors.toList())
+    }
+
+    def cleanup() {
+        context.close()
     }
 
     def "should extract header version from request"() {
@@ -116,7 +125,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
     def "should return initial routes ignoring version"() {
         when:
         def strategies = []
-        def handler = new RouteVersionFilter(strategies)
+        def handler = new RouteVersionFilter(strategies, new RoutesVersioningConfiguration())
         def request = HttpRequest.GET("/versioned/hello")
 
         then:
@@ -125,7 +134,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
 
     def "should return initial versions due to header provided"() {
         when:
-        def handler = new RouteVersionFilter(strategies)
+        def handler = new RouteVersionFilter(strategies, new RoutesVersioningConfiguration())
         def request = HttpRequest.GET("/versioned/hello")
 
         then:
@@ -134,7 +143,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
 
     def "should return exact route for header version"() {
         when:
-        def handler = new RouteVersionFilter(strategies)
+        def handler = new RouteVersionFilter(strategies, new RoutesVersioningConfiguration())
         def request = HttpRequest.GET("/versioned/hello").header("API-VERSION", "1")
         def matches = routes.stream().filter(handler.filter(request)).collect(Collectors.toList())
 
@@ -145,7 +154,7 @@ class DefaultVersionedUrlFilterSpec extends Specification {
 
     def "should return duplicating routes for header version"() {
         when:
-        def handler = new RouteVersionFilter(strategies)
+        def handler = new RouteVersionFilter(strategies, new RoutesVersioningConfiguration())
         def request = HttpRequest.GET("/versioned/hello").header("API-VERSION", "2")
         def matches = routes.stream().filter(handler.filter(request)).collect(Collectors.toList())
 
@@ -168,14 +177,25 @@ class DefaultVersionedUrlFilterSpec extends Specification {
                         it
                     })
         ]
-        def handler = new RouteVersionFilter(strategies)
+        def handler = new RouteVersionFilter(strategies, new RoutesVersioningConfiguration())
         def request = HttpRequest.GET("/versioned/hello").header("API-VERSION", "2")
         def matches = routes.stream().filter(handler.filter(request)).collect(Collectors.toList())
         then:
         matches.size() == 2
+    }
 
+    void "test default version configuration"() {
+        when:
+        def handler = new RouteVersionFilter(strategies, new RoutesVersioningConfiguration(defaultVersion: "2"))
+        def request = HttpRequest.GET("/versioned/hello")
+        def matches = routes.stream().filter(handler.filter(request)).collect(Collectors.toList())
 
-
+        then:
+        //only the specified version routes that don't match the default are filtered out
+        matches.size() == 3
+        matches.stream()
+                .map({r -> r.getExecutableMethod().methodName })
+                .noneMatch({mn -> mn.equals("helloV1")})
     }
 
 }

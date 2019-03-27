@@ -111,6 +111,12 @@ class ViewsController {
         HttpResponse.notFound(CollectionUtils.mapOf("username", "sdelamo", "status", "", "exception", "global"))
     }
 
+    @View("relativeLink")
+    @Get("/relative-link")
+    HttpResponse relativeLink() {
+        HttpResponse.ok()
+    }
+
     static class LocalException extends RuntimeException {
 
     }

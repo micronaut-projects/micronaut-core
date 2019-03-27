@@ -52,6 +52,31 @@ micronaut:
 
 If this is not enough you can also implement the api:web.router.version.resolution.RequestVersionResolver[] interface which receives the api:http.HttpRequest[] and can implement any strategy you choose.
 
+=== Default Version
+
+It is possible to supply a default version through configuration.
+
+.Configuring Default Version
+[source,yaml]
+----
+micronaut:
+    router:
+        versioning:
+            enabled: true
+            default-version: 3 <1>
+----
+
+<1> Sets the default version
+
+A route will *not* be matched if the following conditions are met:
+
+* The default version is configured
+* No version is found in the request
+* The route defines a version
+* The route version does not match the default version
+
+If the incoming request specifies a version then the default version has no effect.
+
 === Versioning Client Requests
 
 Micronaut's <<clientAnnotation, Declarative HTTP client>> also supports automatic versioning of outgoing requests via the ann:core.version.annotation.Version[] annotation.
