@@ -267,7 +267,7 @@ abstract class AbstractOpenApiVisitor  {
             Optional<ClassElement> classElement = Optional.empty();
             if (impl.isPresent()) {
                 classElement = context.getClassElement(impl.get());
-            } else if(type.isPresent()) {
+            } else if (type.isPresent()) {
                 PrimitiveType primitiveType = PrimitiveType.fromName(type.get());
                 if (primitiveType != null) {
                     classElement = context.getClassElement(primitiveType.getKeyClass());
