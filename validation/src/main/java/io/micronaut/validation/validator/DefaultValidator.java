@@ -16,6 +16,7 @@
 package io.micronaut.validation.validator;
 
 import io.micronaut.context.ExecutionHandleLocator;
+import io.micronaut.context.MessageSource;
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -63,6 +64,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
     private final ValueExtractorRegistry valueExtractorRegistry;
     private final TraversableResolver traversableResolver;
     private final ExecutionHandleLocator executionHandleLocator;
+    private final MessageSource messageSource;
 
     /**
      * Default constructor.
@@ -71,6 +73,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
      * @param valueExtractorRegistry      The value extractor registry.
      * @param clockProvider               The clock provider
      * @param traversableResolver         The traversable resolver to use
+     * @param messageSource               The message source
      * @param executionHandleLocator      The execution handle locator for located executable methods to validate
      */
     @Inject
@@ -79,6 +82,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
             @Nullable ValueExtractorRegistry valueExtractorRegistry,
             @Nullable ClockProvider clockProvider,
             @Nullable TraversableResolver traversableResolver,
+            @Nullable MessageSource messageSource,
             @Nullable ExecutionHandleLocator executionHandleLocator) {
         ArgumentUtils.requireNonNull("constraintValidatorRegistry", constraintValidatorRegistry);
         ArgumentUtils.requireNonNull("valueExtractorRegistry", valueExtractorRegistry);
@@ -99,6 +103,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
         };
         this.executionHandleLocator = executionHandleLocator != null ? executionHandleLocator : new ExecutionHandleLocator() {
         };
+        this.messageSource = messageSource;
     }
 
     @Nonnull
@@ -607,7 +612,19 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                                     rootBean != null ? rootBean.getClass() : null,
                                     object,
                                     propertyValue,
-                                    messageTemplate, // TODO: message interpolation
+                                    messageSource.interpolate(messageTemplate, new MessageSource.MessageContext() {
+                                        @Nonnull
+                                        @Override
+                                        public Map<String, Object> getVariables() {
+                                            final Map<?, ?> values = annotationValue.getValues();
+                                            Map<String, Object> variables = new LinkedHashMap<>(values.size() + 1);
+                                            for (Map.Entry<?, ?> entry : values.entrySet()) {
+                                                variables.put(entry.getKey().toString(),  entry.getValue());
+                                            }
+                                            variables.put("validatedValue", propertyValue);
+                                            return variables;
+                                        }
+                                    }),
                                     messageTemplate,
                                     new PathImpl(context.currentPath)
                             )
