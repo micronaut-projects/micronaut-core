@@ -16,6 +16,8 @@
 
 package io.micronaut.validation.validator;
 
+import io.micronaut.core.annotation.AnnotatedElement;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import javax.validation.ConstraintViolation;
@@ -39,11 +41,36 @@ public interface Validator extends javax.validation.Validator {
     @Nonnull ExecutableMethodValidator forExecutables();
 
     @Override
-    @Nonnull <T> Set<ConstraintViolation<T>> validate(@Nonnull T object, Class<?>... groups);
+    @Nonnull <T> Set<ConstraintViolation<T>> validate(
+            @Nonnull T object,
+            Class<?>... groups
+    );
 
     @Override
-    @Nonnull <T> Set<ConstraintViolation<T>> validateProperty(@Nonnull T object, @Nonnull String propertyName, Class<?>... groups);
+    @Nonnull <T> Set<ConstraintViolation<T>> validateProperty(
+            @Nonnull T object,
+            @Nonnull String propertyName,
+            Class<?>... groups
+    );
 
     @Override
-    @Nonnull <T> Set<ConstraintViolation<T>> validateValue(@Nonnull Class<T> beanType, @Nonnull String propertyName, @Nullable Object value, Class<?>... groups);
+    @Nonnull <T> Set<ConstraintViolation<T>> validateValue(
+            @Nonnull Class<T> beanType,
+            @Nonnull String propertyName,
+            @Nullable Object value,
+            Class<?>... groups
+    );
+
+    /**
+     * Validates an annotated element for the given value.
+     * @param element The element
+     * @param value  The value
+     * @param groups The groups
+     * @return The constraint violations
+     */
+    @Nonnull Set<ConstraintViolation<AnnotatedElement>> validateElement(
+            @Nonnull AnnotatedElement element,
+            @Nullable Object value,
+            Class<?>... groups
+    );
 }
