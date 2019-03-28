@@ -2,6 +2,7 @@ package io.micronaut.validation.validator
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Executable
+import io.micronaut.context.annotation.Prototype
 import io.micronaut.core.annotation.Introspected
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -157,6 +158,27 @@ class ValidatorSpec extends Specification {
         violations.find { it.invalidValue == 60 && it.propertyPath.toList()[0].index == 2 }
     }
 
+    void "test cascade to array elements - nested"() {
+        when:
+        ArrayTest arrayTest = new ArrayTest(integers: [10, 15] as int[], child: new ArrayTest(integers: [10, 60] as int[]))
+        def violations = validator.validate(arrayTest).toList()
+
+        then:
+        violations.size() == 1
+        violations[0].propertyPath.toString() == 'child.integers[1]'
+
+
+        when:
+        arrayTest = new ArrayTest(
+                integers: [10, 15] as int[],
+                child: new ArrayTest(integers: [10, 15] as int[], child: new ArrayTest(integers: [10, 60] as int[])))
+        violations = validator.validate(arrayTest).toList()
+
+        then:
+        violations.size() == 1
+        violations[0].propertyPath.toString() == 'child.child.integers[1]'
+    }
+
 
     void "test cascade to array elements null"() {
         given:
@@ -186,7 +208,7 @@ class ValidatorSpec extends Specification {
     }
 
     void "test executable validator - cascade to array"() {
-        given:
+        when:
         BookService bookService = applicationContext.getBean(BookService)
         def constraintViolations = validator.forExecutables().validateParameters(
                 bookService,
@@ -195,9 +217,23 @@ class ValidatorSpec extends Specification {
         ).toList().sort({ it.propertyPath.toString() })
 
 
-        expect:
+        then:
         constraintViolations.size() == 2
         constraintViolations[0].propertyPath.toString() == 'saveIntArray.integers[0]'
+
+        when:
+        ArrayTest arrayTest = applicationContext.createBean(ArrayTest)
+        arrayTest.integers = [30,10,60] as int[]
+        def violations = validator.forExecutables().validateParameters(
+                new ArrayTest(),
+                ArrayTest.getDeclaredMethod("saveChild", ArrayTest.class),
+                [arrayTest] as Object[]
+        ).toList().sort({ it -> it.propertyPath.toString() })
+
+        then:
+        violations.size() == 2
+        violations[0].propertyPath.toString() == 'saveChild.arrayTest.integers[0]'
+
     }
 }
 
@@ -230,11 +266,20 @@ class Author {
 }
 
 @Introspected
+@Prototype
 class ArrayTest {
     @Valid
     @Max(20l)
     @NotNull
     int[] integers
+
+    @Valid
+    ArrayTest child
+
+    @Executable
+    void saveChild(@Valid ArrayTest arrayTest) {
+
+    }
 }
 
 @Singleton

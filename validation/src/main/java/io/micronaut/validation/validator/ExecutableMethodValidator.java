@@ -47,6 +47,21 @@ public interface ExecutableMethodValidator extends ExecutableValidator  {
             @Nonnull ExecutableMethod method,
             @Nullable Object[] parameterValues, @Nullable Class<?>... groups);
 
+    /**
+     * Validates the return value of a {@link ExecutableMethod}.
+     * @param object The object
+     * @param executableMethod The method
+     * @param returnValue The return value
+     * @param groups The groups
+     * @param <T> The object type
+     * @return A set of contstraint violations
+     */
+    @Nonnull <T> Set<ConstraintViolation<T>> validateReturnValue(
+            @Nonnull T object,
+            @Nonnull ExecutableMethod<?, Object> executableMethod,
+            @Nullable Object returnValue,
+            @Nullable Class<?>... groups);
+
     @Override
     @Nonnull <T> Set<ConstraintViolation<T>> validateParameters(@Nonnull T object, @Nonnull Method method, @Nonnull Object[] parameterValues, @Nullable Class<?>... groups);
 

@@ -23,6 +23,7 @@ import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanIntrospector;
 import io.micronaut.core.beans.BeanProperty;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ExecutableMethod;
@@ -106,7 +107,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
         ArgumentUtils.requireNonNull("object", object);
         final BeanIntrospection<Object> introspection = getBeanIntrospection(object);
         if (introspection == null) {
-            throw new ValidationException("Passed object [" + object + "] cannot be introspected. Please annotation with @Introspected");
+            throw new ValidationException("Passed object [" + object + "] cannot be introspected. Please annotate with @Introspected");
         }
         final Collection<? extends BeanProperty<Object, Object>> constrainedProperties = introspection.getIndexedProperties(Constraint.class);
         final Collection<BeanProperty<Object, Object>> cascadeProperties =
@@ -137,7 +138,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
         ArgumentUtils.requireNonNull("propertyName", propertyName);
         final BeanIntrospection<Object> introspection = getBeanIntrospection(object);
         if (introspection == null) {
-            throw new ValidationException("Passed object [" + object + "] cannot be introspected. Please annotation with @Introspected");
+            throw new ValidationException("Passed object [" + object + "] cannot be introspected. Please annotate with @Introspected");
         }
 
         final Optional<BeanProperty<Object, Object>> property = introspection.getProperty(propertyName);
@@ -177,7 +178,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
 
         final BeanIntrospection<Object> introspection = getBeanIntrospection(beanType);
         if (introspection == null) {
-            throw new ValidationException("Passed bean type [" + beanType + "] cannot be introspected. Please annotation with @Introspected");
+            throw new ValidationException("Passed bean type [" + beanType + "] cannot be introspected. Please annotate with @Introspected");
         }
 
         final BeanProperty<Object, Object> beanProperty = introspection.getProperty(propertyName)
@@ -188,7 +189,38 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
         final DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext();
         try {
             context.addPropertyNode(propertyName, null);
-            validatePropertyInternal(null, null, context, overallViolations, beanProperty.getType(), beanProperty, value);
+            validatePropertyInternal(
+                    null,
+                    null,
+                    context,
+                    overallViolations,
+                    beanProperty.getType(),
+                    beanProperty,
+                    value);
+        } finally {
+            context.removeLast();
+        }
+
+        return Collections.unmodifiableSet(overallViolations);
+    }
+
+    @Nonnull
+    @Override
+    public Set<ConstraintViolation<AnnotatedElement>> validateElement(@Nonnull AnnotatedElement element, @Nullable Object value, Class<?>... groups) {
+        ArgumentUtils.requireNonNull("element", element);
+
+        final HashSet overallViolations = new HashSet<>(5);
+        final DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext();
+        try {
+            context.addPropertyNode(element.getName(), null);
+            validatePropertyInternal(
+                    element,
+                    element,
+                    context,
+                    overallViolations,
+                    value != null ? value.getClass() : Object.class,
+                    element,
+                    value);
         } finally {
             context.removeLast();
         }
@@ -722,13 +754,18 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                     } else {
                         final BeanIntrospection<Object> beanIntrospection = getBeanIntrospection(parameterValue);
                         if (beanIntrospection != null) {
-                            cascadeToOneIntrospection(
-                                    context,
-                                    object,
-                                    parameterValue,
-                                    beanIntrospection,
-                                    overallViolations
-                            );
+                            try {
+                                context.addParameterNode(argument.getName(), i, null);
+                                cascadeToOneIntrospection(
+                                        context,
+                                        object,
+                                        parameterValue,
+                                        beanIntrospection,
+                                        overallViolations
+                                );
+                            } finally {
+                                context.removeLast();
+                            }
                         }
                     }
                 }
@@ -797,8 +834,42 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
 
     @Nonnull
     @Override
-    public <T> Set<ConstraintViolation<T>> validateReturnValue(@Nonnull T object, @Nonnull Method method, @Nullable Object returnValue, @Nullable Class<?>... groups) {
-        return Collections.emptySet();
+    public <T> Set<ConstraintViolation<T>> validateReturnValue(
+            @Nonnull T object,
+            @Nonnull Method method,
+            @Nullable Object returnValue,
+            @Nullable Class<?>... groups) {
+        ArgumentUtils.requireNonNull("method", method);
+        ArgumentUtils.requireNonNull("object", object);
+        return executionHandleLocator.findExecutableMethod(
+                method.getDeclaringClass(),
+                method.getName(),
+                method.getParameterTypes()
+        ).map(executableMethod -> 
+                validateReturnValue(object, executableMethod, returnValue, groups)
+        ).orElse(Collections.emptySet());
+    }
+
+    @Override
+    public @Nonnull <T> Set<ConstraintViolation<T>> validateReturnValue(
+            @Nonnull T object,
+            @Nonnull ExecutableMethod<?, Object> executableMethod,
+            @Nullable Object returnValue,
+            @Nullable Class<?>... groups) {
+        final ReturnType<Object> returnType = executableMethod.getReturnType();
+        final Argument<Object> returnTypeArgument = returnType.asArgument();
+        final HashSet overallViolations = new HashSet(3);
+        validateConstrainedPropertyInternal(
+                object,
+                object,
+                returnTypeArgument,
+                returnType.getType(),
+                returnValue,
+                new DefaultConstraintValidatorContext(object),
+                overallViolations,
+                null
+        );
+        return (Set<ConstraintViolation<T>>) overallViolations;
     }
 
     @Nonnull
