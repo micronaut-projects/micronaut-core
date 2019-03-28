@@ -17,10 +17,102 @@ package io.micronaut.openapi.visitor
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.swagger.v3.oas.models.Operation
+import io.swagger.v3.oas.models.media.ArraySchema
 
 class OpenApiOperationParseSpec extends AbstractTypeElementSpec {
     def setup() {
         System.setProperty(AbstractOpenApiVisitor.ATTR_TEST_MODE, "true")
+    }
+
+    void "test parse the OpenAPI @ApiResponse Content with @ArraySchema annotation"() {
+        given:
+        buildBeanDefinition('test.MyBean','''
+package test;
+
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Get;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.ArraySchema;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+
+import java.util.List;
+
+@Controller("/pet")
+interface PetOperations {
+
+    @Operation(summary = "List Pets",
+            description = "List Pets",
+            tags = "pets",
+            responses = {
+                    @ApiResponse(description = "List Pets", responseCode = "200", content = @Content(
+                            mediaType = "application/json",
+                            array = @ArraySchema(schema = @Schema(implementation = Pet.class)))),
+                    @ApiResponse(description = "Pets not found", responseCode = "404")
+            })
+    @Get
+    HttpResponse<List<Pet>> list();
+    
+    @Operation(summary = "List Pet Names",
+            description = "List Pet Names",
+            tags = "pet-name",
+            responses = {
+                    @ApiResponse(description = "List Pet Names", responseCode = "200", content = @Content(
+                            mediaType = "application/json",
+                            array = @ArraySchema(schema = @Schema(type="string")))),
+                    @ApiResponse(description = "Not found", responseCode = "404")
+            })
+    @Get("/names")
+    HttpResponse<List<String>> listNames();
+}
+
+@Schema(description = "Represents a pet")
+class Pet {
+    @Schema(description = "The pet name")
+    private String name;
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+}
+
+@javax.inject.Singleton
+class MyBean {}
+''')
+
+        Operation operation = AbstractOpenApiVisitor.testReference?.paths?.get("/pet")?.get
+
+        expect:
+        operation
+        operation.summary == 'List Pets'
+        operation.tags.size() == 1
+        operation.tags == ['pets']
+        operation.responses.size() == 2
+        operation.responses.'200'.content.size() == 1
+        operation.responses.'200'.content['application/json']
+        operation.responses.'200'.content['application/json'].schema
+        operation.responses.'200'.content['application/json'].schema.type == "array"
+        ((ArraySchema) operation.responses.'200'.content['application/json'].schema).items.$ref == "#/components/schemas/Pet"
+
+        when:
+        Operation operationNames = AbstractOpenApiVisitor.testReference?.paths?.get("/pet/names")?.get
+
+        then:
+        operationNames
+        operationNames.summary == "List Pet Names"
+        operationNames.tags == ['pet-name']
+        operationNames.responses.size() == 2
+        operationNames.responses.'200'.content.size() == 1
+        operationNames.responses.'200'.content['application/json']
+        operationNames.responses.'200'.content['application/json'].schema
+        operationNames.responses.'200'.content['application/json'].schema.type == "array"
+        ((ArraySchema) operationNames.responses.'200'.content['application/json'].schema).items.type == "string"
     }
 
     void "test parse the OpenAPI @ApiResponse Content with @Schema annotation"() {
