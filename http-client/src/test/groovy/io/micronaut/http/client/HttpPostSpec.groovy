@@ -26,6 +26,7 @@ import io.micronaut.http.client.annotation.Client
 import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.http.client.multipart.MultipartBody
 import io.micronaut.http.multipart.CompletedFileUpload
+import io.micronaut.core.type.Argument
 import io.micronaut.runtime.server.EmbeddedServer
 import io.reactivex.Flowable
 import spock.lang.AutoCleanup
@@ -315,6 +316,20 @@ class HttpPostSpec extends Specification {
         book == toSend
     }
 
+    void "test posting an array of simple types"() {
+        BlockingHttpClient blockingHttpClient = client.toBlocking()
+        List<Boolean> booleans = blockingHttpClient.retrieve(
+                HttpRequest.POST("/post/booleans", "[true, true, false]"),
+
+                Argument.of(List.class, Boolean.class)
+        )
+
+        expect:
+        booleans[0] == true
+        booleans[1] == true
+        booleans[2] == false
+    }
+
     @Controller('/post')
     static class PostController {
 
@@ -392,6 +407,11 @@ class HttpPostSpec extends Specification {
                 produces = MediaType.TEXT_PLAIN)
         String multipartCharset(@Body CompletedFileUpload file) {
             return file.fileUpload.getCharset()
+        }
+
+        @Post(uri = "/booleans")
+        List<Boolean> booleans(@Body List<Boolean> booleans) {
+            return booleans
         }
     }
 

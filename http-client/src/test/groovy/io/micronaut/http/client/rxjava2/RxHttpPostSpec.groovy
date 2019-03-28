@@ -18,7 +18,7 @@ package io.micronaut.http.client.rxjava2
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Post
-import io.micronaut.http.annotation.QueryValue
+import io.micronaut.http.client.RxStreamingHttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.reactivex.Flowable
 import io.micronaut.context.ApplicationContext
@@ -30,8 +30,10 @@ import io.micronaut.http.client.BlockingHttpClient
 import io.micronaut.http.client.HttpPostSpec
 import io.micronaut.http.client.RxHttpClient
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.core.type.Argument
 import io.reactivex.Maybe
 import io.reactivex.Single
+import io.reactivex.functions.Function
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
@@ -52,6 +54,10 @@ class RxHttpPostSpec extends Specification {
     @Shared
     @AutoCleanup
     RxHttpClient client = context.createBean(RxHttpClient, embeddedServer.getURL())
+
+    @Shared
+    @AutoCleanup
+    RxStreamingHttpClient streamingHttpClient = context.createBean(RxStreamingHttpClient, embeddedServer.getURL())
 
     void "test simple post exchange request with JSON"() {
         when:
@@ -147,6 +153,50 @@ class RxHttpPostSpec extends Specification {
         e.message.contains('Cannot construct instance of `io.micronaut.http.client.rxjava2.Movie`')
     }
 
+    void "test reactive post error handling"() {
+        when:
+        Flowable<User> flowable = client.retrieve(
+                HttpRequest.POST("/reactive/post/user-error", '{"userName":"edwin","movies":[]}')
+                        .accept(MediaType.APPLICATION_JSON_TYPE),
+
+                Argument.of(User),
+                Argument.of(User)
+        )
+        User user = flowable.onErrorResumeNext((Function){ t ->
+            Flowable.just(((HttpClientResponseException) t).response.getBody(User).get())
+        }).blockingFirst()
+
+        then:
+        user.userName == "edwin"
+    }
+
+    void "test reactive post error handling without specifying error body type"() {
+        when:
+        Flowable<User> flowable = client.retrieve(
+                HttpRequest.POST("/reactive/post/user-error", '{"userName":"edwin","movies":[]}')
+                        .accept(MediaType.APPLICATION_JSON_TYPE),
+
+                Argument.of(User)
+        )
+        User user = flowable.onErrorResumeNext((Function){ t ->
+            Flowable.just(((HttpClientResponseException) t).response.getBody(User).get())
+        }).blockingFirst()
+
+        then:
+        user.userName == "edwin"
+    }
+
+    void "test posting an array of simple types"() {
+        List<Boolean> booleans = streamingHttpClient.jsonStream(
+                HttpRequest.POST("/reactive/post/booleans", "[true, true, false]"),
+                Boolean.class
+        ).toList().blockingGet()
+
+        expect:
+        booleans[0] == true
+        booleans[1] == true
+        booleans[2] == false
+    }
 
     @Controller('/reactive/post')
     static class ReactivePostController {
@@ -167,6 +217,17 @@ class RxHttpPostSpec extends Specification {
             })
         }
 
+        @Post("/user-error")
+        Single<HttpResponse<User>> postUserError(@Body Single<User> user) {
+            return user.map({ User u->
+                return HttpResponse.badRequest(u)
+            })
+        }
+
+        @Post(uri = "/booleans")
+        Flowable<Boolean> booleans(@Body Flowable<Boolean> booleans) {
+            return booleans
+        }
     }
 
 }
