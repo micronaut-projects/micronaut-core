@@ -20,7 +20,7 @@ import io.micronaut.core.naming.Named;
 
 /**
  * An annotated element is some point in the code, whether it be a constructor, field,
- * method which provides annotation metadata.
+ * method etc. which provides annotation metadata.
  *
  * @author graemerocher
  * @since 1.2
