@@ -23,6 +23,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.ValueNode;
+
 import io.micronaut.core.async.processor.SingleThreadedBufferingProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -47,7 +49,6 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
     private final JsonFactory jsonFactory;
     private String currentFieldName;
     private boolean streamArray;
-    private boolean rootIsArray;
 
     /**
      * Creates a new JacksonProcessor.
@@ -158,6 +159,16 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
         }
     }
 
+    private JsonNode streamArrayNodeOrAddNodeToArray(ArrayNode arrayNode, ValueNode valueNode) {
+        // Only stream elements of root array node
+        if (streamArray && nodeStack.size() == 1) {
+            return valueNode;
+        } else {
+            arrayNode.add(valueNode);
+            return null;
+        }
+    }
+
     /**
      * @return The root node when the whole tree is built.
      **/
@@ -168,11 +179,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                 break;
 
             case START_ARRAY:
-                JsonNode node = nodeStack.peekFirst();
-                if (node == null) {
-                    rootIsArray = true;
-                }
-                nodeStack.push(array(node));
+                nodeStack.push(array(nodeStack.peekFirst()));
                 break;
 
             case END_OBJECT:
@@ -184,7 +191,7 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                 if (nodeStack.isEmpty()) {
                     return current;
                 } else {
-                    if (streamArray && event == JsonToken.END_OBJECT && nodeStack.size() == 1) {
+                    if (streamArray && nodeStack.size() == 1) {
                         JsonNode jsonNode = nodeStack.peekFirst();
                         if (jsonNode instanceof ArrayNode) {
                             return current;
@@ -211,7 +218,9 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                 if (intNode instanceof ObjectNode) {
                     ((ObjectNode) intNode).put(currentFieldName, currentNonBlockingJsonParser.getLongValue());
                 } else {
-                    ((ArrayNode) intNode).add(currentNonBlockingJsonParser.getLongValue());
+                    ArrayNode arrayNode = (ArrayNode) intNode;
+                    ValueNode valueNode = arrayNode.numberNode(currentNonBlockingJsonParser.getLongValue());
+                    return streamArrayNodeOrAddNodeToArray(arrayNode, valueNode);
                 }
                 break;
 
@@ -223,7 +232,9 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                 if (stringNode instanceof ObjectNode) {
                     ((ObjectNode) stringNode).put(currentFieldName, currentNonBlockingJsonParser.getValueAsString());
                 } else {
-                    ((ArrayNode) stringNode).add(currentNonBlockingJsonParser.getValueAsString());
+                    ArrayNode arrayNode = (ArrayNode) stringNode;
+                    ValueNode valueNode = arrayNode.textNode(currentNonBlockingJsonParser.getValueAsString());
+                    return streamArrayNodeOrAddNodeToArray(arrayNode, valueNode);
                 }
                 break;
 
@@ -240,42 +251,54 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                         if (decimalNode instanceof ObjectNode) {
                             ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getFloatValue());
                         } else {
-                            ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getFloatValue());
+                            ArrayNode arrayNode = (ArrayNode) decimalNode;
+                            ValueNode valueNode = arrayNode.numberNode(currentNonBlockingJsonParser.getFloatValue());
+                            return streamArrayNodeOrAddNodeToArray(arrayNode, valueNode);
                         }
                         break;
                     case DOUBLE:
                         if (decimalNode instanceof ObjectNode) {
                             ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getDoubleValue());
                         } else {
-                            ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getDoubleValue());
+                            ArrayNode arrayNode = (ArrayNode) decimalNode;
+                            ValueNode valueNode = arrayNode.numberNode(currentNonBlockingJsonParser.getDoubleValue());
+                            return streamArrayNodeOrAddNodeToArray(arrayNode, valueNode);
                         }
                     break;
                     case BIG_DECIMAL:
                         if (decimalNode instanceof ObjectNode) {
                             ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getDecimalValue());
                         } else {
-                            ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getDecimalValue());
+                            ArrayNode arrayNode = (ArrayNode) decimalNode;
+                            ValueNode valueNode = arrayNode.numberNode(currentNonBlockingJsonParser.getDecimalValue());
+                            return streamArrayNodeOrAddNodeToArray(arrayNode, valueNode);
                         }
                     break;
                     case BIG_INTEGER:
                         if (decimalNode instanceof ObjectNode) {
                             ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getBigIntegerValue());
                         } else {
-                            ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getBigIntegerValue());
+                            ArrayNode arrayNode = (ArrayNode) decimalNode;
+                            ValueNode valueNode = arrayNode.numberNode(currentNonBlockingJsonParser.getBigIntegerValue());
+                            return streamArrayNodeOrAddNodeToArray(arrayNode, valueNode);
                         }
                     break;
                     case LONG:
                         if (decimalNode instanceof ObjectNode) {
                             ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getLongValue());
                         } else {
-                            ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getLongValue());
+                            ArrayNode arrayNode = (ArrayNode) decimalNode;
+                            ValueNode valueNode = arrayNode.numberNode(currentNonBlockingJsonParser.getLongValue());
+                            return streamArrayNodeOrAddNodeToArray(arrayNode, valueNode);
                         }
                     break;
                     case INT:
                         if (decimalNode instanceof ObjectNode) {
                             ((ObjectNode) decimalNode).put(currentFieldName, currentNonBlockingJsonParser.getIntValue());
                         } else {
-                            ((ArrayNode) decimalNode).add(currentNonBlockingJsonParser.getIntValue());
+                            ArrayNode arrayNode = (ArrayNode) decimalNode;
+                            ValueNode valueNode = arrayNode.numberNode(currentNonBlockingJsonParser.getIntValue());
+                            return streamArrayNodeOrAddNodeToArray(arrayNode, valueNode);
                         }
                     break;
                     default:
@@ -291,7 +314,9 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                 if (nullNode instanceof ObjectNode) {
                     ((ObjectNode) nullNode).putNull(currentFieldName);
                 } else {
-                    ((ArrayNode) nullNode).addNull();
+                    ArrayNode arrayNode = (ArrayNode) nullNode;
+                    ValueNode valueNode = arrayNode.nullNode();
+                    return streamArrayNodeOrAddNodeToArray(arrayNode, valueNode);
                 }
                 break;
 
@@ -304,20 +329,14 @@ public class JacksonProcessor extends SingleThreadedBufferingProcessor<byte[], J
                 if (booleanNode instanceof ObjectNode) {
                     ((ObjectNode) booleanNode).put(currentFieldName, currentNonBlockingJsonParser.getBooleanValue());
                 } else {
-                    ((ArrayNode) booleanNode).add(currentNonBlockingJsonParser.getBooleanValue());
+                    ArrayNode arrayNode = (ArrayNode) booleanNode;
+                    ValueNode valueNode = arrayNode.booleanNode(currentNonBlockingJsonParser.getBooleanValue());
+                    return streamArrayNodeOrAddNodeToArray(arrayNode, valueNode);
                 }
                 break;
 
             default:
                 throw new IllegalStateException("Unsupported JSON event: " + event);
-        }
-
-        //its an array and the stack size is 1 which means the value is scalar
-        if (rootIsArray && nodeStack.size() == 1) {
-            ArrayNode arrayNode = (ArrayNode) nodeStack.peekFirst();
-            if (arrayNode.size() > 0) {
-                return arrayNode.get(arrayNode.size() - 1);
-            }
         }
 
         return null;

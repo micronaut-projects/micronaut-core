@@ -16,6 +16,7 @@
 package io.micronaut.jackson.parser
 
 
+import com.fasterxml.jackson.core.JsonFactory
 import com.fasterxml.jackson.core.JsonParseException
 import com.fasterxml.jackson.core.io.JsonEOFException
 import com.fasterxml.jackson.databind.JsonNode
@@ -23,6 +24,9 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ArrayNode
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.DefaultApplicationContext
+
+import java.nio.charset.StandardCharsets
+
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
 import spock.lang.AutoCleanup
@@ -104,17 +108,14 @@ class JacksonProcessorSpec extends Specification {
         foo.age == 10
     }
 
-    void "test publish JSON array async"() {
+    void "test publish nested JSON array async"() {
 
         given:
-        ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
-        JacksonProcessor processor = new JacksonProcessor()
-        Foo[] instances = [new Foo(name: "Fred", age: 10), new Foo(name: "Barney", age: 11)] as Foo[]
-
+        JacksonProcessor processor = new JacksonProcessor(new JsonFactory(), true)
+        String arr = "[1, 2, [3, 4, [5, 6], 7], [8, 9, 10], 11, 12]"
 
         when:
-        def string = objectMapper.writeValueAsString(instances)
-        byte[] bytes = objectMapper.writeValueAsBytes(instances)
+        byte[] bytes = arr.getBytes(StandardCharsets.UTF_8)
         boolean complete = false
         JsonNode node = null
         Throwable error = null
@@ -159,18 +160,75 @@ class JacksonProcessorSpec extends Specification {
         complete
         node != null
         error == null
-        nodeCount == 1
-        node instanceof ArrayNode
-        string == '[{"name":"Fred","age":10},{"name":"Barney","age":11}]'
+        nodeCount == 6
+    }
 
-        when:
-        Foo[] foos = objectMapper.treeToValue(node, Foo[].class)
+    void "test publish JSON arrays async"() {
 
-        then:
-        foos.size() == 2
-        foos[0] != null
-        foos[0].name == "Fred"
-        foos[0].age == 10
+         given:
+         ObjectMapper objectMapper = applicationContext.getBean(ObjectMapper)
+         JacksonProcessor processor = new JacksonProcessor()
+         Foo[] instances = [new Foo(name: "Fred", age: 10), new Foo(name: "Barney", age: 11)] as Foo[]
+
+         when:
+         def string = objectMapper.writeValueAsString(instances)
+         byte[] bytes = objectMapper.writeValueAsBytes(instances)
+         boolean complete = false
+         JsonNode node = null
+         Throwable error = null
+         int nodeCount = 0
+         processor.subscribe(new Subscriber<JsonNode>() {
+             @Override
+             void onSubscribe(Subscription s) {
+                 s.request(Long.MAX_VALUE)
+             }
+
+             @Override
+             void onNext(JsonNode jsonNode) {
+                 nodeCount++
+                 node = jsonNode
+             }
+
+             @Override
+             void onError(Throwable t) {
+                 error = t
+             }
+
+             @Override
+             void onComplete() {
+                 complete = true
+             }
+         })
+         processor.onSubscribe(new Subscription() {
+             @Override
+             void request(long n) {
+
+             }
+
+             @Override
+             void cancel() {
+
+             }
+         })
+         processor.onNext(bytes)
+         processor.onComplete()
+
+         then:
+         complete
+         node != null
+         error == null
+         nodeCount == 1
+         node instanceof ArrayNode
+         string == '[{"name":"Fred","age":10},{"name":"Barney","age":11}]'
+
+         when:
+         Foo[] foos = objectMapper.treeToValue(node, Foo[].class)
+
+         then:
+         foos.size() == 2
+         foos[0] != null
+         foos[0].name == "Fred"
+         foos[0].age == 10
     }
 
     void "test incomplete JSON error"() {
