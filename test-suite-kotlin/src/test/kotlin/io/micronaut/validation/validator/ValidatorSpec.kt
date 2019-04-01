@@ -22,7 +22,7 @@ class ValidatorSpec : TestCase() {
     @Test
     fun testValidateNew() {
         val context = ApplicationContext.run()
-        val validator = context.getBean(Validator::class.java)
+        val validator = context.getBean(Validator::class.java).forExecutables()
 
         try {
             val person = validator.createValid(Person::class.java, "", 10)
