@@ -17,6 +17,7 @@ package io.micronaut.validation.validator;
 
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.MessageSource;
+import io.micronaut.context.annotation.Primary;
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -60,6 +61,7 @@ import java.util.stream.Collectors;
  * @since 1.2
  */
 @Singleton
+@Primary
 public class DefaultValidator implements Validator, ExecutableMethodValidator {
 
     private final ConstraintValidatorRegistry constraintValidatorRegistry;
