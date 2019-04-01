@@ -43,6 +43,7 @@ public class FunctionInitializer extends AbstractExecutor implements Closeable, 
      */
     public FunctionInitializer() {
         ApplicationContext applicationContext = buildApplicationContext(null);
+        applicationContext.registerSingleton(this);
         startThis(applicationContext);
         injectThis(applicationContext);
         this.closeContext = true;
