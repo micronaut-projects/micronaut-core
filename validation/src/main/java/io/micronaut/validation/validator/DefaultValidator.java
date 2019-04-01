@@ -35,6 +35,7 @@ import io.micronaut.validation.validator.constraints.DefaultConstraintValidators
 import io.micronaut.validation.validator.extractors.DefaultValueExtractors;
 import io.micronaut.validation.validator.extractors.SimpleValueReceiver;
 import io.micronaut.validation.validator.extractors.ValueExtractorRegistry;
+import io.micronaut.validation.validator.messages.DefaultMessages;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -103,20 +104,35 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
         };
         this.executionHandleLocator = executionHandleLocator != null ? executionHandleLocator : new ExecutionHandleLocator() {
         };
-        this.messageSource = messageSource;
+        this.messageSource = messageSource != null ? messageSource : new DefaultMessages();
     }
 
+    @SuppressWarnings("unchecked")
     @Nonnull
     @Override
     public <T> Set<ConstraintViolation<T>> validate(@Nonnull T object, @Nullable Class<?>... groups) {
         ArgumentUtils.requireNonNull("object", object);
-        final BeanIntrospection<Object> introspection = getBeanIntrospection(object);
+        final BeanIntrospection<T> introspection = (BeanIntrospection<T>) getBeanIntrospection(object);
+        return validate(introspection, object, groups);
+    }
+
+    /**
+     * Validate the given introspection and object.
+     * @param introspection The introspection
+     * @param object The object
+     * @param groups The groups
+     * @param <T> The object type
+     * @return The constraint violations
+     */
+    @SuppressWarnings("ConstantConditions")
+    @Nonnull
+    public <T> Set<ConstraintViolation<T>> validate(@Nonnull BeanIntrospection<T> introspection, @Nonnull T object, @Nullable Class<?>... groups) {
         if (introspection == null) {
             throw new ValidationException("Passed object [" + object + "] cannot be introspected. Please annotate with @Introspected");
         }
-        final Collection<? extends BeanProperty<Object, Object>> constrainedProperties = introspection.getIndexedProperties(Constraint.class);
+        final Collection<? extends BeanProperty<Object, Object>> constrainedProperties = ((BeanIntrospection<Object>) introspection).getIndexedProperties(Constraint.class);
         final Collection<BeanProperty<Object, Object>> cascadeProperties =
-                introspection.getIndexedProperties(Valid.class);
+                ((BeanIntrospection<Object>) introspection).getIndexedProperties(Valid.class);
 
         if (CollectionUtils.isNotEmpty(constrainedProperties) || CollectionUtils.isNotEmpty(cascadeProperties)) {
             DefaultConstraintValidatorContext context = new DefaultConstraintValidatorContext(object);
@@ -605,6 +621,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                 if (!validator.isValid(propertyValue, annotationValue, context)) {
 
                     final String messageTemplate = buildMessageTemplate(annotationValue);
+                    Map<String, Object> variables = newConstraintVariables(annotationValue, propertyValue);
                     //noinspection unchecked
                     overallViolations.add(
                             new DefaultConstraintViolation(
@@ -612,19 +629,7 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                                     rootBean != null ? rootBean.getClass() : null,
                                     object,
                                     propertyValue,
-                                    messageSource.interpolate(messageTemplate, new MessageSource.MessageContext() {
-                                        @Nonnull
-                                        @Override
-                                        public Map<String, Object> getVariables() {
-                                            final Map<?, ?> values = annotationValue.getValues();
-                                            Map<String, Object> variables = new LinkedHashMap<>(values.size() + 1);
-                                            for (Map.Entry<?, ?> entry : values.entrySet()) {
-                                                variables.put(entry.getKey().toString(),  entry.getValue());
-                                            }
-                                            variables.put("validatedValue", propertyValue);
-                                            return variables;
-                                        }
-                                    }),
+                                    messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(variables)),
                                     messageTemplate,
                                     new PathImpl(context.currentPath)
                             )
@@ -632,6 +637,17 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                 }
             }
         }
+    }
+
+    private Map<String, Object> newConstraintVariables(AnnotationValue annotationValue, @Nullable Object propertyValue) {
+        final Map<?, ?> values = annotationValue.getValues();
+        int initSize = (int) Math.ceil(values.size() / 0.75);
+        Map<String, Object> variables = new LinkedHashMap<>(initSize);
+        for (Map.Entry<?, ?> entry : values.entrySet()) {
+            variables.put(entry.getKey().toString(),  entry.getValue());
+        }
+        variables.put("validatedValue", propertyValue);
+        return variables;
     }
 
     private String buildMessageTemplate(AnnotationValue annotationValue) {
@@ -816,12 +832,13 @@ public class DefaultValidator implements Validator, ExecutableMethodValidator {
                             annotationMetadata.getAnnotation(constraintType);
                     if (annotationValue != null && !constraintValidator.isValid(parameterValue, annotationValue, context)) {
                         final String messageTemplate = buildMessageTemplate(annotationValue);
+                        final Map<String, Object> variables = newConstraintVariables(annotationValue, parameterValue);
                         overallViolations.add(new DefaultConstraintViolation(
                                 object,
                                 object.getClass(),
                                 null,
                                 parameterValue,
-                                messageTemplate,
+                                messageSource.interpolate(messageTemplate, MessageSource.MessageContext.of(variables)),
                                 messageTemplate,
                                 new PathImpl(context.currentPath), parameterValues));
                     }
